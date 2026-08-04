@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { FaPlus, FaTrash } from "react-icons/fa";
-import type { Json } from "@/lib/database.types";
+import type { Json } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 // Enhanced type definitions
@@ -127,9 +127,10 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
                 onClick={() => removeOtherData(index)}
                 variant="destructive"
                 size="sm"
+                aria-label={`Remove ${key} field`}
                 className="text-red-600 hover:text-red-700 hover:bg-red-50"
               >
-                <FaTrash className="w-4 h-4" />
+                <FaTrash className="w-4 h-4" aria-hidden="true" />
               </Button>
             )}
           </div>
@@ -137,8 +138,8 @@ const OtherDataFields: React.FC<OtherDataFieldsProps> = ({
       </div>
       
       {editMode && (
-        <div className="mt-4 p-4 border border-gray-200 rounded-lg bg-gray-50">
-          <h4 className="mb-3 text-sm font-medium text-gray-700">Add New Field</h4>
+        <div className="mt-4 rounded-md border border-dashed border-border bg-muted/30 p-4">
+          <h4 className="mb-3 text-sm font-medium text-foreground">Add New Field</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <FormField htmlFor="new-other-data-key" label="Field Name">
               <Input

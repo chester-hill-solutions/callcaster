@@ -1,24 +1,30 @@
-import {
-  getChatSortOption,
-} from "@/lib/chat-conversation-sort";
-import {
-  SupabaseClient,
-} from "@supabase/supabase-js";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { getChatSortOption } from "@/lib/chat-conversation-sort";
 import { data as routeData, redirect } from "react-router";
-import { fetchCampaignsByType, fetchContactData, fetchConversationSummary, getUserRole } from "@/lib/database.server";
+import { fetchCampaignsByType } from "@/lib/database/campaign.server";
+import { fetchContactData } from "@/lib/database/contact.server";
+import {
+  fetchConversationSummary,
+  getEffectiveWorkspaceTwilioPortalConfigForWorkspace,
+  getUserRole,
+} from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
-import type { User } from "@/lib/types";
+import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
+import type { Json } from "@/lib/db-types";
+import { workspace_number as workspaceNumberTable } from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
+import { eq } from "drizzle-orm";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-  const { id: workspaceId } = params;
-  const url = new URL(request.url);
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ params, url, auth }) => {
+  const { headers, user, workspaceId, userRole } = auth;
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
+  const search = url.searchParams.get("search") ?? undefined;
   const sortBy = getChatSortOption(url.searchParams.get("sort"));
   const page = Math.max(
     1,
@@ -37,45 +43,65 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   if (!workspaceId) {
     throw redirect("/workspaces");
   }
-  const userRole = await getUserRole({
-    supabaseClient: supabaseClient as SupabaseClient,
-    user: user as unknown as User,
-    workspaceId: workspaceId as string,
-  });
+
+  const tdb = createTenantDb(workspaceId);
 
   let optOutKeywords = parseOptOutKeywords(null);
+  let attachedSenderPhoneNumbers: string[] = [];
   try {
     const onboarding = await getWorkspaceMessagingOnboardingState({
-      supabaseClient,
-      workspaceId: workspaceId as string,
+      workspaceId,
     });
     optOutKeywords = parseOptOutKeywords(
       onboarding.businessProfile.optOutKeywords,
     );
+    attachedSenderPhoneNumbers =
+      onboarding.messagingService.attachedSenderPhoneNumbers;
   } catch {
     // use default keywords if onboarding not available
   }
 
-  const [workspaceNumbers, contactData, smsCampaigns] = await Promise.all([
-    supabaseClient
-      .from("workspace_number")
-      .select("*")
-      .eq("workspace", workspaceId)
-      .eq("type", "rented"),
+  const [workspaceNumbers, contactData, smsCampaigns, portalConfig] =
+    await Promise.all([
+    tdb.workspace_number.findMany({
+      where: eq(workspaceNumberTable.type, "rented"),
+    }),
     contact_number
       ? fetchContactData(
-          supabaseClient,
           workspaceId,
           contact_id,
           contact_number,
+          tdb,
         )
       : null,
     fetchCampaignsByType({
-      supabaseClient,
       workspaceId,
       type: "message_campaign",
+      tdb,
     }),
+    getEffectiveWorkspaceTwilioPortalConfigForWorkspace({ workspaceId }),
   ]);
+  // A configured SID alone is not enough to send: a Messaging Service with no
+  // attached senders fails at Twilio. Mirrors the campaign settings loader so
+  // both surfaces agree on what "ready" means.
+  const messagingServiceReady =
+    portalConfig.sendMode === "messaging_service" &&
+    workspaceMessagingServiceHasAvailableSenders({
+      messagingServiceSid: portalConfig.messagingServiceSid,
+      attachedSenderPhoneNumbers,
+      workspaceNumbers: workspaceNumbers.map((n) => ({
+        phone_number: n.phone_number,
+        capabilities: n.capabilities as Json | null,
+      })),
+    });
+  const senderSelection = {
+    // The composer's initial selection only — every workspace number stays
+    // selectable so a misconfigured Messaging Service is never a dead end.
+    defaultMode: messagingServiceReady
+      ? ("messaging_service" as const)
+      : ("from_number" as const),
+    messagingServiceReady,
+  };
   const { contact, potentialContacts, contactError } = contactData || {
     contact: null,
     potentialContacts: [],
@@ -103,8 +129,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
           hasMore: false,
         },
         potentialContacts: [],
+        senderSelection,
         userRole,
-        workspaceNumbers: workspaceNumbers?.data ?? [],
+        workspaceNumbers: workspaceNumbers ?? [],
         contact_number,
       },
       { headers },
@@ -112,20 +139,20 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   const { chats, chatsError, hasMore } = await fetchConversationSummary(
-    supabaseClient,
     workspaceId,
     campaign_id,
     {
       limit: pageSize,
       offset,
       sort: sortBy,
+      search,
     },
   );
 
   return routeData(
     {
       campaigns: smsCampaigns,
-      workspaceNumbers: workspaceNumbers?.data ?? [],
+      workspaceNumbers: workspaceNumbers ?? [],
       chats: chats ?? [],
       chatsError:
         chatsError && typeof chatsError === "object" && "message" in chatsError
@@ -135,6 +162,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       contact,
       error: null,
       optOutKeywords,
+      senderSelection,
       userRole,
       contact_number,
       pagination: {
@@ -145,4 +173,5 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     },
     { headers },
   );
-}
+  },
+});

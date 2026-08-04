@@ -1,6 +1,9 @@
-import Twilio from "twilio";
+import type Twilio from "twilio";
+import TwilioRestClient from "twilio/lib/rest/Twilio.js";
+import { validateRequest } from "twilio/lib/webhooks/webhooks.js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { TWILIO_REQUEST_TIMEOUT_MS } from "@/lib/twilio-client-options";
 
 /** When false, skips X-Twilio-Signature checks (local dev only). Defaults to true. */
 export function shouldValidateTwilioWebhooks(): boolean {
@@ -55,7 +58,7 @@ export async function validateTwilioWebhook(
   }
 
   const url = new URL(request.url).href;
-  const valid = Twilio.validateRequest(authToken, signature, url, params);
+  const valid = validateRequest(authToken, signature, url, params);
   if (!valid) {
     return new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
       status: 403,
@@ -88,7 +91,7 @@ export function validateTwilioWebhookParams(
     return false;
   }
 
-  return Twilio.validateRequest(authToken, signature, url, params);
+  return validateRequest(authToken, signature, url, params);
 }
 
 declare global {
@@ -104,14 +107,28 @@ export function singleton<Value>(name: string, factory: () => Value): Value {
   return global.__singletons[name] as Value;
 }
 
-export const twilio = singleton<Twilio.Twilio>("twilio", () =>
-  new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN())
-);
+function getTwilioSingleton(): Twilio.Twilio {
+  return singleton<Twilio.Twilio>("twilio", () =>
+    new TwilioRestClient(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN(), {
+      timeout: TWILIO_REQUEST_TIMEOUT_MS,
+    }),
+  );
+}
 
-export async function sendSms(request: {
-  from: string;
-  to: string;
-  body: string;
-}) {
-  return twilio.messages.create(request);
+export const twilio = new Proxy({} as Twilio.Twilio, {
+  get(_target, prop) {
+    return getTwilioSingleton()[prop as keyof Twilio.Twilio];
+  },
+});
+
+/**
+ * Construct a fresh parent-account Twilio REST client.
+ * Use this when a route needs a one-off parent client (e.g. available-number
+ * search) without reusing the process-wide {@link twilio} singleton. Routes
+ * must not call `new Twilio.Twilio(...)` inline (ADR-0011 / issue #1007).
+ */
+export function createParentTwilioInstance(): Twilio.Twilio {
+  return new TwilioRestClient(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN(), {
+    timeout: TWILIO_REQUEST_TIMEOUT_MS,
+  });
 }

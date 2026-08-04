@@ -34,8 +34,12 @@ type ExistingAnswerRow = {
   survey_question: { question_id: string };
 };
 
-function safeString(value: string | string[]): string {
-  return Array.isArray(value) ? JSON.stringify(value) : value;
+function safeString(value: unknown): string {
+  if (Array.isArray(value)) return value.map(String).join(", ");
+  if (value !== null && typeof value === "object") {
+    return Object.values(value).map(String).join(", ");
+  }
+  return String(value);
 }
 
 export default function SurveyPage() {
@@ -56,7 +60,10 @@ export default function SurveyPage() {
     const formData = new FormData();
     formData.append("surveyId", survey.survey_id);
     formData.append("questionId", questionId);
-    formData.append("answerValue", Array.isArray(value) ? JSON.stringify(value) : safeString(value));
+    formData.append(
+      "answerValue",
+      Array.isArray(value) ? JSON.stringify(value) : safeString(value),
+    );
     formData.append("contactId", contact?.id?.toString() || "");
     formData.append("resultId", resultId);
     formData.append("pageId", currentPage?.page_id ?? "");
@@ -72,8 +79,8 @@ export default function SurveyPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Survey Not Found</h1>
-          <p className="text-gray-600">The survey page could not be loaded.</p>
+          <h1 className="text-2xl font-bold text-foreground mb-4">Survey Not Found</h1>
+          <p className="text-muted-foreground">The survey page could not be loaded.</p>
         </div>
       </div>
     );
@@ -153,13 +160,13 @@ export default function SurveyPage() {
       return (
         <div className="flex items-center gap-2 mt-1">
           {status === 'saving' && (
-            <div className="flex items-center gap-1 text-blue-600 text-xs">
-              <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="flex items-center gap-1 text-muted-foreground text-xs">
+              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
               Saving...
             </div>
           )}
           {status === 'saved' && (
-            <div className="flex items-center gap-1 text-green-600 text-xs">
+            <div className="flex items-center gap-1 text-success text-xs">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
@@ -167,7 +174,7 @@ export default function SurveyPage() {
             </div>
           )}
           {status === 'error' && (
-            <div className="flex items-center gap-1 text-red-600 text-xs">
+            <div className="flex items-center gap-1 text-destructive text-xs">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
@@ -184,7 +191,7 @@ export default function SurveyPage() {
           <div className="space-y-2">
             <Label htmlFor={questionId}>{question.question_text}</Label>
             <Input
-              className="bg-white text-black"
+              className="bg-background text-foreground"
               id={questionId}
               value={currentAnswer || ""}
               onChange={(e) => handleAnswerChange(questionId, e.target.value)}
@@ -199,7 +206,7 @@ export default function SurveyPage() {
           <div className="space-y-2">
             <Label htmlFor={questionId}>{question.question_text}</Label>
             <Textarea
-              className="bg-white text-black"
+              className="bg-background text-foreground"
               id={questionId}
               value={currentAnswer || ""}
               onChange={(e) => handleAnswerChange(questionId, e.target.value)}
@@ -229,7 +236,7 @@ export default function SurveyPage() {
                       checked={currentAnswer === option.option_value}
                       onChange={(e) => handleAnswerChange(questionId, e.target.value)}
                       required={question.is_required}
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
+                      className="w-4 h-4 text-primary bg-muted border-input focus:ring-ring"
                     />
                     <Label htmlFor={`${questionId}-${option.id}`}>{cleanLabel}</Label>
                   </div>
@@ -254,7 +261,7 @@ export default function SurveyPage() {
                       
                       debouncedSave(questionId, answerValue);
                     }}
-                    className="w-full bg-white text-black"
+                    className="w-full bg-background text-foreground"
                   />
                 </div>
               )}
@@ -317,7 +324,7 @@ export default function SurveyPage() {
                       
                       debouncedSave(questionId, processedValues);
                     }}
-                    className="w-full bg-white text-black"
+                    className="w-full bg-background text-foreground"
                   />
                 </div>
               )}
@@ -333,17 +340,17 @@ export default function SurveyPage() {
 
   if (isCompleted) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-muted/40 flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="p-8 text-center">
             <div className="mb-4">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Thank You!</h2>
-              <p className="text-gray-600 mt-2">
+              <h2 className="text-2xl font-bold text-foreground">Thank You!</h2>
+              <p className="text-muted-foreground mt-2">
                 Your response has been submitted successfully.
               </p>
             </div>
@@ -354,20 +361,20 @@ export default function SurveyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-8">
+    <div className="min-h-screen bg-muted/40 flex items-center justify-center py-8">
       <Card className="w-full max-w-2xl mx-4">
         <CardHeader>
           <div className="mb-4">
             <Progress value={progress} className="mb-2" />
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Page {currentPageIndex + 1} of {totalPages}
             </p>
           </div>
           <CardTitle className="text-2xl">{survey.title}</CardTitle>
           <CardDescription>{currentPage.title}</CardDescription>
           {contact && (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
+            <div className="mt-4 p-3 bg-secondary rounded-lg">
+              <p className="text-sm text-secondary-foreground">
                 Welcome, {contact.firstname || contact.surname || 'Valued Customer'}!
               </p>
             </div>

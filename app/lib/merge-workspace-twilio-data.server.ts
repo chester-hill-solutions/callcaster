@@ -1,61 +1,159 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
-import { isRecord } from "@/lib/parse-utils.server";
+import { eq, or, sql } from "drizzle-orm";
+import { workspace as workspaceTable } from "@/db/schema";
+import { adminDb } from "@/server/admin-db";
+import { isObject } from "@/lib/type-safety-utils";
 
 export type WorkspaceTwilioData = Record<string, unknown>;
 
+/**
+ * Resolve a workspace id from a Twilio AccountSid embedded in `workspace.twilio_data`.
+ * Used as a webhook-auth fallback when the call/message row is not yet visible
+ * (create→insert race on outbound IVR/SMS).
+ */
+export async function findWorkspaceIdByTwilioAccountSid(
+  accountSid: string,
+): Promise<string | null> {
+  const trimmed = accountSid.trim();
+  if (!trimmed) return null;
+
+  const rows = await adminDb
+    .select({ id: workspaceTable.id })
+    .from(workspaceTable)
+    .where(
+      or(
+        sql`${workspaceTable.twilio_data}->>'sid' = ${trimmed}`,
+        sql`${workspaceTable.twilio_data}->>'account_sid' = ${trimmed}`,
+        sql`${workspaceTable.twilio_data}->>'accountSid' = ${trimmed}`,
+      ),
+    )
+    .limit(1);
+
+  return rows[0]?.id ?? null;
+}
+
+/**
+ * Per-process, in-memory TTL cache for `workspace.twilio_data`.
+ *
+ * Twilio status callbacks (voice + SMS) fire many times per call/message,
+ * and each one re-resolves the workspace's Twilio credentials to validate
+ * the webhook signature and route the request. Credentials rarely change,
+ * so we cache the parsed value for a short TTL per workspace and bust it on
+ * writes.
+ *
+ * This is a per-process cache only (not shared across server
+ * instances/replicas, and cleared on restart). That's an acceptable
+ * tradeoff: the worst case is a stale credential read for up to
+ * WORKSPACE_TWILIO_DATA_CACHE_TTL_MS after a rotation on a given process,
+ * not a weakened signature check — every request is still verified against
+ * whichever token is resolved.
+ */
+const WORKSPACE_TWILIO_DATA_CACHE_TTL_MS = 60_000;
+
+type CacheEntry = { data: WorkspaceTwilioData; expiresAt: number };
+
+const workspaceTwilioDataCache = new Map<string, CacheEntry>();
+
+/**
+ * Monotonic per-workspace version, bumped every time the cache is busted.
+ * Lets other in-process caches derived from workspace Twilio credentials
+ * (e.g. the memoized Twilio client in workspace.server.ts) detect that
+ * credentials changed without reaching into this module's cache internals.
+ */
+const workspaceTwilioDataVersion = new Map<string, number>();
+
+export function getWorkspaceTwilioDataVersion(workspaceId: string): number {
+  return workspaceTwilioDataVersion.get(workspaceId) ?? 0;
+}
+
+/**
+ * Bust the cached Twilio data (and bump the version) for a workspace.
+ * Must be called after any write to `workspace.twilio_data` for that
+ * workspace, from any code path.
+ */
+export function invalidateWorkspaceTwilioData(workspaceId: string): void {
+  workspaceTwilioDataCache.delete(workspaceId);
+  workspaceTwilioDataVersion.set(
+    workspaceId,
+    (workspaceTwilioDataVersion.get(workspaceId) ?? 0) + 1,
+  );
+}
+
 export async function loadWorkspaceTwilioData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
 ): Promise<WorkspaceTwilioData> {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
+  const cached = workspaceTwilioDataCache.get(workspaceId);
+  if (cached && cached.expiresAt > Date.now()) {
+    // Defensive clone: callers must not be able to corrupt the cache (or
+    // each other) by mutating the object they got back.
+    return structuredClone(cached.data);
   }
 
-  return isRecord(data?.twilio_data) ? data.twilio_data : {};
+  const [row] = await adminDb
+    .select({ twilio_data: workspaceTable.twilio_data })
+    .from(workspaceTable)
+    .where(eq(workspaceTable.id, workspaceId))
+    .limit(1);
+
+  if (!row) {
+    throw new Error(`Workspace ${workspaceId} not found`);
+  }
+
+  const raw = row.twilio_data;
+  let data: WorkspaceTwilioData;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      data = isObject(parsed) ? parsed : {};
+    } catch {
+      data = {};
+    }
+  } else {
+    data = isObject(raw) ? raw : {};
+  }
+
+  workspaceTwilioDataCache.set(workspaceId, {
+    data,
+    expiresAt: Date.now() + WORKSPACE_TWILIO_DATA_CACHE_TTL_MS,
+  });
+
+  return structuredClone(data);
 }
 
 export async function persistWorkspaceTwilioData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   twilioData: WorkspaceTwilioData,
 ): Promise<void> {
-  const { error } = await supabaseClient
-    .from("workspace")
-    .update({
-      twilio_data:
-        twilioData as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-    })
-    .eq("id", workspaceId);
+  const onboarding = twilioData.onboarding;
+  const dataForPersistence =
+    isObject(onboarding) && "steps" in onboarding
+      ? {
+          ...twilioData,
+          onboarding: (({ steps: _steps, ...rest }) => rest)(onboarding),
+        }
+      : twilioData;
 
-  if (error) {
-    throw error;
-  }
+  await adminDb
+    .update(workspaceTable)
+    .set({ twilio_data: JSON.stringify(dataForPersistence) })
+    .where(eq(workspaceTable.id, workspaceId));
+  invalidateWorkspaceTwilioData(workspaceId);
 }
 
 export async function mergeWorkspaceTwilioData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   updater: (current: WorkspaceTwilioData) => WorkspaceTwilioData,
 ): Promise<WorkspaceTwilioData> {
-  const current = await loadWorkspaceTwilioData(supabaseClient, workspaceId);
+  const current = await loadWorkspaceTwilioData(workspaceId);
   const next = updater(current);
-  await persistWorkspaceTwilioData(supabaseClient, workspaceId, next);
+  await persistWorkspaceTwilioData(workspaceId, next);
   return next;
 }
 
 export async function patchWorkspaceTwilioData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   patch: WorkspaceTwilioData,
 ): Promise<WorkspaceTwilioData> {
-  return mergeWorkspaceTwilioData(supabaseClient, workspaceId, (current) => ({
+  return mergeWorkspaceTwilioData(workspaceId, (current) => ({
     ...current,
     ...patch,
   }));

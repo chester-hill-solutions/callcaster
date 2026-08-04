@@ -1,0 +1,581 @@
+import { eq, sql } from "drizzle-orm";
+import {
+  buildAgentBridgeTwiml,
+  buildHoldMusicTwiml,
+  makeQueueName,
+  parseQueueIdFromName,
+  type QueueRecord,
+  type TwilioCredentials,
+} from "../../../shared/acd-utils";
+import {
+  inbound_queue as inboundQueueTable,
+  inbound_queue_entry as inboundQueueEntryTable,
+  queue_entry_state,
+  workspace as workspaceTable,
+} from "@/db/schema";
+import {
+  rpcAcceptInboundOffer,
+  rpcAbandonInboundQueueEntry,
+  rpcResetStaleInboundOffers,
+  rpcClaimInboundQueueEntry,
+  rpcCompleteInboundQueueEntry,
+  rpcReleaseInboundOffer,
+} from "@/lib/db-rpc.server";
+import { env } from "@/lib/env.server";
+import { logger } from "@/lib/logger.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import {
+  readTwilioWorkspaceCredentials,
+  resolveTwilioWebhookAuthToken,
+} from "@/lib/twilio-workspace-credentials";
+import { validateTwilioWebhookParams } from "@/twilio.server";
+import { TWILIO_REQUEST_TIMEOUT_MS } from "@/lib/twilio-client-options";
+import { adminDb } from "@/server/admin-db";
+import { db } from "@/server/db";
+import { isObject } from "@/lib/type-safety-utils";
+
+export type { QueueRecord, TwilioCredentials };
+export {
+  buildAgentBridgeTwiml,
+  buildHoldMusicTwiml,
+  makeQueueName,
+  parseQueueIdFromName,
+} from "../../../shared/acd-utils";
+
+export const INBOUND_OFFER_TIMEOUT_SECONDS = 25;
+export const POLL_INTERVAL_MS = 3000;
+export const MAX_QUEUE_TIME_SECONDS = 3600;
+export const MAX_OFFER_ATTEMPTS = 5;
+
+type QueueEntryState = (typeof queue_entry_state.enumValues)[number];
+
+/** Renders a `(…)` list for `in`, with the labels checked against the enum. */
+function entryStateList(...states: QueueEntryState[]) {
+  return sql.raw(`(${states.map((state) => `'${state}'`).join(", ")})`);
+}
+
+/**
+ * States in which a queue entry is still working its way to an agent.
+ *
+ * Positive, not an exclusion list, for two independent reasons. This filter
+ * previously excluded `'failed'`, which is not a label of queue_entry_state at
+ * all — Postgres rejected the coercion on every inbound call, and the error was
+ * swallowed upstream into generic hold TwiML, so no agent was ever dialed. And
+ * an exclusion list counted `declined` / `timed_out` entries as still active,
+ * which blocked re-offering the call that MAX_OFFER_ATTEMPTS exists to allow.
+ *
+ * Built from the enum's own values so a label that does not exist cannot
+ * compile, rather than failing at runtime where nothing was watching.
+ */
+const ACTIVE_ENTRY_STATES_SQL = entryStateList("queued", "offered", "accepted");
+
+/** Entries that were offered to an agent but did not result in a connection. */
+const RETRYABLE_ENTRY_STATES_SQL = entryStateList("offered", "declined", "timed_out");
+
+export type InboundQueueEntryRow = {
+  id: number;
+  queue_id: number;
+  workspace_id: string;
+  call_sid: string | null;
+  caller_number: string | null;
+  status: QueueEntryState;
+  offered_to_user_id: string | null;
+};
+
+export async function findExistingInboundQueueEntry(args: {
+  queueId: number;
+  callSid: string;
+}): Promise<InboundQueueEntryRow | null> {
+  const rows = await adminDb.execute(sql`
+    select id, queue_id, workspace_id, call_sid, caller_number, status, offered_to_user_id
+    from ${inboundQueueEntryTable}
+    where queue_id = ${args.queueId}
+      and call_sid = ${args.callSid}
+      and status in ${ACTIVE_ENTRY_STATES_SQL}
+    limit 1
+  `);
+  return (rows[0] as InboundQueueEntryRow | undefined) ?? null;
+}
+
+export async function countInboundQueueOfferAttempts(args: {
+  queueId: number;
+  callSid: string;
+}): Promise<number> {
+  const rows = await adminDb.execute(sql`
+    select count(*) as count
+    from ${inboundQueueEntryTable}
+    where queue_id = ${args.queueId}
+      and call_sid = ${args.callSid}
+      and status in ${RETRYABLE_ENTRY_STATES_SQL}
+  `);
+  const value = (rows[0] as { count: number } | undefined)?.count ?? 0;
+  return typeof value === "string" ? parseInt(value, 10) : value;
+}
+
+function parseTwilioData(raw: unknown): Record<string, unknown> | null {
+  if (isObject(raw)) return raw;
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return isObject(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function lookupQueue(queueId: number): Promise<QueueRecord | null> {
+  const [row] = await adminDb
+    .select({
+      id: inboundQueueTable.id,
+      workspace_id: inboundQueueTable.workspace_id,
+      name: inboundQueueTable.name,
+      hold_audio: inboundQueueTable.hold_audio,
+    })
+    .from(inboundQueueTable)
+    .where(eq(inboundQueueTable.id, queueId))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function loadWorkspaceTwilioCredentialsForAcd(
+  workspaceId: string,
+): Promise<TwilioCredentials | null> {
+  const [row] = await adminDb
+    .select({ twilio_data: workspaceTable.twilio_data })
+    .from(workspaceTable)
+    .where(eq(workspaceTable.id, workspaceId))
+    .limit(1);
+
+  const creds = readTwilioWorkspaceCredentials(parseTwilioData(row?.twilio_data));
+  if (!creds) return null;
+  return { accountSid: creds.sid, authToken: creds.authToken };
+}
+
+export async function claimAgentForQueue(args: {
+  queueId: number;
+  workspaceId: string;
+  callSid: string;
+  callerNumber: string;
+}): Promise<{ agentUserId: string; entryId: number } | null> {
+  // Reclaim offers whose status callback never arrived before looking for an
+  // agent. Claiming marks an agent `busy` and only the callback releases them,
+  // so a single lost webhook would otherwise remove that agent from inbound
+  // routing permanently. Sweeping here means the repair happens exactly when it
+  // matters — a caller needs an agent — with no scheduler involved.
+  //
+  // Trade-off: an agent stranded while no calls are arriving stays `busy` in
+  // the UI until the next inbound call sweeps them. That costs nothing
+  // functionally, since there is no call to route in the meantime.
+  // Best-effort: a failed sweep must not stop us trying to route this caller.
+  try {
+    const released = await rpcResetStaleInboundOffers(db);
+    if (released > 0) {
+      logger.info("acd.stale_offers_released", { released, queueId: args.queueId });
+    }
+  } catch (error) {
+    logger.error("reset_stale_inbound_offers RPC error", error);
+  }
+
+  try {
+    const row = await rpcClaimInboundQueueEntry(db, {
+      queueId: args.queueId,
+      workspaceId: args.workspaceId,
+      callSid: args.callSid,
+      callerNumber: args.callerNumber,
+    });
+    if (!row) return null;
+    return { agentUserId: row.agent_user_id, entryId: row.entry_id };
+  } catch (error) {
+    logger.error("claim_inbound_queue_entry RPC error", error);
+    return null;
+  }
+}
+
+export async function dialAgent(args: {
+  twilioCredentials: TwilioCredentials;
+  agentUserId: string;
+  queueId: number;
+  entryId: number;
+  baseUrl: string;
+  callerNumber: string;
+}): Promise<void> {
+  const { default: TwilioRestClient } = await import("twilio/lib/rest/Twilio.js");
+  const client = new TwilioRestClient(
+    args.twilioCredentials.accountSid,
+    args.twilioCredentials.authToken,
+    { timeout: TWILIO_REQUEST_TIMEOUT_MS },
+  );
+  const queueName = makeQueueName(args.queueId);
+  const agentBridgeUrl = `${args.baseUrl}/api/acd-router/agent-bridge?queue_name=${queueName}&entry_id=${args.entryId}`;
+  const agentStatusUrl = `${args.baseUrl}/api/acd-router/agent-status?entry_id=${args.entryId}&queue_id=${args.queueId}`;
+
+  try {
+    await client.calls.create({
+      to: `client:agent_${args.agentUserId.replace(/-/g, "_")}`,
+      from: args.callerNumber,
+      url: agentBridgeUrl,
+      statusCallback: agentStatusUrl,
+      statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
+      statusCallbackMethod: "POST",
+      timeout: INBOUND_OFFER_TIMEOUT_SECONDS,
+    });
+  } catch (error) {
+    logger.error("Failed to dial agent", {
+      agentUserId: args.agentUserId,
+      entryId: args.entryId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // The agent call never existed, so the status callback that normally
+    // releases the offer will never fire — release the claim here or the
+    // agent stays claimed and the entry is never re-offered.
+    await releaseAgent(args.entryId, "timed_out");
+  }
+}
+
+export async function releaseAgent(
+  entryId: number,
+  outcome: "timed_out" | "declined" = "timed_out",
+): Promise<void> {
+  try {
+    await rpcReleaseInboundOffer(db, { entryId, outcome });
+  } catch (error) {
+    logger.error("release_inbound_offer RPC error", error);
+  }
+}
+
+function getBaseUrl(): string {
+  return env.BASE_URL().replace(/\/$/, "");
+}
+
+function buildValidationUrl(requestUrl: string, pathSuffix: string): string {
+  const url = new URL(requestUrl);
+  url.pathname = pathSuffix.startsWith("/api/")
+    ? pathSuffix
+    : `/api/acd-router${pathSuffix === "/" ? "" : pathSuffix}`;
+  return url.href;
+}
+
+async function resolveWorkspaceId(
+  url: URL,
+  formData: FormData,
+): Promise<string | null> {
+  const queueIdRaw =
+    url.searchParams.get("queue_id") || String(formData.get("queue_id") || "");
+  const queueId = queueIdRaw ? parseInt(queueIdRaw, 10) : 0;
+  if (queueId) {
+    const queue = await lookupQueue(queueId);
+    if (queue) return queue.workspace_id;
+  }
+
+  const queueName =
+    url.searchParams.get("queue_name") || String(formData.get("queue_name") || "");
+  const parsedQueueId = parseQueueIdFromName(queueName);
+  if (parsedQueueId) {
+    const queue = await lookupQueue(parsedQueueId);
+    if (queue) return queue.workspace_id;
+  }
+
+  const entryIdRaw =
+    url.searchParams.get("entry_id") || String(formData.get("entry_id") || "");
+  const entryId = entryIdRaw ? parseInt(entryIdRaw, 10) : 0;
+  if (entryId) {
+    const [row] = await adminDb
+      .select({ workspace_id: inboundQueueEntryTable.workspace_id })
+      .from(inboundQueueEntryTable)
+      .where(eq(inboundQueueEntryTable.id, entryId))
+      .limit(1);
+    if (row?.workspace_id) return row.workspace_id;
+  }
+
+  return null;
+}
+
+async function validateAcdSignature(args: {
+  request: Request;
+  pathSuffix: string;
+  formData: FormData;
+  workspaceId: string;
+}): Promise<boolean> {
+  const creds = await loadWorkspaceTwilioCredentialsForAcd(args.workspaceId);
+  const authToken = resolveTwilioWebhookAuthToken(
+    creds ? { sid: creds.accountSid, authToken: creds.authToken } : null,
+  );
+  if (!authToken) return false;
+  const signature = args.request.headers.get("x-twilio-signature") || "";
+  const params = Object.fromEntries(args.formData.entries()) as Record<string, string>;
+  const validationUrl = buildValidationUrl(args.request.url, args.pathSuffix);
+  return validateTwilioWebhookParams(params, signature, validationUrl, authToken);
+}
+
+const invalidSignature = (): Response =>
+  new Response("Invalid Twilio signature", { status: 403 });
+
+export type AcdRouterPath = "wait" | "agent-bridge" | "agent-status" | "complete";
+
+export async function handleAcdRouterRequest(
+  request: Request,
+  path: AcdRouterPath,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const pathSuffix =
+    path === "wait"
+      ? "/api/acd-router"
+      : path === "complete"
+        ? "/api/acd-router/complete"
+        : `/api/acd-router/${path}`;
+
+  try {
+    if (path === "agent-bridge") {
+      return await handleAgentBridge(request, url, pathSuffix);
+    }
+    if (path === "agent-status") {
+      return await handleAgentStatus(request, url, pathSuffix);
+    }
+    if (path === "complete") {
+      return await handleComplete(request, url, pathSuffix);
+    }
+    return await handleWaitUrl(request, url, pathSuffix);
+  } catch (error) {
+    logger.error("acd-router error", error);
+    if (path === "wait") {
+      return new Response(
+        `<?xml version="1.0" encoding="UTF-8"?><Response><Say>Please wait for the next available agent.</Say></Response>`,
+        { headers: { "Content-Type": "text/xml" } },
+      );
+    }
+    return new Response(JSON.stringify({ error: String(error) }), {
+      headers: { "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+}
+
+async function handleWaitUrl(
+  request: Request,
+  url: URL,
+  pathSuffix: string,
+): Promise<Response> {
+  const queueId = parseInt(url.searchParams.get("queue_id") || "0", 10);
+  if (!queueId) {
+    return new Response(buildHoldMusicTwiml({ holdAudio: null, queueName: "" }), {
+      headers: { "Content-Type": "text/xml" },
+    });
+  }
+
+  const formData = await request.formData().catch(() => new FormData());
+  const callSid = String(formData.get("CallSid") || url.searchParams.get("CallSid") || "");
+  const callerNumber = String(formData.get("From") || url.searchParams.get("From") || "");
+  const queueTime = String(formData.get("QueueTime") || "0");
+
+  const queue = await lookupQueue(queueId);
+  if (!queue) {
+    return new Response(buildHoldMusicTwiml({ holdAudio: null, queueName: "" }), {
+      headers: { "Content-Type": "text/xml" },
+    });
+  }
+
+  const isValid = await validateAcdSignature({
+    request,
+    pathSuffix,
+    formData,
+    workspaceId: queue.workspace_id,
+  });
+  if (!isValid) return invalidSignature();
+
+  const queueName = makeQueueName(queueId);
+  const parsedQueueTime = parseInt(queueTime, 10);
+  if (parsedQueueTime >= MAX_QUEUE_TIME_SECONDS) {
+    return new Response(hangupTwiml(), {
+      headers: { "Content-Type": "text/xml" },
+    });
+  }
+
+  const existingEntry = await findExistingInboundQueueEntry({
+    queueId,
+    callSid,
+  });
+  if (!existingEntry) {
+    const offerAttempts = await countInboundQueueOfferAttempts({
+      queueId,
+      callSid,
+    });
+    if (offerAttempts >= MAX_OFFER_ATTEMPTS) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
+    const claimed = await claimAgentForQueue({
+      queueId,
+      workspaceId: queue.workspace_id,
+      callSid,
+      callerNumber,
+    });
+
+    if (claimed) {
+      const credentials = await loadWorkspaceTwilioCredentialsForAcd(queue.workspace_id);
+      if (credentials) {
+        await dialAgent({
+          twilioCredentials: credentials,
+          agentUserId: claimed.agentUserId,
+          queueId,
+          entryId: claimed.entryId,
+          baseUrl: getBaseUrl(),
+          callerNumber,
+        });
+      }
+    }
+  }
+
+  return new Response(
+    buildHoldMusicTwiml({
+      holdAudio: queue.hold_audio,
+      queueName,
+    }),
+    { headers: { "Content-Type": "text/xml" } },
+  );
+}
+
+async function handleAgentBridge(
+  request: Request,
+  url: URL,
+  pathSuffix: string,
+): Promise<Response> {
+  const queueName = url.searchParams.get("queue_name") || "";
+  const entryId = parseInt(url.searchParams.get("entry_id") || "0", 10);
+
+  if (!entryId && !queueName) {
+    return new Response(buildAgentBridgeTwiml(queueName), {
+      headers: { "Content-Type": "text/xml" },
+    });
+  }
+
+  const formData = await request.formData().catch(() => new FormData());
+  const workspaceId = await resolveWorkspaceId(url, formData);
+  if (workspaceId) {
+    const isValid = await validateAcdSignature({
+      request,
+      pathSuffix,
+      formData,
+      workspaceId,
+    });
+    if (!isValid) return invalidSignature();
+  } else if (entryId) {
+    return invalidSignature();
+  }
+
+  if (entryId) {
+    try {
+      await rpcAcceptInboundOffer(db, entryId);
+    } catch {
+      // best-effort
+    }
+  }
+
+  return new Response(buildAgentBridgeTwiml(queueName), {
+    headers: { "Content-Type": "text/xml" },
+  });
+}
+
+async function handleAgentStatus(
+  request: Request,
+  url: URL,
+  pathSuffix: string,
+): Promise<Response> {
+  const entryId = parseInt(url.searchParams.get("entry_id") || "0", 10);
+  const formData = await request.formData().catch(() => new FormData());
+  const callStatus = String(formData.get("CallStatus") || "").toLowerCase();
+
+  if (!entryId) {
+    return new Response(JSON.stringify({ ok: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const workspaceId = await resolveWorkspaceId(url, formData);
+  if (workspaceId) {
+    const isValid = await validateAcdSignature({
+      request,
+      pathSuffix,
+      formData,
+      workspaceId,
+    });
+    if (!isValid) return invalidSignature();
+  } else {
+    return invalidSignature();
+  }
+
+  if (
+    callStatus === "no-answer" ||
+    callStatus === "busy" ||
+    callStatus === "failed" ||
+    callStatus === "canceled"
+  ) {
+    await releaseAgent(entryId, "timed_out");
+  }
+
+  return new Response(JSON.stringify({ ok: true }), {
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function handleComplete(
+  request: Request,
+  url: URL,
+  pathSuffix: string,
+): Promise<Response> {
+  const formData = await request.formData().catch(() => new FormData());
+  const queueResult = String(formData.get("QueueResult") || "").toLowerCase();
+  const callSid = String(formData.get("CallSid") || "");
+
+  const workspaceId = await resolveWorkspaceId(url, formData);
+  if (!workspaceId) return invalidSignature();
+  const isValid = await validateAcdSignature({
+    request,
+    pathSuffix,
+    formData,
+    workspaceId,
+  });
+  if (!isValid) return invalidSignature();
+
+  // The <Enqueue action> URL is rendered before any queue entry exists, so it
+  // cannot carry a real entry_id. Prefer an explicit entry_id when present
+  // (legacy URLs), otherwise resolve the live entry by CallSid + queue.
+  let entryId = parseInt(url.searchParams.get("entry_id") || "0", 10);
+  if (!entryId && callSid) {
+    const queueName =
+      url.searchParams.get("queue_name") ||
+      String(formData.get("queue_name") || "");
+    const queueId = parseQueueIdFromName(queueName);
+    if (queueId) {
+      const entry = await findExistingInboundQueueEntry({ queueId, callSid });
+      if (entry) entryId = entry.id;
+    }
+  }
+
+  if (entryId) {
+    try {
+      if (queueResult === "bridged" || queueResult === "completed") {
+        await rpcCompleteInboundQueueEntry(db, entryId);
+      } else if (
+        queueResult === "hangup" ||
+        queueResult === "leave" ||
+        queueResult === "leaving"
+      ) {
+        await rpcAbandonInboundQueueEntry(db, entryId);
+      }
+    } catch (error) {
+      logger.error("acd complete/abandon RPC error", { entryId, queueResult, error });
+    }
+  } else {
+    logger.warn("acd complete could not resolve a queue entry", {
+      callSid,
+      queueResult,
+      workspaceId,
+    });
+  }
+
+  return new Response("", { status: 200 });
+}

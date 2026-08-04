@@ -14,10 +14,12 @@ export function jsonError(
   message: string,
   status = 400,
   code?: string,
+  headers?: HeadersInit,
 ): Response {
   return jsonResponse(
     code ? { error: message, code } : { error: message },
     status,
+    headers,
   );
 }
 

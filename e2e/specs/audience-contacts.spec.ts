@@ -12,12 +12,16 @@ ownerTest.describe("Audience and contacts @authenticated", () => {
   });
 
   ownerTest("AUD-01 CSV upload form", async ({ page }) => {
-    await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "audiences/new"));
-    await page.locator("#audience-name").fill("E2E Upload Test");
-    await page.getByRole("button", { name: /Next: Upload Contacts/i }).click();
-    await expect(page.getByRole("heading", { name: "Upload Contacts" })).toBeVisible();
+    await page.goto(
+      `${workspacePath(E2E_WORKSPACES.ready.id, "audiences/new")}?step=upload&name=${encodeURIComponent("E2E Upload Test")}`,
+    );
+    await expect(page.getByTestId("audience-upload-step")).toBeVisible();
+    await expect(page.getByText("Drop or choose a CSV file")).toBeVisible();
     await page.locator("#contacts").setInputFiles(goodCsv);
-    await expect(page.getByText(/Map CSV Headers|Upload contacts/i).first()).toBeVisible();
+    await expect(page.getByText("Map CSV Headers")).toBeVisible();
+    await expect(
+      page.getByText(/Contacts need a valid phone number to dial or message/),
+    ).toBeVisible();
   });
 
   ownerTest("AUD-04 contacts list", async ({ page }) => {

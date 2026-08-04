@@ -1,244 +1,146 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-const mocks = vi.hoisted(() => {
-  return {
-    verifyAuth: vi.fn(),
-    getUserRole: vi.fn(),
-    logger: {
-      error: vi.fn(),
-      info: vi.fn(),
-      debug: vi.fn(),
-      warn: vi.fn(),
-    },
-  };
-});
+import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
-  }),
+const mocks = vi.hoisted(() => ({
+  verifyAuth: vi.fn(),
+  getUserRole: vi.fn(),
+  getWorkspaceForClient: vi.fn(),
+  listWorkspaceContactsApi: vi.fn(),
+  logger: {
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+    warn: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers() }),
   verifyAuth: (...args: unknown[]) => mocks.verifyAuth(...args),
 }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   getUserRole: (...args: unknown[]) => mocks.getUserRole(...args),
+}));
+
+vi.mock("@/lib/workspace-client-projection.server", () => ({
+  getWorkspaceForClient: (...args: unknown[]) => mocks.getWorkspaceForClient(...args),
+}));
+
+vi.mock("@/lib/platform-data.server", () => ({
+  listWorkspaceContactsApi: (...args: unknown[]) =>
+    mocks.listWorkspaceContactsApi(...args),
+}));
+
+const tdbMocks = vi.hoisted(() => ({
+  campaign: {
+    findMany: vi.fn(async () => []),
+  },
+}));
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => tdbMocks),
 }));
 
 vi.mock("@/lib/logger.server", () => ({
   logger: mocks.logger,
 }));
 
-class ContactQueryBuilder {
-  constructor(private readonly result: unknown) {}
+const workspaceId = "11111111-1111-1111-1111-111111111111";
 
-  select = vi.fn(() => this);
-  eq = vi.fn(() => this);
-  range = vi.fn(() => this);
-  order = vi.fn(() => this);
-  or = vi.fn(() => this);
-
-  then<TResult1 = unknown, TResult2 = never>(
-    onfulfilled?:
-      | ((value: unknown) => TResult1 | PromiseLike<TResult1>)
-      | undefined
-      | null,
-    onrejected?:
-      | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
-      | undefined
-      | null,
-  ): Promise<TResult1 | TResult2> {
-    return Promise.resolve(this.result).then(onfulfilled, onrejected);
-  }
-}
-
-function buildWorkspaceQuery(result: unknown) {
+function makeWorkspace() {
   return {
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        single: vi.fn(async () => result),
-      })),
-    })),
+    id: workspaceId,
+    name: "Workspace",
+    credits: 1,
+    feature_flags: {},
   };
 }
 
-function buildCampaignQuery(result: unknown = { data: [], error: null }) {
+function makeContactsResult(searchParams: URLSearchParams) {
   return {
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        order: vi.fn(async () => result),
-      })),
-    })),
+    ok: true as const,
+    contacts: [],
+    pagination: { page: 1, page_size: 20, total_count: 0, total_pages: 0 },
+    search_query: searchParams.get("q") || null,
   };
 }
 
 describe("app/routes/workspaces++_.$id_.contacts.tsx", () => {
-  const workspaceId = "11111111-1111-1111-1111-111111111111";
-
   beforeEach(() => {
     vi.resetModules();
+    mocks.verifyAuth.mockReset();
     mocks.getUserRole.mockReset();
+    mocks.getWorkspaceForClient.mockReset();
+    mocks.listWorkspaceContactsApi.mockReset();
     mocks.logger.error.mockReset();
   });
 
   test("uses prefix search for short query guardrails", async () => {
-    const countQuery = new ContactQueryBuilder({ count: 0, error: null });
-    const contactsQuery = new ContactQueryBuilder({ data: [], error: null });
-    let contactQueryCount = 0;
-
-    const supabaseClient = {
-      from: vi.fn((table: string) => {
-        if (table === "contact") {
-          contactQueryCount += 1;
-          return contactQueryCount === 1 ? countQuery : contactsQuery;
-        }
-
-        if (table === "workspace") {
-          return buildWorkspaceQuery({
-            data: {
-              id: workspaceId,
-              name: "Workspace",
-              credits: 1,
-              feature_flags: {},
-            },
-            error: null,
-          });
-        }
-
-        if (table === "campaign") {
-          return buildCampaignQuery();
-        }
-
-        throw new Error(`Unexpected table: ${table}`);
-      }),
-    };
-
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       headers: new Headers(),
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
+    mocks.getWorkspaceForClient.mockResolvedValueOnce(makeWorkspace());
+    mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=jo")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(await withWorkspaceRouteArgs({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=jo`,
       ),
       params: { id: workspaceId },
-    } as any));
+    })));
 
     expect(res.status).toBe(200);
-
-    const countFilter = String(countQuery.or.mock.calls[0]?.[0]);
-    expect(countFilter).toContain("surname.ilike.jo%");
-    expect(countFilter).not.toContain("surname.ilike.%jo%");
-    expect(countFilter).toContain("phone.ilike.jo%");
+    const [, searchParams] = mocks.listWorkspaceContactsApi.mock.calls[0];
+    expect(searchParams.get("q")).toBe("jo");
   });
 
   test("uses contains search for longer text queries", async () => {
-    const countQuery = new ContactQueryBuilder({ count: 0, error: null });
-    const contactsQuery = new ContactQueryBuilder({ data: [], error: null });
-    let contactQueryCount = 0;
-
-    const supabaseClient = {
-      from: vi.fn((table: string) => {
-        if (table === "contact") {
-          contactQueryCount += 1;
-          return contactQueryCount === 1 ? countQuery : contactsQuery;
-        }
-
-        if (table === "workspace") {
-          return buildWorkspaceQuery({
-            data: {
-              id: workspaceId,
-              name: "Workspace",
-              credits: 1,
-              feature_flags: {},
-            },
-            error: null,
-          });
-        }
-
-        if (table === "campaign") {
-          return buildCampaignQuery();
-        }
-
-        throw new Error(`Unexpected table: ${table}`);
-      }),
-    };
-
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       headers: new Headers(),
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
+    mocks.getWorkspaceForClient.mockResolvedValueOnce(makeWorkspace());
+    mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=example.com")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
-    await mod.loader({
+    const res = await asRouteResponse(mod.loader(await withWorkspaceRouteArgs({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=example.com`,
       ),
       params: { id: workspaceId },
-    } as any);
+    })));
 
-    const countFilter = String(countQuery.or.mock.calls[0]?.[0]);
-    expect(countFilter).toContain("surname.ilike.%example.com%");
-    expect(countFilter).toContain("email.ilike.%example.com%");
+    expect(res.status).toBe(200);
+    const [, searchParams] = mocks.listWorkspaceContactsApi.mock.calls[0];
+    expect(searchParams.get("q")).toBe("example.com");
   });
 
   test("supports phone substring and last4 search for longer numeric queries", async () => {
-    const countQuery = new ContactQueryBuilder({ count: 0, error: null });
-    const contactsQuery = new ContactQueryBuilder({ data: [], error: null });
-    let contactQueryCount = 0;
-
-    const supabaseClient = {
-      from: vi.fn((table: string) => {
-        if (table === "contact") {
-          contactQueryCount += 1;
-          return contactQueryCount === 1 ? countQuery : contactsQuery;
-        }
-
-        if (table === "workspace") {
-          return buildWorkspaceQuery({
-            data: {
-              id: workspaceId,
-              name: "Workspace",
-              credits: 1,
-              feature_flags: {},
-            },
-            error: null,
-          });
-        }
-
-        if (table === "campaign") {
-          return buildCampaignQuery();
-        }
-
-        throw new Error(`Unexpected table: ${table}`);
-      }),
-    };
-
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       headers: new Headers(),
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
+    mocks.getWorkspaceForClient.mockResolvedValueOnce(makeWorkspace());
+    mocks.listWorkspaceContactsApi.mockResolvedValueOnce(makeContactsResult(new URLSearchParams("q=1234")));
 
     const mod = await import("../app/routes/workspaces+/$id/contacts.route");
-    await mod.loader({
+    const res = await asRouteResponse(mod.loader(await withWorkspaceRouteArgs({
       request: new Request(
         `http://localhost/workspaces/${workspaceId}/contacts?q=1234`,
       ),
       params: { id: workspaceId },
-    } as any);
+    })));
 
-    const countFilter = String(countQuery.or.mock.calls[0]?.[0]);
-    expect(countFilter).toContain("phone.eq.1234");
-    expect(countFilter).toContain("phone.ilike.1234%");
-    expect(countFilter).toContain("phone.ilike.%1234%");
+    expect(res.status).toBe(200);
+    const [, searchParams] = mocks.listWorkspaceContactsApi.mock.calls[0];
+    expect(searchParams.get("q")).toBe("1234");
   });
 });

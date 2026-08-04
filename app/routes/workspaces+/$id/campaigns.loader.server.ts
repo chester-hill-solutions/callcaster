@@ -1,3 +1,4 @@
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import {
   Audience,
   WorkspaceData,
@@ -5,15 +6,12 @@ import {
   Campaign,
 } from "@/lib/types";
 import { redirect } from "react-router";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-
-  const { headers, user } = await verifyAuth(request);
-  if (!user) {
-    return redirect("/signin", { headers });
-  }
-  return null;
-}
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["none"],
+  handler: async () => {
+    return null;
+  },
+});

@@ -1,5 +1,12 @@
-import { describe, expect, test, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse, normalizeRouteResult } from "./helpers/route-result";
+import { findActiveConferenceIdsForUser, findCallsByConferenceId } from "@/lib/telephony-db.server";
 
 const loggerMocks = vi.hoisted(() => {
   return { error: vi.fn() };
@@ -18,10 +25,10 @@ vi.mock("../app/lib/logger.server", () => {
 
 vi.mock("../app/lib/env.server", () => ({
   env: {
-    SUPABASE_URL: () => "http://supabase.test",
-    SUPABASE_ANON_KEY: () => "anon-key",
-    SUPABASE_SERVICE_KEY: () => "service-key",
-    SUPABASE_PUBLISHABLE_KEY: () => "publishable-key",
+    BETTER_AUTH_URL: () => "http://adminDb.test",
+    BETTER_AUTH_ANON_KEY: () => "anon-key",
+    BETTER_AUTH_SERVICE_KEY: () => "service-key",
+    BETTER_AUTH_PUBLISHABLE_KEY: () => "publishable-key",
     TWILIO_SID: () => "AC123",
     TWILIO_AUTH_TOKEN: () => "auth-token",
     TWILIO_APP_SID: () => "AP123",
@@ -36,6 +43,80 @@ const twilioMocks = vi.hoisted(() => {
     instance: null as any,
   };
 });
+
+const adminDbMocks = vi.hoisted(() => ({
+  workspaceRow: {
+    twilio_data: { sid: "AC", authToken: "t" },
+    key: "",
+    token: "",
+  } as Record<string, unknown> | null,
+  workspaceError: null as Error | null,
+  callRows: [] as Array<{ sid: string }>,
+  callLookupError: null as Error | null,
+  messageRows: [] as Array<{ sid: string }>,
+  messageQueryError: null as Error | null,
+  messageSelectCalls: 0,
+  nextQueryKind: "message" as "message" | "call",
+}));
+
+vi.mock("@/server/admin-db", () => ({
+  adminDb: {
+    query: {
+      workspace: {
+        findFirst: vi.fn(async () => {
+          if (adminDbMocks.workspaceError) {
+            throw adminDbMocks.workspaceError;
+          }
+          return adminDbMocks.workspaceRow;
+        }),
+      },
+    },
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => {
+          if (adminDbMocks.nextQueryKind === "call") {
+            if (adminDbMocks.callLookupError) {
+              return Promise.reject(adminDbMocks.callLookupError);
+            }
+            return Promise.resolve(adminDbMocks.callRows);
+          }
+          return {
+            limit: vi.fn(async () => {
+              adminDbMocks.messageSelectCalls += 1;
+              if (adminDbMocks.messageQueryError) {
+                throw adminDbMocks.messageQueryError;
+              }
+              if (adminDbMocks.messageSelectCalls === 1) {
+                return adminDbMocks.messageRows;
+              }
+              return [];
+            }),
+          };
+        }),
+      })),
+    })),
+    execute: vi.fn(async (query: unknown) => {
+      const sql = typeof query === "object" && query !== null ? String(query) : String(query ?? "");
+      if (sql.includes("from call")) {
+        return [{ id: 1 }];
+      }
+      if (sql.includes("from message")) {
+        return [{ id: "m1" }];
+      }
+      return [];
+    }),
+  },
+}));
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcCancelOutreachAttemptsByCallSids: vi.fn(async () => ({})),
+  rpcCancelMessages: vi.fn(async () => ({})),
+}));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  findActiveConferenceIdsForUser: vi.fn(async () => ["u1~00000000-0000-0000-0000-000000000000"]),
+  findCallsByConferenceId: vi.fn(async () => []),
+}));
 
 vi.mock("twilio", () => {
   class TwilioClientMock {
@@ -55,6 +136,20 @@ describe("database.server helpers", () => {
   beforeEach(() => {
     twilioMocks.instance = null;
     loggerMocks.error.mockReset();
+    adminDbMocks.workspaceRow = {
+      twilio_data: { sid: "AC", authToken: "t" },
+      key: "",
+      token: "",
+    };
+    adminDbMocks.workspaceError = null;
+    adminDbMocks.callRows = [];
+    adminDbMocks.callLookupError = null;
+    adminDbMocks.messageRows = [];
+    adminDbMocks.messageQueryError = null;
+    adminDbMocks.messageSelectCalls = 0;
+    adminDbMocks.nextQueryKind = "message";
+    vi.mocked(findActiveConferenceIdsForUser).mockReset();
+    vi.mocked(findCallsByConferenceId).mockReset();
     vi.resetModules();
   });
 
@@ -63,7 +158,7 @@ describe("database.server helpers", () => {
   });
 
   test("parseRequestData handles json, urlencoded, missing, and unsupported content-types", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/request-utils.server");
 
     const missing = new Request("http://localhost/x", { method: "POST" });
     await expect(mod.parseRequestData(missing)).resolves.toBeUndefined();
@@ -107,7 +202,7 @@ describe("database.server helpers", () => {
   }, 30000);
 
   test("safeParseJson returns data, throws 400 Response on SyntaxError, and rethrows non-SyntaxError", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/request-utils.server");
 
     const ok = new Request("http://localhost/x", {
       method: "POST",
@@ -139,7 +234,7 @@ describe("database.server helpers", () => {
   });
 
   test("parseActionRequest parses json and form bodies (including duplicate keys)", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/request-utils.server");
 
     const jsonReq = new Request("http://localhost/x", {
       method: "POST",
@@ -184,7 +279,7 @@ describe("database.server helpers", () => {
   });
 
   test("handleError logs and returns json response", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/request-utils.server");
     const res = await asRouteResponse(mod.handleError(new Error("boom"), "nope", 418));
     expect(res.status).toBe(418);
     await expect(res.json()).resolves.toEqual({ error: "nope" });
@@ -196,102 +291,52 @@ describe("database.server helpers", () => {
   });
 
   test("endConferenceByUser throws when workspace lookup fails or user_id missing", async () => {
-    const mod = await import("../app/lib/database.server");
-    const supabaseClient = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({ data: null, error: new Error("no row") }),
-          }),
-        }),
-      }),
-    } as any;
+    const mod = await import("../app/lib/database/call-actions.server");
 
+    adminDbMocks.workspaceError = new Error("no row");
     await expect(
       mod.endConferenceByUser({
         workspace_id: "w1",
         user_id: "u1",
-        supabaseClient,
       }),
     ).rejects.toThrow("no row");
 
-    const supabaseNoDataNoError = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({ data: null, error: null }),
-          }),
-        }),
-      }),
-    } as any;
+    adminDbMocks.workspaceError = null;
+    adminDbMocks.workspaceRow = null;
     await expect(
       mod.endConferenceByUser({
         workspace_id: "w1",
         user_id: "u1",
-        supabaseClient: supabaseNoDataNoError,
       }),
     ).rejects.toThrow("No workspace found");
 
-    const supabaseOk = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: {
-                twilio_data: { sid: "AC", authToken: "t" },
-                key: "",
-                token: "",
-              },
-              error: null,
-            }),
-          }),
-        }),
-      }),
-    } as any;
+    adminDbMocks.workspaceRow = {
+      twilio_data: { sid: "AC", authToken: "t" },
+      key: "",
+      token: "",
+    };
 
     await expect(
       mod.endConferenceByUser({
         workspace_id: "w1",
         user_id: "",
-        supabaseClient: supabaseOk,
       }),
     ).rejects.toThrow("User ID is required");
   });
 
   test("endConferenceByUser completes conferences and attempts to hang up calls, logging per-call/per-conf failures", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
-    const supabaseClient = {
-      from: (table: string) => {
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: {
-                    twilio_data: { sid: "AC", authToken: "t" },
-                    key: "",
-                    token: "",
-                  },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-        if (table === "call") {
-          return {
-            select: () => ({
-              eq: async () => ({
-                data: [{ sid: "CA1" }, { sid: "CA2" }],
-                error: null,
-              }),
-            }),
-          };
-        }
-        throw new Error(`unexpected table ${table}`);
-      },
-    } as any;
+    vi.mocked(findActiveConferenceIdsForUser).mockResolvedValueOnce([
+      "CONF_BAD",
+      "CONF_OK",
+    ]);
+    vi.mocked(findCallsByConferenceId)
+      .mockResolvedValueOnce([
+        { sid: "CA1", outreach_attempt_id: 1, contact_id: 1 },
+        { sid: "CA2", outreach_attempt_id: 2, contact_id: 2 },
+      ])
+      .mockResolvedValueOnce([]);
 
     const callsUpdate = vi
       .fn()
@@ -300,7 +345,7 @@ describe("database.server helpers", () => {
 
     const conferencesUpdate = vi
       .fn()
-      .mockRejectedValueOnce(new Error("conf-update-failed")); // first conf fails -> logged
+      .mockRejectedValueOnce(new Error("conf-update-failed")); // CONF_BAD fails -> logged
 
     twilioMocks.instance = {
       conferences: Object.assign(
@@ -309,7 +354,9 @@ describe("database.server helpers", () => {
             sid === "CONF_BAD" ? conferencesUpdate : vi.fn(async () => ({})),
         }),
         {
-          list: vi.fn(async () => [{ sid: "CONF_BAD" }, { sid: "CONF_OK" }]),
+          list: vi.fn(async ({ friendlyName }: { friendlyName: string }) => [
+            { sid: friendlyName },
+          ]),
         },
       ),
       calls: (sid: string) => ({
@@ -322,7 +369,6 @@ describe("database.server helpers", () => {
       mod.endConferenceByUser({
         workspace_id: "w1",
         user_id: "u1",
-        supabaseClient,
       }),
     ).resolves.toBeUndefined();
 
@@ -330,39 +376,10 @@ describe("database.server helpers", () => {
   });
 
   test("endConferenceByUser logs when call lookup errors for a conference", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
-    const supabaseClient = {
-      from: (table: string) => {
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: {
-                    twilio_data: { sid: "AC", authToken: "t" },
-                    key: "",
-                    token: "",
-                  },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-        if (table === "call") {
-          return {
-            select: () => ({
-              eq: async () => ({
-                data: [],
-                error: new Error("call-select-failed"),
-              }),
-            }),
-          };
-        }
-        throw new Error(`unexpected table ${table}`);
-      },
-    } as any;
+    vi.mocked(findActiveConferenceIdsForUser).mockResolvedValueOnce(["CONF_X"]);
+    vi.mocked(findCallsByConferenceId).mockRejectedValueOnce(new Error("call-select-failed"));
 
     twilioMocks.instance = {
       conferences: Object.assign(
@@ -378,18 +395,13 @@ describe("database.server helpers", () => {
       mod.endConferenceByUser({
         workspace_id: "w1",
         user_id: "u1",
-        supabaseClient,
       }),
     ).resolves.toBeUndefined();
     expect(loggerMocks.error).toHaveBeenCalled();
   });
 
   test("cancelQueuedCalls returns canceled IDs, aggregates per-call errors, and handles list() failures", async () => {
-    const mod = await import("../app/lib/database.server");
-
-    const supabase = {
-      rpc: vi.fn(async () => ({})),
-    } as any;
+    const mod = await import("../app/lib/database/call-actions.server");
 
     const update = vi
       .fn()
@@ -412,7 +424,7 @@ describe("database.server helpers", () => {
       ),
     } as any;
 
-    const res = await mod.cancelQueuedCalls(twilio, supabase, 2);
+    const res = await mod.cancelQueuedCalls(twilio, 2);
     expect(res.canceledCalls).toEqual(["CA1"]);
     expect(res.errors.join("\n")).toMatch(
       /Error canceling call CA2: Unknown error/,
@@ -424,28 +436,24 @@ describe("database.server helpers", () => {
     const twilioFail = {
       calls: { list: async () => Promise.reject(new Error("list failed")) },
     } as any;
-    const res2 = await mod.cancelQueuedCalls(twilioFail, supabase, 100);
+    const res2 = await mod.cancelQueuedCalls(twilioFail, 100);
     expect(res2.canceledCalls).toEqual([]);
     expect(res2.errors[0]).toMatch(/Error retrieving calls: list failed/);
 
     const twilioFailUnknown = {
       calls: { list: async () => Promise.reject("nope") },
     } as any;
-    const res3 = await mod.cancelQueuedCalls(twilioFailUnknown, supabase, 100);
+    const res3 = await mod.cancelQueuedCalls(twilioFailUnknown, 100);
     expect(res3.errors[0]).toMatch(/Error retrieving calls: Unknown error/);
 
     // Covers default batchSize = 100
     const twilioEmpty = { calls: { list: async () => [] } } as any;
-    const res4 = await mod.cancelQueuedCalls(twilioEmpty, supabase);
+    const res4 = await mod.cancelQueuedCalls(twilioEmpty);
     expect(res4).toEqual({ canceledCalls: [], errors: [] });
   });
 
   test("cancelQueuedMessages returns canceled IDs, aggregates per-message errors, and handles list() failures", async () => {
-    const mod = await import("../app/lib/database.server");
-
-    const supabase = {
-      rpc: vi.fn(async () => ({})),
-    } as any;
+    const mod = await import("../app/lib/database/call-actions.server");
 
     const update = vi
       .fn()
@@ -468,7 +476,7 @@ describe("database.server helpers", () => {
       ),
     } as any;
 
-    const res = await mod.cancelQueuedMessages(twilio, supabase, 2);
+    const res = await mod.cancelQueuedMessages(twilio, 2);
     expect(res.canceledMessages).toEqual(["SM1"]);
     expect(res.errors.join("\n")).toMatch(
       /Error canceling call SM2: msg update failed/,
@@ -480,60 +488,33 @@ describe("database.server helpers", () => {
     const twilioFail = {
       messages: { list: async () => Promise.reject("nope") },
     } as any;
-    const res2 = await mod.cancelQueuedMessages(twilioFail, supabase, 100);
+    const res2 = await mod.cancelQueuedMessages(twilioFail, 100);
     expect(res2.canceledMessages).toEqual([]);
     expect(res2.errors[0]).toMatch(/Error retrieving messages: Unknown error/);
 
     const twilioFailErr = {
       messages: { list: async () => Promise.reject(new Error("list failed")) },
     } as any;
-    const res2b = await mod.cancelQueuedMessages(twilioFailErr, supabase, 100);
+    const res2b = await mod.cancelQueuedMessages(twilioFailErr, 100);
     expect(res2b.errors[0]).toMatch(/Error retrieving messages: list failed/);
 
     // Covers default batchSize = 100
     const twilioEmpty = { messages: { list: async () => [] } } as any;
-    const res3 = await mod.cancelQueuedMessages(twilioEmpty, supabase);
+    const res3 = await mod.cancelQueuedMessages(twilioEmpty);
     expect(res3).toEqual({ canceledMessages: [], errors: [] });
   });
 
   test("cancelQueuedMessagesForCampaign only cancels queued rows for the requested campaign", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     const update = vi
       .fn()
       .mockResolvedValueOnce({ sid: "SM1" })
       .mockResolvedValueOnce({ sid: "SM2" });
 
-    let selectCalls = 0;
-    const supabase = {
-      rpc: vi.fn(async () => ({})),
-      from: vi.fn((table: string) => {
-        expect(table).toBe("message");
-        const builder: any = {};
-        builder.select = () => builder;
-        builder.eq = (field: string, value: unknown) => {
-          expect(field).toBe("campaign_id");
-          expect(value).toBe(77);
-          return builder;
-        };
-        builder.in = (field: string, statuses: string[]) => {
-          expect(field).toBe("status");
-          expect(statuses).toEqual(["accepted", "scheduled", "queued"]);
-          return builder;
-        };
-        builder.limit = async () => {
-          selectCalls += 1;
-          if (selectCalls === 1) {
-            return {
-              data: [{ sid: "SM1" }, { sid: "SM2" }],
-              error: null,
-            };
-          }
-          return { data: [], error: null };
-        };
-        return builder;
-      }),
-    } as any;
+    adminDbMocks.messageRows = [{ sid: "SM1" }, { sid: "SM2" }];
+    adminDbMocks.messageSelectCalls = 0;
+    adminDbMocks.nextQueryKind = "message";
 
     const twilio = {
       messages: ((sid: string) => ({
@@ -543,57 +524,32 @@ describe("database.server helpers", () => {
 
     const res = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      supabase,
       77,
       10,
     );
     expect(res).toEqual({ canceledMessages: ["SM1", "SM2"], errors: [] });
     expect(update).toHaveBeenCalledTimes(2);
-    expect(supabase.rpc).toHaveBeenCalledTimes(2);
 
-    // Covers default batchSize = 100 path.
-    const supabaseEmpty = {
-      from: vi.fn(() => {
-        const builder: any = {};
-        builder.select = () => builder;
-        builder.eq = () => builder;
-        builder.in = () => builder;
-        builder.limit = async () => ({ data: [], error: null });
-        return builder;
-      }),
-    } as any;
+    adminDbMocks.messageRows = [];
+    adminDbMocks.messageSelectCalls = 0;
     const resDefault = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      supabaseEmpty,
       99,
     );
     expect(resDefault).toEqual({ canceledMessages: [], errors: [] });
   });
 
   test("cancelQueuedMessagesForCampaign handles query errors and thrown exceptions", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     const twilio = {
       messages: ((sid: string) => ({ update: async () => ({ sid }) })) as any,
     } as any;
 
-    const supabaseQueryError = {
-      from: vi.fn(() => {
-        const builder: any = {};
-        builder.select = () => builder;
-        builder.eq = () => builder;
-        builder.in = () => builder;
-        builder.limit = async () => ({
-          data: null,
-          error: { message: "db down" },
-        });
-        return builder;
-      }),
-    } as any;
-
+    adminDbMocks.messageQueryError = new Error("db down");
+    adminDbMocks.messageSelectCalls = 0;
     const queryErrorRes = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      supabaseQueryError,
       1,
       5,
     );
@@ -602,23 +558,10 @@ describe("database.server helpers", () => {
       errors: ["Error retrieving messages: db down"],
     });
 
-    const supabaseQueryUnknown = {
-      from: vi.fn(() => {
-        const builder: any = {};
-        builder.select = () => builder;
-        builder.eq = () => builder;
-        builder.in = () => builder;
-        builder.limit = async () => ({
-          data: null,
-          error: { message: "" },
-        });
-        return builder;
-      }),
-    } as any;
-
+    adminDbMocks.messageQueryError = new Error("");
+    adminDbMocks.messageSelectCalls = 0;
     const unknownMessageRes = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      supabaseQueryUnknown,
       1,
       5,
     );
@@ -627,15 +570,10 @@ describe("database.server helpers", () => {
       errors: ["Error retrieving messages: Unknown error"],
     });
 
-    const supabaseThrown = {
-      from: vi.fn(() => {
-        throw new Error("explode");
-      }),
-    } as any;
-
+    adminDbMocks.messageQueryError = new Error("explode");
+    adminDbMocks.messageSelectCalls = 0;
     const thrownRes = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      supabaseThrown,
       1,
       5,
     );
@@ -644,15 +582,10 @@ describe("database.server helpers", () => {
       errors: ["Error retrieving messages: explode"],
     });
 
-    const supabaseThrownUnknown = {
-      from: vi.fn(() => {
-        throw "nope";
-      }),
-    } as any;
-
+    adminDbMocks.messageQueryError = "nope" as unknown as Error;
+    adminDbMocks.messageSelectCalls = 0;
     const unknownThrownRes = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      supabaseThrownUnknown,
       1,
       5,
     );
@@ -663,26 +596,14 @@ describe("database.server helpers", () => {
   });
 
   test("cancelQueuedMessagesForCampaign continues when page size equals batch size", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
     const update = vi.fn(async (sid: string) => ({ sid }));
-    let page = 0;
-    const supabase = {
+    adminDbMocks.messageRows = [{ sid: "SM1" }, { sid: "SM2" }];
+    adminDbMocks.messageSelectCalls = 0;
+    adminDbMocks.nextQueryKind = "message";
+    const client = {
       rpc: vi.fn(async () => ({})),
-      from: vi.fn(() => {
-        const builder: any = {};
-        builder.select = () => builder;
-        builder.eq = () => builder;
-        builder.in = () => builder;
-        builder.limit = async () => {
-          page += 1;
-          if (page === 1) {
-            return { data: [{ sid: "SM1" }, { sid: "SM2" }], error: null };
-          }
-          return { data: [], error: null };
-        };
-        return builder;
-      }),
     } as any;
 
     const twilio = {
@@ -691,27 +612,18 @@ describe("database.server helpers", () => {
 
     const res = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      supabase,
       55,
       2,
     );
     expect(res).toEqual({ canceledMessages: ["SM1", "SM2"], errors: [] });
-    expect(page).toBe(2);
+    expect(adminDbMocks.messageSelectCalls).toBe(2);
   });
 
   test("cancelQueuedMessagesForCampaign handles null queuedMessages payload", async () => {
-    const mod = await import("../app/lib/database.server");
+    const mod = await import("../app/lib/database/call-actions.server");
 
-    const supabaseNullData = {
-      from: vi.fn(() => {
-        const builder: any = {};
-        builder.select = () => builder;
-        builder.eq = () => builder;
-        builder.in = () => builder;
-        builder.limit = async () => ({ data: null, error: null });
-        return builder;
-      }),
-    } as any;
+    adminDbMocks.messageRows = [];
+    adminDbMocks.messageSelectCalls = 0;
 
     const twilio = {
       messages: ((sid: string) => ({ update: async () => ({ sid }) })) as any,
@@ -719,7 +631,6 @@ describe("database.server helpers", () => {
 
     const res = await mod.cancelQueuedMessagesForCampaign(
       twilio,
-      supabaseNullData,
       12,
       3,
     );

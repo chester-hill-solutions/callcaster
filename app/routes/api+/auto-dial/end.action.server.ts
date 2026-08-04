@@ -1,94 +1,95 @@
-import { createWorkspaceTwilioInstance, safeParseJson } from "@/lib/database.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { resolveJsonAuthSession } from "@/lib/api-route-auth.server";
+import { resolveJsonAuthSession } from "@/lib/api-auth.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database, Tables } from "@/lib/database.types";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import type { Database, Tables } from "@/lib/db-types";
+import {
+  findActiveConferenceIdsForUser,
+  findCallsByConferenceId,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
 import type TwilioSDK from "twilio";
 
-type Supabase = SupabaseClient<Database>;
 type TwilioClient = TwilioSDK.Twilio;
 
 type AutoDialEndDeps = Partial<{
-  verifyAuth: (
-    request: Request,
-  ) => Promise<{ supabaseClient: Supabase; user: User }>;
+  verifyAuth: typeof resolveJsonAuthSession;
   safeParseJson: <T>(request: Request) => Promise<T>;
-  createWorkspaceTwilioInstance: (args: {
-    supabase: Supabase;
-    workspace_id: string;
-  }) => Promise<TwilioClient>;
+  createWorkspaceTwilioInstance: (args: { workspace_id: string }) => Promise<TwilioClient>;
   logger: typeof logger;
 }>;
 
-export const action = async ({
-  request,
-  deps,
-}: ActionFunctionArgs & { deps?: AutoDialEndDeps }) => {
+export const action = defineAction({
+  auth: async (args) => {
+    const { deps } = args as ActionFunctionArgs & { deps?: AutoDialEndDeps };
+    const verifyAuth = deps?.verifyAuth ?? resolveJsonAuthSession;
+    const { user } = await verifyAuth(args.request);
+    return user;
+  },
+  sideEffects: ["db-write", "twilio"],
+  handler: async (ctx) => {
+  const { request, auth: user } = ctx;
+  const { deps } = ctx as typeof ctx & { deps?: AutoDialEndDeps };
 
   const d = {
-    verifyAuth: deps?.verifyAuth ?? resolveJsonAuthSession,
     safeParseJson: deps?.safeParseJson ?? safeParseJson,
     createWorkspaceTwilioInstance:
       deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
     logger: deps?.logger ?? logger,
   };
-  const { supabaseClient, user } = await d.verifyAuth(request);
   const { workspaceId: workspace_id } = await d.safeParseJson<{ workspaceId?: string }>(request);
   if (typeof workspace_id !== "string") {
     return routeData({ error: "Missing workspaceId" }, { status: 400 });
   }
-  const twilio = await d.createWorkspaceTwilioInstance({
-    supabase: supabaseClient,
-    workspace_id,
-  });
+
+  try {
+    await requireWorkspaceAccess({ user, workspaceId: workspace_id });
+  } catch {
+    return routeData({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const twilio = await d.createWorkspaceTwilioInstance({ workspace_id });
 
   const updateOutreachAttempt = async (
     id: string,
     update: Partial<Tables<"outreach_attempt">>,
   ): Promise<Tables<"outreach_attempt">> => {
-    try {
-      const { data: outreachData, error } = await supabaseClient
-        .from("outreach_attempt")
-        .update(update)
-        .eq("id", Number(id))
-        .single();
-      if (error) throw error;
-      return outreachData;
-    } catch (error) {
-      d.logger.error("Error updating outreach attempt:", error);
-      throw error;
+    const result = await updateOutreachAttemptForWorkspace(workspace_id, id, update);
+    if (result instanceof Response) {
+      throw new Error(await result.text());
     }
+    return result;
   };
 
   try {
-    const conferences = await twilio.conferences.list({
-      friendlyName: user.id,
-      status: "in-progress" as const,
-    });
+    const conferenceIds = await findActiveConferenceIdsForUser(workspace_id, user.id);
     await Promise.all(
-      conferences.map(async (conf) => {
+      conferenceIds.map(async (conferenceId) => {
         try {
-          await twilio.conferences(conf.sid).update({ status: "completed" });
+          if (conferenceId.startsWith("CF")) {
+            await twilio.conferences(conferenceId).update({ status: "completed" });
+          } else {
+            const conferences = await twilio.conferences.list({
+              friendlyName: conferenceId,
+              status: "in-progress" as const,
+            });
+            await Promise.all(
+              conferences.map(({ sid }) =>
+                twilio.conferences(sid).update({ status: "completed" }),
+              ),
+            );
+          }
 
-          const { data, error } = await supabaseClient
-            .from("call")
-            .select("sid, outreach_attempt_id, contact_id")
-            .eq("conference_id", conf.sid);
-          logger.debug("Conference calls data:", data);
-          if (error) throw error;
-          if (!data || !data.length) return;
-          type CallRecord = Pick<
-            Tables<"call">,
-            "sid" | "outreach_attempt_id" | "contact_id"
-          >;
-          const calls = data.filter(
-            (call): call is CallRecord =>
-              call !== null &&
-              typeof call.sid === "string" &&
-              call.sid.length > 0,
-          );
+          const calls = await findCallsByConferenceId(workspace_id, conferenceId);
+          logger.debug("Conference calls data:", calls);
+          if (!calls.length) return;
           await Promise.all(
             calls.map(async (call) => {
               if (!call.outreach_attempt_id) return;
@@ -99,14 +100,14 @@ export const action = async ({
                   );
                   await twilio
                     .calls(call.sid)
-                    .update({ twiml: `<Response><Hangup/></Response>` });
+                    .update({ twiml: hangupTwiml() });
               } catch (callError) {
                 d.logger.error(`Error updating call ${call.sid}:`, callError);
               }
             }),
           );
         } catch (confError) {
-          d.logger.error(`Error updating conference ${conf.sid}:`, confError);
+          d.logger.error(`Error updating conference ${conferenceId}:`, confError);
         }
       }),
     );
@@ -118,4 +119,5 @@ export const action = async ({
   }
 
   return routeData({ success: true });
-}
+  },
+});

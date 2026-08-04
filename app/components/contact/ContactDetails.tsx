@@ -1,16 +1,12 @@
-import React, { useState, useCallback } from "react";
-import {
-  Card,
-  CardHeader,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
+import React, { useState, useCallback, useImperativeHandle, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { FaEdit, FaSave } from "react-icons/fa";
+import { Heading } from "@/components/ui/typography";
+import { FaEdit } from "react-icons/fa";
 import ContactFields from "./ContactDetailsFields";
 import OtherDataFields from "./ContactDetailsOtherFields";
 import RecentContacts from "./RecentContacts";
 import type { Audience, Contact, ContactAudience } from "@/lib/types";
+import type { Json } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 // Enhanced type definitions
@@ -20,6 +16,13 @@ export interface ContactDetailsProps {
   userRole?: string;
   onDirtyChange?: (isDirty: boolean) => void;
   onChangesChange?: (hasChanges: boolean) => void;
+  /**
+   * Contacts created via "New Contact" have no saved state to protect, so the
+   * fields should be editable on arrival instead of gated behind an Edit
+   * button that only makes sense once there is something to accidentally
+   * overwrite.
+   */
+  startEditable?: boolean;
 }
 
 export interface ContactDetailsState {
@@ -32,16 +35,80 @@ export interface ContactUpdateData {
   [key: string]: unknown;
 }
 
-const ContactDetails: React.FC<ContactDetailsProps> = ({
-  contact,
-  audiences,
-  userRole,
-  onDirtyChange,
-  onChangesChange,
-}) => {
-  const [editMode, setEditMode] = useState<boolean>(false);
+/** Text fields editable via ContactFields — the set the Save button submits. */
+const EDITABLE_FIELD_NAMES = [
+  "firstname",
+  "surname",
+  "phone",
+  "email",
+  "address",
+  "city",
+  "province",
+  "postal",
+] as const;
+
+/** Imperative handle so the route's single header Save/Reset can read and
+ * clear this component's in-progress edits without lifting all field state
+ * up (audiences/other-data stay local; only the persisted text fields need
+ * to reach the action). */
+export interface ContactDetailsHandle {
+  getFormValues: () => Record<string, string>;
+  reset: () => void;
+}
+
+function buildFieldValues(
+  contact?: Contact | null,
+): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const name of EDITABLE_FIELD_NAMES) {
+    const value = contact?.[name];
+    values[name] = value != null ? String(value) : "";
+  }
+  return values;
+}
+
+const ContactDetails = React.forwardRef<
+  ContactDetailsHandle,
+  ContactDetailsProps
+>(function ContactDetails(
+  {
+    contact,
+    audiences,
+    userRole,
+    onDirtyChange,
+    onChangesChange,
+    startEditable = false,
+  },
+  ref,
+) {
+  const [editMode, setEditMode] = useState<boolean>(startEditable);
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [hasChanges, setHasChanges] = useState<boolean>(false);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(() =>
+    buildFieldValues(contact),
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      getFormValues: () => fieldValues,
+      reset: () => {
+        setFieldValues(buildFieldValues(contact));
+        setIsDirty(false);
+        setHasChanges(false);
+        onDirtyChange?.(false);
+        onChangesChange?.(false);
+      },
+    }),
+    [fieldValues, contact, onDirtyChange, onChangesChange],
+  );
+
+  // The values ContactFields renders: saved contact data overlaid with
+  // whatever the user has typed so far, so edits are visible immediately.
+  const effectiveContact = useMemo(
+    () => ({ ...(contact ?? {}), ...fieldValues }) as Contact,
+    [contact, fieldValues],
+  );
 
   // Enhanced handlers with better type safety
   const handleEdit = useCallback((): void => {
@@ -54,30 +121,18 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
     }
   }, [onDirtyChange]);
 
-  const handleSave = useCallback((): void => {
-    try {
-      setEditMode(false);
-      setIsDirty(false);
-      setHasChanges(false);
-      onDirtyChange?.(false);
-      onChangesChange?.(false);
-    } catch (error) {
-      logger.error('Error saving contact:', error);
-    }
-  }, [onDirtyChange, onChangesChange]);
-
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
     try {
       const { name, value } = e.target;
-      const updateData: ContactUpdateData = { [name]: value };
-      
-      // Update contact data (this would typically be passed from parent)
+      setFieldValues((prev) => ({ ...prev, [name]: value }));
+      setIsDirty(true);
       setHasChanges(true);
+      onDirtyChange?.(true);
       onChangesChange?.(true);
     } catch (error) {
       logger.error('Error handling input change:', error);
     }
-  }, [onChangesChange]);
+  }, [onDirtyChange, onChangesChange]);
 
   const handleAudienceChange = useCallback((e: React.ChangeEvent<HTMLInputElement>): void => {
     try {
@@ -115,88 +170,90 @@ const ContactDetails: React.FC<ContactDetailsProps> = ({
   }, []);
 
   return (
-    <Card className="mx-auto w-full max-w-4xl">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold">Contact Details</h2>
-          {isDirty && (
-            <span className="text-sm text-orange-600 font-medium">
-              Unsaved changes
-            </span>
-          )}
-        </div>
-      </CardHeader>
-      
-      <CardContent>
-        <ContactFields
-          contact={contact}
-          editMode={editMode}
-          onInputChange={handleInputChange}
-        />
-        
-        <div className="my-6">
-          <h3 className="mb-4 text-xl font-semibold">Audiences</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {audiences.map((audience) => (
-              <div key={audience.id} className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  value={audience.id}
-                  checked={isContactInAudience(audience.id)}
-                  name={getAudienceName(audience)}
-                  id={`audience-${audience.id}`}
-                  onChange={handleAudienceChange}
-                  disabled={!editMode}
-                  className="rounded border-gray-300"
-                />
-                <label 
-                  htmlFor={`audience-${audience.id}`}
-                  className="text-sm font-medium text-gray-700"
-                >
-                  {getAudienceName(audience)}
-                </label>
-              </div>
-            ))}
-          </div>
-        </div>
+    <div className="mx-auto w-full max-w-4xl space-y-6">
+      <div className="flex items-center justify-between border-b border-border pb-4">
+        <Heading level={3}>Contact Details</Heading>
+        {isDirty && (
+          <span className="text-sm font-medium text-warning">
+            Unsaved changes
+          </span>
+        )}
+      </div>
 
-        <OtherDataFields
-          otherData={contact?.other_data}
-          editMode={editMode}
-          setContact={(data: ContactUpdateData) => {
+      <ContactFields
+        contact={effectiveContact}
+        editMode={editMode}
+        onInputChange={handleInputChange}
+      />
+
+      <div className="border-t border-border pt-6">
+        <Heading level={4} className="mb-4">Audiences</Heading>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+          {audiences.map((audience) => (
+            <div key={audience.id} className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                value={audience.id}
+                checked={isContactInAudience(audience.id)}
+                name={getAudienceName(audience)}
+                id={`audience-${audience.id}`}
+                onChange={handleAudienceChange}
+                disabled={!editMode}
+                className="rounded border-input"
+              />
+              <label
+                htmlFor={`audience-${audience.id}`}
+                className="text-sm font-medium text-foreground"
+              >
+                {getAudienceName(audience)}
+              </label>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <OtherDataFields
+        otherData={(() => {
+          // other_data is a jsonb array since 20260722110000; tolerate a
+          // legacy stringified value defensively (pre-migration snapshots).
+          const raw: unknown = contact?.other_data;
+          if (Array.isArray(raw)) return raw as Json[];
+          if (typeof raw === "string") {
             try {
-              // Handle other data changes
-              setHasChanges(true);
-              onChangesChange?.(true);
-            } catch (error) {
-              logger.error('Error updating other data:', error);
+              const parsed = JSON.parse(raw) as Json[];
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
             }
-          }}
-        />
-        
-        <RecentContacts contact={contact} />
-      </CardContent>
-      
-      <CardFooter className="flex justify-end space-x-2">
-        {editMode ? (
-          <Button
-            onClick={handleSave}
-            className="bg-green-500 text-white hover:bg-green-600"
-            disabled={!hasChanges}
-          >
-            <FaSave className="mr-2" /> Save
-          </Button>
-        ) : (
-          <Button
-            onClick={handleEdit}
-            className="bg-blue-500 text-white hover:bg-blue-600"
-          >
+          }
+          return [];
+        })()}
+        editMode={editMode}
+        setContact={(data: ContactUpdateData) => {
+          try {
+            // Handle other data changes
+            setHasChanges(true);
+            onChangesChange?.(true);
+          } catch (error) {
+            logger.error('Error updating other data:', error);
+          }
+        }}
+      />
+
+      <RecentContacts contact={contact} />
+
+      {/* There is only one working Save action (the page header's, which
+          submits to the server) — this footer's only job is the Edit gate
+          for existing contacts. New contacts start editable and skip it. */}
+      {!editMode && (
+        <div className="flex justify-end border-t border-border pt-4">
+          <Button onClick={handleEdit}>
             <FaEdit className="mr-2" /> Edit
           </Button>
-        )}
-      </CardFooter>
-    </Card>
+        </div>
+      )}
+    </div>
   );
-};
+});
 
 export default ContactDetails;

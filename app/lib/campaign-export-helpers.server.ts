@@ -1,7 +1,13 @@
-import { type SupabaseClient } from "@supabase/supabase-js";
 import { CSV_DEFAULT_LINE_ENDING, CSV_UTF8_BOM } from "@/lib/csv";
-import type { Database } from "@/lib/database.types";
 import { logger } from "@/lib/logger.server";
+import {
+  createSignedObjectUrl,
+  uploadObject,
+} from "@/lib/object-storage.server";
+import {
+  isProcessingStale,
+  PROCESSING_INTERRUPTED_MESSAGE,
+} from "@/lib/processing-watchdog.server";
 import type { ExportScript } from "@/lib/campaign-export-types.server";
 
 export type CampaignExportStatus = {
@@ -13,6 +19,10 @@ export type CampaignExportStatus = {
   stage: string;
   workspaceId: string;
   created_at: string;
+  /** Stamped on every writeExportStatus() call; used by the staleness
+   * watchdog in the status loader to detect a run abandoned by a mid-run
+   * restart. See app/lib/processing-watchdog.server.ts. */
+  updated_at?: string;
   campaignId?: number;
   processed?: number;
   total?: number;
@@ -26,6 +36,7 @@ export function createInitialExportStatus(args: {
   workspaceId: string;
   campaignId: number;
 }): CampaignExportStatus {
+  const now = new Date().toISOString();
   return {
     status: "processing",
     progress: 0,
@@ -34,34 +45,36 @@ export function createInitialExportStatus(args: {
     campaignName: args.campaignName,
     stage: "Starting export",
     workspaceId: args.workspaceId,
-    created_at: new Date().toISOString(),
+    created_at: now,
+    updated_at: now,
   };
 }
 
 export async function writeExportStatus(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   exportId: string,
   statusData: CampaignExportStatus,
   patch: Partial<CampaignExportStatus>,
 ): Promise<CampaignExportStatus> {
-  const nextStatus = { ...statusData, ...patch };
-  const { error } = await supabaseClient.storage
-    .from("campaign-exports")
-    .upload(`${workspaceId}/${exportId}.json`, JSON.stringify(nextStatus), {
+  const nextStatus = {
+    ...statusData,
+    ...patch,
+    updated_at: new Date().toISOString(),
+  };
+  await uploadObject(
+    "campaign-exports",
+    `${workspaceId}/${exportId}.json`,
+    JSON.stringify(nextStatus),
+    {
       contentType: "application/json",
       upsert: true,
-    });
-
-  if (error) {
-    throw new Error(`Error updating export status: ${error.message}`);
-  }
+    },
+  );
 
   return nextStatus;
 }
 
 export async function finalizeCsvExport(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   exportId: string,
   statusData: CampaignExportStatus,
@@ -70,43 +83,39 @@ export async function finalizeCsvExport(
 ): Promise<CampaignExportStatus> {
   const csvData = `${CSV_UTF8_BOM}${csvLines.join(CSV_DEFAULT_LINE_ENDING)}${CSV_DEFAULT_LINE_ENDING}`;
 
-  const { error: csvError } = await supabaseClient.storage
-    .from("campaign-exports")
-    .upload(`${workspaceId}/${exportId}.csv`, new Blob([csvData], { type: "text/csv" }), {
+  await uploadObject(
+    "campaign-exports",
+    `${workspaceId}/${exportId}.csv`,
+    csvData,
+    {
       contentType: "text/csv",
       upsert: true,
-    });
+    },
+  );
 
-  if (csvError) {
-    throw new Error(`Error uploading CSV file: ${csvError.message}`);
-  }
+  const signedUrl = await createSignedObjectUrl(
+    "campaign-exports",
+    `${workspaceId}/${exportId}.csv`,
+    24 * 60 * 60,
+  );
 
-  const { data: signedUrlData, error: signedUrlError } = await supabaseClient.storage
-    .from("campaign-exports")
-    .createSignedUrl(`${workspaceId}/${exportId}.csv`, 24 * 60 * 60);
-
-  if (signedUrlError) {
-    throw new Error(`Error creating signed URL: ${signedUrlError.message}`);
-  }
-
-  return writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
+  return writeExportStatus(workspaceId, exportId, statusData, {
     status: "completed",
     progress: 100,
-    downloadUrl: signedUrlData.signedUrl,
+    downloadUrl: signedUrl,
     stage: "Export completed",
     ...completionPatch,
   });
 }
 
 export async function writeExportErrorStatus(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   exportId: string,
   statusData: CampaignExportStatus,
   error: unknown,
 ): Promise<void> {
   try {
-    await writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
+    await writeExportStatus(workspaceId, exportId, statusData, {
       status: "error",
       error: error instanceof Error ? error.message : "Unknown error",
       exportId,
@@ -116,6 +125,46 @@ export async function writeExportErrorStatus(
   } catch (statusError) {
     logger.error("Error writing error status:", statusError);
   }
+}
+
+/**
+ * Staleness watchdog for the polling status loader:
+ * `processMessageCampaignExport`/`processCallCampaignExport` run
+ * fire-and-forget in the request process that started them (see
+ * app/routes/api+/campaign-export.action.server.ts). If that process
+ * restarts mid-run, the status blob is stranded at status: "processing"
+ * forever and the client polls indefinitely.
+ *
+ * Call this from the status loader (write-through on read): if the status
+ * is "processing" and hasn't been updated in PROCESSING_STALE_MS, rewrite
+ * it as a terminal failure.
+ */
+export async function markCampaignExportInterruptedIfStale(
+  workspaceId: string,
+  exportId: string,
+  statusData: CampaignExportStatus,
+  now?: Date,
+): Promise<{ interrupted: boolean; statusData: CampaignExportStatus }> {
+  if (statusData.status !== "processing") {
+    return { interrupted: false, statusData };
+  }
+  const lastUpdated = statusData.updated_at ?? statusData.created_at;
+  if (!isProcessingStale(lastUpdated, now)) {
+    return { interrupted: false, statusData };
+  }
+
+  const nextStatus = await writeExportStatus(workspaceId, exportId, statusData, {
+    status: "error",
+    error: PROCESSING_INTERRUPTED_MESSAGE,
+    stage: "Export failed",
+  });
+
+  logger.error("campaign_export.watchdog.interrupted", {
+    workspaceId,
+    exportId,
+  });
+
+  return { interrupted: true, statusData: nextStatus };
 }
 
 export type ScriptQuestion = {

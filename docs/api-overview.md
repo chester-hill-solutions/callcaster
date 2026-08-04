@@ -59,14 +59,14 @@ The workspace is inferred from the key. If you send `workspace_id` in the body, 
 
 ### API key setup
 
-API keys are created in the workspace **Settings** UI (session required). The admin endpoint `POST /api/workspace-api-keys` is **not** part of the public integrator API.
+API keys are created in the workspace **Settings** UI, or programmatically via `POST /api/workspaces/{workspaceId}/api-keys` (session or Bearer JWT auth — see the [agent quickstart](./api-agent-quickstart.md#api-keys-automation)). The flat admin endpoint `POST /api/workspace-api-keys` backs the Settings UI and is **not** part of the public integrator API.
 
 1. Sign in to CallCaster in a browser.
-2. Open workspace **Settings** and create an API key.
+2. Open workspace **Settings** and create an API key with the capability scopes it needs (at least one required).
 3. Copy the key once (shown only at creation); store it securely.
 4. Use the key as `X-API-Key` or `Authorization: Bearer` in server-side scripts.
 
-Never commit API keys to source control.
+Each key only accesses operations covered by its scopes. Requests that need a missing capability return `403`. Never commit API keys to source control.
 
 ---
 
@@ -86,7 +86,7 @@ Validation errors from Zod-backed public routes may include field paths, e.g. `t
 |--------|---------------|----------|
 | `400` | Validation or business rule | Missing `title`; invalid UUID; both `script` and `script_id` sent; `caller_id` not in workspace; `user_id` required for API key on `/api/sms` |
 | `401` | Missing or invalid auth | Invalid API key; no session cookie |
-| `403` | Workspace mismatch | `workspace_id` in body does not match API key workspace |
+| `403` | Workspace mismatch or missing capability | `workspace_id` does not match API key workspace; API key lacks required scope |
 | `404` | Not found (chat SMS) | Invalid phone number normalization |
 | `405` | Wrong HTTP method | Non-POST to action route |
 | `500` | Server/Twilio failure | Twilio send error; database error |

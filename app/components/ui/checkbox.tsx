@@ -1,28 +1,50 @@
-import * as React from "react"
-import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
-import { Check } from "lucide-react"
+import type { CheckboxProps as AriaCheckboxProps } from "react-aria-components";
 
-import { cn } from "@/lib/utils"
+import { Checkbox as ShadCheckbox } from "@chester-hill-solutions/shad-cc/checkbox";
 
-const Checkbox = React.forwardRef<
-  React.ElementRef<typeof CheckboxPrimitive.Root>,
-  React.ComponentPropsWithoutRef<typeof CheckboxPrimitive.Root>
->(({ className, ...props }, ref) => (
-  <CheckboxPrimitive.Root
-    ref={ref}
-    className={cn(
-      "peer h-4 w-4 shrink-0 rounded-sm border border-primary ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
-      className
-    )}
-    {...props}
-  >
-    <CheckboxPrimitive.Indicator
-      className={cn("flex items-center justify-center text-current")}
-    >
-      <Check className="h-4 w-4" />
-    </CheckboxPrimitive.Indicator>
-  </CheckboxPrimitive.Root>
-))
-Checkbox.displayName = CheckboxPrimitive.Root.displayName
+type CheckboxProps = Omit<
+  AriaCheckboxProps,
+  "isSelected" | "defaultSelected" | "onChange" | "isDisabled" | "isIndeterminate"
+> & {
+  checked?: boolean | "indeterminate";
+  defaultChecked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+  disabled?: boolean;
+  isDisabled?: boolean;
+  isSelected?: boolean;
+  isIndeterminate?: boolean;
+  onChange?: AriaCheckboxProps["onChange"];
+};
 
-export { Checkbox }
+function Checkbox({
+  checked,
+  defaultChecked,
+  onCheckedChange,
+  disabled,
+  isDisabled,
+  isSelected,
+  isIndeterminate,
+  onChange,
+  ...props
+}: CheckboxProps) {
+  const indeterminate =
+    isIndeterminate || checked === "indeterminate";
+  const selected =
+    isSelected ?? (checked === "indeterminate" ? false : checked);
+
+  return (
+    <ShadCheckbox
+      isSelected={selected}
+      isIndeterminate={indeterminate}
+      defaultSelected={defaultChecked}
+      isDisabled={isDisabled ?? disabled}
+      onChange={(value) => {
+        onChange?.(value);
+        onCheckedChange?.(value);
+      }}
+      {...props}
+    />
+  );
+}
+
+export { Checkbox };

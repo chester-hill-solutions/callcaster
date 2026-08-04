@@ -1,95 +1,119 @@
-import { buildDequeuedQueueUpdate } from "@/lib/queue-status";
-import { createClient } from "@supabase/supabase-js";
+import { data as routeData } from "react-router";
+import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { createErrorResponse } from "@/lib/errors.server";
-import { createWorkspaceTwilioInstance, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
+import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 
-import type { ActionFunctionArgs } from "react-router";
+import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
+import { createTenantDb } from "@/server/tenant-db";
+import { insertCallForWorkspace } from "@/lib/telephony-db.server";
+import { defineAction } from "@/lib/handler.server";
 
-export const action = async ({ request }:ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request, auth }) => {
+    const user = auth.user;
+    const formData = await request.formData();
 
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-  const userSupabase = getAuthSupabaseClient(auth);
-  const user = auth.user;
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
-  const formData = await request.formData();
+    const to_number = formData.get("to_number") as string;
+    const campaign_id = formData.get("campaign_id") as string;
+    const workspace_id = formData.get("workspace_id") as string;
+    const contact_id = formData.get("contact_id") as string;
+    const caller_id = formData.get("caller_id") as string;
+    const queue_id = formData.get("queue_id") as string;
+    const user_id = formData.get("user_id") as string;
+    if (!workspace_id || !campaign_id || !contact_id || !caller_id || !queue_id || !user_id) {
+      throw new Error("Missing required form data");
+    }
+    let outreachAttemptId;
+    let call;
+    const twilio = await createWorkspaceTwilioInstance({ workspace_id });
 
-  const to_number = formData.get("to_number") as string;
-  const campaign_id = formData.get("campaign_id") as string;
-  const workspace_id = formData.get("workspace_id") as string;
-  const contact_id = formData.get("contact_id") as string;
-  const caller_id = formData.get("caller_id") as string;
-  const queue_id = formData.get("queue_id") as string;
-  const user_id = formData.get("user_id") as string;
-  if (!workspace_id || !campaign_id || !contact_id || !caller_id || !queue_id || !user_id) {
-    throw new Error("Missing required form data");
-  }
-  let outreachAttemptId;
-  let call;
-  const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
-    workspace_id,
-  });
+    try {
+      await requireWorkspaceAccess({ user, workspaceId: workspace_id });
 
-  try {
-    await requireWorkspaceAccess({ supabaseClient: userSupabase, user, workspaceId: workspace_id });
-    const { data, error: outreachError } = await supabase.rpc(
-      "create_outreach_attempt",
-      {
-        con_id: contact_id,
-        cam_id: campaign_id,
-        wks_id: workspace_id,
-        queue_id: queue_id,
-        usr_id: user_id,
-      },
-    );
+      // Recipient-local calling window (TCPA/CRTC 8am–9pm recipient time).
+      // Return without dequeuing so the row stays `queued` for a later,
+      // in-window run.
+      const windowStatus = recipientCallingWindowStatus(to_number);
+      if (!windowStatus.allowed) {
+        logger.info("ivr.recipient_window_skip", {
+          campaignId: campaign_id,
+          queueId: queue_id,
+          timezone: windowStatus.timezone,
+          reason: windowStatus.reason,
+        });
+        return routeData(
+          { skipped: true, reason: "outside_recipient_calling_window" },
+          { status: 200 },
+        );
+      }
 
-    if (outreachError) throw outreachError;
-    outreachAttemptId = data;
+      const credits = await getWorkspaceCreditsBalance(workspace_id);
+      if (credits === null) {
+        return routeData({ error: "Workspace not found" }, { status: 404 });
+      }
+      if (hasInsufficientCreditsForOutbound(credits)) {
+        return routeData({ creditsError: true }, { status: 402 });
+      }
 
-    call = await withTwilioRetry(
-      () =>
-        twilio.calls.create({
-          to: to_number,
-          from: caller_id,
-          url: `${env.BASE_URL()}/api/ivr/${campaign_id}/page_1/`,
-          machineDetection: "Enable",
-          statusCallbackEvent: ["answered", "completed"],
-          statusCallback: `${env.BASE_URL()}/api/ivr/status`,
-        }),
-      { workspaceId: workspace_id, operation: "calls.create" },
-    );
+      const tdb = createTenantDb(workspace_id);
+      outreachAttemptId = await rpcCreateOutreachAttempt(tdb, {
+        contactId: Number(contact_id),
+        campaignId: Number(campaign_id),
+        userId: user_id,
+        workspaceId: workspace_id,
+        queueId: Number(queue_id),
+      });
 
-    
-    const { error: insertError } = await supabase.from("call").insert({
-      sid: call.sid,
-      to: to_number,
-      from: caller_id,
-      campaign_id,
-      contact_id,
-      workspace: workspace_id,
-      outreach_attempt_id: outreachAttemptId,
-    }).select();
+      call = await withTwilioRetry(
+        () =>
+          twilio.calls.create({
+            to: to_number,
+            from: caller_id,
+            url: `${env.BASE_URL()}/api/ivr/${campaign_id}/page_1/`,
+            machineDetection: "Enable",
+            statusCallbackEvent: ["answered", "completed"],
+            statusCallback: `${env.BASE_URL()}/api/ivr/status`,
+          }),
+        { workspaceId: workspace_id, operation: "calls.create" },
+      );
 
-    if (insertError) throw insertError;
+      const callRow = await insertCallForWorkspace(workspace_id, {
+        sid: call.sid,
+        to: to_number,
+        from: caller_id,
+        campaign_id: Number(campaign_id),
+        contact_id: Number(contact_id),
+        outreach_attempt_id: Number(outreachAttemptId),
+      });
 
-    // Dequeue
-    const { error: dequeueError } = await supabase
-      .from("campaign_queue")
-      .update(buildDequeuedQueueUpdate(user_id, "IVR call completed"))
-      .eq("id", queue_id);
-      
-    if (dequeueError) throw dequeueError;
+      if (!callRow) throw new Error("Failed to insert call record");
 
-    return new Response(JSON.stringify({ success: true, callSid: call.sid }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error: unknown) {
-    logger.error("Error processing IVR request:", error);
-    return createErrorResponse(error, "Error processing IVR request");
-  }
-}
+      // Dequeue
+      await dequeueCampaignQueueById({
+        queueId: Number(queue_id),
+        userId: user_id,
+        reason: "IVR call completed",
+      });
+
+      return new Response(JSON.stringify({ success: true, callSid: call.sid }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error: unknown) {
+      logger.error("Error processing IVR request:", error);
+      return createErrorResponse(error, "Error processing IVR request");
+    }
+  },
+});

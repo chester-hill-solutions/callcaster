@@ -8,86 +8,69 @@ vi.mock("@/lib/env.server", () => {
   return { env: new Proxy({}, handler) };
 });
 
-const requireWorkspaceAccess = vi.fn(async () => undefined);
-const supabaseMockState = vi.hoisted(() => ({ lastSupabaseClient: null as any }));
+const requireWorkspaceAccess = vi.hoisted(() =>
+  vi.fn(async () => undefined),
+);
 
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/database.server")>(
-    "@/lib/database.server",
-  );
-  return { ...actual, requireWorkspaceAccess };
-});
+const audienceExportMocks = vi.hoisted(() => ({
+  findAudienceWorkspaceById: vi.fn(async () => "w1"),
+  listAudienceContactsForExport: vi.fn(async () => [
+    {
+      id: 1,
+      firstname: "=1+1",
+      surname: 'Doe, "Jr"',
+      opt_out: false,
+      other_data: [{ key: "custom", value: "@SUM(1,1)" }],
+    },
+  ]),
+}));
 
-function buildSupabaseClient() {
-  const supabaseClient: any = {};
-  const contactAudienceCalls: any[] = [];
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    requireWorkspaceAccess(...args),
+}));
 
-  supabaseClient.from = (table: string) => {
-    if (table === "audience") {
-      return {
-        select: () => ({
-          eq: () => ({
-            single: async () => ({
-              data: { workspace: "w1" },
-              error: null,
-            }),
-          }),
-        }),
-      };
-    }
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
+  requireDataPlaneRouteCapability: async (
+    _context: unknown,
+    workspaceId: string,
+  ) => ({ workspaceId, auth: { workspaceId, userId: "u1" } }),
+}));
 
-    if (table === "contact_audience") {
-      const builder: any = {};
-      builder.select = () => builder;
-      builder.eq = (col: string, val: any) => {
-        contactAudienceCalls.push({ op: "eq", col, val });
-        return builder;
-      };
-      builder.or = (q: string) => {
-        contactAudienceCalls.push({ op: "or", q });
-        return builder;
-      };
-      builder.order = (key: string, opts: any) => {
-        contactAudienceCalls.push({ op: "order", key, opts });
-        return builder;
-      };
-      builder.then = (resolve: any, reject: any) =>
-        Promise.resolve({
-          data: [
-            {
-              id: 1,
-              firstname: "=1+1",
-              surname: 'Doe, "Jr"',
-              opt_out: false,
-              other_data: [{ key: "custom", value: "@SUM(1,1)" }],
-            },
-          ],
-          error: null,
-        }).then(resolve, reject);
-      (supabaseClient as any).__contactAudienceCalls = contactAudienceCalls;
-      return builder;
-    }
+vi.mock("@/lib/audience-upload-db.server", () => ({
+  findAudienceWorkspaceById: (...args: any[]) =>
+    audienceExportMocks.findAudienceWorkspaceById(...args),
+}));
 
-    throw new Error(`unexpected table ${table}`);
-  };
+vi.mock("@/lib/database/contact-audience.server", () => ({
+  listAudienceContactsForExport: (...args: any[]) =>
+    audienceExportMocks.listAudienceContactsForExport(...args),
+}));
 
-  supabaseMockState.lastSupabaseClient = supabaseClient;
-  return supabaseClient;
-}
-
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 
 describe("api.audiences CSV export contract", () => {
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
+    audienceExportMocks.findAudienceWorkspaceById.mockReset();
+    audienceExportMocks.listAudienceContactsForExport.mockReset();
+    audienceExportMocks.findAudienceWorkspaceById.mockResolvedValue("w1");
+    audienceExportMocks.listAudienceContactsForExport.mockResolvedValue([
+      {
+        id: 1,
+        firstname: "=1+1",
+        surname: 'Doe, "Jr"',
+        opt_out: false,
+        other_data: [{ key: "custom", value: "@SUM(1,1)" }],
+      },
+    ]);
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers(),
+            headers: new Headers(),
       user: { id: "u1" },
     });
   });
@@ -97,7 +80,7 @@ describe("api.audiences CSV export contract", () => {
     const request = new Request(
       "http://localhost/api/audiences?returnType=csv&audienceId=123&q=doe&sortKey=firstname&sortDirection=desc",
     );
-    const res = await asRouteResponse(await mod.loader({ request } as any));
+    const res = await asRouteResponse(mod.loader({ request } as any));
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/csv; charset=utf-8");
@@ -122,7 +105,7 @@ describe("api.audiences CSV export contract", () => {
     const request = new Request(
       "http://localhost/api/audiences?returnType=csv&audienceId=123&q=doe&sortKey=firstname&sortDirection=desc",
     );
-    const res = await asRouteResponse(await mod.loader({ request } as any));
+    const res = await asRouteResponse(mod.loader({ request } as any));
     expect(res.status).toBe(200);
 
     const bytes = new Uint8Array(await res.arrayBuffer());
@@ -136,19 +119,14 @@ describe("api.audiences CSV export contract", () => {
       "surname",
     ]);
 
-    const calls = supabaseMockState.lastSupabaseClient?.__contactAudienceCalls as
-      | any[]
-      | undefined;
-    expect(Array.isArray(calls)).toBe(true);
-    expect(calls.some((c) => c.op === "or" && String(c.q).includes("contact.firstname.ilike")))
-      .toBe(true);
-    expect(
-      calls.some(
-        (c) =>
-          c.op === "order" &&
-          c.key === "contact(firstname)" &&
-          c.opts?.ascending === false,
-      ),
-    ).toBe(true);
+    expect(audienceExportMocks.listAudienceContactsForExport).toHaveBeenCalledWith(
+      "w1",
+      123,
+      expect.objectContaining({
+        q: "doe",
+        sortKey: "firstname",
+        sortDirection: "desc",
+      }),
+    );
   });
 });

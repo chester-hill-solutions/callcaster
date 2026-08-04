@@ -10,11 +10,11 @@
  * --merge: upsert on sid (overwrites columns for existing rows; default is insert-new-only)
  * --patch-contacts: only DB pass — set contact_id on inbound rows where null and find_contact_by_phone returns exactly one row
  *
- * Requires: SUPABASE_URL, SUPABASE_SERVICE_KEY, and workspace.twilio_data with sid + authToken.
+ * Requires: DATABASE_URL env var, and workspace.twilio_data with sid + authToken.
  */
 import "dotenv/config";
 
-import { createClient } from "@supabase/supabase-js";
+import postgres from "postgres";
 import Twilio from "twilio";
 
 const VALID_SMS_STATUSES = new Set([
@@ -93,24 +93,43 @@ function toIso(d) {
 
 /**
  * Mirrors api.inbound-sms: single unambiguous contact only.
- * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  */
-async function resolveContactIdForFrom(supabase, workspaceId, fromPhone, cache) {
+async function resolveContactIdForFrom(sql, workspaceId, fromPhone, cache) {
   if (!fromPhone) return null;
   if (cache.has(fromPhone)) return cache.get(fromPhone);
 
-  const { data, error } = await supabase.rpc("find_contact_by_phone", {
-    p_workspace_id: workspaceId,
-    p_phone_number: fromPhone,
-  });
+  const rows = await sql`select * from find_contact_by_phone(${fromPhone} ::text, ${workspaceId} ::uuid)`;
 
   let id = null;
-  if (!error && Array.isArray(data) && data.length === 1 && typeof data[0].id === "number") {
-    id = data[0].id;
+  if (rows.length === 1 && rows[0].id != null) {
+    id = rows[0].id;
   }
   cache.set(fromPhone, id);
   return id;
 }
+
+const MESSAGE_COLUMNS = [
+  "sid",
+  "account_sid",
+  "body",
+  "from",
+  "to",
+  "direction",
+  "status",
+  "workspace",
+  "date_created",
+  "date_sent",
+  "date_updated",
+  "num_media",
+  "num_segments",
+  "messaging_service_sid",
+  "api_version",
+  "uri",
+  "subresource_uris",
+  "error_code",
+  "error_message",
+  "contact_id",
+];
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -121,22 +140,26 @@ async function main() {
     process.exit(1);
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
-  if (!supabaseUrl || !supabaseKey) {
-    console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in environment.");
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.error("Missing DATABASE_URL in environment.");
     process.exit(1);
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
-  const { data: ws, error: wsErr } = await supabase
-    .from("workspace")
-    .select("id, twilio_data")
-    .eq("id", args.workspaceId)
-    .single();
+  const sql = postgres(databaseUrl);
 
-  if (wsErr || !ws) {
-    console.error("Workspace load failed:", wsErr?.message ?? wsErr);
+  let ws;
+  try {
+    [ws] = await sql`select id, twilio_data from workspace where id = ${args.workspaceId}`;
+  } catch (error) {
+    console.error("Workspace load failed:", error.message);
+    await sql.end();
+    process.exit(1);
+  }
+
+  if (!ws) {
+    console.error("Workspace load failed: not found");
+    await sql.end();
     process.exit(1);
   }
 
@@ -147,34 +170,37 @@ async function main() {
     const MAX_ROWS = 10_000;
     let patched = 0;
     let examined = 0;
-    const { data: rows, error } = await supabase
-      .from("message")
-      .select("sid, from")
-      .eq("workspace", workspaceId)
-      .eq("direction", "inbound")
-      .is("contact_id", null)
-      .not("from", "is", null)
-      .order("sid", { ascending: true })
-      .limit(MAX_ROWS);
-    if (error) {
+    let rows;
+    try {
+      rows = await sql`
+        select sid, "from"
+        from message
+        where workspace = ${workspaceId}
+          and direction = 'inbound'
+          and contact_id is null
+          and "from" is not null
+        order by sid
+        limit ${MAX_ROWS}
+      `;
+    } catch (error) {
       console.error(JSON.stringify({ workspaceId, error: error.message }, null, 2));
+      await sql.end();
       process.exit(1);
     }
-    for (const row of rows ?? []) {
+    for (const row of rows) {
       examined++;
       const cid = await resolveContactIdForFrom(
-        supabase,
+        sql,
         workspaceId,
         row.from,
         contactCache,
       );
       if (cid == null || args.dryRun) continue;
-      const { error: upErr } = await supabase
-        .from("message")
-        .update({ contact_id: cid })
-        .eq("sid", row.sid);
-      if (upErr) {
-        console.error(JSON.stringify({ workspaceId, error: upErr.message }, null, 2));
+      try {
+        await sql`update message set contact_id = ${cid} where sid = ${row.sid}`;
+      } catch (error) {
+        console.error(JSON.stringify({ workspaceId, error: error.message }, null, 2));
+        await sql.end();
         process.exit(1);
       }
       patched++;
@@ -192,12 +218,14 @@ async function main() {
         2,
       ),
     );
+    await sql.end();
     return;
   }
 
   const creds = readTwilioWorkspaceCredentials(ws.twilio_data);
   if (!creds) {
     console.error("Workspace has no usable Twilio credentials in twilio_data.");
+    await sql.end();
     process.exit(1);
   }
 
@@ -221,23 +249,34 @@ async function main() {
     const chunk = batch.splice(0, batch.length);
     let toWrite = chunk;
 
-    if (!args.merge) {
-      const sids = chunk.map((r) => r.sid);
-      const { data: existing, error: exErr } = await supabase
-        .from("message")
-        .select("sid")
-        .in("sid", sids);
-      if (exErr) return { inserted: 0, skippedExisting: 0, error: exErr };
-      const have = new Set((existing ?? []).map((r) => r.sid));
-      toWrite = chunk.filter((r) => !have.has(r.sid));
-      const skippedExisting = chunk.length - toWrite.length;
-      if (toWrite.length === 0) {
-        return { inserted: 0, skippedExisting, error: null };
+    try {
+      if (!args.merge) {
+        const sids = chunk.map((r) => r.sid);
+        const existingRows = await sql`select sid from message where sid in ${sql(sids)}`;
+        const have = new Set((existingRows ?? []).map((r) => r.sid));
+        toWrite = chunk.filter((r) => !have.has(r.sid));
+        const skippedExisting = chunk.length - toWrite.length;
+        if (toWrite.length === 0) {
+          return { inserted: 0, skippedExisting, error: null };
+        }
+
+        for (const row of toWrite) {
+          const cid = await resolveContactIdForFrom(
+            sql,
+            workspaceId,
+            row.from,
+            contactCache,
+          );
+          if (cid != null) row.contact_id = cid;
+        }
+
+        await sql`insert into message ${sql(toWrite, ...MESSAGE_COLUMNS)}`;
+        return { inserted: toWrite.length, skippedExisting, error: null };
       }
 
       for (const row of toWrite) {
         const cid = await resolveContactIdForFrom(
-          supabase,
+          sql,
           workspaceId,
           row.from,
           contactCache,
@@ -245,27 +284,33 @@ async function main() {
         if (cid != null) row.contact_id = cid;
       }
 
-      const { error } = await supabase.from("message").insert(toWrite);
-      if (error) return { inserted: 0, skippedExisting, error };
-      return { inserted: toWrite.length, skippedExisting, error: null };
+      await sql`
+        insert into message ${sql(toWrite, ...MESSAGE_COLUMNS)}
+        on conflict (sid) do update set
+          account_sid = excluded.account_sid,
+          body = excluded.body,
+          "from" = excluded."from",
+          to = excluded.to,
+          direction = excluded.direction,
+          status = excluded.status,
+          workspace = excluded.workspace,
+          date_created = excluded.date_created,
+          date_sent = excluded.date_sent,
+          date_updated = excluded.date_updated,
+          num_media = excluded.num_media,
+          num_segments = excluded.num_segments,
+          messaging_service_sid = excluded.messaging_service_sid,
+          api_version = excluded.api_version,
+          uri = excluded.uri,
+          subresource_uris = excluded.subresource_uris,
+          error_code = excluded.error_code,
+          error_message = excluded.error_message,
+          contact_id = excluded.contact_id
+      `;
+      return { inserted: toWrite.length, skippedExisting: 0, error: null };
+    } catch (error) {
+      return { inserted: 0, skippedExisting: 0, error };
     }
-
-    for (const row of toWrite) {
-      const cid = await resolveContactIdForFrom(
-        supabase,
-        workspaceId,
-        row.from,
-        contactCache,
-      );
-      if (cid != null) row.contact_id = cid;
-    }
-
-    const { error } = await supabase.from("message").upsert(toWrite, {
-      onConflict: "sid",
-      ignoreDuplicates: false,
-    });
-    if (error) return { inserted: 0, skippedExisting: 0, error };
-    return { inserted: toWrite.length, skippedExisting: 0, error: null };
   }
 
   let inserted = 0;
@@ -343,6 +388,7 @@ async function main() {
     ),
   );
 
+  await sql.end();
   if (lastError) process.exit(1);
 }
 

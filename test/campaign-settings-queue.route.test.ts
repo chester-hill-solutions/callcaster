@@ -1,26 +1,42 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
     parseActionRequest: vi.fn(),
     enqueueContactsForCampaign: vi.fn(),
+    searchCampaignQueueIds: vi.fn(),
+    updateCampaignQueueStatusByIds: vi.fn(),
+    deleteAllCampaignQueueForCampaign: vi.fn(),
+    deleteCampaignQueueByIds: vi.fn(),
+    fetchCampaignQueuePage: vi.fn(),
+    countCampaignQueueRows: vi.fn(),
+    countQueuedCampaignQueueRows: vi.fn(),
+    requireWorkspaceLoaderContext: vi.fn(),
+    workspaceAuth: {
+      headers: new Headers(),
+      user: { id: "u1" },
+      workspaceId: "w1",
+      userRole: "admin",
+    },
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+const dbMocks = vi.hoisted(() => ({
+  selectChain: vi.fn(),
+}));
+
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("../app/lib/database.server")>(
-    "../app/lib/database.server",
-  );
+vi.mock("@/lib/request-utils.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/request-utils.server")
+  >("@/lib/request-utils.server");
   return {
     ...actual,
     parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
@@ -32,34 +48,96 @@ vi.mock("@/lib/queue.server", () => ({
     mocks.enqueueContactsForCampaign(...args),
 }));
 
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  deleteAllCampaignQueueForCampaign: (...args: any[]) =>
+    mocks.deleteAllCampaignQueueForCampaign(...args),
+  deleteCampaignQueueByIds: (...args: any[]) =>
+    mocks.deleteCampaignQueueByIds(...args),
+  updateCampaignQueueStatusByIds: (...args: any[]) =>
+    mocks.updateCampaignQueueStatusByIds(...args),
+}));
+
+vi.mock("@/lib/campaign-queue-search.server", () => ({
+  searchCampaignQueueIds: (...args: any[]) =>
+    mocks.searchCampaignQueueIds(...args),
+  fetchCampaignQueuePage: (...args: any[]) =>
+    mocks.fetchCampaignQueuePage(...args),
+  countCampaignQueueRows: (...args: any[]) =>
+    mocks.countCampaignQueueRows(...args),
+  countQueuedCampaignQueueRows: (...args: any[]) =>
+    mocks.countQueuedCampaignQueueRows(...args),
+}));
+
+vi.mock("@/lib/workspace-route.server", async (importOriginal) => ({
+  // Keep the real hasMinRole (pure role-rank check) so the route's authz gate
+  // runs for real against the mocked userRole, instead of calling undefined.
+  ...(await importOriginal<typeof import("@/lib/workspace-route.server")>()),
+  getWorkspaceRouteContext: vi.fn(() => mocks.workspaceAuth),
+  workspaceRouteAuth: () => mocks.workspaceAuth,
+  requireWorkspaceLoaderContext: (...args: any[]) =>
+    mocks.requireWorkspaceLoaderContext(...args),
+}));
+
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  findCampaignInWorkspace: vi.fn(async () => ({ id: 99 })),
+}));
+
+vi.mock("@/lib/campaign-audience-db.server", () => ({
+  campaignAndAudienceShareWorkspace: vi.fn(async () => true),
+}));
+
+vi.mock("@/server/db", () => ({
+  db: {
+    select: () => ({
+      from: () => ({
+        where: () => dbMocks.selectChain(),
+      }),
+    }),
+  },
+}));
+
 describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.parseActionRequest.mockReset();
     mocks.enqueueContactsForCampaign.mockReset();
+    mocks.searchCampaignQueueIds.mockReset();
+    mocks.updateCampaignQueueStatusByIds.mockReset();
+    mocks.deleteAllCampaignQueueForCampaign.mockReset();
+    mocks.deleteCampaignQueueByIds.mockReset();
+    mocks.fetchCampaignQueuePage.mockReset();
+    mocks.countCampaignQueueRows.mockReset();
+    mocks.countQueuedCampaignQueueRows.mockReset();
+    mocks.requireWorkspaceLoaderContext.mockReset();
+    dbMocks.selectChain.mockReset();
+    mocks.verifyAuth.mockResolvedValue({
+      user: { id: "u1" },
+    });
+    mocks.searchCampaignQueueIds.mockResolvedValue([]);
+    mocks.updateCampaignQueueStatusByIds.mockResolvedValue(undefined);
+    mocks.deleteAllCampaignQueueForCampaign.mockResolvedValue(undefined);
+    mocks.deleteCampaignQueueByIds.mockResolvedValue(undefined);
+    mocks.fetchCampaignQueuePage.mockResolvedValue({ items: [], totalCount: 0 });
+    mocks.countCampaignQueueRows.mockResolvedValue(0);
+    mocks.countQueuedCampaignQueueRows.mockResolvedValue(0);
+    mocks.requireWorkspaceLoaderContext.mockResolvedValue({
+      ok: true,
+      ctx: {
+        headers: new Headers(),
+        user: { id: "u1" },
+        workspaceId: "w1",
+        userRole: "admin",
+      },
+    });
+    dbMocks.selectChain.mockResolvedValue([]);
   });
 
   test("add_from_audience routes contacts through enqueue helper", async () => {
-    const supabaseClient = {
-      from: vi.fn((table: string) => {
-        if (table !== "contact_audience") {
-          throw new Error(`unexpected table ${table}`);
-        }
-        return {
-          select: () => ({
-            eq: async () => ({
-              data: [{ contact_id: 11 }, { contact_id: 12 }],
-              error: null,
-            }),
-          }),
-        };
-      }),
-    };
+    dbMocks.selectChain.mockResolvedValueOnce([
+      { contact_id: 11 },
+      { contact_id: 12 },
+    ]);
 
-    mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
-      user: { id: "u1" },
-    });
     mocks.parseActionRequest.mockResolvedValueOnce({
       intent: "add_from_audience",
       audienceId: "5",
@@ -68,15 +146,14 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(
-      supabaseClient,
       99,
       [11, 12],
       { requeue: false },
@@ -84,14 +161,13 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
   });
 
   test("add_contacts routes direct contacts through enqueue helper", async () => {
-    const supabaseClient = {
+    const dbClient = {
       from: vi.fn(() => {
         throw new Error("unexpected from()");
       }),
     };
 
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -102,37 +178,25 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "77" },
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
     expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(
-      supabaseClient,
       77,
       [21, 22],
       { requeue: false },
     );
   });
 
-  test("add_from_audience returns contact lookup errors before enqueueing", async () => {
-    const supabaseClient = {
-      from: vi.fn(() => ({
-        select: () => ({
-          eq: async () => ({
-            data: null,
-            error: { message: "lookup failed" },
-          }),
-        }),
-      })),
-    };
+  // A technical error must not reach the user verbatim; toUserMessage swaps it
+  // for the route's fallback. See the sibling test for the pass-through case.
+  test("add_from_audience replaces a technical error with a safe message", async () => {
+    dbMocks.selectChain.mockRejectedValueOnce(new Error("lookup failed"));
 
-    mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
-      user: { id: "u1" },
-    });
     mocks.parseActionRequest.mockResolvedValueOnce({
       intent: "add_from_audience",
       audienceId: "5",
@@ -141,17 +205,41 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       success: false,
-      error: "lookup failed",
+      error: "Failed to add audience to queue",
     });
     expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
+  });
+
+  test("add_from_audience passes through an intentional user-facing message", async () => {
+    dbMocks.selectChain.mockRejectedValueOnce(
+      new Error("That audience has no contacts yet."),
+    );
+
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "add_from_audience",
+      audienceId: "5",
+    });
+
+    const mod = await import(
+      "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
+    );
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+      request: new Request("http://x", { method: "POST" }),
+      params: { selected_id: "99" },
+    } as any)));
+
+    await expect(res.json()).resolves.toEqual({
+      success: false,
+      error: "That audience has no contacts yet.",
+    });
   });
 
   test("loader keeps untouched queued contacts visible", async () => {
@@ -175,40 +263,20 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
       then: (resolve: (value: typeof queueQueryResult) => unknown) =>
         Promise.resolve(resolve(queueQueryResult)),
     };
-    const supabaseClient = {
-      from: vi.fn((table: string) => {
-        if (table === "campaign_audience") {
-          return {
-            select: () => ({
-              eq: async () => ({
-                data: [],
-                error: null,
-              }),
-            }),
-          };
-        }
 
-        if (table === "campaign_queue") {
-          return queueChain;
-        }
-
-        throw new Error(`unexpected table ${table}`);
-      }),
-    };
-
-    mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
-      user: { id: "u1" },
+    mocks.fetchCampaignQueuePage.mockImplementationOnce(async () => {
+      queueChain.eq("campaign_id", "99");
+      return { items: [], totalCount: 0 };
     });
 
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
 
-    await mod.loader({
+    await mod.loader(withRouteUrl({
       request: new Request("http://x/workspaces/w1/campaigns/99/queue"),
       params: { selected_id: "99" },
-    } as any);
+    } as any));
 
     expect(queueEqCalls).not.toContainEqual([
       "contact.outreach_attempt.campaign_id",
@@ -217,44 +285,9 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
   });
 
   test("bulk status update no longer filters rows by outreach-attempt campaign id", async () => {
-    const queueEqCalls: Array<[string, unknown]> = [];
-    const filteredRows = [{ id: 11 }, { id: 12 }];
-    const updateIn = vi.fn(async () => ({ error: null }));
-    const queueQueryResult = { data: filteredRows, error: null, count: filteredRows.length };
-    const queueChain: any = {
-      select: () => queueChain,
-      eq: (column: string, value: unknown) => {
-        queueEqCalls.push([column, value]);
-        return queueChain;
-      },
-      or: () => queueChain,
-      ilike: () => queueChain,
-      like: () => queueChain,
-      in: () => queueChain,
-      is: () => queueChain,
-      not: () => queueChain,
-      neq: () => queueChain,
-      limit: () => queueChain,
-      then: (resolve: (value: typeof queueQueryResult) => unknown) =>
-        Promise.resolve(resolve(queueQueryResult)),
-      update: () => ({
-        in: updateIn,
-      }),
-    };
-    const supabaseClient = {
-      from: vi.fn((table: string) => {
-        if (table === "campaign_queue") {
-          return queueChain;
-        }
+    mocks.searchCampaignQueueIds.mockResolvedValueOnce([11, 12]);
+    mocks.updateCampaignQueueStatusByIds.mockResolvedValueOnce(undefined);
 
-        throw new Error(`unexpected table ${table}`);
-      }),
-    };
-
-    mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
-      user: { id: "u1" },
-    });
     mocks.parseActionRequest.mockResolvedValueOnce({
       intent: "update_status",
       status: "paused",
@@ -273,17 +306,30 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
     );
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST" }),
       params: { selected_id: "99" },
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(queueEqCalls).not.toContainEqual([
-      "contact.outreach_attempt.campaign_id",
-      "99",
-    ]);
-    expect(updateIn).toHaveBeenCalledWith("id", [11, 12]);
+    expect(mocks.searchCampaignQueueIds).toHaveBeenCalledWith({
+      campaignId: 99,
+      workspaceId: "w1",
+      filters: {
+        name: "",
+        phone: "",
+        email: "",
+        address: "",
+        audiences: "",
+        disposition: "",
+        queueStatus: "",
+      },
+    });
+    expect(mocks.updateCampaignQueueStatusByIds).toHaveBeenCalledWith(
+      [11, 12],
+      "paused",
+      "w1",
+    );
   });
 });

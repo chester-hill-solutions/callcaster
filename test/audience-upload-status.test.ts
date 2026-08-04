@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import {
   queueDualAuthSession,
   setDualAuthSession,
   setDualAuthUnauthorized,
 } from "./helpers/route-auth-mock";
+
+vi.mock("@/server/db", () => ({ db: {}, dbDirect: {} }));
 
 let user: null | { id: string } = { id: "u1" };
 let downloadMode:
@@ -15,19 +20,40 @@ let downloadMode:
   kind: "ok",
   statusJson: { state: "processing" },
 };
-let uploadMode: { kind: "ok"; row: any } | { kind: "error"; message: string } =
-  {
-    kind: "ok",
-    row: {
-      file_name: "f.csv",
-      file_size: 1,
-      total_contacts: 2,
-      processed_contacts: 1,
-      error_message: null,
-    },
-  };
+let uploadMode:
+  | { kind: "ok"; row: Record<string, unknown> }
+  | { kind: "missing" }
+  | { kind: "throw"; value: unknown } = {
+  kind: "ok",
+  row: {
+    id: 1,
+    audience_id: 2,
+    status: "pending",
+    file_name: "f.csv",
+    file_size: 1,
+    total_contacts: 2,
+    processed_contacts: 1,
+    error_message: null,
+  },
+};
 
-function buildSupabaseClient() {
+const findAudienceUploadById = vi.hoisted(() =>
+  vi.fn(async (_workspaceId: string, uploadId: number) => {
+    if (uploadMode.kind === "missing") {
+      return null;
+    }
+    if (uploadMode.kind === "throw") {
+      throw uploadMode.value;
+    }
+    return { ...uploadMode.row, id: uploadId };
+  }),
+);
+
+vi.mock("@/lib/audience-upload-db.server", () => ({
+  findAudienceUploadById: (...args: unknown[]) => findAudienceUploadById(...args),
+}));
+
+function buildMockDb() {
   const storageDownload = async () => {
     if (downloadMode.kind === "throw") throw downloadMode.value;
     if (downloadMode.kind === "error")
@@ -40,29 +66,31 @@ function buildSupabaseClient() {
     };
   };
 
-  const uploadSingle = async () => {
-    if (uploadMode.kind === "error")
-      return { data: null, error: new Error(uploadMode.message) };
-    return { data: uploadMode.row, error: null };
-  };
-
   return {
     storage: { from: () => ({ download: storageDownload }) },
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: uploadSingle,
-        }),
-      }),
-    }),
   };
 }
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers({ "set-cookie": "x=y" }),
+const downloadObjectMock = vi.hoisted(() => vi.fn());
+const uploadObjectMock = vi.hoisted(() => vi.fn(async () => undefined));
+
+vi.mock("@/lib/object-storage.server", () => ({
+  downloadObject: downloadObjectMock,
+  uploadObject: uploadObjectMock,
+}));
+
+const tenantAudienceUploadUpdateMock = vi.hoisted(() =>
+  vi.fn(async () => [{}]),
+);
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    audience_upload: { update: tenantAudienceUploadUpdateMock },
   }),
+}));
+
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: vi.fn(async () => undefined),
 }));
 
 vi.mock("@/lib/logger.server", () => {
@@ -78,6 +106,9 @@ describe("api.audience-upload-status loader", () => {
     uploadMode = {
       kind: "ok",
       row: {
+        id: 1,
+        audience_id: 2,
+        status: "pending",
         file_name: "f.csv",
         file_size: 1,
         total_contacts: 2,
@@ -85,11 +116,19 @@ describe("api.audience-upload-status loader", () => {
         error_message: null,
       },
     };
+    downloadObjectMock.mockReset();
+    uploadObjectMock.mockClear();
+    tenantAudienceUploadUpdateMock.mockClear();
+    downloadObjectMock.mockImplementation(async () => {
+      if (downloadMode.kind === "throw") throw downloadMode.value;
+      if (downloadMode.kind === "error")
+        throw new Error(downloadMode.message);
+      return Buffer.from(JSON.stringify(downloadMode.statusJson), "utf-8");
+    });
 
     if (user) {
       setDualAuthSession({
-        supabaseClient: buildSupabaseClient(),
-        headers: new Headers({ "set-cookie": "x=y" }),
+                headers: new Headers({ "set-cookie": "x=y" }),
         user,
       });
     } else {
@@ -100,73 +139,95 @@ describe("api.audience-upload-status loader", () => {
   test("returns 401 when no user", async () => {
     queueDualAuthSession({ user: null });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api.audience-upload-status"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(401);
   });
 
   test("returns 400 when params missing", async () => {
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://localhost/api.audience-upload-status"),
-    } as any));
+    } as any)));
     expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      ok: false,
+      error: "Missing required parameters",
+    });
   });
 
   test("returns 400 when uploadId invalid", async () => {
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=not-a-number&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      ok: false,
+      error: "Invalid upload ID",
+    });
   });
 
-  test("returns 500 when storage download errors", async () => {
+  test("returns DB-backed status when storage sidecar download errors", async () => {
     downloadMode = { kind: "error", message: "nope" };
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({
-      file_name: "f.csv",
-      processed_contacts: 1,
-      stage: "Processing contacts",
+    expect(await res.json()).toEqual({
+      ok: true,
+      snapshot: {
+        uploadId: 1,
+        audience_id: 2,
+        status: "pending",
+        file_name: "f.csv",
+        file_size: 1,
+        total_contacts: 2,
+        processed_contacts: 1,
+        error_message: null,
+        stage: "Processing contacts",
+        skipped_invalid_contacts: null,
+        skipped_duplicate_contacts: null,
+      },
     });
   });
 
   test("returns 500 when upload record query errors", async () => {
-    uploadMode = { kind: "error", message: "db" };
+    uploadMode = { kind: "throw", value: new Error("db") };
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers({ "set-cookie": "x=y" }),
+            headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "db" });
+    expect(await res.json()).toEqual({ ok: false, error: "db" });
   });
 
   test("returns merged status + upload record fields on success", async () => {
-    downloadMode = { kind: "ok", statusJson: { state: "done", ok: true } };
+    downloadMode = {
+      kind: "ok",
+      statusJson: { stage: "Custom stage", skipped_invalid_contacts: 2 },
+    };
     uploadMode = {
       kind: "ok",
       row: {
+        id: 2,
+        audience_id: 2,
+        status: "pending",
         file_name: "a.csv",
         file_size: 10,
         total_contacts: 5,
@@ -175,61 +236,256 @@ describe("api.audience-upload-status loader", () => {
       },
     };
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers({ "set-cookie": "x=y" }),
+            headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=2&workspaceId=w1",
       ),
-    } as any));
+    } as any)));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toEqual({
-      state: "done",
       ok: true,
-      stage: "Processing contacts",
-      file_name: "a.csv",
-      file_size: 10,
-      total_contacts: 5,
-      processed_contacts: 5,
-      error_message: null,
+      snapshot: {
+        uploadId: 2,
+        audience_id: 2,
+        status: "pending",
+        file_name: "a.csv",
+        file_size: 10,
+        total_contacts: 5,
+        processed_contacts: 5,
+        error_message: null,
+        stage: "Custom stage",
+        skipped_invalid_contacts: 2,
+        skipped_duplicate_contacts: null,
+      },
     });
   });
 
-  test("returns 500 with Unknown error when thrown value is not Error", async () => {
+  test("maps sidecar failure into snapshot.error_message without top-level error", async () => {
+    downloadMode = {
+      kind: "ok",
+      statusJson: {
+        stage: "Upload failed",
+        error: "column support_level does not exist",
+        status: "error",
+      },
+    };
+    uploadMode = {
+      kind: "ok",
+      row: {
+        id: 3,
+        audience_id: 2,
+        status: "error",
+        file_name: "a.csv",
+        file_size: 10,
+        total_contacts: 5,
+        processed_contacts: 0,
+        error_message: "column support_level does not exist",
+      },
+    };
+    setDualAuthSession({
+      headers: new Headers({ "set-cookie": "x=y" }),
+      user: { id: "u1" },
+    });
+    const mod = await import("../app/routes/api+/audience-upload-status");
+    const res = await asRouteResponse(
+      mod.loader(
+        withRouteUrl({
+          request: new Request(
+            "http://localhost/api.audience-upload-status?uploadId=3&workspaceId=w1",
+          ),
+        } as any),
+      ),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      ok: true,
+      snapshot: {
+        uploadId: 3,
+        audience_id: 2,
+        status: "error",
+        file_name: "a.csv",
+        file_size: 10,
+        total_contacts: 5,
+        processed_contacts: 0,
+        error_message: "column support_level does not exist",
+        stage: "Upload failed",
+        skipped_invalid_contacts: null,
+        skipped_duplicate_contacts: null,
+      },
+    });
+  });
+
+  test("returns upload record fields when download throws non-Error", async () => {
     downloadMode = { kind: "throw", value: "boom" };
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers({ "set-cookie": "x=y" }),
+            headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any));
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "Unknown error" });
+    } as any)));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      ok: true,
+      snapshot: {
+        uploadId: 1,
+        file_name: "f.csv",
+        processed_contacts: 1,
+      },
+    });
   });
 
-  test("returns 500 with error.message when thrown value is Error", async () => {
+  test("returns upload record fields when download throws Error", async () => {
     downloadMode = { kind: "throw", value: new Error("boom") };
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers({ "set-cookie": "x=y" }),
+            headers: new Headers({ "set-cookie": "x=y" }),
       user: { id: "u1" },
     });
     const mod = await import("../app/routes/api+/audience-upload-status");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
       ),
-    } as any));
-    expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "boom" });
+    } as any)));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      ok: true,
+      snapshot: {
+        uploadId: 1,
+        file_name: "f.csv",
+        processed_contacts: 1,
+      },
+    });
+  });
+
+  describe("staleness watchdog", () => {
+    test("marks a processing upload failed when its status blob is stale (>10min)", async () => {
+      const staleUpdatedAt = new Date(Date.now() - 11 * 60 * 1000).toISOString();
+      downloadMode = {
+        kind: "ok",
+        statusJson: { status: "processing", progress: 40, updated_at: staleUpdatedAt },
+      };
+      uploadMode = {
+        kind: "ok",
+        row: {
+          id: 1,
+          audience_id: 2,
+          status: "processing",
+          file_name: "f.csv",
+          file_size: 1,
+          total_contacts: 10,
+          processed_contacts: 4,
+          error_message: null,
+        },
+      };
+      setDualAuthSession({
+        headers: new Headers({ "set-cookie": "x=y" }),
+        user: { id: "u1" },
+      });
+      const mod = await import("../app/routes/api+/audience-upload-status");
+      const res = await asRouteResponse(mod.loader(withRouteUrl({
+        request: new Request(
+          "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
+        ),
+      } as any)));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        ok: true,
+        snapshot: {
+          status: "error",
+          error_message: "Processing interrupted — please retry",
+        },
+      });
+      expect(tenantAudienceUploadUpdateMock).toHaveBeenCalledTimes(1);
+      expect(uploadObjectMock).toHaveBeenCalledTimes(1);
+    });
+
+    test("leaves a processing upload alone when its status blob was updated recently", async () => {
+      const freshUpdatedAt = new Date(Date.now() - 60 * 1000).toISOString();
+      downloadMode = {
+        kind: "ok",
+        statusJson: { status: "processing", progress: 40, updated_at: freshUpdatedAt },
+      };
+      uploadMode = {
+        kind: "ok",
+        row: {
+          id: 1,
+          audience_id: 2,
+          status: "processing",
+          file_name: "f.csv",
+          file_size: 1,
+          total_contacts: 10,
+          processed_contacts: 4,
+          error_message: null,
+        },
+      };
+      setDualAuthSession({
+        headers: new Headers({ "set-cookie": "x=y" }),
+        user: { id: "u1" },
+      });
+      const mod = await import("../app/routes/api+/audience-upload-status");
+      const res = await asRouteResponse(mod.loader(withRouteUrl({
+        request: new Request(
+          "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
+        ),
+      } as any)));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        ok: true,
+        snapshot: { status: "processing" },
+      });
+      expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
+      expect(uploadObjectMock).not.toHaveBeenCalled();
+    });
+
+    test("does not touch a non-processing upload even if its status blob is old", async () => {
+      const staleUpdatedAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      downloadMode = {
+        kind: "ok",
+        statusJson: { status: "completed", progress: 100, updated_at: staleUpdatedAt },
+      };
+      uploadMode = {
+        kind: "ok",
+        row: {
+          id: 1,
+          audience_id: 2,
+          status: "completed",
+          file_name: "f.csv",
+          file_size: 1,
+          total_contacts: 10,
+          processed_contacts: 10,
+          error_message: null,
+        },
+      };
+      setDualAuthSession({
+        headers: new Headers({ "set-cookie": "x=y" }),
+        user: { id: "u1" },
+      });
+      const mod = await import("../app/routes/api+/audience-upload-status");
+      const res = await asRouteResponse(mod.loader(withRouteUrl({
+        request: new Request(
+          "http://localhost/api.audience-upload-status?uploadId=1&workspaceId=w1",
+        ),
+      } as any)));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        ok: true,
+        snapshot: { status: "completed" },
+      });
+      expect(tenantAudienceUploadUpdateMock).not.toHaveBeenCalled();
+      expect(uploadObjectMock).not.toHaveBeenCalled();
+    });
   });
 });

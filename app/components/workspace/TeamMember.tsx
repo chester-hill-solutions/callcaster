@@ -17,6 +17,10 @@ import { MdCancel } from "react-icons/md";
 import { User } from "@/lib/types";
 
 import { MemberRole } from "@/lib/member-role";
+import {
+  getWorkspaceRoleDisplayName,
+  isWorkspaceMemberRole,
+} from "@/lib/workspace-role-display";
 export { MemberRole };
 
 export const handleIconStyles = (memberRole: MemberRole): string =>
@@ -57,10 +61,12 @@ export default function TeamMember({
 
   const iconStyles = handleIconStyles(memberRole as MemberRole);
   const roleTextStyles = handleRoleTextStyles(memberRole as MemberRole);
+  const roleDisplayName = isWorkspaceMemberRole(memberRole)
+    ? getWorkspaceRoleDisplayName(memberRole)
+    : capitalize(memberRole);
 
   const { theme } = useTheme();
   const memberIsOwner = memberRole === MemberRole.Owner;
-  // console.log("User role :", userRole);
   return (
     <div className="flex w-full justify-between rounded-md border-2 border-black bg-transparent p-2 text-xl shadow-sm dark:border-white">
       <div className="flex items-center gap-2">
@@ -68,12 +74,15 @@ export default function TeamMember({
         <p className="pr-4 font-semibold">{member.username}</p>
       </div>
       <div className="flex items-center gap-2">
-        <p className={roleTextStyles}>{capitalize(memberRole)}</p>
+        <p className={roleTextStyles}>{roleDisplayName}</p>
         {!memberIsOwner && (
           <Sheet>
             {userRole !== MemberRole.Caller && memberRole !== "invited" && (
               <SheetTrigger asChild>
-                <Button className="h-fit rounded-full bg-transparent p-2">
+                <Button
+                  className="h-fit rounded-full bg-transparent p-2"
+                  aria-label={`Manage ${member.username ?? "team member"}`}
+                >
                   {theme === "dark" ? (
                     <GrUserSettings
                       size="16px"
@@ -94,7 +103,11 @@ export default function TeamMember({
               <Form method="POST">
                 <input type="hidden" value="cancelInvite" name="formName" id="formName"/>
                 <input type="hidden" value={member.id} name="userId" id="userId"/>
-              <Button className="h-fit rounded-full bg-transparent p-2" type="submit">
+              <Button
+                className="h-fit rounded-full bg-transparent p-2"
+                type="submit"
+                aria-label={`Cancel invite for ${member.username ?? "this member"}`}
+              >
                 {theme === "dark" ? (
                   <MdCancel
                     size="16px"
@@ -152,7 +165,7 @@ export default function TeamMember({
                               value={role.valueOf()}
                               className=""
                             >
-                              {capitalize(role.valueOf())}
+                              {getWorkspaceRoleDisplayName(role)}
                             </option>
                           );
                         })}

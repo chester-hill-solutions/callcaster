@@ -1,13 +1,16 @@
 export { loader } from "./edit.loader.server";
 export { action } from "./edit.action.server";
 
-import { data as routeData, redirect } from "react-router";
-import { useLoaderData, useSubmit } from "react-router";
+import { useLoaderData } from "react-router";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
+import SelectScript from "@/components/campaign/settings/detailed/CampaignDetailed.SelectScript";
+import { CampaignPlaceNav } from "@/components/campaign/CampaignPlaceNav";
 import { Button } from "@/components/ui/button";
 import { useHasChanges } from "@/hooks/utils/useHasChanges";
+import { useUnsavedChangesGuard } from "@/hooks/utils/useUnsavedChangesGuard";
 import { SaveBar } from "@/components/shared/SaveBar";
 
 import { MessageSettings } from "@/components/MessageSettings";
@@ -19,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import type { Script } from "@/lib/types";
 import type { ScriptEditLoaderData } from "./edit.types";
 import { logger as loggerClient } from "@/lib/logger.client";
 import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
@@ -26,36 +30,97 @@ import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
 type LoaderData = ScriptEditLoaderData;
 type PageData = LoaderData["data"];
 
+function isVoiceCampaignType(type: PageData["type"]): boolean {
+  return (
+    type === "live_call" ||
+    type === "robocall" ||
+    type === "simple_ivr" ||
+    type === "complex_ivr"
+  );
+}
+
 export default function ScriptEditor() {
-  const { workspace_id, selected_id, mediaNames = [], scripts = [], data } =
-    useLoaderData<LoaderData>();
+  const {
+    mediaNames = [],
+    data,
+    scripts = [],
+  } = useLoaderData<LoaderData>();
   const [initData, setInitData] = useState<PageData>(data);
-  const submit = useSubmit();
   const [pageData, setPageData] = useState<PageData>(data);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const isChanged = useHasChanges(
     pageData,
     initData,
     normalizeScriptPageDataForComparison,
   );
+  useUnsavedChangesGuard(isChanged);
 
   const handleSaveUpdate = async (saveScriptAsCopy: boolean) => {
+    setIsSaving(true);
     try {
+      const campaignPayload =
+        pageData.type === "message"
+          ? {
+              ...pageData,
+              body_text: pageData.campaignDetails.body_text ?? "",
+              message_media: pageData.campaignDetails.message_media ?? [],
+            }
+          : pageData;
       const formData = new FormData();
-      formData.append('campaignData', JSON.stringify(pageData));
-      formData.append('campaignDetails', JSON.stringify(pageData.campaignDetails));
-      formData.append('scriptData', JSON.stringify(pageData.campaignDetails.script));
-      formData.append('saveScriptAsCopy', saveScriptAsCopy.toString());
+      formData.append("campaignData", JSON.stringify(campaignPayload));
+      formData.append(
+        "campaignDetails",
+        JSON.stringify(pageData.campaignDetails),
+      );
+      formData.append(
+        "scriptData",
+        JSON.stringify(pageData.campaignDetails.script ?? null),
+      );
+      formData.append("saveScriptAsCopy", saveScriptAsCopy.toString());
 
-      submit(formData, {
-        method: !saveScriptAsCopy ? "PATCH" : "POST",
-        action: "/api/campaigns",
-        navigate: false,
+      // The HTTP method is always PATCH here: "save as copy" is a flag the
+      // server uses to copy the script row, not a request to create a new
+      // campaign (that's what POST /api/campaigns does elsewhere).
+      const response = await fetch("/api/campaigns", {
+        method: "PATCH",
+        body: formData,
       });
-      setInitData(pageData);
+      const result = await response.json().catch(() => null);
+
+      if (!response.ok || result?.error) {
+        throw new Error(result?.error ?? "Failed to save script");
+      }
+
+      // Merge the persisted script (which may have a new id/name if this
+      // was a "save as copy") back into local state so future saves target
+      // the row that actually exists on the server.
+      const savedPageData: PageData = result?.script
+        ? {
+            ...pageData,
+            campaignDetails: {
+              ...pageData.campaignDetails,
+              script: result.script,
+              script_id: result.script.id,
+            },
+          }
+        : pageData;
+
+      setPageData(savedPageData);
+      setInitData(savedPageData);
       setShowSaveModal(false);
+      toast.success(
+        pageData.type === "message" ? "Message saved" : "Script saved",
+      );
     } catch (error) {
       loggerClient.error("Error saving update:", error);
+      toast.error(
+        pageData.type === "message"
+          ? "Couldn't save the message. Please try again."
+          : "Couldn't save the script. Please try again.",
+      );
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -67,16 +132,42 @@ export default function ScriptEditor() {
     setPageData(newPageData);
   };
 
-  const renderCampaignSettingsScript = (mediaNames: string[] = []) => {
-    if (!pageData.campaignDetails.script) return null;
-    
+  const handleScriptAssignment = (name: string, value: string | number | boolean | null) => {
+    if (name !== "script_id") return;
+
+    const nextScriptId =
+      value === "" || value == null ? null : Number(value);
+    const nextScript: Script | undefined =
+      nextScriptId == null
+        ? undefined
+        : scripts.find((script) => String(script.id) === String(nextScriptId));
+
+    handlePageDataChange({
+      ...pageData,
+      campaignDetails: {
+        ...pageData.campaignDetails,
+        script_id: nextScriptId,
+        script: nextScript,
+      },
+    });
+  };
+
+  const renderCampaignSettingsScript = (scriptMediaNames: string[] = []) => {
+    if (!pageData.campaignDetails.script) {
+      return (
+        <p className="text-sm text-muted-foreground">
+          Select a script above to edit it here.
+        </p>
+      );
+    }
+
     const scriptPageData = {
       campaignDetails: {
         ...pageData.campaignDetails,
-        script: pageData.campaignDetails.script
-      }
+        script: pageData.campaignDetails.script,
+      },
     };
-    
+
     return (
       <CampaignSettingsScript
         pageData={scriptPageData}
@@ -86,50 +177,74 @@ export default function ScriptEditor() {
             campaignDetails: {
               ...pageData.campaignDetails,
               script: newData.campaignDetails.script,
-            }
+            },
           });
         }}
-        scripts={scripts}
-        mediaNames={mediaNames}
+        mediaNames={scriptMediaNames}
       />
     );
   };
+
+  const selectedScriptId = pageData.campaignDetails.script_id ?? null;
+  const isScriptMissing = isVoiceCampaignType(pageData.type) && !selectedScriptId;
 
   return (
     <>
       <div className="relative flex h-full flex-col">
         <SaveBar
           isChanged={isChanged}
-          onSave={() => setShowSaveModal(true)}
+          isSaving={isSaving}
+          onSave={() => {
+            // Message campaigns have no script copy flow — save directly (#1115).
+            if (pageData.type === "message") {
+              void handleSaveUpdate(false);
+              return;
+            }
+            setShowSaveModal(true);
+          }}
           onReset={handleReset}
         />
-        <div className="h-full flex-grow p-4">
-          {(pageData.type === "live_call") && renderCampaignSettingsScript([])}
+        <div className="flex h-full flex-grow flex-col gap-4 p-4">
+          {isVoiceCampaignType(pageData.type) ? (
+            <div id="campaign-setup-content" className="space-y-3">
+              <SelectScript
+                handleInputChange={handleScriptAssignment}
+                selectedScript={selectedScriptId}
+                scripts={scripts}
+                invalid={isScriptMissing}
+              />
+            </div>
+          ) : null}
+          {pageData.type === "live_call" && renderCampaignSettingsScript([])}
           {(pageData.type === "robocall" ||
             pageData.type === "simple_ivr" ||
-            pageData.type === "complex_ivr") && renderCampaignSettingsScript(mediaNames)}
+            pageData.type === "complex_ivr") &&
+            renderCampaignSettingsScript(mediaNames)}
           {pageData.type === "message" && (
-            <MessageSettings
-              mediaLinks={
-                Array.isArray(pageData.campaignDetails.mediaLinks)
-                  ? pageData.campaignDetails.mediaLinks.filter(
-                      (link): link is string => typeof link === "string",
-                    )
-                  : []
-              }
-              details={pageData.campaignDetails}
-              onChange={(field, value) => {
-                handlePageDataChange({
-                  ...pageData,
-                  campaignDetails: {
-                    ...pageData.campaignDetails,
-                    [field]: value,
-                  },
-                });
-              }}
-              surveys={[]}
-            />
+            <div id="campaign-setup-content">
+              <MessageSettings
+                mediaLinks={
+                  Array.isArray(pageData.campaignDetails.mediaLinks)
+                    ? pageData.campaignDetails.mediaLinks.filter(
+                        (link): link is string => typeof link === "string",
+                      )
+                    : []
+                }
+                details={pageData.campaignDetails}
+                onChange={(field, value) => {
+                  handlePageDataChange({
+                    ...pageData,
+                    campaignDetails: {
+                      ...pageData.campaignDetails,
+                      [field]: value,
+                    },
+                  });
+                }}
+                surveys={[]}
+              />
+            </div>
           )}
+          <CampaignPlaceNav current="content" />
         </div>
       </div>
       <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
@@ -148,10 +263,13 @@ export default function ScriptEditor() {
               onClick={() => handleSaveUpdate(false)}
               className="mr-2"
               variant={"outline"}
+              disabled={isSaving}
             >
               Save
             </Button>
-            <Button onClick={() => handleSaveUpdate(true)}>Save as Copy</Button>
+            <Button onClick={() => handleSaveUpdate(true)} disabled={isSaving}>
+              Save as Copy
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

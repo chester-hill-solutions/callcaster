@@ -22,7 +22,6 @@ describe("useCalls", () => {
           eventType: "INSERT",
         },
         [],
-        null,
         vi.fn(),
         vi.fn(),
         vi.fn(),

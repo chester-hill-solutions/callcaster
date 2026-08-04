@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   useFetcher,
   useLoaderData,
@@ -8,22 +9,23 @@ import {
   useParams,
   useSearchParams,
 } from "react-router";
-import {
-  RealtimePostgresChangesPayload,
-} from "@supabase/supabase-js";
 import { isOptOutMessage } from "@/lib/chat-opt-out";
+import { parseChatSenderSelection } from "@/lib/sms-campaign-send-mode";
 import { formatMessageTimestamp, normalizePhoneNumber } from "@/lib/utils";
 import { phoneNumbersMatch } from "@/hooks/realtime/useChatRealtime";
 import { useContactSearch } from "@/hooks/contact/useContactSearch";
-import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import {
   getConversationParticipantPhones,
+  getConversationPhoneKey,
   getChatSortOption,
   sortConversationSummaries,
 } from "@/lib/chat-conversation-sort";
 import { useImageHandling } from "@/hooks/chats/useImageHandling";
+import { markConversationRead } from "@/lib/chats/messaging-client";
 import type { Contact, Workspace } from "@/lib/types";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
+import type { RealtimeChangePayload } from "@/lib/workspace-events.shared";
 import { logger } from "@/lib/logger.client";
 import {
   ALL_CAMPAIGNS_VALUE,
@@ -40,7 +42,7 @@ import type {
 } from "@/lib/chats/types";
 
 export function useChatsPage() {
-  const { supabase, workspace } = useOutletContext<ChatsWorkspaceContextType>();
+  const { workspace } = useOutletContext<ChatsWorkspaceContextType>();
   const {
     chats,
     chatsError,
@@ -50,6 +52,7 @@ export function useChatsPage() {
     campaigns,
     workspaceNumbers,
     optOutKeywords,
+    senderSelection,
   } = useLoaderData<ChatsLoaderData>();
   const [searchParams, setSearchParams] = useSearchParams();
   const hideStopConversations = searchParams.get("hide_stop") === "1";
@@ -57,7 +60,8 @@ export function useChatsPage() {
   const paginationFilterKey = useMemo(() => {
     const campaignFilter = searchParams.get("campaign_id") ?? ALL_CAMPAIGNS_VALUE;
     const sortFilter = getChatSortOption(searchParams.get("sort"));
-    return `${campaignFilter}:${sortFilter}`;
+    const searchFilter = searchParams.get("search") ?? "";
+    return `${campaignFilter}:${sortFilter}:${searchFilter}`;
   }, [searchParams]);
   const paginationFetcher = useFetcher<ChatsLoaderData>({
     key: `chat-pages-${workspace.id}-${paginationFilterKey}`,
@@ -66,11 +70,16 @@ export function useChatsPage() {
   const chatActionsRef = useRef<{
     addOptimisticMessage?: (p: {
       body: string;
-      from: string;
+      from?: string;
       to: string;
       media?: string;
+      sid?: string;
     }) => void;
+    markOptimisticMessageFailed?: (sid: string) => void;
   } | null>(null);
+  const pendingOptimisticMessageRef = useRef<{ sid: string; body: string } | null>(
+    null,
+  );
   const requestedPageRef = useRef(pagination.page);
   const registerChatActions = useCallback(
     (actions: typeof chatActionsRef.current) => {
@@ -100,14 +109,47 @@ export function useChatsPage() {
         .map((workspaceNumber) => ({
           id: String(workspaceNumber.id),
           phone_number: workspaceNumber.phone_number ?? "",
+          friendly_name: workspaceNumber.friendly_name ?? null,
         })),
     [workspaceNumbers],
   );
+  // ConversationSummary.user_phone holds the workspace number that most
+  // recently texted this contact. Resolving it here lets the composer
+  // default to the number the contact already knows, instead of always
+  // defaulting to the workspace's first number.
+  const establishedFromNumber = useMemo(() => {
+    if (!contact_number) return "";
+    const activeConversation = loadedChats.find((chat) =>
+      phoneNumbersMatch(chat.contact_phone, contact_number),
+    );
+    return activeConversation?.user_phone || "";
+  }, [loadedChats, contact_number]);
+
+  const initialFrom = useMemo(() => {
+    const fallback = chatInputWorkspaceNumbers[0]?.phone_number || "";
+    if (!establishedFromNumber) return fallback;
+
+    const establishedKey = getConversationPhoneKey(establishedFromNumber);
+    const matchedWorkspaceNumber = chatInputWorkspaceNumbers.find(
+      (num) => getConversationPhoneKey(num.phone_number) === establishedKey,
+    );
+    // Only use a sender that appears in the From options. An historical
+    // conversation number that is no longer rented would leave the controlled
+    // <select> with a blank selection.
+    return matchedWorkspaceNumber?.phone_number || fallback;
+  }, [establishedFromNumber, chatInputWorkspaceNumbers]);
+
   const chatsRoutePath = `/workspaces/${workspace.id}/chats`;
   const closeMobileConversationList = useCallback(() => {
     setIsMobileConversationListOpen(false);
   }, []);
 
+  /**
+   * @effect CANDIDATE-REMOVE: mirror the loader's chats/pagination into local loadedChats/paginationState whenever the loader revalidates (e.g. filter/search/sort change, realtime-triggered revalidation), skipping the sync if the pagination fetcher already loaded a further-ahead page.
+   * @effect-deps chats, pagination (loader data to mirror), paginationFetcher.data, paginationFetcher.state (guards against clobbering an in-flight/completed "load more" page with stale loader data)
+   * @effect-side-effects none (setState + ref write only)
+   * @effect-why-not-loader chats/pagination are already loader data (via useLoaderData); this copies them into local state, the "sync state to a prop" pattern the effects guide flags. It's kept as an effect because loadedChats also accumulates fetcher-loaded pages over time (see the effect below) and must be reconciled against a fresh loader response without discarding those extra pages — a case not implemented today via a pure derivation.
+   */
   useEffect(() => {
     if (paginationFetcher.state !== "idle") {
       return;
@@ -121,6 +163,12 @@ export function useChatsPage() {
     requestedPageRef.current = pagination.page;
   }, [chats, pagination, paginationFetcher.data, paginationFetcher.state]);
 
+  /**
+   * @effect Merge a newly-loaded "load more" page of conversations (from the pagination fetcher) into the accumulated local chat list, and advance the pagination cursor.
+   * @effect-deps paginationFetcher.data (react to the fetcher settling with a new page)
+   * @effect-side-effects none directly — reacts to a fetcher (external async subscription); performs setState + ref write
+   * @effect-why-not-loader paginationFetcher is already the idiomatic fetcher for infinite-scroll pagination; accumulating results across multiple `.load()` calls over time is state, not a pure render-time derivation of the latest loader/fetcher value.
+   */
   useEffect(() => {
     if (!paginationFetcher.data) {
       return;
@@ -162,7 +210,6 @@ export function useChatsPage() {
     toggleContactMenu,
     isValid,
   } = useContactSearch({
-    supabase,
     workspace_id: workspace.id,
     contact_number,
     potentialContacts,
@@ -170,6 +217,12 @@ export function useChatsPage() {
     initialContact: contact,
   });
 
+  /**
+   * @effect CANDIDATE-REMOVE: redirect back to the chats list when the route's contact_number param doesn't look like a valid phone number.
+   * @effect-deps contact_number (the value to validate), navigate, outlet (only redirect once a child route is actually mounted), paginationFetcher.state (avoid redirecting mid-pagination-load)
+   * @effect-side-effects none directly — calls router navigate() after render (not dom/timer/subscription/fetch)
+   * @effect-why-not-loader Route-param validation like this is normally done in the loader (`throw redirect(...)`) before the invalid UI ever renders, rather than rendering first and then navigating away client-side in an effect. Left as-is because the current chats route loader isn't parameterized by contact_number in a way that makes this trivial to relocate without a wider route restructuring.
+   */
   useEffect(() => {
     if (!outlet || paginationFetcher.state !== "idle") return;
     const decoded = contact_number ? decodeURIComponent(contact_number) : "";
@@ -188,12 +241,12 @@ export function useChatsPage() {
     );
   }, []);
 
-  useSupabaseRealtimeSubscription({
-    supabase,
+  useWorkspaceEventSubscription({
+    workspaceId: workspace.id,
     table: "message",
     filter: `workspace=eq.${workspace.id}`,
     onChange: (payload) => {
-      const typedPayload = payload as RealtimePostgresChangesPayload<
+      const typedPayload = payload as RealtimeChangePayload<
         Tables<"message">
       >;
       const selectedCampaignId = searchParams.get("campaign_id");
@@ -279,18 +332,35 @@ export function useChatsPage() {
       if (!toNumber || messageFetcher.state !== "idle") return;
 
       const formData = new FormData(target);
+      // ChatInput only renders a hidden `contact_number` field for the
+      // "new number" composer flow (header search); replying inside an
+      // already-open thread has no such field in the DOM, so `toNumber`
+      // (route param or header state) must be set explicitly or the action
+      // receives no destination number at all and 500s before it can even
+      // attempt the send.
+      formData.set("contact_number", toNumber);
       formData.append("media", JSON.stringify(selectedImages));
       const body = (formData.get("body") as string) || "";
+      // Resolve the sender the same way the action does, so the optimistic
+      // bubble shows the number the message will actually be sent from. A
+      // Messaging Service send has no specific number, hence `undefined`.
+      const selection = parseChatSenderSelection({
+        rawFrom: formData.get("from") as string | null,
+        messagingServiceAvailable: senderSelection.messagingServiceReady,
+      });
       const from =
-        (formData.get("from") as string) ||
-        workspaceNumbers?.[0]?.phone_number ||
-        "";
+        selection.mode === "messaging_service"
+          ? undefined
+          : selection.fromNumber || workspaceNumbers?.[0]?.phone_number || "";
       const media = formData.get("media") as string | undefined;
+      const pendingSid = `pending-${Date.now()}`;
+      pendingOptimisticMessageRef.current = { sid: pendingSid, body };
       chatActionsRef.current?.addOptimisticMessage?.({
         body,
         from,
         to: toNumber,
         media,
+        sid: pendingSid,
       });
 
       messageFetcher.submit(formData, { method: "POST" });
@@ -307,37 +377,56 @@ export function useChatsPage() {
       messageFetcher,
       selectedImages,
       setSelectedImages,
+      senderSelection.messagingServiceReady,
       workspaceNumbers,
     ],
   );
 
-  const markConversationRead = useCallback(
+  /**
+   * @effect When the message-send fetcher settles with an error, reconcile the optimistic UI: mark the pending optimistic message as failed and restore its text into the composer.
+   * @effect-deps messageFetcher.state, messageFetcher.data (react to the send fetcher settling)
+   * @effect-side-effects dom (reads/writes the #body input's value); no fetch itself (reacts to the existing send fetcher)
+   * @effect-why-not-loader This reconciles optimistic client state against a fetcher action's result; it's inherently a "react after the fetcher settles" side effect, not something a loader or derived value can express.
+   */
+  useEffect(() => {
+    if (messageFetcher.state !== "idle") return;
+    const pending = pendingOptimisticMessageRef.current;
+    if (!pending) return;
+
+    const data = messageFetcher.data as { error?: string } | undefined;
+    if (!data || !data.error) {
+      pendingOptimisticMessageRef.current = null;
+      return;
+    }
+
+    toast.error(data.error);
+    chatActionsRef.current?.markOptimisticMessageFailed?.(pending.sid);
+    const bodyField = document.getElementById("body") as
+      | HTMLTextAreaElement
+      | HTMLInputElement
+      | null;
+    if (bodyField && !bodyField.value) {
+      bodyField.value = pending.body;
+    }
+    pendingOptimisticMessageRef.current = null;
+  }, [messageFetcher.state, messageFetcher.data]);
+
+  const markConversationReadForContact = useCallback(
     (number: string) => {
       clearUnreadCount(number);
 
-      supabase
-        .from("message")
-        .update({ status: "delivered" })
-        .eq("workspace", workspace.id)
-        .eq("status", "received")
-        .or(`from.eq.${number},to.eq.${number}`)
-        .then(
-          ({ error }) => {
-            if (error) {
-              logger.error("Error marking messages as read:", error);
-            } else {
-              window.dispatchEvent(
-                new CustomEvent("messages-read", {
-                  detail: { contactNumber: number },
-                }),
-              );
-            }
-          },
-          (err: unknown) =>
-            logger.error("Error marking messages as read:", err),
-        );
+      void markConversationRead(workspace.id, number).then(
+        () => {
+          window.dispatchEvent(
+            new CustomEvent("messages-read", {
+              detail: { contactNumber: number },
+            }),
+          );
+        },
+        (err: unknown) => logger.error("Error marking messages as read:", err),
+      );
     },
-    [clearUnreadCount, supabase, workspace.id],
+    [clearUnreadCount, workspace.id],
   );
 
   const handleContactSelect = useCallback(
@@ -346,10 +435,10 @@ export function useChatsPage() {
       if (number) {
         closeMobileConversationList();
         navigate(`./${number}`);
-        markConversationRead(number);
+        markConversationReadForContact(number);
       }
     },
-    [closeMobileConversationList, navigate, markConversationRead],
+    [closeMobileConversationList, navigate, markConversationReadForContact],
   );
 
   const handleExistingConversationClick = useCallback(
@@ -361,17 +450,23 @@ export function useChatsPage() {
       const query = search.toString();
       const path = `./${encodeURIComponent(nextPhoneNumber)}`;
       navigate(query ? `${path}?${query}` : path);
-      markConversationRead(nextPhoneNumber);
+      markConversationReadForContact(nextPhoneNumber);
     },
     [
       closeMobileConversationList,
       navigate,
       searchParams,
       hideStopConversations,
-      markConversationRead,
+      markConversationReadForContact,
     ],
   );
 
+  /**
+   * @effect Subscribe to the cross-hook "message-read"/"messages-read" window events (dispatched by useChatThread when it marks messages read) so the sidebar's unread badges clear immediately.
+   * @effect-deps clearUnreadCount (stable useCallback; re-subscribes only if it changes identity)
+   * @effect-side-effects subscription (window.addEventListener for two custom event names; removed on cleanup)
+   * @effect-why-not-loader This listens for an imperative cross-hook notification (useChatThread and useChatsPage are siblings under a route Outlet with no direct prop path), not data fetching or derivable state.
+   */
   useEffect(() => {
     const handleMessageRead = (event: Event) => {
       const customEvent = event as CustomEvent<{ contactNumber?: string }>;
@@ -443,9 +538,9 @@ export function useChatsPage() {
   } as const;
 
   return {
-    supabase,
     workspace,
     workspaceNumbers,
+    senderSelection,
     registerChatActions,
     outlet,
     contact,
@@ -469,6 +564,8 @@ export function useChatsPage() {
     setIsMobileConversationListOpen,
     sidebarProps,
     chatInputWorkspaceNumbers,
+    initialFrom,
+    establishedFromNumber,
     handleSubmit,
     handleImageSelect,
     handleImageRemove,

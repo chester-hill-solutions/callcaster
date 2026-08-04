@@ -181,7 +181,13 @@ export function getSmsSegmentInfo(text: string): SmsSegmentInfo {
   const totalCharacters = getCharacterCount(text);
   const gsm7Units = getGsm7Units(text);
   const encoding: SmsEncoding = gsm7Units == null ? "UCS-2" : "GSM-7";
-  const totalUnits = gsm7Units ?? totalCharacters;
+  // UCS-2 SMS segmentation is billed in UTF-16 code units, not Unicode code
+  // points: an astral-plane character (most emoji, e.g. U+1F525 "fire") is
+  // encoded as a surrogate pair and consumes 2 units of the 70/67-character
+  // budget even though it displays as a single glyph. `text.length` counts
+  // UTF-16 code units directly, so use it here instead of the code-point
+  // count used for the human-facing `totalCharacters` field below.
+  const totalUnits = gsm7Units ?? text.length;
 
   const singleSegmentLimit = encoding === "GSM-7" ? 160 : 70;
   const multiSegmentLimit = encoding === "GSM-7" ? 153 : 67;
@@ -205,4 +211,20 @@ export function getSmsSegmentInfo(text: string): SmsSegmentInfo {
     unitsUsedInCurrentSegment,
     unitsRemainingInCurrentSegment,
   };
+}
+
+export type SegmentEstimate = {
+  segments: number;
+  encoding: SmsEncoding;
+};
+
+/**
+ * Minimal segment estimate — just the two fields SMS billing cares about
+ * (see SMS_SEGMENT_CREDITS in shared/pricing.ts, which multiplies `segments`
+ * by the per-segment credit rate). Thin wrapper around getSmsSegmentInfo()
+ * for callers that don't need the full unit-accounting breakdown.
+ */
+export function estimateSegments(body: string): SegmentEstimate {
+  const { segmentCount, encoding } = getSmsSegmentInfo(body);
+  return { segments: segmentCount, encoding };
 }

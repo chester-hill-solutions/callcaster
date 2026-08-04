@@ -1,7 +1,7 @@
 import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { verifyAuth } from "@/lib/auth.server";
 import { confirmStripeCheckoutSessionForRedirect } from "@/lib/platform-billing.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
 function buildBillingRedirect(
   workspaceId: string,
@@ -16,38 +16,39 @@ function buildBillingRedirect(
   return redirect(`/workspaces/${workspaceId}/billing?${searchParams.toString()}`);
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const url = new URL(request.url);
-  const sessionId = url.searchParams.get("session_id");
+export const loader = defineLoader({
+  sideEffects: ["external", "credit"],
+  handler: async ({ request, url }) => {
+    const sessionId = url.searchParams.get("session_id");
 
-  if (!sessionId) {
-    return redirect("/workspaces");
-  }
+    if (!sessionId) {
+      return redirect("/workspaces");
+    }
 
-  const nextUrl = url.pathname + (url.search ?? "");
-  const { supabaseClient } = await verifyAuth(request, nextUrl);
+    const nextUrl = url.pathname + (url.search ?? "");
+    await verifyAuth(request, nextUrl);
 
-  const result = await confirmStripeCheckoutSessionForRedirect({
-    supabase: supabaseClient,
-    sessionId,
-  });
-
-  if (result.ok) {
-    return buildBillingRedirect(result.workspaceId, {
-      payment_status: "success",
-      credits_added: result.creditAmount,
+    const result = await confirmStripeCheckoutSessionForRedirect({
+      sessionId,
     });
-  }
 
-  if (result.workspaceId) {
-    return buildBillingRedirect(result.workspaceId, {
-      payment_status: "error",
-      payment_message:
-        "We could not confirm this payment yet. If your card was charged, please contact support.",
-    });
-  }
+    if (result.ok) {
+      return buildBillingRedirect(result.workspaceId, {
+        payment_status: "success",
+        credits_added: result.creditAmount,
+      });
+    }
 
-  return redirect(
-    "/workspaces?payment_status=error&payment_message=We%20could%20not%20confirm%20this%20payment.",
-  );
-}
+    if (result.workspaceId) {
+      return buildBillingRedirect(result.workspaceId, {
+        payment_status: "error",
+        payment_message:
+          "We could not confirm this payment yet. If your card was charged, please contact support.",
+      });
+    }
+
+    return redirect(
+      "/workspaces?payment_status=error&payment_message=We%20could%20not%20confirm%20this%20payment.",
+    );
+  },
+});

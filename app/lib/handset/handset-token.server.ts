@@ -1,20 +1,15 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import twilio from "twilio";
-
-import type { Database } from "@/lib/database.types";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 
 export type HandsetAccessTokenResult =
   | { token: string; error: null }
   | { token: null; error: string };
 
 export async function createHandsetAccessToken({
-  supabaseClient,
   workspaceId,
   clientIdentity,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   clientIdentity: string;
 }): Promise<HandsetAccessTokenResult> {
@@ -22,17 +17,18 @@ export async function createHandsetAccessToken({
     return { token: null, error: "workspace and client_identity are required" };
   }
 
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data, key, token")
-    .eq("id", workspaceId)
-    .single();
+  const data = await getWorkspaceById(workspaceId);
 
-  if (error || !data) {
+  if (!data) {
     return { token: null, error: "Workspace not found" };
   }
 
-  const twilioData = (data.twilio_data ?? {}) as Record<string, unknown>;
+  const rawTwilioData = data.twilio_data;
+  const twilioData = (
+    typeof rawTwilioData === "string"
+      ? JSON.parse(rawTwilioData)
+      : rawTwilioData ?? {}
+  ) as Record<string, unknown>;
   const twilioAccountSid =
     typeof twilioData.sid === "string" ? twilioData.sid : "";
   const twilioApiKey = (data.key ?? "") as string;
@@ -43,11 +39,13 @@ export async function createHandsetAccessToken({
   }
 
   try {
-    const voiceGrant = new twilio.jwt.AccessToken.VoiceGrant({
+    const accessTokenModule = await import("twilio/lib/jwt/AccessToken.js");
+    const AccessToken = accessTokenModule.default ?? accessTokenModule;
+    const voiceGrant = new AccessToken.VoiceGrant({
       outgoingApplicationSid: env.TWILIO_APP_SID(),
       incomingAllow: true,
     });
-    const token = new twilio.jwt.AccessToken(
+    const token = new AccessToken(
       twilioAccountSid,
       twilioApiKey,
       twilioApiSecret,

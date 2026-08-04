@@ -1,4 +1,8 @@
 import type Twilio from "twilio";
+import {
+  normalizeAddressRequirement,
+  type AddressRequirement,
+} from "@/lib/number-address-requirements";
 
 export const TOLL_FREE_VERIFICATION_STATUSES = [
   "not_submitted",
@@ -72,4 +76,56 @@ export function tollFreeVerificationBlocksBulkSms(
       summary.status !== "approved" &&
       summary.status !== "unknown",
   );
+}
+
+export type AvailableTollFreeNumber = {
+  phoneNumber: string;
+  friendlyName: string;
+  region: string | null;
+  locality: string | null;
+  /** ISO country of the available number (e.g. "CA"). */
+  isoCountry: string | null;
+  /** Q43: Twilio regulatory address requirement (none|any|local|foreign). */
+  addressRequirements: AddressRequirement;
+  capabilities: { sms: boolean; mms: boolean; voice: boolean };
+};
+
+/**
+ * Search-only helper for available toll-free numbers in a country (Canada-first,
+ * `countryCode` defaults to "CA"). This is a thin read wrapper; actual purchase
+ * should go through the existing number-purchase infra
+ * (`purchaseWorkspaceNumber` in `platform-workspace-numbers.server.ts`) so that
+ * billing, emergency-address attachment and Messaging Service enrolment are
+ * applied consistently — we deliberately do NOT duplicate purchase logic here.
+ */
+export async function searchAvailableTollFreeNumbers(args: {
+  twilio: Twilio.Twilio;
+  countryCode?: string;
+  areaCode?: number;
+  smsEnabled?: boolean;
+  limit?: number;
+}): Promise<AvailableTollFreeNumber[]> {
+  const countryCode = args.countryCode ?? "CA";
+  const results = await args.twilio
+    .availablePhoneNumbers(countryCode)
+    .tollFree.list({
+      limit: args.limit ?? 20,
+      smsEnabled: args.smsEnabled ?? true,
+      ...(typeof args.areaCode === "number" ? { areaCode: args.areaCode } : {}),
+    })
+    .catch(() => []);
+
+  return results.map((n) => ({
+    phoneNumber: n.phoneNumber ?? "",
+    friendlyName: n.friendlyName ?? n.phoneNumber ?? "",
+    region: typeof n.region === "string" ? n.region : null,
+    locality: typeof n.locality === "string" ? n.locality : null,
+    isoCountry: typeof n.isoCountry === "string" ? n.isoCountry : null,
+    addressRequirements: normalizeAddressRequirement(n.addressRequirements),
+    capabilities: {
+      sms: Boolean(n.capabilities?.sms),
+      mms: Boolean(n.capabilities?.mms),
+      voice: Boolean(n.capabilities?.voice),
+    },
+  }));
 }

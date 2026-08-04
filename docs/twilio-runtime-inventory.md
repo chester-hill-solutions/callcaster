@@ -42,6 +42,7 @@ Static coverage check: `node scripts/check-twilio-webhook-coverage.mjs`
 | Function | Caller | `verify_jwt` | Signature |
 | --- | --- | --- | --- |
 | `sms-status` | Twilio SMS status | `false` | `validateRequest` |
+| `acd-router` | Twilio inbound ACD wait/bridge/status/complete | `false` | `validateRequest` (per-workspace subaccount token) |
 | `ivr-flow` | Twilio IVR TwiML | `false` | `validateRequest` |
 | `ivr-status` | Twilio IVR status | `false` | `validateRequest` |
 | `ivr-recording` | Twilio recording | `false` | `validateRequest` |

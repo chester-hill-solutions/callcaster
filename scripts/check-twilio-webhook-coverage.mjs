@@ -9,13 +9,26 @@ import { join } from "node:path";
 const ROOT = join(import.meta.dirname, "..");
 const API_DIR = join(ROOT, "app/routes/api+");
 
+/**
+ * Constructs that actually authenticate a TWILIO request.
+ *
+ * Deliberately narrow. This list previously also accepted `requireWorkspaceAccess`,
+ * `verifyAuth`, `verifyApiKey` and `safeOutboundUrl`. None of those proves a
+ * request came from Twilio: the first three prove a *session or API key*, which
+ * an inbound webhook never carries, and `safeOutboundUrl` is an EGRESS SSRF
+ * guard that says nothing about the inbound request at all. With them present, a
+ * route could swap its signature check for a session check and stay green — the
+ * guard would report success on a webhook anyone could forge.
+ *
+ * Every route inventoried below was verified to use one of these before the
+ * broader patterns were removed, so this narrowing changed no result today. It
+ * closes the false pass, not a live hole.
+ */
 const VALIDATION_PATTERNS = [
+  /requireTwilioSignature/,
+  /requireTwilioEventsSinkSecret/,
   /validateTwilioWebhook/,
   /validateWorkspaceTwilioWebhook/,
-  /requireWorkspaceAccess/,
-  /verifyAuth/,
-  /verifyApiKey/,
-  /safeOutboundUrl/,
 ];
 
 /** Routes that are app-authenticated or non-Twilio; excluded from Twilio signature audit. */
@@ -26,19 +39,26 @@ const EXCLUDED_SUFFIXES = [
   "connect-phone-device.action.server.ts",
   "hangup.action.server.ts",
   "error-report.action.server.ts",
-  "verify-audio-session.action.server.ts",
-  "verify-pin-input.action.server.ts",
-  "inbound-verification.action.server.ts",
 ];
 
 /** Twilio webhook handlers (POST from Twilio). Loader-only conference connect validated separately. */
 const TWILIO_WEBHOOK_SUFFIXES = [
+  "acd-router.action.server.ts",
+  "acd-router/agent-bridge.action.server.ts",
+  "acd-router/agent-status.action.server.ts",
+  "acd-router/complete.action.server.ts",
+  "call.action.server.ts",
   "inbound.action.server.ts",
   "inbound-sms.action.server.ts",
+  "inbound-verification.action.server.ts",
   "inbound-handset.action.server.ts",
   "inbound-handset-dial-end.action.server.ts",
+  "inbound-ivr/$numberId/$pageId.action.server.ts",
+  "inbound-ivr/$numberId/$pageId/$blockId.action.server.ts",
+  "inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
   "sms/status.action.server.ts",
   "call-status.action.server.ts",
+  "dial/$number.action.server.ts",
   "dial/status.action.server.ts",
   "auto-dial/status.action.server.ts",
   "auto-dial/$roomId.action.server.ts",
@@ -49,6 +69,8 @@ const TWILIO_WEBHOOK_SUFFIXES = [
   "ivr/$campaignId/$pageId.action.server.ts",
   "ivr/$campaignId/$pageId/$blockId.action.server.ts",
   "ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
+  "twilio/trusthub/status.action.server.ts",
+  "twilio/a2p/events.action.server.ts",
 ];
 
 function collectActionFiles(dir, prefix = "") {

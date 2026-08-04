@@ -1,28 +1,44 @@
 export { loader } from "./$audience_id.loader.server";
 
-import { data as routeData, LoaderFunctionArgs, Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
+import { Form, useLoaderData, useNavigate, useOutletContext, useRevalidator } from "react-router";
 
 import { useState } from "react";
 import { AudienceTable } from "@/components/audience/AudienceTable";
 import AudienceUploadHistory from "@/components/audience/AudienceUploadHistory";
 import AudienceUploader from "@/components/audience/AudienceUploader";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Heading } from "@/components/ui/typography";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { Database } from "@/lib/database.types";
 import { useInterval } from "@/hooks/utils/useInterval";
 import { logger } from "@/lib/logger.client";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { AUDIENCE_UPLOAD_PROCESSING_POLL_MS } from "../../../../../shared/audience-upload";
 
 import type { AudienceDetailLoaderData } from "./$audience_id.types";
 
 export default function AudienceView() {
-  const { contacts, audience, error, workspace_id, audience_id, pagination, sorting, latestUpload } =
-    useLoaderData<AudienceDetailLoaderData>();
+  const {
+    contacts,
+    audience,
+    error,
+    contactsError,
+    workspace_id,
+    audience_id,
+    pagination,
+    sorting,
+    latestUpload,
+  } = useLoaderData<AudienceDetailLoaderData>();
   const navigate = useNavigate();
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient<Database> }>();
+  useOutletContext<{ }>();
   const [activeTab, setActiveTab] = useState("contacts");
   const revalidator = useRevalidator();
+  const [name, setName] = useState(audience?.name ?? "");
+  const [prevAudienceName, setPrevAudienceName] = useState(audience?.name ?? "");
+  if (prevAudienceName !== (audience?.name ?? "")) {
+    setPrevAudienceName(audience?.name ?? "");
+    setName(audience?.name ?? "");
+  }
 
   // Track current upload status
   const [currentUploadId, setCurrentUploadId] = useState<number | null>(
@@ -44,12 +60,12 @@ export default function AudienceView() {
           setCurrentUploadId(null);
           revalidator.revalidate();
         }
-      } catch (error) {
-        logger.error("Error polling status:", error);
+      } catch (pollError) {
+        logger.error("Error polling status:", pollError);
         setCurrentUploadId(null);
       }
     },
-    currentUploadId ? 2000 : null
+    currentUploadId ? AUDIENCE_UPLOAD_PROCESSING_POLL_MS : null
   );
 
   const handleUploadComplete = (_uploadId: string) => {
@@ -58,12 +74,16 @@ export default function AudienceView() {
     setActiveTab("contacts");
   };
 
+  const title =
+    name.trim() ||
+    (audience_id ? `Unnamed Call list ${audience_id}` : "Unnamed Call list");
+
   return (
-    <main className="flex h-full flex-col gap-4 text-white">
+    <main className="flex h-full flex-col gap-4 text-foreground">
       <div className="flex items-center justify-between gap-4">
-        <h1 className="font-Zilla-Slab text-3xl font-bold text-brand-primary dark:text-white">
-          {audience?.name || `Unnamed Audience ${audience_id}`}
-        </h1>
+        <Heading as="h1" level={2} branded={false}>
+          {title}
+        </Heading>
         <div className="flex gap-1">
           <Form
             method="DELETE"
@@ -77,11 +97,24 @@ export default function AudienceView() {
               variant={"destructive"}
               className="font-Zilla-Slab"
             >
-              Delete Audience
+              Delete Call list
             </Button>
           </Form>
         </div>
       </div>
+
+      {error ? (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+      {contactsError ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            Contacts could not be loaded. The call list name and settings below are still available.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
@@ -99,37 +132,31 @@ export default function AudienceView() {
 
         <TabsContent value="contacts">
           <AudienceTable
-            {...{
-              contacts,
-              workspace_id,
-              selected_id: audience_id,
-              audience,
-              pagination,
-              sorting
-            }}
+            contacts={contacts}
+            workspace_id={workspace_id}
+            selected_id={audience_id}
+            pagination={pagination}
+            sorting={sorting}
+            name={name}
+            onNameChange={setName}
           />
         </TabsContent>
 
-        <TabsContent value="upload">
-          <div className="bg-white dark:bg-zinc-800 p-6 rounded-lg shadow">
-            <h2 className="font-Zilla-Slab text-xl font-semibold mb-4 text-brand-primary dark:text-white">
-              Upload Contacts to {audience?.name}
-            </h2>
-            <AudienceUploader
-              existingAudienceId={audience_id}
-              supabase={supabase}
-              onUploadComplete={handleUploadComplete}
-            />
-          </div>
+        <TabsContent value="upload" className="space-y-4">
+          <Heading as="h2" level={3} branded={false}>
+            Upload Contacts to {title}
+          </Heading>
+          <AudienceUploader
+            existingAudienceId={audience_id}
+            onUploadComplete={handleUploadComplete}
+          />
         </TabsContent>
 
         <TabsContent value="history">
-          <div className="bg-white dark:bg-zinc-800 p-6 rounded-lg shadow">
-            <h2 className="font-Zilla-Slab text-xl font-semibold mb-4 text-brand-primary dark:text-white">
-              Upload History
-            </h2>
-            <AudienceUploadHistory audienceId={Number(audience_id)} />
-          </div>
+          <AudienceUploadHistory
+            audienceId={Number(audience_id)}
+            workspaceId={workspace_id ?? ""}
+          />
         </TabsContent>
       </Tabs>
     </main>

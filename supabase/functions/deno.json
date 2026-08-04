@@ -1,8 +1,0 @@
-{
-  "compilerOptions": {
-    "lib": ["deno.window", "deno.unstable"],
-    "strict": true
-  },
-  "nodeModulesDir": "auto",
-  "exclude": ["node_modules"]
-}

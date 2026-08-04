@@ -1,4 +1,4 @@
-import { useEffect, useState, FormEvent } from "react";
+import { useState, useMemo, FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { AudienceForm } from "./AudienceForm";
 import { Download, Search, X } from "lucide-react";
@@ -24,8 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Database } from "@/lib/database.types";
-import { Contact } from "@/lib/types";
+import type { ContactListRow } from "@/lib/contacts-loader.types";
 import {
   Select,
   SelectContent,
@@ -35,10 +34,9 @@ import {
 } from "@/components/ui/select";
 
 type AudienceTableProps = {
-  contacts: Array<{ contact: Database['public']['Tables']['contact']['Row'] }> | null;
+  contacts: Array<{ contact: ContactListRow }> | null;
   workspace_id: string | undefined;
   selected_id: string | undefined;
-  audience: Database['public']['Tables']['audience']['Row'] | null;
   pagination: {
     currentPage: number;
     pageSize: number;
@@ -48,22 +46,30 @@ type AudienceTableProps = {
     sortKey: string;
     sortDirection: 'asc' | 'desc';
   };
+  /** Controlled name owned by the page (H1 sync). */
+  name: string;
+  onNameChange: (name: string) => void;
 };
 
 export function AudienceTable({
   contacts: initialContacts,
   workspace_id,
   selected_id: audience_id,
-  audience: initialAudience,
   pagination,
-  sorting
+  sorting,
+  name,
+  onNameChange,
 }: AudienceTableProps) {
-  // Transform the contacts data to extract the nested contact info
-  const transformedContacts = initialContacts?.map(item => item.contact) || [];
-  const [contacts, setContacts] = useState<Contact[]>(transformedContacts);
-  const [audienceInfo, setAudienceInfo] = useState(initialAudience);
+  // Transform the contacts data to extract the nested contact info.
+  // Memoized so this map only reruns when the loader actually hands us a new
+  // `initialContacts` reference, not on every unrelated re-render.
+  const transformedContacts = useMemo(
+    () => initialContacts?.map(item => item.contact) || [],
+    [initialContacts],
+  );
+  const [contacts, setContacts] = useState<ContactListRow[]>(transformedContacts);
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("q") ?? "");
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
 
   const removeFetcher = useFetcher<{ error?: string }>();
@@ -75,11 +81,13 @@ export function AudienceTable({
     errorMessage: "Failed to remove contact. Changes reverted.",
   });
 
-  useEffect(() => {
-    const transformed = initialContacts?.map(item => item.contact) || [];
-    setContacts(transformed);
-    setAudienceInfo(initialAudience);
-  }, [initialContacts, initialAudience]);
+  const [prevInitialContacts, setPrevInitialContacts] = useState(initialContacts);
+  if (prevInitialContacts !== initialContacts) {
+    setPrevInitialContacts(initialContacts);
+    // `transformedContacts` is already recomputed for the new `initialContacts`
+    // in this same render pass (useMemo above), so reuse it instead of re-mapping.
+    setContacts(transformedContacts);
+  }
 
   const handlePageChange = (newPage: number) => {
     const newParams = new URLSearchParams(searchParams);
@@ -94,6 +102,24 @@ export function AudienceTable({
     setSearchParams(newParams);
   };
 
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const newParams = new URLSearchParams(searchParams);
+    const query = searchTerm.trim();
+    if (query) newParams.set("q", query);
+    else newParams.delete("q");
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
+  const clearSearch = () => {
+    setSearchTerm("");
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("q");
+    newParams.set("page", "1");
+    setSearchParams(newParams);
+  };
+
   const handleSaveAudience = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
@@ -103,9 +129,7 @@ export function AudienceTable({
     });
     const result = await response.json();
 
-    if (response.ok) {
-      setAudienceInfo(result);
-    } else {
+    if (!response.ok) {
       logger.error("Failed to save audience", result);
     }
   };
@@ -193,17 +217,23 @@ export function AudienceTable({
     }
   };
 
-  // Filter contacts based on search term (client-side filtering only)
-  const filteredContacts = contacts.filter(contact => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      (contact.firstname?.toLowerCase().includes(searchLower) || false) ||
-      (contact.surname?.toLowerCase().includes(searchLower) || false) ||
-      (contact.email?.toLowerCase().includes(searchLower) || false) ||
-      (contact.phone?.toLowerCase().includes(searchLower) || false)
-    );
-  });
+  // Filter contacts based on search term (client-side filtering only).
+  // Memoized on [contacts, searchTerm] so this doesn't rerun on renders
+  // triggered by unrelated state (e.g. selection toggles, dropdown opens).
+  const filteredContacts = useMemo(
+    () =>
+      contacts.filter(contact => {
+        if (!searchTerm) return true;
+        const searchLower = searchTerm.toLowerCase();
+        return (
+          (contact.firstname?.toLowerCase().includes(searchLower) || false) ||
+          (contact.surname?.toLowerCase().includes(searchLower) || false) ||
+          (contact.email?.toLowerCase().includes(searchLower) || false) ||
+          (contact.phone?.toLowerCase().includes(searchLower) || false)
+        );
+      }),
+    [contacts, searchTerm],
+  );
 
   const totalPages = Math.ceil((pagination.totalCount || 0) / pagination.pageSize);
 
@@ -211,32 +241,38 @@ export function AudienceTable({
     <div className="w-full space-y-4">
       <div id="audience-settings" className="flex justify-between items-center">
         <AudienceForm
-          audienceInfo={audienceInfo}
           handleSaveAudience={handleSaveAudience}
           audience_id={audience_id}
           workspace_id={workspace_id}
+          name={name}
+          onNameChange={onNameChange}
         />
       </div>
       <div className="flex justify-between items-center mb-4">
-        <div className="relative w-72">
+        <form className="relative w-72" onSubmit={handleSearch} role="search">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search contacts..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8"
+            className="pl-10"
           />
           {searchTerm && (
             <Button
               variant="ghost"
               size="sm"
               className="absolute right-0 top-0 h-full"
-              onClick={() => setSearchTerm("")}
+              type="button"
+              aria-label="Clear contact search"
+              onClick={clearSearch}
             >
               <X className="h-4 w-4" />
             </Button>
           )}
-        </div>
+          <button type="submit" className="sr-only">
+            Search contacts
+          </button>
+        </form>
 
         <div className="flex items-center gap-2">
           <Select
@@ -326,7 +362,9 @@ export function AudienceTable({
             {filteredContacts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  {searchTerm ? "No contacts found matching your search" : "No contacts in this audience yet"}
+                  {searchTerm
+                    ? "Contacts matching your search will appear here"
+                    : "Add contacts to start building this Call list"}
                 </TableCell>
               </TableRow>
             ) : (

@@ -1,11 +1,13 @@
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import {
   buildWorkspaceAnalytics,
   defaultAnalyticsRange,
   parseAnalyticsDateParam,
   type WorkspaceAnalyticsResult,
 } from "../../shared/workspace-analytics";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import { call as callTable, outreach_attempt as outreachAttemptTable } from "@/db/schema";
+import { listWorkspaceMembersEnriched } from "@/lib/workspace-members-db.server";
+import { createTenantDb } from "@/server/tenant-db";
 
 type AnalyticsAttemptRow = {
   id: number;
@@ -23,7 +25,6 @@ type AnalyticsAttemptRow = {
 };
 
 export async function loadWorkspaceAnalytics(args: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   requestUrl: string;
   currentUserId: string;
@@ -41,62 +42,71 @@ export async function loadWorkspaceAnalytics(args: {
     ? requestedUserId || null
     : args.currentUserId;
 
-  let attemptsQuery = args.supabaseClient
-    .from("outreach_attempt")
-    .select(
-      `
-      id,
-      user_id,
-      created_at,
-      answered_at,
-      ended_at,
-      disposition,
-      call (
-        duration,
-        call_duration,
-        status,
-        end_time
-      )
-    `,
-    )
-    .eq("workspace", args.workspaceId)
-    .gte("created_at", range.from)
-    .lte("created_at", range.to)
-    .order("created_at", { ascending: false })
-    .limit(5000);
+  const tdb = createTenantDb(args.workspaceId);
+  const attemptWhere = and(
+    gte(outreachAttemptTable.created_at, range.from),
+    lte(outreachAttemptTable.created_at, range.to),
+    scopedUserId ? eq(outreachAttemptTable.user_id, scopedUserId) : undefined,
+  );
 
-  if (scopedUserId) {
-    attemptsQuery = attemptsQuery.eq("user_id", scopedUserId);
+  const attempts = await tdb.outreach_attempt.findMany({
+    where: attemptWhere,
+    orderBy: [desc(outreachAttemptTable.created_at)],
+    limit: 5000,
+  });
+
+  const attemptIds = attempts.map((row) => row.id);
+  const calls =
+    attemptIds.length === 0
+      ? []
+      : await tdb.call.findMany({
+          where: inArray(callTable.outreach_attempt_id, attemptIds),
+          columns: {
+            outreach_attempt_id: true,
+            duration: true,
+            call_duration: true,
+            status: true,
+            end_time: true,
+          },
+        });
+
+  const callsByAttemptId = new Map<number, AnalyticsAttemptRow["call"]>();
+  for (const callRow of calls) {
+    if (callRow.outreach_attempt_id == null) {
+      continue;
+    }
+    const bucket = callsByAttemptId.get(callRow.outreach_attempt_id) ?? [];
+    bucket.push({
+      duration: callRow.duration,
+      call_duration: callRow.call_duration,
+      status: callRow.status,
+      end_time: callRow.end_time,
+    });
+    callsByAttemptId.set(callRow.outreach_attempt_id, bucket);
   }
 
-  const { data: workspaceUsers } = await args.supabaseClient
-    .from("workspace_users")
-    .select("user_id, user:user_id(id, username, first_name)")
-    .eq("workspace_id", args.workspaceId);
+  const analyticsAttempts: AnalyticsAttemptRow[] = attempts.map((attempt) => ({
+    id: attempt.id,
+    user_id: attempt.user_id,
+    created_at: attempt.created_at,
+    answered_at: attempt.answered_at,
+    ended_at: attempt.ended_at,
+    disposition: attempt.disposition,
+    call: callsByAttemptId.get(attempt.id) ?? null,
+  }));
 
-  const { data: attempts, error } = await attemptsQuery;
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const users = (workspaceUsers ?? [])
-    .map((entry) => {
-      const user = entry.user as {
-        id: string;
-        username: string;
-        first_name: string | null;
-      } | null;
-      if (!user) return null;
+  const memberRows = await listWorkspaceMembersEnriched(args.workspaceId);
+  const users = memberRows
+    .map((user) => {
       const label = user.first_name
         ? `${user.first_name} (${user.username})`
         : user.username;
-      return { id: user.id, label };
+      return { id: user.user_id, label };
     })
-    .filter((entry): entry is { id: string; label: string } => Boolean(entry))
     .sort((left, right) => left.label.localeCompare(right.label));
 
   return buildWorkspaceAnalytics({
-    attempts: (attempts as AnalyticsAttemptRow[] | null) ?? [],
+    attempts: analyticsAttempts,
     users,
     range,
     scopedUserId,

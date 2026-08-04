@@ -1,7 +1,3 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
-} from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import {
   testWebhookBodySchema,
@@ -13,50 +9,31 @@ import {
   upsertWorkspaceWebhook,
 } from "@/lib/platform-members.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { defineAction, defineLoader } from "@/lib/handler.server";
+import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+function requireWorkspaceUser({
+  params,
+  context,
+}: Pick<LoaderFunctionArgs, "params" | "context">) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
-
-  const result = await getWorkspaceWebhook(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
-    workspaceId,
-  );
-
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
+  const { userId } = getDataPlaneRouteContext(context, workspaceId);
+  if (!userId) {
+    return jsonError("Unauthorized", 401);
   }
-
-  return jsonResponse({ webhook: result.webhook }, 200);
+  return { workspaceId, userId };
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-
-  const supabase = getAuthSupabaseClient(auth);
-
-  if (request.method === "PUT") {
-    const parsed = await parseJsonBodyOrResponse(request, upsertWebhookBodySchema);
-    if (parsed instanceof Response) return parsed;
-
-    const result = await upsertWorkspaceWebhook(
-      supabase,
-      auth.user.id,
-      workspaceId,
-      parsed,
+export const loader = defineLoader({
+  auth: requireWorkspaceUser,
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const result = await getWorkspaceWebhook(    auth.userId,
+      auth.workspaceId,
     );
 
     if (!result.ok) {
@@ -64,31 +41,56 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     return jsonResponse({ webhook: result.webhook }, 200);
-  }
+  },
+});
 
-  if (request.method === "POST") {
-    const parsed = await parseJsonBodyOrResponse(request, testWebhookBodySchema);
-    if (parsed instanceof Response) return parsed;
+export const action = defineAction({
+  auth: requireWorkspaceUser,
+  sideEffects: ["db-write", "external"],
+  handler: async ({ request, auth }) => {
+    const { workspaceId, userId } = auth;
 
-    const result = await testWorkspaceWebhook(
-      parsed.destination_url,
-      parsed.custom_headers as Record<string, string> | [string, string][],
-      parsed.event,
-    );
+    if (request.method === "PUT") {
+      const parsed = await parseJsonBodyOrResponse(request, upsertWebhookBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-    if (!result.ok) {
-      return jsonError(result.error, result.status);
+      const result = await upsertWorkspaceWebhook(
+        userId,
+        workspaceId,
+        parsed,
+      );
+
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse({ webhook: result.webhook }, 200);
     }
 
-    return jsonResponse(
-      {
-        data: result.data,
-        status: result.status,
-        statusText: result.statusText,
-      },
-      200,
-    );
-  }
+    if (request.method === "POST") {
+      const parsed = await parseJsonBodyOrResponse(request, testWebhookBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-  return jsonError("Method not allowed", 405);
-}
+      const result = await testWorkspaceWebhook(
+        parsed.destination_url,
+        parsed.custom_headers as Record<string, string> | [string, string][],
+        parsed.event,
+      );
+
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse(
+        {
+          data: result.data,
+          status: result.status,
+          statusText: result.statusText,
+        },
+        200,
+      );
+    }
+
+    return jsonError("Method not allowed", 405);
+  },
+});

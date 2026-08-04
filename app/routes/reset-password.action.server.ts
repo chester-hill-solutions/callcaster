@@ -1,27 +1,43 @@
 import { data as routeData } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { ActionFunctionArgs } from "react-router";
+import { auth } from "@/server/auth-instance";
+import { defineAction } from "@/lib/handler.server";
 
-export async function action({ request }: ActionFunctionArgs) {
+export const action = defineAction({
+  sideEffects: ["db-write"],
+  handler: async ({ request, url }) => {
+    const formData = await request.formData();
+    const passwordRaw = formData.get("password");
+    const confirmPasswordRaw =
+      formData.get("confirm_password") ?? formData.get("confirmPassword");
 
-  const { supabaseClient, headers } = await verifyAuth(request);
+    if (typeof passwordRaw !== "string" || typeof confirmPasswordRaw !== "string") {
+      return routeData({
+        success: null,
+        error: { message: "Invalid form submission" },
+      });
+    }
 
-  const formData = await request.formData();
-  const newPasswordRaw = formData.get("password") as string;
-  const confirmNewPasswordRaw = formData.get("confirmPassword") as string;
+    const password = passwordRaw.trim();
+    const confirmPassword = confirmPasswordRaw.trim();
 
-  const newPassword = newPasswordRaw.trim();
-  const confirmNewPassword = confirmNewPasswordRaw.trim();
+    if (password !== confirmPassword) {
+      return routeData({
+        success: null,
+        error: { message: "Passwords do not match" },
+      });
+    }
 
-  if (newPassword !== confirmNewPassword) {
-    return routeData({
-      success: null,
-      error: { message: "Passwords do not match" },
-    });
-  }
+    const token = url.searchParams.get("token") ?? "";
 
-  const { data: updateUser, error: updateUserError } =
-    await supabaseClient.auth.updateUser({ password: newPassword });
+    try {
+      await auth.api.resetPassword({
+        body: { newPassword: password, token },
+        headers: request.headers,
+      });
+    } catch {
+      // Always return a generic success message regardless of token validity.
+    }
 
-  return routeData({ success: updateUser, error: updateUserError }, { headers });
-}
+    return routeData({ success: true, error: null });
+  },
+});

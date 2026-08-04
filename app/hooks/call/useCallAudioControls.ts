@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Call } from "@twilio/voice-sdk";
+import type { Call, Device } from "@twilio/voice-sdk";
 import { logger } from "@/lib/logger.client";
 import { playTone } from "@/lib/utils";
-import {
-  logTwilioAdapterResult,
-  replaceCallInputStream,
-  sendCallDigits,
-} from "@/lib/twilio/twilio-call-adapter.client";
+import { sendCallDigits } from "@/lib/twilio/twilio-call-adapter.client";
 import type { MicCoordinator } from "@/lib/twilio/call-session-types";
+import {
+  getUsableAudioDevices,
+  reconcileAudioDeviceId,
+} from "@/hooks/call/audio-device-selection";
 
 type UseCallAudioControlsOptions = {
-  device: import("@twilio/voice-sdk").Device | null;
+  device: Device | null;
   activeCall: Call | null;
   micCoordinator: MicCoordinator;
 };
@@ -27,19 +27,29 @@ export function useCallAudioControls({
   const [availableSpeakers, setAvailableSpeakers] = useState<MediaDeviceInfo[]>([]);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const gainNodeRef = useRef<GainNode | null>(null);
 
   const isMicrophoneMuted = micCoordinator.isMicMuted;
 
-  const requestMicrophoneAccess = useCallback(async () => {
+  const refreshDevices = useCallback(async () => {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      setAvailableMicrophones(devices.filter((d) => d.kind === "audioinput"));
-      setAvailableSpeakers(devices.filter((d) => d.kind === "audiooutput"));
-      const audioContext = new window.AudioContext();
-      audioContextRef.current = audioContext;
-      const gainNode = audioContext.createGain();
-      gainNodeRef.current = gainNode;
+      const microphones = getUsableAudioDevices(devices, "audioinput");
+      const speakers = getUsableAudioDevices(devices, "audiooutput");
+      setAvailableMicrophones(microphones);
+      setAvailableSpeakers(speakers);
+      setMicrophone((current) => reconcileAudioDeviceId(microphones, current));
+      setOutput((current) => reconcileAudioDeviceId(speakers, current));
+    } catch (error) {
+      logger.error("Error enumerating audio devices:", error);
+      setAvailableMicrophones([]);
+      setAvailableSpeakers([]);
+      setMicrophone(null);
+      setOutput(null);
+    }
+  }, []);
+
+  const requestMicrophoneAccess = useCallback(async () => {
+    try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: false,
@@ -47,6 +57,7 @@ export function useCallAudioControls({
 
       setStream(mediaStream);
       setPermissionError(null);
+      await refreshDevices();
     } catch (error: unknown) {
       logger.error("Error accessing microphone:", error);
       if (error instanceof Error && error.name === "NotAllowedError") {
@@ -60,62 +71,20 @@ export function useCallAudioControls({
         );
       }
     }
-  }, []);
+  }, [refreshDevices]);
 
   const handleMicrophoneChange = useCallback(
     (event: React.ChangeEvent<HTMLSelectElement>) => {
-      if (!device) {
-        logger.error("No device available");
-        return;
-      }
-      const selectedMicrophone = event.target.value;
-      const audio = device.audio;
-      audio?.setInputDevice(selectedMicrophone).then(() => {
-        micCoordinator.setMicMuted(false);
-        setMicrophone(selectedMicrophone);
-        logger.debug("Microphone set to", selectedMicrophone);
-
-        navigator.mediaDevices
-          .getUserMedia({ audio: { deviceId: selectedMicrophone } })
-          .then((newStream) => {
-            if (activeCall) {
-              replaceCallInputStream(activeCall, newStream)
-                .then((result) => {
-                  logTwilioAdapterResult(result, "replaceCallInputStream");
-                  if (result.status === "ok") {
-                    logger.debug("Active call input tracks updated with new microphone");
-                  }
-                })
-                .catch((error: unknown) => {
-                  logger.error("Error updating active call input tracks:", error);
-                });
-            }
-          })
-          .catch((error: unknown) => {
-            logger.error("Error getting stream from new microphone:", error);
-          });
-      }).catch((error: unknown) => {
-        logger.error("Error setting microphone:", error);
-      });
+      setMicrophone(event.target.value);
     },
-    [device, activeCall, micCoordinator],
+    [],
   );
 
   const handleSpeakerChange = useCallback(
     (event: React.ChangeEvent<HTMLSelectElement>) => {
-      if (!device) {
-        logger.error("No device available");
-        return;
-      }
-      const selectedSpeaker = event.target.value;
-      setOutput(selectedSpeaker);
-      device.audio?.speakerDevices.set(selectedSpeaker).then(() => {
-        logger.debug("Speaker set to", selectedSpeaker);
-      }).catch((error: unknown) => {
-        logger.error("Error setting speaker:", error);
-      });
+      setOutput(event.target.value);
     },
-    [device],
+    [],
   );
 
   const handleMuteMicrophone = useCallback(() => {
@@ -133,6 +102,16 @@ export function useCallAudioControls({
     [activeCall],
   );
 
+  /**
+   * @effect Create a Web Audio API AudioContext on mount for DTMF tone
+   * playback (handleDTMF), and close it on unmount to release the audio
+   * hardware resource.
+   * @effect-deps [] — intentionally mount-once; the AudioContext should be
+   * created exactly once per hook lifetime, not recreated per render.
+   * @effect-side-effects dom (Web Audio API AudioContext construction/close)
+   * @effect-why-not-loader Browser audio API object construction, not
+   * request/response data.
+   */
   useEffect(() => {
     audioContextRef.current = new (window.AudioContext ||
       (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext)();
@@ -143,6 +122,54 @@ export function useCallAudioControls({
     };
   }, []);
 
+  /**
+   * @effect Enumerate audio devices on mount and subscribe to OS
+   * devicechange events so mic/speaker pickers stay in sync with hardware.
+   * @effect-deps refreshDevices (stable callback)
+   * @effect-side-effects subscription (mediaDevices "devicechange" listener)
+   * @effect-why-not-loader Browser hardware enumeration is a client-only API.
+   */
+  useEffect(() => {
+    void refreshDevices();
+    navigator.mediaDevices?.addEventListener?.("devicechange", refreshDevices);
+    return () => {
+      navigator.mediaDevices?.removeEventListener?.("devicechange", refreshDevices);
+    };
+  }, [refreshDevices]);
+
+  /**
+   * @effect Apply the selected microphone and speaker device IDs to the
+   * active Twilio Device audio stack whenever hardware selection changes.
+   * @effect-deps device, microphone, output
+   * @effect-side-effects dom (Twilio Device audio input/output routing)
+   * @effect-why-not-loader Live Twilio audio routing follows user device picks.
+   */
+  useEffect(() => {
+    if (!device?.audio) return;
+    if (microphone) {
+      device.audio.setInputDevice(microphone).catch((error: unknown) => {
+        logger.error("Error setting microphone:", error);
+      });
+    }
+    if (output) {
+      device.audio.speakerDevices.set(output).catch((error: unknown) => {
+        logger.error("Error setting speaker:", error);
+      });
+    }
+  }, [device, microphone, output]);
+
+  /**
+   * @effect Auto-request microphone access whenever there's no live stream
+   * and no prior permission error, so audio controls have a mic stream ready
+   * by default (on mount, and again if the stream/error state is reset).
+   * @effect-deps stream, permissionError, requestMicrophoneAccess (re-runs
+   * whenever these change; the internal guard prevents repeated prompts once
+   * a stream exists or permission was denied)
+   * @effect-side-effects dom (navigator.mediaDevices.getUserMedia browser
+   * permission prompt + enumerateDevices), no timer/subscription/analytics
+   * @effect-why-not-loader Browser media-permission/hardware access is a
+   * client-only side effect gated on user consent, not app request data.
+   */
   useEffect(() => {
     if (!stream && !permissionError) {
       requestMicrophoneAccess();

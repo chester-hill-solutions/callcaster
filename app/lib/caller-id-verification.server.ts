@@ -1,8 +1,10 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { eq } from "drizzle-orm";
+import { workspace_number as workspaceNumberTable } from "@/db/schema";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
 import { normalizePhoneNumber } from "@/lib/utils";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import Twilio from "twilio";
+import { createTenantDb } from "@/server/tenant-db";
+import { INBOUND_RING_COUNT_DEFAULT } from "../../shared/inbound-rings";
 
 export type CallerIdValidationRequest = {
   accountSid: string;
@@ -24,39 +26,29 @@ export type StartWorkspaceCallerIdVerificationResult = {
   }>;
 };
 
+const CALLER_ID_CAPABILITIES = {
+  fax: false,
+  mms: false,
+  sms: false,
+  voice: false,
+  verification_status: "pending",
+  emergency_address_status: "not_started",
+  emergency_address_sid: null,
+  emergency_eligible: false,
+  emergency_compliance_status: "not_started",
+} as const;
+
 export async function startWorkspaceCallerIdVerification({
   workspaceId,
   phoneNumber,
   friendlyName,
 }: {
-  supabaseClient?: SupabaseClient;
   workspaceId: string;
   phoneNumber: string;
   friendlyName: string;
 }): Promise<StartWorkspaceCallerIdVerificationResult> {
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
-
-  const { data, error } = await supabase
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-  if (error) {
-    throw new Error(`Supabase query error: ${error.message}`);
-  }
-  if (!data) {
-    throw new Error("No workspace data found");
-  }
-
-  const creds = readTwilioWorkspaceCredentials(
-    (data as { twilio_data?: unknown }).twilio_data,
-  );
-  if (!creds) {
-    throw new Error("Workspace twilio_data not found");
-  }
-
-  const twilio = new Twilio.Twilio(creds.sid, creds.authToken, {
-    accountSid: creds.sid,
+  const twilio = await createWorkspaceTwilioInstance({
+    workspace_id: workspaceId,
   });
 
   const validationRequest = await twilio.validationRequests.create({
@@ -65,39 +57,51 @@ export async function startWorkspaceCallerIdVerification({
     statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
   });
   const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+  const tdb = createTenantDb(workspaceId);
+  const now = new Date().toISOString();
 
-  const { data: numberRequest, error: numberError } = await supabase
-    .from("workspace_number")
-    .upsert(
-      {
-        workspace: workspaceId,
-        friendly_name: friendlyName,
-        phone_number: normalizedPhoneNumber,
-        type: "caller_id",
-        capabilities: {
-          fax: false,
-          mms: false,
-          sms: false,
-          voice: false,
-          verification_status: "pending",
-          emergency_address_status: "not_started",
-          emergency_address_sid: null,
-          emergency_eligible: false,
-          emergency_compliance_status: "not_started",
-        },
-      },
-      {
-        onConflict: "phone_number, workspace",
-      },
-    )
-    .select();
+  const existing = await tdb.workspace_number.findFirst({
+    where: eq(workspaceNumberTable.phone_number, normalizedPhoneNumber),
+  });
 
-  if (numberError) {
-    throw new Error(`Error inserting workspace number: ${numberError.message}`);
+  const upsertValues = {
+    friendly_name: friendlyName,
+    phone_number: normalizedPhoneNumber,
+    type: "caller_id",
+    capabilities: CALLER_ID_CAPABILITIES,
+  };
+
+  const numberRequest = existing
+    ? await tdb.workspace_number.update({
+        set: upsertValues,
+        where: eq(workspaceNumberTable.id, existing.id),
+      })
+    : await tdb.workspace_number.insert({
+        ...upsertValues,
+        created_at: now,
+        handset_enabled: false,
+        // DB check: inbound_ring_count BETWEEN 1 AND 10.
+        inbound_ring_count: INBOUND_RING_COUNT_DEFAULT,
+      });
+
+  if (!numberRequest[0]) {
+    throw new Error("Error inserting workspace number");
   }
 
+  // Plain POJO for action/fetcher JSON — Twilio SDK instances are unreliable once
+  // serialized. Prefer the submitted number when the API omits phone_number.
+  const plainValidationRequest: CallerIdValidationRequest = {
+    accountSid: String(validationRequest.accountSid ?? ""),
+    callSid: String(validationRequest.callSid ?? ""),
+    friendlyName: String(validationRequest.friendlyName ?? friendlyName),
+    phoneNumber: String(
+      validationRequest.phoneNumber || normalizedPhoneNumber || phoneNumber,
+    ),
+    validationCode: String(validationRequest.validationCode ?? ""),
+  };
+
   return {
-    validationRequest: validationRequest as CallerIdValidationRequest,
-    numberRequest: (numberRequest ?? []) as StartWorkspaceCallerIdVerificationResult["numberRequest"],
+    validationRequest: plainValidationRequest,
+    numberRequest: numberRequest as StartWorkspaceCallerIdVerificationResult["numberRequest"],
   };
 }

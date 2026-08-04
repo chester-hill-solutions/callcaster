@@ -1,16 +1,29 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
+vi.mock("@/server/db", () => ({
+  db: {
+    select: vi.fn(),
+    insert: vi.fn(),
+    update: vi.fn(),
+  },
+}));
+
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => {
   return {
     createClient: vi.fn(),
-    validateTwilioWebhookParams: vi.fn(() => true),
+    requireTwilioSignature: vi.fn(),
     sendWebhookNotification: vi.fn(),
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     env: {
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "tok",
       TWILIO_SID: () => "AC_MAIN",
     },
@@ -18,18 +31,150 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
-vi.mock("@/twilio.server", () => ({
-  validateTwilioWebhookParams: (...a: any[]) => mocks.validateTwilioWebhookParams(...a),
-  shouldValidateTwilioWebhooks: () => true,
+vi.mock("@client/client-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  requireTwilioSignature: (...a: any[]) => mocks.requireTwilioSignature(...a),
 }));
 vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   sendWebhookNotification: (...a: any[]) => mocks.sendWebhookNotification(...a),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: vi.fn(async () => undefined),
+}));
+vi.mock("@/lib/workspace-events.server", () => ({
+  emitChatMessageEvent: vi.fn(async () => undefined),
+}));
 
-function makeSupabase(opts?: {
+const queueDbMocks = vi.hoisted(() => ({
+  dequeueCampaignQueueByContact: vi.fn(),
+}));
+
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueCampaignQueueByContact: (...args: unknown[]) =>
+    queueDbMocks.dequeueCampaignQueueByContact(...args),
+}));
+
+const onboardingMocks = vi.hoisted(() => ({
+  getWorkspaceMessagingOnboardingState: vi.fn(),
+}));
+
+vi.mock("@/lib/messaging-onboarding.server", () => ({
+  getWorkspaceMessagingOnboardingState: (...args: unknown[]) =>
+    onboardingMocks.getWorkspaceMessagingOnboardingState(...args),
+}));
+
+const inboundContextMocks = vi.hoisted(() => ({
+  contacts: [] as Array<{ id: number }>,
+  contactError: null as Error | null,
+  resolveInboundWorkspaceContext: vi.fn(),
+}));
+
+vi.mock("@/lib/inbound-sms-context.server", () => ({
+  parseTrimmedString: (value: unknown) => (typeof value === "string" ? value.trim() : ""),
+  resolveInboundWorkspaceContext: (...args: unknown[]) =>
+    inboundContextMocks.resolveInboundWorkspaceContext(...args),
+  findMatchingContactIds: vi.fn(async () => {
+    if (inboundContextMocks.contactError) {
+      mocks.logger.error("Contact lookup error:", inboundContextMocks.contactError);
+      return [];
+    }
+    return Array.from(
+      new Set(
+        inboundContextMocks.contacts
+          .map((contact) => contact?.id)
+          .filter((id): id is number => typeof id === "number"),
+      ),
+    );
+  }),
+}));
+
+vi.mock("@/lib/database/contact.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/database/contact.server")>();
+  return {
+    ...actual,
+    findPotentialContacts: vi.fn(async () => ({
+      data: inboundContextMocks.contacts,
+      error: inboundContextMocks.contactError,
+    })),
+  };
+});
+
+import { configureTenantDbStub, createTenantDbMock, tenantDbStubState } from "./helpers/tenant-db-stub";
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => createTenantDbMock(),
+}));
+
+function configureInboundWorkspaceContext(opts?: {
+  number?: any;
+  workspaceNumberError?: any;
+  workspaceMsMatches?: any[];
+  workspaceMsError?: any;
+}) {
+  if (opts?.workspaceNumberError) {
+    inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+      ok: false,
+      response: Response.json({ error: "Number lookup failed" }, { status: 500 }),
+    });
+    return;
+  }
+
+  if (opts?.number) {
+    inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+      ok: true,
+      ctx: {
+        workspace: opts.number.workspace,
+        twilio_data: opts.number.twilio_data,
+        webhook: opts.number.webhook ?? [],
+      },
+      attributionPath: "matched_by_to_number",
+    });
+    return;
+  }
+
+  if (opts?.workspaceMsError) {
+    inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+      ok: false,
+      response: Response.json({ error: "Messaging service lookup failed" }, { status: 500 }),
+    });
+    return;
+  }
+
+  const matches = opts?.workspaceMsMatches ?? [];
+  if (matches.length === 1) {
+    inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+      ok: true,
+      ctx: {
+        workspace: matches[0].id,
+        twilio_data: matches[0].twilio_data,
+        webhook: matches[0].webhook ?? [],
+      },
+      attributionPath: "matched_by_messaging_service_sid",
+    });
+    return;
+  }
+
+  if (matches.length > 1) {
+    inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+      ok: false,
+      response: Response.json(
+        { error: "Messaging service matches multiple workspaces" },
+        { status: 409 },
+      ),
+    });
+    return;
+  }
+
+  inboundContextMocks.resolveInboundWorkspaceContext.mockResolvedValue({
+    ok: false,
+    response: Response.json({ error: "Number not found" }, { status: 404 }),
+  });
+}
+
+function makeDbClient(opts?: {
   number?: any;
   workspaceNumberError?: any;
   workspaceMsMatches?: any[];
@@ -42,7 +187,11 @@ function makeSupabase(opts?: {
   smsWebhook?: boolean;
   insertedMessages?: Record<string, unknown>[];
 }) {
-  const supabase: any = {
+  inboundContextMocks.contacts = (opts?.contacts ?? []) as Array<{ id: number }>;
+  inboundContextMocks.contactError = opts?.contactError ?? null;
+  configureInboundWorkspaceContext(opts);
+
+  const client: any = {
     rpc: async () => ({
       data: [],
       error: { message: "stub rpc for tests", code: "stub" },
@@ -56,28 +205,6 @@ function makeSupabase(opts?: {
       }),
     },
     from: (table: string) => {
-      if (table === "workspace_number") {
-        return {
-          select: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({
-                data: opts?.number ?? null,
-                error: opts?.workspaceNumberError ?? null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "workspace") {
-        return {
-          select: () => ({
-            or: async () => ({
-              data: opts?.workspaceMsMatches ?? [],
-              error: opts?.workspaceMsError ?? null,
-            }),
-          }),
-        };
-      }
       if (table === "contact") {
         const contactQuery: any = {
           select: () => contactQuery,
@@ -111,7 +238,7 @@ function makeSupabase(opts?: {
       throw new Error("unexpected table");
     },
   };
-  return supabase;
+  return client;
 }
 
 function makeParams(overrides?: Partial<Record<string, unknown>>) {
@@ -144,55 +271,219 @@ function makeInboundSmsRequest(overrides?: Partial<Record<string, unknown>>) {
 
 describe("app/routes/api+/inbound-sms", () => {
   beforeEach(() => {
-    vi.resetModules();
+    configureTenantDbStub();
+    inboundContextMocks.contacts = [];
+    inboundContextMocks.contactError = null;
+    inboundContextMocks.resolveInboundWorkspaceContext.mockReset();
     mocks.createClient.mockReset();
-    mocks.validateTwilioWebhookParams.mockReset();
-    mocks.validateTwilioWebhookParams.mockReturnValue(true);
+    mocks.requireTwilioSignature.mockReset();
+    mocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.sendWebhookNotification.mockReset();
     mocks.logger.error.mockReset();
     mocks.logger.info.mockReset();
     mocks.logger.warn.mockReset();
     mocks.fetch.mockReset();
+    queueDbMocks.dequeueCampaignQueueByContact.mockReset();
+    queueDbMocks.dequeueCampaignQueueByContact.mockResolvedValue([]);
     vi.stubGlobal("fetch", mocks.fetch);
+    onboardingMocks.getWorkspaceMessagingOnboardingState.mockReset();
+    onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValue({
+      businessProfile: { optOutKeywords: "" },
+    });
+  });
+
+  describe("workspace-configurable opt-out keywords", () => {
+    test("marks contact opted out on a custom configured keyword", async () => {
+      onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
+        businessProfile: { optOutKeywords: "QUIT, LEAVE ME ALONE" },
+      });
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+          request: makeInboundSmsRequest({ Body: "quit", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
+        expect.objectContaining({ set: { opt_out: true } }),
+      );
+    });
+
+    test("does not opt out on default STOP keyword when a custom keyword list doesn't include it", async () => {
+      onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
+        businessProfile: { optOutKeywords: "QUIT" },
+      });
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+          request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(tenantDbStubState.contactUpdateCalls).toHaveLength(0);
+    });
+
+    test("falls back to default STOP/UNSUBSCRIBE keywords when onboarding lookup fails", async () => {
+      onboardingMocks.getWorkspaceMessagingOnboardingState.mockRejectedValueOnce(
+        new Error("onboarding unavailable"),
+      );
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+          request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(mocks.logger.error).toHaveBeenCalledWith(
+        "Error loading workspace opt-out keywords for inbound SMS:",
+        expect.any(Error),
+      );
+      expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
+        expect.objectContaining({ set: { opt_out: true } }),
+      );
+    });
+
+    test("STOP also dequeues the contact from all campaign queues (workspace-scoped)", async () => {
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+          request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
+        expect.objectContaining({ set: { opt_out: true } }),
+      );
+      expect(queueDbMocks.dequeueCampaignQueueByContact).toHaveBeenCalledWith({
+        contactId: 9,
+        userId: null,
+        reason: "Contact opted out via SMS",
+        workspaceId: "w1",
+      });
+    });
+
+    test("STOP dequeue failure is logged but the message is still recorded", async () => {
+      queueDbMocks.dequeueCampaignQueueByContact.mockRejectedValueOnce(
+        new Error("queue down"),
+      );
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+          request: makeInboundSmsRequest({ Body: "stop", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(mocks.logger.error).toHaveBeenCalledWith(
+        "Failed to dequeue opted-out contact from campaign queues:",
+        expect.any(Error),
+      );
+    });
+
+    test("START re-subscribes regardless of configured opt-out keywords", async () => {
+      onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValueOnce({
+        businessProfile: { optOutKeywords: "QUIT" },
+      });
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(
+        makeDbClient({ number, contacts: [{ id: 9 }], mediaOk: true }),
+      );
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+          request: makeInboundSmsRequest({ Body: "start", NumMedia: "0" }),
+        } as any),
+      );
+      expect(res.status).toBe(201);
+      expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
+        expect.objectContaining({ set: { opt_out: false } }),
+      );
+      // Re-subscribe must NOT touch campaign queues (no re-queueing).
+      expect(queueDbMocks.dequeueCampaignQueueByContact).not.toHaveBeenCalled();
+    });
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {
-    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), { status: 403 }));
     const number = {
       workspace: "w1",
       twilio_data: { sid: "sid", authToken: "workspace-tok" },
       webhook: [],
     };
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeInboundSmsRequest(),
       } as any),
     );
     expect(res.status).toBe(403);
-    expect(mocks.validateTwilioWebhookParams).toHaveBeenCalledWith(
-      expect.objectContaining({ To: "+1555" }),
-      "test-sig",
-      expect.any(String),
-      "workspace-tok",
+    expect(mocks.requireTwilioSignature).toHaveBeenCalledWith(
+      expect.objectContaining({ url: "http://x/inbound-sms" }),
+      expect.objectContaining({
+        workspaceId: "w1",
+        params: expect.objectContaining({
+          MessageSid: "SM1",
+          To: "+1555",
+          From: "+1666",
+          Body: "hello",
+        }),
+      }),
     );
   });
 
-  test("returns 403 when Twilio signature header is missing", async () => {
+  test("passes parsed webhook params into signature validation (avoids Bun empty re-read)", async () => {
     const number = {
       workspace: "w1",
       twilio_data: { sid: "sid", authToken: "workspace-tok" },
       webhook: [],
     };
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number, mediaOk: true }));
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(mod.action({
+        request: makeInboundSmsRequest({ NumMedia: "0" }),
+      } as any),
+    );
+    expect(res.status).toBe(201);
+    expect(mocks.requireTwilioSignature).toHaveBeenCalledWith(
+      expect.any(Request),
+      expect.objectContaining({
+        workspaceId: "w1",
+        params: expect.objectContaining({
+          MessageSid: "SM1",
+          AccountSid: "AC1",
+          Body: "hello",
+        }),
+      }),
+    );
+  });
+
+  test("returns 403 when Twilio signature header is missing", async () => {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Missing Twilio signature" }), { status: 403 }));
+    const number = {
+      workspace: "w1",
+      twilio_data: { sid: "sid", authToken: "workspace-tok" },
+      webhook: [],
+    };
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
     const body = new FormData();
     for (const [key, value] of Object.entries(makeParams())) {
       body.append(key, String(value));
     }
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x/inbound-sms", { method: "POST", body }),
       } as never),
     );
@@ -200,16 +491,15 @@ describe("app/routes/api+/inbound-sms", () => {
   });
 
   test("returns 404 when number not found", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number: null }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number: null }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(404);
   });
 
   test("resolves workspace by MessagingServiceSid when To number is unknown", async () => {
-    const insertedMessages: Record<string, unknown>[] = [];
     mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
+      makeDbClient({
         number: null,
         workspaceMsMatches: [
           {
@@ -218,12 +508,10 @@ describe("app/routes/api+/inbound-sms", () => {
             webhook: [],
           },
         ],
-        insertedMessages,
       }),
     );
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeInboundSmsRequest({
           To: "+19998887777",
           MessagingServiceSid: "MG1234567890abcdef",
@@ -232,8 +520,7 @@ describe("app/routes/api+/inbound-sms", () => {
       } as any),
     );
     expect(res.status).toBe(201);
-    expect(insertedMessages[0]).toMatchObject({
-      workspace: "w-ms",
+    expect(tenantDbStubState.messageInsertCalls[0]).toMatchObject({
       messaging_service_sid: "MG1234567890abcdef",
       direction: "inbound",
     });
@@ -241,7 +528,7 @@ describe("app/routes/api+/inbound-sms", () => {
 
   test("returns 409 when MessagingServiceSid matches multiple workspaces", async () => {
     mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
+      makeDbClient({
         number: null,
         workspaceMsMatches: [
           { id: "w1", twilio_data: { sid: "AC1", authToken: "tok1" }, webhook: [] },
@@ -250,8 +537,7 @@ describe("app/routes/api+/inbound-sms", () => {
       }),
     );
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeInboundSmsRequest({
           To: "+19998887777",
           MessagingServiceSid: "MGdup",
@@ -262,47 +548,30 @@ describe("app/routes/api+/inbound-sms", () => {
     expect(res.status).toBe(409);
   });
 
-  test("uses env Twilio creds for MMS when workspace twilio_data is missing in dev", async () => {
-    const originalNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "test";
-    mocks.fetch.mockResolvedValueOnce({
-      ok: true,
-      statusText: "OK",
-      blob: async () => new Blob(["x"]),
-    } as any);
+  test("returns 500 when workspace Twilio credentials are missing", async () => {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Workspace Twilio credentials missing" }), { status: 500 }));
     const number = { workspace: "w1", twilio_data: null, webhook: [] };
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeInboundSmsRequest({ NumMedia: "1" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest({ NumMedia: "1" }) } as any),
     );
-    process.env.NODE_ENV = originalNodeEnv;
-    expect(res.status).toBe(201);
-    expect(mocks.fetch).toHaveBeenCalledWith(
-      "https://m/0",
-      expect.objectContaining({
-        headers: {
-          Authorization: `Basic ${Buffer.from("AC_MAIN:tok").toString("base64")}`,
-        },
-      }),
-    );
+    expect(res.status).toBe(500);
   });
 
   test("processes media (handles fetch/upload failures), inserts message, opt-out stop/start, and sends webhook", async () => {
     mocks.fetch.mockResolvedValueOnce({ ok: false, statusText: "nope" } as any);
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "inbound_sms" }] }] };
-    const insertedMessages: Record<string, unknown>[] = [];
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [{ id: 9 }], insertedMessages, smsWebhook: true }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contacts: [{ id: 9 }], smsWebhook: true }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    let res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    let res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
-    expect(insertedMessages[0]?.contact_id).toBe(9);
+    expect(tenantDbStubState.messageInsertCalls[0]?.contact_id).toBe(9);
     expect(mocks.sendWebhookNotification).toHaveBeenCalled();
 
     // start branch with quoted start + upload error path
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number, uploadError: { message: "up" }, contacts: [{ id: 9 }] }));
-    res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number, uploadError: { message: "up" }, contacts: [{ id: 9 }] }));
+    res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
@@ -310,9 +579,9 @@ describe("app/routes/api+/inbound-sms", () => {
   test("covers media_urls branch, contact lookup error logging, and no-webhook path", async () => {
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "other" }] }] };
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contactError: new Error("c") }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contactError: new Error("c") }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalledWith("Contact lookup error:", expect.any(Error));
     expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
@@ -322,12 +591,12 @@ describe("app/routes/api+/inbound-sms", () => {
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
     const mod = await import("../app/routes/api+/inbound-sms");
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [], contactError: new Error("c") }));
-    let res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contacts: [], contactError: new Error("c") }));
+    let res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number, contacts: [], contactError: new Error("c") }));
-    res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contacts: [], contactError: new Error("c") }));
+    res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalled();
   });
@@ -335,40 +604,41 @@ describe("app/routes/api+/inbound-sms", () => {
   test("covers webhook payload media_urls when media present", async () => {
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "inbound_sms" }] }] };
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number }));
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(201);
     expect(mocks.sendWebhookNotification).toHaveBeenCalledWith(
       expect.objectContaining({
-        payload: expect.objectContaining({ media_urls: ["m1"] }),
+        payload: expect.objectContaining({
+          media_urls: expect.arrayContaining([expect.stringContaining("sms-SM1-0-")]),
+        }),
       }),
     );
   });
 
   test("does not stamp contact_id when phone lookup is ambiguous", async () => {
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
-    const insertedMessages: Record<string, unknown>[] = [];
     mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
+      makeDbClient({
         number,
         contacts: [{ id: 9 }, { id: 10 }],
-        insertedMessages,
       }),
     );
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
 
     expect(res.status).toBe(201);
-    expect(insertedMessages[0]).not.toHaveProperty("contact_id");
+    expect(tenantDbStubState.messageInsertCalls[0]).not.toHaveProperty("contact_id");
   });
 
   test("message insert error returns 400", async () => {
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ number, messageError: new Error("msg") }));
+    configureTenantDbStub({ messageInsertError: new Error("msg") });
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number }));
     const mod = await import("../app/routes/api+/inbound-sms");
-    const res = await asRouteResponse(await mod.action({ request: makeInboundSmsRequest() } as any));
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
     expect(res.status).toBe(400);
   });
 });

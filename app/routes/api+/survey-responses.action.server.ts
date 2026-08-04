@@ -1,12 +1,11 @@
 import { data as routeData } from "react-router";
-import { logger } from "@/lib/logger.server";
-import { getDualAuthSupabase, requireDualAuth } from "@/lib/api-auth.server";
+import { submitSurveyResponse, getSurveyWorkspaceByPublicId } from "@/lib/survey-db.server";
+import { requireDualAuth, getDualAuthUser } from "@/lib/api-auth.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { AppError } from "@/lib/errors.server";
+import { defineAction } from "@/lib/handler.server";
 
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
-
-import { isUniqueViolation } from "@/lib/parse-utils.server";
 
 type SubmittedSurveyAnswer = {
   question_id: string;
@@ -21,166 +20,86 @@ type SubmittedSurveyResponse = {
   answers?: SubmittedSurveyAnswer[];
 };
 
-async function handleSubmitResponse(
-  request: Request,
-  supabaseClient: SupabaseClient<Database>
-) {
-  try {
-    const formData = await request.formData();
-    const responseDataRaw = formData.get("responseData") as string | null;
-    if (!responseDataRaw) {
-      return routeData({ error: "Response data is required" }, { status: 400 });
-    }
-    let responseData: SubmittedSurveyResponse;
-    try {
-      responseData = JSON.parse(responseDataRaw) as SubmittedSurveyResponse;
-    } catch {
-      return routeData({ error: "Invalid response data format" }, { status: 400 });
-    }
-    const surveyId = formData.get("surveyId") as string;
-
-    if (!surveyId) {
-      return routeData({ error: "Survey ID and response data are required" }, { status: 400 });
-    }
-
-    // Get survey to verify it exists and is active
-    const { data: survey, error: surveyError } = await supabaseClient
-      .from("survey")
-      .select("id, is_active")
-      .eq("survey_id", surveyId)
-      .single();
-
-    if (surveyError || !survey) {
-      return routeData({ error: "Survey not found" }, { status: 404 });
-    }
-
-    if (!survey.is_active) {
-      return routeData({ error: "Survey is not active" }, { status: 400 });
-    }
-
-    const nowIso = new Date().toISOString();
-
-    // Idempotent create: insert-first, fetch-on-duplicate.
-    let surveyResponse: { id: number } | null = null;
-    const { data: inserted, error: responseError } = await supabaseClient
-      .from("survey_response")
-      .insert({
-        survey_id: survey.id,
-        result_id: responseData.result_id,
-        contact_id: responseData.contact_id ?? null,
-        started_at: nowIso,
-        completed_at: responseData.completed ? nowIso : null,
-        last_page_completed: responseData.last_page_completed ?? null,
-      })
-      .select("id")
-      .single();
-
-    if (responseError) {
-      if (!isUniqueViolation(responseError)) {
-        logger.error("Error creating survey response:", responseError);
-        return routeData({ error: "Failed to submit response" }, { status: 500 });
-      }
-      const { data: existing, error: existingError } = await supabaseClient
-        .from("survey_response")
-        .select("id")
-        .eq("result_id", responseData.result_id)
-        .single();
-      if (existingError || !existing) {
-        logger.error("Error fetching existing survey response:", existingError);
-        return routeData({ error: "Failed to submit response" }, { status: 500 });
-      }
-      surveyResponse = existing;
-      // Update completion/progress fields deterministically.
-      await supabaseClient
-        .from("survey_response")
-        .update({
-          completed_at: responseData.completed ? nowIso : null,
-          last_page_completed: responseData.last_page_completed ?? null,
-          updated_at: nowIso,
-        })
-        .eq("id", existing.id);
-    } else {
-      surveyResponse = inserted;
-    }
-
-    // Create response answers
-    if (responseData.answers && responseData.answers.length > 0 && surveyResponse) {
-      // Get the page ID if last_page_completed is provided
-      let pageId: number | null = null;
-      if (responseData.last_page_completed) {
-        const { data: page } = await supabaseClient
-          .from("survey_page")
-          .select("id")
-          .eq("survey_id", survey.id)
-          .eq("page_id", responseData.last_page_completed)
-          .single();
-        pageId = page?.id || null;
-      }
-
-      for (const answer of responseData.answers) {
-        // Get question ID from question_id
-        // If pageId is available, filter by it; otherwise just match question_id
-        let questionQuery = supabaseClient
-          .from("survey_question")
-          .select("id")
-          .eq("question_id", answer.question_id);
-        
-        if (pageId) {
-          questionQuery = questionQuery.eq("page_id", pageId);
-        }
-
-        const { data: question, error: questionError } = await questionQuery.single();
-
-        if (questionError || !question) {
-          logger.error("Question not found:", answer.question_id);
-          continue;
-        }
-
-        // Insert-first, update-on-duplicate to avoid duplicate answers under concurrency.
-        const answerValue = Array.isArray(answer.answer_value)
-          ? JSON.stringify(answer.answer_value)
-          : answer.answer_value;
-        const { error: answerInsertError } = await supabaseClient
-          .from("response_answer")
-          .insert({
-            response_id: surveyResponse.id,
-            question_id: question.id,
-            answer_value: answerValue,
-            answered_at: nowIso,
-          });
-        if (answerInsertError) {
-          if (!isUniqueViolation(answerInsertError)) {
-            logger.error("Failed to insert response_answer:", answerInsertError);
-            continue;
-          }
-          await supabaseClient
-            .from("response_answer")
-            .update({ answer_value: answerValue, answered_at: nowIso })
-            .eq("response_id", surveyResponse.id)
-            .eq("question_id", question.id);
-        }
-      }
-    }
-
-    return routeData({ 
-      success: true, 
-      response_id: surveyResponse?.id,
-      result_id: responseData.result_id 
-    });
-  } catch (error) {
-    logger.error("Error in handleSubmitResponse:", error);
-    return routeData({ error: "Internal server error" }, { status: 500 });
+async function handleSubmitResponse(formData: FormData) {
+  const responseDataRaw = formData.get("responseData") as string | null;
+  if (!responseDataRaw) {
+    return routeData({ error: "Response data is required" }, { status: 400 });
   }
+  let responseData: SubmittedSurveyResponse;
+  try {
+    responseData = JSON.parse(responseDataRaw) as SubmittedSurveyResponse;
+  } catch {
+    return routeData({ error: "Invalid response data format" }, { status: 400 });
+  }
+  const surveyId = formData.get("surveyId") as string;
+
+  if (!surveyId) {
+    return routeData({ error: "Survey ID and response data are required" }, { status: 400 });
+  }
+
+  const workspaceId = await getSurveyWorkspaceByPublicId(surveyId);
+  if (!workspaceId) {
+    return routeData({ error: "Survey not found" }, { status: 404 });
+  }
+
+  const result = await submitSurveyResponse({
+    surveyPublicId: surveyId,
+    responseData,
+  });
+
+  if (!result.ok) {
+    return routeData({ error: result.error }, { status: result.status });
+  }
+
+  return routeData({
+    success: true,
+    response_id: result.response_id,
+    result_id: result.result_id,
+  });
 }
 
-export async function action({ request }: ActionFunctionArgs) {
+// NOTE: the 405 method check intentionally precedes auth and returns
+// `routeData` (not a Response), so it cannot live in the factory's `auth:`
+// slot without changing the response shape — the guard stays in the handler.
+export const action = defineAction({
+  sideEffects: ["db-write"],
+  handler: async ({ request }: ActionFunctionArgs) => {
+  if (request.method !== "POST") {
+    return routeData({ error: "Method not allowed" }, { status: 405 });
+  }
+
   const auth = await requireDualAuth(request);
   if (auth instanceof Response) return auth;
-  const supabaseClient = getDualAuthSupabase(auth);
-  
-  if (request.method === "POST") {
-    return handleSubmitResponse(request, supabaseClient);
+
+  const formData = await request.formData();
+  const surveyId = formData.get("surveyId") as string;
+  if (!surveyId) {
+    return routeData({ error: "Survey ID is required" }, { status: 400 });
+  }
+  const workspaceId = await getSurveyWorkspaceByPublicId(surveyId);
+
+  if (auth.authType === "api_key") {
+    if (!workspaceId || workspaceId !== auth.workspaceId) {
+      return routeData({ error: "Unauthorized" }, { status: 403 });
+    }
+  } else {
+    const user = getDualAuthUser(auth);
+    if (!user) {
+      return routeData({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!workspaceId) {
+      return routeData({ error: "Survey not found" }, { status: 404 });
+    }
+    try {
+      await requireWorkspaceAccess({ user, workspaceId });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return routeData({ error: error.message }, { status: error.statusCode });
+      }
+      throw error;
+    }
   }
 
-  return routeData({ error: "Method not allowed" }, { status: 405 });
-}
+  return handleSubmitResponse(formData);
+  },
+});

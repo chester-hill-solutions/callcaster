@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { API_SURFACE, getPublicOpenApiEntries } from "../app/lib/api-surface";
 import { completeOpenApiSpec } from "../app/lib/openapi-complete";
 import { openApiSpec } from "../app/lib/openapi";
+import { toOpenApiPath } from "../app/lib/openapi-build";
 import {
   INTEGRATOR_API_PATHS,
 } from "../app/lib/public-api";
@@ -101,7 +102,7 @@ async function main() {
       continue;
     }
     const pathItem =
-      openApiSpec.paths[entry.path as keyof typeof openApiSpec.paths];
+      openApiSpec.paths[toOpenApiPath(entry.path) as keyof typeof openApiSpec.paths];
     if (!pathItem) {
       errors.push(
         `public OpenAPI missing inventory entry ${entry.path} (specTarget publicOpenApi)`,
@@ -130,7 +131,7 @@ async function main() {
     }
     const pathItem =
       completeOpenApiSpec.paths[
-        entry.path as keyof typeof completeOpenApiSpec.paths
+        toOpenApiPath(entry.path) as keyof typeof completeOpenApiSpec.paths
       ];
     if (!pathItem) {
       errors.push(

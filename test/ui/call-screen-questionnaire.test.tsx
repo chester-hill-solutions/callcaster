@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
-vi.mock("@/components/call-list/records/participant/Result", () => ({
+vi.mock("@/components/campaign/settings/script/Result", () => ({
   default: ({ questionId, initResult, action, disabled }: any) => {
     return (
       <div>

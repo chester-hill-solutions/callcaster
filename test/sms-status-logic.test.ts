@@ -6,7 +6,7 @@ import {
   pickRawTwilioSmsStatus,
   sendOutboundSmsWebhookIfConfigured,
   shouldUpdateOutreachDisposition,
-} from "../supabase/functions/_shared/sms-status-logic.ts";
+} from "../shared/sms-status-logic.ts";
 
 describe("sms-status shared logic", () => {
   test("pickRawTwilioSmsStatus prefers SmsStatus over MessageStatus", () => {
@@ -67,7 +67,7 @@ describe("sms-status shared logic", () => {
 
   test("sendOutboundSmsWebhookIfConfigured sends POST with merged headers", async () => {
     const fetchImpl = vi.fn(async () => new Response("ok", { status: 200 }));
-    const supabase: any = {
+    const client: any = {
       from: () => ({
         select: () => ({
           eq: () => ({
@@ -86,7 +86,7 @@ describe("sms-status shared logic", () => {
     };
 
     await sendOutboundSmsWebhookIfConfigured({
-      supabase,
+      client,
       workspaceId: "w1",
       message: { sid: "SM1", status: "delivered" },
       fetchImpl,
@@ -102,7 +102,7 @@ describe("sms-status shared logic", () => {
 
   test("sendOutboundSmsWebhookIfConfigured throws on non-ok responses", async () => {
     const fetchImpl = vi.fn(async () => new Response("bad", { status: 500 }));
-    const supabase: any = {
+    const client: any = {
       from: () => ({
         select: () => ({
           eq: () => ({
@@ -117,7 +117,7 @@ describe("sms-status shared logic", () => {
 
     await expect(
       sendOutboundSmsWebhookIfConfigured({
-        supabase,
+        client,
         workspaceId: "w1",
         message: { sid: "SM1", status: "delivered" },
         fetchImpl,

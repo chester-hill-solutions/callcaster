@@ -1,30 +1,23 @@
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import {
-  applyOnboardingStepsWithWorkspaceNumbers,
-  applyWorkspaceOnboardingChannelPolicy,
-  deriveWorkspaceMessagingReadiness,
-  getWorkspaceMessagingOnboardingState,
   isWizardOnboardingStepId,
+  resolvePersistedWizardStep,
 } from "@/lib/messaging-onboarding.server";
 import {
-  getUserRole,
   getWorkspaceInfo,
-  getWorkspacePhoneNumbers,
+  getWorkspaceUsers,
   requireWorkspaceAccess,
-} from "@/lib/database.server";
-import {
-  getWorkspaceRcsBlockingIssues,
-  hydrateWorkspaceRcsOnboardingState,
-  isRcsOnboardingEnabled,
-} from "@/lib/rcs-onboarding.server";
+} from "@/lib/database/workspace.server";
+import { loadWorkspaceOnboardingView } from "@/lib/platform-onboarding-helpers.server";
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
+import { listObjects } from "@/lib/object-storage.server";
+import { createTenantDb } from "@/server/tenant-db";
+import { defineLoader } from "@/lib/handler.server";
 import type {
-  User,
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,
 } from "@/lib/types";
-import type { LoaderFunctionArgs } from "react-router";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 
 export type OnboardingLoaderData = {
   workspaceId: string;
@@ -35,88 +28,91 @@ export type OnboardingLoaderData = {
   phoneNumbers: Tables<"workspace_number">[] | null;
   creditsBalance: number;
   rcsBlockingIssues: string[];
+  workspaceUsers: { id: string; username: string }[];
+  mediaNames: { id: number | string; name: string }[];
+  inboundQueues: { id: number; name: string }[];
+  scripts: { id: number; name: string }[];
+  audienceCount: number;
+  campaignCount: number;
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, user, headers } = await verifyAuth(request);
-  if (!user) {
-    throw redirect("/signin", { headers });
-  }
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-read", "external"],
+  handler: async ({ url, auth }) => {
+    const { headers, user, workspaceId, userRole } = auth;
+    if (!workspaceId) {
+      throw redirect("/workspaces", { headers });
+    }
 
-  const workspaceId = params.id;
-  if (!workspaceId) {
-    throw redirect("/workspaces", { headers });
-  }
-
-  await requireWorkspaceAccess({
-    supabaseClient,
-    user,
-    workspaceId,
-  });
-
-  const userRole = (
-    await getUserRole({
-      supabaseClient,
-      user: user as unknown as User,
+    await requireWorkspaceAccess({
+      user,
       workspaceId,
-    })
-  )?.role;
-  const [{ data: workspaceInfo }, { data: phoneNumbers }, onboarding, workspaceCredits] =
-    await Promise.all([
-      getWorkspaceInfo({ supabaseClient, workspaceId }),
-      getWorkspacePhoneNumbers({ supabaseClient, workspaceId }),
-      getWorkspaceMessagingOnboardingState({ supabaseClient, workspaceId }),
-      supabaseClient.from("workspace").select("credits").eq("id", workspaceId).single(),
+    });
+
+    const tdb = createTenantDb(workspaceId);
+    const [
+      onboardingView,
+      { data: workspaceInfo },
+      { data: workspaceUsersData },
+      mediaNames,
+      inboundQueues,
+      scripts,
+    ] = await Promise.all([
+      loadWorkspaceOnboardingView(workspaceId),
+      getWorkspaceInfo({ workspaceId }),
+      getWorkspaceUsers({ workspaceId }),
+      listObjects("workspaceAudio", workspaceId).catch(() => [] as { id: number | string; name: string }[]),
+      tdb.inbound_queue.findMany({
+        columns: { id: true, name: true },
+        orderBy: (queue, { asc: ascFn }) => [ascFn(queue.name)],
+      }),
+      tdb.script.findMany({
+        columns: { id: true, name: true },
+        orderBy: (script, { asc: ascFn }) => [ascFn(script.name)],
+      }),
     ]);
-  const hydratedOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
-    hydrateWorkspaceRcsOnboardingState(applyWorkspaceOnboardingChannelPolicy(onboarding)),
-    phoneNumbers ?? [],
-  );
-  const rcsBlockingIssues =
-    isRcsOnboardingEnabled() && hydratedOnboarding.selectedChannels.includes("rcs")
-      ? getWorkspaceRcsBlockingIssues(hydratedOnboarding)
-      : [];
-
-  const readiness = deriveWorkspaceMessagingReadiness({
-    onboarding: hydratedOnboarding,
-    workspaceNumbers: (phoneNumbers ?? []).map((number) => ({
-      type: number?.type ?? null,
-      phone_number: number?.phone_number ?? null,
-      capabilities: number?.capabilities ?? null,
-    })),
-    recentOutboundCount: 0,
-  });
-
-  const requestUrl = new URL(request.url);
-  const stepParam = requestUrl.searchParams.get("step");
-  const serverStep =
-    hydratedOnboarding.currentStep === "use_case"
-      ? "business_profile"
-      : isWizardOnboardingStepId(hydratedOnboarding.currentStep)
-        ? hydratedOnboarding.currentStep
-        : "business_profile";
-
-  if (stepParam && !isWizardOnboardingStepId(stepParam)) {
-    requestUrl.searchParams.set("step", serverStep);
-    throw redirect(`${requestUrl.pathname}?${requestUrl.searchParams.toString()}`, { headers });
-  }
-
-  if (!stepParam && hydratedOnboarding.status !== "not_started") {
-    requestUrl.searchParams.set("step", serverStep);
-    throw redirect(`${requestUrl.pathname}?${requestUrl.searchParams.toString()}`, { headers });
-  }
-
-  return routeData<OnboardingLoaderData>(
-    {
-      workspaceId,
-      workspaceName: workspaceInfo?.name ?? "Workspace",
-      userRole,
+    const {
       onboarding: hydratedOnboarding,
       readiness,
       phoneNumbers,
-      creditsBalance: workspaceCredits.data?.credits ?? 0,
+      creditsBalance,
       rcsBlockingIssues,
-    },
-    { headers },
-  );
-};
+      audienceCount,
+      campaignCount,
+    } = onboardingView;
+    const stepParam = url.searchParams.get("step");
+    const serverStep = resolvePersistedWizardStep(hydratedOnboarding.currentStep);
+
+    if (stepParam && !isWizardOnboardingStepId(stepParam)) {
+      const redirected = resolvePersistedWizardStep(stepParam);
+      url.searchParams.set("step", redirected);
+      throw redirect(`${url.pathname}?${url.searchParams.toString()}`, { headers });
+    }
+
+    if (!stepParam && hydratedOnboarding.status !== "not_started") {
+      url.searchParams.set("step", serverStep);
+      throw redirect(`${url.pathname}?${url.searchParams.toString()}`, { headers });
+    }
+
+    return routeData<OnboardingLoaderData>(
+      {
+        workspaceId,
+        workspaceName: workspaceInfo?.name ?? "Workspace",
+        userRole,
+        onboarding: hydratedOnboarding,
+        readiness,
+        phoneNumbers,
+        creditsBalance,
+        rcsBlockingIssues,
+        workspaceUsers: workspaceUsersData ?? [],
+        mediaNames,
+        inboundQueues,
+        scripts,
+        audienceCount,
+        campaignCount,
+      },
+      { headers },
+    );
+  },
+});

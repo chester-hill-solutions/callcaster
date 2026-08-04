@@ -1,9 +1,10 @@
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 export type CallerIdValidationRequest = {
   accountSid: string;
@@ -22,26 +23,38 @@ export function CallerIdVerificationDialog({
   onOpenChange: (open: boolean) => void;
   validationRequest: CallerIdValidationRequest | null | undefined;
 }) {
-  if (!validationRequest) {
-    return null;
-  }
+  const phoneNumber = validationRequest?.phoneNumber?.trim() ?? "";
+  const code = validationRequest?.validationCode?.trim() ?? "";
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="flex w-full max-w-md flex-col items-center">
-        <DialogHeader>
-          <DialogTitle className="text-center">Your verification code</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 text-center">
+    <Sheet
+      open={isOpen && Boolean(validationRequest)}
+      onOpenChange={onOpenChange}
+    >
+      <SheetContent className="flex w-full flex-col sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>Your verification code</SheetTitle>
+          <SheetDescription>
+            Enter this code when prompted on the verification call.
+          </SheetDescription>
+        </SheetHeader>
+        <div className="space-y-4 py-4 text-center">
           <p className="text-sm text-muted-foreground">
-            You will receive a call at {validationRequest.phoneNumber}.
+            {phoneNumber
+              ? `You will receive a call at ${phoneNumber}.`
+              : "You will receive a call at the number you submitted."}
           </p>
-          <div className="rounded-md border bg-muted/30 px-6 py-4 font-mono text-4xl tracking-widest">
-            {validationRequest.validationCode}
-          </div>
-          <p className="text-sm text-muted-foreground">Enter this code when prompted.</p>
+          {code ? (
+            <div className="rounded-md border bg-muted/30 px-6 py-4 font-mono text-4xl tracking-widest">
+              {code}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Check the verification call for your code.
+            </p>
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -35,7 +35,9 @@ describe("app/components/campaign/CampaignEmptyState.tsx", () => {
         <CampaignEmptyState hasAccess type="campaign" />
       </SmokeRouter>,
     );
-    expect(screen.getAllByText(/Get started/i)[0]).toBeInTheDocument();
+    expect(
+      screen.getAllByText(/Get started/i)[0],
+    ).toBeInTheDocument();
     rerender(
       <SmokeRouter>
         <CampaignEmptyState hasAccess={false} type="number" />
@@ -61,20 +63,53 @@ describe("app/components/campaign/CampaignList.tsx", () => {
   });
 });
 
-describe("app/components/campaign/home/CampaignHomeScreen/CampaignNav.tsx", () => {
-  test("navigation links", async () => {
-    const { NavigationLinks } = await import("@/components/campaign/home/CampaignHomeScreen/CampaignNav");
+describe("app/components/campaign/home/CampaignStatusRail.tsx", () => {
+  test("renders place-first rail labels", async () => {
+    const { CampaignStatusRail } = await import(
+      "@/components/campaign/home/CampaignStatusRail"
+    );
+    const { buildCampaignStatusRail } = await import("@/lib/campaign-status-rail");
+    const items = buildCampaignStatusRail({
+      workspaceId: "w1",
+      campaignId: 1,
+      campaignData: makeCampaign({ type: "live_call", status: "draft" }),
+      readinessIssues: [],
+      hasAccess: true,
+      pathname: "/workspaces/w1/campaigns/1/settings",
+      hash: "",
+      joinDisabled: null,
+    });
     render(
       <SmokeRouter>
-        <NavigationLinks hasAccess data={makeCampaign({ type: "live_call" })} joinDisabled={null} />
+        <CampaignStatusRail items={items} />
       </SmokeRouter>,
     );
-    expect(screen.getByText("Settings")).toBeInTheDocument();
+    expect(screen.getByTestId("campaign-status-rail")).toBeInTheDocument();
+    expect(screen.getAllByText("Setup").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Content").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Call").length).toBeGreaterThan(0);
+  });
+});
+
+describe("app/components/campaign/home/CampaignHomeScreen/CampaignInstructions.tsx", () => {
+  test("blocks Join Campaign and exposes the reason", async () => {
+    const { CampaignInstructions } = await import(
+      "@/components/campaign/home/CampaignHomeScreen/CampaignInstructions"
+    );
     render(
       <SmokeRouter>
-        <NavigationLinks hasAccess={false} data={makeCampaign()} joinDisabled="busy" />
+        <CampaignInstructions
+          campaignData={{}}
+          totalCalls={0}
+          expectedTotal={10}
+          joinDisabled="Only campaign admins can join."
+        />
       </SmokeRouter>,
     );
+
+    expect(screen.queryByRole("link", { name: "Join Campaign" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join Campaign" })).toBeDisabled();
+    expect(screen.getByText("Only campaign admins can join.")).toBeVisible();
   });
 });
 
@@ -100,13 +135,81 @@ describe("app/components/campaign/settings/detailed/live/CampaignDetailed.Live.S
   });
 });
 
-describe("app/components/campaign/settings/basic/CampaignBasicInfo.SelectStatus.tsx", () => {
-  test("status select", async () => {
-    const SelectStatus = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.SelectStatus")).default;
+describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", () => {
+  test("uses calling-hours wording for call campaigns", async () => {
+    const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
     render(
-      <SelectStatus handleInputChange={handleInputChange} campaignData={{ status: "draft" }} />,
+      <SelectDates
+        campaignData={makeCampaign({ type: "live_call", schedule: null })}
+        handleInputChange={handleInputChange}
+      />,
     );
-    expect(screen.getByText("Campaign Status")).toBeInTheDocument();
+    expect(screen.getByText("Calling Hours")).toBeInTheDocument();
+    expect(screen.getByText("No calling hours set")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Edit Calling Hours" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Send Window")).not.toBeInTheDocument();
+  });
+
+  test("message campaign weekday preset persists sms_send_window, not schedule", async () => {
+    const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
+    const onChange = vi.fn();
+    render(
+      <SelectDates
+        campaignData={makeCampaign({ type: "message", schedule: null, sms_send_window: null })}
+        handleInputChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit Send Window" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply 09:00–17:00 local to Weekdays" }),
+    );
+    expect(onChange).toHaveBeenCalled();
+    const [field, value] = onChange.mock.calls.at(-1)!;
+    expect(field).toBe("sms_send_window");
+    expect(typeof value).toBe("string");
+    const parsed = JSON.parse(String(value));
+    expect(parsed.monday.active).toBe(true);
+  });
+
+  test("call campaign weekday preset persists schedule", async () => {
+    const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
+    const onChange = vi.fn();
+    render(
+      <SelectDates
+        campaignData={makeCampaign({ type: "live_call", schedule: null })}
+        handleInputChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit Calling Hours" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Apply 09:00–17:00 local to Weekdays" }),
+    );
+    const [field] = onChange.mock.calls.at(-1)!;
+    expect(field).toBe("schedule");
+  });
+
+  test("enabling a day defaults to local business hours", async () => {
+    const SelectDates = (await import("@/components/campaign/settings/basic/CampaignBasicInfo.Dates")).default;
+    const onChange = vi.fn();
+    render(
+      <SelectDates
+        campaignData={makeCampaign({ type: "live_call", schedule: null })}
+        handleInputChange={onChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit Calling Hours" }));
+    fireEvent.click(screen.getByLabelText("Monday active"));
+    const [, value] = onChange.mock.calls.at(-1)!;
+    const parsed = JSON.parse(String(value));
+    expect(parsed.monday.active).toBe(true);
+    expect(parsed.monday.intervals).toHaveLength(1);
+    // Stored as UTC; local 09:00–17:00 must not be the all-day sentinel.
+    expect(parsed.monday.intervals[0]).not.toEqual({
+      start: expect.stringMatching(/^00:00/),
+      end: expect.stringMatching(/^23:59/),
+    });
   });
 });
 
@@ -132,6 +235,32 @@ describe("app/components/campaign/settings/detailed/CampaignDetailed.ActivateBut
         handleScheduleButton={handleScheduleButton}
       />,
     );
+  });
+});
+
+describe("app/components/campaign/settings/detailed/CampaignDetailed.tsx", () => {
+  test("message setup shows send mode and content link", async () => {
+    const { CampaignTypeSpecificSettings } = await import(
+      "@/components/campaign/settings/detailed/CampaignDetailed"
+    );
+    render(
+      <SmokeRouter>
+        <CampaignTypeSpecificSettings
+          campaignData={makeCampaign({
+            type: "message",
+            caller_id: "+15551234567",
+            sms_send_mode: "from_number",
+          })}
+          handleInputChange={vi.fn()}
+          isBusy={false}
+        />
+      </SmokeRouter>,
+    );
+
+    expect(screen.getByText("Send using")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Edit content/i }),
+    ).toBeInTheDocument();
   });
 });
 

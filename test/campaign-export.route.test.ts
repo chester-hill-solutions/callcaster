@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 import { setDualAuthSession, setDualAuthUnauthorized } from "./helpers/route-auth-mock";
 
@@ -10,12 +15,107 @@ vi.mock("@/lib/env.server", () => {
 });
 
 const requireWorkspaceAccess = vi.fn(async () => undefined);
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/database.server")>(
-    "@/lib/database.server",
-  );
+vi.mock("@/lib/database/workspace.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/database/workspace.server")
+  >("@/lib/database/workspace.server");
   return { ...actual, requireWorkspaceAccess };
 });
+
+const campaignIvrMocks = vi.hoisted(() => ({
+  findCampaignExportMeta: vi.fn(),
+}));
+
+const queueMocks = vi.hoisted(() => ({
+  getCampaignQueueContactIds: vi.fn(),
+}));
+
+const exportDbMocks = vi.hoisted(() => ({
+  findCampaignForMessageExport: vi.fn(),
+  findCampaignWithScriptForExport: vi.fn(),
+  findExportContactsByIds: vi.fn(),
+  countExportCampaignMessages: vi.fn(),
+  listExportCampaignMessages: vi.fn(),
+  countExportOutreachAttempts: vi.fn(),
+  listExportOutreachAttempts: vi.fn(),
+  findExportCallsByOutreachAttemptIds: vi.fn(),
+}));
+
+vi.mock("@/lib/campaign-export-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-export-db.server")>();
+  return {
+    ...actual,
+    findCampaignForMessageExport: (...args: unknown[]) =>
+      exportDbMocks.findCampaignForMessageExport(...args),
+    findCampaignWithScriptForExport: (...args: unknown[]) =>
+      exportDbMocks.findCampaignWithScriptForExport(...args),
+    findExportContactsByIds: (...args: unknown[]) =>
+      exportDbMocks.findExportContactsByIds(...args),
+    countExportCampaignMessages: (...args: unknown[]) =>
+      exportDbMocks.countExportCampaignMessages(...args),
+    listExportCampaignMessages: (...args: unknown[]) =>
+      exportDbMocks.listExportCampaignMessages(...args),
+    countExportOutreachAttempts: (...args: unknown[]) =>
+      exportDbMocks.countExportOutreachAttempts(...args),
+    listExportOutreachAttempts: (...args: unknown[]) =>
+      exportDbMocks.listExportOutreachAttempts(...args),
+    findExportCallsByOutreachAttemptIds: (...args: unknown[]) =>
+      exportDbMocks.findExportCallsByOutreachAttemptIds(...args),
+  };
+});
+
+vi.mock("@/lib/campaign-queue-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-queue-db.server")>();
+  return {
+    ...actual,
+    getCampaignQueueContactIds: (...args: unknown[]) =>
+      queueMocks.getCampaignQueueContactIds(...args),
+  };
+});
+
+vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
+  return {
+    ...actual,
+    findCampaignExportMeta: (...args: unknown[]) =>
+      campaignIvrMocks.findCampaignExportMeta(...args),
+  };
+});
+
+const objectStorageUploads: Array<{ path: string; body: any; opts?: any }> = [];
+let objectStorageUploadBehaviors: UploadBehavior[] | undefined;
+let objectStorageUploadBehavior: ((path: string, idx: number) => UploadBehavior) | undefined;
+let objectStorageUploadCallIndex = 0;
+let objectStorageSignedUrlBehavior: "ok" | "error" | undefined;
+const uploadObjectMock = vi.hoisted(() =>
+  vi.fn(async (_bucket: string, path: string, body: any, opts?: any) => {
+    objectStorageUploads.push({ path, body, opts });
+    objectStorageUploadCallIndex += 1;
+    const behavior =
+      objectStorageUploadBehavior?.(path, objectStorageUploadCallIndex) ??
+      objectStorageUploadBehaviors?.[objectStorageUploadCallIndex - 1] ??
+      "ok";
+    if (behavior === "throw" || behavior === "error")
+      throw new Error("upload error");
+    if (behavior === "throwNonError") throw "upload throw";
+    return;
+  }),
+);
+const createSignedObjectUrlMock = vi.hoisted(() =>
+  vi.fn(async () => {
+    if (objectStorageSignedUrlBehavior === "error") {
+      throw new Error("signed url error");
+    }
+    return "https://signed.example/csv";
+  }),
+);
+
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: uploadObjectMock,
+  createSignedObjectUrl: createSignedObjectUrlMock,
+  deleteObject: vi.fn(),
+  listObjects: vi.fn(async () => []),
+}));
 
 const loggerError = vi.fn();
 vi.mock("@/lib/logger.server", () => {
@@ -31,7 +131,7 @@ vi.mock("@/lib/logger.server", () => {
 
 type UploadBehavior = "ok" | "error" | "throw" | "throwNonError";
 
-type ExportSupabaseConfig = {
+type ExportPostgresConfig = {
   campaign: {
     id: number;
     workspace: string;
@@ -122,7 +222,128 @@ class QueryBuilder {
   }
 }
 
-function makeSupabase(config: ExportSupabaseConfig) {
+function makeDbClient(config: ExportPostgresConfig) {
+  campaignIvrMocks.findCampaignExportMeta.mockImplementation(
+    async (workspaceId: string, campaignId: number) => {
+      if (config.campaignError) {
+        return null;
+      }
+      const campaign = config.campaign;
+      if (campaignId !== campaign.id || campaign.workspace !== workspaceId) {
+        return null;
+      }
+      return {
+        id: campaign.id,
+        type: campaign.type,
+        title: campaign.title ?? "",
+        workspace: campaign.workspace,
+      };
+    },
+  );
+
+  queueMocks.getCampaignQueueContactIds.mockImplementation(
+    async () => config.campaignQueueContactIds ?? [],
+  );
+
+  exportDbMocks.findCampaignForMessageExport.mockImplementation(
+    async (_workspaceId: string, campaignId: number) => {
+      if (config.campaignError) {
+        return null;
+      }
+      const campaign = config.campaign;
+      if (campaignId !== campaign.id) {
+        return null;
+      }
+      return campaign;
+    },
+  );
+
+  exportDbMocks.findCampaignWithScriptForExport.mockImplementation(
+    async (_workspaceId: string, campaignId: number) => {
+      if (config.campaignExportError) {
+        throw new Error(config.campaignExportError);
+      }
+      if (config.campaignExportMissing) {
+        return null;
+      }
+      const campaign = config.campaign;
+      if (campaignId !== campaign.id) {
+        return null;
+      }
+      if (config.scriptError != null) {
+        throw new Error(config.scriptError);
+      }
+      return {
+        ...campaign,
+        script:
+          config.script === undefined
+            ? { steps: { pages: {}, blocks: {} } }
+            : config.script,
+      };
+    },
+  );
+
+  exportDbMocks.findExportContactsByIds.mockImplementation(async () => {
+    if (config.contactsError != null) {
+      throw new Error(config.contactsError);
+    }
+    return config.contacts ?? [];
+  });
+
+  exportDbMocks.countExportCampaignMessages.mockImplementation(async () => {
+    if (config.messageCountError != null) {
+      throw new Error(config.messageCountError);
+    }
+    return config.messageCount ?? (config.messages ?? []).length;
+  });
+
+  exportDbMocks.listExportCampaignMessages.mockImplementation(
+    async (
+      _workspaceId: string,
+      campaignId: number,
+      _startDate: string,
+      _endDate: string,
+      offset: number,
+      limit: number,
+    ) => {
+      if (config.messagesError != null) {
+        throw new Error(config.messagesError);
+      }
+      const filteredMessages = (config.messages ?? []).filter(
+        (message) => message.campaign_id === campaignId,
+      );
+      return filteredMessages.slice(offset, offset + limit);
+    },
+  );
+
+  exportDbMocks.countExportOutreachAttempts.mockImplementation(async () => {
+    if (config.outreachAttemptCountError != null) {
+      throw new Error(config.outreachAttemptCountError);
+    }
+    return config.outreachAttemptCount ?? 0;
+  });
+
+  exportDbMocks.listExportOutreachAttempts.mockImplementation(
+    async (
+      _workspaceId: string,
+      _campaignId: number,
+      offset: number,
+      limit: number,
+    ) => {
+      if (config.outreachAttemptsError != null) {
+        throw new Error(config.outreachAttemptsError);
+      }
+      return (config.outreachAttempts ?? []).slice(offset, offset + limit);
+    },
+  );
+
+  exportDbMocks.findExportCallsByOutreachAttemptIds.mockImplementation(async () => {
+    if (config.callsError != null) {
+      throw new Error(config.callsError);
+    }
+    return config.calls ?? [];
+  });
+
   const uploads: Array<{ path: string; body: any; opts?: any }> = [];
   let uploadCallIdx = 0;
 
@@ -148,7 +369,7 @@ function makeSupabase(config: ExportSupabaseConfig) {
     }),
   };
 
-  const supabaseClient: any = {
+  const mockClient: any = {
     __uploads: uploads,
     storage: {
       from: () => storageBucket,
@@ -161,6 +382,8 @@ function makeSupabase(config: ExportSupabaseConfig) {
           const isExportQuery = qb.filters.some(
             (f) => f[0] === "eq" && f[1] === "workspace",
           );
+          const selectStr = String(qb.selectArgs[0] ?? "");
+          const wantsScript = selectStr.includes("script");
           if (isExportQuery) {
             if (config.campaignExportError) {
               return {
@@ -170,6 +393,21 @@ function makeSupabase(config: ExportSupabaseConfig) {
             }
             if (config.campaignExportMissing) {
               return { data: null, error: null };
+            }
+            if (wantsScript && config.scriptError != null) {
+              return { data: null, error: { message: config.scriptError } };
+            }
+            if (wantsScript) {
+              return {
+                data: {
+                  ...campaign,
+                  script:
+                    config.script === undefined
+                      ? { steps: { pages: {}, blocks: {} } }
+                      : config.script,
+                },
+                error: null,
+              };
             }
           }
 
@@ -232,20 +470,6 @@ function makeSupabase(config: ExportSupabaseConfig) {
           return { data: filteredMessages, error: null };
         }
 
-        if (table === "live_campaign" || table === "ivr_campaign") {
-          if (config.scriptError != null)
-            return { data: null, error: { message: config.scriptError } };
-          return {
-            data: {
-              script:
-                config.script === undefined
-                  ? { steps: { pages: {}, blocks: {} } }
-                  : config.script,
-            },
-            error: null,
-          };
-        }
-
         if (table === "outreach_attempt") {
           const [, selectOpts] = qb.selectArgs;
           const wantsCount = !!selectOpts?.count;
@@ -285,16 +509,19 @@ function makeSupabase(config: ExportSupabaseConfig) {
     },
   };
 
-  return { supabaseClient, uploads, storageBucket };
+  objectStorageUploadBehaviors = config.uploadBehaviors;
+  objectStorageUploadBehavior = config.uploadBehavior;
+  objectStorageUploadCallIndex = 0;
+  objectStorageSignedUrlBehavior = config.signedUrlBehavior;
+
+  return { uploads, storageBucket };
 }
 
 let authUser: any = { id: "u1" };
-let supabaseForAuth: any = null;
+let postgresForAuth: any = null;
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 
@@ -304,7 +531,7 @@ function applyDualAuth() {
     return;
   }
   setDualAuthSession({
-    supabaseClient: supabaseForAuth ?? {},
+    null: postgresForAuth ?? {},
     user: authUser,
   });
 }
@@ -319,8 +546,15 @@ describe("api.campaign-export", () => {
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
     loggerError.mockClear();
+    uploadObjectMock.mockClear();
+    createSignedObjectUrlMock.mockClear();
+    objectStorageUploads.length = 0;
+    objectStorageUploadCallIndex = 0;
+    objectStorageUploadBehaviors = undefined;
+    objectStorageUploadBehavior = undefined;
+    objectStorageSignedUrlBehavior = undefined;
     authUser = { id: "u1" };
-    supabaseForAuth = null;
+    postgresForAuth = null;
     applyDualAuth();
     vi.useRealTimers();
   });
@@ -333,73 +567,73 @@ describe("api.campaign-export", () => {
     authUser = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST" }),
     } as any));
     expect(res.status).toBe(401);
   }, 60000);
 
   test("returns 400 when campaignId/workspaceId missing", async () => {
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: { id: 1, workspace: "w1", type: "message", title: "T" },
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({ request: reqForm("http://x", {}) } as any));
+    const res = await asRouteResponse(mod.action({ request: reqForm("http://x", {}) } as any));
     expect(res.status).toBe(400);
   }, 60000);
 
   test("returns 404 when campaign not found", async () => {
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: { id: 1, workspace: "w1", type: "message", title: "T" },
       campaignError: "not found",
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(404);
   });
 
-  test("returns 403 when campaign belongs to different workspace", async () => {
-    const { supabaseClient } = makeSupabase({
+  test("returns 404 when campaign belongs to different workspace", async () => {
+    makeDbClient({
       campaign: { id: 1, workspace: "w2", type: "message", title: "T" },
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
   });
 
   test("returns 400 on invalid campaign type", async () => {
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: { id: 1, workspace: "w1", type: "nope", title: "T" },
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(400);
   });
 
   test("returns 500 when request.formData throws, and Unknown error when non-Error thrown", async () => {
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: { id: 1, workspace: "w1", type: "message", title: "T" },
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: {
         formData: () => {
           throw new Error("bad form");
@@ -407,12 +641,14 @@ describe("api.campaign-export", () => {
       },
     } as any));
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toEqual({ error: "bad form" });
+    // A thrown formData error is internal plumbing, not something a user can
+    // act on — toUserMessage replaces it with the route's fallback.
+    await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
 
     requireWorkspaceAccess.mockImplementationOnce(async () => {
       throw "nope";
     });
-    const res2 = await asRouteResponse(await mod.action({
+    const res2 = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res2.status).toBe(500);
@@ -421,7 +657,7 @@ describe("api.campaign-export", () => {
 
   test("message export runs to completion (covers matching + non-matching messages)", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 1,
         workspace: "w1",
@@ -469,18 +705,18 @@ describe("api.campaign-export", () => {
         },
       ],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
 
     await vi.runAllTimersAsync();
     // final status upload should include "completed"
-    const completed = (supabaseClient.__uploads as any[]).some((u) => {
+    const completed = (objectStorageUploads as any[]).some((u) => {
       if (!String(u.path).endsWith(".json")) return false;
       try {
         const obj = JSON.parse(String(u.body));
@@ -494,7 +730,7 @@ describe("api.campaign-export", () => {
 
   test("message export excludes same-phone messages from other campaigns", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 81,
         workspace: "w1",
@@ -533,11 +769,11 @@ describe("api.campaign-export", () => {
         },
       ],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "81", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -545,7 +781,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     const csvUpload = (
-      supabaseClient.__uploads as Array<{ path: string; body: unknown }>
+      objectStorageUploads as Array<{ path: string; body: unknown }>
     ).find((u) => String(u.path).endsWith(".csv"));
     expect(csvUpload).toBeTruthy();
     const csvText =
@@ -558,7 +794,7 @@ describe("api.campaign-export", () => {
 
   test("message export catch uses Unknown error when a non-Error is thrown", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 5,
         workspace: "w1",
@@ -569,11 +805,11 @@ describe("api.campaign-export", () => {
       },
       uploadBehaviors: ["throwNonError", "ok"],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "5", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -585,7 +821,7 @@ describe("api.campaign-export", () => {
     vi.useFakeTimers();
     const mod = await import("../app/routes/api+/campaign-export");
 
-    const { supabaseClient: sbMsg } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 6,
         workspace: "w1",
@@ -599,14 +835,13 @@ describe("api.campaign-export", () => {
       messageCount: 0,
       messages: [],
     });
-    supabaseForAuth = sbMsg;
     applyDualAuth();
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "6", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
 
-    const { supabaseClient: sbCall } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 7,
         workspace: "w1",
@@ -618,9 +853,8 @@ describe("api.campaign-export", () => {
       outreachAttemptCount: 0,
       outreachAttempts: [],
     });
-    supabaseForAuth = sbCall;
     applyDualAuth();
-    const res2 = await asRouteResponse(await mod.action({
+    const res2 = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "7", workspaceId: "w1" }),
     } as any));
     expect(res2.status).toBe(200);
@@ -630,7 +864,7 @@ describe("api.campaign-export", () => {
 
   test("message export covers opt_out=true and message_date branches (date_sent and fallback)", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 8,
         workspace: "w1",
@@ -660,11 +894,11 @@ describe("api.campaign-export", () => {
         },
       ],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "8", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -673,7 +907,7 @@ describe("api.campaign-export", () => {
 
   test("message export covers contactBatch null branch", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 9,
         workspace: "w1",
@@ -687,10 +921,10 @@ describe("api.campaign-export", () => {
       messageCount: 0,
       messages: [],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "9", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -699,7 +933,7 @@ describe("api.campaign-export", () => {
 
   test("message export final status upload error triggers catch", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 4,
         workspace: "w1",
@@ -715,11 +949,11 @@ describe("api.campaign-export", () => {
       // init status ok, contact stage ok, CSV ok, final status errors
       uploadBehaviors: ["ok", "ok", "ok", "error"],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "4", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -734,7 +968,7 @@ describe("api.campaign-export", () => {
     vi.useFakeTimers();
     const mod = await import("../app/routes/api+/campaign-export");
 
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 10,
         workspace: "w1",
@@ -745,9 +979,9 @@ describe("api.campaign-export", () => {
       },
       campaignExportError: "campaign export error",
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "10", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -758,7 +992,7 @@ describe("api.campaign-export", () => {
     );
 
     loggerError.mockClear();
-    const { supabaseClient: sb2 } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 11,
         workspace: "w1",
@@ -769,9 +1003,8 @@ describe("api.campaign-export", () => {
       },
       campaignExportMissing: true,
     });
-    supabaseForAuth = sb2;
     applyDualAuth();
-    const res2 = await asRouteResponse(await mod.action({
+    const res2 = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "11", workspaceId: "w1" }),
     } as any));
     expect(res2.status).toBe(200);
@@ -795,68 +1028,63 @@ describe("api.campaign-export", () => {
     };
 
     // campaign_queue error
-    const { supabaseClient: sbQueueErr } = makeSupabase({
+    makeDbClient({
       campaign: { id: 20, ...baseCampaign } as any,
       campaignQueueError: "queue err",
     });
-    supabaseForAuth = sbQueueErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "20", workspaceId: "w1" }),
     } as any);
 
     // no contacts found
-    const { supabaseClient: sbNoContacts } = makeSupabase({
+    makeDbClient({
       campaign: { id: 21, ...baseCampaign } as any,
       campaignQueueContactIds: [],
     });
-    supabaseForAuth = sbNoContacts;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "21", workspaceId: "w1" }),
     } as any);
 
     // contact batch error
-    const { supabaseClient: sbContactErr } = makeSupabase({
+    makeDbClient({
       campaign: { id: 22, ...baseCampaign } as any,
       campaignQueueContactIds: [1],
       contactsError: "contact err",
     });
-    supabaseForAuth = sbContactErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "22", workspaceId: "w1" }),
     } as any);
 
     // message count error
-    const { supabaseClient: sbCountErr } = makeSupabase({
+    makeDbClient({
       campaign: { id: 23, ...baseCampaign } as any,
       campaignQueueContactIds: [1],
       contacts: [{ id: 1, phone: "+1 (333) 333-3333", workspace: "w1" }],
       messageCountError: "count err",
     });
-    supabaseForAuth = sbCountErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "23", workspaceId: "w1" }),
     } as any);
 
     // messages chunk error
-    const { supabaseClient: sbMsgErr } = makeSupabase({
+    makeDbClient({
       campaign: { id: 24, ...baseCampaign } as any,
       campaignQueueContactIds: [1],
       contacts: [{ id: 1, phone: "+1 (444) 444-4444", workspace: "w1" }],
       messageCount: 1,
       messagesError: "messages err",
     });
-    supabaseForAuth = sbMsgErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "24", workspaceId: "w1" }),
     } as any);
 
     // CSV upload error
-    const { supabaseClient: sbCsvErr } = makeSupabase({
+    makeDbClient({
       campaign: { id: 25, ...baseCampaign } as any,
       campaignQueueContactIds: [1],
       contacts: [{ id: 1, phone: "+1 (555) 555-5555", workspace: "w1" }],
@@ -866,7 +1094,6 @@ describe("api.campaign-export", () => {
       ],
       uploadBehavior: (path) => (path.endsWith(".csv") ? "error" : "ok"),
     });
-    supabaseForAuth = sbCsvErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "25", workspaceId: "w1" }),
@@ -881,7 +1108,7 @@ describe("api.campaign-export", () => {
 
   test("message export covers no-matches and empty-messages break, and signed-url error path", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 1,
         workspace: "w1",
@@ -896,11 +1123,11 @@ describe("api.campaign-export", () => {
       messages: [], // triggers break (no data)
       signedUrlBehavior: "error",
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -913,7 +1140,7 @@ describe("api.campaign-export", () => {
 
   test("message export covers opt_out=true match and from/to empty-string fallbacks", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 50,
         workspace: "w1",
@@ -942,11 +1169,11 @@ describe("api.campaign-export", () => {
         },
       ],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "50", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -958,7 +1185,7 @@ describe("api.campaign-export", () => {
     const mod = await import("../app/routes/api+/campaign-export");
 
     // campaign_queue error -> uses "Error fetching campaign contacts"
-    const { supabaseClient: sbQueueErr } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 60,
         workspace: "w1",
@@ -969,7 +1196,6 @@ describe("api.campaign-export", () => {
       },
       campaignQueueError: "",
     });
-    supabaseForAuth = sbQueueErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "60", workspaceId: "w1" }),
@@ -977,7 +1203,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // contact batch error -> uses `Error fetching contact batch ${i}`
-    const { supabaseClient: sbBatchErr } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 61,
         workspace: "w1",
@@ -989,7 +1215,6 @@ describe("api.campaign-export", () => {
       campaignQueueContactIds: [1],
       contactsError: "",
     });
-    supabaseForAuth = sbBatchErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "61", workspaceId: "w1" }),
@@ -997,7 +1222,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // message count error -> uses "Error counting messages"
-    const { supabaseClient: sbCountErr } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 62,
         workspace: "w1",
@@ -1010,7 +1235,6 @@ describe("api.campaign-export", () => {
       contacts: [{ id: 1, phone: "5550000000", workspace: "w1" }],
       messageCountError: "",
     });
-    supabaseForAuth = sbCountErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "62", workspaceId: "w1" }),
@@ -1018,7 +1242,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // messages chunk error -> uses `Error fetching messages chunk at offset ${offset}`
-    const { supabaseClient: sbMsgsErr } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 63,
         workspace: "w1",
@@ -1032,7 +1256,6 @@ describe("api.campaign-export", () => {
       messageCount: 1,
       messagesError: "",
     });
-    supabaseForAuth = sbMsgsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "63", workspaceId: "w1" }),
@@ -1047,7 +1270,7 @@ describe("api.campaign-export", () => {
 
   test("call export runs and covers result parsing (string/object/invalid), visited pages, and credits", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 2,
         workspace: "w1",
@@ -1132,18 +1355,18 @@ describe("api.campaign-export", () => {
         { outreach_attempt_id: null, sid: "s3", duration: "0" }, // covers outreach_attempt_id guard
       ],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "2", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
 
     await vi.runAllTimersAsync();
 
-    const completed = (supabaseClient.__uploads as any[]).some((u) => {
+    const completed = (objectStorageUploads as any[]).some((u) => {
       if (!String(u.path).endsWith(".json")) return false;
       try {
         const obj = JSON.parse(String(u.body));
@@ -1161,7 +1384,7 @@ describe("api.campaign-export", () => {
     vi.useFakeTimers();
     const mod = await import("../app/routes/api+/campaign-export");
 
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 40,
         workspace: "w1",
@@ -1172,9 +1395,9 @@ describe("api.campaign-export", () => {
       },
       campaignExportError: "campaign export error",
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "40", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1185,7 +1408,7 @@ describe("api.campaign-export", () => {
     );
 
     loggerError.mockClear();
-    const { supabaseClient: sb2 } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 41,
         workspace: "w1",
@@ -1196,9 +1419,8 @@ describe("api.campaign-export", () => {
       },
       campaignExportMissing: true,
     });
-    supabaseForAuth = sb2;
     applyDualAuth();
-    const res2 = await asRouteResponse(await mod.action({
+    const res2 = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "41", workspaceId: "w1" }),
     } as any));
     expect(res2.status).toBe(200);
@@ -1211,7 +1433,7 @@ describe("api.campaign-export", () => {
 
   test("call export CSV upload error triggers catch", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 42,
         workspace: "w1",
@@ -1224,11 +1446,11 @@ describe("api.campaign-export", () => {
       outreachAttempts: [],
       uploadBehavior: (path) => (path.endsWith(".csv") ? "error" : "ok"),
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "42", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1239,9 +1461,9 @@ describe("api.campaign-export", () => {
     );
   });
 
-  test("call export covers ivr_campaign selection and errors (script/count/calls)", async () => {
+  test("call export covers unified campaign script selection and errors (script/count/calls)", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 3,
         workspace: "w1",
@@ -1254,11 +1476,11 @@ describe("api.campaign-export", () => {
       outreachAttemptCountError: "count blew up",
       callsError: "calls blew up",
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "3", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1282,81 +1504,75 @@ describe("api.campaign-export", () => {
     };
 
     // status upload error (call export)
-    const { supabaseClient: sbStatusErr } = makeSupabase({
+    makeDbClient({
       campaign: { id: 30, ...baseCampaign } as any,
       uploadBehaviors: ["error"],
     });
-    supabaseForAuth = sbStatusErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "30", workspaceId: "w1" }),
     } as any);
 
     // attempt count error
-    const { supabaseClient: sbAttemptCountErr } = makeSupabase({
+    makeDbClient({
       campaign: { id: 31, ...baseCampaign } as any,
       outreachAttemptCountError: "attempt count err",
     });
-    supabaseForAuth = sbAttemptCountErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "31", workspaceId: "w1" }),
     } as any);
 
     // attempts error
-    const { supabaseClient: sbAttemptsErr } = makeSupabase({
+    makeDbClient({
       campaign: { id: 32, ...baseCampaign } as any,
       outreachAttemptCount: 1,
       outreachAttemptsError: "attempts err",
     });
-    supabaseForAuth = sbAttemptsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "32", workspaceId: "w1" }),
     } as any);
 
     // break when attempts empty + signed url error after upload
-    const { supabaseClient: sbAttemptsEmpty } = makeSupabase({
+    makeDbClient({
       campaign: { id: 33, ...baseCampaign } as any,
       outreachAttemptCount: 1,
       outreachAttempts: [],
       signedUrlBehavior: "error",
     });
-    supabaseForAuth = sbAttemptsEmpty;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "33", workspaceId: "w1" }),
     } as any);
 
     // contacts error
-    const { supabaseClient: sbContactsErr } = makeSupabase({
+    makeDbClient({
       campaign: { id: 34, ...baseCampaign } as any,
       outreachAttemptCount: 1,
       outreachAttempts: [{ id: "a1", contact_id: "c1", campaign_id: 34 }],
       contactsError: "contacts err",
     });
-    supabaseForAuth = sbContactsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "34", workspaceId: "w1" }),
     } as any);
 
     // calls error
-    const { supabaseClient: sbCallsErr } = makeSupabase({
+    makeDbClient({
       campaign: { id: 35, ...baseCampaign } as any,
       outreachAttemptCount: 1,
       outreachAttempts: [{ id: "a1", contact_id: "c1", campaign_id: 35 }],
       contacts: [{ id: "c1" }],
       callsError: "calls err",
     });
-    supabaseForAuth = sbCallsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "35", workspaceId: "w1" }),
     } as any);
 
     // CSV upload error and nested catch logging (error status upload throws)
-    const { supabaseClient: sbNested } = makeSupabase({
+    makeDbClient({
       campaign: { id: 36, ...baseCampaign } as any,
       outreachAttemptCount: 1,
       outreachAttempts: [],
@@ -1366,7 +1582,6 @@ describe("api.campaign-export", () => {
         return "ok";
       },
     });
-    supabaseForAuth = sbNested;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "36", workspaceId: "w1" }),
@@ -1386,7 +1601,7 @@ describe("api.campaign-export", () => {
       created_at: new Date().toISOString(),
     }));
 
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 70,
         workspace: "w1",
@@ -1412,11 +1627,11 @@ describe("api.campaign-export", () => {
       contacts: [{ id: "c0", phone: "1", opt_out: true, workspace: "w1" }],
       calls: [],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "70", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1428,7 +1643,7 @@ describe("api.campaign-export", () => {
     const mod = await import("../app/routes/api+/campaign-export");
 
     // script pages/blocks fallbacks via null script
-    const { supabaseClient: sbNullScript } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 71,
         workspace: "w1",
@@ -1441,7 +1656,6 @@ describe("api.campaign-export", () => {
       outreachAttemptCount: 0,
       outreachAttempts: [],
     });
-    supabaseForAuth = sbNullScript;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "71", workspaceId: "w1" }),
@@ -1449,7 +1663,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // script error default message: "Error fetching script"
-    const { supabaseClient: sbScriptErr } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 72,
         workspace: "w1",
@@ -1460,7 +1674,6 @@ describe("api.campaign-export", () => {
       },
       scriptError: "",
     });
-    supabaseForAuth = sbScriptErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "72", workspaceId: "w1" }),
@@ -1468,7 +1681,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // attempts count default message: "Error counting attempts"
-    const { supabaseClient: sbCountErr } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 73,
         workspace: "w1",
@@ -1479,7 +1692,6 @@ describe("api.campaign-export", () => {
       },
       outreachAttemptCountError: "",
     });
-    supabaseForAuth = sbCountErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "73", workspaceId: "w1" }),
@@ -1487,7 +1699,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // attempts chunk default message: `Error fetching attempts chunk at offset ${offset}`
-    const { supabaseClient: sbAttemptsErr } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 74,
         workspace: "w1",
@@ -1499,7 +1711,6 @@ describe("api.campaign-export", () => {
       outreachAttemptCount: 1,
       outreachAttemptsError: "",
     });
-    supabaseForAuth = sbAttemptsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "74", workspaceId: "w1" }),
@@ -1507,7 +1718,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // contacts/calls default messages
-    const { supabaseClient: sbContactsErr } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 75,
         workspace: "w1",
@@ -1520,14 +1731,13 @@ describe("api.campaign-export", () => {
       outreachAttempts: [{ id: "a1", contact_id: "c1", campaign_id: 75 }],
       contactsError: "",
     });
-    supabaseForAuth = sbContactsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "75", workspaceId: "w1" }),
     } as any);
     await vi.runAllTimersAsync();
 
-    const { supabaseClient: sbCallsErr } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 76,
         workspace: "w1",
@@ -1541,7 +1751,6 @@ describe("api.campaign-export", () => {
       contacts: [{ id: "c1" }],
       callsError: "",
     });
-    supabaseForAuth = sbCallsErr;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "76", workspaceId: "w1" }),
@@ -1549,7 +1758,7 @@ describe("api.campaign-export", () => {
     await vi.runAllTimersAsync();
 
     // non-Error throw -> error status should use "Unknown error"
-    const { supabaseClient: sbNonError } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 77,
         workspace: "w1",
@@ -1560,14 +1769,13 @@ describe("api.campaign-export", () => {
       },
       uploadBehaviors: ["throwNonError", "ok"],
     });
-    supabaseForAuth = sbNonError;
     applyDualAuth();
     await mod.action({
       request: reqForm("http://x", { campaignId: "77", workspaceId: "w1" }),
     } as any);
     await vi.runAllTimersAsync();
 
-    const wroteUnknown = (sbNonError.__uploads as any[]).some((u) => {
+    const wroteUnknown = (objectStorageUploads as any[]).some((u) => {
       if (!String(u.path).endsWith(".json")) return false;
       try {
         const obj = JSON.parse(String(u.body));
@@ -1581,7 +1789,7 @@ describe("api.campaign-export", () => {
 
   test("call export covers null contacts/calls else branches", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 78,
         workspace: "w1",
@@ -1597,11 +1805,11 @@ describe("api.campaign-export", () => {
       contacts: null as any,
       calls: null as any,
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "78", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1610,7 +1818,7 @@ describe("api.campaign-export", () => {
 
   test("message export initial status upload error logs and error status upload returns error", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 1,
         workspace: "w1",
@@ -1626,11 +1834,11 @@ describe("api.campaign-export", () => {
       messageCount: 0,
       messages: [],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);
@@ -1648,7 +1856,7 @@ describe("api.campaign-export", () => {
 
   test("message export initial status upload error logs and error status upload throws", async () => {
     vi.useFakeTimers();
-    const { supabaseClient } = makeSupabase({
+    makeDbClient({
       campaign: {
         id: 1,
         workspace: "w1",
@@ -1664,11 +1872,11 @@ describe("api.campaign-export", () => {
       messageCount: 0,
       messages: [],
     });
-    supabaseForAuth = supabaseClient;
+    postgresForAuth = null;
     applyDualAuth();
 
     const mod = await import("../app/routes/api+/campaign-export");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("http://x", { campaignId: "1", workspaceId: "w1" }),
     } as any));
     expect(res.status).toBe(200);

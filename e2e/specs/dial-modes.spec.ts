@@ -8,9 +8,10 @@ ownerTest.describe("Dial modes @authenticated @slow", () => {
     await page.goto(
       workspacePath(
         E2E_WORKSPACES.ready.id,
-        `campaigns/${E2E_CAMPAIGNS.livePredictive.id}/settings`,
+        `campaigns/${E2E_CAMPAIGNS.livePredictive.id}/launch`,
       ),
     );
+    await page.getByText("Calling options").click();
     await expect(page.getByText("Dial Type:")).toBeVisible();
     await expect(page.locator("#dial_type")).toBeVisible();
   });
@@ -31,7 +32,10 @@ ownerTest.describe("Dial modes @authenticated @slow", () => {
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 0);
     const callScreen = new CallScreenPage(page);
     await callScreen.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
-    await expect(page.getByText(/No Credits Remaining|Purchase Credits/i).first()).toBeVisible();
+    const banner = page.getByTestId("credits-error-banner");
+    await expect(banner).toBeVisible({ timeout: 30_000 });
+    await expect(banner.getByText(/Credit balance depleted/i)).toBeVisible();
+    await expect(banner.getByRole("link", { name: /Add credits/i })).toBeVisible();
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 500);
   });
 });

@@ -3,17 +3,21 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
-  validateTwilioWebhookForWorkspace: vi.fn(),
-  getServiceSupabase: vi.fn(),
+  requireTwilioSignature: vi.fn(),
+  getAdminDb: vi.fn(),
+  findCampaignInWorkspace: vi.fn(),
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock("@/lib/env.server", () => ({
   env: { BASE_URL: () => "https://base.example" },
 }));
 
+vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForWorkspace: (...args: unknown[]) =>
-    mocks.validateTwilioWebhookForWorkspace(...args),
+  requireTwilioSignature: (...args: unknown[]) =>
+    mocks.requireTwilioSignature(...args),
   twilioWebhookForbidden: (message: string) =>
     new Response(JSON.stringify({ error: message }), {
       status: 403,
@@ -21,8 +25,12 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
     }),
 }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  getServiceSupabase: () => mocks.getServiceSupabase(),
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  findCampaignInWorkspace: (...args: unknown[]) => mocks.findCampaignInWorkspace(...args),
+}));
+
+vi.mock("@/lib/auth.server", () => ({
+  getAdminDb: () => mocks.null /* removed service client */,
 }));
 
 vi.mock("twilio/lib/twiml/VoiceResponse.js", () => {
@@ -41,6 +49,9 @@ vi.mock("twilio/lib/twiml/VoiceResponse.js", () => {
         },
       };
     }
+    hangup() {
+      this.parts.push("hangup");
+    }
     toString() {
       return `<Response>${this.parts.join("|")}</Response>`;
     }
@@ -51,31 +62,17 @@ vi.mock("twilio/lib/twiml/VoiceResponse.js", () => {
 describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.validateTwilioWebhookForWorkspace.mockResolvedValue({
-      ok: true,
-      params: {},
-      authToken: "token",
-      workspaceId: "w1",
-    });
-    mocks.getServiceSupabase.mockReturnValue({
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: { id: 1 }, error: null }),
-            }),
-          }),
-        }),
-      }),
-    });
+    mocks.requireTwilioSignature.mockResolvedValue(null);
+    mocks.getAdminDb.mockReturnValue({});
+    mocks.findCampaignInWorkspace.mockResolvedValue({ id: 1 });
+    mocks.logger.error.mockReset();
   });
 
   test("returns TwiML with campaign conference name when signature validates", async () => {
     const mod = await import(
       "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route"
     );
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader({
         request: new Request(
           "https://base.example/api/connect-campaign-conference/w1/c1?CallSid=CA1",
           {
@@ -91,19 +88,15 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
   });
 
   test("rejects unauthenticated Twilio requests", async () => {
-    mocks.validateTwilioWebhookForWorkspace.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
         headers: { "Content-Type": "application/json" },
-      }),
-    });
+      }));
 
     const mod = await import(
       "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route"
     );
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader({
         request: new Request(
           "https://base.example/api/connect-campaign-conference/w1/c1",
         ),
@@ -111,5 +104,29 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
       } as never),
     );
     expect(res.status).toBe(403);
+  });
+
+  test("returns fallback TwiML (not an HTML error page) when an unexpected error is thrown", async () => {
+    mocks.findCampaignInWorkspace.mockRejectedValueOnce(new Error("db down"));
+
+    const mod = await import(
+      "../app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route"
+    );
+    const res = await asRouteResponse(mod.loader({
+        request: new Request(
+          "https://base.example/api/connect-campaign-conference/w1/c1",
+        ),
+        params: { workspaceId: "w1", campaignId: "1" },
+      } as never),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("text/xml");
+    const body = await res.text();
+    expect(body).toContain("say:");
+    expect(body).toContain("hangup");
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Unhandled error in api.connect-campaign-conference",
+      expect.objectContaining({ error: "db down" }),
+    );
   });
 });

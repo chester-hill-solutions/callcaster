@@ -8,11 +8,15 @@ ownerTest.describe("Workspace API keys @authenticated", () => {
   });
 
   ownerTest("API-02 create key shows reveal banner", async ({ page }) => {
-    await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "settings"));
-    await page.getByRole("button", { name: /create.*key|new.*key|add.*key/i }).click();
-    await page.getByLabel(/name/i).fill("E2E Playwright Key");
-    await page.getByRole("button", { name: /create|save/i }).click();
-    await expect(page.getByTestId("api-key-reveal")).toBeVisible();
+    await page.goto(`${workspacePath(E2E_WORKSPACES.ready.id, "settings")}?create=1`);
+    await expect(page.getByTestId("api-key-create-form")).toBeVisible();
+    await page.locator("#api-key-name").fill("E2E Playwright Key");
+    // Capability scopes are required on create after the CHS capability cutover.
+    await page.locator('input[data-scope-value="messages.send"]').check();
+    await expect(page.locator('input[type="hidden"][name="scopes"][value="messages.send"]')).toHaveCount(1);
+    await page.getByTestId("api-key-submit").click();
+    await page.waitForURL(/\/settings/);
+    await expect(page.getByTestId("api-key-reveal")).toBeVisible({ timeout: 30_000 });
   });
 
   ownerTest("API-05 SMS with seeded key", async ({ request }) => {

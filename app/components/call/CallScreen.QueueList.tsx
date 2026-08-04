@@ -1,6 +1,21 @@
-import { TableHeader } from "@/components/call-list/records/TableHeader";
-import QueueContact from "@/components/call-list/records/participant/CallContact";
-import { Tables } from "@/lib/database.types";
+import { useMemo } from "react";
+import QueueContact from "@/components/call/CallContact";
+import { Button } from "@/components/ui/button";
+import { Text } from "@/components/ui/typography";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  callPanelBodyScrollClass,
+  callPanelHeaderSecondaryClass,
+  callPanelShellClass,
+} from "@/components/call/call-panel-classes";
+import type { Tables } from "@/lib/db-types";
 
 type Contact = Tables<"contact">;
 type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
@@ -34,9 +49,23 @@ const QueueList = ({
   count,
   completed,
 }: QueueListProps) => {
-  const renderQueueContacts = () => {
-    if (groupByHousehold && Object.keys(householdMap).length) {
-      return Object.values(householdMap).flatMap((household) =>
+  // Households are derived once per householdMap identity change, not per render,
+  // so QueueContact's `household` prop stays referentially stable across renders
+  // that don't touch the queue (e.g. a call-advance that only moves nextRecipient).
+  const households = useMemo(
+    () => Object.values(householdMap),
+    [householdMap],
+  );
+
+  const selectedContactId = nextRecipient?.contact?.id ?? null;
+
+  // Recomputed only when the queue/grouping/selection actually change, so a
+  // QueueList re-render triggered by unrelated props (isBusy, etc.) doesn't
+  // rebuild this array. React.memo on QueueContact then skips re-rendering any
+  // row whose props (contact/household/selected/...) didn't change.
+  const queueRows = useMemo(() => {
+    if (groupByHousehold && households.length) {
+      return households.flatMap((household) =>
         household.map((contact, index) => (
           <QueueContact
             key={`household-${contact.contact?.id}`}
@@ -44,154 +73,99 @@ const QueueList = ({
             household={household}
             firstInHouse={index === 0}
             grouped={true}
-            selected={nextRecipient?.contact?.id === contact.contact?.id}
+            selected={selectedContactId === contact.contact?.id}
           />
         )),
       );
-    } else {
-      return queue.map((contact) => {
-        return (
-          <QueueContact
-            key={contact.contact?.id}
-            contact={contact.contact}
-            selected={nextRecipient?.contact?.id === contact.contact?.id}
-          />
-        );
-      });
     }
-  };
+
+    return queue.map((contact) => (
+      <QueueContact
+        key={contact.contact?.id}
+        contact={contact.contact}
+        selected={selectedContactId === contact.contact?.id}
+      />
+    ));
+  }, [groupByHousehold, households, queue, selectedContactId]);
 
   return (
-    <div
-      style={{
-        flex: "1 1 20%",
-        border: "3px solid #BCEBFF",
-        borderRadius: "20px",
-        minHeight: "300px",
-        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderTopLeftRadius: "18px",
-          borderTopRightRadius: "18px",
-          padding: "16px",
-        }}
-        className="bg-brand-secondary font-Tabac-Slab text-xl text-slate-800"
-      >
-        <div
-          className="row gap2 flex"
-          style={{ display: "flex", gap: "8px", flex: "auto" }}
-        >
-          {!predictive ? (
-            <>
-              <button
-                onClick={() => handleNextNumber(true)}
-                style={{
-                  flex: "1 1 auto",
-                  padding: "4px 8px",
-                  background: "#d60000",
-                  borderRadius: "5px",
-                  color: "white",
-                  fontSize: "small",
-                }}
-                disabled={isBusy}
-              >
-                Skip Household
-              </button>
-              <button
-                onClick={() => handleNextNumber(false)}
-                style={{
-                  flex: "1 1 auto",
-                  padding: "4px 8px",
-                  border: "1px solid #d60000",
-                  borderRadius: "5px",
-                  fontSize: "small",
-                }}
-                disabled={isBusy}
-              >
-                Skip Person
-              </button>
-            </>
-          ) : (
-            <div className="flex-1 text-center">
-              <h4>Recipient List</h4>
-            </div>
-          )}
-        </div>
+    <div className={callPanelShellClass}>
+      <div className={callPanelHeaderSecondaryClass}>
+        {!predictive ? (
+          <div className="flex w-full gap-2">
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              className="flex-1 font-Zilla-Slab text-xs"
+              onClick={() => handleNextNumber(true)}
+              disabled={isBusy}
+            >
+              Skip Household
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="flex-1 border-primary font-Zilla-Slab text-xs text-primary"
+              onClick={() => handleNextNumber(false)}
+              disabled={isBusy}
+            >
+              Skip Person
+            </Button>
+          </div>
+        ) : (
+          <span className="font-semibold">Recipient List</span>
+        )}
       </div>
 
-      <div
-        className="column flex"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          maxHeight: "80vh",
-          overflowY: "scroll",
-        }}
-      >
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <TableHeader keys={["Name", "Number", "Address"]} />
+      <div className={callPanelBodyScrollClass}>
+        <Table className="w-full border-collapse">
+          <TableHeader>
+            <TableRow>
+              <TableHead hidden>Name</TableHead>
+              <TableHead hidden>Number</TableHead>
+              <TableHead hidden>Address</TableHead>
+            </TableRow>
+          </TableHeader>
           {queue.length > 0 ? (
-            <tbody>{renderQueueContacts()}</tbody>
+            <TableBody>{queueRows}</TableBody>
           ) : (
-            <tbody>
+            <TableBody>
               {!predictive && (
-                <tr>
-                  <td
-                    colSpan={3}
-                    style={{ padding: "36px", textAlign: "center" }}
-                  >
-                    <button
+                <TableRow>
+                  <TableCell colSpan={3} className="px-4 py-9 text-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-primary font-Zilla-Slab text-primary"
                       onClick={handleQueueButton}
-                      style={{
-                        flex: "1 1 auto",
-                        padding: "4px 8px",
-                        border: "1px solid #d60000",
-                        borderRadius: "5px",
-                        fontSize: "small",
-                      }}
                     >
                       Load Queue
-                    </button>
-                  </td>
-                </tr>
+                    </Button>
+                  </TableCell>
+                </TableRow>
               )}
               {!queue.length && count === 0 && completed === 0 && (
-                <tr>
-                  <td
-                    colSpan={3}
-                    style={{
-                      padding: "36px",
-                      textAlign: "center",
-                      opacity: ".5",
-                    }}
-                  >
-                    Check with your administration to ensure your queue is set
-                    up.
-                  </td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={3} className="px-4 py-9 text-center">
+                    <Text variant="muted">
+                      Check with your administration to ensure your queue is set up.
+                    </Text>
+                  </TableCell>
+                </TableRow>
               )}
               {!queue.length && completed > 0 && (
-                <tr>
-                  <td
-                    colSpan={3}
-                    style={{
-                      padding: "36px",
-                      textAlign: "center",
-                      opacity: ".5",
-                    }}
-                  >
-                    You're all done! Great work.
-                  </td>
-                </tr>
+                <TableRow>
+                  <TableCell colSpan={3} className="px-4 py-9 text-center">
+                    <Text variant="muted">You&apos;re all done! Great work.</Text>
+                  </TableCell>
+                </TableRow>
               )}
-            </tbody>
+            </TableBody>
           )}
-        </table>
+        </Table>
       </div>
     </div>
   );

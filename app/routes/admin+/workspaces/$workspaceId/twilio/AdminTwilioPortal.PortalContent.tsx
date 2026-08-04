@@ -1,6 +1,7 @@
 import type { TwilioPageData } from "../loadTwilioData.server";
 
 import { HealthPanel } from "./AdminTwilioPortal.HealthPanel";
+import { CompliancePanel } from "./AdminTwilioPortal.CompliancePanel";
 import { ConfigChangesPanel } from "./AdminTwilioPortal.ConfigChangesPanel";
 import { MessagingSignalsPanel } from "./AdminTwilioPortal.MessagingSignalsPanel";
 import { OnboardingPanel } from "./AdminTwilioPortal.OnboardingPanel";
@@ -28,6 +29,7 @@ export function PortalContent({ data }: { data: TwilioPageData }) {
         <>
             <OnboardingPanel onboarding={onboarding} readiness={readiness} />
             <HealthPanel onboarding={onboarding} syncSnapshot={syncSnapshot} />
+            <CompliancePanel onboarding={onboarding} syncSnapshot={syncSnapshot} />
             <SendingSetupPanel
                 config={config}
                 effectiveConfig={effectiveConfig}

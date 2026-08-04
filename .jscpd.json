@@ -1,0 +1,18 @@
+{
+  "path": ["app", "server", "worker", "shared"],
+  "ignore": [
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/__tests__/**",
+    "**/api-generated/**",
+    "**/vendor/**",
+    "**/node_modules/**",
+    "**/*.d.ts"
+  ],
+  "minTokens": 50,
+  "reporters": ["json"],
+  "output": "./node_modules/.cache/jscpd",
+  "gitignore": true,
+  "silent": true,
+  "absolute": false
+}

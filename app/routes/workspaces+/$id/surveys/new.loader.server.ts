@@ -1,32 +1,25 @@
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { getUserRole } from "@/lib/database.server";
-import { User , SurveyFormData, SurveyQuestionType, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["none"],
+  handler: ({ auth }) => {
+    const { user, workspaceId, userRole, headers } = auth;
 
-  const { supabaseClient, user } = await verifyAuth(request);
-  const workspaceId = params.id;
+    if (!workspaceId) {
+      throw new Response("Workspace ID is required", { status: 400 });
+    }
 
-  if (!workspaceId) {
-    throw new Response("Workspace ID is required", { status: 400 });
-  }
+    if (!userRole || !["owner", "admin", "member"].includes(userRole)) {
+      throw new Response("Unauthorized", { status: 403 });
+    }
 
-  // Get user role for this workspace
-  const userRole = await getUserRole({ 
-    supabaseClient, 
-    user: user as unknown as User, 
-    workspaceId 
-  });
-
-  if (!userRole || !["owner", "admin", "member"].includes(userRole.role)) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
-
-  return routeData({
-    workspaceId,
-    user,
-    userRole,
-  });
-}
+    return routeData({
+      workspaceId,
+      user,
+      userRole,
+    }, { headers });
+  },
+});

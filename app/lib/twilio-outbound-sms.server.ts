@@ -13,6 +13,8 @@ export function buildTwilioOutboundSmsCreateParams(args: {
   explicitMessagingServiceSid?: string | null;
   campaignSmsSendMode?: string | null;
   campaignSmsMessagingServiceSid?: string | null;
+  /** "Send later" scheduling — only valid when the resolved sender is a Messaging Service. */
+  schedule?: { scheduleType: "fixed"; sendAt: Date } | null;
 }) {
   const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
     explicitRequestSid: args.explicitMessagingServiceSid ?? null,
@@ -42,5 +44,11 @@ export function buildTwilioOutboundSmsCreateParams(args: {
         }
       : { from: effectiveFrom }),
     ...(resolvedMessageIntent ? { messageIntent: resolvedMessageIntent } : {}),
+    ...(args.schedule
+      ? {
+          scheduleType: args.schedule.scheduleType,
+          sendAt: args.schedule.sendAt,
+        }
+      : {}),
   };
 }

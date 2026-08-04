@@ -1,8 +1,6 @@
-import { env } from "@/lib/env.server";
-
 /**
  * Parse workspace.twilio_data JSON for Twilio REST clients and webhook validation.
- * Matches Edge helper `supabase/functions/_shared/twilio-workspace-credentials.ts`.
+ * Ported from Postgres Edge `_shared/twilio-workspace-credentials.ts`.
  */
 export type TwilioWorkspaceCredentials = {
   sid: string;
@@ -11,18 +9,12 @@ export type TwilioWorkspaceCredentials = {
 
 /**
  * Auth token for Twilio webhook signature validation.
- * Uses workspace/subaccount credentials when present; main account token only in development.
+ * Uses workspace/subaccount credentials only; no main-account fallback.
  */
 export function resolveTwilioWebhookAuthToken(
   creds: TwilioWorkspaceCredentials | null,
 ): string | null {
-  if (creds?.authToken) {
-    return creds.authToken;
-  }
-  if (process.env.NODE_ENV !== "production") {
-    return env.TWILIO_AUTH_TOKEN();
-  }
-  return null;
+  return creds?.authToken ?? null;
 }
 
 export function readTwilioWorkspaceCredentials(

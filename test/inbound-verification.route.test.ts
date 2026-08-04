@@ -10,10 +10,9 @@ const mocks = vi.hoisted(() => {
     return { say, hangup, toString };
   });
   return {
-    createClient: vi.fn(),
     env: {
-      SUPABASE_URL: vi.fn(() => "http://supabase"),
-      SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
+      BETTER_AUTH_URL: vi.fn(() => "http://client"),
+      BETTER_AUTH_SERVICE_KEY: vi.fn(() => "service"),
     },
     logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     VoiceResponse,
@@ -23,91 +22,81 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: (...args: unknown[]) => mocks.createClient(...args),
+const twilioWebhookMocks = vi.hoisted(() => ({
+  requireTwilioSignature: vi.fn(async () => null),
 }));
+
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  requireTwilioSignature: (...args: unknown[]) =>
+    twilioWebhookMocks.requireTwilioSignature(...args),
+}));
+
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("twilio", () => ({
   default: { twiml: { VoiceResponse: mocks.VoiceResponse } },
 }));
 
-function makeSupabase(opts: {
-  session?: { data: unknown; error: unknown } | null;
-  user?: { data: unknown; error: unknown };
-  updateError?: unknown;
-}) {
-  const updateEq = vi.fn(async () => ({ error: opts.updateError ?? null }));
-  return {
-    from: vi.fn((table: string) => {
-      if (table === "verification_session") {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                gte: vi.fn(() => ({
-                  order: vi.fn(() => ({
-                    limit: vi.fn(() => ({
-                      maybeSingle: vi.fn(
-                        async () =>
-                          opts.session ?? {
-                            data: null,
-                            error: { message: "no session" },
-                          }
-                      ),
-                    })),
-                  })),
-                })),
-              })),
-            })),
-          })),
-          update: vi.fn(() => ({
-            eq: updateEq,
-          })),
-        };
-      }
-      if (table === "user") {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              single: vi.fn(
-                async () =>
-                  opts.user ?? {
-                    data: { verified_audio_numbers: [] },
-                    error: null,
-                  }
-              ),
-            })),
-          })),
-          update: vi.fn(() => ({
-            eq: updateEq,
-          })),
-        };
-      }
-      throw new Error(`Unexpected table ${table}`);
-    }),
-    _spies: { updateEq },
-  };
-}
+const verificationDbMocks = vi.hoisted(() => ({
+  findPendingVerificationSession: vi.fn(),
+  getUserVerifiedAudioNumbers: vi.fn(),
+  appendVerifiedAudioNumber: vi.fn(),
+  markVerificationSessionVerified: vi.fn(),
+}));
+
+vi.mock("@/lib/verification-db.server", () => ({
+  findPendingVerificationSession: (...args: unknown[]) =>
+    verificationDbMocks.findPendingVerificationSession(...args),
+  getUserVerifiedAudioNumbers: (...args: unknown[]) =>
+    verificationDbMocks.getUserVerifiedAudioNumbers(...args),
+  appendVerifiedAudioNumber: (...args: unknown[]) =>
+    verificationDbMocks.appendVerifiedAudioNumber(...args),
+  markVerificationSessionVerified: (...args: unknown[]) =>
+    verificationDbMocks.markVerificationSessionVerified(...args),
+}));
 
 describe("app/routes/api+/inbound/route-verification.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.createClient.mockReset();
+    twilioWebhookMocks.requireTwilioSignature.mockReset();
+    twilioWebhookMocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.VoiceResponse.mockClear();
     mocks.say.mockReset();
     mocks.hangup.mockReset();
     mocks.toString.mockReset();
     mocks.toString.mockReturnValue("<Response />");
+    verificationDbMocks.findPendingVerificationSession.mockReset();
+    verificationDbMocks.getUserVerifiedAudioNumbers.mockReset();
+    verificationDbMocks.appendVerifiedAudioNumber.mockReset();
+    verificationDbMocks.markVerificationSessionVerified.mockReset();
+  });
+
+  test("action rejects requests with invalid Twilio signature", async () => {
+    twilioWebhookMocks.requireTwilioSignature.mockResolvedValueOnce(
+      new Response("<Response><Hangup/></Response>", {
+        status: 403,
+        headers: { "Content-Type": "text/xml" },
+      }),
+    );
+
+    const formData = new FormData();
+    formData.set("From", "+15551234567");
+    const mod = await import("../app/routes/api+/inbound-verification");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://x", {
+        method: "POST",
+        body: formData,
+      }),
+    } as never));
+
+    expect(res.status).toBe(403);
+    expect(verificationDbMocks.findPendingVerificationSession).not.toHaveBeenCalled();
   });
 
   test("action returns error TwiML when From missing", async () => {
-    mocks.createClient.mockReturnValue(
-      makeSupabase({ session: { data: null, error: null } })
-    );
     const formData = new FormData();
     const mod = await import("../app/routes/api+/inbound-verification");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", {
         method: "POST",
         body: formData,
@@ -120,14 +109,11 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
   });
 
   test("action returns error TwiML when no matching session", async () => {
-    const supabase = makeSupabase({
-      session: { data: null, error: null },
-    });
-    mocks.createClient.mockReturnValue(supabase);
+    verificationDbMocks.findPendingVerificationSession.mockResolvedValueOnce(null);
     const formData = new FormData();
     formData.set("From", "+15551234567");
     const mod = await import("../app/routes/api+/inbound-verification");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", {
         method: "POST",
         body: formData,
@@ -139,29 +125,19 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
   });
 
   test("action success updates user and returns success TwiML", async () => {
-    const updateEq = vi.fn(async () => ({ error: null }));
-    const supabase: ReturnType<typeof makeSupabase> = makeSupabase({
-      session: {
-        data: {
-          id: "vs-1",
-          user_id: "u1",
-          expected_caller: "+15551234567",
-        },
-        error: null,
-      },
-      user: {
-        data: { verified_audio_numbers: [] },
-        error: null,
-      },
+    verificationDbMocks.findPendingVerificationSession.mockResolvedValueOnce({
+      id: "vs-1",
+      user_id: "u1",
+      expected_caller: "+15551234567",
     });
-    (supabase as { _spies?: { updateEq: ReturnType<typeof vi.fn> } })._spies =
-      { updateEq };
-    mocks.createClient.mockReturnValue(supabase);
+    verificationDbMocks.getUserVerifiedAudioNumbers.mockResolvedValueOnce([]);
+    verificationDbMocks.appendVerifiedAudioNumber.mockResolvedValueOnce(undefined);
+    verificationDbMocks.markVerificationSessionVerified.mockResolvedValueOnce(undefined);
 
     const formData = new FormData();
     formData.set("From", "+15551234567");
     const mod = await import("../app/routes/api+/inbound-verification");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", {
         method: "POST",
         body: formData,
@@ -172,29 +148,23 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
     expect(mocks.say).toHaveBeenCalledWith(
       "Your phone number has been successfully verified. You may now hang up."
     );
+    expect(verificationDbMocks.appendVerifiedAudioNumber).toHaveBeenCalledWith("u1", "+15551234567");
+    expect(verificationDbMocks.markVerificationSessionVerified).toHaveBeenCalledWith("vs-1");
   });
 
   test("action handles already-verified number", async () => {
-    const supabase = makeSupabase({
-      session: {
-        data: {
-          id: "vs-1",
-          user_id: "u1",
-          expected_caller: "+15551234567",
-        },
-        error: null,
-      },
-      user: {
-        data: { verified_audio_numbers: ["+15551234567"] },
-        error: null,
-      },
+    verificationDbMocks.findPendingVerificationSession.mockResolvedValueOnce({
+      id: "vs-1",
+      user_id: "u1",
+      expected_caller: "+15551234567",
     });
-    mocks.createClient.mockReturnValue(supabase);
+    verificationDbMocks.getUserVerifiedAudioNumbers.mockResolvedValueOnce(["+15551234567"]);
+    verificationDbMocks.markVerificationSessionVerified.mockResolvedValueOnce(undefined);
 
     const formData = new FormData();
     formData.set("From", "+15551234567");
     const mod = await import("../app/routes/api+/inbound-verification");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", {
         method: "POST",
         body: formData,
@@ -204,5 +174,6 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
     expect(mocks.say).toHaveBeenCalledWith(
       "This number is already verified."
     );
+    expect(verificationDbMocks.markVerificationSessionVerified).toHaveBeenCalledWith("vs-1");
   });
 });

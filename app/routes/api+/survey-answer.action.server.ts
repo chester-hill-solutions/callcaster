@@ -1,168 +1,127 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
-import { logger } from "@/lib/logger.server";
+import {
+  checkRateLimit,
+  clientRateLimitKey,
+  rateLimitResponse,
+} from "@/lib/platform-rate-limit.server";
+import {
+  createRespondentToken,
+  verifyRespondentToken,
+} from "@/lib/survey-respondent-token.server";
+import {
+  getActiveSurveyByPublicId,
+  saveSurveyAnswer,
+} from "@/lib/survey-db.server";
+import { loadSurveyRespondentContact } from "@/lib/survey-respondent.server";
+import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { isUniqueViolation } from "@/lib/parse-utils.server";
+const SURVEY_RATE_LIMIT = { limit: 10, windowMs: 60_000 };
 
-async function handleSaveAnswer(
+function getRespondentToken(request: Request, formData: FormData): string | null {
+  const url = new URL(request.url);
+  return url.searchParams.get("respondent_token") || (formData.get("respondent_token") as string | null);
+}
+
+async function resolveRespondentToken(
   request: Request,
-  supabaseClient: SupabaseClient<Database>
-) {
-  try {
-    type SurveyResponseRow = Database["public"]["Tables"]["survey_response"]["Row"];
-    const formData = await request.formData();
-    const surveyId = formData.get("surveyId") as string;
-    const questionId = formData.get("questionId") as string;
-    const answerValue = formData.get("answerValue") as string;
-    const contactId = formData.get("contactId") as string;
-    const resultId = formData.get("resultId") as string;
-    const pageId = formData.get("pageId") as string;
-
-    if (!surveyId || !questionId || !resultId || !pageId) {
-      return routeData({ error: "Missing required fields" }, { status: 400 });
+  formData: FormData,
+  survey: { id: number; workspace: string },
+): Promise<{ ok: true; resultId: string; token: string } | { ok: false; response: ReturnType<typeof routeData> }> {
+  const token = getRespondentToken(request, formData);
+  if (token) {
+    const payload = await verifyRespondentToken(token, survey.id);
+    if (!payload) {
+      return { ok: false, response: routeData({ error: "Invalid or expired respondent token" }, { status: 400 }) };
     }
-    
-    // Get survey to verify it exists and is active
-    const surveyIdNum = parseInt(surveyId, 10);
-    if (isNaN(surveyIdNum)) {
-      return routeData({ error: "Invalid survey ID" }, { status: 400 });
-    }
-    
-    const { data: survey, error: surveyError } = await supabaseClient
-      .from("survey")
-      .select("id, is_active")
-      .eq("id", surveyIdNum)
-      .single();
-
-    if (surveyError || !survey) {
-      return routeData({ error: "Survey not found" }, { status: 404 });
-    }
-
-    if (!survey.is_active) {
-      return routeData({ error: "Survey is not active" }, { status: 400 });
-    }
-
-    // Get-or-create survey response in an idempotent way (avoid select-then-insert races).
-    const contactIdNum = contactId ? parseInt(contactId, 10) : null;
-    if (contactIdNum !== null && Number.isNaN(contactIdNum)) {
-      return routeData({ error: "Invalid contact ID" }, { status: 400 });
-    }
-
-    const nowIso = new Date().toISOString();
-    let surveyResponse: SurveyResponseRow | null = null;
-
-    const { data: insertedResponse, error: insertError } = await supabaseClient
-      .from("survey_response")
-      .insert({
-        survey_id: survey.id,
-        result_id: resultId,
-        contact_id: contactIdNum,
-        started_at: nowIso,
-        last_page_completed: pageId,
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      if (!isUniqueViolation(insertError)) {
-        logger.error("Error creating survey response:", insertError);
-        return routeData({ error: "Failed to create survey response" }, { status: 500 });
-      }
-      // Duplicate result_id: fetch existing row.
-      const { data: existingResponse, error: fetchExistingError } =
-        await supabaseClient
-          .from("survey_response")
-          .select("*")
-          .eq("result_id", resultId)
-          .single();
-      if (fetchExistingError || !existingResponse) {
-        logger.error("Error fetching existing survey response:", fetchExistingError);
-        return routeData({ error: "Failed to load survey response" }, { status: 500 });
-      }
-      surveyResponse = existingResponse;
-    } else {
-      surveyResponse = insertedResponse;
-    }
-
-    if (!surveyResponse) {
-      logger.error("Missing survey response after insert/fetch");
-      return routeData({ error: "Failed to create survey response" }, { status: 500 });
-    }
-
-    // Always update progress fields deterministically.
-    const { error: updateError } = await supabaseClient
-      .from("survey_response")
-      .update({
-        last_page_completed: pageId,
-        updated_at: nowIso,
-      })
-      .eq("id", surveyResponse.id);
-    if (updateError) {
-      logger.error("Error updating survey response:", updateError);
-    }
-
-    // Get question ID from question_id
-    const { data: question, error: questionError } = await supabaseClient
-      .from("survey_question")
-      .select("id")
-      .eq("question_id", questionId)
-      .single();
-
-    if (questionError || !question) {
-      logger.error("Question not found:", questionId);
-      return routeData({ error: "Question not found" }, { status: 404 });
-    }
-
-    // Insert-first, then update-on-duplicate to avoid race creating duplicate answers.
-    const { error: answerInsertError } = await supabaseClient
-      .from("response_answer")
-      .insert({
-        response_id: surveyResponse.id,
-        question_id: question.id,
-        answer_value: answerValue,
-        answered_at: nowIso,
-      });
-
-    if (answerInsertError) {
-      if (!isUniqueViolation(answerInsertError)) {
-        logger.error("Error creating answer:", answerInsertError);
-        return routeData({ error: "Failed to save answer" }, { status: 500 });
-      }
-      const { error: updateError } = await supabaseClient
-        .from("response_answer")
-        .update({
-          answer_value: answerValue,
-          answered_at: nowIso,
-        })
-        .eq("response_id", surveyResponse.id)
-        .eq("question_id", question.id);
-      if (updateError) {
-        logger.error("Error updating answer:", updateError);
-        return routeData({ error: "Failed to update answer" }, { status: 500 });
-      }
-    }
-
-    return routeData({ 
-      success: true, 
-      response_id: surveyResponse.id,
-      result_id: resultId 
-    });
-  } catch (error) {
-    logger.error("Error in handleSaveAnswer:", error);
-    return routeData({ error: "Internal server error" }, { status: 500 });
+    return { ok: true, resultId: payload.result_id, token };
   }
+  const created = await createRespondentToken(survey.id, survey.workspace);
+  return { ok: true, resultId: created.resultId, token: created.token };
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-
-  const { supabaseClient } = createSupabaseServerClient(request);
-  
-  if (request.method === "POST") {
-    return handleSaveAnswer(request, supabaseClient);
+async function handleSaveAnswer(request: Request) {
+  const rateLimit = await checkRateLimit({
+    key: clientRateLimitKey(request, "survey:answer"),
+    ...SURVEY_RATE_LIMIT,
+  });
+  if (!rateLimit.ok) {
+    return rateLimitResponse(rateLimit.retryAfterSeconds);
   }
 
-  return routeData({ error: "Method not allowed" }, { status: 405 });
+  const formData = await request.formData();
+  const honeypot = formData.get("website");
+  if (honeypot && typeof honeypot === "string" && honeypot.trim().length > 0) {
+    return routeData({ error: "Invalid submission" }, { status: 400 });
+  }
+
+  const surveyId = formData.get("surveyId") as string;
+  const questionId = formData.get("questionId") as string;
+  const answerValue = formData.get("answerValue") as string;
+  const contactId = formData.get("contactId") as string;
+  const pageId = formData.get("pageId") as string;
+
+  if (!surveyId || !questionId || !pageId) {
+    return routeData({ error: "Missing required fields" }, { status: 400 });
+  }
+
+  // The public survey page (app/routes/survey+/$surveyId.tsx) always sends the
+  // public slug (`survey.survey_id`, e.g. "e2e-survey-public") in this field,
+  // never the numeric internal id — mirror survey-complete's lookup so answers
+  // actually resolve to a survey instead of 400ing on every non-numeric slug.
+  const survey = await getActiveSurveyByPublicId(surveyId);
+  if (!survey) {
+    return routeData({ error: "Survey not found" }, { status: 404 });
+  }
+  if (!survey.is_active) {
+    return routeData({ error: "Survey is not active" }, { status: 400 });
+  }
+
+  const tokenResult = await resolveRespondentToken(request, formData, survey);
+  if (!tokenResult.ok) {
+    return tokenResult.response;
+  }
+
+  const contactIdNum = contactId ? parseInt(contactId, 10) : null;
+  if (contactIdNum !== null && Number.isNaN(contactIdNum)) {
+    return routeData({ error: "Invalid contact ID" }, { status: 400 });
+  }
+  if (contactIdNum !== null) {
+    // Scoped to the survey's workspace, so a foreign id simply does not resolve.
+    const contact = await loadSurveyRespondentContact(contactIdNum, survey.workspace);
+    if (!contact) {
+      return routeData({ error: "Invalid contact" }, { status: 400 });
+    }
+  }
+
+  const result = await saveSurveyAnswer({
+    surveyInternalId: survey.id,
+    questionPublicId: questionId,
+    answerValue,
+    contactId: contactIdNum,
+    resultId: tokenResult.resultId,
+    pageId,
+  });
+
+  if (!result.ok) {
+    return routeData({ error: result.error }, { status: result.status });
+  }
+
+  return routeData({
+    success: true,
+    response_id: result.response_id,
+    result_id: result.result_id,
+    respondent_token: tokenResult.token,
+  });
 }
+
+export const action = defineAction({
+  sideEffects: ["db-write"],
+  handler: async ({ request }: ActionFunctionArgs) => {
+    if (request.method === "POST") {
+      return handleSaveAnswer(request);
+    }
+
+    return routeData({ error: "Method not allowed" }, { status: 405 });
+  },
+});

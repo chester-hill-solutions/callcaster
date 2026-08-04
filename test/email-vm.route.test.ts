@@ -4,34 +4,60 @@ import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => {
   return {
-    createClient: vi.fn(),
     sendEmail: vi.fn(),
     sendWebhookNotification: vi.fn(),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
     fetch: vi.fn(),
     env: {
       RESEND_API_KEY: () => "rk",
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       BASE_URL: () => "https://base.example",
     },
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: (...args: any[]) => mocks.createClient(...args),
+const telephonyDbMocks = vi.hoisted(() => ({
+  findCallBySid: vi.fn(),
+  updateCallRecordingUrlBySid: vi.fn(),
 }));
+
+const inboundDbMocks = vi.hoisted(() => ({
+  findWorkspaceNumberVoicemailContextByPhone: vi.fn(),
+}));
+
+const objectStorageMocks = vi.hoisted(() => ({
+  uploadObject: vi.fn(),
+  createSignedObjectUrl: vi.fn(),
+}));
+
+const credentialsMocks = vi.hoisted(() => ({
+  readTwilioWorkspaceCredentials: vi.fn(),
+}));
+
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
   sendWebhookNotification: (...args: unknown[]) => mocks.sendWebhookNotification(...args),
 }));
+vi.mock("@/lib/telephony-db.server", () => ({
+  findCallBySid: (...args: any[]) => telephonyDbMocks.findCallBySid(...args),
+  updateCallRecordingUrlBySid: (...args: any[]) => telephonyDbMocks.updateCallRecordingUrlBySid(...args),
+}));
+vi.mock("@/lib/inbound-call-db.server", () => ({
+  findWorkspaceNumberVoicemailContextByPhone: (...args: any[]) =>
+    inboundDbMocks.findWorkspaceNumberVoicemailContextByPhone(...args),
+}));
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: (...args: any[]) => objectStorageMocks.uploadObject(...args),
+  createSignedObjectUrl: (...args: any[]) => objectStorageMocks.createSignedObjectUrl(...args),
+}));
+vi.mock("@/lib/twilio-workspace-credentials", () => ({
+  readTwilioWorkspaceCredentials: (...args: any[]) =>
+    credentialsMocks.readTwilioWorkspaceCredentials(...args),
+}));
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: vi.fn(async () => ({
-    ok: true,
-    params: {},
-    authToken: "tok",
-  })),
+  requireTwilioSignature: vi.fn(async () => (null)),
 }));
 
 vi.mock("resend", () => {
@@ -42,93 +68,47 @@ vi.mock("resend", () => {
   return { Resend };
 });
 
-function makeSupabase(overrides?: {
-  callError?: { message: string } | null;
-  numberError?: { message: string } | null;
+function setupEmailVmMocks(overrides?: {
+  callRow?: any;
+  numberRow?: any;
   workspace?: any;
-  uploadError?: { message: string } | null;
-  signedUrlError?: { message: string } | null;
+  uploadError?: any;
+  signedUrlError?: any;
 }) {
-  const callRow = {
+  const workspace = overrides?.workspace ?? {
+    id: "w1",
+    name: "W",
+    twilio_data: { sid: "tsid", authToken: "ttok" },
+    webhook: [],
+  };
+
+  const callRow = overrides?.callRow ?? {
     sid: "CA1",
     from: "+15550001111",
     to: "+15550002222",
   };
-  const hasWorkspaceOverride = Boolean(overrides && Object.prototype.hasOwnProperty.call(overrides, "workspace"));
-  const workspace = hasWorkspaceOverride
-    ? overrides!.workspace
-    : ({
-        id: "w1",
-        name: "W",
-        twilio_data: { sid: "tsid", authToken: "ttok" },
-        webhook: [],
-      } as any);
 
   const numberRow = {
     inbound_action: "notify@example.com",
     type: "inbound",
     workspace,
+    ...(overrides?.numberRow ?? {}),
   };
 
-  const upload = vi.fn(async () => ({
-    data: { path: "p" },
-    error: overrides?.uploadError ?? null,
-  }));
-  const createSignedUrl = vi.fn(async () => ({
-    data: { signedUrl: "https://signed" },
-    error: overrides?.signedUrlError ?? null,
-  }));
-
-  const supabase: any = {
-    from: (table: string) => {
-      if (table === "call") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: callRow,
-                error: overrides?.callError ?? null,
-              }),
-            }),
-          }),
-          update: () => ({
-            eq: () => ({
-              select: () => ({
-                single: async () => ({
-                  data: callRow,
-                  error: overrides?.callError ?? null,
-                }),
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "workspace_number") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: numberRow,
-                error: overrides?.numberError ?? null,
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error("unexpected table");
-    },
-    storage: {
-      from: (_b: string) => ({
-        upload,
-        createSignedUrl,
-      }),
-    },
-    _upload: upload,
-    _createSignedUrl: createSignedUrl,
-    _numberRow: numberRow,
-  };
-
-  return supabase;
+  telephonyDbMocks.findCallBySid.mockResolvedValue(callRow);
+  telephonyDbMocks.updateCallRecordingUrlBySid.mockResolvedValue(callRow);
+  inboundDbMocks.findWorkspaceNumberVoicemailContextByPhone.mockResolvedValue(numberRow);
+  objectStorageMocks.uploadObject.mockImplementation(async () => {
+    if (overrides?.uploadError) throw overrides.uploadError;
+  });
+  objectStorageMocks.createSignedObjectUrl.mockImplementation(async () => {
+    if (overrides?.signedUrlError) throw overrides.signedUrlError;
+    return "https://signed";
+  });
+  credentialsMocks.readTwilioWorkspaceCredentials.mockReturnValue({
+    sid: workspace.twilio_data?.sid ?? "tsid",
+    authToken: workspace.twilio_data?.authToken ?? "ttok",
+  });
 }
 
 function makeReq(fields: Record<string, any>) {
@@ -143,26 +123,27 @@ function makeReq(fields: Record<string, any>) {
 describe("app/routes/api+/email-vm/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.createClient.mockReset();
     mocks.sendEmail.mockReset();
     mocks.sendWebhookNotification.mockReset();
     mocks.logger.error.mockReset();
     mocks.fetch.mockReset();
     vi.stubGlobal("fetch", mocks.fetch);
+    telephonyDbMocks.findCallBySid.mockReset();
+    telephonyDbMocks.updateCallRecordingUrlBySid.mockReset();
+    inboundDbMocks.findWorkspaceNumberVoicemailContextByPhone.mockReset();
+    objectStorageMocks.uploadObject.mockReset();
+    objectStorageMocks.createSignedObjectUrl.mockReset();
+    credentialsMocks.readTwilioWorkspaceCredentials.mockReset();
+    setupEmailVmMocks();
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {
-    const { validateTwilioWebhookForCallSid } = await import("@/lib/twilio-webhook.server");
-    vi.mocked(validateTwilioWebhookForCallSid).mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    const { requireTwilioSignature } = await import("@/lib/twilio-webhook.server");
+    vi.mocked(requireTwilioSignature).mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+      }));
     const mod = await import("../app/routes/api+/email-vm");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: makeReq({
           RecordingUrl: "https://tw/rec",
           CallSid: "CA1",
@@ -177,18 +158,17 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   });
 
   test("success path sends email and (optionally) webhook", async () => {
-    const supabase = makeSupabase({
+    setupEmailVmMocks({
       workspace: {
         id: "w1",
         name: "W",
         twilio_data: { sid: "tsid", authToken: "ttok" },
         webhook: [
-          { events: [{ category: "voicemail" }] },
-          { events: [{ category: "other" }] },
+          { events: ["voicemail"] },
+          { events: ["other"] },
         ],
       },
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
     mocks.fetch.mockResolvedValueOnce({
       ok: true,
       statusText: "OK",
@@ -197,7 +177,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
     const mod = await import("../app/routes/api+/email-vm");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -223,7 +203,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   });
 
   test("success path with no matching webhook does not call sendWebhookNotification", async () => {
-    const supabase = makeSupabase({
+    setupEmailVmMocks({
       workspace: {
         id: "w1",
         name: "W",
@@ -231,7 +211,6 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
         webhook: [{ events: [{ category: "other" }] }],
       },
     });
-    mocks.createClient.mockReturnValueOnce(supabase);
     mocks.fetch.mockResolvedValueOnce({
       ok: true,
       statusText: "OK",
@@ -240,7 +219,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
     const mod = await import("../app/routes/api+/email-vm");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -254,20 +233,18 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
   });
 
   test("covers webhook events fallback, to:'' fallback, and duration undefined branch", async () => {
-    const supabase = makeSupabase({
+    setupEmailVmMocks({
       workspace: {
         id: "w1",
         name: "W",
         twilio_data: { sid: "tsid", authToken: "ttok" },
         webhook: [
-          { events: undefined }, // events?.filter || []
-          { events: [{ category: "voicemail" }] },
+          { events: undefined }, // non-array events is skipped by the filter
+          { events: ["voicemail"] },
         ],
       },
+      numberRow: { inbound_action: null },
     });
-    // inbound_action null => action?.toString() || ''
-    supabase._numberRow.inbound_action = null;
-    mocks.createClient.mockReturnValueOnce(supabase);
     mocks.fetch.mockResolvedValueOnce({
       ok: true,
       statusText: "OK",
@@ -276,7 +253,7 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
     const mod = await import("../app/routes/api+/email-vm");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         RecordingUrl: "https://tw/rec",
         CallSid: "CA1",
@@ -297,39 +274,40 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     );
   });
 
-  test("validates required fields and returns 500 on failures", async () => {
+  test("validates required fields: malformed payloads 4xx, downstream faults 5xx", async () => {
     const mod = await import("../app/routes/api+/email-vm");
-    mocks.createClient.mockReturnValue(makeSupabase());
     mocks.fetch.mockResolvedValue({
       ok: true,
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
 
-    // RecordingUrl missing
-    let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }), params: {} } as any));
-    expect(res.status).toBe(500);
+    // Missing RecordingUrl/CallSid are PERMANENT client errors -> 4xx.
+    // They used to 500, which makes Twilio retry a callback that can never
+    // succeed (found by the surface prober's first CI run).
+    let res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }), params: {} } as any));
+    expect(res.status).toBe(400);
 
     // CallSid missing
-    res = await asRouteResponse(await mod.action({ request: makeReq({ RecordingUrl: "x" }), params: {} } as any));
-    expect(res.status).toBe(500);
+    res = await asRouteResponse(mod.action({ request: makeReq({ RecordingUrl: "x" }), params: {} } as any));
+    expect(res.status).toBe(400);
 
     // AccountSid missing
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", RecordingSid: "RE1" }),
       params: {},
     } as any));
     expect(res.status).toBe(500);
 
     // RecordingSid missing
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1" }),
       params: {},
     } as any));
     expect(res.status).toBe(500);
 
     // non-string RecordingUrl (File)
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({
         RecordingUrl: new File(["x"], "f.txt"),
         CallSid: "CA1",
@@ -338,81 +316,131 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
       }),
       params: {},
     } as any));
-    expect(res.status).toBe(500);
-    expect(mocks.logger.error).toHaveBeenCalled();
+    expect(res.status).toBe(400);
+    expect(mocks.logger.warn).toHaveBeenCalled();
   });
 
-  test("covers supabase and fetch error branches (callError, numberError, missing workspace/twilio_data, fetch !ok, uploadError, signedUrlError)", async () => {
+  test("webhook retry: does not resend email when the call's recording URL already matches", async () => {
+    setupEmailVmMocks({
+      callRow: {
+        sid: "CA1",
+        from: "+15550001111",
+        to: "+15550002222",
+        recording_url: "https://tw/rec",
+      },
+    });
+
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({
+        RecordingUrl: "https://tw/rec",
+        CallSid: "CA1",
+        AccountSid: "AC1",
+        RecordingSid: "RE1",
+      }),
+      params: {},
+    } as any));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ success: true });
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
+    expect(objectStorageMocks.uploadObject).not.toHaveBeenCalled();
+    expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
+  });
+
+  test("does not skip processing when the recording URL differs from what's stored (new voicemail on same call)", async () => {
+    setupEmailVmMocks({
+      callRow: {
+        sid: "CA1",
+        from: "+15550001111",
+        to: "+15550002222",
+        recording_url: "https://tw/old-rec",
+      },
+    });
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
+    } as any);
+    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({
+        RecordingUrl: "https://tw/new-rec",
+        CallSid: "CA1",
+        AccountSid: "AC1",
+        RecordingSid: "RE2",
+      }),
+      params: {},
+    } as any));
+
+    expect(res.status).toBe(200);
+    expect(mocks.sendEmail).toHaveBeenCalled();
+  });
+
+  test("covers helper error branches (call not found, number not found, missing workspace/twilio_data, fetch !ok, uploadError, signedUrlError)", async () => {
     const mod = await import("../app/routes/api+/email-vm");
 
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ callError: { message: "call" } }),
-    );
-    let res = await asRouteResponse(await mod.action({
+    // Unknown CallSid is a PERMANENT condition — acked (200), not 500, or
+    // Twilio retries the callback forever. See the 5xx-retry note in the route.
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(null);
+    let res = await asRouteResponse(mod.action({
+      request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
+      params: {},
+    } as any));
+    expect(res.status).toBe(200);
+
+    setupEmailVmMocks();
+    inboundDbMocks.findWorkspaceNumberVoicemailContextByPhone.mockResolvedValueOnce(null);
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
     expect(res.status).toBe(500);
 
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ numberError: { message: "num" } }),
-    );
-    res = await asRouteResponse(await mod.action({
+    setupEmailVmMocks();
+    credentialsMocks.readTwilioWorkspaceCredentials.mockReturnValueOnce(null);
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
     expect(res.status).toBe(500);
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ workspace: null }));
-    res = await asRouteResponse(await mod.action({
-      request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
-      params: {},
-    } as any));
-    expect(res.status).toBe(500);
-
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ workspace: { id: "w1", name: "W", twilio_data: null, webhook: [] } }),
-    );
-    res = await asRouteResponse(await mod.action({
-      request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
-      params: {},
-    } as any));
-    expect(res.status).toBe(500);
-
-    const supOk = makeSupabase();
-    mocks.createClient.mockReturnValueOnce(supOk);
+    setupEmailVmMocks();
     mocks.fetch.mockResolvedValueOnce({ ok: false, statusText: "nope" } as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
     expect(res.status).toBe(500);
 
-    const supUploadErr = makeSupabase({ uploadError: { message: "up" } });
-    mocks.createClient.mockReturnValueOnce(supUploadErr);
+    setupEmailVmMocks();
+    objectStorageMocks.uploadObject.mockRejectedValueOnce(new Error("up"));
     mocks.fetch.mockResolvedValueOnce({
       ok: true,
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
     expect(res.status).toBe(500);
 
-    const supSignedErr = makeSupabase({ signedUrlError: { message: "sig" } });
-    mocks.createClient.mockReturnValueOnce(supSignedErr);
+    setupEmailVmMocks();
+    objectStorageMocks.createSignedObjectUrl.mockRejectedValueOnce(new Error("sig"));
     mocks.fetch.mockResolvedValueOnce({
       ok: true,
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    res = await asRouteResponse(await mod.action({
+    res = await asRouteResponse(mod.action({
       request: makeReq({ RecordingUrl: "x", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
       params: {},
     } as any));
     expect(res.status).toBe(500);
   });
-});
 
+});

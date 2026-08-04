@@ -7,26 +7,33 @@ import {
   isRouteErrorResponse,
   useLoaderData,
   useNavigate,
+  useNavigation,
   useRouteError,
 } from "react-router";
-import type { LinksFunction } from "react-router";
-import { createBrowserClient } from "@supabase/ssr";
-import { useEffect, useMemo } from "react";
+import type { LinksFunction, MetaFunction } from "react-router";
+import { useCallback } from "react";
 import { Toaster } from "sonner";
 
 import Navbar from "@/components/layout/Navbar";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import stylesheet from "@/tailwind.css?url";
-import { Database } from "./lib/database.types";
 
 import type { RootLoaderData } from "./root.loader.server";
 
 export { loader } from "./root.loader.server";
 export type { RootLoaderData } from "./root.loader.server";
 
+export const meta: MetaFunction = () => [
+  { title: "CallCaster" },
+  {
+    name: "description",
+    content: "Outbound calling and SMS campaigns for teams.",
+  },
+];
+
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
-  { rel: "modulepreload", href: "/buffer-polyfill.mjs" },
+  { rel: "icon", href: "/favicon.ico" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
@@ -39,43 +46,43 @@ export const links: LinksFunction = () => [
   },
 ];
 
+function GlobalNavigationIndicator() {
+  const navigation = useNavigation();
+  if (navigation.state === "idle") {
+    return null;
+  }
+  return (
+    <div
+      aria-hidden
+      className="fixed left-0 top-0 z-[100] h-0.5 w-full overflow-hidden bg-brand-primary/20"
+    >
+      <div className="h-full w-full animate-pulse bg-brand-primary" />
+    </div>
+  );
+}
+
 export default function App() {
-  const { env, session, workspaces, user, params } =
+  const { isSignedIn, workspaces, user, params } =
     useLoaderData<RootLoaderData>();
 
-  const supabase = useMemo(
-    () =>
-      createBrowserClient<Database>(env.SUPABASE_URL!, env.SUPABASE_KEY!),
-    [env.SUPABASE_KEY, env.SUPABASE_URL],
-  );
-
-  const serverAccessToken = session?.access_token ?? null;
   const navigate = useNavigate();
 
-  async function signOut(): Promise<{
+  const signOut = useCallback(async (): Promise<{
     success: string | null;
     error: string | null;
-  }> {
-    const { error: signOutError } = await supabase.auth.signOut();
-
-    if (signOutError) {
-      return { success: null, error: signOutError.message };
-    }
-    navigate("/");
-    return { success: "Sign off successful", error: null };
-  }
-
-  useEffect(() => {
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        navigate("/reset");
-      }
+  }> => {
+    const response = await fetch("/api/auth/signout", {
+      method: "POST",
+      credentials: "include",
     });
 
-    return () => {
-      data.subscription.unsubscribe();
-    };
-  }, [navigate, serverAccessToken, supabase]);
+    if (!response.ok) {
+      return { success: null, error: "Sign out failed" };
+    }
+
+    navigate("/");
+    return { success: "Sign off successful", error: null };
+  }, [navigate]);
 
   return (
     <html lang="en">
@@ -83,7 +90,11 @@ export default function App() {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
-        <script type="module" src="/buffer-polyfill.mjs" />
+        {/* Synchronous classic script: csv-parse (in the client route graph)
+            reads Buffer at module scope, and RR8's bootstrap statically
+            imports route modules BEFORE entry.client runs — so the polyfill
+            must be installed before any module executes. */}
+        <script src="/buffer-polyfill.mjs" />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){var t=localStorage.getItem("callcaster-theme");if(t==="dark")document.documentElement.classList.add("dark");else if(t==="light")document.documentElement.classList.remove("dark");else if(window.matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark");else document.documentElement.classList.remove("dark");})();`,
@@ -93,19 +104,20 @@ export default function App() {
       </head>
       <body className="min-h-screen bg-background">
         <ThemeProvider
-          defaultTheme="light"
+          defaultTheme="system"
           storageKey="callcaster-theme"
           attribute="class"
         >
+          <GlobalNavigationIndicator />
           <Navbar
             className="bg-brand-secondary"
             handleSignOut={signOut}
             workspaces={workspaces}
-            isSignedIn={serverAccessToken != null}
+            isSignedIn={isSignedIn}
             user={user ?? null}
             params={params}
           />
-          <Outlet context={{ env, supabase }} />
+          <Outlet context={{} satisfies Record<string, never>} />
           <Toaster position="top-right" richColors visibleToasts={3} />
           <ScrollRestoration />
           <Scripts />
@@ -115,33 +127,102 @@ export default function App() {
   );
 }
 
-export function ErrorBoundary() {
-  const error = useRouteError();
-  const message = isRouteErrorResponse(error)
-    ? `${error.status} ${error.statusText}`
-    : error instanceof Error
-      ? error.message
-      : "An unexpected error occurred";
+const SUPPORT_EMAIL = "info@callcaster.ca";
 
+function ErrorShell({
+  title,
+  heading,
+  body,
+}: {
+  title: string;
+  heading: string;
+  body: string;
+}) {
   return (
     <html lang="en">
-      <body>
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="max-w-md w-full bg-white shadow-lg rounded-lg p-6 text-center">
-            <h3 className="text-lg font-medium text-gray-900">
-              Something went wrong
-            </h3>
-            <p className="mt-2 text-sm text-gray-500">{message}</p>
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="mt-4 inline-flex items-center px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
-            >
-              Reload Page
-            </button>
+      <head>
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{title}</title>
+        <Meta />
+        {/* Error pages bootstrap the same route graph, so they need the
+            Buffer polyfill installed before <Scripts /> too — see the
+            comment in App's <head>. */}
+        <script src="/buffer-polyfill.mjs" />
+        <Links />
+      </head>
+      <body className="min-h-screen bg-background">
+        <main className="flex min-h-screen items-center justify-center p-6">
+          <div className="w-full max-w-md text-center">
+            <p className="font-Tabac-Slab text-2xl font-black text-brand-primary">
+              CallCaster
+            </p>
+            <h1 className="mt-6 text-3xl font-semibold text-foreground">
+              {heading}
+            </h1>
+            <p className="mt-3 text-base text-muted-foreground">
+              {body}
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <a
+                href="/"
+                className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
+              >
+                Go home
+              </a>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="inline-flex items-center rounded-md border border-input px-4 py-2 text-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                Try again
+              </button>
+            </div>
+            <p className="mt-6 text-sm text-muted-foreground">
+              Still stuck?{" "}
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="text-brand-primary underline"
+              >
+                Contact support
+              </a>
+            </p>
           </div>
-        </div>
+        </main>
+        <Scripts />
       </body>
     </html>
+  );
+}
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+
+  if (isRouteErrorResponse(error)) {
+    const isNotFound = error.status === 404;
+    return (
+      <ErrorShell
+        title={`${error.status} — CallCaster`}
+        heading={isNotFound ? "Page not found" : `${error.status} ${error.statusText}`}
+        body={
+          isNotFound
+            ? "The page you're looking for doesn't exist or may have moved."
+            : typeof error.data === "string" && error.data
+              ? error.data
+              : "Something went wrong handling your request."
+        }
+      />
+    );
+  }
+
+  // Log the real error for operators; never surface internals to the user.
+  console.error("Root ErrorBoundary caught:", error);
+
+  return (
+    <ErrorShell
+      title="Unexpected error — CallCaster"
+      heading="Something went wrong"
+      body="An unexpected error occurred on our end. Your data is safe — please try again, and reach out if the problem continues."
+    />
   );
 }

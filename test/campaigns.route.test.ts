@@ -9,29 +9,39 @@ const mocks = vi.hoisted(() => {
     updateCampaign: vi.fn(),
     deleteCampaign: vi.fn(),
     createCampaign: vi.fn(),
+    updateCampaignWithScript: vi.fn(),
     createErrorResponse: vi.fn((_e: any) => new Response("err", { status: 400 })),
+    requireWorkspaceAccess: vi.fn(),
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers({ "X": "1" }),
-  }),
+vi.mock("@/lib/platform-telephony.server", () => ({
+  resolveCampaignWorkspaceId: vi.fn(async () => "w1"),
 }));
-vi.mock("@/lib/database.server", () => ({
-  parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
+
+vi.mock("@/lib/auth.server", () => ({
+  getSession: vi.fn(async (request: Request) => ({ user: { id: "u1" }, headers: new Headers(request.headers) })),
+}));
+vi.mock("@/lib/database/campaign.server", () => ({
   updateCampaign: (...args: any[]) => mocks.updateCampaign(...args),
   deleteCampaign: (...args: any[]) => mocks.deleteCampaign(...args),
   createCampaign: (...args: any[]) => mocks.createCampaign(...args),
+  updateCampaignWithScript: (...args: any[]) =>
+    mocks.updateCampaignWithScript(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: any[]) =>
+    mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
+  parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
 }));
 vi.mock("@/lib/errors.server", () => ({
   createErrorResponse: (...args: any[]) => mocks.createErrorResponse(...args),
 }));
 
-function authSession(supabaseClient: unknown, headers = new Headers()) {
+function authSession(_session: unknown, headers = new Headers()) {
   return queueDualAuthSession({
-    supabaseClient,
     headers,
     user: { id: "u1" },
   });
@@ -44,52 +54,162 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     mocks.updateCampaign.mockReset();
     mocks.deleteCampaign.mockReset();
     mocks.createCampaign.mockReset();
+    mocks.updateCampaignWithScript.mockReset();
     mocks.createErrorResponse.mockClear();
   });
 
   test("PATCH parses JSON fields and returns updated campaign", async () => {
     authSession({ sb: 1 }, new Headers({ "X": "1" }));
     mocks.parseActionRequest.mockResolvedValueOnce({
-      campaignData: JSON.stringify({ title: "t" }),
+      campaignData: JSON.stringify({ id: 1, title: "t" }),
       campaignDetails: { x: 1 },
     });
     mocks.updateCampaign.mockResolvedValueOnce({ campaign: { id: 1 }, campaignDetails: { campaign_id: 1 } });
 
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
-      request: new Request("http://localhost/api/campaigns", { method: "PATCH" }),
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
     } as any));
-    expect(res.headers.get("X")).toBe("1");
     await expect(res.json()).resolves.toMatchObject({ campaign: { id: 1 } });
+  });
+
+  test("PATCH with scriptData persists the script and links it to the campaign", async () => {
+    authSession({ sb: 1 }, new Headers({ "X": "1" }));
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      campaignData: JSON.stringify({ id: 1, title: "t" }),
+      campaignDetails: { x: 1 },
+      scriptData: JSON.stringify({ id: 5, name: "S", steps: {} }),
+      saveScriptAsCopy: "false",
+    });
+    mocks.updateCampaignWithScript.mockResolvedValueOnce({
+      campaign: { id: 1, script_id: 5 },
+      campaignDetails: { campaign_id: 1 },
+      scriptId: 5,
+      script: { id: 5, name: "S" },
+    });
+
+    const mod = await import("../app/routes/api+/campaigns");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
+    } as any));
+
+    expect(mocks.updateCampaignWithScript).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "w1",
+        scriptData: { id: 5, name: "S", steps: {} },
+        saveAsCopy: false,
+        actorId: "u1",
+      }),
+    );
+    expect(mocks.updateCampaign).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toMatchObject({
+      campaign: { id: 1, script_id: 5 },
+      scriptId: 5,
+      script: { id: 5, name: "S" },
+    });
+  });
+
+  test("PATCH with saveScriptAsCopy=true forwards saveAsCopy: true", async () => {
+    authSession({ sb: 1 }, new Headers({ "X": "1" }));
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      campaignData: JSON.stringify({ id: 1, title: "t" }),
+      campaignDetails: {},
+      scriptData: JSON.stringify({ id: 5, name: "S" }),
+      saveScriptAsCopy: "true",
+    });
+    mocks.updateCampaignWithScript.mockResolvedValueOnce({
+      campaign: { id: 1, script_id: 9 },
+      campaignDetails: {},
+      scriptId: 9,
+      script: { id: 9, name: "S (Copy)" },
+    });
+
+    const mod = await import("../app/routes/api+/campaigns");
+    await mod.action({
+      request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
+    } as any);
+
+    expect(mocks.updateCampaignWithScript).toHaveBeenCalledWith(
+      expect.objectContaining({ saveAsCopy: true }),
+    );
+  });
+
+  test("PATCH without scriptData does not touch the script and leaves campaignData untouched", async () => {
+    authSession({ sb: 1 }, new Headers({ "X": "1" }));
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      campaignData: JSON.stringify({ id: 1, title: "t" }),
+      campaignDetails: {},
+      // Mirrors what a message-type campaign sends when there's no script:
+      // JSON.stringify(undefined) coerces to the literal string "undefined".
+      scriptData: "undefined",
+    });
+    mocks.updateCampaign.mockResolvedValueOnce({ campaign: { id: 1 }, campaignDetails: {} });
+
+    const mod = await import("../app/routes/api+/campaigns");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
+    } as any));
+
+    expect(mocks.updateCampaignWithScript).not.toHaveBeenCalled();
+    expect(mocks.updateCampaign).toHaveBeenCalledWith({
+      campaignData: expect.objectContaining({ id: 1, title: "t" }),
+      campaignDetails: {},
+    });
+    await expect(res.json()).resolves.toMatchObject({ campaign: { id: 1 } });
+  });
+
+  test("PATCH returns an error response when script persistence fails, without touching the campaign", async () => {
+    authSession({ sb: 1 }, new Headers({ "X": "1" }));
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      campaignData: JSON.stringify({ id: 1, title: "t" }),
+      campaignDetails: {},
+      scriptData: JSON.stringify({ id: 5, name: "S" }),
+      saveScriptAsCopy: "false",
+    });
+    mocks.updateCampaignWithScript.mockRejectedValueOnce(new Error("duplicate name"));
+
+    const mod = await import("../app/routes/api+/campaigns");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/campaigns", { method: "PATCH", headers: { "X": "1" } }),
+    } as any));
+
+    expect(res.status).toBe(400);
+    expect(mocks.createErrorResponse).toHaveBeenCalledWith(
+      expect.any(Error),
+      "Failed to save script",
+      400,
+      expect.any(Object),
+    );
+    expect(mocks.updateCampaign).not.toHaveBeenCalled();
   });
 
   test("DELETE calls deleteCampaign", async () => {
     authSession({ sb: 1 });
-    mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: 123 });
+    mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: 123, workspaceId: "w1" });
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "DELETE" }),
     } as any));
     expect(res.status).toBe(200);
-    expect(mocks.deleteCampaign).toHaveBeenCalledWith({ supabase: { sb: 1 }, campaignId: "123" });
+    expect(mocks.deleteCampaign).toHaveBeenCalledWith({ workspaceId: "w1", campaignId: "123" });
   });
 
   test("DELETE campaignId fallback covers ?? '' branch", async () => {
     authSession({ sb: 1 });
-    mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: null });
+    mocks.parseActionRequest.mockResolvedValueOnce({ campaignId: null, workspaceId: "w1" });
     const mod = await import("../app/routes/api+/campaigns");
     await mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "DELETE" }),
     } as any);
-    expect(mocks.deleteCampaign).toHaveBeenCalledWith({ supabase: { sb: 1 }, campaignId: "" });
+    expect(mocks.deleteCampaign).toHaveBeenCalledWith({ workspaceId: "w1", campaignId: "" });
   });
 
   test("POST calls createCampaign", async () => {
     authSession({ sb: 1 });
-    mocks.parseActionRequest.mockResolvedValueOnce({ campaignData: { title: "x" } });
+    mocks.parseActionRequest.mockResolvedValueOnce({ campaignData: { title: "x", workspace: "w1" } });
     mocks.createCampaign.mockResolvedValueOnce({ campaign: { id: 2 }, campaignDetails: { campaign_id: 2 } });
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "POST" }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ campaign: { id: 2 } });
@@ -99,7 +219,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     authSession({});
     mocks.parseActionRequest.mockResolvedValueOnce({});
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "GET" }),
     } as any));
     expect(res.status).toBe(405);
@@ -109,7 +229,7 @@ describe("app/routes/api+/campaigns/route.tsx", () => {
     authSession({}, new Headers({ "X": "1" }));
     mocks.parseActionRequest.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/campaigns");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/campaigns", { method: "PATCH" }),
     } as any));
     expect(res.status).toBe(400);

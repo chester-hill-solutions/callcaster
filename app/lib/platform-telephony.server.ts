@@ -1,5 +1,11 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { checkSchedule, getHandsetNumberForWorkspace, getUserRole, requireWorkspaceAccess } from "@/lib/database.server";
+import { and, eq, gt } from "drizzle-orm";
+import { checkSchedule } from "@/lib/database/campaign.server";
+import {
+  getHandsetNumberForWorkspace,
+  getUserRole,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
+import { findCampaignById } from "@/lib/campaign-audience-db.server";
 import {
   getCallScreenData,
   getInitialCallsList,
@@ -15,13 +21,12 @@ import {
   getHandsetLoaderData,
 } from "@/lib/handset/handset-session.server";
 import { createHandsetAccessToken } from "@/lib/handset/handset-token.server";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
+import { resolveContactWorkspaceIdFromQueue , releaseAssignedQueueForUser } from "@/lib/campaign-queue-db.server";
+import { handset_session as handsetSessionTable } from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
 import { MemberRole } from "@/lib/member-role";
 import { generateToken } from "@/lib/twilio-token.server";
-import {
-  buildQueuedQueueUpdate,
-  isAssignedToUser,
-} from "@/lib/queue-status";
 import { logger } from "@/lib/logger.server";
 
 const EMPTY_LISTENING = {
@@ -31,19 +36,16 @@ const EMPTY_LISTENING = {
 } as const;
 
 export async function getWorkspaceCallLogApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   requestUrl: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
   const callLog = await loadCallLogPage({
-    supabaseClient,
     workspaceId,
     requestUrl,
   });
@@ -52,26 +54,24 @@ export async function getWorkspaceCallLogApi(
 }
 
 async function loadListeningState(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   userId: string,
 ) {
   const { data: handsetData } = await getHandsetNumberForWorkspace({
-    supabaseClient,
     workspaceId,
   });
   const handsetNumber = handsetData?.phone_number ?? null;
   const now = new Date().toISOString();
-  const { data: session } = await supabaseClient
-    .from("handset_session")
-    .select("client_identity")
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .gt("expires_at", now)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const tdb = createTenantDb(workspaceId);
+  const session = await tdb.handset_session.findFirst({
+    where: and(
+      eq(handsetSessionTable.user_id, userId),
+      eq(handsetSessionTable.status, "active"),
+      gt(handsetSessionTable.expires_at, now),
+    ),
+    columns: { client_identity: true },
+    orderBy: (row, { desc: descFn }) => [descFn(row.created_at)],
+  });
 
   if (!session?.client_identity) {
     return {
@@ -81,7 +81,6 @@ async function loadListeningState(
   }
 
   const tokenResult = await createHandsetAccessToken({
-    supabaseClient,
     workspaceId,
     clientIdentity: session.client_identity,
   });
@@ -97,18 +96,15 @@ async function loadListeningState(
 }
 
 export async function startCallListeningApi(
-  supabaseClient: SupabaseClient<Database>,
   user: { id: string },
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user,
     workspaceId,
   });
 
   const handset = await getHandsetLoaderData({
-    supabaseClient,
     user,
     workspaceId,
   });
@@ -133,12 +129,10 @@ export async function startCallListeningApi(
 }
 
 export async function stopCallListeningApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -148,17 +142,15 @@ export async function stopCallListeningApi(
 }
 
 export async function getHandsetSessionApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
-  const listening = await loadListeningState(supabaseClient, workspaceId, userId);
+  const listening = await loadListeningState(workspaceId, userId);
   return {
     ok: true as const,
     handset_number: listening.handset_number,
@@ -167,12 +159,10 @@ export async function getHandsetSessionApi(
 }
 
 export async function deleteHandsetSessionApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -182,23 +172,17 @@ export async function deleteHandsetSessionApi(
 }
 
 export async function getCampaignCallSessionApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   campaignId: string,
 ) {
-  const { data: campaignRow, error: campaignError } = await supabaseClient
-    .from("campaign")
-    .select("id, workspace, dial_type, title, status, schedule")
-    .eq("id", Number(campaignId))
-    .single();
+  const campaignRow = await findCampaignById(Number(campaignId));
 
-  if (campaignError || !campaignRow || !campaignRow.workspace) {
+  if (!campaignRow?.workspace) {
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
 
   const workspaceId = campaignRow.workspace;
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -211,24 +195,23 @@ export async function getCampaignCallSessionApi(
     queueCount,
     completedCount,
     attempts,
-  } = await getCallScreenData(supabaseClient, campaignId, workspaceId, userId);
+  } = await getCallScreenData(campaignId, workspaceId, userId);
 
-  const twilioData = workspaceData.twilio_data as { sid: string };
+  const ws = workspaceData!;
+  const twilioData = (ws.twilio_data as unknown) as { sid: string };
   const queue = await getQueueByDialType(
-    supabaseClient,
     campaignId,
-    campaign.dial_type,
+    campaign.dial_type ?? "",
     userId,
   );
   const token = await generateToken({
     twilioAccountSid: twilioData.sid,
-    twilioApiKey: workspaceData.key as string,
-    twilioApiSecret: workspaceData.token as string,
+    twilioApiKey: ws.key as string,
+    twilioApiSecret: ws.token as string,
     identity: userId,
   });
-  const verifiedNumbers = await getVerifiedNumbers(supabaseClient, userId);
+  const verifiedNumbers = await getVerifiedNumbers(userId);
   const userRole = await getUserRole({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -236,6 +219,7 @@ export async function getCampaignCallSessionApi(
     userRole?.role as MemberRole,
   );
   const isActive = campaign ? checkSchedule(campaign) : false;
+  const nextRecipient = getNextRecipient(queue, campaign.dial_type ?? "", userId);
 
   return {
     ok: true as const,
@@ -245,14 +229,14 @@ export async function getCampaignCallSessionApi(
     audiences,
     queue,
     contacts: queue.map((queueItem) => queueItem.contact),
-    next_recipient: getNextRecipient(queue, campaign?.dial_type, userId),
+    next_recipient: nextRecipient,
     calls: getInitialCallsList(attempts || []),
-    recent_call: getInitialRecentCall(attempts || []),
-    recent_attempt: getInitialRecentAttempt(attempts || []),
+    recent_call: getInitialRecentCall(attempts || [], nextRecipient),
+    recent_attempt: getInitialRecentAttempt(attempts || [], nextRecipient),
     token,
     queue_count: queueCount,
     completed_count: completedCount,
-    credits: workspaceData.credits,
+    credits: ws.credits,
     is_active: isActive,
     has_access: hasAccess,
     verified_numbers: verifiedNumbers,
@@ -260,92 +244,41 @@ export async function getCampaignCallSessionApi(
 }
 
 export async function releaseCampaignCallSessionApi(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   campaignId: string,
 ) {
-  const { data: campaignRow, error: campaignError } = await supabaseClient
-    .from("campaign")
-    .select("id, workspace")
-    .eq("id", Number(campaignId))
-    .single();
+  const workspaceId = await resolveCampaignWorkspaceId(campaignId);
 
-  if (campaignError || !campaignRow || !campaignRow.workspace) {
+  if (!workspaceId) {
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
 
-  const workspaceId = campaignRow.workspace;
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
-  const { data: assignedRows, error: assignedRowsError } = await supabaseClient
-    .from("campaign_queue")
-    .select("id, status, dequeued_at, assigned_to_user_id")
-    .eq("campaign_id", Number(campaignId))
-    .is("dequeued_at", null);
+  const result = await releaseAssignedQueueForUser(userId,
+    campaignId,
+  );
 
-  if (assignedRowsError) {
-    logger.error("releaseCampaignCallSessionApi queue error", assignedRowsError);
-    return { ok: false as const, error: assignedRowsError.message, status: 500 };
+  if (!result.ok) {
+    logger.error("releaseCampaignCallSessionApi queue error", result.error);
+    return { ok: false as const, error: result.error, status: 500 };
   }
 
-  const assignedIds = (assignedRows ?? [])
-    .filter((row) => isAssignedToUser(row, userId))
-    .map((row) => row.id);
-
-  if (assignedIds.length === 0) {
-    return { ok: true as const, released: 0 };
-  }
-
-  const update = await supabaseClient
-    .from("campaign_queue")
-    .update(buildQueuedQueueUpdate())
-    .in("id", assignedIds)
-    .select("id");
-
-  if (update.error) {
-    logger.error("releaseCampaignCallSessionApi update error", update.error);
-    return { ok: false as const, error: update.error.message, status: 500 };
-  }
-
-  return { ok: true as const, released: update.data?.length ?? 0 };
+  return { ok: true as const, released: result.released };
 }
 
 export async function resolveCampaignWorkspaceId(
-  supabaseClient: SupabaseClient<Database>,
   campaignId: string | number,
 ) {
-  const { data, error } = await supabaseClient
-    .from("campaign")
-    .select("workspace")
-    .eq("id", Number(campaignId))
-    .single();
-
-  if (error || !data) {
-    return null;
-  }
-
-  return data.workspace;
+  const row = await findCampaignById(Number(campaignId));
+  return row?.workspace ?? null;
 }
 
 export async function resolveContactWorkspaceId(
-  supabaseClient: SupabaseClient<Database>,
   contactId: string | number,
 ) {
-  const { data, error } = await supabaseClient
-    .from("campaign_queue")
-    .select("campaign!inner(workspace)")
-    .eq("contact_id", Number(contactId))
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) {
-    return null;
-  }
-
-  const campaign = data.campaign as { workspace: string } | null;
-  return campaign?.workspace ?? null;
+  return resolveContactWorkspaceIdFromQueue(Number(contactId));
 }

@@ -1,4 +1,5 @@
 import type {
+  Schedule,
   TwilioSendMode,
   TwilioThroughputProduct,
   TwilioTrafficClass,
@@ -12,15 +13,15 @@ import {
   LEGACY_MESSAGE_PIPELINE_MPS,
   twilioAssumedSmsMps,
 } from "@/lib/throughput-config";
+import {
+  parseSendWindow,
+  sendWindowActiveIntervals,
+  type SendWindowDayKey,
+} from "@/lib/campaign-send-window";
 
 export const QUEUE_NEXT_DELAY_MS = 200;
 export const SMS_HANDLER_NEXT_DELAY_MS = 300;
 export const IVR_HANDLER_NEXT_DELAY_MS = 500;
-
-/** @deprecated Use configuredDispatcherSmsMps with portal config instead. */
-export const MESSAGE_PIPELINE_MESSAGES_PER_SECOND = LEGACY_MESSAGE_PIPELINE_MPS;
-/** @deprecated Use configuredDispatcherVoiceCps with portal config instead. */
-export const IVR_PIPELINE_DIAL_ATTEMPTS_PER_SECOND = LEGACY_IVR_PIPELINE_CPS;
 
 type ThroughputContext = {
   smsSenderClass: WorkspaceTwilioOpsConfig["smsSenderClass"];
@@ -72,6 +73,127 @@ export type IvrCampaignEstimate = {
 
 function normalizeSenderPoolSize(value: number) {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 1;
+}
+
+const OUTBOUND_ETA_DAY_KEYS: SendWindowDayKey[] = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
+const MS_PER_MINUTE = 60_000;
+const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
+
+export type OutboundCompletionInput = {
+  /** Number of queued sends remaining. */
+  queueCount: number;
+  /** Effective throughput in messages (or dial starts) per second. */
+  ratePerSecond: number;
+  /** Reference "now"; defaults to the current time. */
+  now?: Date;
+  /**
+   * Optional per-campaign send window. When present, the projection only
+   * consumes throughput during in-window time, so the ETA reflects windowed
+   * sending rather than assuming continuous dispatch. `null`/undefined =>
+   * unrestricted.
+   */
+  sendWindow?: Schedule | null;
+};
+
+export type OutboundCompletionEstimate = {
+  /** Active seconds of dispatch required (ignores window pauses). */
+  activeSeconds: number;
+  fastFinish: Date;
+  averageFinish: Date;
+  slowFinish: Date;
+};
+
+/**
+ * Walk a weekly send window forward from `now`, consuming `neededSeconds` of
+ * in-window dispatch time, and return the wall-clock finish. Bounded lookahead
+ * (~1 year); falls back to continuous projection if the window has no active
+ * time. Overnight intervals are approximated by extending past midnight, which
+ * is acceptable for an ETA range (the built-in presets never wrap midnight).
+ */
+function projectThroughSendWindow(
+  now: Date,
+  neededSeconds: number,
+  schedule: Schedule,
+): Date {
+  let remaining = neededSeconds;
+  const nowMs = now.getTime();
+  const baseMidnightMs = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+
+  for (let dayOffset = 0; dayOffset < 366 && remaining > 0; dayOffset++) {
+    const dayStartMs = baseMidnightMs + dayOffset * MS_PER_DAY;
+    const dayKey = OUTBOUND_ETA_DAY_KEYS[new Date(dayStartMs).getUTCDay()];
+    if (!dayKey) continue;
+
+    const intervals = sendWindowActiveIntervals(schedule, dayKey).sort(
+      (a, b) => a.start - b.start,
+    );
+    for (const interval of intervals) {
+      const intervalStartMs = dayStartMs + interval.start * MS_PER_MINUTE;
+      const spanMinutes =
+        interval.end > interval.start
+          ? interval.end - interval.start
+          : interval.end + 24 * 60 - interval.start;
+      const intervalEndMs = intervalStartMs + spanMinutes * MS_PER_MINUTE;
+      const effectiveStartMs = Math.max(intervalStartMs, nowMs);
+      if (intervalEndMs <= effectiveStartMs) continue;
+
+      const availableSeconds = (intervalEndMs - effectiveStartMs) / 1000;
+      if (availableSeconds >= remaining) {
+        return new Date(effectiveStartMs + remaining * 1000);
+      }
+      remaining -= availableSeconds;
+    }
+  }
+
+  // No usable in-window time within lookahead: fall back to continuous.
+  return new Date(nowMs + neededSeconds * 1000);
+}
+
+/**
+ * Projected queue-completion estimate at a given effective throughput, with
+ * optional send-window awareness. Returns `null` when there is nothing to send
+ * or the rate is non-positive. The fast/slow bounds apply a +/-20% spread to
+ * the required active dispatch time before projecting through the window.
+ */
+export function estimateOutboundCompletion(
+  input: OutboundCompletionInput,
+): OutboundCompletionEstimate | null {
+  const { queueCount, ratePerSecond } = input;
+  if (queueCount <= 0 || ratePerSecond <= 0) {
+    return null;
+  }
+
+  const now = input.now ?? new Date();
+  const activeSeconds = queueCount / ratePerSecond;
+  const window = input.sendWindow ? parseSendWindow(input.sendWindow) : null;
+
+  const project = (multiplier: number): Date => {
+    const neededSeconds = activeSeconds * multiplier;
+    if (!window) {
+      return new Date(now.getTime() + neededSeconds * 1000);
+    }
+    return projectThroughSendWindow(now, neededSeconds, window);
+  };
+
+  return {
+    activeSeconds,
+    fastFinish: project(0.8),
+    averageFinish: project(1),
+    slowFinish: project(1.2),
+  };
 }
 
 function estimateTwilioMessagesPerSecond({
@@ -145,11 +267,6 @@ export function estimateMessageCampaignOutbound(
   ) {
     warnings.push(
       "Configured SMS dispatch rate exceeds the estimated Twilio sender limit.",
-    );
-  }
-  if (!input.portalConfig.parallelDispatchEnabled) {
-    warnings.push(
-      "Legacy sequential dispatch is still enabled (~2 MPS). Enable parallel dispatch after Twilio limits are confirmed.",
     );
   }
 

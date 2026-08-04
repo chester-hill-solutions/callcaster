@@ -12,7 +12,9 @@ vi.mock("@/components/ui/button", () => ({
 
 describe("app/components/call/CallScreen.DTMFPhone.tsx", () => {
   test("renders display states and formats duration as m:ss", async () => {
-    const { PhoneKeypad } = await import("@/components/call/CallScreen.DTMFPhone");
+    const { PhoneKeypad } = await import(
+      "@/components/call/CallScreen.DTMFPhone"
+    );
 
     const base = {
       onKeyPress: vi.fn(),
@@ -32,14 +34,18 @@ describe("app/components/call/CallScreen.DTMFPhone.tsx", () => {
     ];
 
     for (const c of cases) {
-      const { unmount } = render(<PhoneKeypad {...base} displayState={c.displayState} />);
+      const { unmount } = render(
+        <PhoneKeypad {...base} displayState={c.displayState} />,
+      );
       expect(screen.getByText(c.expected)).toBeInTheDocument();
       unmount();
     }
   });
 
   test("clicking keypad buttons calls onKeyPress with string values", async () => {
-    const { PhoneKeypad } = await import("@/components/call/CallScreen.DTMFPhone");
+    const { PhoneKeypad } = await import(
+      "@/components/call/CallScreen.DTMFPhone"
+    );
     const onKeyPress = vi.fn();
 
     render(
@@ -51,13 +57,31 @@ describe("app/components/call/CallScreen.DTMFPhone.tsx", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "*" }));
-    fireEvent.click(screen.getByRole("button", { name: "0" }));
-    fireEvent.click(screen.getByRole("button", { name: "#" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dial *" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dial 0" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dial #" }));
 
     expect(onKeyPress).toHaveBeenCalledWith("*");
     expect(onKeyPress).toHaveBeenCalledWith("0");
     expect(onKeyPress).toHaveBeenCalledWith("#");
   });
-});
 
+  test("can omit its status announcement when opened contextually", async () => {
+    const { PhoneKeypad } = await import(
+      "@/components/call/CallScreen.DTMFPhone"
+    );
+
+    render(
+      <PhoneKeypad
+        onKeyPress={vi.fn()}
+        displayState="connected"
+        displayColor="#000"
+        callDuration={61}
+        showStatus={false}
+      />,
+    );
+
+    expect(screen.queryByText("Connected 1:01")).toBeNull();
+    expect(screen.getByRole("button", { name: "Dial 1" })).toBeInTheDocument();
+  });
+});

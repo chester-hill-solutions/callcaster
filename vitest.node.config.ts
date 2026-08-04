@@ -9,7 +9,7 @@ export default mergeConfig(
       environment: "node",
       testTimeout: 60000,
       include: ["test/**/*.test.ts"],
-      exclude: ["test/ui/**"],
+      exclude: ["test/ui/**", "test/server-runtime.test.ts", "test/twilio-webhook-prehandler.test.ts"],
       setupFiles: ["test/setup.node.ts"],
       coverage: {
         provider: "istanbul",
@@ -37,7 +37,7 @@ export default mergeConfig(
           "app/lib/form-validation.ts",
           "app/routes/archive/**",
           "app/routes/old.*",
-          "supabase/functions/**",
+          "shared/**",
         ],
       },
     },

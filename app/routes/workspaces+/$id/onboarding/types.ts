@@ -1,15 +1,17 @@
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 import type {
+  User,
   WorkspaceMessagingOnboardingState,
   WorkspaceMessagingReadiness,
 } from "@/lib/types";
 
 export type OnboardingPendingActions = {
+  isSavingWorkspaceName: boolean;
   isSavingBusinessProfile: boolean;
   isSavingChannels: boolean;
-  isBootstrappingMessagingService: boolean;
   isProvisioningA2P: boolean;
   isSavingRcs: boolean;
+  isAttachingRcsSender: boolean;
   isReviewingEmergencyVoice: boolean;
   isVerifyingCallerId: boolean;
 };
@@ -23,6 +25,12 @@ export type OnboardingStepProps = {
   rcsBlockingIssues: string[];
   isReadOnly: boolean;
   pending: OnboardingPendingActions;
+  // Structural shapes matching what the loader actually provides
+  // (WorkspaceUserRow / StoredObjectMeta) and what NumbersTable consumes.
+  workspaceUsers: { id: string; username: string }[];
+  mediaNames: { id: number | string; name: string }[];
+  inboundQueues: { id: number; name: string }[];
+  scripts: { id: number; name: string }[];
 };
 
 export type OnboardingProviderActionsProps = Pick<

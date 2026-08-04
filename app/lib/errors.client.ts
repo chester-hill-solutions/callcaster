@@ -2,23 +2,17 @@
  * Client-side error handling utilities
  */
 
-export interface ClientError {
-  error: string;
-  message?: string;
-  details?: unknown;
-  code?: string;
-  statusCode?: number;
-}
+import type { ErrorPayload } from "./type-safety-utils";
 
 /**
- * Check if an error response is a standard error response
+ * Check if an error response is a standard error payload
  */
-export function isErrorResponse(error: unknown): error is ClientError {
+export function isErrorResponse(error: unknown): error is ErrorPayload {
   return (
     typeof error === "object" &&
     error !== null &&
     "error" in error &&
-    typeof (error as ClientError).error === "string"
+    typeof (error as ErrorPayload).error === "string"
   );
 }
 
@@ -29,15 +23,15 @@ export function getErrorMessage(error: unknown): string {
   if (isErrorResponse(error)) {
     return error.message || error.error || "An error occurred";
   }
-  
+
   if (error instanceof Error) {
     return error.message;
   }
-  
+
   if (typeof error === "string") {
     return error;
   }
-  
+
   return "An unexpected error occurred";
 }
 

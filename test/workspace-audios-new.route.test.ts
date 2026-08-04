@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
+import { uploadObject } from "@/lib/object-storage.server";
+
 const mocks = vi.hoisted(() => {
   class AudioUploadError extends Error {
     status: number;
@@ -34,32 +37,15 @@ vi.mock("@/lib/audio.server", () => ({
   getSafeMediaBaseName: (...args: unknown[]) => mocks.getSafeMediaBaseName(...args),
   normalizeUploadedAudio: (...args: unknown[]) => mocks.normalizeUploadedAudio(...args),
 }));
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
-  }),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers() }),
   verifyAuth: (...args: unknown[]) => mocks.verifyAuth(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-
-function makeSupabase(opts?: { uploadError?: unknown }) {
-  const upload = vi.fn(async () => ({
-    data: opts?.uploadError ? null : { path: "workspaceAudio/w1/greeting.mp3" },
-    error: opts?.uploadError ?? null,
-  }));
-
-  return {
-    upload,
-    client: {
-      storage: {
-        from: () => ({
-          upload,
-        }),
-      },
-    },
-  };
-}
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: vi.fn().mockResolvedValue(undefined),
+  createSignedObjectUrl: vi.fn().mockResolvedValue("https://signed"),
+}));
 
 describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
   beforeEach(() => {
@@ -68,12 +54,12 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     mocks.normalizeUploadedAudio.mockReset();
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
+    vi.mocked(uploadObject).mockReset();
+    vi.mocked(uploadObject).mockResolvedValue(undefined);
   });
 
   test("normalizes the upload before storing a canonical mp3", async () => {
-    const supabase = makeSupabase();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient: supabase.client,
       headers: new Headers(),
     });
     mocks.normalizeUploadedAudio.mockResolvedValueOnce({
@@ -90,33 +76,28 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       new File(["source-audio"], "greeting.m4a", { type: "audio/mp4" }),
     );
 
-    const response = await asRouteResponse(await mod.action({
+    const response = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
       }),
       params: { id: "w1" },
-    } as any));
+    })));
 
     expect(response.status).toBe(302);
     expect(response.headers.get("Location")).toBe("../audios?uploaded=1");
     expect(mocks.normalizeUploadedAudio).toHaveBeenCalledTimes(1);
     expect(mocks.getSafeMediaBaseName).toHaveBeenCalledWith(" Greeting ");
-    expect(supabase.upload).toHaveBeenCalledWith(
+    expect(vi.mocked(uploadObject)).toHaveBeenCalledWith(
+      "workspaceAudio",
       "w1/Greeting.mp3",
       Buffer.from("normalized-audio"),
-      {
-        cacheControl: "60",
-        upsert: false,
-        contentType: "audio/mpeg",
-      },
+      { contentType: "audio/mpeg" },
     );
   });
 
   test("returns a validation error when no file is provided", async () => {
-    const supabase = makeSupabase();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient: supabase.client,
       headers: new Headers(),
     });
 
@@ -124,13 +105,13 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     const formData = new FormData();
     formData.set("media-name", "Greeting");
 
-    const response = await asRouteResponse(await mod.action({
+    const response = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
       }),
       params: { id: "w1" },
-    } as any));
+    })));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
@@ -138,13 +119,11 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       error: "Please choose an audio file to upload.",
     });
     expect(mocks.normalizeUploadedAudio).not.toHaveBeenCalled();
-    expect(supabase.upload).not.toHaveBeenCalled();
+    expect(vi.mocked(uploadObject)).not.toHaveBeenCalled();
   });
 
   test("returns helper failures without uploading invalid audio", async () => {
-    const supabase = makeSupabase();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient: supabase.client,
       headers: new Headers(),
     });
     mocks.normalizeUploadedAudio.mockRejectedValueOnce(
@@ -159,13 +138,13 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       new File(["bogus"], "bad.ogg", { type: "audio/ogg" }),
     );
 
-    const response = await asRouteResponse(await mod.action({
+    const response = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://localhost/workspaces/w1/audios/new", {
         method: "POST",
         body: formData,
       }),
       params: { id: "w1" },
-    } as any));
+    })));
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
@@ -173,6 +152,6 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
       error: "Unsupported audio format.",
     });
     expect(mocks.logger.error).toHaveBeenCalled();
-    expect(supabase.upload).not.toHaveBeenCalled();
+    expect(vi.mocked(uploadObject)).not.toHaveBeenCalled();
   });
 });

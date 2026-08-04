@@ -1,0 +1,241 @@
+import { eq, inArray } from "drizzle-orm";
+import type { Database } from "@/lib/db-types";
+import type { Script } from "@/lib/types";
+import {
+  campaign as campaignTable,
+  campaign_audience as campaignAudienceTable,
+  script as scriptTable,
+} from "@/db/schema";
+import { db } from "@/server/db";
+import { adminDb } from "@/server/admin-db";
+import { createTenantDb } from "@/server/tenant-db";
+import { emitCampaignStatusEvent } from "@/lib/workspace-events.server";
+
+/** PostgREST select for unified campaign + joined script row. */
+export const CAMPAIGN_WITH_SCRIPT_SELECT = "*, script:script(*)";
+
+export const CALL_WITH_CAMPAIGN_SCRIPT_SELECT =
+  "*, campaign(*, script:script(*))";
+
+export type CampaignWithScript = {
+  script?: Script | Script[] | null;
+  workspace?: string | null;
+  voicemail_file?: string | null;
+};
+
+export function resolveCampaignScript<T extends { steps?: unknown }>(
+  campaign: { script?: T | T[] | null } | null | undefined,
+): T | null {
+  if (!campaign?.script) return null;
+  return Array.isArray(campaign.script) ? (campaign.script[0] ?? null) : campaign.script;
+}
+
+export function ivrScriptStepsFromCampaign(
+  campaign: { script?: { steps?: unknown } | { steps?: unknown }[] | null } | null | undefined,
+): unknown {
+  return resolveCampaignScript(campaign)?.steps ?? null;
+}
+
+export async function fetchCampaignWithScript(campaignId: string | number,
+) {
+  const campaign = await adminDb.query.campaign.findFirst({
+    where: eq(campaignTable.id, Number(campaignId)),
+  });
+  if (!campaign) {
+    throw new Error(`Campaign ${campaignId} not found`);
+  }
+  const script = campaign.script_id
+    ? await adminDb.query.script.findFirst({
+        where: eq(scriptTable.id, campaign.script_id),
+      })
+    : null;
+  return { ...campaign, script };
+}
+
+export async function fetchCampaignByIdForWorkspace(
+  workspaceId: string,
+  campaignId: string | number,
+) {
+  const tdb = createTenantDb(workspaceId);
+  const row = await tdb.campaign.findFirst({
+    where: eq(campaignTable.id, Number(campaignId)),
+  });
+  if (!row) {
+    throw new Error(`Campaign ${campaignId} not found`);
+  }
+  return row;
+}
+
+export async function fetchCampaignWithScriptForWorkspace(
+  workspaceId: string,
+  campaignId: string | number,
+) {
+  const tdb = createTenantDb(workspaceId);
+  const campaign = await tdb.campaign.findFirst({
+    where: eq(campaignTable.id, Number(campaignId)),
+  });
+  if (!campaign) {
+    throw new Error(`Campaign ${campaignId} not found`);
+  }
+  const script = campaign.script_id
+    ? await tdb.script.findFirst({
+        where: eq(scriptTable.id, campaign.script_id),
+      })
+    : null;
+  return { ...campaign, script };
+}
+
+export async function findCampaignInWorkspace(
+  workspaceId: string,
+  campaignId: string | number,
+) {
+  const tdb = createTenantDb(workspaceId);
+  return tdb.campaign.findFirst({
+    where: eq(campaignTable.id, Number(campaignId)),
+  });
+}
+
+export async function findCampaignExportMeta(
+  workspaceId: string,
+  campaignId: number,
+) {
+  const tdb = createTenantDb(workspaceId);
+  return tdb.campaign.findFirst({
+    where: eq(campaignTable.id, campaignId),
+    columns: { id: true, type: true, title: true, workspace: true },
+  });
+}
+
+export async function findCampaignMessageMedia(
+  workspaceId: string,
+  campaignId: number,
+) {
+  const tdb = createTenantDb(workspaceId);
+  return tdb.campaign.findFirst({
+    where: eq(campaignTable.id, campaignId),
+    columns: { id: true, message_media: true },
+  });
+}
+
+export async function updateCampaignMessageMedia(
+  workspaceId: string,
+  campaignId: number,
+  messageMedia: string[],
+) {
+  const tdb = createTenantDb(workspaceId);
+  const [row] = await tdb.campaign.update({
+    set: { message_media: messageMedia },
+    where: eq(campaignTable.id, campaignId),
+  });
+  return row ?? null;
+}
+
+export async function updateCampaignVoicedropAudio(
+  workspaceId: string,
+  campaignId: number,
+  voicedropAudio: string,
+) {
+  const tdb = createTenantDb(workspaceId);
+  const [row] = await tdb.campaign.update({
+    set: { voicedrop_audio: voicedropAudio },
+    where: eq(campaignTable.id, campaignId),
+  });
+  return row ?? null;
+}
+
+export async function updateCampaignStatusInWorkspace(
+  workspaceId: string,
+  campaignId: number,
+  update: { status: string; is_active?: boolean },
+) {
+  const tdb = createTenantDb(workspaceId);
+  const existingRows = await tdb.campaign.findMany({
+    where: eq(campaignTable.id, campaignId),
+    limit: 1,
+  });
+  const existing = existingRows[0] ?? null;
+  const [row] = await tdb.campaign.update({
+    set: update,
+    where: eq(campaignTable.id, campaignId),
+  });
+  if (!row) {
+    throw new Error("Campaign not found");
+  }
+  await emitCampaignStatusEvent(
+    workspaceId,
+    row as Record<string, unknown>,
+    (existing ?? null) as Record<string, unknown> | null,
+  );
+  return row;
+}
+
+export async function insertCampaignForWorkspace(
+  workspaceId: string,
+  values: Record<string, unknown>,
+) {
+  const tdb = createTenantDb(workspaceId);
+  const [row] = await tdb.campaign.insert(values);
+  if (!row) {
+    throw new Error("Failed to create campaign");
+  }
+  return row;
+}
+
+export async function fetchCampaignForScriptEdit(
+  workspaceId: string,
+  campaignId: number,
+) {
+  const tdb = createTenantDb(workspaceId);
+  const campaign = await tdb.campaign.findFirst({
+    where: eq(campaignTable.id, campaignId),
+  });
+  if (!campaign) {
+    return null;
+  }
+  const script = campaign.script_id
+    ? await tdb.script.findFirst({
+        where: eq(scriptTable.id, campaign.script_id),
+      })
+    : null;
+  const campaignAudience = await db
+    .select()
+    .from(campaignAudienceTable)
+    .where(eq(campaignAudienceTable.campaign_id, campaignId));
+  return { ...campaign, script, campaign_audience: campaignAudience };
+}
+
+/**
+ * Campaigns the export endpoint will accept.
+ *
+ * `/api/campaign-export` rejects anything outside these three types with a bare
+ * 400, so the picker must not offer the others.
+ */
+export async function listExportableCampaignsInWorkspace(workspaceId: string) {
+  const tdb = createTenantDb(workspaceId);
+  return tdb.campaign.findMany({
+    columns: { id: true, title: true, type: true },
+    where: inArray(campaignTable.type, ["message", "live_call", "robocall"]),
+    orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
+  });
+}
+
+export async function listArchivedCampaignsInWorkspace(workspaceId: string) {
+  const tdb = createTenantDb(workspaceId);
+  return tdb.campaign.findMany({
+    where: eq(campaignTable.status, "archived"),
+    orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
+  });
+}
+
+export async function updateCampaignScriptId(
+  workspaceId: string,
+  campaignId: number,
+  scriptId: number,
+) {
+  const tdb = createTenantDb(workspaceId);
+  const [row] = await tdb.campaign.update({
+    set: { script_id: scriptId },
+    where: eq(campaignTable.id, campaignId),
+  });
+  return row ?? null;
+}

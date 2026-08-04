@@ -1,0 +1,18 @@
+# Vendored third-party code
+vendor/
+
+# Build artifacts
+dist/
+build/
+
+# Coverage
+coverage/
+
+# Generated Playwright artifacts
+e2e/playwright-report/
+test-results/
+
+# Local tooling
+.opencode/
+.agents/
+.cursor/

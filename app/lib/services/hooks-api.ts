@@ -1,4 +1,3 @@
-import { data as routeData } from "react-router";
 /**
  * Hooks API Service Layer
  * Centralized API calls specifically for React hooks
@@ -15,7 +14,6 @@ interface HangupCallResponse {
 }
 
 interface StartConferenceParams {
-  user_id: string;
   caller_id: string;
   workspace_id: string;
   campaign_id: string;
@@ -74,11 +72,9 @@ export async function hangupCall(params: HangupCallParams): Promise<HangupCallRe
  * @throws Error if the API call fails or parameters are invalid
  */
 export async function startConferenceAndDial(params: StartConferenceParams): Promise<StartConferenceResponse> {
-  const { user_id, caller_id, workspace_id, campaign_id, selected_device } = params;
+  const { caller_id, workspace_id, campaign_id, selected_device } = params;
 
-  // Validate required parameters
   const missingParams: string[] = [];
-  if (!user_id) missingParams.push('user_id');
   if (!caller_id) missingParams.push('caller_id');
   if (!workspace_id) missingParams.push('workspace_id');
   if (!campaign_id) missingParams.push('campaign_id');
@@ -89,17 +85,28 @@ export async function startConferenceAndDial(params: StartConferenceParams): Pro
   }
 
   try {
-    const response = await fetch('/api/auto-dial', {
+    const response = await fetch(
+      `/api/workspaces/${encodeURIComponent(workspace_id)}/campaigns/${encodeURIComponent(campaign_id)}/dialer/start`,
+      {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        user_id,
         caller_id,
-        workspace_id,
-        campaign_id,
         selected_device,
       }),
-    });
+    },
+    );
+
+    if (response.status === 402) {
+      // Insufficient credits — the route returns this as a graceful JSON
+      // body, not a hard failure, so read it before the !response.ok gate
+      // below would otherwise turn it into a thrown error.
+      return {
+        success: false,
+        creditsError: true,
+        error: 'Insufficient credits to start conference',
+      };
+    }
 
     if (!response.ok) {
       const errorText = await response.text();

@@ -64,7 +64,7 @@ export const audienceColumns: ColumnDef<Audience>[] = [
     cell: ({ row }) => {
       return (
         <div className="flex flex-auto min-w-[250px]">
-          {row.original.name || `Unnamed audience`}
+          {row.original.name || `Unnamed Call list`}
         </div>
       );
     },
@@ -119,7 +119,7 @@ export const campaignColumns: ColumnDef<Campaign>[] = [
       const progress = (row.getValue("progress") as number) * 100;
       return (
         <div className="flex flex-col items-center gap-1">
-          <p className="font-Zilla-Slab font-bold">{progress}%</p>
+          <p className="font-bold tabular-nums">{progress}%</p>
           <Progress value={progress} />
         </div>
       );

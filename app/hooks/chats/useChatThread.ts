@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFetcher, useLoaderData, useLocation, useParams } from "react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { useChatRealTime } from "@/hooks/realtime/useChatRealtime";
-import { useInfiniteScroll } from "@/hooks";
+import { useInfiniteScroll } from "@/hooks/useIntersectionObserver";
+import { markConversationRead } from "@/lib/chats/messaging-client";
 import { isOptOutMessage } from "@/lib/chat-opt-out";
 import { logger } from "@/lib/logger.client";
 import type { Message, Workspace, WorkspaceNumber } from "@/lib/types";
@@ -15,28 +15,28 @@ type ChatThreadLoaderData = {
 };
 
 type ChatThreadOutletContext = {
-  supabase: SupabaseClient;
   workspace: NonNullable<Workspace>;
   workspaceNumbers: WorkspaceNumber[];
   registerChatActions?: (
     actions: {
       addOptimisticMessage?: (p: {
         body: string;
-        from: string;
+        from?: string;
         to: string;
         media?: string;
+        sid?: string;
       }) => void;
+      markOptimisticMessageFailed?: (sid: string) => void;
     } | null,
   ) => void;
   contactOptOut?: boolean;
 };
 
 export function useChatThread({
-  supabase,
-  workspace,
+    workspace,
   registerChatActions,
   contactOptOut = false,
-}: Pick<ChatThreadOutletContext, "supabase" | "workspace" | "registerChatActions"> & {
+}: Pick<ChatThreadOutletContext, "workspace" | "registerChatActions"> & {
   contactOptOut?: boolean;
 }) {
   const {
@@ -62,17 +62,29 @@ export function useChatThread({
 
   const olderFetcher = useFetcher<ChatThreadLoaderData>();
 
-  const { messages, setMessages, addOptimisticMessage } = useChatRealTime({
-    supabase,
-    initial: initialMessages,
-    workspace: workspace.id,
-    contact_number,
-  });
+  const { messages, setMessages, addOptimisticMessage, markOptimisticMessageFailed } =
+    useChatRealTime({
+      initial: initialMessages,
+      workspace: workspace.id,
+      contact_number,
+    });
 
+  /**
+   * @effect CANDIDATE-REMOVE: mirror the loader's initialHasMore into local hasMoreOlder state every time the thread's loader data changes (e.g. switching contact_number).
+   * @effect-deps initialHasMore (loader value for the freshly-loaded thread)
+   * @effect-side-effects none (setState only)
+   * @effect-why-not-loader This copies loader data into state after a render — the "reset state when a prop changes" pattern the effects guide recommends avoiding (e.g. via a `key` remount or reading useLoaderData directly). It's an effect today because hasMoreOlder is also mutated later by the older-messages fetcher merge, and this route doesn't remount per contact_number.
+   */
   useEffect(() => {
     setHasMoreOlder(initialHasMore);
   }, [initialHasMore]);
 
+  /**
+   * @effect Clear the "already merged" fetcher-data marker when the active conversation changes, so a stale older-messages page from the previous thread isn't mistaken for already-merged data.
+   * @effect-deps contact_number (a new thread means any previously loaded olderFetcher.data no longer applies)
+   * @effect-side-effects none (ref mutation only)
+   * @effect-why-not-loader This resets bookkeeping in a ref, not render state; it exists purely to keep the fetcher-merge effect below correct across thread switches.
+   */
   useEffect(() => {
     lastMergedFetcherDataRef.current = null;
   }, [contact_number]);
@@ -105,6 +117,12 @@ export function useChatThread({
     rootMargin: "120px",
   });
 
+  /**
+   * @effect Merge a newly-loaded page of older messages (from the "load older" fetcher) into the message list once it resolves, and mark that a prepend happened so scroll position can be restored.
+   * @effect-deps olderFetcher.data (react to the fetcher settling with a new page), setMessages (stable setter from useChatRealTime)
+   * @effect-side-effects none directly — reacts to a fetcher (an external async subscription), not a fetch itself; performs setState + ref writes
+   * @effect-why-not-loader olderFetcher is already the idiomatic React Router fetcher for this pagination; this effect is the standard way to react to fetcher.data changing over time and accumulate results across multiple loads, which can't be expressed as a pure render-time derivation.
+   */
   useEffect(() => {
     const data = olderFetcher.data;
     if (!data?.messages?.length || data === lastMergedFetcherDataRef.current)
@@ -120,6 +138,12 @@ export function useChatThread({
     didPrependRef.current = true;
   }, [olderFetcher.data, setMessages]);
 
+  /**
+   * @effect After older messages are prepended, restore the scroll position so the viewport stays anchored on the same messages instead of jumping to the top.
+   * @effect-deps messages.length (fires once the prepended messages have actually rendered into the DOM)
+   * @effect-side-effects dom (reads/writes scrollContainerRef.current.scrollTop)
+   * @effect-why-not-loader Adjusting scrollTop must happen after the DOM reflects the new message count; this is inherently an imperative DOM effect, not derivable data.
+   */
   useEffect(() => {
     if (
       didPrependRef.current &&
@@ -134,44 +158,53 @@ export function useChatThread({
     }
   }, [messages.length]);
 
+  /**
+   * @effect Track the previous rendered message count in a ref so the scroll-to-bottom effect below can detect when new messages arrived.
+   * @effect-deps messages.length (records the count after every render where it changes)
+   * @effect-side-effects none (ref mutation only)
+   * @effect-why-not-loader Pure "previous value" bookkeeping for another effect's comparison; not data that can be derived at render time since it must reflect what was last rendered.
+   */
   useEffect(() => {
     lastMessageCountRef.current = messages.length;
   }, [messages.length]);
 
+  /**
+   * @effect Expose this thread's optimistic-message handlers to the parent chats-page hook (which owns the message-submit form) via a registration callback, and unregister them on unmount/change.
+   * @effect-deps addOptimisticMessage, markOptimisticMessageFailed (re-register whenever the underlying handlers from useChatRealTime change identity), registerChatActions (the parent-supplied registration callback)
+   * @effect-side-effects none (calls a callback prop; no DOM/timer/subscription/fetch)
+   * @effect-why-not-loader This is cross-hook imperative wiring (the thread is rendered via an <Outlet/>, so there's no direct parent-child prop path for the chats-page submit handler to reach these callbacks); not data fetching or derivable state.
+   */
   useEffect(() => {
-    registerChatActions?.({ addOptimisticMessage });
+    registerChatActions?.({ addOptimisticMessage, markOptimisticMessageFailed });
     return () => registerChatActions?.(null);
-  }, [addOptimisticMessage, registerChatActions]);
+  }, [addOptimisticMessage, markOptimisticMessageFailed, registerChatActions]);
 
+  /**
+   * @effect Mark the conversation as read (server call) once when a thread is opened, updating local message statuses and notifying the sidebar via a window event.
+   * @effect-deps contact_number (re-fires the mark-as-read call when the viewed thread changes), workspace.id, setMessages (stable setter)
+   * @effect-side-effects fetch (markConversationRead) + dom event dispatch (window.dispatchEvent("messages-read")) + setState; guarded by hasMarkedAsReadRef so it only fires once per contact_number
+   * @effect-why-not-loader This is a mutation triggered by the user viewing the thread, not data required to render it, so a loader can't express it. It runs automatically on mount/thread-change (no user click to hang a fetcher.submit off), and needs the ref guard for idempotency, which is easiest to express as an effect.
+   */
   useEffect(() => {
     if (!contact_number || hasMarkedAsReadRef.current) return;
 
     const markMessagesAsRead = async () => {
       try {
-        const { error } = await supabase
-          .from("message")
-          .update({ status: "delivered" })
-          .eq("workspace", workspace.id)
-          .eq("status", "received")
-          .or(`from.eq.${contact_number},to.eq.${contact_number}`);
+        await markConversationRead(workspace.id, contact_number);
 
-        if (error) {
-          logger.error("Error marking messages as read:", error);
-        } else {
-          setMessages((prevMessages) =>
-            prevMessages.map((msg) =>
-              msg?.status === "received" ? { ...msg, status: "delivered" } : msg,
-            ),
-          );
+        setMessages((prevMessages) =>
+          prevMessages.map((msg) =>
+            msg?.status === "received" ? { ...msg, status: "delivered" } : msg,
+          ),
+        );
 
-          window.dispatchEvent(
-            new CustomEvent("messages-read", {
-              detail: { contactNumber: contact_number },
-            }),
-          );
+        window.dispatchEvent(
+          new CustomEvent("messages-read", {
+            detail: { contactNumber: contact_number },
+          }),
+        );
 
-          hasMarkedAsReadRef.current = true;
-        }
+        hasMarkedAsReadRef.current = true;
       } catch (err) {
         logger.error("Error in markMessagesAsRead:", err);
       }
@@ -182,17 +215,14 @@ export function useChatThread({
     return () => {
       hasMarkedAsReadRef.current = false;
     };
-  }, [contact_number, supabase, workspace.id, setMessages]);
+  }, [contact_number, workspace.id, setMessages]);
 
   const updateMessageStatus = async (messageId: string) => {
-    const { error } = await supabase
-      .from("message")
-      .update({ status: "delivered" })
-      .eq("sid", messageId);
+    try {
+      await markConversationRead(workspace.id, contact_number, {
+        messageSid: messageId,
+      });
 
-    if (error) {
-      logger.error("Error updating message status:", error);
-    } else {
       setMessages((prevMessages) =>
         prevMessages.map((msg) =>
           msg?.sid === messageId ? { ...msg, status: "delivered" } : msg,
@@ -204,6 +234,8 @@ export function useChatThread({
           detail: { messageId, contactNumber: contact_number },
         }),
       );
+    } catch (error) {
+      logger.error("Error updating message status:", error);
     }
   };
 
@@ -215,6 +247,12 @@ export function useChatThread({
     }
   };
 
+  /**
+   * @effect Attach an IntersectionObserver to every rendered `.message-item` so inbound "received" messages get marked "delivered" once they actually scroll into view.
+   * @effect-deps messages (re-attaches the observer whenever the rendered message list changes, so newly-rendered DOM nodes get observed); `observerCallback` is intentionally omitted from the deps array — see eslint-disable comment below.
+   * @effect-side-effects dom (creates/observes/disconnects an IntersectionObserver over `.message-item` elements); indirectly triggers a fetch via observerCallback -> updateMessageStatus -> markConversationRead when a message intersects
+   * @effect-why-not-loader Observing on-screen visibility of DOM nodes is inherently an imperative browser API effect; it isn't loader-able or derivable data.
+   */
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -233,8 +271,21 @@ export function useChatThread({
     return () => {
       observer.disconnect();
     };
+    // observerCallback is re-created every render (it closes over updateMessageStatus,
+    // which is also unmemoized) and is not being added to the deps array: doing so
+    // would tear down and recreate the IntersectionObserver on every render instead
+    // of only when the message list changes, causing observer churn and duplicate
+    // read-marking races. Keeping [messages] as the sole dep preserves the intended
+    // "re-observe only when the rendered messages change" behavior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
+  /**
+   * @effect Auto-scroll the thread to the newest message when new messages arrive, but only if the user was already near the bottom; otherwise preserve their current scroll position.
+   * @effect-deps messages (detects new arrivals by comparing messages.length to lastMessageCountRef)
+   * @effect-side-effects dom (scrollIntoView, and manual scrollTop restoration via requestAnimationFrame)
+   * @effect-why-not-loader Scroll positioning must run after the new messages are in the DOM; it's not expressible as loader/derived data.
+   */
   useEffect(() => {
     if (!messagesEndRef.current) return;
 

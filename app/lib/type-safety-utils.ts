@@ -5,11 +5,11 @@
  * These utilities help eliminate `any` types and provide better type safety throughout the app.
  */
 
-import type { Database } from './database.types';
+import type { Database, Json } from '@/lib/db-types';
 import { logger } from '@/lib/logger.client';
 
 // Type-safe error handling
-export interface AppError {
+export interface AppErrorShape {
   message: string;
   code: string;
   details?: Record<string, unknown>;
@@ -21,7 +21,7 @@ export function createAppError(
   code: string,
   details?: Record<string, unknown>,
   originalError?: unknown
-): AppError {
+): AppErrorShape {
   return {
     message,
     code,
@@ -30,16 +30,25 @@ export function createAppError(
   };
 }
 
+// Standard error payload shared by server and client error responses
+export interface ErrorPayload {
+  error: string;
+  message?: string;
+  details?: unknown;
+  code?: string;
+  statusCode: number;
+}
+
 // Type-safe API response wrapper
 export interface ApiResponse<T> {
   data?: T;
-  error?: AppError;
+  error?: AppErrorShape;
   success: boolean;
 }
 
 export function createApiResponse<T>(
   data?: T,
-  error?: AppError
+  error?: AppErrorShape
 ): ApiResponse<T> {
   return {
     data,
@@ -69,74 +78,11 @@ export function isArray(value: unknown): value is unknown[] {
   return Array.isArray(value);
 }
 
-// Type-safe environment variable access
-export function getEnvVar(key: string): string {
-  const value = process.env[key];
-  if (!value) {
-    throw new Error(`Environment variable ${key} is not defined`);
-  }
-  return value;
-}
-
-export function getOptionalEnvVar(key: string): string | undefined {
-  return process.env[key];
-}
-
-// Type-safe Supabase client typing
-export type SupabaseClient = import('@supabase/supabase-js').SupabaseClient<Database>;
+// Type-safe Postgres client typing (deprecated with Drizzle migration)
 
 // Type-safe Twilio client typing
 export type TwilioClient = import('twilio').Twilio;
 
-// Type-safe form data handling
-export function parseFormData<T extends Record<string, unknown>>(
-  formData: FormData,
-  schema: Record<keyof T, (value: string) => unknown>
-): T {
-  const result = {} as T;
-  
-  for (const [key, value] of formData.entries()) {
-    if (key in schema && typeof value === "string") {
-      const parser = schema[key as keyof T];
-      result[key as keyof T] = parser(value) as T[keyof T];
-    }
-  }
-  
-  return result;
-}
-
-// Type-safe JSON parsing
-export function safeJsonParse<T>(json: string, fallback: T): T {
-  try {
-    return JSON.parse(json) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-// Type-safe object property access
-export function getProperty<T, K extends keyof T>(obj: T, key: K): T[K] {
-  return obj[key];
-}
-
-export function hasProperty<T extends object, K extends keyof T>(obj: T, key: K): obj is T & Record<K, unknown> {
-  return key in obj;
-}
-
-// Type-safe array operations
-export function filterArray<T>(
-  array: T[],
-  predicate: (item: T, index: number) => boolean
-): T[] {
-  return array.filter(predicate);
-}
-
-export function mapArray<T, U>(
-  array: T[],
-  mapper: (item: T, index: number) => U
-): U[] {
-  return array.map(mapper);
-}
 
 // Type-safe async operations
 export async function safeAsync<T>(
@@ -162,30 +108,6 @@ export interface TypedEventHandlers {
 export interface TypedState<T> {
   value: T;
   setValue: (value: T | ((prev: T) => T)) => void;
-}
-
-// Type-safe validation
-export interface ValidationRule<T> {
-  validate: (value: T) => boolean;
-  message: string;
-}
-
-export function validateValue<T>(
-  value: T,
-  rules: ValidationRule<T>[]
-): { isValid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  
-  for (const rule of rules) {
-    if (!rule.validate(value)) {
-      errors.push(rule.message);
-    }
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors,
-  };
 }
 
 // Type-safe database operations
@@ -245,36 +167,6 @@ export function createWebhookPayload(
     workspace_id: workspaceId,
     payload,
   };
-}
-
-// Type-safe performance monitoring
-export interface PerformanceMetrics {
-  duration: number;
-  memoryUsage?: number;
-  timestamp: number;
-}
-
-export function measurePerformance<T>(
-  name: string,
-  operation: () => Promise<T>
-): Promise<{ result: T; metrics: PerformanceMetrics }> {
-  const start = performance.now();
-  const startMemory = (performance as typeof performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize;
-  
-  return operation().then(result => {
-    const end = performance.now();
-    const endMemory = (performance as typeof performance & { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize;
-    
-    const metrics: PerformanceMetrics = {
-      duration: end - start,
-      memoryUsage: endMemory && startMemory ? endMemory - startMemory : undefined,
-      timestamp: Date.now(),
-    };
-    
-    logger.debug(`Performance: ${name}`, metrics);
-    
-    return { result, metrics };
-  });
 }
 
 // Type-safe utility functions
@@ -355,4 +247,58 @@ export function getNestedValue<T>(
   }
   
   return current as T;
+}
+
+// Type-safe scalar coercions (folded from type-utils)
+export function safeString(value: unknown): string {
+  if (isString(value)) {
+    return value;
+  }
+  if (isNumber(value)) {
+    return value.toString();
+  }
+  if (isBoolean(value)) {
+    return value.toString();
+  }
+  return '';
+}
+
+export function safeNumber(value: unknown): number {
+  if (isNumber(value)) {
+    return value;
+  }
+  if (isString(value)) {
+    const parsed = parseFloat(value);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+  return 0;
+}
+
+export function safeBoolean(value: unknown): boolean {
+  if (isBoolean(value)) {
+    return value;
+  }
+  if (isString(value)) {
+    return value.toLowerCase() === 'true';
+  }
+  if (isNumber(value)) {
+    return value !== 0;
+  }
+  return false;
+}
+
+export function safeDate(value: unknown): Date | null {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (isString(value) || isNumber(value)) {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+export function formatDate(value: unknown): string {
+  const date = safeDate(value);
+  return date ? date.toLocaleDateString() : 'Invalid Date';
 } 

@@ -4,23 +4,129 @@ import type {
   LiveCampaign,
   MessageCampaign,
   Schedule,
+  ScheduleDay,
   WorkspaceNumbers,
 } from "@/lib/types";
+import type { CampaignType } from "@/lib/db-types";
 import {
   getCampaignReadiness,
   isContentReadinessComplete,
   isScheduleReadinessComplete,
 } from "@/lib/campaign-readiness";
+import {
+  getCampaignReadinessAction,
+  resolveCampaignReadinessRoute,
+} from "@/lib/campaign-readiness-actions";
+import {
+  productGoalForCampaignType,
+  type CampaignProductGoal,
+} from "@/lib/campaign-goals";
 
-export const DEFAULT_WEEKDAY_CALLING_SCHEDULE: Schedule = {
-  monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
-  tuesday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
-  wednesday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
-  thursday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
-  friday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
-  saturday: { active: false, intervals: [] },
-  sunday: { active: false, intervals: [] },
-};
+/** Product default for new-campaign calling hours (CASL / Eastern Canada). */
+export const DEFAULT_CALLING_HOURS_TIMEZONE = "America/Toronto";
+
+/**
+ * Convert a wall-clock HH:mm in `timeZone` to a UTC HH:mm string for storage
+ * in `campaign.schedule` (evaluated in UTC by `checkSchedule`).
+ */
+export function wallClockToUtcHm(
+  wallHm: string,
+  timeZone: string,
+  at: Date = new Date(),
+): string {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(wallHm.trim());
+  if (!match) {
+    throw new Error(`Invalid wall-clock time: ${wallHm}`);
+  }
+  const wallHour = Number(match[1]);
+  const wallMinute = Number(match[2]);
+
+  const dateParts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(at)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  ) as Record<string, string>;
+
+  const year = Number(dateParts.year);
+  const month = Number(dateParts.month);
+  const day = Number(dateParts.day);
+
+  // Interpret the desired wall time as if it were UTC, then correct by the
+  // zone's offset at that instant (iterate once for DST boundaries).
+  let utcMillis = Date.UTC(year, month - 1, day, wallHour, wallMinute, 0, 0);
+  for (let i = 0; i < 2; i += 1) {
+    const offsetMillis = timezoneOffsetMillis(timeZone, new Date(utcMillis));
+    utcMillis =
+      Date.UTC(year, month - 1, day, wallHour, wallMinute, 0, 0) - offsetMillis;
+  }
+
+  const corrected = new Date(utcMillis);
+  return `${String(corrected.getUTCHours()).padStart(2, "0")}:${String(
+    corrected.getUTCMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+function timezoneOffsetMillis(timeZone: string, date: Date): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  ) as Record<string, string>;
+
+  const asUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    parts.hour === "24" ? 0 : Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second),
+  );
+  return asUtc - date.getTime();
+}
+
+/** Mon–Fri 09:00–17:00 in `timeZone`, stored as UTC clock times. */
+export function buildWeekdayCallingSchedule(
+  timeZone: string = DEFAULT_CALLING_HOURS_TIMEZONE,
+  at: Date = new Date(),
+): Schedule {
+  const start = wallClockToUtcHm("09:00", timeZone, at);
+  const end = wallClockToUtcHm("17:00", timeZone, at);
+  const weekday = (): ScheduleDay => ({
+    active: true,
+    intervals: [{ start, end }],
+  });
+  const inactive: ScheduleDay = { active: false, intervals: [] };
+
+  return {
+    monday: weekday(),
+    tuesday: weekday(),
+    wednesday: weekday(),
+    thursday: weekday(),
+    friday: weekday(),
+    saturday: inactive,
+    sunday: inactive,
+  };
+}
+
+/** Snapshot at module load; prefer {@link buildWeekdayCallingSchedule} at insert time. */
+export const DEFAULT_WEEKDAY_CALLING_SCHEDULE: Schedule =
+  buildWeekdayCallingSchedule();
 
 export type CampaignSetupStepId =
   | "phone_number"
@@ -61,7 +167,42 @@ export type CampaignSetupStepsResult = {
   currentStepNumber: number;
   totalSteps: number;
   allComplete: boolean;
+  goal: CampaignProductGoal | null;
+  guideTitle: string;
+  launchActionLabel: string;
 };
+
+function getGuideCopy(goal: CampaignProductGoal | null): {
+  guideTitle: string;
+  launchActionLabel: string;
+} {
+  switch (goal) {
+    case "live_calling":
+      return {
+        guideTitle: "Set up live calling",
+        launchActionLabel: "Start calling",
+      };
+    case "text_campaign":
+      return {
+        guideTitle: "Set up your text campaign",
+        launchActionLabel: "Start text campaign",
+      };
+    case "automated_phone_menu":
+      return {
+        guideTitle: "Set up your automated phone menu",
+        launchActionLabel: "Start phone menu",
+      };
+    case null:
+      return {
+        guideTitle: "Set up your campaign",
+        launchActionLabel: "Start campaign",
+      };
+    default: {
+      const _exhaustive: never = goal;
+      return _exhaustive;
+    }
+  }
+}
 
 export function getDefaultCampaignDates(): { start_date: string; end_date: string } {
   const start = new Date();
@@ -138,7 +279,7 @@ function buildPhoneNumberStep(
   if (phoneNumbers.length === 0) {
     return {
       description:
-        "Rent or connect an outbound phone number so this campaign can place calls or send messages.",
+        "Rent or connect an outbound phone number so this campaign can place calls or send messages. Renting a number also lets you set up inbound call routing and handset ringing for it.",
       action: {
         type: "link",
         href: `/workspaces/${workspaceId}/settings/numbers/purchase`,
@@ -162,15 +303,18 @@ function buildContentStep(
   campaignData: Campaign,
   workspaceId: string,
   scriptsCount: number,
+  campaignId: string | number,
 ): Pick<CampaignSetupStep, "label" | "description" | "action"> {
+  const contentHref = `/workspaces/${workspaceId}/campaigns/${campaignId}/script/edit`;
+
   if (campaignData.type === "message") {
     return {
       label: "Message content",
       description:
         "Write the SMS body or attach media that contacts will receive when this campaign runs.",
       action: {
-        type: "scroll",
-        targetId: "campaign-setup-content",
+        type: "link",
+        href: contentHref,
         label: "Add message content",
       },
     };
@@ -185,8 +329,8 @@ function buildContentStep(
     action:
       scriptsCount > 0
         ? {
-            type: "scroll",
-            targetId: "campaign-setup-content",
+            type: "link",
+            href: contentHref,
             label: "Select a script",
           }
         : {
@@ -239,15 +383,32 @@ export function getCampaignSetupSteps(
   } = options;
 
   if (!campaignData) {
+    const copy = getGuideCopy(null);
     return {
       steps: [],
       currentStepId: null,
       currentStepNumber: 0,
       totalSteps: 0,
       allComplete: false,
+      goal: null,
+      ...copy,
     };
   }
 
+  const supportedCampaignTypes: readonly CampaignType[] = [
+    "message",
+    "robocall",
+    "simple_ivr",
+    "complex_ivr",
+    "live_call",
+    "email",
+  ];
+  const goal =
+    campaignData.type &&
+    supportedCampaignTypes.includes(campaignData.type as CampaignType)
+      ? productGoalForCampaignType(campaignData.type as CampaignType)
+      : null;
+  const guideCopy = getGuideCopy(goal);
   const readiness = getCampaignReadiness(campaignData, campaignDetails, {
     queueCount,
     smsMessagingServiceSendersReady,
@@ -266,7 +427,7 @@ export function getCampaignSetupSteps(
       id: "messaging",
       label: "Messaging setup",
       description:
-        "Finish messaging onboarding so Twilio can send SMS from this workspace.",
+        "Finish messaging setup to prepare this workspace for text campaigns.",
       complete: isMessagingStepComplete(
         campaignData,
         smsMessagingServiceSendersReady,
@@ -288,18 +449,28 @@ export function getCampaignSetupSteps(
     });
   }
 
-  const contentMeta = buildContentStep(campaignData, workspaceId, scriptsCount);
-  stepDefinitions.push({
+  const contentMeta = buildContentStep(
+    campaignData,
+    workspaceId,
+    scriptsCount,
+    campaignData.id,
+  );
+  const contentStep = {
     id: "content",
-    label: contentMeta.label,
+    label:
+      goal === "live_calling"
+        ? "Calling script"
+        : goal === "automated_phone_menu"
+          ? "Phone menu script"
+          : contentMeta.label,
     description: contentMeta.description,
     complete: isContentReadinessComplete(readiness.issues),
     action: contentMeta.action,
-  });
+  } satisfies (typeof stepDefinitions)[number];
 
-  stepDefinitions.push({
+  const scheduleStep = {
     id: "schedule",
-    label: "Dates and hours",
+    label: goal === "text_campaign" ? "Send schedule" : "Calling schedule",
     description:
       "Set when this campaign runs and which days and times outreach is allowed.",
     complete: isScheduleReadinessComplete(readiness.issues),
@@ -308,25 +479,38 @@ export function getCampaignSetupSteps(
       targetId: "campaign-setup-schedule",
       label: "Set schedule",
     },
-  });
+  } satisfies (typeof stepDefinitions)[number];
 
   const queueMeta = buildQueueStep(audienceCount, workspaceId);
-  stepDefinitions.push({
+  const queueStep = {
     id: "queue",
-    label: "Contacts in queue",
+    label:
+      goal === "live_calling"
+        ? "Contacts to call"
+        : goal === "text_campaign"
+          ? "Message recipients"
+          : "Contacts to dial",
     description: queueMeta.description,
     complete: isQueueStepComplete(queueCount),
     action: queueMeta.action,
-  });
+  } satisfies (typeof stepDefinitions)[number];
+
+  if (goal === "live_calling") {
+    stepDefinitions.push(contentStep, queueStep, scheduleStep);
+  } else if (goal === "text_campaign") {
+    stepDefinitions.push(contentStep, scheduleStep, queueStep);
+  } else {
+    stepDefinitions.push(scheduleStep, contentStep, queueStep);
+  }
 
   const prerequisiteSteps = stepDefinitions;
   const prerequisitesComplete = prerequisiteSteps.every((step) => step.complete);
 
   stepDefinitions.push({
     id: "launch",
-    label: "Ready to go",
+    label: "Start your campaign",
     description: prerequisitesComplete
-      ? "Everything is set. Save any changes, then start your campaign."
+      ? "Everything is set. Go to the Launch page and click \"Start calling\" to activate your campaign."
       : "Complete the steps above before starting this campaign.",
     complete: prerequisitesComplete && readiness.issues.length === 0,
   });
@@ -363,11 +547,36 @@ export function getCampaignSetupSteps(
     };
   });
 
+  const firstIssue = readiness.issues[0];
+  if (firstIssue && firstIncompleteIndex >= 0) {
+    const correctiveAction = getCampaignReadinessAction(firstIssue.code);
+    const currentStep = steps[firstIncompleteIndex];
+    if (currentStep) {
+      if (correctiveAction.type === "scroll") {
+        currentStep.action = correctiveAction;
+      } else if (campaignData.id != null) {
+        const href = resolveCampaignReadinessRoute(correctiveAction, {
+          workspaceId,
+          campaignId: campaignData.id,
+        });
+        if (href) {
+          currentStep.action = {
+            type: "link",
+            href,
+            label: correctiveAction.label,
+          };
+        }
+      }
+    }
+  }
+
   return {
     steps,
     currentStepId,
     currentStepNumber,
     totalSteps: actionableSteps.length,
     allComplete: prerequisitesComplete && readiness.issues.length === 0,
+    goal,
+    ...guideCopy,
   };
 }

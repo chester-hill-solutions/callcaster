@@ -63,6 +63,12 @@ export function useLocalStorage<T>(
     }
   }, [key, onError]);
 
+  /**
+   * @effect Keep state in sync with this localStorage key when it changes in another tab/window.
+   * @effect-deps key, deserializer, onError (re-subscribes and re-parses using the current key/deserializer)
+   * @effect-side-effects subscription (window 'storage' event listener; removed on cleanup)
+   * @effect-why-not-loader Cross-tab localStorage sync is client-only browser state, not server/route data.
+   */
   // Listen for changes to this localStorage key from other tabs/windows
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
@@ -173,6 +179,15 @@ export function useLocalStorageMulti<T extends Record<string, any>>(
     setErrors({});
   }, []);
 
+  /**
+   * @effect CANDIDATE-REMOVE Populate `values` by reading each key from localStorage on mount.
+   * @effect-deps keys, options (re-reads if the tracked key list or serializer options change)
+   * @effect-side-effects none — synchronous localStorage.getItem reads only; setValues at the end
+   * @effect-why-not-loader This is derived initial state, not data fetching: the single-key
+   *   useLocalStorage above already does this via a lazy useState(() => ...) initializer with no
+   *   effect. useLocalStorageMulti could do the same (compute initialValues in a lazy initializer)
+   *   instead of reading on mount via useEffect, avoiding an extra render with empty `values`.
+   */
   // Initialize values from localStorage
   useEffect(() => {
     const initialValues: Partial<T> = {};

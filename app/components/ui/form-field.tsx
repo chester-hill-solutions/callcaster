@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Slot } from "@radix-ui/react-slot";
 
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -6,6 +7,7 @@ import { Label } from "@/components/ui/label";
 type FormFieldContextValue = {
   descriptionId?: string;
   errorId?: string;
+  invalid?: boolean;
 };
 
 const FormFieldContext = React.createContext<FormFieldContextValue>({});
@@ -33,7 +35,9 @@ export function FormField({
   const errorId = error ? `${id}-error` : undefined;
 
   return (
-    <FormFieldContext.Provider value={{ descriptionId, errorId }}>
+    <FormFieldContext.Provider
+      value={{ descriptionId, errorId, invalid: Boolean(error) }}
+    >
       <div className={cn("space-y-2", className)} {...props}>
         {label ? (
           <Label htmlFor={htmlFor} className="text-sm font-semibold">
@@ -57,20 +61,25 @@ export function FormField({
   );
 }
 
-export interface FormFieldControlProps
-  extends React.HTMLAttributes<HTMLDivElement> {}
+export interface FormFieldControlProps {
+  /** The single form control to describe — an input, select, or textarea. */
+  children: React.ReactNode;
+}
 
-export function FormFieldControl({
-  children,
-  className,
-  ...props
-}: FormFieldControlProps) {
-  const { descriptionId, errorId } = React.useContext(FormFieldContext);
-  const describedBy = [descriptionId, errorId].filter(Boolean).join(" ") || undefined;
+/**
+ * Wraps the field's control and forwards `aria-describedby` / `aria-invalid`
+ * onto it. This merges onto the control itself rather than a wrapper element:
+ * both attributes are only meaningful on the focusable control, so a wrapping
+ * <div> would announce nothing.
+ */
+export function FormFieldControl({ children }: FormFieldControlProps) {
+  const { descriptionId, errorId, invalid } = React.useContext(FormFieldContext);
+  const describedBy =
+    [descriptionId, errorId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <div className={className} aria-describedby={describedBy} {...props}>
+    <Slot aria-describedby={describedBy} aria-invalid={invalid || undefined}>
       {children}
-    </div>
+    </Slot>
   );
 }

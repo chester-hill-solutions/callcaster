@@ -1,19 +1,36 @@
 import { useState, useEffect } from 'react';
 import { logger } from '@/lib/logger.client';
 
-const AudioStreamer = () => {
+interface AudioStreamerProps {
+  id: string;
+  token: string;
+  /** Override the media-stream host in production. Defaults to MEDIA_STREAM_HOST. */
+  host?: string;
+}
+
+const AudioStreamer = ({ id, token, host }: AudioStreamerProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [socket, setSocket] = useState<WebSocket | null>(null);
 
+  /**
+   * @effect Open a WebSocket connection to the media-stream host for this call/id and expose it as `socket`.
+   * @effect-deps id, token, host — reconnects whenever the target stream (or auth token) changes.
+   * @effect-side-effects subscription (opens a live WebSocket; closes it on cleanup/re-run)
+   * @effect-why-not-loader A persistent bidirectional audio-streaming socket is live client state, not request/response data a loader can express.
+   */
   useEffect(() => {
-    const ws = new WebSocket('ws://localhost:3000');
+    const wsUrl =
+      process.env.NODE_ENV === 'production'
+        ? `wss://${host ?? process.env.MEDIA_STREAM_HOST}/${id}?token=${token}`
+        : `ws://localhost:3001/${id}?token=${token}`;
+    const ws = new WebSocket(wsUrl);
     setSocket(ws);
 
     return () => {
       ws.close();
     };
-  }, []);
+  }, [id, token, host]);
 
   const startRecording = async () => {
     try {

@@ -1,14 +1,50 @@
 # End-to-end (E2E) testing
 
-Browser E2E tests use [Playwright](https://playwright.dev/) against a production build of the app and local Supabase.
+Browser E2E tests use [Playwright](https://playwright.dev/) against a production build and a Postgres database seeded for deterministic fixtures.
 
 ## Prerequisites
 
-- Docker (Supabase local)
-- Supabase CLI
+- Docker (for compose Postgres + MinIO + Inbucket)
 - Node 20+
+- Bun 1.2+ (production server and E2E use `server/bun.ts`)
 
-## Quick start
+## Quick start (compose-first — recommended)
+
+```bash
+npm run test:e2e:compose
+```
+
+This runs: `docker compose -f docker-compose.dev.yml up` (Postgres on **127.0.0.1:5433**, MinIO, Inbucket) → Drizzle bootstrap (`drizzle/0000`–`0005` + ledger RPC + legacy trigger cleanup) → Better Auth seed → `npm run build` → Bun server on port **3100** → Playwright.
+
+**G4 gate:** **77/77** specs pass on this stack (2026-07-07). Railway review smoke is optional staging only.
+
+Optional env:
+
+- `E2E_SKIP_BOOTSTRAP=1` — DB already migrated
+- `E2E_SKIP_BUILD=1` — reuse existing `build/`
+- `E2E_DISABLE_2FA_ENFORCEMENT=1` — default in compose runner; skips privileged-role 2FA enrollment gate during E2E
+
+## Manual steps (same stack)
+
+```bash
+docker compose -f docker-compose.dev.yml up -d postgres minio inbucket
+export DATABASE_URL=postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster
+node scripts/e2e/bootstrap-compose-db.mjs
+npm run test:e2e:seed
+npm run build
+npm run test:e2e:server &      # waits for /readyz on port 3100
+E2E_BASE_URL=http://127.0.0.1:3100 npm run test:e2e
+```
+
+## Railway review (optional staging smoke)
+
+Legacy review DB may still have Supabase cruft. Use only for staging smoke, not as the G4 gate:
+
+```bash
+npm run test:e2e:review
+```
+
+## Legacy Supabase local (deprecated)
 
 ```bash
 supabase start
@@ -17,9 +53,9 @@ export SUPABASE_URL="${API_URL}"
 export SUPABASE_SERVICE_KEY="${SERVICE_ROLE_KEY}"
 export SUPABASE_ANON_KEY="${ANON_KEY}"
 export SUPABASE_PUBLISHABLE_KEY="${ANON_KEY}"
-npm run test:e2e:seed          # idempotent; use instead of db reset if migrations are incomplete locally
+npm run test:e2e:seed
 npm run build
-npm run test:e2e:server &      # separate terminal — waits for /readyz on port 3100
+npm run test:e2e:server &
 E2E_BASE_URL=http://127.0.0.1:3100 npm run test:e2e
 ```
 
@@ -34,6 +70,7 @@ E2E defaults to **port 3100** (`e2e/playwright.config.ts`) so it does not collid
 | `npm run test:e2e:debug` | Headed debug |
 | `npm run test:e2e:rbac` | RBAC spec only |
 | `npm run test:e2e:seed` | Seed deterministic test data |
+| `npm run test:e2e:compose` | Full compose-first runner (bootstrap + seed + build + server + Playwright) |
 | `npm run test:e2e:server` | Start production server with E2E env |
 
 ## Seed users (local only)
@@ -48,7 +85,9 @@ E2E defaults to **port 3100** (`e2e/playwright.config.ts`) so it does not collid
 | `invitee@e2e.test` | pending invite | `E2eTestPass1!` |
 | `authflow@e2e.test` | sign-in/sign-out smoke only (not in Playwright storage fixtures) | `E2eTestPass1!` |
 
-AUTH-06 signs out as `authflow@e2e.test` so Supabase session revocation does not invalidate parallel tests that reuse `owner@e2e.test` / `member@e2e.test` storage state.
+AUTH-06 signs out as `authflow@e2e.test` so session revocation does not invalidate parallel tests that reuse `owner@e2e.test` / `member@e2e.test` storage state.
+
+Seed users are created in `auth_user` / `auth_account` (Better Auth) via `scripts/e2e/seed-auth-users.mjs`, not Supabase Auth.
 
 ## Workspaces
 

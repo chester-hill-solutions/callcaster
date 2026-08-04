@@ -12,6 +12,7 @@ export interface Campaign {
 export interface RouteWorkspaceNumber {
   id: number;
   phone_number: string | null;
+  friendly_name?: string | null;
 }
 
 export interface Chat {
@@ -31,6 +32,11 @@ export type ChatsLoaderData = {
   contact: Contact | null;
   error: string | null;
   optOutKeywords: string[];
+  senderSelection: {
+    /** The composer's initial sender selection, not a lock. */
+    defaultMode: "from_number" | "messaging_service";
+    messagingServiceReady: boolean;
+  };
   userRole: string;
   contact_number: string | undefined;
   workspaceNumbers: RouteWorkspaceNumber[];
@@ -48,9 +54,6 @@ export type ImageFetcherData = {
 };
 
 export type ChatsWorkspaceContextType = {
-  supabase: import("@supabase/supabase-js").SupabaseClient<
-    import("@/lib/database.types").Database
-  >;
   workspace: {
     id: string;
     name: string;
@@ -64,6 +67,7 @@ export type ChatsWorkspaceContextType = {
 export type ChatInputWorkspaceNumber = {
   id: string;
   phone_number: string;
+  friendly_name: string | null;
 };
 
 export type { WorkspaceNumber };

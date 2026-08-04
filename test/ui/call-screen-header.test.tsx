@@ -26,6 +26,10 @@ vi.mock("lucide-react", () => {
     Monitor: Icon("Monitor"),
     Plus: Icon("Plus"),
     CheckCircleIcon: Icon("CheckCircleIcon"),
+    ChevronDown: Icon("ChevronDown"),
+    X: Icon("X"),
+    // shad-cc Dialog close control
+    XIcon: Icon("XIcon"),
   };
 });
 
@@ -40,6 +44,37 @@ vi.mock("@/components/ui/button", () => ({
   },
 }));
 
+// Render accordion content unconditionally so tests can reach the device/mic/
+// speaker controls without driving Radix's collapsible state in jsdom.
+vi.mock("@/components/ui/accordion", () => ({
+  Accordion: ({ children }: any) => <div>{children}</div>,
+  AccordionItem: ({ children }: any) => <div>{children}</div>,
+  AccordionTrigger: ({ children, ...props }: any) => (
+    <button {...props}>{children}</button>
+  ),
+  AccordionContent: ({ children }: any) => <div>{children}</div>,
+}));
+
+// Bridge Radix Select to a native <select> so fireEvent.change tests keep
+// working while production uses the real ui/select primitives.
+vi.mock("@/components/ui/select", () => ({
+  Select: ({ value, defaultValue, onValueChange, disabled, children }: any) => (
+    <select
+      value={value ?? defaultValue ?? ""}
+      disabled={disabled}
+      onChange={(e) => onValueChange?.(e.target.value)}
+    >
+      {children}
+    </select>
+  ),
+  SelectTrigger: ({ children }: any) => <>{children}</>,
+  SelectValue: ({ placeholder }: any) => <option value="">{placeholder}</option>,
+  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectItem: ({ value, children }: any) => (
+    <option value={value}>{children}</option>
+  ),
+}));
+
 function baseProps(overrides: Partial<any> = {}) {
   return {
     campaign: { title: "Camp" },
@@ -48,6 +83,8 @@ function baseProps(overrides: Partial<any> = {}) {
     mediaStream: null,
     availableMicrophones: [{ deviceId: "m1", label: "Mic 1" }] as any[],
     availableSpeakers: [{ deviceId: "s1", label: "Spk 1" }] as any[],
+    selectedMicrophone: "m1",
+    selectedSpeaker: "s1",
     onLeaveCampaign: vi.fn(),
     onReportError: vi.fn(),
     handleMicrophoneChange: vi.fn(),
@@ -67,7 +104,7 @@ function baseProps(overrides: Partial<any> = {}) {
     newPhoneNumber: "",
     onNewPhoneNumberChange: vi.fn(),
     onVerifyNewNumber: vi.fn(),
-    pin: "",
+    verificationPhoneNumber: "",
     ...overrides,
   };
 }
@@ -178,14 +215,34 @@ describe("app/components/call/CallScreen.Header.tsx", () => {
     expect(screen.getByText("Unmute Microphone")).toBeInTheDocument();
   });
 
-  test("add-number dialog and PIN overlay wiring", async () => {
+  test("add-number dialog and call-in instructions wiring", async () => {
     const { CampaignHeader } = await import("@/components/call/CallScreen.Header");
     const onAddNumberCancel = vi.fn();
     const onVerifyNewNumber = vi.fn();
     const onNewPhoneNumberChange = vi.fn();
     const onAddNumberClick = vi.fn();
 
+    // 1. Closed state: the accordion "Add Phone Number" trigger is queryable
+    //    and calls onAddNumberClick. (When the Dialog is open, Radix hides the
+    //    rest of the DOM from the accessibility tree, so we test the trigger
+    //    while the dialog is closed first.)
     const { rerender } = render(
+      <CampaignHeader
+        {...baseProps({
+          isAddingNumber: false,
+          onAddNumberCancel,
+          onVerifyNewNumber,
+          onNewPhoneNumberChange,
+          onAddNumberClick,
+        })}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Add Phone Number/i }));
+    expect(onAddNumberClick).toHaveBeenCalledTimes(1);
+
+    // 2. Open state: the dialog content (tel input, Verify, Cancel) renders via
+    //    portal and is queryable through `screen`.
+    rerender(
       <CampaignHeader
         {...baseProps({
           isAddingNumber: true,
@@ -198,9 +255,6 @@ describe("app/components/call/CallScreen.Header.tsx", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Add Phone Number/i }));
-    expect(onAddNumberClick).toHaveBeenCalledTimes(1);
-
     const tel = screen.getByPlaceholderText("+1234567890") as HTMLInputElement;
     fireEvent.change(tel, { target: { value: "+15550001111" } });
     expect(onNewPhoneNumberChange).toHaveBeenCalledWith("+15550001111");
@@ -211,9 +265,16 @@ describe("app/components/call/CallScreen.Header.tsx", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onAddNumberCancel).toHaveBeenCalledTimes(1);
 
-    // PIN overlay branch
-    rerender(<CampaignHeader {...baseProps({ pin: "1234" })} />);
-    expect(screen.getByText(/enter the PIN: 1234/i)).toBeInTheDocument();
+    // 3. Call-in instructions dialog branch
+    rerender(
+      <CampaignHeader
+        {...baseProps({
+          newPhoneNumber: "+15550001111",
+          verificationPhoneNumber: "+15559990000",
+        })}
+      />,
+    );
+    expect(screen.getByText(/call \+15559990000 from \+15550001111/i)).toBeInTheDocument();
   });
 });
 

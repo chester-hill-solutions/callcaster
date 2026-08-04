@@ -1,10 +1,10 @@
 import { Link, useLoaderData, useNavigate, useFetcher, useOutletContext } from "react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { BellOff } from "lucide-react";
-import { SupabaseClient } from "@supabase/supabase-js";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/shared/CustomCard";
+import { PageShell } from "@/components/ui/page-shell";
 import {
   Select,
   SelectContent,
@@ -12,33 +12,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Text } from "@/components/ui/typography";
 import { SoftphonePanel } from "@/components/calls/SoftphonePanel";
 import type { HandsetLoaderData } from "@/lib/handset/handset-session.server";
 import { useAgentStatus } from "@/hooks/agent/useAgentStatus";
+import { useEndSessionOnUnmount } from "@/hooks/handset/useEndSessionOnUnmount";
 import { useSoftphoneController } from "@/hooks/call/useSoftphoneController";
 import { useSoftphoneAudioDevices } from "@/hooks/call/useSoftphoneAudioDevices";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 type AgentState = Database["public"]["Enums"]["agent_state"];
 type OutletContext = {
-  supabase: SupabaseClient<Database>;
-  env: { SUPABASE_URL: string; SUPABASE_KEY: string; BASE_URL: string };
+  env: { BASE_URL: string };
 };
 
 const STATUS_OPTIONS: { value: AgentState; label: string; color: string }[] = [
-  { value: "available", label: "Available", color: "bg-green-500" },
-  { value: "away", label: "Away", color: "bg-amber-500" },
-  { value: "offline", label: "Offline", color: "bg-gray-400" },
+  { value: "available", label: "Available", color: "bg-success" },
+  { value: "away", label: "Away", color: "bg-warning" },
+  { value: "offline", label: "Offline", color: "bg-muted-foreground" },
 ];
 
-const STATUS_REASONS: Record<string, string[]> = {
-  away: ["break", "lunch", "meeting", "training", "other"],
+const STATUS_REASONS: Record<"away" | "offline", string[]> = {
+  away: ["break", "lunch", "meeting", "training"],
   offline: ["ended_shift", "device_issue"],
 };
 
+type ReasonedAgentState = Extract<AgentState, "away" | "offline">;
+
 export default function AgentDesktop() {
   const loaderData = useLoaderData<HandsetLoaderData>();
-  const { supabase } = useOutletContext<OutletContext>();
+  useOutletContext<OutletContext>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const sessionEndedRef = useRef(false);
@@ -60,8 +63,7 @@ export default function AgentDesktop() {
     loading: statusLoading,
     error: statusError,
   } = useAgentStatus({
-    supabase,
-    workspaceId,
+        workspaceId,
     userId,
   });
 
@@ -76,80 +78,69 @@ export default function AgentDesktop() {
     );
   }, [fetcher, workspaceId]);
 
-  useEffect(() => {
-    return () => {
-      endSession();
-    };
-  }, [endSession]);
+  useEndSessionOnUnmount(endSession);
 
   const handleSetStatus = useCallback(
-    async (to: AgentState, reason?: string) => {
+    async (to: AgentState, reason?: string): Promise<boolean> => {
       if (to === "available") {
         const ok = await runDeviceCheck();
         if (!ok) {
           setRuntimeError(
             "Cannot go Available: microphone access required. Check your browser permissions.",
           );
-          return;
+          return false;
         }
       }
-      await setStatus(to, reason ?? undefined);
+      return setStatus(to, reason ?? undefined);
     },
     [setStatus],
   );
 
   if (!handsetNumber) {
     return (
-      <div className="container mx-auto max-w-md p-6">
-        <Card className="p-6">
-          <h1 className="text-xl font-semibold">Agent Desktop</h1>
-          <p className="mt-2 text-muted-foreground">
-            No phone number is set up for this workspace. Add a number in
-            workspace settings and enable handset mode to receive calls here.
-          </p>
-          <Button asChild className="mt-4">
-            <Link to={`/workspaces/${workspaceId}/settings`}>
-              Workspace settings
-            </Link>
-          </Button>
-        </Card>
-      </div>
+      <PageShell title="Agent Desktop" maxWidth="narrow">
+        <Text variant="muted">
+          No phone number is set up for this workspace. Add a number in
+          workspace settings and enable handset mode to receive calls here.
+        </Text>
+        <Button asChild className="w-fit">
+          <Link to={`/workspaces/${workspaceId}/settings`}>
+            Workspace settings
+          </Link>
+        </Button>
+      </PageShell>
     );
   }
 
   if (tokenError || runtimeError) {
     return (
-      <div className="container mx-auto max-w-md p-6">
-        <Card className="p-6">
-          <h1 className="text-xl font-semibold">Agent Desktop</h1>
-          <StatusBar
-            currentStatus={effectiveStatus}
-            onSetStatus={handleSetStatus}
-            disabled={statusLoading}
-            error={tokenError ?? runtimeError ?? undefined}
-          />
-          <p className="mt-4 text-destructive">{tokenError ?? runtimeError}</p>
-          <Button asChild variant="outline" className="mt-4">
-            <Link to={`/workspaces/${workspaceId}`}>Back to workspace</Link>
-          </Button>
-        </Card>
-      </div>
+      <PageShell title="Agent Desktop" maxWidth="narrow">
+        <StatusBar
+          currentStatus={effectiveStatus}
+          onSetStatus={handleSetStatus}
+          disabled={statusLoading}
+          error={tokenError ?? runtimeError ?? undefined}
+        />
+        <Alert variant="destructive">
+          <AlertDescription>{tokenError ?? runtimeError}</AlertDescription>
+        </Alert>
+        <Button asChild variant="outline" className="w-fit">
+          <Link to={`/workspaces/${workspaceId}`}>Back to workspace</Link>
+        </Button>
+      </PageShell>
     );
   }
 
   if (!token) {
     return (
-      <div className="container mx-auto max-w-md p-6">
-        <Card className="p-6">
-          <h1 className="text-xl font-semibold">Agent Desktop</h1>
-          <StatusBar
-            currentStatus={effectiveStatus}
-            onSetStatus={handleSetStatus}
-            disabled={statusLoading}
-          />
-          <p className="mt-4 text-muted-foreground">Connecting...</p>
-        </Card>
-      </div>
+      <PageShell title="Agent Desktop" maxWidth="narrow">
+        <StatusBar
+          currentStatus={effectiveStatus}
+          onSetStatus={handleSetStatus}
+          disabled={statusLoading}
+        />
+        <Text variant="muted">Connecting...</Text>
+      </PageShell>
     );
   }
 
@@ -177,7 +168,7 @@ type AgentDesktopConnectedProps = {
   clientIdentity: string;
   workspaceId: string;
   effectiveStatus: HandsetLoaderData["agentStatus"];
-  onSetStatus: (to: AgentState, reason?: string) => Promise<void>;
+  onSetStatus: (to: AgentState, reason?: string) => Promise<boolean>;
   statusLoading: boolean;
   statusError: string | null;
   runtimeError?: string;
@@ -221,9 +212,9 @@ function AgentDesktopConnected({
   });
 
   const waitingContent = isAvailable ? (
-    <p className="mt-6 text-center text-muted-foreground">Waiting for calls...</p>
+    <p className="text-center text-muted-foreground">Waiting for calls...</p>
   ) : (
-    <div className="mt-6 flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-2">
       <BellOff className="h-8 w-8 text-muted-foreground/50" />
       <p className="text-muted-foreground">
         You&apos;re currently {effectiveStatus?.status ?? "offline"}
@@ -245,17 +236,18 @@ function AgentDesktopConnected({
       controller={controller}
       audio={audio}
       outboundDialDisabled={!isAvailable}
+      outboundDialDisabledReason={
+        isAvailable ? undefined : "Set your status to Available to dial out."
+      }
       waitingContent={waitingContent}
       onEndSession={controller.handleEndSession}
       headerExtra={
-        <div className="mt-2">
-          <StatusBar
-            currentStatus={effectiveStatus}
-            onSetStatus={onSetStatus}
-            disabled={statusLoading}
-            error={runtimeError ?? statusError ?? undefined}
-          />
-        </div>
+        <StatusBar
+          currentStatus={effectiveStatus}
+          onSetStatus={onSetStatus}
+          disabled={statusLoading}
+          error={runtimeError ?? statusError ?? undefined}
+        />
       }
     />
   );
@@ -268,37 +260,49 @@ function StatusBar({
   error,
 }: {
   currentStatus: HandsetLoaderData["agentStatus"];
-  onSetStatus: (to: AgentState, reason?: string) => Promise<void>;
+  onSetStatus: (to: AgentState, reason?: string) => Promise<boolean>;
   disabled: boolean;
   error?: string;
 }) {
   const [reason, setReason] = useState<string>("");
-  const [showReasons, setShowReasons] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<ReasonedAgentState | null>(
+    null,
+  );
 
   const currentState = currentStatus?.status ?? "offline";
 
   const handleSetStatus = useCallback(
     async (to: AgentState) => {
       if (to === "away" || to === "offline") {
-        setShowReasons(true);
+        setPendingStatus(to);
+        setReason("");
         return;
       }
-      await onSetStatus(to);
-      setShowReasons(false);
-      setReason("");
+      const ok = await onSetStatus(to);
+      if (ok) {
+        setPendingStatus(null);
+        setReason("");
+      }
     },
     [onSetStatus],
   );
 
   const handleReasonSubmit = useCallback(
     async (selectedReason: string) => {
-      const to = showReasons ? "away" : "available";
-      await onSetStatus(to === "away" ? "away" : to, selectedReason || undefined);
-      setShowReasons(false);
-      setReason("");
+      if (!pendingStatus) return;
+      const ok = await onSetStatus(pendingStatus, selectedReason || undefined);
+      if (ok) {
+        setPendingStatus(null);
+        setReason("");
+      }
     },
-    [onSetStatus, showReasons],
+    [onSetStatus, pendingStatus],
   );
+
+  const handleCancelReason = useCallback(() => {
+    setPendingStatus(null);
+    setReason("");
+  }, []);
 
   return (
     <div className="flex flex-col gap-2">
@@ -307,10 +311,10 @@ function StatusBar({
           <div
             className={`h-3 w-3 rounded-full ${
               currentState === "available"
-                ? "bg-green-500"
+                ? "bg-success"
                 : currentState === "away"
-                  ? "bg-amber-500"
-                  : "bg-gray-400"
+                  ? "bg-warning"
+                  : "bg-muted-foreground"
             }`}
           />
           <span className="text-sm font-medium capitalize">
@@ -340,26 +344,26 @@ function StatusBar({
         </div>
       </div>
 
-      {showReasons && (
-        <div className="flex items-center gap-2 rounded-lg border p-2">
+      {pendingStatus && (
+        <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 p-2">
           <Select
             value={reason}
             onValueChange={(v) => {
               setReason(v);
-              handleReasonSubmit(v);
+              void handleReasonSubmit(v);
             }}
           >
             <SelectTrigger className="h-8 w-full text-xs">
-              <SelectValue placeholder="Select a reason..." />
+              <SelectValue
+                placeholder={`Select a reason for ${pendingStatus}...`}
+              />
             </SelectTrigger>
             <SelectContent>
-              {(STATUS_REASONS[currentState === "available" ? "away" : "offline"] ?? []).map(
-                (r) => (
-                  <SelectItem key={r} value={r} className="text-xs">
-                    {r}
-                  </SelectItem>
-                ),
-              )}
+              {(STATUS_REASONS[pendingStatus] ?? []).map((r) => (
+                <SelectItem key={r} value={r} className="text-xs">
+                  {r}
+                </SelectItem>
+              ))}
               <SelectItem value="other" className="text-xs">
                 Other
               </SelectItem>
@@ -370,10 +374,7 @@ function StatusBar({
             variant="ghost"
             size="sm"
             className="h-8 text-xs"
-            onClick={() => {
-              setShowReasons(false);
-              onSetStatus("available");
-            }}
+            onClick={handleCancelReason}
           >
             Cancel
           </Button>

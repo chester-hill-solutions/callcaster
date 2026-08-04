@@ -1,27 +1,52 @@
-import { data as routeData, redirect, type LoaderFunctionArgs } from "react-router";
-import type { Params } from "react-router";
-import type { Session } from "@supabase/supabase-js";
+import { data as routeData, redirect, type LoaderFunctionArgs, Params } from "react-router";
 
-import { createSupabaseServerClient } from "@/lib/supabase.server";
-import { env as envUtil } from "@/lib/env.server";
+import { getSession } from "@/lib/auth.server";
 import { logger } from "@/lib/logger.server";
-import type { ENV, User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
+import {
+  listUserWorkspaceSummaries,
+  loadUserWithInvites,
+} from "@/lib/workspace-members-db.server";
+
+export type RootNavbarInvite = {
+  id: string;
+};
+
+export type RootNavbarUser = {
+  id: string;
+  first_name: string | null;
+  username: string | null;
+  workspace_invite: RootNavbarInvite[];
+};
+
+export type RootWorkspaceSummary = {
+  id: string;
+  name: string;
+  role: string;
+  /** Present for Admin+ members only; null hides the navbar credit readout. */
+  credits: number | null;
+};
 
 export type RootLoaderData = {
-  env: ENV;
-  session: Session | null;
-  workspaces: WorkspaceData[] | null;
-  user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
+  isSignedIn: boolean;
+  workspaces: RootWorkspaceSummary[] | null;
+  user: RootNavbarUser | null;
   params: Params<string>;
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const env: ENV = {
-    SUPABASE_URL: envUtil.SUPABASE_URL(),
-    SUPABASE_KEY: envUtil.SUPABASE_PUBLISHABLE_KEY(),
-    BASE_URL: envUtil.BASE_URL(),
+function toNavbarUser(
+  userData: NonNullable<Awaited<ReturnType<typeof loadUserWithInvites>>>,
+): RootNavbarUser {
+  return {
+    id: userData.id,
+    first_name: userData.first_name ?? null,
+    username: userData.username ?? null,
+    workspace_invite: userData.workspace_invite.map((invite) => ({
+      id: invite.id,
+    })),
   };
+}
 
+export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const qParam = url.searchParams.get("q");
 
@@ -38,51 +63,44 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     }
   }
 
-  const { supabaseClient: supabase, headers } =
-    createSupabaseServerClient(request);
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const user = await supabase.auth.getUser();
-  if (!user.data.user) {
+  const { user: authUser, headers } = await getSession(request);
+  if (!authUser) {
     return routeData(
       {
-        env,
-        session,
+        isSignedIn: false,
         workspaces: null,
         user: null,
         params,
-      },
+      } satisfies RootLoaderData,
       { headers },
     );
   }
-  const { data: userData, error: userError } = await supabase
-    .from("user")
-    .select(`*, workspace_invite(workspace(id, name))`)
-    .eq("id", user.data.user.id)
-    .single();
 
-  const { data: workspaceData, error: workspacesError } = await supabase
-    .from("workspace_users")
-    .select("workspace ( id, name )")
-    .eq("user_id", user.data.user.id)
-    .order("last_accessed", { ascending: false });
-  if (workspacesError || userError) {
-    logger.error("Error loading workspaces or user data", {
-      workspacesError,
-      userError,
-    });
+  try {
+    const [userData, workspaces] = await Promise.all([
+      loadUserWithInvites(authUser.id),
+      listUserWorkspaceSummaries(authUser.id),
+    ]);
+
+    return routeData(
+      {
+        isSignedIn: true,
+        workspaces,
+        user: userData ? toNavbarUser(userData) : null,
+        params,
+      } satisfies RootLoaderData,
+      { headers },
+    );
+  } catch (error) {
+    logger.error("Error loading workspaces or user data", error);
+    return routeData(
+      {
+        isSignedIn: true,
+        workspaces: null,
+        user: null,
+        params,
+      } satisfies RootLoaderData,
+      { headers },
+    );
   }
-  const workspaces = workspaceData?.map((data) => data.workspace);
-
-  return routeData(
-    {
-      env,
-      session,
-      workspaces,
-      user: userData,
-      params,
-    },
-    { headers },
-  );
 };

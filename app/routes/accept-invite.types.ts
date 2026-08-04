@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 export type WorkspaceInviteRow = Database["public"]["Tables"]["workspace_invite"]["Row"];
 export type WorkspaceRow = Database["public"]["Tables"]["workspace"]["Row"];

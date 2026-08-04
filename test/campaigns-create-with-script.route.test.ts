@@ -10,24 +10,43 @@ type VerifyError = { error: string; status: number };
 type VerifyApiKey = {
   authType: "api_key";
   workspaceId: string;
-  supabase: any;
+  keyId?: string;
+  scopes?: readonly string[];
+  client?: any;
 };
 type VerifySession = {
   authType: "session";
-  supabaseClient: any;
   user: { id: string } | null;
 };
 
 const mocks = vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
   return {
     verifyApiKeyOrSession: vi.fn<[], Promise<VerifyError | VerifyApiKey | VerifySession>>(),
     parseJsonBodyOrResponse: vi.fn(),
     createCampaign: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     enqueueContactsForCampaign: vi.fn(),
+    validateCreateWithScriptPreflight: vi.fn(),
+    createScriptForCampaign: vi.fn(),
+    linkAudiencesToNewCampaign: vi.fn(),
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
+
+vi.mock("@/lib/create-with-script.server", () => ({
+  validateCreateWithScriptPreflight: (...args: unknown[]) =>
+    mocks.validateCreateWithScriptPreflight(...args),
+  createScriptForCampaign: (...args: unknown[]) => mocks.createScriptForCampaign(...args),
+  linkAudiencesToNewCampaign: (...args: unknown[]) => mocks.linkAudiencesToNewCampaign(...args),
+}));
+
+
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
+}));
 
 vi.mock("@/lib/api-auth.server", () => ({
   verifyApiKeyOrSession: (...args: any[]) => (mocks.verifyApiKeyOrSession as any)(...args),
@@ -35,12 +54,21 @@ vi.mock("@/lib/api-auth.server", () => ({
 vi.mock("@/lib/api-parse.server", () => ({
   parseJsonBodyOrResponse: (...args: any[]) => mocks.parseJsonBodyOrResponse(...args),
 }));
-vi.mock("@/lib/database.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+vi.mock("@/lib/database/campaign.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/database/campaign.server")>();
   return {
     ...actual,
     createCampaign: (...args: any[]) => mocks.createCampaign(...args),
-    requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+  };
+});
+vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/database/workspace.server")>();
+  return {
+    ...actual,
+    requireWorkspaceAccess: (...args: any[]) =>
+      mocks.requireWorkspaceAccess(...args),
   };
 });
 vi.mock("@/lib/queue.server", () => ({
@@ -48,7 +76,7 @@ vi.mock("@/lib/queue.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-function makeSupabaseForValidations(opts: {
+function makeDbClientForValidations(opts: {
   callerNumbers?: string[];
   numbersError?: any;
   audiences?: number[];
@@ -84,7 +112,7 @@ function makeSupabaseForValidations(opts: {
       if (table === "script") {
         return {
           select: () => {
-            let requestedId: number | null = null;
+            let requestedId: number | dbClient = null;
             const builder = {
               eq: (col: string, value: unknown) => {
                 if (col === "id") {
@@ -117,12 +145,39 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     mocks.createCampaign.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.enqueueContactsForCampaign.mockReset();
+    mocks.validateCreateWithScriptPreflight.mockReset();
+    mocks.createScriptForCampaign.mockReset();
+    mocks.linkAudiencesToNewCampaign.mockReset();
     mocks.logger.error.mockReset();
+    mocks.validateCreateWithScriptPreflight.mockResolvedValue({ ok: true });
+    mocks.createScriptForCampaign.mockImplementation(async (args: any) => {
+      if (args.scriptPayload) {
+        return {
+          ok: true,
+          scriptId: 9,
+          createdScript: {
+            id: 9,
+            name: args.scriptPayload.name ?? "Campaign script",
+            type: args.scriptPayload.type ?? "script",
+            steps: args.scriptPayload.steps ?? { pages: {}, blocks: {} },
+          },
+        };
+      }
+      return {
+        ok: true,
+        scriptId: args.existingScriptId,
+        createdScript: null,
+      };
+    });
+    mocks.linkAudiencesToNewCampaign.mockResolvedValue({
+      audiencesLinked: 0,
+      contactsEnqueued: 0,
+    });
   });
 
   test("returns 405 for non-POST", async () => {
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
     await expect(res.json()).resolves.toEqual({ error: "Method not allowed" });
   });
@@ -130,13 +185,13 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   test("returns auth error when verifyApiKeyOrSession fails", async () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ error: "no", status: 401 });
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "no" });
   });
 
   test("returns 400 on invalid JSON body", async () => {
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: {} } as any);
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, keyId: "k1", scopes: ["campaigns.write"], client: {} } as any);
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(
       new Response(JSON.stringify({ error: "Invalid JSON body" }), {
         status: 400,
@@ -144,16 +199,15 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       }),
     );
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: "Invalid JSON body" });
   });
 
   test("session auth requires workspace_id", async () => {
-    const supabaseClient = makeSupabaseForValidations({});
+    const dbClient = makeDbClientForValidations({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -163,7 +217,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       script_id: 1,
     });
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       error: "workspace_id is required when using session auth",
@@ -171,8 +225,8 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("api_key auth rejects mismatched workspace_id", async () => {
-    const supabase = makeSupabaseForValidations({});
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    const client = makeDbClientForValidations({});
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {}, keyId: "k1", scopes: ["campaigns.write"]});
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID_ALT,
       title: "t",
@@ -181,14 +235,14 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       script_id: 1,
     });
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toEqual({ error: "workspace_id does not match API key" });
   });
 
   test("validates title/type/caller_id/script requirements", async () => {
-    const supabase = makeSupabaseForValidations({});
-    mocks.verifyApiKeyOrSession.mockResolvedValue({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    const client = makeDbClientForValidations({});
+    mocks.verifyApiKeyOrSession.mockResolvedValue({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, client: {}, keyId: "k1", scopes: ["campaigns.write"]});
     mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
       const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(
         "@/lib/api-parse.server",
@@ -206,13 +260,11 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
         }),
       } as any);
 
-    const r1 = await asRouteResponse(
-      await post({ type: "live_call", caller_id: "+1555", script_id: 1 }),
+    const r1 = await asRouteResponse(post({ type: "live_call", caller_id: "+1555", script_id: 1 }),
     );
     expect(r1.status).toBe(400);
 
-    const r2 = await asRouteResponse(
-      await post({
+    const r2 = await asRouteResponse(post({
         workspace_id: TEST_WORKSPACE_ID,
         title: "t",
         type: "message",
@@ -222,8 +274,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     );
     expect(r2.status).toBe(400);
 
-    const r3 = await asRouteResponse(
-      await post({
+    const r3 = await asRouteResponse(post({
         workspace_id: TEST_WORKSPACE_ID,
         title: "t",
         type: "live_call",
@@ -232,8 +283,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     );
     expect(r3.status).toBe(400);
 
-    const r4 = await asRouteResponse(
-      await post({
+    const r4 = await asRouteResponse(post({
         workspace_id: TEST_WORKSPACE_ID,
         title: "t",
         type: "live_call",
@@ -242,8 +292,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     );
     expect(r4.status).toBe(400);
 
-    const r5 = await asRouteResponse(
-      await post({
+    const r5 = await asRouteResponse(post({
         workspace_id: TEST_WORKSPACE_ID,
         title: "t",
         type: "live_call",
@@ -259,8 +308,18 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("returns 500 when workspace_number query errors", async () => {
-    const supabase = makeSupabaseForValidations({ numbersError: { message: "db" } });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
+      ok: false,
+      error: "Failed to validate request",
+      status: 500,
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -269,15 +328,24 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       script_id: 1,
     });
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toEqual({ error: "Failed to validate caller_id" });
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error fetching workspace numbers", expect.anything());
+    await expect(res.json()).resolves.toEqual({ error: "Failed to validate request" });
   });
 
   test("returns 400 when caller_id does not belong to workspace", async () => {
-    const supabase = makeSupabaseForValidations({ callerNumbers: ["+1999"] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
+      ok: false,
+      error: "caller_id must be a phone number that belongs to this workspace",
+      status: 400,
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -286,20 +354,23 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       script_id: 1,
     });
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
   });
 
   test("covers workspaceNumbers ?? [] when workspaceNumbers is null", async () => {
-    const supabase = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") {
-          return { select: () => ({ eq: async () => ({ data: null, error: null }) }) };
-        }
-        return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
-      }),
-    };
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
+      ok: false,
+      error: "caller_id must be a phone number that belongs to this workspace",
+      status: 400,
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -308,15 +379,25 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       script_id: 1,
     });
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
   });
 
   test("validates audience_ids: audError (500) and invalid ids (400)", async () => {
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
 
-    const supabaseErr = makeSupabaseForValidations({ audError: { message: "aud" }, audiences: [] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: supabaseErr });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
+      ok: false,
+      error: "Failed to validate request",
+      status: 500,
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -325,11 +406,21 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       script_id: 1,
       audience_ids: [1],
     });
-    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const r1 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(r1.status).toBe(500);
 
-    const supabaseBad = makeSupabaseForValidations({ audiences: [2] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: supabaseBad });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
+      ok: false,
+      error: "audience_ids must belong to this workspace; invalid: 1",
+      status: 400,
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -338,13 +429,23 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       script_id: 1,
       audience_ids: [1],
     });
-    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const r2 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(r2.status).toBe(400);
   });
 
   test("validates script_id belongs to workspace", async () => {
-    const supabase = makeSupabaseForValidations({ scripts: [] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
+      ok: false,
+      error: "script_id must belong to this workspace",
+      status: 400,
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -354,7 +455,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       error: "script_id must belong to this workspace",
@@ -362,8 +463,18 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
   });
 
   test("returns 500 when script_id lookup errors", async () => {
-    const supabase = makeSupabaseForValidations({ scriptError: { message: "script lookup failed" } });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
+      ok: false,
+      error: "Failed to validate request",
+      status: 500,
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -373,58 +484,52 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({
-      error: "Failed to validate script_id",
+      error: "Failed to validate request",
     });
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error validating script_id", expect.anything());
   });
 
   test("covers workspaceAudiences ?? [] when workspaceAudiences is null", async () => {
-    const caller_id = "+1555";
-    const supabase = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") {
-          return { select: () => ({ eq: async () => ({ data: [{ phone_number: caller_id }], error: null }) }) };
-        }
-        if (table === "audience") {
-          return { select: () => ({ eq: async () => ({ data: null, error: null }) }) };
-        }
-        throw new Error(`Unexpected table: ${table}`);
-      }),
-    };
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.validateCreateWithScriptPreflight.mockResolvedValueOnce({
+      ok: false,
+      error: "audience_ids must belong to this workspace; invalid: 1",
+      status: 400,
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
       type: "live_call",
-      caller_id,
+      caller_id: "+1555",
       script_id: 1,
       audience_ids: [1],
     });
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
   });
 
   test("script creation errors: insert error and missing row", async () => {
-    const supabase = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") {
-          return { select: () => ({ eq: async () => ({ data: [{ phone_number: "+1555" }], error: null }) }) };
-        }
-        if (table === "script") {
-          return {
-            insert: () => ({
-              select: async () => ({ data: null, error: { message: "script bad" } }),
-            }),
-          };
-        }
-        return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
-      }),
-    };
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.createScriptForCampaign.mockResolvedValueOnce({
+      ok: false,
+      error: "Failed to create script: script bad",
+      status: 500,
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -433,26 +538,21 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       script: { name: "s", steps: {} },
     });
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const r1 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(r1.status).toBe(500);
 
-    // missing row after successful insert
-    const supabase2 = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") {
-          return { select: () => ({ eq: async () => ({ data: [{ phone_number: "+1555" }], error: null }) }) };
-        }
-        if (table === "script") {
-          return {
-            insert: () => ({
-              select: async () => ({ data: [], error: null }),
-            }),
-          };
-        }
-        return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
-      }),
-    };
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase: supabase2 });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.createScriptForCampaign.mockResolvedValueOnce({
+      ok: false,
+      error: "Failed to create script",
+      status: 500,
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -460,31 +560,29 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       caller_id: "+1555",
       script: { name: "s", steps: {} },
     });
-    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const r2 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(r2.status).toBe(500);
   });
 
   test("covers script name default, steps provided, createdBy null, and non-array scriptRows", async () => {
     const caller_id = "+1555";
-    const supabase = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") {
-          return { select: () => ({ eq: async () => ({ data: [{ phone_number: caller_id }], error: null }) }) };
-        }
-        if (table === "script") {
-          return {
-            insert: () => ({
-              select: async () => ({
-                data: { id: 9, name: "Campaign script", type: "script", steps: { pages: { a: 1 } } },
-                error: null,
-              }),
-            }),
-          };
-        }
-        return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
-      }),
-    };
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
+    mocks.createScriptForCampaign.mockResolvedValueOnce({
+      ok: true,
+      scriptId: 9,
+      createdScript: {
+        id: 9,
+        name: "Campaign script",
+        type: "script",
+        steps: { pages: { a: 1 } },
+      },
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -503,15 +601,20 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       campaignDetails: { campaign_id: 1 },
     });
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     const json = await res.json();
     expect(json.script).toBeTruthy();
   });
 
   test("createCampaign errors are returned as 400 (Error and non-Error)", async () => {
-    const supabase = makeSupabaseForValidations({ callerNumbers: ["+1555"] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -521,10 +624,16 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     });
     mocks.createCampaign.mockRejectedValueOnce(new Error("nope"));
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const r1 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(r1.status).toBe(400);
 
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId: TEST_WORKSPACE_ID, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId: TEST_WORKSPACE_ID,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: TEST_WORKSPACE_ID,
       title: "t",
@@ -533,7 +642,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       script_id: 1,
     });
     mocks.createCampaign.mockRejectedValueOnce("nope");
-    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const r2 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(r2.status).toBe(400);
   });
 
@@ -542,78 +651,10 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     const caller_id = "+1555";
     const audience_ids = [1, 2, 3, 4, 5, 6];
     const campaignId = 777;
-
-    const checkResponses = [
-      { data: null, error: { message: "check" } }, // audience 1 -> continue
-      { data: { id: 1 }, error: null }, // audience 2 existing -> continue
-      { data: null, error: null }, // audience 3 -> proceed to insert (but addError)
-      { data: null, error: null }, // audience 4 -> insert ok, contactsError
-      { data: null, error: null }, // audience 5 -> insert ok, contacts ok (enqueue)
-      { data: null, error: null }, // audience 6 -> insert ok, contacts ok (no enqueue)
-    ];
-    const insertErrors = [
-      { error: { message: "add" } }, // audience 3 -> addError continue
-      { error: null }, // audience 4
-      { error: null }, // audience 5
-      { error: null }, // audience 6
-    ];
-    const contactResponses = [
-      { data: null, error: { message: "contacts" } }, // audience 4 -> contactsError continue
-      { data: [{ contact_id: 10 }, { contact_id: 11 }], error: null }, // audience 5 -> enqueue 11 only
-      { data: [{ contact_id: 10 }], error: null }, // audience 6 -> no enqueue
-    ];
-
-    const supabaseClient = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") {
-          return { select: () => ({ eq: async () => ({ data: [{ phone_number: caller_id }], error: null }) }) };
-        }
-        if (table === "audience") {
-          return { select: () => ({ eq: async () => ({ data: audience_ids.map((id) => ({ id })), error: null }) }) };
-        }
-        if (table === "script") {
-          return {
-            insert: () => ({
-              select: async () => ({
-                data: [{ id: 55, name: "s", type: "ivr", steps: { pages: {}, blocks: {} } }],
-                error: null,
-              }),
-            }),
-          };
-        }
-        if (table === "campaign_queue") {
-          return {
-            select: () => ({
-              eq: async () => ({ data: [{ contact_id: 10 }], error: null }),
-            }),
-          };
-        }
-        if (table === "campaign_audience") {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  maybeSingle: async () => checkResponses.shift(),
-                }),
-              }),
-            }),
-            insert: async () => insertErrors.shift(),
-          };
-        }
-        if (table === "contact_audience") {
-          return {
-            select: () => ({
-              eq: async () => contactResponses.shift(),
-            }),
-          };
-        }
-        throw new Error(`Unexpected table: ${table}`);
-      }),
-    };
+    const dbClient = {};
 
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -634,21 +675,34 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       campaign: { id: campaignId },
       campaignDetails: { campaign_id: campaignId },
     });
+    mocks.linkAudiencesToNewCampaign.mockResolvedValueOnce({
+      audiencesLinked: 3,
+      contactsEnqueued: 1,
+    });
 
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.audiences_linked).toBe(3);
     expect(body.contacts_enqueued).toBe(1);
-    expect(mocks.enqueueContactsForCampaign).toHaveBeenCalledWith(supabaseClient, campaignId, [11], { requeue: false });
+    expect(mocks.linkAudiencesToNewCampaign).toHaveBeenCalledWith({
+      campaignId,
+      audienceIds: audience_ids,
+      enqueueAudienceContacts: true,
+    });
   });
 
   test("existing script_id path works and skips audience loop when audience_ids empty", async () => {
     const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
-    const supabase = makeSupabaseForValidations({ callerNumbers: [caller_id] });
-    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ authType: "api_key", workspaceId, supabase });
+    mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+      authType: "api_key",
+      workspaceId,
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.write"],
+    });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       workspace_id: workspaceId,
       title: "t",
@@ -664,7 +718,7 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({
       audiences_linked: 0,
@@ -672,46 +726,13 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     });
   });
 
-  test("covers queuedRows ?? [] when campaign_queue returns null data", async () => {
+  test("passes enqueue flag through to linkAudiencesToNewCampaign", async () => {
     const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
-    const supabaseClient = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") {
-          return { select: () => ({ eq: async () => ({ data: [{ phone_number: caller_id }], error: null }) }) };
-        }
-        if (table === "audience") {
-          return { select: () => ({ eq: async () => ({ data: [{ id: 1 }], error: null }) }) };
-        }
-        if (table === "script") {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  maybeSingle: async () => ({ data: { id: 1 }, error: null }),
-                }),
-              }),
-            }),
-          };
-        }
-        if (table === "campaign_queue") {
-          return { select: () => ({ eq: async () => ({ data: null, error: null }) }) };
-        }
-        if (table === "campaign_audience") {
-          return {
-            select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
-            insert: async () => ({ error: null }),
-          };
-        }
-        if (table === "contact_audience") {
-          return { select: () => ({ eq: async () => ({ data: [{ contact_id: 1 }], error: null }) }) };
-        }
-        throw new Error(`Unexpected table: ${table}`);
-      }),
-    };
+    const dbClient = {};
+
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -728,49 +749,31 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       campaign: { id: 7 },
       campaignDetails: { campaign_id: 7 },
     });
+    mocks.linkAudiencesToNewCampaign.mockResolvedValueOnce({
+      audiencesLinked: 1,
+      contactsEnqueued: 1,
+    });
 
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.audiences_linked).toBe(1);
     expect(body.contacts_enqueued).toBe(1);
+    expect(mocks.linkAudiencesToNewCampaign).toHaveBeenCalledWith({
+      campaignId: 7,
+      audienceIds: [1],
+      enqueueAudienceContacts: true,
+    });
   });
 
-  test("covers enqueue_audience_contacts false branch inside audience loop", async () => {
+  test("skips enqueue when enqueue_audience_contacts is false", async () => {
     const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
-    const supabaseClient = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") {
-          return { select: () => ({ eq: async () => ({ data: [{ phone_number: caller_id }], error: null }) }) };
-        }
-        if (table === "audience") {
-          return { select: () => ({ eq: async () => ({ data: [{ id: 1 }], error: null }) }) };
-        }
-        if (table === "script") {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  maybeSingle: async () => ({ data: { id: 1 }, error: null }),
-                }),
-              }),
-            }),
-          };
-        }
-        if (table === "campaign_audience") {
-          return {
-            select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
-            insert: async () => ({ error: null }),
-          };
-        }
-        throw new Error(`Unexpected table: ${table}`);
-      }),
-    };
+    const dbClient = {};
+
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -787,57 +790,32 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       campaign: { id: 7 },
       campaignDetails: { campaign_id: 7 },
     });
+    mocks.linkAudiencesToNewCampaign.mockResolvedValueOnce({
+      audiencesLinked: 1,
+      contactsEnqueued: 0,
+    });
 
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({
       audiences_linked: 1,
       contacts_enqueued: 0,
     });
+    expect(mocks.linkAudiencesToNewCampaign).toHaveBeenCalledWith({
+      campaignId: 7,
+      audienceIds: [1],
+      enqueueAudienceContacts: false,
+    });
   });
 
-  test("covers audienceContacts ?? [] when contact_audience returns null data", async () => {
+  test("returns linkAudiencesToNewCampaign counts in response", async () => {
     const workspaceId = TEST_WORKSPACE_ID;
     const caller_id = "+1555";
-    const supabaseClient = {
-      from: vi.fn((table: string) => {
-        if (table === "workspace_number") {
-          return { select: () => ({ eq: async () => ({ data: [{ phone_number: caller_id }], error: null }) }) };
-        }
-        if (table === "audience") {
-          return { select: () => ({ eq: async () => ({ data: [{ id: 1 }], error: null }) }) };
-        }
-        if (table === "script") {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  maybeSingle: async () => ({ data: { id: 1 }, error: null }),
-                }),
-              }),
-            }),
-          };
-        }
-        if (table === "campaign_queue") {
-          return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
-        }
-        if (table === "campaign_audience") {
-          return {
-            select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }),
-            insert: async () => ({ error: null }),
-          };
-        }
-        if (table === "contact_audience") {
-          return { select: () => ({ eq: async () => ({ data: null, error: null }) }) };
-        }
-        throw new Error(`Unexpected table: ${table}`);
-      }),
-    };
+    const dbClient = {};
 
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "session",
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -854,9 +832,13 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       campaign: { id: 7 },
       campaignDetails: { campaign_id: 7 },
     });
+    mocks.linkAudiencesToNewCampaign.mockResolvedValueOnce({
+      audiencesLinked: 1,
+      contactsEnqueued: 0,
+    });
 
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({
       audiences_linked: 1,

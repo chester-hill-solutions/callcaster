@@ -105,7 +105,12 @@ export function OnboardingPanel({ onboarding, readiness }: OnboardingPanelProps)
                 </div>
 
                 <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-                    Twilio currently manages RCS sender creation and compliance review in Console. Save the sender package here, then continue the registration flow in Twilio.
+                    Twilio does not offer a public API to create or approve RCS senders — that step still happens in
+                    Console: create the sender, submit it for Google/carrier compliance review, then paste the
+                    resulting Sender SID (starts with &quot;XE&quot;) into the field below. Once it is saved here,
+                    use &quot;Attach RCS sender to pool&quot; in Twilio health above to add it to this workspace&apos;s
+                    Messaging Service sender pool via the Twilio ChannelSenders API — no manual Console step needed
+                    for that part.
                     <div className="mt-3 flex flex-wrap gap-3">
                         <a className="underline" href={TWILIO_RCS_SENDERS_URL} target="_blank" rel="noreferrer">
                             Open Twilio RCS senders

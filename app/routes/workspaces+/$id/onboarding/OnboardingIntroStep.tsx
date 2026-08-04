@@ -1,65 +1,72 @@
+import { Form } from "react-router";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { NumberRentalCreditsAlert } from "@/components/phone-numbers/NumberRentalCreditsAlert";
-import { hasCreditsForNumberRental, NUMBER_RENTAL_MONTHLY_CREDITS } from "@/lib/number-rental";
-import { WIZARD_STEP_META } from "./constants";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Section, SectionHeader } from "@/components/shared/Section";
 
 type OnboardingIntroStepProps = {
   workspaceName: string;
-  workspaceId: string;
-  creditsBalance: number;
-  onStart: () => void;
+  isReadOnly: boolean;
+  isSaving: boolean;
+  error?: string | null;
+  onContinue?: () => void;
 };
 
 export function OnboardingIntroStep({
   workspaceName,
-  workspaceId,
-  creditsBalance,
-  onStart,
+  isReadOnly,
+  isSaving,
+  error,
+  onContinue,
 }: OnboardingIntroStepProps) {
-  const needsCredits = !hasCreditsForNumberRental(creditsBalance);
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Set up {workspaceName}</CardTitle>
-        <CardDescription>
-          We will walk you through messaging compliance, your first phone number, and provider
-          registration step by step. Most teams finish the essentials in a few minutes.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <ol className="space-y-3 text-sm text-muted-foreground">
-          {WIZARD_STEP_META.map((step, index) => (
-            <li key={step.id} className="flex gap-3">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-medium text-foreground">
-                {index + 1}
-              </span>
-              <span>
-                <span className="font-medium text-foreground">{step.label}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-        <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-          Write each answer as if a carrier reviewer has never seen your business before. Use plain
-          language, avoid internal shorthand, and be specific about what customers sign up for.
-        </div>
-        <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
-          If you plan to rent a Canadian number, budget{" "}
-          <strong>{NUMBER_RENTAL_MONTHLY_CREDITS.toLocaleString()} credits</strong> for each 30-day
-          rental period. Verifying your own number does not use credits.
-        </div>
-        {needsCredits ? (
-          <NumberRentalCreditsAlert
-            creditsBalance={creditsBalance}
-            billingLink={`/workspaces/${workspaceId}/billing`}
-            title="Add credits before you rent a number"
-          />
-        ) : null}
-        <Button type="button" onClick={onStart}>
-          Start setup
-        </Button>
-      </CardContent>
-    </Card>
+    <Section variant="flat">
+      <SectionHeader
+        compact
+        title="Name your workspace"
+        description="Choose the name your team will see across campaigns, contacts, and billing."
+      />
+      <div className="max-w-2xl">
+        {isReadOnly ? (
+          <p className="text-sm text-muted-foreground">
+            Workspace name: <span className="font-medium text-foreground">{workspaceName}</span>
+          </p>
+        ) : (
+          <Form
+            method="post"
+            className="space-y-6"
+            onSubmit={() => onContinue?.()}
+          >
+            <input type="hidden" name="_action" value="save_workspace_name" />
+            {error ? (
+              <Alert variant="destructive" role="alert">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
+            <FormField
+              htmlFor="workspaceName"
+              label="Workspace name"
+              required
+            >
+              <Input
+                id="workspaceName"
+                name="workspaceName"
+                type="text"
+                defaultValue={workspaceName}
+                maxLength={200}
+                required
+                autoComplete="organization"
+                disabled={isSaving}
+                aria-invalid={Boolean(error) || undefined}
+              />
+            </FormField>
+            <Button type="submit" disabled={isSaving} aria-busy={isSaving}>
+              {isSaving ? "Saving…" : "Continue"}
+            </Button>
+          </Form>
+        )}
+      </div>
+    </Section>
   );
 }

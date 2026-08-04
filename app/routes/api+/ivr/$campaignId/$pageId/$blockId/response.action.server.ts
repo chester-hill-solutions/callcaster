@@ -1,30 +1,26 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { fetchCampaignWithScript, ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
+import {
+  findCallBySid,
+  findOutreachAttemptById,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { redirect } from "react-router";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { requireTwilioSignatureForIvrResponse } from "@/lib/ivr-webhook-auth.server";
+import { defineAction } from "@/lib/handler.server";
+import {
+  extractTypedOutreachFields,
+  syncContactSupportLevelCache,
+} from "@/lib/outreach-typed-fields.server";
+import { createTenantDb } from "@/server/tenant-db";
 import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
 
-const getCampaignData = async (supabase: SupabaseClient<Database>, campaign_id: string) => {
-  const { data: campaign, error } = await supabase
-    .from("campaign")
-    .select(`*, ivr_campaign(*, script(*))`)
-    .eq("id", Number(campaign_id))
-    .single();
-  if (error) throw error;
-  return campaign;
-};
-
-const getOutreach = async (supabase: SupabaseClient<Database>, outreachId: number) => {
-  const { data, error } = await supabase
-    .from("outreach_attempt")
-    .select("result")
-    .eq("id", outreachId)
-    .single();
-  if (error) throw error;
-  return data.result;
+import type { Json } from "@/lib/db-types";
+const getOutreach = async (workspaceId: string, outreachId: number) => {
+  const row = await findOutreachAttemptById(workspaceId, outreachId);
+  if (!row) throw new Error("Outreach attempt not found");
+  return row.result;
 };
 
 interface Script {
@@ -69,7 +65,8 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
 };
 
 const findNextStep = (currentBlock: { id: string; options?: Array<{ value: string; next?: string }> }, userInput: string | null, script: Script, pageId: string): string => {
-  if (currentBlock.options) {
+  const hasUserInput = userInput != null && String(userInput).trim() !== "";
+  if (currentBlock.options && hasUserInput) {
     const matchedOption = currentBlock.options.find((option) => {
       const optionValue = String(option.value).trim();
       const input = String(userInput).trim();
@@ -113,62 +110,39 @@ const handleNextStep = (
   }
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request, params }) =>
+    requireTwilioSignatureForIvrResponse(request, [params.campaignId, params.pageId, params.blockId]),
+  sideEffects: ["db-write"],
+  handler: async ({ params, auth }) => {
   const baseUrl = env.BASE_URL();
 
-  const supabase = createClient(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY()
-  );
   const twiml = new Twilio.twiml.VoiceResponse();
 
-  const pageId = params.pageId;
-  const blockId = params.blockId;
-  const campaignId = params.campaignId;
+  const pageId = params.pageId as string;
+  const blockId = params.blockId as string;
+  const campaignId = params.campaignId as string;
 
-  if (!campaignId || !pageId || !blockId) {
-    return new Response("Missing required parameters", { status: 400 });
-  }
-
-  const formData = await request.formData();
-  const formParams = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const digitsValue = formParams.Digits;
-  const speechResultValue = formParams.SpeechResult;
-  const callSidValue = formParams.CallSid;
-
-  const userInput =
-    typeof digitsValue === "string"
-      ? digitsValue
-      : typeof speechResultValue === "string"
-        ? speechResultValue
-        : null;
-  const callSid = typeof callSidValue === "string" ? callSidValue : null;
-
-  if (!callSid) {
-    return new Response("Missing CallSid parameter", { status: 400 });
-  }
-
-  const validation = await validateTwilioWebhookForCallSid({
-    request,
-    supabase,
-    callSid,
-    params: formParams,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const { callSid, userInput } = auth;
 
   try {
-    const [{ data: call }, campaignData] = await Promise.all([
-      supabase.from("call").select("*").eq("sid", callSid).single(),
-      getCampaignData(supabase, campaignId),
+    const [call, campaignData] = await Promise.all([
+      findCallBySid(callSid),
+      fetchCampaignWithScript(campaignId),
     ]);
 
-    if (!call) {
-      throw new Error("Call not found");
+    if (!call?.workspace) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+    if (call.campaign_id !== Number(campaignId)) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
     }
 
-    const stepsValue = campaignData.ivr_campaign[0]?.script?.steps;
+    const stepsValue = ivrScriptStepsFromCampaign(campaignData);
     if (!stepsValue) {
       throw new Error("Script steps not found");
     }
@@ -177,12 +151,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (!script || !script.blocks || !script.pages) {
       throw new Error("Invalid script structure");
     }
-    const currentBlock = script.blocks[blockId];
+    const currentPage = script.pages[pageId];
+    const currentBlock = currentPage?.blocks.includes(blockId)
+      ? script.blocks[blockId]
+      : undefined;
     if (!currentBlock) {
       throw new Error(`Block ${blockId} not found`);
     }
 
-    const resultValue = await getOutreach(supabase, call.outreach_attempt_id);
+    const resultValue = await getOutreach(call.workspace, call.outreach_attempt_id ?? 0);
     const result =
       resultValue && typeof resultValue === "object"
         ? (resultValue as Record<string, unknown>)
@@ -203,10 +180,24 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       },
     };
 
-    await supabase
-      .from("outreach_attempt")
-      .update({ result: newResult })
-      .eq("id", call.outreach_attempt_id);
+    if (!call.outreach_attempt_id) {
+      throw new Error("Missing outreach attempt for IVR response");
+    }
+    const typedFields = extractTypedOutreachFields(newResult as Json);
+    const tdb = createTenantDb(call.workspace);
+    const outreachUpdate = await updateOutreachAttemptForWorkspace(
+      call.workspace,
+      call.outreach_attempt_id,
+      { result: newResult, ...typedFields },
+      { tdb },
+    );
+    if (outreachUpdate instanceof Response) {
+      throw new Error(await outreachUpdate.text());
+    }
+
+    if (call.contact_id != null && typedFields.support_level != null) {
+      await syncContactSupportLevelCache(tdb, call.contact_id, typedFields.support_level);
+    }
 
     const nextStep = findNextStep(currentBlock, userInput, script, pageId);
     handleNextStep(twiml, nextStep, campaignId, pageId, baseUrl);
@@ -221,4 +212,5 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "application/xml" },
   });
-};
+  },
+});

@@ -1,9 +1,19 @@
 {
+  // Every runtime this repo ships must be here. `app/` + `shared/` alone left
+  // the Bun web server, the job worker, and the media-stream service entirely
+  // unchecked — three of the four things we deploy. Verify with
+  // `npx tsc --noEmit --listFiles`, not by reading this list.
   "include": [
     "app/env.ts",
     "app/**/*.ts",
     "app/**/*.tsx",
     "shared/**/*.ts",
+    "server/**/*.ts",
+    "worker/**/*.ts",
+    "services/**/*.ts",
+    // The three load-bearing CI scripts (openapi export, api-surface check and
+    // report). The rest of scripts/ is .mjs migration tooling — deliberately out.
+    "scripts/*.ts",
     ".react-router/types/**/*"
   ],
   "exclude": [
@@ -12,11 +22,14 @@
     "public/build",
     "**/*.test.ts",
     "**/*.test.tsx",
-    "supabase/functions/**",
+    "client/functions/**",
     "archive/deprecated/twilio-serverless/**",
     "app/routes/archive/**",
     "app/routes/old*",
-    "app/routes/old.**"
+    "app/routes/old.**",
+    // Gitignored agent scratch: 800+ stray .ts files that a broader glob would
+    // otherwise pull into the program.
+    ".opencode"
   ],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
@@ -33,10 +46,16 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "rootDirs": [".", "./.react-router/types"],
-    "types": ["@react-router/node", "vite/client"],
+    // "bun" was already reaching the program implicitly via the triple-slash
+    // reference in server/bun.ts; declare it. bun-types is DOM-aware
+    // (UseLibDomIfAvailable), so it composes with the DOM lib above.
+    "types": ["@react-router/node", "vite/client", "bun"],
     "paths": {
       "@/*": ["./app/*"]
     },
+    // server/ and worker/ import each other with explicit .ts specifiers, which
+    // Bun resolves natively. Legal here only because noEmit is set.
+    "allowImportingTsExtensions": true,
 
     // Enhanced type safety options
     "noImplicitAny": true,

@@ -1,50 +1,44 @@
 import { Form, Link, useNavigate, useNavigation, useSearchParams } from "react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
-  isWizardOnboardingStepId,
-  type WizardOnboardingStepId,
-  WIZARD_ONBOARDING_STEP_IDS,
-  workspaceHasFirstNumber,
-} from "@/lib/messaging-onboarding.server";
+  nextWizardStep,
+  previousWizardStep,
+  wizardStepsForGoal,
+} from "@/lib/messaging-onboarding/goals";
+import { workspaceHasFirstNumber } from "@/lib/messaging-onboarding/predicates";
 import type { OnboardingLoaderData } from "../onboarding.loader.server";
-import { OnboardingBusinessBasicsStep } from "./OnboardingBusinessBasicsStep";
-import { OnboardingChannelsStep } from "./OnboardingChannelsStep";
+import type { OnboardingActionData } from "../onboarding.action.server";
+import { OnboardingBusinessIdentityStep } from "./OnboardingBusinessIdentityStep";
+import { OnboardingBusinessProgramStep } from "./OnboardingBusinessProgramStep";
+import { OnboardingChecklistLinkStep } from "./OnboardingChecklistLinkStep";
+import { OnboardingCreditsStep } from "./OnboardingCreditsStep";
 import { OnboardingFirstNumberStep } from "./OnboardingFirstNumberStep";
+import { OnboardingGoalStep } from "./OnboardingGoalStep";
 import { OnboardingIntroStep } from "./OnboardingIntroStep";
 import { OnboardingLaunchStep } from "./OnboardingLaunchStep";
-import { OnboardingMessagingServiceStep } from "./OnboardingMessagingServiceStep";
-import { OnboardingOverviewCard } from "./OnboardingOverviewCard";
-import { OnboardingProviderActionsStep } from "./OnboardingProviderActionsStep";
-import { WIZARD_STEP_META } from "./constants";
-import { hasVoiceCapability } from "./utils";
+import { readWizardStep } from "./wizard-step-resolution";
 import type { OnboardingPendingActions } from "./types";
-
-function resolveWizardStep(currentStep: string | null | undefined): WizardOnboardingStepId {
-  if (currentStep === "use_case") {
-    return "business_profile";
-  }
-  if (currentStep && isWizardOnboardingStepId(currentStep)) {
-    return currentStep;
-  }
-  return "business_profile";
-}
-
-function readWizardStep(
-  urlStep: string | null,
-  currentStep: string | null | undefined,
-): WizardOnboardingStepId {
-  if (urlStep && isWizardOnboardingStepId(urlStep)) {
-    return urlStep;
-  }
-  return resolveWizardStep(currentStep);
-}
 
 type OnboardingWizardProps = OnboardingLoaderData & {
   pending: OnboardingPendingActions;
   a2pBlockingIssues: string[];
   a2pErrors: string[];
+  actionError?: string | null;
+  actionData?: OnboardingActionData;
 };
+
+function checklistCreateHref(
+  workspaceId: string,
+  resourcePath: "audiences/new" | "scripts/new" | "campaigns/new",
+  step: "audience" | "script" | "campaign_info",
+): string {
+  const returnTo = encodeURIComponent(
+    `/workspaces/${workspaceId}/onboarding?step=${step}`,
+  );
+  return `/workspaces/${workspaceId}/${resourcePath}?returnTo=${returnTo}`;
+}
 
 export function OnboardingWizard({
   workspaceId,
@@ -54,45 +48,69 @@ export function OnboardingWizard({
   readiness,
   phoneNumbers,
   creditsBalance,
-  rcsBlockingIssues,
   pending,
+  workspaceUsers,
+  mediaNames,
+  inboundQueues,
+  scripts,
+  audienceCount,
+  campaignCount,
   a2pBlockingIssues,
   a2pErrors,
+  actionError,
+  actionData,
 }: OnboardingWizardProps) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const navigation = useNavigation();
   const isReadOnly = userRole !== "owner" && userRole !== "admin";
   const urlStep = searchParams.get("step");
-  const [showIntro, setShowIntro] = useState(
-    () => onboarding.status === "not_started" && urlStep !== "business_profile",
-  );
-  const activeStep = showIntro ? null : readWizardStep(urlStep, onboarding.currentStep);
+  // Intro is the pre-wizard name screen. Explicit ?step= or a session override
+  // wins over status; avoid syncing showIntro from props via an effect.
+  const autoShowIntro = onboarding.status === "not_started" && !urlStep;
+  const [introSession, setIntroSession] = useState<
+    "auto" | "force_show" | "force_hide"
+  >("auto");
+  const showIntro =
+    introSession === "force_hide"
+      ? false
+      : urlStep
+        ? false
+        : introSession === "force_show"
+          ? true
+          : autoShowIntro;
 
-  const stepIndex = activeStep
-    ? WIZARD_ONBOARDING_STEP_IDS.indexOf(activeStep)
-    : -1;
-  const progressValue =
-    stepIndex >= 0 ? ((stepIndex + 1) / WIZARD_ONBOARDING_STEP_IDS.length) * 100 : 0;
+  const goal = onboarding.selectedGoal;
+  const visibleSteps = wizardStepsForGoal(goal);
+  const activeStep = showIntro
+    ? null
+    : readWizardStep(urlStep, onboarding.currentStep, visibleSteps);
+  const stepIndex = activeStep ? visibleSteps.indexOf(activeStep) : -1;
+
+  /**
+   * @effect Keep the `?step=` search param aligned with the resolved active wizard step after goal-driven step lists change.
+   * @effect-deps activeStep (canonical step after goal/visibility resolution); urlStep (current query); showIntro (skip while intro is showing); navigate (replace navigation)
+   * @effect-side-effects navigation — `navigate(..., { replace: true })` updates the URL without adding history entries
+   * @effect-why-not-loader Step resolution depends on client-only intro state and goal-derived visibility; a loader cannot replace the query mid-wizard without a client redirect.
+   */
+  useEffect(() => {
+    if (!activeStep || showIntro) return;
+    if (urlStep === activeStep) return;
+    navigate(`?step=${activeStep}`, { replace: true });
+  }, [activeStep, navigate, showIntro, urlStep]);
 
   const hasFirstNumber = workspaceHasFirstNumber(phoneNumbers ?? []);
   const isFormSubmitting = navigation.state !== "idle";
-  const messagingProvisioned = Boolean(onboarding.messagingService.serviceSid);
+  const firstNumberStepIndex = visibleSteps.indexOf("first_number");
+  const showSkippedFirstNumberNotice =
+    !hasFirstNumber && firstNumberStepIndex >= 0 && stepIndex > firstNumberStepIndex;
 
   const previousStep =
-    activeStep && stepIndex > 0 ? WIZARD_ONBOARDING_STEP_IDS[stepIndex - 1]! : null;
-  const nextStep =
-    activeStep && stepIndex >= 0 && stepIndex < WIZARD_ONBOARDING_STEP_IDS.length - 1
-      ? WIZARD_ONBOARDING_STEP_IDS[stepIndex + 1]!
-      : null;
-
-  const emergencyEligibleNumbers = new Set(onboarding.emergencyVoice.emergencyEligiblePhoneNumbers);
-  const voiceCapableWorkspaceNumbers = (phoneNumbers ?? []).filter(
-    (number) => number?.phone_number && number.type === "rented" && hasVoiceCapability(number.capabilities),
-  );
+    activeStep && stepIndex > 0 ? previousWizardStep(activeStep, goal) : null;
+  const continueTarget = activeStep ? nextWizardStep(activeStep, goal) : null;
 
   const goToPreviousIntro = () => {
-    setShowIntro(true);
+    setIntroSession("force_show");
     navigate(`/workspaces/${workspaceId}/onboarding`, { replace: true });
   };
 
@@ -101,11 +119,22 @@ export function OnboardingWizard({
       return null;
     }
     switch (activeStep) {
-      case "business_profile":
+      case "business_identity":
         return (
           <Button
             type="submit"
-            form="onboarding-business-form"
+            form="onboarding-business-identity-form"
+            disabled={pending.isSavingBusinessProfile}
+            aria-busy={pending.isSavingBusinessProfile}
+          >
+            {pending.isSavingBusinessProfile ? "Saving…" : "Save & continue"}
+          </Button>
+        );
+      case "business_program":
+        return (
+          <Button
+            type="submit"
+            form="onboarding-business-program-form"
             disabled={pending.isSavingBusinessProfile}
             aria-busy={pending.isSavingBusinessProfile}
           >
@@ -123,36 +152,12 @@ export function OnboardingWizard({
             {pending.isSavingChannels ? "Saving…" : "Save & continue"}
           </Button>
         );
-      case "messaging_service":
-        if (messagingProvisioned && nextStep) {
-          return (
-            <Form method="post">
-              <input type="hidden" name="_action" value="advance_step" />
-              <input type="hidden" name="targetStep" value={nextStep} />
-              <Button type="submit" disabled={isFormSubmitting}>
-                Next
-              </Button>
-            </Form>
-          );
-        }
-        return (
-          <Button
-            type="submit"
-            form="onboarding-messaging-form"
-            disabled={pending.isBootstrappingMessagingService}
-            aria-busy={pending.isBootstrappingMessagingService}
-          >
-            {pending.isBootstrappingMessagingService
-              ? "Provisioning…"
-              : "Provision & continue"}
-          </Button>
-        );
       case "first_number":
-        if (hasFirstNumber) {
+        if (hasFirstNumber && continueTarget) {
           return (
             <Form method="post">
               <input type="hidden" name="_action" value="advance_step" />
-              <input type="hidden" name="targetStep" value="provider_provisioning" />
+              <input type="hidden" name="targetStep" value={continueTarget} />
               <Button type="submit" disabled={isFormSubmitting}>
                 Continue
               </Button>
@@ -160,67 +165,100 @@ export function OnboardingWizard({
           );
         }
         return null;
-      case "provider_provisioning":
-        return (
-          <Form method="post">
-            <input type="hidden" name="_action" value="advance_step" />
-            <input type="hidden" name="targetStep" value="launch_checks" />
-            <Button type="submit" disabled={isFormSubmitting}>
-              Continue to review
-            </Button>
-          </Form>
-        );
       case "launch_checks":
         return (
-          <Button type="button" variant="default" onClick={() => navigate(`/workspaces/${workspaceId}`)}>
+          <Button
+            type="button"
+            variant="default"
+            onClick={() => navigate(`/workspaces/${workspaceId}`)}
+          >
             Go to workspace
           </Button>
         );
-      default:
+      case "audience":
+      case "script":
+      case "campaign_info":
+      case "credits":
         return null;
+      default: {
+        const _exhaustive: never = activeStep;
+        return _exhaustive;
+      }
     }
   })();
 
   return (
     <div className="space-y-6">
-      {!showIntro && activeStep ? (
-        <OnboardingOverviewCard
-          onboarding={onboarding}
-          readiness={readiness}
-          workspaceName={workspaceName}
-          workspaceId={workspaceId}
-          creditsBalance={creditsBalance}
-          activeStep={activeStep}
-          stepIndex={stepIndex}
-          progressValue={progressValue}
-        />
+      {/*
+        Compliance state is computed by the loader and was previously dropped on
+        the floor here, so a workspace stuck in "Action needed by CallCaster
+        support" showed a wizard with no explanation at all. Rendered above the
+        steps so it is visible whichever step the customer is on.
+      */}
+      {a2pErrors.length > 0 ? (
+        <Alert variant="destructive" data-testid="onboarding-compliance-errors">
+          <AlertDescription>
+            <p className="font-medium">We hit a problem setting up your messaging.</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {a2pErrors.map((error) => (
+                <li key={error}>{error}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {a2pBlockingIssues.length > 0 ? (
+        <Alert variant="warning" data-testid="onboarding-compliance-blocking">
+          <AlertDescription>
+            <p className="font-medium">Needed before your messaging can go live:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {a2pBlockingIssues.map((issue) => (
+                <li key={issue}>{issue}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {showSkippedFirstNumberNotice ? (
+        <Alert variant="warning" data-testid="skipped-first-number-notice">
+          <AlertDescription>
+            You can rent or verify a number from workspace Settings before launching campaigns.
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       {showIntro ? (
         <OnboardingIntroStep
           workspaceName={workspaceName}
-          workspaceId={workspaceId}
-          creditsBalance={creditsBalance}
-          onStart={() => {
-            setShowIntro(false);
-            navigate(`/workspaces/${workspaceId}/onboarding?step=business_profile`, { replace: true });
-          }}
+          isReadOnly={isReadOnly}
+          isSaving={pending.isSavingWorkspaceName}
+          error={actionError}
+          onContinue={() => setIntroSession("force_hide")}
         />
       ) : null}
 
-      {!showIntro && activeStep === "business_profile" ? (
-        <OnboardingBusinessBasicsStep
-          formId="onboarding-business-form"
+      {!showIntro && activeStep === "business_identity" ? (
+        <OnboardingBusinessIdentityStep
+          formId="onboarding-business-identity-form"
           onboarding={onboarding}
           isReadOnly={isReadOnly}
           pending={pending}
-          voiceCapableWorkspaceNumbers={voiceCapableWorkspaceNumbers}
-          emergencyEligibleNumbers={emergencyEligibleNumbers}
+        />
+      ) : null}
+
+      {!showIntro && activeStep === "business_program" ? (
+        <OnboardingBusinessProgramStep
+          formId="onboarding-business-program-form"
+          onboarding={onboarding}
+          isReadOnly={isReadOnly}
+          pending={pending}
         />
       ) : null}
 
       {!showIntro && activeStep === "path_selection" ? (
-        <OnboardingChannelsStep
+        <OnboardingGoalStep
           formId="onboarding-channels-form"
           onboarding={onboarding}
           isReadOnly={isReadOnly}
@@ -228,14 +266,19 @@ export function OnboardingWizard({
         />
       ) : null}
 
-      {!showIntro && activeStep === "messaging_service" ? (
-        <OnboardingMessagingServiceStep
-          formId="onboarding-messaging-form"
-          onboarding={onboarding}
+      {!showIntro && activeStep === "audience" && continueTarget ? (
+        <OnboardingChecklistLinkStep
+          title="Audience"
+          description="Upload the contacts you want to reach. Every live call, IVR, and SMS campaign uses a call list."
+          complete={audienceCount > 0}
+          completeLabel={`You have ${audienceCount} call list${audienceCount === 1 ? "" : "s"} ready.`}
+          incompleteLabel="Create a call list and upload contacts, then return here to continue."
+          actionHref={checklistCreateHref(workspaceId, "audiences/new", "audience")}
+          actionLabel={audienceCount > 0 ? "Add another call list" : "Upload call list"}
+          secondaryHref={`/workspaces/${workspaceId}/audiences`}
+          secondaryLabel="View call lists"
+          nextStep={continueTarget}
           isReadOnly={isReadOnly}
-          pending={pending}
-          workspaceId={workspaceId}
-          creditsBalance={creditsBalance}
         />
       ) : null}
 
@@ -246,17 +289,56 @@ export function OnboardingWizard({
           phoneNumbers={phoneNumbers}
           creditsBalance={creditsBalance}
           isReadOnly={isReadOnly}
+          workspaceUsers={workspaceUsers}
+          mediaNames={mediaNames}
+          inboundQueues={inboundQueues}
+          scripts={scripts}
+          pending={pending}
+          validationRequest={actionData?.validationRequest}
         />
       ) : null}
 
-      {!showIntro && activeStep === "provider_provisioning" ? (
-        <OnboardingProviderActionsStep
-          onboarding={onboarding}
-          rcsBlockingIssues={rcsBlockingIssues}
+      {!showIntro && activeStep === "script" && continueTarget ? (
+        <OnboardingChecklistLinkStep
+          title="Script"
+          description={
+            goal === "sms_blast"
+              ? "Create the message content your SMS campaign will send."
+              : "Create the IVR or call script your campaign will use."
+          }
+          complete={scripts.length > 0}
+          completeLabel={`You have ${scripts.length} script${scripts.length === 1 ? "" : "s"} ready.`}
+          incompleteLabel="Create a script, then return here to continue."
+          actionHref={checklistCreateHref(workspaceId, "scripts/new", "script")}
+          actionLabel={scripts.length > 0 ? "Manage scripts" : "Create script"}
+          secondaryHref={`/workspaces/${workspaceId}/scripts`}
+          secondaryLabel="View scripts"
+          nextStep={continueTarget}
           isReadOnly={isReadOnly}
-          pending={pending}
-          a2pBlockingIssues={a2pBlockingIssues}
-          a2pErrors={a2pErrors}
+        />
+      ) : null}
+
+      {!showIntro && activeStep === "campaign_info" && continueTarget ? (
+        <OnboardingChecklistLinkStep
+          title="Campaign info"
+          description="Create a campaign that connects your audience, phone number, and script to your goal."
+          complete={campaignCount > 0}
+          completeLabel={`You have ${campaignCount} campaign${campaignCount === 1 ? "" : "s"} ready.`}
+          incompleteLabel="Create a campaign with a name and the assets you just set up."
+          actionHref={checklistCreateHref(workspaceId, "campaigns/new", "campaign_info")}
+          actionLabel={campaignCount > 0 ? "Manage campaigns" : "Create campaign"}
+          secondaryHref={`/workspaces/${workspaceId}/campaigns`}
+          secondaryLabel="View campaigns"
+          nextStep={continueTarget}
+          isReadOnly={isReadOnly}
+        />
+      ) : null}
+
+      {!showIntro && activeStep === "credits" ? (
+        <OnboardingCreditsStep
+          workspaceId={workspaceId}
+          creditsBalance={creditsBalance}
+          isReadOnly={isReadOnly}
         />
       ) : null}
 
@@ -266,11 +348,15 @@ export function OnboardingWizard({
           readiness={readiness}
           workspaceId={workspaceId}
           phoneNumbers={phoneNumbers}
+          audienceCount={audienceCount}
+          campaignCount={campaignCount}
+          scriptCount={scripts.length}
+          creditsBalance={creditsBalance}
         />
       ) : null}
 
       {!showIntro && activeStep ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           {previousStep ? (
             <Button type="button" variant="outline" asChild disabled={isFormSubmitting}>
               <Link to={`?step=${previousStep}`} replace>
@@ -278,7 +364,12 @@ export function OnboardingWizard({
               </Link>
             </Button>
           ) : (
-            <Button type="button" variant="outline" onClick={goToPreviousIntro} disabled={isFormSubmitting}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={goToPreviousIntro}
+              disabled={isFormSubmitting}
+            >
               Back
             </Button>
           )}
@@ -294,13 +385,6 @@ export function OnboardingWizard({
             {footerContinue}
           </div>
         </div>
-      ) : null}
-
-      {!showIntro ? (
-        <p className="text-center text-xs text-muted-foreground">
-          Step {stepIndex + 1} of {WIZARD_STEP_META.length}:{" "}
-          {WIZARD_STEP_META[stepIndex]?.label ?? ""}
-        </p>
       ) : null}
     </div>
   );

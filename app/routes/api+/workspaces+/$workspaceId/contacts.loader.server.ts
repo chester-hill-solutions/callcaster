@@ -1,35 +1,44 @@
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { findContactsByPhone } from "@/lib/database/contact.server";
 import {
   listWorkspaceContactsApi,
-  resolveDataPlaneAuth,
 } from "@/lib/platform-data.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { dataPlaneCapabilityAuth } from "@/lib/capability-guard.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
+export const loader = defineLoader({
+  auth: dataPlaneCapabilityAuth("campaigns.read"),
+  sideEffects: ["db-read"],
+  handler: async ({ auth, url }) => {
+    const { workspaceId } = auth;
+    const phone = url.searchParams.get("phone");
+    if (phone) {
+      try {
+        const contacts = await findContactsByPhone(workspaceId, phone);
+        return jsonResponse({ contacts }, 200);
+      } catch (error) {
+        return jsonError(
+          error instanceof Error ? error.message : "Failed to search contacts by phone",
+          500,
+        );
+      }
+    }
 
-  const auth = await resolveDataPlaneAuth(request, workspaceId);
-  if (auth instanceof Response) return auth;
+    const result = await listWorkspaceContactsApi(
+      workspaceId,
+      url.searchParams,
+    );
+    if (!result.ok) {
+      return jsonError(result.error, result.status);
+    }
 
-  const url = new URL(request.url);
-  const result = await listWorkspaceContactsApi(
-    auth.supabase,
-    workspaceId,
-    url.searchParams,
-  );
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
-
-  return jsonResponse(
-    {
-      contacts: result.contacts,
-      pagination: result.pagination,
-      search_query: result.search_query,
-    },
-    200,
-  );
-}
+    return jsonResponse(
+      {
+        contacts: result.contacts,
+        pagination: result.pagination,
+        search_query: result.search_query,
+      },
+      200,
+    );
+  },
+});

@@ -12,7 +12,7 @@ export async function postCallStatus(
   } = {},
 ): Promise<APIResponse> {
   const body = new URLSearchParams({
-    CallSid: params.callSid ?? "CA_e2e_webhook_test",
+    CallSid: params.callSid ?? `CA_e2e_webhook_${Date.now()}`,
     CallStatus: params.callStatus ?? "completed",
     CallDuration: params.duration ?? "30",
     ...(params.campaignId ? { campaignId: String(params.campaignId) } : {}),

@@ -44,7 +44,6 @@ describe("queue hooks", () => {
       result.current.updateCalls(
         { new: { sid: "new", outreach_attempt_id: 2, contact_id: 2 } as any, eventType: "INSERT" },
         [queueItem(2, 2)],
-        null,
         setNext,
         setQuestion,
         setAttempt,
@@ -56,7 +55,6 @@ describe("queue hooks", () => {
       result.current.updateCalls(
         { new: { sid: "new", outreach_attempt_id: 2, contact_id: 2, status: "completed" } as any, eventType: "UPDATE" },
         [],
-        null,
         setNext,
         setQuestion,
         setAttempt,
@@ -67,7 +65,6 @@ describe("queue hooks", () => {
       result.current.updateCalls(
         { new: { sid: "x", contact_id: 3 } as any },
         [],
-        null,
         setNext,
         setQuestion,
         setAttempt,

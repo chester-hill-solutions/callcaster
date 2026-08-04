@@ -1,0 +1,101 @@
+import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
+import {
+  agent_status,
+  agent_status_event,
+  audience,
+  audience_upload,
+  call,
+  campaign,
+  campaign_queue,
+  contact,
+  handset_session,
+  households,
+  inbound_queue,
+  inbound_queue_entry,
+  inbound_queue_member,
+  message,
+  outreach_attempt,
+  script,
+  survey,
+  transaction_history,
+  webhook,
+  workspace_api_key,
+  workspace_audio,
+  workspace_events,
+  workspace_audit_event,
+  workspace_invite,
+  workspace_member,
+  workspace_number,
+  workspace_users,
+} from "./schema";
+
+/**
+ * Registry of every table that carries a workspace-tenancy column.
+ *
+ * `createTenantDb(workspaceId)` auto-scopes each of these tables on every
+ * read/update/delete and auto-injects the tenancy column on every insert (ADR-0004).
+ * Count is asserted in test/tenant-db.test.ts against the tables declared in
+ * schema.ts, so a new workspace-scoped table cannot be added without either
+ * registering it here or explicitly opting out.
+ */
+export const WORKSPACE_SCOPED_TABLES = {
+  campaign: { table: campaign, workspaceColumn: campaign.workspace },
+  campaign_queue: { table: campaign_queue, workspaceColumn: campaign_queue.workspace },
+  contact: { table: contact, workspaceColumn: contact.workspace },
+  audience: { table: audience, workspaceColumn: audience.workspace },
+  audience_upload: { table: audience_upload, workspaceColumn: audience_upload.workspace },
+  call: { table: call, workspaceColumn: call.workspace },
+  message: { table: message, workspaceColumn: message.workspace },
+  outreach_attempt: { table: outreach_attempt, workspaceColumn: outreach_attempt.workspace },
+  script: { table: script, workspaceColumn: script.workspace },
+  survey: { table: survey, workspaceColumn: survey.workspace },
+  webhook: { table: webhook, workspaceColumn: webhook.workspace },
+  workspace_number: { table: workspace_number, workspaceColumn: workspace_number.workspace },
+  workspace_audio: { table: workspace_audio, workspaceColumn: workspace_audio.workspace_id },
+  workspace_invite: { table: workspace_invite, workspaceColumn: workspace_invite.workspace },
+  transaction_history: {
+    table: transaction_history,
+    workspaceColumn: transaction_history.workspace,
+  },
+  households: { table: households, workspaceColumn: households.workspace_id },
+  inbound_queue: { table: inbound_queue, workspaceColumn: inbound_queue.workspace_id },
+  inbound_queue_member: {
+    table: inbound_queue_member,
+    workspaceColumn: inbound_queue_member.workspace_id,
+  },
+  inbound_queue_entry: {
+    table: inbound_queue_entry,
+    workspaceColumn: inbound_queue_entry.workspace_id,
+  },
+  agent_status: { table: agent_status, workspaceColumn: agent_status.workspace_id },
+  agent_status_event: {
+    table: agent_status_event,
+    workspaceColumn: agent_status_event.workspace_id,
+  },
+  handset_session: { table: handset_session, workspaceColumn: handset_session.workspace_id },
+  workspace_users: { table: workspace_users, workspaceColumn: workspace_users.workspace_id },
+  /** CHS membership; `workspace_id` is text (CallCaster workspace ids stored as text). */
+  workspace_member: {
+    table: workspace_member,
+    workspaceColumn: workspace_member.workspace_id,
+  },
+  workspace_api_key: {
+    table: workspace_api_key,
+    workspaceColumn: workspace_api_key.workspace_id,
+  },
+  workspace_events: {
+    table: workspace_events,
+    workspaceColumn: workspace_events.workspace_id,
+  },
+  workspace_audit_event: {
+    table: workspace_audit_event,
+    workspaceColumn: workspace_audit_event.workspace_id,
+  },
+} as const;
+
+export type WorkspaceScopedTableName = keyof typeof WORKSPACE_SCOPED_TABLES;
+
+export type WorkspaceScopedEntry = {
+  table: PgTable;
+  workspaceColumn: PgColumn;
+};

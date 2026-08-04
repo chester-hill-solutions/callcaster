@@ -2,7 +2,7 @@ import {
   buildDefaultWorkspaceTwilioPortalSnapshot,
   createWorkspaceTwilioInstance,
   getWorkspaceTwilioPortalSnapshot,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { loadBillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import type { BillingReconciliationReport } from "@/lib/billing-reconciliation.server";
 import {
@@ -10,9 +10,9 @@ import {
   type BillingReconciliationSnapshot,
 } from "@/lib/billing-reconciliation-snapshot.server";
 import { logger } from "@/lib/logger.server";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import type { WorkspaceTwilioPortalSnapshot } from "@/lib/types";
 
@@ -55,7 +55,6 @@ export interface TwilioPageData {
 }
 
 export async function loadTwilioData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
 ): Promise<TwilioPageData> {
 
@@ -68,7 +67,6 @@ export async function loadTwilioData(
   let billingReconciliationSnapshot: BillingReconciliationSnapshot | null = null;
 
   const portalSnapshot = await getWorkspaceTwilioPortalSnapshot({
-    supabaseClient,
     workspaceId,
   }).catch((error): WorkspaceTwilioPortalSnapshot => {
     logger.error("Error fetching Twilio portal snapshot:", error);
@@ -76,25 +74,20 @@ export async function loadTwilioData(
   });
 
   try {
-    const { data: workspace } = await supabaseClient
-      .from("workspace")
-      .select("*")
-      .eq("id", workspaceId)
-      .single();
+    const workspace = await getWorkspaceById(workspaceId);
 
     const adminTwilioCreds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
     billingReconciliationSnapshot = getWorkspaceBillingReconciliationSnapshot(
       workspace?.twilio_data,
     );
     if (adminTwilioCreds?.sid) {
-      const twilio = await createWorkspaceTwilioInstance({
-        supabase: supabaseClient,
-        workspace_id: workspaceId,
+      const twilio = await createWorkspaceTwilioInstance({         workspace_id: workspaceId,
       });
       const [account, numbers, usageRecords] = await Promise.all([
         twilio.api.v2010.accounts(adminTwilioCreds.sid).fetch(),
         twilio.incomingPhoneNumbers.list({ limit: 20 }),
-        twilio.usage.records.list(),
+        // Limit usage records fetch to prevent auto-paging the entire usage history.
+        twilio.usage.records.list({ limit: 200 }),
       ]);
 
       twilioAccountInfo = {
@@ -128,7 +121,6 @@ export async function loadTwilioData(
       }));
 
       billingReconciliation = await loadBillingReconciliationReport({
-        supabaseClient,
         workspaceId,
         twilioUsage,
       }).catch((reconcileError) => {

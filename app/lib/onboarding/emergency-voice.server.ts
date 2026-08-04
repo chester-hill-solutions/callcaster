@@ -2,31 +2,29 @@ import {
   createWorkspaceTwilioInstance,
   getWorkspacePhoneNumbers,
   updateWorkspacePhoneNumber,
-} from "@/lib/database.server";
+} from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
-import { isRecord } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 import { hasVoiceCapability } from "@/lib/onboarding/voice-capabilities";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import type Twilio from "twilio";
-import type { OnboardingActionData } from "@/lib/onboarding-actions.server";
-import { data as routeData } from "react-router";
 import { persistWorkspaceOnboardingState } from "@/lib/onboarding/onboarding-persist.server";
 
+export type ReviewWorkspaceEmergencyVoiceResult =
+  | { ok: true; success?: string }
+  | { ok: false; error: string; status?: number };
+
 export async function reviewWorkspaceEmergencyVoice(args: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
-}) {
-  const { supabaseClient, workspaceId, actorUserId } = args;
+}): Promise<ReviewWorkspaceEmergencyVoiceResult> {
+  const { workspaceId, actorUserId } = args;
 
   const [current, workspacePhoneNumbers] = await Promise.all([
     getWorkspaceMessagingOnboardingState({
-      supabaseClient,
       workspaceId,
     }),
     getWorkspacePhoneNumbers({
-      supabaseClient,
       workspaceId,
     }),
   ]);
@@ -43,16 +41,15 @@ export async function reviewWorkspaceEmergencyVoice(args: {
     !address.postalCode.trim() ||
     !customerName
   ) {
-    return routeData<OnboardingActionData>(
-      { error: "Save a complete emergency service address before running voice review." },
-      { status: 400 },
-    );
+    return {
+      ok: false,
+      error: "Save a complete emergency service address before running voice review.",
+      status: 400,
+    };
   }
 
   try {
-    const twilio = (await createWorkspaceTwilioInstance({
-      supabase: supabaseClient,
-      workspace_id: workspaceId,
+    const twilio = (await createWorkspaceTwilioInstance({       workspace_id: workspaceId,
     })) as Twilio.Twilio;
 
     const addressPayload = {
@@ -81,7 +78,7 @@ export async function reviewWorkspaceEmergencyVoice(args: {
         continue;
       }
 
-      const baseCapabilities = isRecord(workspaceNumber.capabilities)
+      const baseCapabilities = isObject(workspaceNumber.capabilities)
         ? workspaceNumber.capabilities
         : {};
       const isRentedVoiceNumber =
@@ -91,7 +88,6 @@ export async function reviewWorkspaceEmergencyVoice(args: {
         ineligibleCallerIds.push(phoneNumber);
         if (workspaceNumber?.id != null) {
           await updateWorkspacePhoneNumber({
-            supabaseClient,
             workspaceId,
             numberId: workspaceNumber.id,
             updates: {
@@ -128,7 +124,6 @@ export async function reviewWorkspaceEmergencyVoice(args: {
 
       if (workspaceNumber?.id != null) {
         await updateWorkspacePhoneNumber({
-          supabaseClient,
           workspaceId,
           numberId: workspaceNumber.id,
           updates: {
@@ -147,7 +142,6 @@ export async function reviewWorkspaceEmergencyVoice(args: {
     }
 
     await persistWorkspaceOnboardingState({
-      supabaseClient,
       workspaceId,
       actorUserId,
       updates: {
@@ -173,22 +167,23 @@ export async function reviewWorkspaceEmergencyVoice(args: {
     });
 
     if (eligiblePhoneNumbers.length === 0) {
-      return routeData<OnboardingActionData>({
+      return {
+        ok: true,
         success:
           "Emergency address validated. Add or refresh a rented voice number to finish voice readiness.",
-      });
+      };
     }
 
     const ineligibleCount = ineligibleCallerIds.length;
-    return routeData<OnboardingActionData>({
+    return {
+      ok: true,
       success:
         ineligibleCount > 0
           ? `Emergency voice reviewed. ${eligiblePhoneNumbers.length} number(s) are ready and ${ineligibleCount} still need review.`
           : `Emergency voice reviewed. ${eligiblePhoneNumbers.length} number(s) are emergency-ready.`,
-    });
+    };
   } catch (error) {
     await persistWorkspaceOnboardingState({
-      supabaseClient,
       workspaceId,
       actorUserId,
       updates: {
@@ -208,12 +203,11 @@ export async function reviewWorkspaceEmergencyVoice(args: {
       },
     });
 
-    return routeData<OnboardingActionData>(
-      {
-        error:
-          error instanceof Error ? error.message : "Emergency address validation failed.",
-      },
-      { status: 500 },
-    );
+    return {
+      ok: false,
+      error:
+        error instanceof Error ? error.message : "Emergency address validation failed.",
+      status: 500,
+    };
   }
 }

@@ -1,10 +1,30 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { parseCSV } from '@/lib/csv';
-import { processAudienceUpload } from "@/lib/audience-upload-process.server";
-import { resolveDualAuthSession } from "@/lib/api-route-auth.server";
-import type { Database, Tables } from "@/lib/database.types";
-import type { SupabaseClient, User } from "@supabase/supabase-js";
+import {
+  normalizeVoterListSource,
+  type VoterListSource,
+} from "@/lib/audience-upload-process.server";
+import { resolveDualAuthSession } from "@/lib/api-auth.server";
+import {
+  createAudienceForUpload,
+  createAudienceUploadRecord,
+  findAudienceInWorkspace,
+  findCampaignForAudienceUpload,
+  linkAudienceToCampaign,
+  markAudienceUpdating,
+} from "@/lib/audience-upload-db.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { AppError } from "@/lib/errors.server";
+import { defineAction } from "@/lib/handler.server";
+import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { toUserMessage } from "@/lib/user-message";
+import type { ActionFunctionArgs } from "react-router";
+import type { Database } from "@/lib/db-types";
+import {
+  isContactImportTarget,
+  validateContactImportMapping,
+} from "../../../shared/contact-import-headers";
 
 interface StorageBucket {
   id: string;
@@ -35,26 +55,29 @@ type AudienceUploadDeps = Partial<{
   verifyAuth: (
     request: Request,
   ) => Promise<{
-    supabaseClient: SupabaseClient<Database>;
     headers: Headers;
-    user: User | null;
+    user: { id: string } | null;
   }>;
-  processAudienceUpload: typeof processAudienceUpload;
+  enqueueJob: typeof enqueueJob;
+  requireWorkspaceAccess: (args: {
+    user: { id: string };
+    workspaceId: string;
+  }) => Promise<void>;
 }>;
 
-export const action = async ({
-  request,
-  deps,
-}: {
-  request: Request;
-  deps?: AudienceUploadDeps;
-}) => {
+export const action = defineAction({
+  sideEffects: ["db-write", "external"],
+  handler: async ({
+    request,
+    deps,
+  }: ActionFunctionArgs & { deps?: AudienceUploadDeps }) => {
 
   const d = {
     verifyAuth: deps?.verifyAuth ?? resolveDualAuthSession,
-    processAudienceUpload: deps?.processAudienceUpload ?? processAudienceUpload,
+    enqueueJob: deps?.enqueueJob ?? enqueueJob,
+    requireWorkspaceAccess: deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
   };
-  const { supabaseClient, headers, user } = await d.verifyAuth(request);
+  const { headers, user } = await d.verifyAuth(request);
   
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401, headers });
@@ -72,6 +95,11 @@ export const action = async ({
   const contactsFile = formData.get("contacts") as File;
   const headerMapping = formData.get("header_mapping") as string;
   const splitNameColumn = formData.get("split_name_column") as string;
+  const campaignIdRaw = formData.get("campaign_id");
+  const voterListSourceRaw = formData.get("voter_list_source") as string | null;
+  const voterListSource: VoterListSource | null = normalizeVoterListSource(
+    voterListSourceRaw,
+  );
   
   if (!workspaceId) {
     return routeData({ error: "Workspace ID is required" }, { status: 400, headers });
@@ -86,56 +114,95 @@ export const action = async ({
   }
 
   try {
+    if (user) {
+      await d.requireWorkspaceAccess({ user, workspaceId });
+    }
+
+    let parsedHeaderMapping: Record<string, string>;
+    try {
+      const parsed = headerMapping ? JSON.parse(headerMapping) : {};
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Header mapping must be an object");
+      }
+      parsedHeaderMapping = Object.fromEntries(
+        Object.entries(parsed as Record<string, unknown>).map(([header, target]) => {
+          if (typeof target !== "string" || !isContactImportTarget(target)) {
+            throw new Error(`Unsupported mapping target for "${header}"`);
+          }
+          return [header, target];
+        }),
+      );
+    } catch (error) {
+      return routeData(
+        { error: error instanceof Error ? error.message : "Header mapping is invalid" },
+        { status: 400, headers },
+      );
+    }
+
+    const mappingIssues = validateContactImportMapping(parsedHeaderMapping);
+    const blockingIssue = mappingIssues.find((issue) => issue.blocking);
+    if (blockingIssue) {
+      return routeData({ error: blockingIssue.message }, { status: 400, headers });
+    }
+
+    const fileContent = await contactsFile.arrayBuffer();
+    const fileContentText = new TextDecoder().decode(fileContent);
+    const parsedFile = parseCSV(fileContentText);
+    const availableHeaders = new Set(parsedFile.headers.map((header) => header.toLowerCase()));
+    const missingHeaders = Object.keys(parsedHeaderMapping).filter(
+      (header) => !availableHeaders.has(header.toLowerCase()),
+    );
+    if (missingHeaders.length > 0) {
+      return routeData(
+        { error: `Mapped columns are missing from the CSV: ${missingHeaders.join(", ")}` },
+        { status: 400, headers },
+      );
+    }
+    const campaignId =
+      campaignIdRaw == null ? null : Number.parseInt(String(campaignIdRaw), 10);
+    if (campaignId != null) {
+      if (!Number.isSafeInteger(campaignId)) {
+        return routeData({ error: "Campaign ID is invalid" }, { status: 400, headers });
+      }
+      if (!(await findCampaignForAudienceUpload(workspaceId, campaignId))) {
+        return routeData({ error: "Campaign not found" }, { status: 404, headers });
+      }
+    }
+
     // If audienceId is provided, use it; otherwise create a new audience
     let finalAudienceId: number;
     
     if (audienceIdStr) {
       const audienceId = parseInt(audienceIdStr, 10);
-      
-      // Verify the audience exists and belongs to the workspace
-      const { data: existingAudience, error: audienceCheckError } = await supabaseClient
-        .from("audience")
-        .select("id")
-        .eq("id", audienceId)
-        .eq("workspace", workspaceId)
-        .single();
-        
-      if (audienceCheckError || !existingAudience) {
+
+      const existingAudience = await findAudienceInWorkspace(workspaceId, audienceId);
+      if (!existingAudience) {
         return routeData({ error: "Audience not found or not accessible" }, { status: 404, headers });
       }
-      
-      finalAudienceId = audienceId;
-      
-      // Update the audience status to indicate it's being updated
-      await supabaseClient
-        .from("audience")
-        .update({
-          status: "updating"
-        })
-        .eq("id", finalAudienceId);
-    } else {
-      // Create a new audience
-      const { data: audienceData, error: audienceError } = await supabaseClient
-        .from("audience")
-        .insert({
-          name: audienceName,
-          workspace: workspaceId,
-          status: "pending"
-        })
-        .select()
-        .single();
 
-      if (audienceError) {
-        return routeData({ error: audienceError.message }, { status: 500, headers });
+      finalAudienceId = audienceId;
+      await markAudienceUpdating(workspaceId, finalAudienceId);
+    } else {
+      const audienceData = await createAudienceForUpload(workspaceId, audienceName);
+      if (!audienceData) {
+        return routeData({ error: "Failed to create audience" }, { status: 500, headers });
       }
 
       finalAudienceId = audienceData.id;
     }
 
+    if (campaignId != null) {
+      const linked = await linkAudienceToCampaign({
+        workspaceId,
+        campaignId,
+        audienceId: finalAudienceId,
+      });
+      if (!linked) {
+        return routeData({ error: "Campaign not found" }, { status: 404, headers });
+      }
+    }
+
     // Convert file to base64 for processing
-    const fileContent = await contactsFile.arrayBuffer();
-    const fileContentText = new TextDecoder().decode(fileContent);
-    
     // Use a safer encoding method that can handle non-ASCII characters
     // First encode the string as UTF-8, then encode to base64
     const encoder = new TextEncoder();
@@ -144,42 +211,37 @@ export const action = async ({
     // Convert the UTF-8 bytes to base64
     const fileBase64 = Buffer.from(utf8Bytes).toString('base64');
 
-    // Create an upload record
-    const { data: uploadData, error: uploadError } = await supabaseClient
-      .from("audience_upload")
-      .insert({
-        audience_id: finalAudienceId,
-        workspace: workspaceId,
-        created_by: user.id,
-        status: "pending",
-        file_name: contactsFile.name,
-        file_size: contactsFile.size,
-        total_contacts: 0,
-        processed_contacts: 0,
-        header_mapping: headerMapping ? JSON.parse(headerMapping) : {},
-        split_name_column: splitNameColumn || null
-      })
-      .select()
-      .single();
+    const uploadData = await createAudienceUploadRecord({
+      workspaceId,
+      audienceId: finalAudienceId,
+      createdBy: user.id,
+      fileName: contactsFile.name,
+      fileSize: contactsFile.size,
+      headerMapping: parsedHeaderMapping,
+      splitNameColumn: splitNameColumn || null,
+    });
 
-    if (uploadError) {
-      return routeData({ error: uploadError.message }, { status: 500, headers });
+    if (!uploadData) {
+      return routeData({ error: "Failed to create upload record" }, { status: 500, headers });
     }
 
     const uploadId = uploadData.id;
 
-    // Start background processing
-    d.processAudienceUpload(
-      supabaseClient,
-      uploadId,
-      finalAudienceId,
+    await d.enqueueJob({
+      type: "audience_upload",
       workspaceId,
-      user.id,
-      fileBase64,
-      headerMapping ? JSON.parse(headerMapping) : {},
-      splitNameColumn || null
-    ).catch(error => {
-      logger.error("Background processing error:", error);
+      userId: user.id,
+      params: {
+        uploadId,
+        audienceId: finalAudienceId,
+        workspaceId,
+        userId: user.id,
+        fileContent: fileBase64,
+        headerMapping: parsedHeaderMapping,
+        splitNameColumn: splitNameColumn || null,
+        voterListSource,
+      },
+      dedupe: { kind: "idempotency", key: `audience_upload:${uploadId}` },
     });
 
     // Return the audience ID and upload ID immediately
@@ -197,8 +259,12 @@ export const action = async ({
 
   } catch (error) {
     logger.error("Upload request error:", error);
-    return routeData({ 
-      error: error instanceof Error ? error.message : "Unknown error" 
+    if (error instanceof AppError) {
+      return routeData({ error: error.message }, { status: error.statusCode, headers });
+    }
+    return routeData({
+      error: toUserMessage(error, "Unknown error")
     }, { status: 500, headers });
   }
-}
+  },
+});

@@ -1,47 +1,75 @@
-import { createNewWorkspace } from "@/lib/database.server";
+import { listUserWorkspaces } from "@/lib/platform-workspace.server";
+import { data as routeData } from "react-router";
+import { createAuthLayoutLoader } from "@/lib/auth-layout.server";
+import { requireTwoFactorEnrollmentForPrivilegedUser } from "@/lib/two-factor.server";
+import { defineLoader } from "@/lib/handler.server";
 import { logger } from "@/lib/logger.server";
-import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
 
-interface Workspace {
-  id: string;
-  name: string;
-}
-
-interface WorkspaceUser {
-  last_accessed: string;
+export type WorkspaceListItem = {
+  last_accessed: string | null;
   role: string;
-  workspace: Workspace;
-}
+  workspace: {
+    id: string;
+    name: string;
+  };
+};
 
-interface LoaderData {
-  workspaces: WorkspaceUser[] | null;
-  userId: string;
+export type WorkspacesIndexLoaderData = {
+  workspaces: WorkspaceListItem[] | null;
   error: string | null;
-}
+};
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+const authLayoutLoader = createAuthLayoutLoader({
+  onAuthenticated: async ({ user, request }) => {
+    await requireTwoFactorEnrollmentForPrivilegedUser({
+      userId: user.id,
+      request,
+    });
+    return null;
+  },
+});
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+export const loader = defineLoader({
+  auth: (args) => authLayoutLoader(args),
+  sideEffects: ["db-read"],
+  handler: async ({ auth: layout }) => {
+    const { user } = layout.data;
+    const headers =
+      layout.init?.headers instanceof Headers
+        ? layout.init.headers
+        : new Headers();
 
-  if (!user) {
-    return redirect("/signin", { headers });
-  }
+    const result = await listUserWorkspaces(user.id);
 
-  const userId = user.id;
-  if (!userId) {
-    return redirect("/signin", { headers });
-  }
+    if (!result.ok) {
+      logger.error("Failed to load workspaces for index", {
+        userId: user.id,
+        error: result.error,
+      });
+      return routeData(
+        {
+          workspaces: null,
+          error: "Failed to load workspaces. Please refresh and try again.",
+        } satisfies WorkspacesIndexLoaderData,
+        { headers },
+      );
+    }
 
-  const { data: workspaces, error: workspacesError } = await supabaseClient
-    .from("workspace_users")
-    .select("last_accessed, role, workspace(id, name)")
-    .eq("user_id", userId)
-    .order("last_accessed", { ascending: false });
+    const workspaces: WorkspaceListItem[] = result.workspaces.map((row) => ({
+      last_accessed: row.last_accessed ?? null,
+      role: String(row.role ?? ""),
+      workspace: {
+        id: row.workspace.id,
+        name: row.workspace.name,
+      },
+    }));
 
-  if (workspacesError) {
-    return { workspaces: null, userId: userId, error: workspacesError }
-  }
-  return { workspaces: workspaces, userId: userId, error: null };
-}
+    return routeData(
+      {
+        workspaces,
+        error: null,
+      } satisfies WorkspacesIndexLoaderData,
+      { headers },
+    );
+  },
+});

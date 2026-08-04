@@ -1,29 +1,34 @@
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
-import { Message, Workspace, WorkspaceNumber } from "@/lib/types";
+import {
+  countDistinctNumbersForConversation,
+  markReceivedMessagesAsDeliveredForPhone,
+} from "@/lib/message-db.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { createTenantDb } from "@/server/tenant-db";
+import type { Message } from "@/lib/types";
 import { fetchMessagePage } from "./$contact_number.messages.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-write"],
+  handler: async ({ params, url, auth }) => {
   const { id, contact_number } = params;
-  const { supabaseClient, headers } = await verifyAuth(request);
-  const url = new URL(request.url);
+  const { headers, user, workspaceId } = auth;
   const before = url.searchParams.get("before");
   let messages: Message[] = [];
   let hasMore = false;
   let normalizedNumber: string | null = null;
   let optOutKeywords = parseOptOutKeywords(null);
+  let multipleNumbersUsed = false;
 
   if (id) {
     try {
       const onboarding = await getWorkspaceMessagingOnboardingState({
-        supabaseClient,
         workspaceId: id,
       });
       optOutKeywords = parseOptOutKeywords(
@@ -34,6 +39,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
   }
 
+  const tdb = id ? createTenantDb(id) : null;
+
   if (contact_number !== "new") {
     try {
       normalizedNumber = normalizePhoneNumber(contact_number || "");
@@ -42,28 +49,40 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     }
 
     const contactFilter = normalizedNumber ?? contact_number ?? "";
-    if (contactFilter) {
+    if (contactFilter && id) {
       const result = await fetchMessagePage({
-        supabaseClient,
-        workspaceId: id as string,
+        workspaceId: id,
         contactFilter,
         before: before || null,
+        tdb: tdb ?? undefined,
       });
       messages = result.messages;
       hasMore = result.hasMore;
     }
 
     // Mark messages as read on initial load (no "before" = first page)
-    if (normalizedNumber && !before) {
+    if (normalizedNumber && !before && id) {
       try {
-        await supabaseClient
-          .from("message")
-          .update({ status: "delivered" })
-          .eq("workspace", id as string)
-          .eq("status", "received")
-          .or(`from.eq.${normalizedNumber},to.eq.${normalizedNumber}`);
+        await markReceivedMessagesAsDeliveredForPhone(id, normalizedNumber, {
+          tdb: tdb ?? undefined,
+        });
       } catch (error) {
         logger.error("Error marking messages as read:", error);
+      }
+    }
+
+    // Only computed on the initial page load (not on "load older" pagination
+    // fetches) to keep this cheap.
+    if (contactFilter && id && !before) {
+      try {
+        const distinctNumbers = await countDistinctNumbersForConversation(
+          id,
+          contactFilter,
+          { tdb: tdb ?? undefined },
+        );
+        multipleNumbersUsed = distinctNumbers > 1;
+      } catch (error) {
+        logger.error("Error counting distinct numbers for conversation:", error);
       }
     }
   }
@@ -74,7 +93,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
       hasMore,
       contact_number: normalizedNumber || contact_number,
       optOutKeywords,
+      multipleNumbersUsed,
     },
     { headers },
   );
-}
+  },
+});

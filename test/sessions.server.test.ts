@@ -25,7 +25,7 @@ describe("themeSessionResolver", () => {
     await expect(mod.themeSessionResolver.getTheme(req)).resolves.toBe("dark");
   });
 
-  test("uses secure + domain cookie settings in production", async () => {
+  test("uses secure cookie without a Domain attribute in production", async () => {
     vi.resetModules();
     process.env.NODE_ENV = "production";
     const mod = await import("../app/sessions.server");
@@ -35,7 +35,9 @@ describe("themeSessionResolver", () => {
     const setCookie = headers.get("Set-Cookie") ?? "";
 
     expect(setCookie).toContain("Secure");
-    expect(setCookie).toContain("Domain=your-production-domain.com");
+    // A Domain that doesn't match the host makes browsers drop the cookie —
+    // the cookie must default to the request host.
+    expect(setCookie).not.toContain("Domain=");
   });
 });
 

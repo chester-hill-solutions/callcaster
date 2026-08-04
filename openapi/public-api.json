@@ -77,6 +77,10 @@
       "description": "Platform API endpoints."
     },
     {
+      "name": "Provider Webhook",
+      "description": "Provider Webhook endpoints."
+    },
+    {
       "name": "Public Form",
       "description": "Public Form endpoints."
     },
@@ -602,7 +606,7 @@
       "get": {
         "operationId": "getAuth_callback",
         "summary": "GET /api/auth/callback",
-        "description": "Supabase auth callback; sets session cookies and redirects.",
+        "description": "Postgres auth callback; sets session cookies and redirects.",
         "tags": [
           "Authentication",
           "Public Form"
@@ -612,71 +616,6 @@
         "x-callcaster-auth-class": "publicForm",
         "x-callcaster-docs-guide": "docs/api-auth-matrix.md",
         "security": [],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auto-dial": {
-      "post": {
-        "operationId": "postAuto_dial",
-        "summary": "POST /api/auto-dial",
-        "description": "Start auto-dial session for workspace.",
-        "tags": [
-          "Dialer",
-          "User API"
-        ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -1446,15 +1385,81 @@
         }
       }
     },
+    "/api/coaching-ack": {
+      "post": {
+        "operationId": "postCoaching_ack",
+        "summary": "POST /api/coaching-ack",
+        "description": "",
+        "tags": [
+          "Telephony",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/campaigns/create-with-script": {
       "post": {
         "operationId": "createCampaignWithScript",
         "summary": "Create campaign with script and phone number (one-shot)",
-        "description": "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both.",
+        "description": "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both. Requires the campaigns.write capability for API keys.",
         "tags": [
           "Integrator API",
           "Campaigns"
         ],
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -1566,11 +1571,12 @@
       "post": {
         "operationId": "sendChatSms",
         "summary": "Send a single SMS",
-        "description": "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body.",
+        "description": "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
         "tags": [
           "Integrator API",
           "Messaging"
         ],
+        "x-callcaster-capability": "messages.send",
         "security": [
           {
             "sessionCookie": []
@@ -3119,6 +3125,71 @@
         }
       }
     },
+    "/api/outreach_attempts/{id}": {
+      "post": {
+        "operationId": "postOutreach_attempts_id",
+        "summary": "POST /api/outreach_attempts/:id",
+        "description": "Session-scoped outreach attempt updates via requireJsonAuthForOutreachAttempt.",
+        "tags": [
+          "Campaigns",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/questions": {
       "post": {
         "operationId": "postQuestions",
@@ -3149,6 +3220,173 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/queues": {
+      "get": {
+        "operationId": "getQueues",
+        "summary": "GET /api/queues",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
+        "tags": [
+          "Queues",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postQueues",
+        "summary": "POST /api/queues",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
+        "tags": [
+          "Queues",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteQueues",
+        "summary": "DELETE /api/queues",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
+        "tags": [
+          "Queues",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -3318,11 +3556,12 @@
       "post": {
         "operationId": "dispatchCampaignSms",
         "summary": "Dispatch SMS to queued campaign contacts",
-        "description": "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user.",
+        "description": "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user. Requires the campaigns.dispatch capability for API keys.",
         "tags": [
           "Integrator API",
           "Messaging"
         ],
+        "x-callcaster-capability": "campaigns.dispatch",
         "security": [
           {
             "sessionCookie": []
@@ -3890,11 +4129,11 @@
         }
       }
     },
-    "/api/verify-audio-pin/:pin": {
+    "/api/verify-audio-pin/{pin}": {
       "get": {
         "operationId": "getVerify_audio_pin_pin",
         "summary": "GET /api/verify-audio-pin/:pin",
-        "description": "Static TwiML gather entry; returns TwiML.",
+        "description": "Retired audio PIN flow; returns 410.",
         "tags": [
           "Telephony",
           "Public Form"
@@ -3906,17 +4145,28 @@
         "security": [],
         "responses": {
           "200": {
-            "description": "TwiML XML response",
+            "description": "Success",
             "content": {
-              "text/xml": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "type": "object",
+                  "additionalProperties": true
                 }
               }
             }
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -3932,7 +4182,7 @@
       "get": {
         "operationId": "getVerify_audio_session",
         "summary": "GET /api/verify-audio-session",
-        "description": "**Security:** GET requires session; POST action returns TwiML without auth check.",
+        "description": "Retired audio PIN flow; both methods return 410.",
         "tags": [
           "Telephony",
           "User API"
@@ -3983,7 +4233,7 @@
       "post": {
         "operationId": "postVerify_audio_session",
         "summary": "POST /api/verify-audio-session",
-        "description": "**Security:** GET requires session; POST action returns TwiML without auth check.",
+        "description": "Retired audio PIN flow; both methods return 410.",
         "tags": [
           "Telephony",
           "User API"
@@ -4240,71 +4490,6 @@
             "sessionCookie": []
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspace": {
-      "post": {
-        "operationId": "postWorkspace",
-        "summary": "POST /api/workspace",
-        "description": "",
-        "tags": [
-          "Workspace",
-          "Workspace Admin"
-        ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Success",
@@ -5097,43 +5282,31 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId": {
+    "/api/workspaces/{workspaceId}": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId",
-        "summary": "GET /api/workspaces/:workspaceId",
-        "description": "",
+        "operationId": "getWorkspace",
+        "summary": "Get workspace details",
         "tags": [
-          "Workspace",
-          "User API"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
-          }
-        ],
-        "parameters": [
+          },
           {
-            "name": "workspace_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
+            "apiKey": []
           }
         ],
+        "description": "Returns workspace metadata for an authorized session member or workspace API key with campaigns.read scoped to the route workspace.",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Workspace details",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/WorkspaceDetailResponse"
                 }
               }
             }
@@ -5143,17 +5316,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
+          "404": {
+            "description": "Workspace not found",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5161,42 +5334,45 @@
         }
       },
       "patch": {
-        "operationId": "patchWorkspaces_workspaceId",
-        "summary": "PATCH /api/workspaces/:workspaceId",
-        "description": "",
+        "operationId": "updateWorkspace",
+        "summary": "Update workspace settings",
         "tags": [
-          "Workspace",
-          "User API"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Rename a workspace. Requires an admin-or-higher signed-in session.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/UpdateWorkspaceRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Workspace updated",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/UpdateWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5206,17 +5382,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Admin role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Workspace not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5224,30 +5410,35 @@
         }
       },
       "delete": {
-        "operationId": "deleteWorkspaces_workspaceId",
-        "summary": "DELETE /api/workspaces/:workspaceId",
-        "description": "",
+        "operationId": "deleteWorkspace",
+        "summary": "Delete a workspace",
         "tags": [
-          "Workspace",
-          "User API"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Permanently delete a workspace. Owner session only.",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Workspace deleted",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/DeleteWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Deletion blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5257,17 +5448,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Owner role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5275,44 +5466,47 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/transfer-ownership": {
+    "/api/workspaces/{workspaceId}/transfer-ownership": {
       "post": {
-        "operationId": "postWorkspaces_workspaceId_transfer_ownership",
-        "summary": "POST /api/workspaces/:workspaceId/transfer-ownership",
-        "description": "",
+        "operationId": "transferWorkspaceOwnership",
+        "summary": "Transfer workspace ownership",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Owner session only. The incoming owner must have MFA enrolled (SEC-08).",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/TransferOwnershipRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Ownership transferred",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/TransferOwnershipResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Transfer blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5322,17 +5516,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Owner session and new-owner MFA required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5340,7 +5534,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/billing": {
+    "/api/workspaces/{workspaceId}/billing": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_billing",
         "summary": "GET /api/workspaces/:workspaceId/billing",
@@ -5404,7 +5598,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/billing/checkout-session": {
+    "/api/workspaces/{workspaceId}/billing/checkout-session": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_billing_checkout_session",
         "summary": "POST /api/workspaces/:workspaceId/billing/checkout-session",
@@ -5469,7 +5663,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/billing/sessions/:sessionId": {
+    "/api/workspaces/{workspaceId}/billing/sessions/{sessionId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_billing_sessions_sessionId",
         "summary": "GET /api/workspaces/:workspaceId/billing/sessions/:sessionId",
@@ -5533,7 +5727,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/onboarding": {
+    "/api/workspaces/{workspaceId}/onboarding": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_onboarding",
         "summary": "GET /api/workspaces/:workspaceId/onboarding",
@@ -5660,7 +5854,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/onboarding/actions": {
+    "/api/workspaces/{workspaceId}/onboarding/actions": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_onboarding_actions",
         "summary": "POST /api/workspaces/:workspaceId/onboarding/actions",
@@ -5725,43 +5919,27 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/numbers": {
+    "/api/workspaces/{workspaceId}/numbers": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId_numbers",
-        "summary": "GET /api/workspaces/:workspaceId/numbers",
-        "description": "",
+        "operationId": "listWorkspaceNumbers",
+        "summary": "List workspace phone numbers",
         "tags": [
-          "Telephony",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace",
+          "Telephony"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
-          }
-        ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Phone numbers",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/WorkspaceNumbersListResponse"
                 }
               }
             }
@@ -5771,17 +5949,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5789,42 +5957,46 @@
         }
       },
       "post": {
-        "operationId": "postWorkspaces_workspaceId_numbers",
-        "summary": "POST /api/workspaces/:workspaceId/numbers",
-        "description": "",
+        "operationId": "purchaseWorkspaceNumber",
+        "summary": "Purchase and provision a phone number",
         "tags": [
-          "Telephony",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace",
+          "Telephony"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Requires sufficient workspace credits and numbers-manager role.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/PurchaseNumberRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Number purchased",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/PurchaseNumberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5834,17 +6006,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Insufficient credits",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Numbers manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5852,19 +6034,15 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/numbers/:numberId": {
+    "/api/workspaces/{workspaceId}/numbers/{numberId}": {
       "patch": {
-        "operationId": "patchWorkspaces_workspaceId_numbers_numberId",
-        "summary": "PATCH /api/workspaces/:workspaceId/numbers/:numberId",
-        "description": "",
+        "operationId": "patchWorkspaceNumber",
+        "summary": "Update phone number settings",
         "tags": [
-          "Telephony",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace",
+          "Telephony"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
         "security": [
           {
             "sessionCookie": []
@@ -5875,21 +6053,28 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/PatchNumberRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Number updated",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/PatchNumberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5899,17 +6084,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Numbers manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5917,17 +6112,13 @@
         }
       },
       "delete": {
-        "operationId": "deleteWorkspaces_workspaceId_numbers_numberId",
-        "summary": "DELETE /api/workspaces/:workspaceId/numbers/:numberId",
-        "description": "",
+        "operationId": "deleteWorkspaceNumber",
+        "summary": "Release a workspace phone number",
         "tags": [
-          "Telephony",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace",
+          "Telephony"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
         "security": [
           {
             "sessionCookie": []
@@ -5935,12 +6126,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Number released",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/DeleteWorkspaceResponse"
                 }
               }
             }
@@ -5950,17 +6140,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Numbers manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Number not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -5968,43 +6168,27 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/webhook": {
+    "/api/workspaces/{workspaceId}/webhook": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId_webhook",
-        "summary": "GET /api/workspaces/:workspaceId/webhook",
-        "description": "POST tests webhook delivery.",
+        "operationId": "getWorkspaceWebhook",
+        "summary": "Get workspace webhook configuration",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
-          }
-        ],
+        "description": "Session-only trust-root route.",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Webhook config",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/WorkspaceWebhookResponse"
                 }
               }
             }
@@ -6014,17 +6198,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6032,42 +6216,45 @@
         }
       },
       "put": {
-        "operationId": "putWorkspaces_workspaceId_webhook",
-        "summary": "PUT /api/workspaces/:workspaceId/webhook",
-        "description": "POST tests webhook delivery.",
+        "operationId": "upsertWorkspaceWebhook",
+        "summary": "Create or update workspace webhook",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Destination URL must pass SSRF-safe outbound validation.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/UpsertWebhookRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Webhook saved",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/WorkspaceWebhookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or blocked destination URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6077,17 +6264,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6095,42 +6282,45 @@
         }
       },
       "post": {
-        "operationId": "postWorkspaces_workspaceId_webhook",
-        "summary": "POST /api/workspaces/:workspaceId/webhook",
-        "description": "POST tests webhook delivery.",
+        "operationId": "testWorkspaceWebhook",
+        "summary": "Send a test webhook payload",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Delivers a sample event via safe outbound fetch.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/TestWebhookRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Test delivery result",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/TestWebhookResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or blocked destination URL",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6140,17 +6330,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6158,43 +6348,27 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/members": {
+    "/api/workspaces/{workspaceId}/members": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId_members",
-        "summary": "GET /api/workspaces/:workspaceId/members",
-        "description": "",
+        "operationId": "listWorkspaceMembers",
+        "summary": "List workspace members and pending invites",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
-          }
-        ],
+        "description": "Session-only trust-root route.",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Members and invites",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/WorkspaceMembersListResponse"
                 }
               }
             }
@@ -6204,17 +6378,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6222,42 +6386,49 @@
         }
       },
       "post": {
-        "operationId": "postWorkspaces_workspaceId_members",
-        "summary": "POST /api/workspaces/:workspaceId/members",
-        "description": "",
+        "operationId": "inviteWorkspaceMember",
+        "summary": "Invite a workspace member",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "x-callcaster-capability": "members.invite",
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "apiKey": []
           }
         ],
+        "description": "Invite a member with a session (role subordination rules apply) or an API key with members.invite (admin-equivalent role assignment: member/caller only). Privileged session role assignment may require MFA enrollment.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/InviteMemberRequest"
+              }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Success",
+          "201": {
+            "description": "Invite sent",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/InviteMemberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6267,17 +6438,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required or MFA enrollment required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6285,42 +6456,45 @@
         }
       },
       "patch": {
-        "operationId": "patchWorkspaces_workspaceId_members",
-        "summary": "PATCH /api/workspaces/:workspaceId/members",
-        "description": "",
+        "operationId": "updateWorkspaceMemberRole",
+        "summary": "Update a member role",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Owner-role changes require an owner actor with MFA.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/UpdateMemberRequest"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Member updated",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/UpdateMemberResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6330,17 +6504,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Insufficient role or MFA enrollment required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Member not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6348,30 +6532,45 @@
         }
       },
       "delete": {
-        "operationId": "deleteWorkspaces_workspaceId_members",
-        "summary": "DELETE /api/workspaces/:workspaceId/members",
-        "description": "",
+        "operationId": "removeWorkspaceMember",
+        "summary": "Remove a member or cancel an invite",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Pass `target: invite` to cancel a pending invite.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteMemberRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "Member removed or invite cancelled",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/DeleteWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6381,17 +6580,27 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Member or invite not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6399,43 +6608,27 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/api-keys": {
+    "/api/workspaces/{workspaceId}/api-keys": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId_api_keys",
-        "summary": "GET /api/workspaces/:workspaceId/api-keys",
-        "description": "",
+        "operationId": "listWorkspaceApiKeys",
+        "summary": "List workspace API keys",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "description": "Workspace scope (required for session auth)."
-          }
-        ],
+        "description": "Session-only trust-root route. Lists key metadata without secrets.",
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "API keys",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/ApiKeyListResponse"
                 }
               }
             }
@@ -6445,17 +6638,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6463,42 +6656,45 @@
         }
       },
       "post": {
-        "operationId": "postWorkspaces_workspaceId_api_keys",
-        "summary": "POST /api/workspaces/:workspaceId/api-keys",
-        "description": "",
+        "operationId": "createWorkspaceApiKey",
+        "summary": "Create a workspace API key",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route. Returns the full secret once; store it immediately.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
+                "$ref": "#/components/schemas/CreateApiKeyRequest"
+              }
             }
           }
         },
         "responses": {
-          "200": {
-            "description": "Success",
+          "201": {
+            "description": "API key created",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/CreateApiKeyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6508,17 +6704,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6526,30 +6722,45 @@
         }
       },
       "delete": {
-        "operationId": "deleteWorkspaces_workspaceId_api_keys",
-        "summary": "DELETE /api/workspaces/:workspaceId/api-keys",
-        "description": "",
+        "operationId": "deleteWorkspaceApiKey",
+        "summary": "Revoke a workspace API key",
         "tags": [
-          "Workspace",
-          "Workspace Admin"
+          "Platform API",
+          "Workspace"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
             "sessionCookie": []
           }
         ],
+        "description": "Session-only trust-root route.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteApiKeyRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "API key revoked",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true
+                  "$ref": "#/components/schemas/DeleteWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6559,17 +6770,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
           },
           "403": {
-            "description": "Forbidden",
+            "description": "Member manager role required",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/PlatformError"
                 }
               }
             }
@@ -6577,7 +6788,91 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/campaigns": {
+    "/api/workspaces/{workspaceId}/audit-events": {
+      "get": {
+        "operationId": "listWorkspaceAuditEvents",
+        "summary": "List workspace audit events",
+        "tags": [
+          "Platform API",
+          "Workspace"
+        ],
+        "x-callcaster-capability": "audit.read",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "description": "Cursor-paginated immutable audit log for privileged workspace actions. Requires owner session or an API key with the audit.read capability.",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Opaque cursor from a previous page's next_cursor."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit events page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceAuditEventListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner session required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/campaigns": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_campaigns",
         "summary": "GET /api/workspaces/:workspaceId/campaigns",
@@ -6590,6 +6885,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -6644,7 +6940,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId": {
+    "/api/campaigns/{campaignId}": {
       "get": {
         "operationId": "getCampaigns_campaignId",
         "summary": "GET /api/campaigns/:campaignId",
@@ -6657,6 +6953,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -6711,6 +7008,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -6766,7 +7064,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/queue": {
+    "/api/campaigns/{campaignId}/queue": {
       "get": {
         "operationId": "getCampaigns_campaignId_queue",
         "summary": "GET /api/campaigns/:campaignId/queue",
@@ -6779,6 +7077,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -6833,6 +7132,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -6888,25 +7188,22 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/results": {
+    "/api/campaigns/{campaignId}/results": {
       "get": {
         "operationId": "getCampaigns_campaignId_results",
         "summary": "GET /api/campaigns/:campaignId/results",
         "description": "",
         "tags": [
           "Analytics & Export",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "responses": {
@@ -6944,7 +7241,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/call-session": {
+    "/api/campaigns/{campaignId}/call-session": {
       "get": {
         "operationId": "getCampaigns_campaignId_call_session",
         "summary": "GET /api/campaigns/:campaignId/call-session",
@@ -6997,7 +7294,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/call-session/release": {
+    "/api/campaigns/{campaignId}/call-session/release": {
       "post": {
         "operationId": "postCampaigns_campaignId_call_session_release",
         "summary": "POST /api/campaigns/:campaignId/call-session/release",
@@ -7062,7 +7359,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/contacts": {
+    "/api/workspaces/{workspaceId}/contacts": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_contacts",
         "summary": "GET /api/workspaces/:workspaceId/contacts",
@@ -7075,6 +7372,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7129,7 +7427,7 @@
         }
       }
     },
-    "/api/contacts/:contactId": {
+    "/api/contacts/{contactId}": {
       "get": {
         "operationId": "getContacts_contactId",
         "summary": "GET /api/contacts/:contactId",
@@ -7142,6 +7440,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7196,6 +7495,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -7239,7 +7539,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audiences": {
+    "/api/workspaces/{workspaceId}/audiences": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audiences",
         "summary": "GET /api/workspaces/:workspaceId/audiences",
@@ -7252,6 +7552,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7306,7 +7607,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audiences/:audienceId": {
+    "/api/workspaces/{workspaceId}/audiences/{audienceId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audiences_audienceId",
         "summary": "GET /api/workspaces/:workspaceId/audiences/:audienceId",
@@ -7319,6 +7620,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7373,7 +7675,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audience-uploads/:uploadId": {
+    "/api/workspaces/{workspaceId}/audience-uploads/{uploadId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audience_uploads_uploadId",
         "summary": "GET /api/workspaces/:workspaceId/audience-uploads/:uploadId",
@@ -7386,6 +7688,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7440,7 +7743,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/scripts": {
+    "/api/workspaces/{workspaceId}/scripts": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_scripts",
         "summary": "GET /api/workspaces/:workspaceId/scripts",
@@ -7453,6 +7756,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7507,7 +7811,7 @@
         }
       }
     },
-    "/api/scripts/:scriptId": {
+    "/api/scripts/{scriptId}": {
       "get": {
         "operationId": "getScripts_scriptId",
         "summary": "GET /api/scripts/:scriptId",
@@ -7520,6 +7824,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7563,7 +7868,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/surveys": {
+    "/api/workspaces/{workspaceId}/surveys": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_surveys",
         "summary": "GET /api/workspaces/:workspaceId/surveys",
@@ -7576,6 +7881,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7630,7 +7936,7 @@
         }
       }
     },
-    "/api/surveys/:surveyId": {
+    "/api/surveys/{surveyId}": {
       "get": {
         "operationId": "getSurveys_surveyId",
         "summary": "GET /api/surveys/:surveyId",
@@ -7643,6 +7949,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7686,7 +7993,7 @@
         }
       }
     },
-    "/api/surveys/:surveyId/responses": {
+    "/api/surveys/{surveyId}/responses": {
       "get": {
         "operationId": "getSurveys_surveyId_responses",
         "summary": "GET /api/surveys/:surveyId/responses",
@@ -7699,6 +8006,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7742,25 +8050,22 @@
         }
       }
     },
-    "/api/surveys/:surveyId/responses/export": {
+    "/api/surveys/{surveyId}/responses/export": {
       "get": {
         "operationId": "getSurveys_surveyId_responses_export",
         "summary": "GET /api/surveys/:surveyId/responses/export",
         "description": "",
         "tags": [
           "Analytics & Export",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "responses": {
@@ -7798,7 +8103,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/conversations": {
+    "/api/workspaces/{workspaceId}/conversations": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_conversations",
         "summary": "GET /api/workspaces/:workspaceId/conversations",
@@ -7811,6 +8116,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7865,7 +8171,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/conversations/:contactNumber": {
+    "/api/workspaces/{workspaceId}/conversations/{contactNumber}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_conversations_contactNumber",
         "summary": "GET /api/workspaces/:workspaceId/conversations/:contactNumber",
@@ -7878,6 +8184,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -7932,25 +8239,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audios": {
+    "/api/workspaces/{workspaceId}/audios": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audios",
         "summary": "GET /api/workspaces/:workspaceId/audios",
         "description": "",
         "tags": [
           "Media",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -8004,18 +8308,15 @@
         "description": "",
         "tags": [
           "Media",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "requestBody": {
@@ -8065,25 +8366,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/voicemails": {
+    "/api/workspaces/{workspaceId}/voicemails": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_voicemails",
         "summary": "GET /api/workspaces/:workspaceId/voicemails",
         "description": "",
         "tags": [
           "Media",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -8132,25 +8430,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/analytics": {
+    "/api/workspaces/{workspaceId}/analytics": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_analytics",
         "summary": "GET /api/workspaces/:workspaceId/analytics",
         "description": "",
         "tags": [
           "Analytics & Export",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -8199,25 +8494,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/exports": {
+    "/api/workspaces/{workspaceId}/exports": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_exports",
         "summary": "GET /api/workspaces/:workspaceId/exports",
         "description": "",
         "tags": [
           "Analytics & Export",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -8271,18 +8563,15 @@
         "description": "",
         "tags": [
           "Analytics & Export",
-          "Integrator API"
+          "User API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "requestBody": {
@@ -8332,7 +8621,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/calls": {
+    "/api/workspaces/{workspaceId}/calls": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_calls",
         "summary": "GET /api/workspaces/:workspaceId/calls",
@@ -8396,7 +8685,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/calls/listening": {
+    "/api/workspaces/{workspaceId}/calls/listening": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_calls_listening",
         "summary": "POST /api/workspaces/:workspaceId/calls/listening",
@@ -8512,7 +8801,162 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/handset/session": {
+    "/api/workspaces/{workspaceId}/calls/{callSid}/disconnect": {
+      "post": {
+        "operationId": "disconnectWorkspaceCall",
+        "summary": "Disconnect an active workspace call",
+        "tags": [
+          "Platform API",
+          "Telephony"
+        ],
+        "x-callcaster-capability": "calls.control",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "description": "Pause/hang up a live call using workspace Twilio credentials. Requires session or API key scoped to the call workspace.",
+        "responses": {
+          "200": {
+            "description": "Disconnect initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallDisconnectResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Call not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Twilio disconnect failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start": {
+      "post": {
+        "operationId": "startCampaignDialer",
+        "summary": "Start auto-dial conference for a campaign",
+        "tags": [
+          "Platform API",
+          "Dialer",
+          "Telephony"
+        ],
+        "x-callcaster-capability": "calls.start",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "description": "Authenticated caller+ session or workspace API key. API keys must supply `agentUserId` for a verified caller in the workspace.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DialerStartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conference started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DialerStartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient role or MFA enrollment required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Campaign not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/handset/session": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_handset_session",
         "summary": "GET /api/workspaces/:workspaceId/handset/session",
@@ -8735,7 +9179,7 @@
         }
       }
     },
-    "/api/admin/users/:userId": {
+    "/api/admin/users/{userId}": {
       "get": {
         "operationId": "getAdmin_users_userId",
         "summary": "GET /api/admin/users/:userId",
@@ -8843,7 +9287,7 @@
         }
       }
     },
-    "/api/admin/users/:userId/workspaces": {
+    "/api/admin/users/{userId}/workspaces": {
       "get": {
         "operationId": "getAdmin_users_userId_workspaces",
         "summary": "GET /api/admin/users/:userId/workspaces",
@@ -8951,7 +9395,7 @@
         }
       }
     },
-    "/api/admin/workspaces/:workspaceId/twilio": {
+    "/api/admin/workspaces/{workspaceId}/twilio": {
       "post": {
         "operationId": "postAdmin_workspaces_workspaceId_twilio",
         "summary": "POST /api/admin/workspaces/:workspaceId/twilio",
@@ -8977,6 +9421,446 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/*": {
+      "get": {
+        "operationId": "getAuth_*",
+        "summary": "GET /api/auth/*",
+        "description": "Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min.",
+        "tags": [
+          "Authentication",
+          "Public Form"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
+        "x-callcaster-docs-guide": "docs/api-auth-matrix.md",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postAuth_*",
+        "summary": "POST /api/auth/*",
+        "description": "Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min.",
+        "tags": [
+          "Authentication",
+          "Public Form"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
+        "x-callcaster-docs-guide": "docs/api-auth-matrix.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acd-router": {
+      "post": {
+        "operationId": "postAcd_router",
+        "summary": "POST /api/acd-router",
+        "description": "Twilio ACD wait URL.",
+        "tags": [
+          "Telephony",
+          "Provider Webhook"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acd-router/agent-bridge": {
+      "post": {
+        "operationId": "postAcd_router_agent_bridge",
+        "summary": "POST /api/acd-router/agent-bridge",
+        "description": "",
+        "tags": [
+          "Telephony",
+          "Provider Webhook"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acd-router/agent-status": {
+      "post": {
+        "operationId": "postAcd_router_agent_status",
+        "summary": "POST /api/acd-router/agent-status",
+        "description": "",
+        "tags": [
+          "Telephony",
+          "Provider Webhook"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acd-router/complete": {
+      "post": {
+        "operationId": "postAcd_router_complete",
+        "summary": "POST /api/acd-router/complete",
+        "description": "",
+        "tags": [
+          "Telephony",
+          "Provider Webhook"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/audiences/{audienceId}/uploads": {
+      "get": {
+        "operationId": "getWorkspaces_workspaceId_audiences_audienceId_uploads",
+        "summary": "GET /api/workspaces/:workspaceId/audiences/:audienceId/uploads",
+        "description": "",
+        "tags": [
+          "Audiences",
+          "Integrator API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope (required for session auth)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/events": {
+      "get": {
+        "operationId": "getWorkspaces_workspaceId_events",
+        "summary": "GET /api/workspaces/:workspaceId/events",
+        "description": "SSE stream for workspace events (activity log).",
+        "tags": [
+          "Misc",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope (required for session auth)."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -9439,6 +10323,823 @@
           "provisioning_warning": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "DialerStartRequest": {
+        "type": "object",
+        "required": [
+          "caller_id",
+          "selected_device"
+        ],
+        "properties": {
+          "caller_id": {
+            "type": "string",
+            "description": "E.164 caller ID to present on outbound dials."
+          },
+          "selected_device": {
+            "type": "string",
+            "description": "Twilio client device identifier for the agent leg."
+          },
+          "agentUserId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Required when authenticating with a workspace API key."
+          }
+        }
+      },
+      "DialerStartResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "conferenceName"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "conferenceName": {
+            "type": "string"
+          }
+        }
+      },
+      "CallDisconnectResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
+      "WorkspaceAuditEvent": {
+        "type": "object",
+        "required": [
+          "id",
+          "workspace_id",
+          "created_at",
+          "actor_type",
+          "action",
+          "outcome"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "actor_type": {
+            "type": "string",
+            "enum": [
+              "session",
+              "api_key",
+              "system",
+              "support"
+            ]
+          },
+          "actor_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "api_key_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "action": {
+            "type": "string"
+          },
+          "target_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "target_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failure",
+              "denied"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "WorkspaceAuditEventListResponse": {
+        "type": "object",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceAuditEvent"
+            }
+          },
+          "next_cursor": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "WorkspaceSummary": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "WorkspaceDetail": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "credits": {
+            "type": "number",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "WorkspaceDetailResponse": {
+        "type": "object",
+        "required": [
+          "workspace"
+        ],
+        "properties": {
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceSummary"
+          }
+        }
+      },
+      "UpdateWorkspaceRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
+      "UpdateWorkspaceResponse": {
+        "type": "object",
+        "required": [
+          "workspace"
+        ],
+        "properties": {
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceDetail"
+          }
+        }
+      },
+      "DeleteWorkspaceResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
+      "WorkspaceMemberRole": {
+        "type": "string",
+        "enum": [
+          "owner",
+          "admin",
+          "member",
+          "caller"
+        ]
+      },
+      "ProductCapabilityId": {
+        "type": "string",
+        "enum": [
+          "campaigns.read",
+          "campaigns.write",
+          "campaigns.dispatch",
+          "calls.start",
+          "calls.control",
+          "messages.send",
+          "members.invite",
+          "audit.read"
+        ],
+        "description": "Stable product capability ID used as an API-key scope."
+      },
+      "ApiKeySummary": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "key_prefix",
+          "created_at",
+          "scopes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "key_prefix": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_used_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductCapabilityId"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "ISO-8601 expiry; null only for pre-SEC-07 legacy keys."
+          }
+        }
+      },
+      "ApiKeyListResponse": {
+        "type": "object",
+        "required": [
+          "keys"
+        ],
+        "properties": {
+          "keys": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiKeySummary"
+            }
+          }
+        }
+      },
+      "CreateApiKeyRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "scopes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "scopes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ProductCapabilityId"
+            },
+            "description": "At least one capability scope is required."
+          },
+          "expires_in_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "description": "Key TTL in days (default 90, max 365)."
+          }
+        }
+      },
+      "CreateApiKeyResponse": {
+        "type": "object",
+        "required": [
+          "key",
+          "id",
+          "name",
+          "key_prefix",
+          "created_at",
+          "scopes"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Full secret key; shown once at creation."
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "key_prefix": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProductCapabilityId"
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "DeleteApiKeyRequest": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "WorkspaceMember": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "username",
+          "role"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "first_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "last_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/WorkspaceMemberRole"
+          }
+        }
+      },
+      "WorkspaceInvite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "$ref": "#/components/schemas/WorkspaceMemberRole"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "user": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "username": {
+                "type": "string",
+                "nullable": true
+              },
+              "first_name": {
+                "type": "string",
+                "nullable": true
+              },
+              "last_name": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          }
+        }
+      },
+      "WorkspaceMembersListResponse": {
+        "type": "object",
+        "required": [
+          "members",
+          "pending_invites"
+        ],
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceMember"
+            }
+          },
+          "pending_invites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceInvite"
+            }
+          }
+        }
+      },
+      "InviteMemberRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "role"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "$ref": "#/components/schemas/WorkspaceMemberRole"
+          }
+        }
+      },
+      "InviteMemberResponse": {
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "invite": {
+            "$ref": "#/components/schemas/WorkspaceInvite"
+          },
+          "warning": {
+            "type": "string"
+          }
+        }
+      },
+      "UpdateMemberRequest": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "role"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "$ref": "#/components/schemas/WorkspaceMemberRole"
+          }
+        }
+      },
+      "UpdateMemberResponse": {
+        "type": "object",
+        "required": [
+          "member"
+        ],
+        "properties": {
+          "member": {
+            "$ref": "#/components/schemas/WorkspaceMember"
+          }
+        }
+      },
+      "DeleteMemberRequest": {
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "target": {
+            "type": "string",
+            "enum": [
+              "member",
+              "invite"
+            ]
+          }
+        }
+      },
+      "WorkspaceWebhookConfig": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "destination_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "WorkspaceWebhookResponse": {
+        "type": "object",
+        "required": [
+          "webhook"
+        ],
+        "properties": {
+          "webhook": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceWebhookConfig"
+              }
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "UpsertWebhookRequest": {
+        "type": "object",
+        "required": [
+          "destination_url",
+          "events"
+        ],
+        "properties": {
+          "destination_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "webhook_id": {
+            "type": "integer"
+          }
+        }
+      },
+      "TestWebhookRequest": {
+        "type": "object",
+        "required": [
+          "destination_url",
+          "event"
+        ],
+        "properties": {
+          "destination_url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "custom_headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "event": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "TestWebhookResponse": {
+        "type": "object",
+        "properties": {
+          "data": {},
+          "status": {
+            "type": "integer"
+          },
+          "statusText": {
+            "type": "string"
+          }
+        }
+      },
+      "TransferOwnershipRequest": {
+        "type": "object",
+        "required": [
+          "new_owner_user_id"
+        ],
+        "properties": {
+          "new_owner_user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "TransferOwnershipResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "new_owner_user_id"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "new_owner_user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "WorkspacePhoneNumber": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "phone_number": {
+            "type": "string"
+          },
+          "friendly_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "inbound_action": {
+            "type": "string",
+            "nullable": true
+          },
+          "handset_enabled": {
+            "type": "boolean",
+            "nullable": true
+          }
+        },
+        "additionalProperties": true
+      },
+      "WorkspaceNumbersListResponse": {
+        "type": "object",
+        "required": [
+          "numbers"
+        ],
+        "properties": {
+          "numbers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspacePhoneNumber"
+            }
+          }
+        }
+      },
+      "PurchaseNumberRequest": {
+        "type": "object",
+        "required": [
+          "phone_number"
+        ],
+        "properties": {
+          "phone_number": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "PurchaseNumberResponse": {
+        "type": "object",
+        "required": [
+          "number"
+        ],
+        "properties": {
+          "number": {
+            "$ref": "#/components/schemas/WorkspacePhoneNumber"
+          },
+          "messagingServiceAttached": {
+            "type": "boolean"
+          },
+          "messagingServiceAttachError": {
+            "type": "string"
+          },
+          "partialSuccess": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PatchNumberRequest": {
+        "type": "object",
+        "properties": {
+          "friendly_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "inbound_action": {
+            "type": "string"
+          },
+          "inbound_audio": {
+            "type": "string",
+            "nullable": true
+          },
+          "inbound_ring_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "inbound_queue_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "inbound_script_id": {
+            "type": "integer",
+            "nullable": true
+          },
+          "handset_enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "PatchNumberResponse": {
+        "type": "object",
+        "required": [
+          "number"
+        ],
+        "properties": {
+          "number": {
+            "$ref": "#/components/schemas/WorkspacePhoneNumber"
           }
         }
       }

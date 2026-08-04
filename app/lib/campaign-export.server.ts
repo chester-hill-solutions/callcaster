@@ -1,13 +1,21 @@
-import { type SupabaseClient } from "@supabase/supabase-js";
-import { CSV_DEFAULT_LINE_ENDING, escapeCsvCell, type CsvCell } from "@/lib/csv";
-import type { Database } from "@/lib/database.types";
+import { csvRow } from "@/lib/csv";
+import {
+  countExportCampaignMessages,
+  countExportOutreachAttempts,
+  findCampaignForMessageExport,
+  findCampaignWithScriptForExport,
+  findExportCallsByOutreachAttemptIds,
+  findExportContactsByIds,
+  listExportCampaignMessages,
+  listExportOutreachAttempts,
+} from "@/lib/campaign-export-db.server";
+import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
 import {
   castExportScript,
   createInitialExportStatus,
   extractScriptQuestions,
   finalizeCsvExport,
-  parseAttemptResult,
   writeExportErrorStatus,
   writeExportStatus,
   type CampaignExportStatus,
@@ -21,7 +29,6 @@ import type {
   ExportMessage,
   ExportMessageWithContact,
   ExportOutreachAttempt,
-  ExportScript,
 } from "@/lib/campaign-export-types.server";
 
 export function generateCampaignExportId() {
@@ -31,7 +38,6 @@ export function generateCampaignExportId() {
 }
 
 export async function processMessageCampaignExport(
-  supabaseClient: SupabaseClient<Database>,
   campaignId: number,
   workspaceId: string,
   exportId: string,
@@ -47,38 +53,21 @@ export async function processMessageCampaignExport(
 
   try {
     statusData = await writeExportStatus(
-      supabaseClient,
       workspaceId,
       exportId,
       statusData,
       {},
     );
 
-    // First, get campaign info
-    const { data: campaignData, error: campaignError } = await supabaseClient
-      .from('campaign')
-      .select('id, title, start_date, end_date')
-      .eq('id', campaignId)
-      .eq('workspace', workspaceId)
-      .single();
+    const campaignData = await findCampaignForMessageExport(workspaceId, campaignId);
 
-    if (campaignError || !campaignData) {
-      throw new Error(campaignError?.message || "Campaign not found");
+    if (!campaignData) {
+      throw new Error("Campaign not found");
     }
 
     const campaign = campaignData as ExportCampaign;
 
-    // Get contacts in campaign queue
-    const { data: campaignContacts, error: contactsError } = await supabaseClient
-      .from('campaign_queue')
-      .select('contact_id')
-      .eq('campaign_id', campaignId);
-
-    if (contactsError) {
-      throw new Error(contactsError.message || "Error fetching campaign contacts");
-    }
-
-    const contactIds = campaignContacts.map(c => c.contact_id);
+    const contactIds = await getCampaignQueueContactIds(campaignId);
 
     if (contactIds.length === 0) {
       throw new Error("No contacts found in campaign");
@@ -97,21 +86,11 @@ export async function processMessageCampaignExport(
     for (let i = 0; i < contactIds.length; i += CONTACT_BATCH_SIZE) {
       const batchIds = contactIds.slice(i, i + CONTACT_BATCH_SIZE);
 
-      const { data: contactBatch, error: batchError } = await supabaseClient
-        .from('contact')
-        .select('*')
-        .in('id', batchIds)
-        .eq('workspace', workspaceId);
+      const contactBatch = await findExportContactsByIds(workspaceId, batchIds);
 
-      if (batchError) {
-        throw new Error(batchError.message || `Error fetching contact batch ${i}`);
-      }
+      contactDetails = [...contactDetails, ...contactBatch];
 
-      if (contactBatch) {
-        contactDetails = [...contactDetails, ...contactBatch];
-      }
-
-      statusData = await writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
+      statusData = await writeExportStatus(workspaceId, exportId, statusData, {
         progress: Math.round((i / contactIds.length) * 30),
         stage: "Fetching contacts",
       });
@@ -156,38 +135,26 @@ export async function processMessageCampaignExport(
     let totalMessages = 0;
     let processedMessages = 0;
 
-    // Count only messages recorded against this campaign to avoid leaking
-    // unrelated workspace conversations that happen to share a phone number.
-    const { count: messageCount, error: countError } = await supabaseClient
-      .from('message')
-      .select('*', { count: 'exact', head: true })
-      .eq('workspace', workspaceId)
-      .eq('campaign_id', campaignId)
-      .gte('date_created', campaign.start_date)
-      .lte('date_created', extendedEndDate.toISOString());
+    const startDate = campaign.start_date ?? "";
+    const endDate = extendedEndDate.toISOString();
 
-    if (countError) {
-      throw new Error(countError.message || "Error counting messages");
-    }
-
-    totalMessages = messageCount || 0;
+    totalMessages = await countExportCampaignMessages(
+      workspaceId,
+      campaignId,
+      startDate,
+      endDate,
+    );
 
     // Process messages in small chunks
     for (let offset = 0; offset < totalMessages; offset += MESSAGE_CHUNK_SIZE) {
-      // Get a chunk of messages
-      const { data: messages, error: messagesError } = await supabaseClient
-        .from('message')
-        .select('*')
-        .eq('workspace', workspaceId)
-        .eq('campaign_id', campaignId)
-        .gte('date_created', campaign.start_date)
-        .lte('date_created', extendedEndDate.toISOString())
-        .order('date_created', { ascending: true })
-        .range(offset, offset + MESSAGE_CHUNK_SIZE - 1);
-
-      if (messagesError) {
-        throw new Error(messagesError.message || `Error fetching messages chunk at offset ${offset}`);
-      }
+      const messages = await listExportCampaignMessages(
+        workspaceId,
+        campaignId,
+        startDate,
+        endDate,
+        offset,
+        MESSAGE_CHUNK_SIZE,
+      );
 
       if (!messages || messages.length === 0) {
         break;
@@ -215,39 +182,44 @@ export async function processMessageCampaignExport(
       // Add matched messages to CSV data
       if (matchedMessages.length > 0) {
         for (const item of matchedMessages) {
-          csvLines.push([
-            escapeExportCell(item.body),
-            escapeExportCell(item.direction),
-            escapeExportCell(item.status),
-            escapeExportCell(item.message_date),
-            escapeExportCell(item.contact.id),
-            escapeExportCell(item.contact.firstname),
-            escapeExportCell(item.contact.surname),
-            escapeExportCell(item.contact.phone),
-            escapeExportCell(item.contact.email),
-            escapeExportCell(item.contact.address),
-            escapeExportCell(item.contact.city),
-            escapeExportCell(item.contact.opt_out ? 'true' : 'false'),
-            escapeExportCell(item.contact.created_at),
-            escapeExportCell(item.contact.workspace),
-            escapeExportCell(item.contact.external_id),
-            escapeExportCell(item.contact.address_id),
-            escapeExportCell(item.contact.postal),
-            escapeExportCell(item.contact.carrier),
-            escapeExportCell(item.contact.province),
-            escapeExportCell(item.contact.country),
-            escapeExportCell(item.contact.cleanPhone),
-            escapeExportCell(campaign.title),
-            escapeExportCell(campaign.start_date),
-            escapeExportCell(campaign.end_date)
-          ].join(','));
+          csvLines.push(
+            csvRow(
+              [
+                item.body,
+                item.direction,
+                item.status,
+                item.message_date,
+                item.contact.id,
+                item.contact.firstname,
+                item.contact.surname,
+                item.contact.phone,
+                item.contact.email,
+                item.contact.address,
+                item.contact.city,
+                item.contact.opt_out ? 'true' : 'false',
+                item.contact.created_at,
+                item.contact.workspace,
+                item.contact.external_id,
+                item.contact.address_id,
+                item.contact.postal,
+                item.contact.carrier,
+                item.contact.province,
+                item.contact.country,
+                item.contact.cleanPhone,
+                campaign.title,
+                campaign.start_date,
+                campaign.end_date,
+              ],
+              { protectFromInjection: true },
+            ),
+          );
         }
       }
 
       processedMessages += messages.length;
 
       const progress = 30 + Math.round((processedMessages / totalMessages) * 70);
-      statusData = await writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
+      statusData = await writeExportStatus(workspaceId, exportId, statusData, {
         progress: Math.min(progress, 99),
         stage: "Processing messages",
         processed: processedMessages,
@@ -260,20 +232,19 @@ export async function processMessageCampaignExport(
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    await finalizeCsvExport(supabaseClient, workspaceId, exportId, statusData, csvLines, {
+    await finalizeCsvExport(workspaceId, exportId, statusData, csvLines, {
       campaignId,
       campaignName: campaign.title,
     });
   } catch (error) {
     logger.error("Export error:", error);
-    await writeExportErrorStatus(supabaseClient, workspaceId, exportId, statusData, error);
+    await writeExportErrorStatus(workspaceId, exportId, statusData, error);
   }
 }
 
 // Process call campaign export in chunks
 
 export async function processCallCampaignExport(
-  supabaseClient: SupabaseClient<Database>,
   campaignId: number,
   workspaceId: string,
   exportId: string,
@@ -288,7 +259,6 @@ export async function processCallCampaignExport(
 
   try {
     statusData = await writeExportStatus(
-      supabaseClient,
       workspaceId,
       exportId,
       statusData,
@@ -299,106 +269,57 @@ export async function processCallCampaignExport(
     const csvLines: string[] = [];
     let isFirstChunk = true;
 
-    // First, get campaign info
-    const { data: campaignData, error: campaignError } = await supabaseClient
-      .from('campaign')
-      .select('id, title, start_date, end_date, type, status')
-      .eq('id', campaignId)
-      .eq('workspace', workspaceId)
-      .single();
-    if (campaignError || !campaignData) {
-      throw new Error(campaignError?.message || "Campaign not found");
+    const campaignWithScript = await findCampaignWithScriptForExport(
+      workspaceId,
+      campaignId,
+    );
+    if (!campaignWithScript) {
+      throw new Error("Campaign not found");
     }
-    const campaignTableKey = campaignData?.type === "live_call" ? "live_campaign" : "ivr_campaign";
-    const { data: scriptData, error: scriptError } = await supabaseClient
-      .from(campaignTableKey)
-      .select('id, script_id, script(*)')
-      .eq('campaign_id', campaignId)
-      .single();
-    if (scriptError) {
-      throw new Error(scriptError.message || "Error fetching script");
-    }
-    
-    const script = castExportScript(scriptData?.script);
-    const campaign = campaignData as ExportCampaign;
+
+    const script = castExportScript(campaignWithScript.script);
+    const campaign = campaignWithScript as ExportCampaign;
     const scriptQuestions = extractScriptQuestions(script);
     const pages = Object.entries(script?.steps?.pages ?? {}).map(([pageId, pageData]) => ({
       id: pageId,
       title: pageData.title || pageId,
     }));
 
-    // Get count of outreach attempts
-    const { count: attemptCount, error: countError } = await supabaseClient
-      .from('outreach_attempt')
-      .select('*', { count: 'exact', head: true })
-      .eq('campaign_id', campaignId);
-
-    if (countError) {
-      throw new Error(countError.message || "Error counting attempts");
-    }
-
-    const totalAttempts = attemptCount || 0;
+    const totalAttempts = await countExportOutreachAttempts(workspaceId, campaignId);
     const ATTEMPT_CHUNK_SIZE = 100;
     let processedAttempts = 0;
 
     // Process attempts in small chunks
     for (let offset = 0; offset < totalAttempts; offset += ATTEMPT_CHUNK_SIZE) {
-      // Get a chunk of attempts
-      const { data: attempts, error: attemptsError } = await supabaseClient
-        .from('outreach_attempt')
-        .select('*')
-        .eq('campaign_id', campaignId)
-        .order('created_at', { ascending: true })
-        .range(offset, offset + ATTEMPT_CHUNK_SIZE - 1);
-
-      if (attemptsError) {
-        throw new Error(attemptsError.message || `Error fetching attempts chunk at offset ${offset}`);
-      }
+      const attempts = await listExportOutreachAttempts(
+        workspaceId,
+        campaignId,
+        offset,
+        ATTEMPT_CHUNK_SIZE,
+      );
 
       if (!attempts || attempts.length === 0) {
         break;
       }
 
-      // Get contact IDs from attempts
-      const contactIds = [...new Set(attempts.map(a => a.contact_id))];
+      const contactIds = [...new Set(attempts.map((a) => a.contact_id))];
 
-      // Get contacts
-      const { data: contacts, error: contactsError } = await supabaseClient
-        .from('contact')
-        .select('*')
-        .in('id', contactIds);
-
-      if (contactsError) {
-        throw new Error(contactsError.message || "Error fetching contacts for attempts");
-      }
+      const contacts = await findExportContactsByIds(workspaceId, contactIds);
 
       const contactsMap: Record<string, ExportContact> = {};
-      if (contacts) {
-        contacts.forEach(contact => {
-          contactsMap[contact.id] = contact;
-        });
+      for (const contact of contacts) {
+        contactsMap[contact.id] = contact;
       }
 
-      // Get call IDs from attempts
-      const attemptIds = attempts.map(a => a.id);
+      const attemptIds = attempts.map((a) => a.id);
 
-      // Get calls
-      const { data: calls, error: callsError } = await supabaseClient
-        .from('call')
-        .select('*')
-        .in('outreach_attempt_id', attemptIds);
-
-      if (callsError) {
-        throw new Error(callsError.message || "Error fetching calls for attempts");
-      }
+      const calls = await findExportCallsByOutreachAttemptIds(workspaceId, attemptIds);
 
       const callsMap: Record<string, ExportCall> = {};
-      if (calls) {
-        calls.forEach(call => {
-          if (call.outreach_attempt_id) {
-            callsMap[call.outreach_attempt_id] = call;
-          }
-        });
+      for (const call of calls) {
+        if (call.outreach_attempt_id) {
+          callsMap[call.outreach_attempt_id] = call;
+        }
       }
 
       // Match attempts with contacts and calls
@@ -419,9 +340,10 @@ export async function processCallCampaignExport(
           "attempt_id,disposition,full_result,attempt_start,call_sid,duration_seconds,answered_by,call_start,call_end,contact_id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,postal,province,country,campaign_name,campaign_start_date,campaign_end_date,campaign_type,campaign_status,credits_used,pages";
 
         // Add a column for each script question
-        const questionColumns = scriptQuestions
-          .map((q) => escapeExportCell(q.title))
-          .join(",");
+        const questionColumns = csvRow(
+          scriptQuestions.map((q) => q.title),
+          { protectFromInjection: true },
+        );
 
         csvLines.push(`${baseHeaders},${questionColumns}`);
         isFirstChunk = false;
@@ -471,50 +393,46 @@ export async function processCallCampaignExport(
           .map((page) => page.title)
           .join("|");
 
-        const baseData = [
-          escapeExportCell(item.id),
-          escapeExportCell(item.disposition || item.call.status || ""),
-          escapeExportCell(JSON.stringify(item.result)),
-          escapeExportCell(item.created_at),
-          escapeExportCell(item.call.sid),
-          escapeExportCell(durationSeconds.toString()),
-          escapeExportCell(item.call.answered_by),
-          escapeExportCell(item.call.start_time || item.call.date_created || ""),
-          escapeExportCell(item.call.end_time || item.call.date_updated || ""),
-          escapeExportCell(item.contact.id),
-          escapeExportCell(item.contact.firstname),
-          escapeExportCell(item.contact.surname),
-          escapeExportCell(item.contact.phone),
-          escapeExportCell(item.contact.email),
-          escapeExportCell(item.contact.address),
-          escapeExportCell(item.contact.city),
-          escapeExportCell(item.contact.opt_out ? "true" : "false"),
-          escapeExportCell(item.contact.created_at),
-          escapeExportCell(item.contact.workspace),
-          escapeExportCell(item.contact.postal),
-          escapeExportCell(item.contact.province),
-          escapeExportCell(item.contact.country),
-          escapeExportCell(campaign.title),
-          escapeExportCell(campaign.start_date),
-          escapeExportCell(campaign.end_date),
-          escapeExportCell(campaign.type),
-          escapeExportCell(campaign.status),
-          escapeExportCell(creditsUsed.toString()),
-          escapeExportCell(pageResponses),
+        const rowData = [
+          item.id,
+          item.disposition || item.call.status || "",
+          JSON.stringify(item.result),
+          item.created_at,
+          item.call.sid,
+          durationSeconds.toString(),
+          item.call.answered_by,
+          item.call.start_time || item.call.date_created || "",
+          item.call.end_time || item.call.date_updated || "",
+          item.contact.id,
+          item.contact.firstname,
+          item.contact.surname,
+          item.contact.phone,
+          item.contact.email,
+          item.contact.address,
+          item.contact.city,
+          item.contact.opt_out ? "true" : "false",
+          item.contact.created_at,
+          item.contact.workspace,
+          item.contact.postal,
+          item.contact.province,
+          item.contact.country,
+          campaign.title,
+          campaign.start_date,
+          campaign.end_date,
+          campaign.type,
+          campaign.status,
+          creditsUsed.toString(),
+          pageResponses,
+          ...scriptQuestions.map((q) => responses[q.id]),
         ];
 
-        // Add a column for each script question's response
-        const questionResponses = scriptQuestions.map((q) =>
-          escapeExportCell(responses[q.id]),
-        );
-
-        csvLines.push([...baseData, ...questionResponses].join(","));
+        csvLines.push(csvRow(rowData, { protectFromInjection: true }));
       }
 
       processedAttempts += attempts.length;
 
       const progress = Math.round((processedAttempts / totalAttempts) * 100);
-      statusData = await writeExportStatus(supabaseClient, workspaceId, exportId, statusData, {
+      statusData = await writeExportStatus(workspaceId, exportId, statusData, {
         progress: Math.min(progress, 99),
         stage: "Processing call attempts",
         processed: processedAttempts,
@@ -525,12 +443,9 @@ export async function processCallCampaignExport(
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    await finalizeCsvExport(supabaseClient, workspaceId, exportId, statusData, csvLines);
+    await finalizeCsvExport(workspaceId, exportId, statusData, csvLines);
   } catch (error) {
     logger.error("Export error:", error);
-    await writeExportErrorStatus(supabaseClient, workspaceId, exportId, statusData, error);
+    await writeExportErrorStatus(workspaceId, exportId, statusData, error);
   }
 }
-
-const escapeExportCell = (value: unknown): string =>
-  escapeCsvCell(value as CsvCell, { protectFromInjection: true });

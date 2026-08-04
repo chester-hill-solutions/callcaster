@@ -24,7 +24,9 @@ describe("logger.server", () => {
     expect(debug).not.toHaveBeenCalled();
   });
 
-  test("logs info/warn/error in non-development", async () => {
+  // Deployed environments emit JSON so Railway logs can be filtered on
+  // message/requestId/workspaceId. Positional output was unqueryable.
+  test("logs single-line JSON in non-development", async () => {
     process.env.NODE_ENV = "production";
     const info = vi.spyOn(console, "info").mockImplementation(() => {});
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -33,25 +35,80 @@ describe("logger.server", () => {
     const { logger } = await vi.importActual<typeof import("../app/lib/logger.server")>(
       "../app/lib/logger.server",
     );
-    logger.info("m1", 1);
+    logger.info("m1", { workspaceId: "ws-1" });
     logger.warn("m2", 2);
-    logger.error("m3", 3);
+    logger.error("m3", new Error("boom"));
 
-    expect(info).toHaveBeenCalledWith(
-      "[2020-01-01T00:00:00.000Z] [INFO]",
-      "m1",
-      1,
+    const infoEntry = JSON.parse(info.mock.calls[0][0] as string);
+    expect(infoEntry).toMatchObject({
+      timestamp: "2020-01-01T00:00:00.000Z",
+      level: "info",
+      message: "m1",
+      // Plain objects fold into the envelope so they are filterable.
+      workspaceId: "ws-1",
+    });
+
+    // Non-object args are preserved rather than dropped.
+    expect(JSON.parse(warn.mock.calls[0][0] as string)).toMatchObject({
+      level: "warn",
+      message: "m2",
+      args: [2],
+    });
+
+    const errorEntry = JSON.parse(error.mock.calls[0][0] as string);
+    expect(errorEntry.level).toBe("error");
+    expect(errorEntry.error).toMatchObject({ name: "Error", message: "boom" });
+    expect(typeof errorEntry.error.stack).toBe("string");
+  });
+
+  // DrizzleQueryError's own message is only "Failed query: … params: …"; the
+  // Postgres detail lives on cause. An alert without it is unactionable —
+  // which is exactly how a production incident arrived.
+  test("unwraps error.cause so the real failure is visible", async () => {
+    process.env.NODE_ENV = "production";
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { logger } = await vi.importActual<typeof import("../app/lib/logger.server")>(
+      "../app/lib/logger.server",
     );
-    expect(warn).toHaveBeenCalledWith(
-      "[2020-01-01T00:00:00.000Z] [WARN]",
-      "m2",
-      2,
+    const wrapped = new Error("Failed query: UPDATE job ...");
+    wrapped.cause = new Error('column "id" does not exist');
+    logger.error("worker.query_failed", wrapped);
+
+    const entry = JSON.parse(error.mock.calls[0][0] as string);
+    expect(entry.error.message).toContain("Failed query");
+    expect(entry.error.cause).toContain('column "id" does not exist');
+  });
+
+  test("JSON output survives circular structures", async () => {
+    process.env.NODE_ENV = "production";
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { logger } = await vi.importActual<typeof import("../app/lib/logger.server")>(
+      "../app/lib/logger.server",
     );
-    expect(error).toHaveBeenCalledWith(
-      "[2020-01-01T00:00:00.000Z] [ERROR]",
-      "m3",
-      3,
+    const circular: Record<string, unknown> = { name: "loop" };
+    circular.self = circular;
+    logger.error("cyclic", circular);
+
+    const entry = JSON.parse(error.mock.calls[0][0] as string);
+    expect(entry.message).toBe("cyclic");
+    expect(entry.name).toBe("loop");
+  });
+
+  test("a caller field cannot clobber the envelope", async () => {
+    process.env.NODE_ENV = "production";
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const { logger } = await vi.importActual<typeof import("../app/lib/logger.server")>(
+      "../app/lib/logger.server",
     );
+    logger.info("real message", { message: "impostor", level: "debug" });
+
+    const entry = JSON.parse(info.mock.calls[0][0] as string);
+    expect(entry.message).toBe("real message");
+    expect(entry.level).toBe("info");
+    expect(entry.field_message).toBe("impostor");
   });
 
   test("allows debug logs in development", async () => {

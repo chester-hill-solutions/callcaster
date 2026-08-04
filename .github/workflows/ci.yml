@@ -5,6 +5,13 @@ on:
     branches: [main, master]
   pull_request:
 
+# packages:read lets GITHUB_TOKEN fetch @chester-hill-solutions/* from GitHub
+# Packages when the workflow token is permitted. Prefer repository secret
+# NODE_AUTH_TOKEN (PAT with read:packages) if org package access fails.
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -12,18 +19,68 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
+      # test:node shells out to `bun test`, and the media-stream service tests
+      # spawn `bun run services/media-stream/index.ts`.
+      - uses: oven-sh/setup-bun@v2
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+      # The app resolves @chester-hill-solutions/scriptkit-* to vendor/ via a
+      # node_modules symlink, and those packages' "main" points at their
+      # committed dist/. Nothing else builds them, so a src/ edit without a
+      # rebuild silently ships stale code. Build here; the `git diff
+      # --exit-code` at the end of this job then fails on a stale dist/.
+      - run: npm run vendor:build
       - run: npm run typecheck
-      - run: npm run typecheck:deno
       - run: npm run lint
       - run: npm run test:node
+        env:
+          # The bun-test step imports server/bun.ts, which eagerly constructs
+          # the parent Twilio client at module scope. Tests never hit Twilio.
+          TWILIO_SID: AC_ci_test_placeholder
+          TWILIO_AUTH_TOKEN: ci_test_placeholder
       - run: npm run test:ui
       - run: npm run tools:routes:verify
       - run: npm run tools:api:surface:check
-      - run: npm run tools:api:codegen
-      - run: git diff --exit-code
+      - run: npm run check:route-server-leaks
+      - run: npm run check:twilio-webhooks
+      - run: npm run check:request-body-consumption
+      - run: npm run check:middleware
+      - run: npm run check:credit-writes
+      # requireDualAuth admits API keys, which carry no user — so
+      # requireWorkspaceAccess cannot check them. One route was declared
+      # session-only and authed dual, leaving key callers entirely unguarded.
+      - run: npm run check:dual-auth
+      # Security gates. These previously ran ONLY in `ci:local`, so a regression
+      # in workspace write authorization, or a loader leaking twilio_data /
+      # stripe_id to the client, could merge unnoticed.
+      - run: npm run check:route-authz
+      # Companion to the above: route-authz asks whether a workspaces+ WRITE
+      # enforces a ROLE. This asks whether ANY tenant-data route proves
+      # MEMBERSHIP — the question the api+ surface was never asked, and where
+      # three cross-tenant IDORs lived. Follows imports into the specific
+      # service functions a route calls, because this codebase checks there.
+      - run: npm run check:route-membership
+      - run: npm run check:workspace-projection
+      - run: npm run check:effects
+      - run: npm run check:type-safety
+      - run: npm run check:dry
+      - run: npm run check:handlers
+      - run: npm run check:db-rpcs
+      - run: npm run db:ledger:check
+      # The production install path. Its drift guard sat below a DATABASE_URL
+      # exit and no workflow invoked it, so a migration wired into the compose
+      # list but not the fresh-DB list was green here and produced a prod schema
+      # missing that migration.
+      - run: npm run db:bootstrap:check
+      # Ratchet (#1048): fail on new >800-line app files or growth of allowlisted offenders.
+      - run: npm run tools:check-file-size
+      # Codegen drift. Split out of `ci:local` because it requires a clean tree,
+      # which made the canonical pre-PR command unusable during the work it
+      # gates. Run it yourself before pushing: `npm run ci:codegen:verify`.
+      - run: npm run ci:codegen:verify
 
   bundle-guard:
     runs-on: ubuntu-latest
@@ -31,9 +88,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - run: npm run build
       - run: npm run check:client-bundle
 
@@ -43,9 +102,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
+      # The media-stream service tests spawn `bun run`.
+      - uses: oven-sh/setup-bun@v2
       - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - run: npm run test:coverage
         env:
           COVERAGE_FULL: "0"

@@ -13,8 +13,7 @@ describe("app/routes/api+/docs/openapi/all.route.tsx", () => {
 
   test("returns 405 when method not GET", async () => {
     const mod = await import("../app/routes/api+/docs/openapi/all.route");
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader({
         request: new Request("http://x", { method: "POST" }),
       } as never),
     );
@@ -23,8 +22,7 @@ describe("app/routes/api+/docs/openapi/all.route.tsx", () => {
 
   test("returns complete spec and cache headers on GET", async () => {
     const mod = await import("../app/routes/api+/docs/openapi/all.route");
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader({
         request: new Request("http://x", { method: "GET" }),
       } as never),
     );

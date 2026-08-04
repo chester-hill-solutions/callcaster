@@ -1,6 +1,6 @@
 export { action } from "./questions.action.server";
 
-import type { Json } from "@/lib/database.types";
+import type { Json } from "@/lib/db-types";
 
 interface RequestData {
   update?: Json;

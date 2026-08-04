@@ -31,6 +31,27 @@ vi.mock("@/hooks/utils/useOptimisticMutation", () => ({
   useOptimisticMutation: () => undefined,
 }));
 
+// Bridge Radix Select to a native <select> so existing fireEvent.change tests
+// keep working while production uses the real ui/select primitives. Radix
+// Select.Root accepts `disabled`, so it is passed through here too.
+vi.mock("@/components/ui/select", () => ({
+  Select: ({ value, onValueChange, disabled, children }: any) => (
+    <select
+      value={value ?? ""}
+      disabled={disabled}
+      onChange={(e) => onValueChange?.(e.target.value)}
+    >
+      {children}
+    </select>
+  ),
+  SelectTrigger: ({ children }: any) => <>{children}</>,
+  SelectValue: ({ placeholder }: any) => <option value="">{placeholder}</option>,
+  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectItem: ({ value, children }: any) => (
+    <option value={value}>{children}</option>
+  ),
+}));
+
 describe("app/components/queue/StatusDropdown.tsx", () => {
   test("changes status", async () => {
     const { StatusDropdown } = await import("@/components/queue/StatusDropdown");
@@ -109,10 +130,36 @@ describe("app/components/queue/QueueTable.tsx", () => {
     render(<QueueTable {...defaultQueueTableProps()} />);
     expect(screen.getByText(/Total: 1 of 1/i)).toBeInTheDocument();
   });
+
+  test("each icon-only column sort control has an accessible name", async () => {
+    const { QueueTable } = await import("@/components/queue/QueueTable");
+    render(<QueueTable {...defaultQueueTableProps()} />);
+    for (const label of ["Name", "Phone", "Email", "Address", "Audiences", "Status"]) {
+      expect(
+        screen.getByRole("button", { name: `Sort by ${label}` }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  // Sort param reflects the click immediately (next order computed before toggle).
+  test("the sort control reports the sort field back to the caller", async () => {
+    const { QueueTable } = await import("@/components/queue/QueueTable");
+    const handleFilterChange = vi.fn();
+    render(
+      <QueueTable {...defaultQueueTableProps()} handleFilterChange={handleFilterChange} />,
+    );
+    const sortByPhone = screen.getByRole("button", { name: "Sort by Phone" });
+
+    fireEvent.click(sortByPhone);
+    expect(handleFilterChange).toHaveBeenNthCalledWith(1, "sort", "phone.asc");
+
+    fireEvent.click(sortByPhone);
+    expect(handleFilterChange).toHaveBeenNthCalledWith(2, "sort", "phone.desc");
+  });
 });
 
 describe("app/components/queue/ContactSearchDialog.tsx", () => {
-  test("opens dialog", async () => {
+  test("renders inline search panel when open", async () => {
     const { ContactSearchDialog } = await import("@/components/queue/ContactSearchDialog");
     render(
       <ContactSearchDialog
@@ -125,5 +172,6 @@ describe("app/components/queue/ContactSearchDialog.tsx", () => {
       />,
     );
     expect(screen.getByText("Search Contacts")).toBeInTheDocument();
+    expect(screen.getByTestId("contact-search-panel")).toBeInTheDocument();
   });
 });

@@ -41,3 +41,8 @@ Thumbs.db
 *.tmp
 *.log
 
+
+# Secrets — never bake into images
+app/transcribe.json
+*.serviceaccount.json
+scripts/dev/certs/

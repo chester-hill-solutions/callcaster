@@ -1,10 +1,22 @@
 /**
  * Contact-related database functions
  */
-import { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import { and, eq, ilike, inArray, isNotNull, ne, or, type SQL } from "drizzle-orm";
+import type { Database } from "@/lib/db-types";
 import { Contact } from "../types";
 import { logger } from "../logger.server";
+import { rpcFindContactByPhone } from "@/lib/db-rpc.server";
+import { buildContactSearchWhere } from "@/lib/contacts/search.server";
+import {
+  audience as audienceTable,
+  contact as contactTable,
+  contact_audience,
+  households as householdsTable,
+} from "@/db/schema";
+import { db } from "@/server/db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { householdKeyFor } from "@/lib/household-key";
+import { stripPhoneNumber } from "@/lib/phone";
 
 function dedupeContactsById(contacts: Contact[]): Contact[] {
   return Array.from(
@@ -16,7 +28,7 @@ function dedupeContactsById(contacts: Contact[]): Contact[] {
   );
 }
 
-function buildExactPhoneCandidates(fullNumber: string): string[] {
+export function buildExactPhoneCandidates(fullNumber: string): string[] {
   const candidates = new Set<string>();
 
   if (!fullNumber) {
@@ -62,82 +74,147 @@ function buildPrefixPhoneCandidates(fullNumber: string): string[] {
   return Array.from(candidates);
 }
 
+function phoneLookupFilters(exactPhoneCandidates: string[]): SQL | undefined {
+  if (exactPhoneCandidates.length === 0) {
+    return undefined;
+  }
+
+  return and(
+    inArray(contactTable.phone, exactPhoneCandidates),
+    isNotNull(contactTable.phone),
+    ne(contactTable.phone, ""),
+  );
+}
+
+export async function findContactsByPhone(
+  workspaceId: string,
+  phoneNumber: string,
+  tdb?: TenantDb,
+): Promise<Contact[]> {
+  const fullNumber = stripPhoneNumber(phoneNumber);
+  if (!fullNumber) {
+    return [];
+  }
+
+  const tenantDb = tdb ?? createTenantDb(workspaceId);
+  const exactPhoneCandidates = buildExactPhoneCandidates(fullNumber);
+  const exactFilter = phoneLookupFilters(exactPhoneCandidates);
+
+  if (!exactFilter) {
+    return [];
+  }
+
+  const exactMatches = (await tenantDb.contact.findMany({
+    where: exactFilter,
+  })) as Contact[];
+  if (exactMatches.length > 0) {
+    return exactMatches;
+  }
+
+  const prefixCandidates = buildPrefixPhoneCandidates(fullNumber);
+  const prefixFilters = prefixCandidates.map((candidate) =>
+    ilike(contactTable.phone, `${candidate}%`),
+  );
+
+  if (prefixFilters.length === 0) {
+    return exactMatches;
+  }
+
+  return (await tenantDb.contact.findMany({
+    where: and(or(...prefixFilters), isNotNull(contactTable.phone), ne(contactTable.phone, "")),
+  })) as Contact[];
+}
+
+export async function searchContactsForQueuePicker(
+  workspaceId: string,
+  searchQuery: string,
+): Promise<Contact[]> {
+  const tdb = createTenantDb(workspaceId);
+  const searchWhere = buildContactSearchWhere(searchQuery);
+  if (!searchWhere) {
+    return [];
+  }
+
+  const contacts = (await tdb.contact.findMany({
+    where: searchWhere,
+    limit: 10,
+  })) as Contact[];
+
+  if (contacts.length === 0) {
+    return [];
+  }
+
+  const contactIds = contacts.map((contact) => contact.id);
+  const audienceLinks = await db
+    .select({
+      contact_id: contact_audience.contact_id,
+      audience_id: contact_audience.audience_id,
+    })
+    .from(contact_audience)
+    .where(inArray(contact_audience.contact_id, contactIds));
+
+  const audiencesByContactId = new Map<number, Array<{ audience_id: number }>>();
+  for (const link of audienceLinks) {
+    const existing = audiencesByContactId.get(link.contact_id) ?? [];
+    existing.push({ audience_id: link.audience_id });
+    audiencesByContactId.set(link.contact_id, existing);
+  }
+
+  return contacts.map((contact) => ({
+    ...contact,
+    contact_audience: audiencesByContactId.get(contact.id) ?? [],
+  }));
+}
+
 export const findPotentialContacts = async (
-  supabaseClient: SupabaseClient<Database>,
   phoneNumber: string,
   workspaceId: string,
+  tdb?: TenantDb,
 ) => {
-  const fullNumber = phoneNumber.replace(/\D/g, "");
+  const fullNumber = stripPhoneNumber(phoneNumber);
   if (!fullNumber) {
     return { data: [], error: null };
   }
 
-  const rpcResult = await supabaseClient.rpc("find_contact_by_phone", {
-    p_workspace_id: workspaceId,
-    p_phone_number: phoneNumber,
-  });
-  if (!rpcResult.error) {
-    return rpcResult;
+  try {
+    const data = await rpcFindContactByPhone(workspaceId, phoneNumber);
+    return { data, error: null };
+  } catch (rpcError) {
+    const error =
+      rpcError instanceof Error ? rpcError : new Error(String(rpcError));
+    logger.warn(
+      "find_contact_by_phone RPC failed, falling back to legacy search",
+      {
+        workspaceId,
+        message: error.message,
+      },
+    );
+
+    try {
+      const contacts = await findContactsByPhone(workspaceId, phoneNumber, tdb);
+      return { data: contacts, error: null };
+    } catch (fallbackError) {
+      return { data: null, error: fallbackError as Error };
+    }
   }
-
-  logger.warn(
-    "find_contact_by_phone RPC failed, falling back to legacy search",
-    {
-      workspaceId,
-      message: rpcResult.error.message,
-      code: (rpcResult.error as { code?: string }).code,
-    },
-  );
-
-  const exactPhoneCandidates = buildExactPhoneCandidates(fullNumber);
-  if (exactPhoneCandidates.length === 0) {
-    return { data: [], error: null };
-  }
-
-  const exactMatchResult = await supabaseClient
-    .from("contact")
-    .select()
-    .eq("workspace", workspaceId)
-    .in("phone", exactPhoneCandidates)
-    .not("phone", "is", null)
-    .neq("phone", "");
-
-  if (exactMatchResult.error || (exactMatchResult.data?.length ?? 0) > 0) {
-    return exactMatchResult;
-  }
-
-  const prefixFilters = buildPrefixPhoneCandidates(fullNumber)
-    .map((candidate) => `phone.ilike.${candidate}%`)
-    .join(",");
-
-  if (!prefixFilters) {
-    return exactMatchResult;
-  }
-
-  return supabaseClient
-    .from("contact")
-    .select()
-    .eq("workspace", workspaceId)
-    .or(prefixFilters)
-    .not("phone", "is", null)
-    .neq("phone", "");
 };
 
 export async function fetchContactData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
   contact_id: number | string | null | undefined,
   contact_number: string,
+  tdb?: TenantDb,
 ) {
+  const tenantDb = tdb ?? createTenantDb(workspaceId);
   const potentialContacts: Contact[] = [];
   let contact: Contact | null = null;
   let contactError: unknown = null;
 
   if (contact_number && !contact_id) {
     const { data: contacts } = await findPotentialContacts(
-      supabaseClient,
       contact_number,
       workspaceId,
+      tenantDb,
     );
     const dedupedContacts = dedupeContactsById((contacts || []) as Contact[]);
 
@@ -149,17 +226,12 @@ export async function fetchContactData(
   }
 
   if (contact_id) {
-    const { data: findContact, error: findContactError } = await supabaseClient
-      .from("contact")
-      .select()
-      .eq("workspace", workspaceId)
-      .eq("id", Number(contact_id))
-      .single();
-
-    if (findContactError) {
+    try {
+      contact = (await tenantDb.contact.findFirst({
+        where: eq(contactTable.id, Number(contact_id)),
+      })) as Contact | null;
+    } catch (findContactError) {
       contactError = findContactError;
-    } else {
-      contact = findContact;
     }
   }
 
@@ -167,119 +239,229 @@ export async function fetchContactData(
 }
 
 export const updateContact = async (
-  supabaseClient: SupabaseClient<Database>,
+  workspaceId: string,
   data: Partial<Contact>,
+  tdb?: TenantDb,
 ) => {
   if (!data.id) {
     throw new Error("Contact ID is required");
   }
+
+  const tenantDb = tdb ?? createTenantDb(workspaceId);
   const sanitizedData = Object.fromEntries(
     Object.entries(data).filter(
       ([key, value]) => key !== "audience_id" && value !== undefined,
     ),
   ) as Partial<Contact>;
 
-  const { data: update, error } = await supabaseClient
-    .from("contact")
-    .update(sanitizedData)
-    .eq("id", data.id)
-    .select();
+  const [updated] = await tenantDb.contact.update({
+    set: sanitizedData,
+    where: eq(contactTable.id, data.id),
+  });
 
-  if (error) throw error;
-  if (!update || update.length === 0) throw new Error("Contact not found");
+  if (!updated) {
+    throw new Error("Contact not found");
+  }
 
-  return update[0];
+  return updated;
 };
 
+/**
+ * Fallback audience name used to keep chat-created contacts visible to
+ * audience-scoped campaign features when the caller didn't pick one.
+ */
+export const DEFAULT_CHAT_AUDIENCE_NAME = "SMS Contacts";
+
+async function findOrCreateDefaultChatAudience(
+  tenantDb: TenantDb,
+  workspaceId: string,
+): Promise<number | null> {
+  const existing = (await tenantDb.audience.findFirst({
+    where: eq(audienceTable.name, DEFAULT_CHAT_AUDIENCE_NAME),
+  })) as { id: number } | undefined;
+
+  if (existing?.id) {
+    return existing.id;
+  }
+
+  const [created] = await tenantDb.audience.insert({
+    name: DEFAULT_CHAT_AUDIENCE_NAME,
+    is_conditional: false,
+    created_at: new Date().toISOString(),
+  });
+
+  return created?.id ?? null;
+}
+
+/**
+ * Find-or-create the household for a contact's address within a workspace.
+ *
+ * Returns the household id, or null when the address/postal pair doesn't
+ * normalize to a household key (see app/lib/household-key.ts). Concurrency-safe
+ * via the households_workspace_key_uniq unique index: the insert is
+ * ON CONFLICT DO NOTHING, and a lost race falls through to selecting the row
+ * the winner created. The tenant-db wrapper doesn't expose onConflict, so this
+ * uses the raw db client with an explicit workspace_id (matching the
+ * contact_audience insert below).
+ */
+async function findOrCreateHouseholdId(
+  workspaceId: string,
+  fields: {
+    address?: string | null;
+    city?: string | null;
+    province?: string | null;
+    postal?: string | null;
+  },
+): Promise<string | null> {
+  const householdKey = householdKeyFor(fields.address ?? null, fields.postal ?? null);
+  if (!householdKey) return null;
+
+  const nowIso = new Date().toISOString();
+  const [inserted] = await db
+    .insert(householdsTable)
+    .values({
+      workspace_id: workspaceId,
+      household_key: householdKey,
+      address: fields.address ?? null,
+      city: fields.city ?? null,
+      province: fields.province ?? null,
+      postal: fields.postal ?? null,
+      do_not_knock: false,
+      created_at: nowIso,
+      updated_at: nowIso,
+    })
+    .onConflictDoNothing({
+      target: [householdsTable.workspace_id, householdsTable.household_key],
+    })
+    .returning({ id: householdsTable.id });
+  if (inserted) return inserted.id;
+
+  const [existing] = await db
+    .select({ id: householdsTable.id })
+    .from(householdsTable)
+    .where(
+      and(
+        eq(householdsTable.workspace_id, workspaceId),
+        eq(householdsTable.household_key, householdKey),
+      ),
+    )
+    .limit(1);
+  return existing?.id ?? null;
+}
+
 export const createContact = async (
-  supabaseClient: SupabaseClient,
   contactData: Partial<Contact>,
   audience_id: string,
   user_id: string,
+  opts?: {
+    tdb?: TenantDb;
+    /**
+     * When true and no `audience_id` was supplied, auto-create-or-reuse the
+     * workspace's default "SMS Contacts" audience and link the new contact
+     * to it. Opt-in only (chat contact-creation flow) so every other
+     * `createContact` caller keeps its existing no-audience behavior.
+     */
+    assignDefaultAudienceIfMissing?: boolean;
+  },
 ) => {
-  const { workspace, firstname, surname, phone, email, address } = contactData;
-  const { data: insert, error } = await supabaseClient
-    .from("contact")
-    .insert({
-      workspace,
-      firstname,
-      surname,
-      phone,
-      email,
-      address,
-      created_by: user_id,
-    })
-    .select();
-
-  if (error) throw error;
-
-  if (audience_id && insert) {
-    const contactAudienceData = insert.map((contact) => ({
-      contact_id: contact.id,
-      audience_id,
-    }));
-    const { error: contactAudienceError } = await supabaseClient
-      .from("contact_audience")
-      .insert(contactAudienceData)
-      .select();
-    if (contactAudienceError) throw contactAudienceError;
+  if (!contactData.workspace) {
+    throw new Error("Workspace is required");
   }
 
-  return insert;
+  const tenantDb = opts?.tdb ?? createTenantDb(contactData.workspace);
+  const { workspace, firstname, surname, phone, email, address, city, province, postal } =
+    contactData;
+
+  const household_id = await findOrCreateHouseholdId(workspace, {
+    address,
+    city,
+    province,
+    postal,
+  });
+
+  const [inserted] = await tenantDb.contact.insert({
+    firstname,
+    surname,
+    phone,
+    email,
+    address,
+    city,
+    province,
+    postal,
+    household_id,
+    // Explicit empty jsonb array (matches the DB default) so the insert type
+    // stays satisfied independent of the schema-level default.
+    other_data: [],
+    created_by: user_id,
+  });
+
+  // Preserve existing behavior exactly when a caller supplies an
+  // audience_id: parse it and attempt the link regardless of whether it
+  // happens to be numeric (unchanged from prior callers' expectations).
+  // Only treat a *missing* audience_id as eligible for the opt-in default.
+  let resolvedAudienceId: number | null = audience_id ? Number(audience_id) : null;
+
+  if (!audience_id && opts?.assignDefaultAudienceIfMissing && inserted && workspace) {
+    resolvedAudienceId = await findOrCreateDefaultChatAudience(tenantDb, workspace);
+  }
+
+  if (resolvedAudienceId != null && inserted) {
+    await db.insert(contact_audience).values({
+      contact_id: inserted.id,
+      audience_id: resolvedAudienceId,
+      created_at: new Date().toISOString(),
+    });
+  }
+
+  return [inserted];
 };
 
 export const bulkCreateContacts = async (
-  supabaseClient: SupabaseClient,
   contacts: Partial<Contact>[],
   workspace_id: string,
   audience_id: string,
   user_id: string,
+  opts?: {
+    tdb?: TenantDb;
+  },
 ) => {
+  const tenantDb = opts?.tdb ?? createTenantDb(workspace_id);
   const contactsWithWorkspace = contacts.map((contact) => ({
     ...contact,
     workspace: workspace_id,
     created_by: user_id,
   }));
 
-  const { data: insert, error } = await supabaseClient
-    .from("contact")
-    .insert(contactsWithWorkspace)
-    .select();
+  const insert = await tenantDb.contact.insertMany(contactsWithWorkspace);
 
-  if (error) throw error;
-
-  const audienceMap = insert.map((contact) => ({
-    contact_id: contact.id,
-    audience_id,
+  const audienceMap = insert.map((row) => ({
+    contact_id: row.id,
+    audience_id: Number(audience_id),
+    created_at: new Date().toISOString(),
   }));
 
-  const { data: audience_insert, error: audience_insert_error } =
-    await supabaseClient.from("contact_audience").insert(audienceMap).select();
+  try {
+    const audience_insert =
+      audienceMap.length > 0 ? await db.insert(contact_audience).values(audienceMap).returning() : [];
 
-  if (audience_insert_error) {
-    const insertedIds = insert.map((contact) => contact.id);
+    return { insert, audience_insert };
+  } catch (audience_insert_error) {
+    const insertedIds = insert.map((row) => row.id);
     if (insertedIds.length > 0) {
-      const { error: rollbackError } = await supabaseClient
-        .from("contact")
-        .delete()
-        .eq("workspace", workspace_id)
-        .in("id", insertedIds);
-
-      if (rollbackError) {
-        logger.error(
-          "Failed to roll back contacts after audience insert failure",
-          {
-            workspace_id,
-            insertedIds,
-            rollbackError,
-            originalError: audience_insert_error,
-          },
-        );
+      try {
+        await tenantDb.contact.delete({
+          where: inArray(contactTable.id, insertedIds),
+        });
+      } catch (rollbackError) {
+        logger.error("Failed to roll back contacts after audience insert failure", {
+          workspace_id,
+          insertedIds,
+          rollbackError,
+          originalError: audience_insert_error,
+        });
       }
     }
 
     throw audience_insert_error;
   }
-
-  return { insert, audience_insert };
 };

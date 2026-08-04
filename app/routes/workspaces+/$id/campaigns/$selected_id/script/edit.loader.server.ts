@@ -1,11 +1,14 @@
-import { data as routeData, redirect } from "react-router";
-import { deepEqual } from "@/lib/utils";
-import { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } from "@/lib/database.server";
-import { isObject } from "@/lib/type-utils";
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { data as routeData } from "react-router";
+import {
+  getMedia,
+  getSignedUrls,
+  getUserRole,
+  getWorkspaceScripts,
+  listMedia,
+} from "@/lib/database/workspace.server";
+import { fetchCampaignForScriptEdit } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
-import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
 import type { Script } from "@/lib/types";
 import {
   type BaseCampaignDetails,
@@ -13,131 +16,123 @@ import {
   getScriptRecordingFileNames,
   type ScriptEditLoaderData,
 } from "./edit.types";
+import { defineLoader } from "@/lib/handler.server";
 
 type LoaderData = ScriptEditLoaderData;
-type PageData = LoaderData["data"];
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = defineLoader({
+  auth: ({ params, context }) => {
+    const { id: workspace_id, selected_id } = params;
 
-  const { id: workspace_id, selected_id } = params;
-  
-  if (!workspace_id || !selected_id) {
-    throw new Response("Missing required parameters", { status: 400 });
-  }
+    if (!workspace_id || !selected_id) {
+      throw new Response("Missing required parameters", { status: 400 });
+    }
 
-  const { supabaseClient, user } = await verifyAuth(request);
-  if (!user) {
-    return redirect("/signin");
-  }
+    return { ...getWorkspaceRouteContext(context), workspace_id, selected_id };
+  },
+  sideEffects: ["db-read", "external"],
+  handler: async ({ auth }) => {
+    const { workspace_id, selected_id, userRole } = auth;
+    const scripts = await getWorkspaceScripts({
+      workspace: workspace_id,
+    }) || [];
 
-  const userRole = await getUserRole({ supabaseClient, user, workspaceId: workspace_id });
-  const scripts = await getWorkspaceScripts({
-    workspace: workspace_id,
-    supabase: supabaseClient,
-  }) || [];
+    const campaignData = await fetchCampaignForScriptEdit(workspace_id, parseInt(selected_id, 10));
 
-  const { data: campaignData, error: campaignError } = await supabaseClient
-    .from("campaign")
-    .select(`*, campaign_audience(*)`)
-    .eq("id", parseInt(selected_id))
-    .single();
+    if (!campaignData) {
+      logger.error("Error fetching campaign data", new Error("Campaign not found"));
+      throw new Response("Error fetching campaign data", { status: 500 });
+    }
 
-  if (campaignError) {
-    logger.error("Error fetching campaign data", campaignError);
-    throw new Response("Error fetching campaign data", { status: 500 });
-  }
+    if (!campaignData.type || !["live_call", "message", "robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type)) {
+      throw new Response("Invalid campaign type", { status: 400 });
+    }
 
-  if (!campaignData.type || !["live_call", "message", "robocall", "simple_ivr", "complex_ivr"].includes(campaignData.type)) {
-    throw new Response("Invalid campaign type", { status: 400 });
-  }
+    let campaignDetails: BaseCampaignDetails | null = null;
+    let mediaNames: string[] = [];
 
-  let campaignDetails: BaseCampaignDetails | null = null;
-  let mediaNames: string[] = [];
+    const files = await listMedia(workspace_id);
+    if (files) {
+      mediaNames = files.map(file => file.name);
+    }
 
-  const files = await listMedia(supabaseClient, workspace_id);
-  if (files) {
-    mediaNames = files.map(file => file.name);
-  }
+    const campaignRow = campaignData as typeof campaignData & {
+      script_id: number | null;
+      message_media: string[] | null;
+      disposition_options: unknown;
+      live_questions: unknown;
+      voicedrop_audio: string | null;
+      script: Script | Script[] | null;
+    };
 
-  switch (campaignData.type) {
-    case "live_call":
-      ({ data: campaignDetails } = await supabaseClient
-        .from("live_campaign")
-        .select(`*, script(*)`)
-        .eq("campaign_id", parseInt(selected_id))
-        .single());
-      break;
+    const scriptRow = Array.isArray(campaignRow.script)
+      ? campaignRow.script[0] ?? undefined
+      : campaignRow.script ?? undefined;
 
-    case "message":
-      ({ data: campaignDetails } = await supabaseClient
-        .from("message_campaign")
-        .select()
-        .eq("campaign_id", parseInt(selected_id))
-        .single());
-      if (campaignDetails && Array.isArray(campaignDetails.message_media) && campaignDetails.message_media.length > 0) {
-        const mediaLinks = await getSignedUrls(
-          supabaseClient,
-          workspace_id,
-          campaignDetails.message_media
-        );
-        campaignDetails = {
-          ...campaignDetails,
-          mediaLinks: mediaLinks as unknown as { [key: string]: string }[]
-        };
-      }
-      break;
+    const baseDetails: BaseCampaignDetails = {
+      campaign_id: campaignRow.id,
+      created_at: campaignRow.created_at,
+      id: campaignRow.id,
+      script_id: campaignRow.script_id,
+      workspace: campaignRow.workspace ?? workspace_id,
+      script: scriptRow,
+      message_media: campaignRow.message_media ?? undefined,
+      body_text: (campaignRow as { body_text?: string | null }).body_text ?? "",
+      disposition_options: (campaignRow.disposition_options ?? undefined) as BaseCampaignDetails["disposition_options"],
+      questions: (campaignRow.live_questions ?? undefined) as BaseCampaignDetails["questions"],
+      voicedrop_audio: campaignRow.voicedrop_audio,
+    };
 
-    case "robocall":
-    case "simple_ivr":
-    case "complex_ivr":
-      ({ data: campaignDetails } = await supabaseClient
-        .from("ivr_campaign")
-        .select(`*, script(*)`)
-        .eq("campaign_id", parseInt(selected_id))
-        .single());
-      if (campaignDetails?.script?.steps) {
-        const fileNames = getScriptRecordingFileNames(campaignDetails.script);
-        const mediaLinks = await getMedia(
-          fileNames,
-          supabaseClient,
-          workspace_id
-        ) || [];
-        campaignDetails = {
-          ...campaignDetails,
-          mediaLinks: mediaLinks as unknown as { [key: string]: string }[]
-        };
-      }
-      break;
-  }
+    switch (campaignData.type) {
+      case "message":
+        if (Array.isArray(baseDetails.message_media) && baseDetails.message_media.length > 0) {
+          const mediaLinks = await getSignedUrls(
+            workspace_id,
+            baseDetails.message_media
+          );
+          campaignDetails = {
+            ...baseDetails,
+            mediaLinks: mediaLinks as unknown as { [key: string]: string }[]
+          };
+        } else {
+          campaignDetails = baseDetails;
+        }
+        break;
 
-  if (!campaignDetails) {
-    throw new Response("Campaign details not found", { status: 404 });
-  }
+      case "live_call":
+      case "robocall":
+      case "simple_ivr":
+      case "complex_ivr":
+        campaignDetails = baseDetails;
+        if (campaignDetails.script?.steps) {
+          const fileNames = getScriptRecordingFileNames(campaignDetails.script);
+          const mediaLinks = await getMedia(
+            fileNames,
+            workspace_id
+          ) || [];
+          campaignDetails = {
+            ...campaignDetails,
+            mediaLinks: mediaLinks as unknown as { [key: string]: string }[]
+          };
+        }
+        break;
+    }
 
-  const typedCampaignDetails: BaseCampaignDetails = {
-    campaign_id: campaignDetails.campaign_id,
-    created_at: campaignDetails.created_at,
-    id: campaignDetails.id,
-    script_id: campaignDetails.script_id,
-    workspace: campaignDetails.workspace,
-    script: campaignDetails.script,
-    mediaLinks: campaignDetails.mediaLinks,
-    message_media: campaignDetails.message_media,
-    disposition_options: campaignDetails.disposition_options ?? undefined,
-    questions: campaignDetails.questions ?? undefined,
-    voicedrop_audio: campaignDetails.voicedrop_audio,
-  };
+    if (!campaignDetails) {
+      throw new Response("Campaign details not found", { status: 404 });
+    }
 
-  return routeData({
-    workspace_id,
-    selected_id,
-    data: {
-      ...campaignData,
-      type: campaignData.type as CampaignType,
-      campaignDetails: typedCampaignDetails
-    },
-    mediaNames,
-    userRole: userRole?.role ?? "",
-    scripts,
-  } satisfies LoaderData);
-}
+    return routeData({
+      workspace_id,
+      selected_id,
+      data: {
+        ...campaignData,
+        type: campaignData.type as CampaignType,
+        campaignDetails,
+      },
+      mediaNames,
+      userRole: userRole ?? "",
+      scripts,
+    } satisfies LoaderData);
+  },
+});

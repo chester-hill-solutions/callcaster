@@ -1,53 +1,54 @@
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { deepEqual } from "@/lib/utils";
-import { getMedia, getSignedUrls, getUserRole, getWorkspaceScripts, listMedia } from "@/lib/database.server";
-import { isObject } from "@/lib/type-utils";
+import {
+  findCampaignMessageMedia,
+  updateCampaignMessageMedia,
+} from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
-import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { ActionFunctionArgs } from "react-router";
-import type { Script } from "@/lib/types";
+import { defineAction } from "@/lib/handler.server";
+import { MemberRole } from "@/lib/member-role";
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-write"],
+  handler: async ({ request, params, auth }) => {
+    const campaignId = params.selected_id;
+    const { headers, workspaceId, userRole } = auth;
+    if (!campaignId || !workspaceId) {
+      throw new Response("Campaign ID is required", { status: 400 });
+    }
 
-  const campaignId = params.selected_id;
-  if (!campaignId) {
-    throw new Response("Campaign ID is required", { status: 400 });
-  }
+    if (!hasMinRole(userRole, MemberRole.Member)) {
+      return routeData(
+        { success: false, error: "You don't have permission to perform this action" },
+        { headers, status: 403 },
+      );
+    }
 
-  const formData = await request.formData();
-  const mediaName = formData.get("fileName");
-  const encodedMediaName = mediaName ? encodeURI(mediaName.toString()) : null;
+    const formData = await request.formData();
+    const mediaName = formData.get("fileName");
+    const encodedMediaName = mediaName ? encodeURI(mediaName.toString()) : null;
 
-  if (!encodedMediaName) {
-    return routeData({ success: false, error: "File name is required" });
-  }
+    if (!encodedMediaName) {
+      return routeData({ success: false, error: "File name is required" });
+    }
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+    const campaign = await findCampaignMessageMedia(workspaceId, parseInt(campaignId, 10));
 
-  const { data: campaign, error } = await supabaseClient
-    .from("message_campaign")
-    .select("id, message_media")
-    .eq("campaign_id", parseInt(campaignId))
-    .single();
+    if (!campaign) {
+      logger.error("Campaign Error", new Error("Campaign not found"));
+      return routeData({ success: false, error: "Campaign not found" }, { headers });
+    }
 
-  if (error) {
-    logger.error("Campaign Error", error);
-    return routeData({ success: false, error: error }, { headers });
-  }
+    const campaignUpdate = await updateCampaignMessageMedia(
+      workspaceId,
+      parseInt(campaignId, 10),
+      campaign.message_media?.filter((med) => med !== encodedMediaName) || [],
+    );
 
-  const { data: campaignUpdate, error: updateError } = await supabaseClient
-    .from("message_campaign")
-    .update({
-      message_media: campaign.message_media?.filter(
-        (med) => med !== encodedMediaName,
-      ) || [],
-    })
-    .eq("campaign_id", parseInt(campaignId))
-    .select();
-
-  if (updateError) {
-    return routeData({ success: false, error: updateError }, { headers });
-  }
-  return routeData({ success: true, data: campaignUpdate }, { headers });
-}
+    if (!campaignUpdate) {
+      return routeData({ success: false, error: "Campaign update failed" }, { headers });
+    }
+    return routeData({ success: true, data: [campaignUpdate] }, { headers });
+  },
+});

@@ -1,34 +1,64 @@
-FROM node:20-bookworm-slim
+# syntax=docker/dockerfile:1
+
+# ─── Build stage ──────────────────────────────────────────────────────
+FROM oven/bun:1.3.5 AS builder
+
 WORKDIR /app
 
-# Add build argument for cache busting (Railway: set RAILWAY_CACHE_BUST env var)
-ARG CACHE_BUST=1
-RUN echo "Cache bust: $CACHE_BUST"
-
-# Copy package files first for better layer caching
-COPY package.json package-lock.json* ./
+# Copy dependency manifests and vendored packages (file: deps in package.json)
+COPY package.json bun.lock ./
+COPY vendor ./vendor
 
 # Install dependencies
-RUN npm install
-
-# Install ffmpeg for upload-time audio normalization
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg \
-  && rm -rf /var/lib/apt/lists/*
+RUN bun install --frozen-lockfile
 
 # Copy source code
 COPY . .
 
-# Clear any existing build artifacts to avoid stale cache issues
-# This ensures fresh builds on Railway (case-sensitive filesystem)
-RUN rm -rf build public/build node_modules/.cache
-
 # Build the application
-RUN npm run build
+RUN bun run build
 
-# Railway automatically provides PORT environment variable
-# Expose default port (Railway will override with their PORT)
+# Prune devDependencies so the production stage ships runtime deps only
+RUN rm -rf node_modules && bun install --frozen-lockfile --production
+
+# ─── Production stage ─────────────────────────────────────────────────
+FROM oven/bun:1.3.5-slim AS production
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOST=0.0.0.0
+
+# ffmpeg is a runtime dependency, not a build tool: app/lib/audio.server.ts
+# spawns it to normalize and trim uploaded audio. Without it every upload
+# fails with "Audio transcoding is unavailable".
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
+
+# Copy built assets and runtime source from builder
+COPY --from=builder --chown=bun:bun /app/build ./build
+COPY --from=builder --chown=bun:bun /app/public ./public
+COPY --from=builder --chown=bun:bun /app/server ./server
+COPY --from=builder --chown=bun:bun /app/app ./app
+COPY --from=builder --chown=bun:bun /app/shared ./shared
+COPY --from=builder --chown=bun:bun /app/services ./services
+# Needed when RUN_CLIENT_MIGRATIONS_ON_BOOT=true (ephemeral PR DBs).
+COPY --from=builder --chown=bun:bun /app/client/migrations ./client/migrations
+COPY --from=builder --chown=bun:bun /app/node_modules ./node_modules
+COPY --from=builder --chown=bun:bun /app/package.json ./package.json
+# Bun resolves the "@/*" import alias from tsconfig paths at runtime
+COPY --from=builder --chown=bun:bun /app/tsconfig.json ./tsconfig.json
+
+USER bun
+
+# Health check (bun fetch — curl is not available in the slim image)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD bun -e "fetch(\`http://localhost:\${process.env.PORT || 3000}/healthz\`).then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+
+# Expose port
 EXPOSE 3000
 
-# Start the application
-CMD npm start
+# Start with Bun server
+ENTRYPOINT ["bun", "run", "./server/bun.ts"]

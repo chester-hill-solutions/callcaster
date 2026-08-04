@@ -1,25 +1,19 @@
-import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { forgotPasswordBodySchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { forgotPassword } from "@/lib/platform-auth.server";
-import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
-import type { ActionFunctionArgs } from "react-router";
+import { rateLimitedPostAuth } from "@/lib/platform-auth-rate-limit.server";
+import { defineAction } from "@/lib/handler.server";
 
-export async function action({ request }: ActionFunctionArgs) {
-  if (request.method !== "POST") {
-    return jsonError("Method not allowed", 405);
-  }
+export const action = defineAction({
+  auth: rateLimitedPostAuth("auth:forgot-password"),
+  input: forgotPasswordBodySchema,
+  sideEffects: ["email"],
+  handler: async ({ request, input }) => {
+    const result = await forgotPassword(request, input);
+    if (!result.ok) {
+      return jsonError(result.error, result.status);
+    }
 
-  const rateLimited = enforceAuthRateLimit(request, "auth:forgot-password");
-  if (rateLimited) return rateLimited;
-
-  const parsed = await parseJsonBodyOrResponse(request, forgotPasswordBodySchema);
-  if (parsed instanceof Response) return parsed;
-
-  const result = await forgotPassword(request, parsed);
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
-
-  return jsonResponse({ success: true }, 200);
-}
+    return jsonResponse({ success: true }, 200);
+  },
+});

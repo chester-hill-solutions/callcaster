@@ -1,0 +1,216 @@
+import type { ContactImportTarget } from "../../../shared/contact-import-headers";
+
+export type AudienceUploadDraft = {
+  file: File;
+  fileName: string;
+  headers: string[];
+  previewRows: Record<string, string>[];
+  rowCount: number;
+  headerMapping: Record<string, ContactImportTarget>;
+  splitNameColumn: string | null;
+};
+
+export type AudienceUploadWizardKind = "file" | "map" | "review";
+
+/** Server snapshot shared by poll + realtime. */
+export type AudienceUploadServerSnapshot = {
+  status?: string | null;
+  total_contacts?: number | null;
+  processed_contacts?: number | null;
+  error_message?: string | null;
+  audience_id?: string | number | null;
+  stage?: string | null;
+  /** Rows dropped for invalid/unparseable phone numbers. */
+  skipped_invalid_contacts?: number | null;
+  /** Rows dropped as duplicates (within the file or already in the audience). */
+  skipped_duplicate_contacts?: number | null;
+  uploadId?: number | null;
+  file_name?: string | null;
+  file_size?: number | null;
+};
+
+/**
+ * Discriminated poll/API contract: API failures never share a flat bag with
+ * a successful failed-upload snapshot (which uses status + error_message).
+ */
+export type AudienceUploadStatusSuccess = {
+  ok: true;
+  snapshot: AudienceUploadServerSnapshot;
+};
+
+export type AudienceUploadStatusFailure = {
+  ok: false;
+  error: string;
+};
+
+export type AudienceUploadStatusResponse =
+  | AudienceUploadStatusSuccess
+  | AudienceUploadStatusFailure;
+
+/**
+ * Object-storage progress blob. Uses `error_message` (DB column name) so it
+ * cannot collide with API `{ ok: false, error }` on the wire.
+ */
+export type AudienceUploadSidecar = {
+  status?: string;
+  progress?: number;
+  uploadId?: number;
+  audienceId?: number;
+  workspaceId?: string;
+  stage?: string;
+  error_message?: string;
+  created_at?: string;
+  updated_at?: string;
+  skipped_invalid_contacts?: number;
+  skipped_duplicate_contacts?: number;
+  [key: string]: unknown;
+};
+
+export type AudienceUploadProgressStatus =
+  | "submitting"
+  | "processing"
+  | "completed"
+  | "error";
+
+/** Contact counters shared by every in-flight/terminal upload variant. */
+type UploadCounters = {
+  totalContacts: number;
+  processedContacts: number;
+  progress: number;
+  /** Import-time skip counters from the server snapshot (absent until known). */
+  skippedInvalidContacts?: number | null;
+  skippedDuplicateContacts?: number | null;
+};
+
+type SubmittingFields = UploadCounters & { warning: string | null };
+
+type ProcessingFields = UploadCounters & {
+  uploadId: number;
+  audienceId: string | null;
+  warning: string | null;
+};
+
+type CompletedFields = UploadCounters & { audienceId: string };
+
+export type AudienceUploadProgressState =
+  | { kind: "idle" }
+  | ({ kind: "submitting" } & SubmittingFields)
+  | ({ kind: "processing" } & ProcessingFields)
+  | ({ kind: "completed" } & CompletedFields)
+  | { kind: "error"; message: string };
+
+/**
+ * Single UI phase derived from wizard step + upload progress.
+ * Upload lifecycle always supersedes the pre-upload wizard.
+ */
+export type AudienceUploadPhase =
+  | { kind: "file" }
+  | { kind: "map"; draft: AudienceUploadDraft }
+  | { kind: "review"; draft: AudienceUploadDraft }
+  | ({ kind: "submitting"; draft: AudienceUploadDraft } & SubmittingFields)
+  | ({ kind: "processing"; draft: AudienceUploadDraft } & ProcessingFields)
+  | ({ kind: "completed" } & CompletedFields)
+  | { kind: "error"; draft: AudienceUploadDraft; message: string };
+
+export function resolveAudienceUploadPhase(args: {
+  wizard: AudienceUploadWizardKind;
+  draft: AudienceUploadDraft | null;
+  progress: AudienceUploadProgressState;
+}): AudienceUploadPhase {
+  const { wizard, draft, progress } = args;
+
+  switch (progress.kind) {
+    case "submitting":
+      if (!draft) return { kind: "file" };
+      return {
+        kind: "submitting",
+        draft,
+        totalContacts: progress.totalContacts,
+        processedContacts: progress.processedContacts,
+        progress: progress.progress,
+        warning: progress.warning,
+      };
+    case "processing":
+      if (!draft) return { kind: "file" };
+      return {
+        kind: "processing",
+        draft,
+        uploadId: progress.uploadId,
+        audienceId: progress.audienceId,
+        totalContacts: progress.totalContacts,
+        processedContacts: progress.processedContacts,
+        progress: progress.progress,
+        warning: progress.warning,
+        skippedInvalidContacts: progress.skippedInvalidContacts,
+        skippedDuplicateContacts: progress.skippedDuplicateContacts,
+      };
+    case "completed":
+      return {
+        kind: "completed",
+        audienceId: progress.audienceId,
+        totalContacts: progress.totalContacts,
+        processedContacts: progress.processedContacts,
+        progress: progress.progress,
+        skippedInvalidContacts: progress.skippedInvalidContacts,
+        skippedDuplicateContacts: progress.skippedDuplicateContacts,
+      };
+    case "error":
+      if (!draft) return { kind: "file" };
+      return { kind: "error", draft, message: progress.message };
+    case "idle":
+      break;
+    default: {
+      const _exhaustive: never = progress;
+      return _exhaustive;
+    }
+  }
+
+  switch (wizard) {
+    case "file":
+      return { kind: "file" };
+    case "map":
+      if (!draft) return { kind: "file" };
+      return { kind: "map", draft };
+    case "review":
+      if (!draft) return { kind: "file" };
+      return { kind: "review", draft };
+    default: {
+      const _exhaustive: never = wizard;
+      return _exhaustive;
+    }
+  }
+}
+
+export function audienceUploadProgressLabel(
+  status: AudienceUploadProgressStatus,
+): string {
+  switch (status) {
+    case "submitting":
+      return "Submitting...";
+    case "processing":
+      return "Processing...";
+    case "completed":
+      return "Completed!";
+    case "error":
+      return "Error";
+    default: {
+      const _exhaustive: never = status;
+      return _exhaustive;
+    }
+  }
+}
+
+export function wizardStepIndex(wizard: AudienceUploadWizardKind): number {
+  switch (wizard) {
+    case "file":
+      return 0;
+    case "map":
+      return 1;
+    case "review":
+      return 2;
+    default: {
+      const _exhaustive: never = wizard;
+      return _exhaustive;
+    }
+  }
+}

@@ -1,45 +1,13 @@
 /**
  * Server-side logging utility
- * 
- * Provides structured logging with different log levels.
- * In production, consider replacing with a proper logging library like pino or winston.
- */
-
-type LogLevel = 'debug' | 'info' | 'warn' | 'error';
-
-const isDevelopment = process.env.NODE_ENV === 'development';
-
-/**
- * Logs a message with the specified level
- */
-function log(level: LogLevel, message: string, ...args: unknown[]): void {
-  const timestamp = new Date().toISOString();
-  const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
-
-  if (!isDevelopment && level === 'debug') {
-    // Skip debug logs in production
-    return;
-  }
-
-  switch (level) {
-    case 'debug':
-      console.debug(prefix, message, ...args);
-      break;
-    case 'info':
-      console.info(prefix, message, ...args);
-      break;
-    case 'warn':
-      console.warn(prefix, message, ...args);
-      break;
-    case 'error':
-      console.error(prefix, message, ...args);
-      break;
-  }
-}
-
-/**
- * Server-side logger
- * 
+ *
+ * Delegates the shared logging behaviour to `logger-core` and supplies the
+ * server-side development probe.
+ *
+ * Deployed environments emit single-line JSON so logs are queryable (filter on
+ * `message`, `requestId`, `workspaceId`, …); local development keeps the
+ * readable positional output.
+ *
  * Usage:
  *   import { logger } from '@/lib/logger.server';
  *   logger.debug('Debug message');
@@ -47,10 +15,27 @@ function log(level: LogLevel, message: string, ...args: unknown[]): void {
  *   logger.warn('Warning message');
  *   logger.error('Error message', error);
  */
-export const logger = {
-  debug: (message: string, ...args: unknown[]) => log('debug', message, ...args),
-  info: (message: string, ...args: unknown[]) => log('info', message, ...args),
-  warn: (message: string, ...args: unknown[]) => log('warn', message, ...args),
-  error: (message: string, ...args: unknown[]) => log('error', message, ...args),
-} as const;
 
+import { createLogger, type Logger } from "./logger-core";
+
+const isDevelopment = process.env.NODE_ENV === "development";
+
+type RequestIdGlobal = typeof globalThis & {
+  __callcasterRequestIdProvider?: () => string | undefined;
+};
+
+/**
+ * The ambient request id, as a first-class field rather than a trailing
+ * positional argument — so it survives JSON folding and cannot be mistaken for
+ * one of the caller's own values.
+ */
+function requestContextFields(): Record<string, unknown> | undefined {
+  const requestId = (globalThis as RequestIdGlobal)
+    .__callcasterRequestIdProvider?.();
+  return requestId ? { requestId } : undefined;
+}
+
+export const logger: Logger = createLogger(isDevelopment, {
+  format: isDevelopment ? "pretty" : "json",
+  contextFields: requestContextFields,
+});

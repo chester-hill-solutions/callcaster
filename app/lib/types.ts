@@ -1,16 +1,30 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Tables } from "./database.types";
+import type { Database, Tables } from "@/lib/db-types";
 import type { AccountInstance } from "twilio/lib/rest/api/v2010/account";
+import type { CallCoachingHydration } from "@/hooks/call/useCallCoaching";
+import type { WorkspaceOnboardingGoal } from "@/lib/workspace-onboarding-goals";
+export {
+  WORKSPACE_ONBOARDING_GOAL_VALUES,
+  type WorkspaceOnboardingGoal,
+} from "@/lib/workspace-onboarding-goals";
 
 export type ENV = {
-  SUPABASE_URL: string | undefined;
-  SUPABASE_KEY: string | undefined;
   BASE_URL: string | undefined;
 };
 
-export type ContextType = {
-  supabase: SupabaseClient;
-  env: ENV;
+/** Parent→child UI outlet context. Do not put session tokens or secrets here. */
+export type ContextType = Record<string, never>;
+
+export type FileObject = {
+  name: string;
+  id: string;
+  created_at: string;
+  updated_at?: string;
+  signedUrl?: string | null;
+  /** workspace_audio sidecar duration; null means unknown (not zero). */
+  durationMs?: number | null;
+  sizeBytes?: number | null;
+  /** Present when this object was cut from another library file. */
+  sourceFileName?: string | null;
 };
 
 export type Audience = Tables<"audience">;
@@ -19,7 +33,7 @@ export type Contact = Tables<"contact">;
 export type Queue = Tables<"campaign_queue"> | null;
 export type Message = Tables<"message"> | null;
 export type OutreachAttempt = Tables<"outreach_attempt"> & {
-  call: Call;
+  call: Call | Call[];
 };
 export type ContactAudience = Tables<"contact_audience"> | null;
 export type CampaignAudience = Tables<"campaign_audience"> | null;
@@ -277,6 +291,14 @@ export const WORKSPACE_ONBOARDING_CHANNEL_VALUES = [
   "a2p10dlc",
   "rcs",
   "voice_compliance",
+  "toll_free_bulk_sms",
+  "local_number",
+] as const;
+
+export const WORKSPACE_OPERATING_COUNTRY_VALUES = [
+  "CA",
+  "US",
+  "BOTH",
 ] as const;
 
 export const WORKSPACE_ONBOARDING_STATUS_VALUES = [
@@ -312,6 +334,8 @@ export const WORKSPACE_TWILIO_AUTH_MODE_VALUES = [
 
 export type WorkspaceOnboardingChannel =
   (typeof WORKSPACE_ONBOARDING_CHANNEL_VALUES)[number];
+export type WorkspaceOperatingCountry =
+  (typeof WORKSPACE_OPERATING_COUNTRY_VALUES)[number];
 export type WorkspaceOnboardingStatus =
   (typeof WORKSPACE_ONBOARDING_STATUS_VALUES)[number];
 export type WorkspaceOnboardingStepStatus =
@@ -342,6 +366,18 @@ export interface WorkspaceMessagingBusinessProfile {
   optOutKeywords: string;
   helpKeywords: string;
   sampleMessages: string[];
+  // --- Phase C/D additive fields (channel-scoped inline inputs collected on the
+  // Channels step). Toll-free bulk SMS (TFV) verification inputs: ---
+  doingBusinessAs: string;
+  businessRegistrationNumber: string;
+  ageGatedContent: boolean;
+  // --- US A2P 10DLC Trust Hub brand inputs: ---
+  ein: string;
+  industry: string;
+  authorizedRepName: string;
+  authorizedRepEmail: string;
+  authorizedRepPhone: string;
+  authorizedRepTitle: string;
 }
 
 export interface WorkspaceMessagingServiceState {
@@ -441,7 +477,10 @@ export interface WorkspaceMessagingOnboardingState {
   version: number;
   status: WorkspaceOnboardingStatus;
   currentStep: string;
+  operatingCountry: WorkspaceOperatingCountry;
   selectedChannels: WorkspaceOnboardingChannel[];
+  selectedGoal: WorkspaceOnboardingGoal | null;
+  /** Read-time via `buildOnboardingStepsForState`; not persisted. */
   steps: WorkspaceOnboardingStepState[];
   businessProfile: WorkspaceMessagingBusinessProfile;
   messagingService: WorkspaceMessagingServiceState;
@@ -472,7 +511,7 @@ export type TwilioAccountData = (Partial<AccountInstance> & {
   authToken?: string;
   portalConfig?: WorkspaceTwilioOpsConfig | null;
   portalSync?: WorkspaceTwilioSyncSnapshot | null;
-  onboarding?: WorkspaceMessagingOnboardingState | null;
+  onboarding?: Omit<WorkspaceMessagingOnboardingState, "steps"> | null;
 }) | null;
 
 export enum WorkspaceTableNames {
@@ -541,7 +580,9 @@ export type IVROption = {
 
 export type Block = {
   id: string;
-  type: "radio" | "dropdown" | "boolean" | "multi" | "textarea" | "textblock" | "audio";
+  /** select/dropdown and checkbox/multi are synonyms (docs/script-json-format.md); Result.tsx treats each pair the same. */
+  type: "radio" | "dropdown" | "select" | "boolean" | "multi" | "checkbox"
+    | "textarea" | "textblock" | "audio";
   title: string;
   content: string;
   options: BlockOption[] | IVROption[];
@@ -585,8 +626,11 @@ export interface ResultsScreenProps {
   isBusy: boolean;
 }
 
-export interface CampaignDetails extends Tables<"live_campaign"> {
+export interface CampaignDetails
+  extends Omit<Tables<"live_campaign">, "disposition_options"> {
   script: Script;
+  /** Normalized at the read boundary (getCallScreenData) — never null. */
+  disposition_options: string[];
 }
 
 export type CampaignState = {
@@ -615,6 +659,10 @@ export type LoaderData = {
   isActive: boolean;
   hasAccess: boolean;
   verifiedNumbers: string[];
+  featureFlags: Record<string, unknown>;
+  /** Transcript/coaching state for a call already in flight; null when the
+   * workspace has no live-media flags or there is nothing to hydrate. */
+  initialCoaching: CallCoachingHydration | null;
 };
 
 export interface CallAreaProps {
@@ -668,9 +716,7 @@ export interface BaseUser {
   username: string;
   first_name: string | null;
   last_name: string | null;
-  organization: number | null;
   access_level: string | null;
-  activity: Json;
   created_at: string;
   verified_audio_numbers: string[] | null;
 }
@@ -726,13 +772,11 @@ export interface BaseCall {
 export interface ActiveCall extends Call {
   parameters: CallParameters;
   mute: (state: boolean) => void;
-  _setInputTracksFromStream: (stream: MediaStream) => Promise<void>;
   sendDigits: (digits: string) => void;
 }
 
-export interface UseSupabaseRealtimeProps {
+export interface UseWorkspaceRealtimeProps {
   user: AppUser;
-  supabase: SupabaseClient<Database>;
   init: {
     predictiveQueue: QueueItem[];
     queue: QueueItem[];
@@ -744,9 +788,10 @@ export interface UseSupabaseRealtimeProps {
     credits: number;
   };
   campaign_id: string;
-  activeCall: ActiveCall | null;
+  activeCall?: ActiveCall | null;
   setQuestionContact: (contact: QueueItem | null) => void;
   predictive: boolean;
+  workspace: string;
   setCallDuration: (duration: number) => void;
   setUpdate: (update: Record<string, unknown> | null) => void;
 }

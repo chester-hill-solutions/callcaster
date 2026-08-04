@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /* eslint-env node */
 import "dotenv/config";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,7 +14,12 @@ const baseURL =
 
 const env = {
   ...process.env,
-  NODE_ENV: process.env.NODE_ENV ?? "development",
+  NODE_ENV: process.env.NODE_ENV ?? "production",
+  // Marks this as the E2E harness: relaxes prod-only boot guards
+  // (localhost BASE_URL check, 2FA-bypass refusal) that would otherwise
+  // reject this intentionally local "production" server.
+  E2E_TEST: "1",
+  SIGNUP_OPEN: process.env.SIGNUP_OPEN ?? "true",
   HOST: process.env.HOST ?? "0.0.0.0",
   PORT: port,
   BASE_URL: baseURL,
@@ -26,6 +31,14 @@ const env = {
   TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN ?? "e2e_twilio_auth_token",
   TWILIO_APP_SID: process.env.TWILIO_APP_SID ?? "AP_e2e_test_app_sid",
   TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER ?? "+15555501001",
+  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ?? "e2e-better-auth-secret-min-32-chars!!",
+  BETTER_AUTH_URL: process.env.BETTER_AUTH_URL ?? baseURL,
+  E2E_DISABLE_2FA_ENFORCEMENT: process.env.E2E_DISABLE_2FA_ENFORCEMENT ?? "1",
+  S3_ENDPOINT: process.env.S3_ENDPOINT ?? "http://127.0.0.1:9000",
+  S3_REGION: process.env.S3_REGION ?? "us-east-1",
+  S3_ACCESS_KEY_ID: process.env.S3_ACCESS_KEY_ID ?? "callcaster",
+  S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY ?? "callcaster-dev-secret",
+  S3_BUCKET: process.env.S3_BUCKET ?? "callcaster",
 };
 
 async function waitForReady(readyUrl, attempts = 90) {
@@ -43,7 +56,29 @@ async function waitForReady(readyUrl, attempts = 90) {
   throw new Error(`Server not ready at ${readyUrl}/readyz`);
 }
 
-const child = spawn("node", ["./server/index.js"], {
+// Best-effort: make sure the S3 bucket exists before anything enqueues an
+// upload — a missing bucket dead-letters audience_upload jobs. Non-fatal so
+// the server still boots for flows that never touch object storage.
+const bucketCheck = spawnSync(
+  "node",
+  ["scripts/e2e/ensure-minio-bucket.mjs", "--keep-objects"],
+  { cwd: rootDir, env, stdio: "inherit" },
+);
+if (bucketCheck.status !== 0) {
+  console.warn(
+    "[e2e-server] WARNING: could not ensure MinIO bucket — uploads will dead-letter until it exists",
+  );
+}
+
+const child = spawn("bun", ["run", "./server/bun.ts"], {
+  cwd: rootDir,
+  env,
+  stdio: "inherit",
+});
+
+// Queued jobs (audience_upload, exports, dispatch) need a polling worker or
+// they sit in "processing" forever — run one alongside the server.
+const workerChild = spawn("bun", ["run", "./worker/index.ts"], {
   cwd: rootDir,
   env,
   stdio: "inherit",
@@ -51,6 +86,7 @@ const child = spawn("node", ["./server/index.js"], {
 
 async function shutdown(code = 0) {
   child.kill("SIGTERM");
+  workerChild.kill("SIGTERM");
   process.exit(code);
 }
 
@@ -66,5 +102,14 @@ try {
 }
 
 child.on("exit", (code) => {
+  workerChild.kill("SIGTERM");
   process.exit(code ?? 0);
+});
+
+workerChild.on("exit", (code, signal) => {
+  if (code != null && code !== 0) {
+    console.error(
+      `[e2e-server] worker exited early code=${code} signal=${signal ?? ""} — queued jobs will not process`,
+    );
+  }
 });

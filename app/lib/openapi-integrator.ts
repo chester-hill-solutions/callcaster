@@ -239,8 +239,9 @@ export const integratorPathOverrides = {
       operationId: "createCampaignWithScript",
       summary: "Create campaign with script and phone number (one-shot)",
       description:
-        "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both.",
+        "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both. Requires the campaigns.write capability for API keys.",
       tags: [INTEGRATOR_API_TAG, "Campaigns"],
+      "x-callcaster-capability": "campaigns.write",
       security: [...publicSecurity],
       requestBody: {
         required: true,
@@ -295,8 +296,9 @@ export const integratorPathOverrides = {
       operationId: "sendChatSms",
       summary: "Send a single SMS",
       description:
-        "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body.",
+        "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
       tags: [INTEGRATOR_API_TAG, "Messaging"],
+      "x-callcaster-capability": "messages.send",
       security: [...publicSecurity],
       requestBody: {
         required: true,
@@ -328,8 +330,9 @@ export const integratorPathOverrides = {
       operationId: "dispatchCampaignSms",
       summary: "Dispatch SMS to queued campaign contacts",
       description:
-        "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user.",
+        "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user. Requires the campaigns.dispatch capability for API keys.",
       tags: [INTEGRATOR_API_TAG, "Messaging"],
+      "x-callcaster-capability": "campaigns.dispatch",
       security: [...publicSecurity],
       requestBody: {
         required: true,

@@ -1,8 +1,7 @@
-import { User } from "@supabase/supabase-js";
-import { useState, useCallback, useEffect, useRef } from "react";
-import { Tables } from "@/lib/database.types";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import type { Tables } from "@/lib/db-types";
 import { sortQueue, createHouseholdMap } from "@/lib/utils";
-import { Contact, QueueItem } from "@/lib/types";
+import { Contact, QueueItem, User } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 import {
   getAssignedUserId,
@@ -82,17 +81,26 @@ export const useQueue = ({
   const [predictiveQueue, setPredictiveQueue] = useState<QueueItem[]>(
     initialPredictiveQueue,
   );
-  const [householdMap, setHouseholdMap] = useState(createHouseholdMap(queue));
+  const householdMap = useMemo(() => createHouseholdMap(queue), [queue]);
   const [nextRecipient, setNextRecipient] = useState<QueueItem | null>(() => {
     return !isPredictive && queue.length > 0 ? (queue[0] ?? null) : null;
   });
-  
+  const effectiveNextRecipient =
+    nextRecipient ?? (!isPredictive ? queue[0] ?? null : null);
+
   // Use ref to avoid including nextRecipient in updateQueue dependencies
-  const nextRecipientRef = useRef(nextRecipient);
-  
+  const nextRecipientRef = useRef(effectiveNextRecipient);
+
+  /**
+   * @effect Keep nextRecipientRef current so updateQueue can read the latest recipient without depending on it.
+   * @effect-deps effectiveNextRecipient (re-syncs the ref whenever the computed recipient changes)
+   * @effect-side-effects none — mutates a ref only; no DOM/subscription/fetch
+   * @effect-why-not-loader Not data fetching — this is the standard "latest ref" pattern used to
+   *   avoid stale closures in updateQueue's useCallback without widening its dependency array.
+   */
   useEffect(() => {
-    nextRecipientRef.current = nextRecipient;
-  }, [nextRecipient]);
+    nextRecipientRef.current = effectiveNextRecipient;
+  }, [effectiveNextRecipient]);
 
   const isDuplicate = useCallback((newItem: QueueItem, currentQueue: QueueItem[]) => {
     return currentQueue.some(item => item.contact_id === newItem.contact_id);
@@ -115,7 +123,7 @@ export const useQueue = ({
       const isRemoval =
         (!isPredictive &&
           !isQueued(payload.new) &&
-          assignedUserId !== user.id) ||
+          assignedUserId !== user?.id) ||
         isDequeued(payload.new);
 
       setQueue((currentQueue) => {
@@ -127,12 +135,12 @@ export const useQueue = ({
           const newQueueItem = payload.new;
 
           if (isPredictive) {
-            if (assignedUserId === user.id || isQueued(newQueueItem)) {
+            if (assignedUserId === user?.id || isQueued(newQueueItem)) {
               if (!isDuplicate(newQueueItem, updatedQueue)) {
                 updatedQueue = updatedQueue.length
                   ? sortQueue([...updatedQueue, newQueueItem])
                   : [newQueueItem];
-                if (assignedUserId === user.id) {
+                if (assignedUserId === user?.id) {
                   setNextRecipient(newQueueItem);
                   setCallDuration(0);
                 }
@@ -141,7 +149,7 @@ export const useQueue = ({
               updatedQueue = updatedQueue.filter((item) => item.id !== payload.new.id);
             }
           } else {
-            if (assignedUserId === user.id) {
+            if (assignedUserId === user?.id) {
               updatedQueue = updatedQueue.filter(
                 (item) => item.contact_id !== payload.new.contact_id,
               );
@@ -170,16 +178,6 @@ export const useQueue = ({
     [isPredictive, user?.id, setCallDuration, isDuplicate],
   );
 
-  useEffect(() => {
-    setHouseholdMap(createHouseholdMap(queue));
-  }, [queue]);
-
-  useEffect(() => {
-    if (!nextRecipient && queue.length > 0 && !isPredictive) {
-      setNextRecipient(queue[0] ?? null);
-    }
-  }, [queue, nextRecipient, isPredictive]);
-
   return {
     queue,
     setQueue,
@@ -187,7 +185,7 @@ export const useQueue = ({
     setPredictiveQueue,
     updateQueue,
     householdMap,
-    nextRecipient,
+    nextRecipient: effectiveNextRecipient,
     setNextRecipient,
   };
 };

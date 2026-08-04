@@ -12,7 +12,8 @@ import {
   WORKSPACE_ONBOARDING_STEP_STATUS_VALUES,
   WORKSPACE_TWILIO_AUTH_MODE_VALUES,
 } from "@/lib/types";
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 import {
   DEFAULT_WORKSPACE_ONBOARDING_STEPS,
 } from "@/lib/messaging-onboarding/defaults.server";
@@ -39,7 +40,7 @@ export function normalizeStep(
   value: unknown,
   fallback: WorkspaceOnboardingStepState,
 ): WorkspaceOnboardingStepState {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     return fallback;
   }
 
@@ -60,7 +61,7 @@ export function mergeStoredOnboardingSteps(
 ): WorkspaceOnboardingStepState[] {
   const storedById = new Map<string, unknown>();
   for (const step of storedSteps) {
-    if (isRecord(step) && typeof step.id === "string" && step.id.trim()) {
+    if (isObject(step) && typeof step.id === "string" && step.id.trim()) {
       storedById.set(step.id, step);
     }
   }
@@ -72,7 +73,7 @@ export function mergeStoredOnboardingSteps(
 }
 
 export function normalizeEmergencyAddress(value: unknown): WorkspaceEmergencyAddressState {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     return {
       addressSid: null,
       customerName: "",
@@ -80,7 +81,7 @@ export function normalizeEmergencyAddress(value: unknown): WorkspaceEmergencyAdd
       city: "",
       region: "",
       postalCode: "",
-      countryCode: "US",
+      countryCode: "CA",
       status: "not_started",
       validationError: null,
       lastValidatedAt: null,
@@ -94,7 +95,7 @@ export function normalizeEmergencyAddress(value: unknown): WorkspaceEmergencyAdd
     city: parseString(value.city),
     region: parseString(value.region),
     postalCode: parseString(value.postalCode),
-    countryCode: parseString(value.countryCode) || "US",
+    countryCode: parseString(value.countryCode) || "CA",
     status: pickEnumValue(
       value.status,
       WORKSPACE_EMERGENCY_ADDRESS_STATUS_VALUES,
@@ -106,7 +107,7 @@ export function normalizeEmergencyAddress(value: unknown): WorkspaceEmergencyAdd
 }
 
 export function normalizeReviewState(value: unknown): WorkspaceOnboardingReviewState {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     return {
       blockingIssues: [],
       lastError: null,
@@ -125,7 +126,7 @@ export function normalizeBusinessProfile(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["businessProfile"],
 ): WorkspaceMessagingOnboardingState["businessProfile"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     legalBusinessName: parseString(value.legalBusinessName),
@@ -141,6 +142,15 @@ export function normalizeBusinessProfile(
     optOutKeywords: parseString(value.optOutKeywords),
     helpKeywords: parseString(value.helpKeywords),
     sampleMessages: parseStringArray(value.sampleMessages),
+    doingBusinessAs: parseString(value.doingBusinessAs),
+    businessRegistrationNumber: parseString(value.businessRegistrationNumber),
+    ageGatedContent: typeof value.ageGatedContent === "boolean" ? value.ageGatedContent : false,
+    ein: parseString(value.ein),
+    industry: parseString(value.industry),
+    authorizedRepName: parseString(value.authorizedRepName),
+    authorizedRepEmail: parseString(value.authorizedRepEmail),
+    authorizedRepPhone: parseString(value.authorizedRepPhone),
+    authorizedRepTitle: parseString(value.authorizedRepTitle),
   };
 }
 
@@ -148,7 +158,7 @@ export function normalizeMessagingServiceSection(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["messagingService"],
 ): WorkspaceMessagingOnboardingState["messagingService"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     desiredSendMode:
@@ -174,7 +184,7 @@ export function normalizeMessagingServiceSection(
     advancedOptOutEnabled:
       typeof value.advancedOptOutEnabled === "boolean"
         ? value.advancedOptOutEnabled
-        : true,
+        : false,
     lastProvisionedAt: parseOptionalString(value.lastProvisionedAt),
     lastError: parseOptionalString(value.lastError),
   };
@@ -184,7 +194,7 @@ export function normalizeSubaccountBootstrapSection(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["subaccountBootstrap"],
 ): WorkspaceMessagingOnboardingState["subaccountBootstrap"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     status: pickEnumValue(
@@ -213,7 +223,7 @@ export function normalizeEmergencyVoiceSection(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["emergencyVoice"],
 ): WorkspaceMessagingOnboardingState["emergencyVoice"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     status: pickEnumValue(
@@ -237,7 +247,7 @@ export function normalizeA2p10dlcSection(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["a2p10dlc"],
 ): WorkspaceMessagingOnboardingState["a2p10dlc"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     status: pickEnumValue(
@@ -261,7 +271,7 @@ export function normalizeRcsSection(
   value: unknown,
   fallback: WorkspaceMessagingOnboardingState["rcs"],
 ): WorkspaceMessagingOnboardingState["rcs"] {
-  if (!isRecord(value)) return fallback;
+  if (!isObject(value)) return fallback;
 
   return {
     status: pickEnumValue(

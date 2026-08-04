@@ -69,16 +69,16 @@ describe("platform auth rate limits", () => {
     resetRateLimitsForTests();
   });
 
-  test("returns 429 after limit exceeded", () => {
+  test("returns 429 after limit exceeded", async () => {
     const request = new Request("http://localhost/api/auth/token", {
       headers: { "x-forwarded-for": "203.0.113.1" },
     });
 
     for (let i = 0; i < 30; i += 1) {
-      expect(enforceAuthRateLimit(request, "auth:token")).toBeNull();
+      expect(await enforceAuthRateLimit(request, "auth:token")).toBeNull();
     }
 
-    const limited = enforceAuthRateLimit(request, "auth:token");
+    const limited = await enforceAuthRateLimit(request, "auth:token");
     expect(limited?.status).toBe(429);
     expect(limited?.headers.get("Retry-After")).toBeTruthy();
   });
@@ -97,12 +97,12 @@ describe("platform idempotency", () => {
     expect(readIdempotencyKey(request)).toBe("ws-create-1");
 
     const response = Response.json({ id: "w1", name: "Acme" }, { status: 201 });
-    storeIdempotentResponse("workspaces:create", "ws-create-1", response, {
+    await storeIdempotentResponse("workspaces:create", "ws-create-1", response, {
       id: "w1",
       name: "Acme",
     });
 
-    const replay = getIdempotentResponse("workspaces:create", "ws-create-1");
+    const replay = await getIdempotentResponse("workspaces:create", "ws-create-1");
     expect(replay?.status).toBe(201);
     expect(replay?.headers.get("Idempotency-Replayed")).toBe("true");
     await expect(replay?.json()).resolves.toEqual({ id: "w1", name: "Acme" });

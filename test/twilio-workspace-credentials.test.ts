@@ -1,23 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test } from "vitest";
 import {
-  readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsEdge,
-  resolveTwilioWebhookAuthToken as resolveTwilioWebhookAuthTokenEdge,
-} from "../supabase/functions/_shared/twilio-workspace-credentials.ts";
-import {
-  readTwilioWorkspaceCredentials as readTwilioWorkspaceCredentialsApp,
+  readTwilioWorkspaceCredentials,
   resolveTwilioWebhookAuthToken,
 } from "../app/lib/twilio-workspace-credentials.ts";
-
-const readTwilioWorkspaceCredentials = readTwilioWorkspaceCredentialsEdge;
-
-describe("readTwilioWorkspaceCredentials (app vs edge parity)", () => {
-  test("snake_case matches between app and Edge copies", () => {
-    const payload = { account_sid: "ACx", auth_token: "y" };
-    expect(readTwilioWorkspaceCredentialsApp(payload)).toEqual(
-      readTwilioWorkspaceCredentialsEdge(payload),
-    );
-  });
-});
 
 describe("readTwilioWorkspaceCredentials", () => {
   test("null and non-objects", () => {
@@ -60,67 +45,14 @@ describe("readTwilioWorkspaceCredentials", () => {
   });
 });
 
-describe("resolveTwilioWebhookAuthToken (app)", () => {
-  const originalNodeEnv = process.env.NODE_ENV;
-
-  afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
-  });
-
+describe("resolveTwilioWebhookAuthToken", () => {
   test("returns workspace token when creds present", () => {
     expect(
       resolveTwilioWebhookAuthToken({ sid: "AC01", authToken: "workspace-tok" }),
     ).toBe("workspace-tok");
   });
 
-  test("returns null in production when creds missing", () => {
-    process.env.NODE_ENV = "production";
+  test("returns null when creds missing", () => {
     expect(resolveTwilioWebhookAuthToken(null)).toBeNull();
-  });
-
-  test("falls back to main token outside production when creds missing", () => {
-    vi.stubEnv("TWILIO_AUTH_TOKEN", "main-tok");
-    process.env.NODE_ENV = "test";
-    expect(resolveTwilioWebhookAuthToken(null)).toBe("main-tok");
-  });
-});
-
-describe("resolveTwilioWebhookAuthToken (Edge)", () => {
-  const denoEnvGet = vi.fn<(key: string) => string | undefined>();
-
-  beforeEach(() => {
-    vi.stubGlobal("Deno", {
-      env: { get: denoEnvGet },
-    });
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
-    denoEnvGet.mockReset();
-  });
-
-  test("returns workspace token when creds present", () => {
-    expect(
-      resolveTwilioWebhookAuthTokenEdge({ sid: "AC01", authToken: "workspace-tok" }),
-    ).toBe("workspace-tok");
-  });
-
-  test("returns null in production when creds missing", () => {
-    denoEnvGet.mockImplementation((key) => {
-      if (key === "ENVIRONMENT") return "production";
-      if (key === "DENO_DEPLOYMENT_ID") return "deploy-1";
-      return undefined;
-    });
-    expect(resolveTwilioWebhookAuthTokenEdge(null)).toBeNull();
-  });
-
-  test("falls back to TWILIO_AUTH_TOKEN outside production when creds missing", () => {
-    denoEnvGet.mockImplementation((key) => {
-      if (key === "ENVIRONMENT") return "development";
-      if (key === "TWILIO_AUTH_TOKEN") return "main-tok";
-      return undefined;
-    });
-    expect(resolveTwilioWebhookAuthTokenEdge(null)).toBe("main-tok");
   });
 });

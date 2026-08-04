@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { createRouteContextProvider, withAdminRouteArgs } from "./helpers/route-context-mock";
 
 const mocks = vi.hoisted(() => ({
   verifyAuth: vi.fn(),
@@ -11,22 +12,30 @@ const mocks = vi.hoisted(() => ({
   ensureWorkspaceTwilioBootstrap: vi.fn(),
   provisionWorkspaceA2P: vi.fn(),
   updateWorkspaceRcsOnboarding: vi.fn(),
+  triggerTwilioOpenSync: vi.fn(),
+  auditWorkspaceTwilioWebhooks: vi.fn(),
+  syncWorkspaceA2pStatus: vi.fn(),
+  attachWorkspaceRcsSenderToPool: vi.fn(),
+  verifyWorkspaceMessagingSenderPool: vi.fn(),
+  enqueueWorkspaceComplianceJob: vi.fn(),
   logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
 }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 
-vi.mock("../app/lib/database.server", () => ({
-  updateWorkspaceTwilioPortalConfig: (...args: any[]) => mocks.updateWorkspaceTwilioPortalConfig(...args),
-  createWorkspaceTwilioInstance: (...args: any[]) => mocks.createWorkspaceTwilioInstance(...args),
-  getWorkspaceTwilioPortalSnapshot: (...args: any[]) => mocks.getWorkspaceTwilioPortalSnapshot(...args),
-  syncWorkspaceTwilioSnapshot: (...args: any[]) => mocks.syncWorkspaceTwilioSnapshot(...args),
+vi.mock("../app/lib/database/workspace.server", () => ({
+  updateWorkspaceTwilioPortalConfig: (...args: any[]) =>
+    mocks.updateWorkspaceTwilioPortalConfig(...args),
+  createWorkspaceTwilioInstance: (...args: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...args),
+  getWorkspaceTwilioPortalSnapshot: (...args: any[]) =>
+    mocks.getWorkspaceTwilioPortalSnapshot(...args),
+  syncWorkspaceTwilioSnapshot: (...args: any[]) =>
+    mocks.syncWorkspaceTwilioSnapshot(...args),
 }));
 
 vi.mock("@/lib/logger.server", () => ({
@@ -41,11 +50,63 @@ vi.mock("../app/lib/twilio-a2p.server", () => ({
   provisionWorkspaceA2P: (...args: any[]) => mocks.provisionWorkspaceA2P(...args),
 }));
 
+vi.mock("../app/lib/twilio-open-sync.server", () => ({
+  triggerTwilioOpenSync: (...args: any[]) => mocks.triggerTwilioOpenSync(...args),
+}));
+
+vi.mock("../app/lib/twilio-webhook-audit.server", () => ({
+  auditWorkspaceTwilioWebhooks: (...args: any[]) => mocks.auditWorkspaceTwilioWebhooks(...args),
+}));
+
+vi.mock("../app/lib/twilio-a2p-status-sync.server", () => ({
+  syncWorkspaceA2pStatus: (...args: any[]) => mocks.syncWorkspaceA2pStatus(...args),
+}));
+
+vi.mock("../app/lib/twilio-sender-pool.server", () => ({
+  attachWorkspaceRcsSenderToPool: (...args: any[]) => mocks.attachWorkspaceRcsSenderToPool(...args),
+  verifyWorkspaceMessagingSenderPool: (...args: any[]) => mocks.verifyWorkspaceMessagingSenderPool(...args),
+}));
+
+vi.mock("../app/lib/worker/handlers.server", () => ({
+  enqueueWorkspaceComplianceJob: (...args: any[]) => mocks.enqueueWorkspaceComplianceJob(...args),
+}));
+
 vi.mock("../app/lib/rcs-onboarding.server", () => ({
   updateWorkspaceRcsOnboarding: (...args: any[]) => mocks.updateWorkspaceRcsOnboarding(...args),
   TWILIO_RCS_PROVIDER: "Twilio",
   TWILIO_RCS_DOCS_URL: "https://www.twilio.com/docs/rcs/onboarding",
   TWILIO_RCS_SENDERS_URL: "https://console.twilio.com/us1/develop/rcs/senders",
+}));
+
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  getWorkspaceById: vi.fn(async () => ({
+    id: "w1",
+    twilio_data: { sid: "AC123", authToken: "test-token" },
+  })),
+}));
+
+vi.mock("@/lib/billing-reconciliation.server", () => ({
+  loadBillingReconciliationReport: vi.fn(async () => null),
+}));
+
+vi.mock("@/lib/billing-reconciliation-snapshot.server", () => ({
+  getWorkspaceBillingReconciliationSnapshot: vi.fn(() => null),
+}));
+
+let currentAccessLevel = "sudo";
+let currentUsername = "ops@example.com";
+
+vi.mock("../app/routes/admin+/requireSudoAdmin.server", () => ({
+  requireSudoAdmin: vi.fn(async () => {
+    const auth = await mocks.verifyAuth();
+    if (currentAccessLevel !== "sudo") {
+      throw { status: 302 };
+    }
+    return {
+      user: auth.user,
+      userData: { id: auth.user.id, access_level: currentAccessLevel, username: currentUsername },
+    };
+  }),
 }));
 
 function makePortalSnapshot() {
@@ -158,7 +219,7 @@ function makePortalSnapshot() {
   };
 }
 
-function makeSupabase(accessLevel: string, workspaceTwilioSid: string | null = null) {
+function makeDbClient(accessLevel: string, workspaceTwilioSid: string | dbClient = null) {
   return {
     from: vi.fn((table: string) => {
       if (table === "user") {
@@ -198,6 +259,8 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.useRealTimers();
+    currentAccessLevel = "sudo";
+    currentUsername = "ops@example.com";
     mocks.verifyAuth.mockReset();
     mocks.updateWorkspaceTwilioPortalConfig.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
@@ -213,28 +276,24 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     vi.useRealTimers();
   });
 
-  test("action redirects non-sudo users", async () => {
-    const supabaseClient = makeSupabase("admin");
-    mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
-      user: { id: "u1" },
-    });
-
+  test("action returns 500 when admin context is missing", async () => {
     const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const formData = new FormData();
     formData.set("_action", "update_twilio_portal");
-    await expect(
+    const context = await createRouteContextProvider({});
+    const res = await asRouteResponse(
       mod.action({
         request: new Request("http://x", { method: "POST", body: formData }),
         params: { workspaceId: "w1" },
+        context,
       } as any),
-    ).rejects.toMatchObject({ status: 302 });
+    );
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "Admin context missing" });
   });
 
   test("action updates Twilio portal settings", async () => {
-    const supabaseClient = makeSupabase("sudo");
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.updateWorkspaceTwilioPortalConfig.mockResolvedValueOnce({});
@@ -254,10 +313,17 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     formData.set("voiceConcurrentCallLimit", "75");
     formData.set("parallelDispatchEnabled", "on");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: formData }),
       params: { workspaceId: "w1" },
-    } as any));
+    }, {
+      userId: "u1",
+      userData: {
+        id: "u1",
+        username: currentUsername,
+        access_level: currentAccessLevel,
+      } as any,
+    })));
 
     expect(res.status).toBe(200);
     expect(mocks.updateWorkspaceTwilioPortalConfig).toHaveBeenCalledWith(
@@ -288,9 +354,8 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
   });
 
   test("action syncs workspace snapshot directly", async () => {
-    const supabaseClient = makeSupabase("sudo");
+    const dbClient = makeDbClient("sudo");
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.syncWorkspaceTwilioSnapshot.mockResolvedValueOnce({});
@@ -299,22 +364,27 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const formData = new FormData();
     formData.set("_action", "sync_twilio_workspace");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: formData }),
       params: { workspaceId: "w1" },
-    } as any));
+    }, {
+      userId: "u1",
+      userData: {
+        id: "u1",
+        username: currentUsername,
+        access_level: currentAccessLevel,
+      } as any,
+    })));
 
     expect(res.status).toBe(200);
     expect(mocks.syncWorkspaceTwilioSnapshot).toHaveBeenCalledWith({
-      supabaseClient,
       workspaceId: "w1",
     });
   });
 
   test("action bootstraps workspace messaging", async () => {
-    const supabaseClient = makeSupabase("sudo");
+    const dbClient = makeDbClient("sudo");
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.ensureWorkspaceTwilioBootstrap.mockResolvedValueOnce({
@@ -330,23 +400,28 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const formData = new FormData();
     formData.set("_action", "bootstrap_workspace_messaging");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: formData }),
       params: { workspaceId: "w1" },
-    } as any));
+    }, {
+      userId: "u1",
+      userData: {
+        id: "u1",
+        username: currentUsername,
+        access_level: currentAccessLevel,
+      } as any,
+    })));
 
     expect(res.status).toBe(200);
     expect(mocks.ensureWorkspaceTwilioBootstrap).toHaveBeenCalledWith({
-      supabaseClient,
       workspaceId: "w1",
       actorUserId: "u1",
     });
   });
 
   test("action provisions workspace A2P and updates RCS state", async () => {
-    const supabaseClient = makeSupabase("sudo");
+    const dbClient = makeDbClient("sudo");
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.provisionWorkspaceA2P.mockResolvedValueOnce({});
@@ -354,19 +429,24 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const mod = await import("../app/routes/admin+/workspaces/$workspaceId/twilio.route");
     const provisionData = new FormData();
     provisionData.set("_action", "provision_workspace_a2p");
-    const provisionRes = await asRouteResponse(await mod.action({
+    const provisionRes = await asRouteResponse(mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: provisionData }),
       params: { workspaceId: "w1" },
-    } as any));
+    }, {
+      userId: "u1",
+      userData: {
+        id: "u1",
+        username: currentUsername,
+        access_level: currentAccessLevel,
+      } as any,
+    })));
     expect(provisionRes.status).toBe(200);
     expect(mocks.provisionWorkspaceA2P).toHaveBeenCalledWith({
-      supabaseClient,
       workspaceId: "w1",
       actorUserId: "u1",
     });
 
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.updateWorkspaceRcsOnboarding.mockResolvedValueOnce({});
@@ -388,13 +468,19 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     rcsData.set("rcsRegions", "US, CA");
     rcsData.set("rcsNotes", "beta");
     rcsData.set("rcsStatus", "in_review");
-    const rcsRes = await asRouteResponse(await mod.action({
+    const rcsRes = await asRouteResponse(mod.action(await withAdminRouteArgs({
       request: new Request("http://x", { method: "POST", body: rcsData }),
       params: { workspaceId: "w1" },
-    } as any));
+    }, {
+      userId: "u1",
+      userData: {
+        id: "u1",
+        username: currentUsername,
+        access_level: currentAccessLevel,
+      } as any,
+    })));
     expect(rcsRes.status).toBe(200);
     expect(mocks.updateWorkspaceRcsOnboarding).toHaveBeenCalledWith({
-      supabaseClient,
       workspaceId: "w1",
       actorUserId: "u1",
       provider: "Twilio",
@@ -433,7 +519,7 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
       },
     ]);
 
-    const supabaseClient = makeSupabase("sudo", "AC123");
+    const dbClient = makeDbClient("sudo", "AC123");
     mocks.getWorkspaceTwilioPortalSnapshot.mockResolvedValueOnce(makePortalSnapshot());
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       api: {
@@ -462,9 +548,12 @@ describe("app/routes/admin+_.workspaces.$workspaceId.twilio.tsx", () => {
     const { loadTwilioData } = await import(
       "../app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server",
     );
-    const data = await loadTwilioData(supabaseClient as any, "w1");
+    const data = await loadTwilioData("w1");
 
-    expect(usageList).toHaveBeenCalledWith();
+    // Bounded: an unbounded list() makes the Twilio helper auto-page the whole
+    // usage history, which is what pushed this admin loader past the SSR
+    // stream timeout.
+    expect(usageList).toHaveBeenCalledWith({ limit: 200 });
     expect(data.twilioUsage).toEqual([
       expect.objectContaining({
         category: "sms-outbound",

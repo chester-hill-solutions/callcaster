@@ -1,17 +1,19 @@
 import { data as routeData, redirect } from "react-router";
 import { loadTwilioData } from "./loadTwilioData.server";
-import { requireSudoAdmin } from "../../requireSudoAdmin.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { adminRouteAuth } from "@/lib/admin-route.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-    const { supabaseClient } = await requireSudoAdmin(request);
-
+export const loader = defineLoader({
+  auth: adminRouteAuth,
+  sideEffects: ["db-read", "twilio"],
+  handler: ({ params }) => {
     const workspaceId = params.workspaceId;
     if (!workspaceId) {
-        throw redirect("/admin?tab=workspaces");
+      throw redirect("/admin?tab=workspaces");
     }
 
     return routeData({
-        twilioData: loadTwilioData(supabaseClient, workspaceId),
+      twilioData: loadTwilioData(workspaceId),
     });
-};
+  },
+});

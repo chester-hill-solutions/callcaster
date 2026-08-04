@@ -10,11 +10,71 @@ vi.mock("@/lib/env.server", () => {
 });
 
 const requireWorkspaceAccess = vi.fn(async () => undefined);
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/database.server")>(
-    "@/lib/database.server",
-  );
+vi.mock("@/lib/database/workspace.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/database/workspace.server")
+  >("@/lib/database/workspace.server");
   return { ...actual, requireWorkspaceAccess };
+});
+
+const campaignIvrMocks = vi.hoisted(() => ({
+  findCampaignExportMeta: vi.fn(),
+}));
+
+const queueMocks = vi.hoisted(() => ({
+  getCampaignQueueContactIds: vi.fn(),
+}));
+
+const exportDbMocks = vi.hoisted(() => ({
+  findCampaignForMessageExport: vi.fn(),
+  findCampaignWithScriptForExport: vi.fn(),
+  findExportContactsByIds: vi.fn(),
+  countExportCampaignMessages: vi.fn(),
+  listExportCampaignMessages: vi.fn(),
+  countExportOutreachAttempts: vi.fn(),
+  listExportOutreachAttempts: vi.fn(),
+  findExportCallsByOutreachAttemptIds: vi.fn(),
+}));
+
+vi.mock("@/lib/campaign-export-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-export-db.server")>();
+  return {
+    ...actual,
+    findCampaignForMessageExport: (...args: unknown[]) =>
+      exportDbMocks.findCampaignForMessageExport(...args),
+    findCampaignWithScriptForExport: (...args: unknown[]) =>
+      exportDbMocks.findCampaignWithScriptForExport(...args),
+    findExportContactsByIds: (...args: unknown[]) =>
+      exportDbMocks.findExportContactsByIds(...args),
+    countExportCampaignMessages: (...args: unknown[]) =>
+      exportDbMocks.countExportCampaignMessages(...args),
+    listExportCampaignMessages: (...args: unknown[]) =>
+      exportDbMocks.listExportCampaignMessages(...args),
+    countExportOutreachAttempts: (...args: unknown[]) =>
+      exportDbMocks.countExportOutreachAttempts(...args),
+    listExportOutreachAttempts: (...args: unknown[]) =>
+      exportDbMocks.listExportOutreachAttempts(...args),
+    findExportCallsByOutreachAttemptIds: (...args: unknown[]) =>
+      exportDbMocks.findExportCallsByOutreachAttemptIds(...args),
+  };
+});
+
+vi.mock("@/lib/campaign-queue-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-queue-db.server")>();
+  return {
+    ...actual,
+    getCampaignQueueContactIds: (...args: unknown[]) =>
+      queueMocks.getCampaignQueueContactIds(...args),
+  };
+});
+
+vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
+  return {
+    ...actual,
+    findCampaignExportMeta: (...args: unknown[]) =>
+      campaignIvrMocks.findCampaignExportMeta(...args),
+  };
 });
 
 type UploadRecord = {
@@ -23,128 +83,42 @@ type UploadRecord = {
   text: string;
   contentType?: string;
 };
-let uploads: UploadRecord[] = [];
+let objectStorageUploads: UploadRecord[] = [];
 
-function buildSupabaseClient() {
-  const supabaseClient: any = {};
-
-  supabaseClient.storage = {
-    from: () => ({
-      upload: async (path: string, data: any, opts?: any) => {
-        if (path.endsWith(".csv")) {
-          const bytes =
-            typeof data === "string"
-              ? new TextEncoder().encode(data)
-              : data instanceof Blob
-                ? new Uint8Array(await data.arrayBuffer())
-                : new TextEncoder().encode(String(data));
-          const text = new TextDecoder("utf-8").decode(bytes);
-          uploads.push({
-            path,
-            bytes,
-            text,
-            contentType: opts?.contentType,
-          });
-        }
-        return { data: null, error: null };
-      },
-      createSignedUrl: async () => ({
-        data: { signedUrl: "http://signed.example" },
-        error: null,
-      }),
-    }),
-  };
-
-  const campaignRow = {
-    id: 123,
-    type: "message",
-    title: "TestCampaign",
-    workspace: "w1",
-    start_date: "2026-01-01T00:00:00.000Z",
-    end_date: "2026-01-02T00:00:00.000Z",
-  };
-
-  const contactRow = {
-    id: 1,
-    firstname: "=1+1",
-    surname: "Smith",
-    phone: "+15555550101",
-    email: "a@example.com",
-    address: "1 Main St",
-    city: "Town",
-    opt_out: false,
-    created_at: "2026-01-01T00:00:00.000Z",
-    workspace: "w1",
-  };
-
-  const messageRow = {
-    id: "m1",
-    body: "hello",
-    from: "+15555550101",
-    to: "+15555550102",
-    direction: "outbound-api",
-    status: "delivered",
-    date_created: "2026-01-01T00:00:00.000Z",
-    date_sent: "2026-01-01T00:00:00.000Z",
-    workspace: "w1",
-  };
-
-  supabaseClient.from = (table: string) => {
-    if (table === "campaign") {
-      const builder: any = {};
-      builder.select = () => builder;
-      builder.eq = () => builder;
-      builder.single = async () => ({ data: campaignRow, error: null });
-      return builder;
+vi.mock("@/lib/object-storage.server", () => ({
+  uploadObject: vi.fn(async (_bucket: string, path: string, body: any, opts?: any) => {
+    if (path.endsWith(".csv")) {
+      const bytes =
+        typeof body === "string"
+          ? new TextEncoder().encode(body)
+          : body instanceof Blob
+            ? new Uint8Array(await body.arrayBuffer())
+            : new TextEncoder().encode(String(body));
+      const text = new TextDecoder("utf-8").decode(bytes);
+      objectStorageUploads.push({
+        path,
+        bytes,
+        text,
+        contentType: opts?.contentType,
+      });
     }
-
-    if (table === "campaign_queue") {
-      return {
-        select: () => ({
-          eq: async () => ({ data: [{ contact_id: 1 }], error: null }),
-        }),
-      };
-    }
-
-    if (table === "contact") {
-      const builder: any = {};
-      builder.select = () => builder;
-      builder.in = () => builder;
-      builder.eq = async () => ({ data: [contactRow], error: null });
-      return builder;
-    }
-
-    if (table === "message") {
-      const builder: any = {};
-      builder.select = (_cols: any, opts?: any) => {
-        builder._selectOpts = opts;
-        return builder;
-      };
-      builder.eq = () => builder;
-      builder.gte = () => builder;
-      builder.lte = () => builder;
-      builder.order = () => builder;
-      builder.range = async () => ({ data: [messageRow], error: null });
-      builder.then = (resolve: any, reject: any) =>
-        Promise.resolve({
-          data: null,
-          error: null,
-          count: 1,
-        }).then(resolve, reject);
-      return builder;
-    }
-
-    throw new Error(`unexpected table ${table}`);
-  };
-
-  return supabaseClient;
-}
-
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
   }),
+  createSignedObjectUrl: vi.fn(async () => "http://signed.example"),
+  deleteObject: vi.fn(),
+  listObjects: vi.fn(async () => []),
+}));
+
+vi.mock("@/lib/logger.server", () => ({
+  logger: {
+    error: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+  },
+}));
+
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ user: { id: "u1" }, headers: new Headers() }),
 }));
 
 async function flushMicrotasks(iterations = 25) {
@@ -154,12 +128,51 @@ async function flushMicrotasks(iterations = 25) {
   }
 }
 
+const campaignRow = {
+  id: 123,
+  type: "message",
+  title: "TestCampaign",
+  workspace: "w1",
+  start_date: "2026-01-01T00:00:00.000Z",
+  end_date: "2026-01-02T00:00:00.000Z",
+};
+
+const contactRow = {
+  id: 1,
+  firstname: "=1+1",
+  surname: "Smith",
+  phone: "+15555550101",
+  email: "a@example.com",
+  address: "1 Main St",
+  city: "Town",
+  opt_out: false,
+  created_at: "2026-01-01T00:00:00.000Z",
+  workspace: "w1",
+};
+
+const messageRow = {
+  id: "m1",
+  body: "hello",
+  from: "+15555550101",
+  to: "+15555550102",
+  direction: "outbound-api",
+  status: "delivered",
+  date_created: "2026-01-01T00:00:00.000Z",
+  date_sent: "2026-01-01T00:00:00.000Z",
+  workspace: "w1",
+};
+
 describe("api.campaign-export CSV contract checks", () => {
   beforeEach(() => {
-    uploads = [];
+    objectStorageUploads = [];
     requireWorkspaceAccess.mockClear();
+    campaignIvrMocks.findCampaignExportMeta.mockResolvedValue(campaignRow);
+    queueMocks.getCampaignQueueContactIds.mockResolvedValue([1]);
+    exportDbMocks.findCampaignForMessageExport.mockResolvedValue(campaignRow);
+    exportDbMocks.findExportContactsByIds.mockResolvedValue([contactRow]);
+    exportDbMocks.countExportCampaignMessages.mockResolvedValue(1);
+    exportDbMocks.listExportCampaignMessages.mockResolvedValue([messageRow]);
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
       user: { id: "u1" },
     });
     vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: any) => {
@@ -182,14 +195,14 @@ describe("api.campaign-export CSV contract checks", () => {
       body: fd,
     });
 
-    const res = await asRouteResponse(await mod.action({ request: req } as any));
+    const res = await asRouteResponse(mod.action({ request: req } as any));
     expect(res.status).toBe(200);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
 
     // export runs asynchronously; flush microtasks until the CSV upload has happened
     await flushMicrotasks();
 
-    const csvUpload = uploads.find((u) => u.path.endsWith(".csv"));
+    const csvUpload = objectStorageUploads.find((u) => u.path.endsWith(".csv"));
     expect(csvUpload).toBeTruthy();
     const csvText = csvUpload!.text;
 
@@ -201,4 +214,3 @@ describe("api.campaign-export CSV contract checks", () => {
     expect(csvText).toContain(",'=1+1,");
   }, 30000);
 });
-

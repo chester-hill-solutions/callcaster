@@ -6,8 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useState } from "react";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 type Queue = {
   id: number;
@@ -31,24 +39,85 @@ type WorkspaceNumber = {
   inbound_queue_id: number | null;
 };
 
+type WorkspaceAgent = {
+  user_id: string;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  role: string | null;
+};
+
 type LoaderData = {
   queues: Queue[];
   members: QueueMember[];
   numbers: WorkspaceNumber[];
+  agents: WorkspaceAgent[];
   workspaceId: string;
 };
+
+function formatAgentLabel(agent: WorkspaceAgent) {
+  const fullName = [agent.first_name, agent.last_name].filter(Boolean).join(" ").trim();
+  return fullName || agent.username || `${agent.user_id.substring(0, 8)}...`;
+}
 
 type QueueFormData = {
   name: string;
   description: string;
 };
 
+type QueueActionResult = { ok: true } | { error: string };
+
+const getQueueActionError = (data: QueueActionResult | undefined) =>
+  data && "error" in data ? data.error : undefined;
+
+const getQueueActionSuccess = (data: QueueActionResult | undefined) =>
+  Boolean(data && "ok" in data && data.ok);
+
 export default function QueueSettings() {
-  const { queues, members, numbers, workspaceId } = useLoaderData<LoaderData>();
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
-  const fetcher = useFetcher();
+  const { queues, members, numbers, agents, workspaceId } = useLoaderData<LoaderData>();
+  useOutletContext<{ }>();
+  const createFetcher = useFetcher<QueueActionResult>({ key: "queue-create" });
+  const editFetcher = useFetcher<QueueActionResult>({ key: "queue-edit" });
+  const deleteFetcher = useFetcher<QueueActionResult>({ key: "queue-delete" });
+  const addMemberFetcher = useFetcher<QueueActionResult>({ key: "queue-add-member" });
+  const removeMemberFetcher = useFetcher<QueueActionResult>({ key: "queue-remove-member" });
   const [editing, setEditing] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [queuePendingDelete, setQueuePendingDelete] = useState<Queue | null>(
+    null,
+  );
+
+  useActionFeedback(createFetcher.data, {
+    getError: getQueueActionError,
+    getSuccess: getQueueActionSuccess,
+    successMessage: "Queue created",
+    onSuccess: () => setShowCreate(false),
+  });
+
+  useActionFeedback(editFetcher.data, {
+    getError: getQueueActionError,
+    getSuccess: getQueueActionSuccess,
+    successMessage: "Queue updated",
+    onSuccess: () => setEditing(null),
+  });
+
+  useActionFeedback(deleteFetcher.data, {
+    getError: getQueueActionError,
+    getSuccess: getQueueActionSuccess,
+    successMessage: "Queue deleted",
+  });
+
+  useActionFeedback(addMemberFetcher.data, {
+    getError: getQueueActionError,
+    getSuccess: getQueueActionSuccess,
+    successMessage: "Agent added to queue",
+  });
+
+  useActionFeedback(removeMemberFetcher.data, {
+    getError: getQueueActionError,
+    getSuccess: getQueueActionSuccess,
+    successMessage: "Agent removed from queue",
+  });
 
   const getQueueMembers = (queueId: number) =>
     members.filter((m) => m.queue_id === queueId);
@@ -101,7 +170,9 @@ export default function QueueSettings() {
   return (
     <main className="mt-8 flex h-fit flex-col">
       <div className="flex justify-between px-4">
-        <Heading branded>Queue Settings</Heading>
+        <Heading as="h1" level={2} branded={false}>
+          Queue Settings
+        </Heading>
         <Button asChild variant="outline">
           <Link to=".." relative="path">Back</Link>
         </Button>
@@ -124,7 +195,7 @@ export default function QueueSettings() {
                 initial={queue}
                 onCancel={() => setEditing(null)}
                 onSubmit={(data) => {
-                  fetcher.submit(
+                  editFetcher.submit(
                     {
                       _action: "update-queue",
                       id: String(queue.id),
@@ -134,13 +205,12 @@ export default function QueueSettings() {
                     },
                     { method: "PUT", encType: "application/json" },
                   );
-                  setEditing(null);
                 }}
               />
             ) : (
               <>
                 <div className="flex items-center justify-between">
-                  <h3 className="font-Zilla-Slab text-xl font-bold">{queue.name}</h3>
+                  <h3 className="text-xl font-bold">{queue.name}</h3>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -152,18 +222,8 @@ export default function QueueSettings() {
                     <Button
                       variant="destructive"
                       size="sm"
-                      onClick={() => {
-                        if (confirm("Delete queue?")) {
-                          fetcher.submit(
-                            {
-                              _action: "delete-queue",
-                              id: String(queue.id),
-                              workspace_id: workspaceId,
-                            },
-                            { method: "DELETE", encType: "application/json" },
-                          );
-                        }
-                      }}
+                      disabled={deleteFetcher.state !== "idle"}
+                      onClick={() => setQueuePendingDelete(queue)}
                     >
                       Delete
                     </Button>
@@ -185,7 +245,7 @@ export default function QueueSettings() {
                 onChange={(e) => {
                   const userId = e.target.value;
                   if (!userId) return;
-                  fetcher.submit(
+                  addMemberFetcher.submit(
                     {
                       _action: "add-member",
                       queue_id: String(queue.id),
@@ -197,11 +257,22 @@ export default function QueueSettings() {
                 }}
               >
                 <option value="" disabled>Add agent...</option>
-                {Array.from(
-                  new Set(members.filter((m) => m.queue_id !== queue.id).map((m) => m.user_id)),
-                ).length === 0 && (
-                  <option value="" disabled>All agents already assigned</option>
-                )}
+                {(() => {
+                  const assignedToThisQueue = new Set(
+                    getQueueMembers(queue.id).map((m) => m.user_id),
+                  );
+                  const availableAgents = agents.filter(
+                    (agent) => !assignedToThisQueue.has(agent.user_id),
+                  );
+                  if (availableAgents.length === 0) {
+                    return <option value="" disabled>All agents already assigned</option>;
+                  }
+                  return availableAgents.map((agent) => (
+                    <option key={agent.user_id} value={agent.user_id}>
+                      {formatAgentLabel(agent)}
+                    </option>
+                  ));
+                })()}
               </select>
               <div className="flex flex-wrap gap-2">
                 {getQueueMembers(queue.id).map((member) => (
@@ -213,7 +284,7 @@ export default function QueueSettings() {
                     <button
                       className="text-destructive hover:underline"
                       onClick={() => {
-                        fetcher.submit(
+                        removeMemberFetcher.submit(
                           {
                             _action: "remove-member",
                             queue_id: String(queue.id),
@@ -258,7 +329,7 @@ export default function QueueSettings() {
           <QueueForm
             onCancel={() => setShowCreate(false)}
             onSubmit={(data) => {
-              fetcher.submit(
+              createFetcher.submit(
                 {
                   _action: "create-queue",
                   name: data.name,
@@ -267,7 +338,6 @@ export default function QueueSettings() {
                 },
                 { method: "POST", encType: "application/json" },
               );
-              setShowCreate(false);
             }}
           />
         )}
@@ -278,6 +348,52 @@ export default function QueueSettings() {
           </Button>
         )}
       </div>
+
+      <Dialog
+        open={queuePendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setQueuePendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete queue?</DialogTitle>
+            <DialogDescription>
+              {queuePendingDelete
+                ? `Delete “${queuePendingDelete.name}” and remove its memberships.`
+                : "Delete this queue."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setQueuePendingDelete(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleteFetcher.state !== "idle"}
+              onClick={() => {
+                if (!queuePendingDelete) return;
+                deleteFetcher.submit(
+                  {
+                    _action: "delete-queue",
+                    id: String(queuePendingDelete.id),
+                    workspace_id: workspaceId,
+                  },
+                  { method: "DELETE", encType: "application/json" },
+                );
+                setQueuePendingDelete(null);
+              }}
+            >
+              Delete queue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

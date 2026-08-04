@@ -14,7 +14,14 @@ export default mergeConfig(
     test: {
       name: "ui",
       environment: "jsdom",
-      include: ["test/ui/**/*.test.{ts,tsx,js,jsx}"],
+      // The vendored scriptkit editor is consumed only by this app, and its
+      // own `npm test` never runs in CI (nothing builds or tests vendor/).
+      // Run its React tests here so the state machine is covered by the same
+      // gate as the app that depends on it.
+      include: [
+        "test/ui/**/*.test.{ts,tsx,js,jsx}",
+        "vendor/scriptkit/**/test/**/*.test.{ts,tsx}",
+      ],
       setupFiles: ["test/setup.ui.ts"],
       pool: "forks",
       maxWorkers: 2,
@@ -34,7 +41,9 @@ export default mergeConfig(
           "app/lib/type-utils.ts",
           "app/lib/type-safety-utils.ts",
           "app/routes/**/*.{ts,tsx,js,jsx}",
-          "supabase/functions/**",
+          // NOTE: do not add a bare "shared/**" here — istanbul's test-exclude
+          // treats it as "**/shared/**", silently dropping app/components/shared
+          // from coverage. The `include: app/**` already keeps top-level dirs out.
           "twilio-serverless/**",
         ],
       },

@@ -2,7 +2,7 @@
  * Type definitions for Twilio webhook payloads and API responses
  */
 
-import type { Database } from "./database.types";
+import type { Database } from "@/lib/db-types";
 
 /**
  * Twilio SMS status webhook payload
@@ -15,6 +15,8 @@ export interface TwilioSmsStatusWebhook {
   From?: string;
   To?: string;
   MessageStatus?: string;
+  /** Twilio error code on failed/undelivered statuses (e.g. "30006" = landline). */
+  ErrorCode?: string;
 }
 
 /**
@@ -70,9 +72,12 @@ export type OutreachDisposition =
  * Webhook event type
  */
 export interface WebhookEvent {
-  category: "inbound_call" | "outbound_call" | "outbound_sms" | "inbound_sms";
+  category: "inbound_call" | "outbound_call" | "outbound_sms" | "inbound_sms" | "voicemail";
   type: "INSERT" | "UPDATE" | "DELETE";
 }
+
+export type WebhookEventCategory = WebhookEvent["category"];
+export type WebhookEventType = WebhookEvent["type"];
 
 /**
  * Webhook configuration from database

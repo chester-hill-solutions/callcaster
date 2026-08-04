@@ -7,70 +7,74 @@ vi.mock("@/lib/logger.client", () => ({
 }));
 
 describe("root hooks", () => {
-  const formInitialValues = { email: "", name: "x" };
-  const formValidationRules = {
-    email: {
-      required: true,
-      minLength: 3,
-      maxLength: 10,
-      pattern: /^.+@.+$/,
-      custom: (value: string) => (value === "bad@x.com" ? "custom" : null),
-    },
-  };
   const multiKeys = ["a", "b"] as Array<"a" | "b">;
   const multiStorageOptions = {};
 
+  const createMemoryStorage = (): Storage => {
+    const store = new Map<string, string>();
+    return {
+      get length() {
+        return store.size;
+      },
+      clear() {
+        store.clear();
+      },
+      getItem(key) {
+        return store.has(key) ? store.get(key)! : null;
+      },
+      key(index) {
+        return Array.from(store.keys())[index] ?? null;
+      },
+      removeItem(key) {
+        store.delete(key);
+      },
+      setItem(key, value) {
+        store.set(key, value);
+      },
+    };
+  };
+
+  const ensureStorage = (name: "localStorage" | "sessionStorage") => {
+    const storage = globalThis[name] as Partial<Storage> | undefined;
+    if (
+      storage &&
+      typeof storage.getItem === "function" &&
+      typeof storage.setItem === "function" &&
+      typeof storage.removeItem === "function"
+    ) {
+      return storage as Storage;
+    }
+
+    const shim = createMemoryStorage();
+    Object.defineProperty(globalThis, name, {
+      configurable: true,
+      writable: true,
+      value: shim,
+    });
+    return shim;
+  };
+
+  const resetStorage = (storage: Storage & { clear?: (() => void) | undefined }) => {
+    if (typeof storage.clear === "function") {
+      storage.clear();
+      return;
+    }
+
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (key) {
+        storage.removeItem(key);
+      }
+    }
+  };
+
   beforeEach(() => {
-    localStorage.clear();
-    sessionStorage.clear();
+    resetStorage(ensureStorage("localStorage"));
+    resetStorage(ensureStorage("sessionStorage"));
   });
 
   afterEach(() => {
     vi.useRealTimers();
-  });
-
-  test("useForm validation, submit, and field helpers", async () => {
-    const { useForm } = await import("@/hooks/useForm");
-    const onSubmit = vi.fn();
-    const onError = vi.fn();
-
-    const { result } = renderHook(() =>
-      useForm({
-        initialValues: formInitialValues,
-        validationRules: formValidationRules,
-        onSubmit,
-        onError,
-      }),
-    );
-
-    const [state, actions] = result.current;
-    expect(state.isDirty).toBe(false);
-
-    act(() => actions.setValue("email", "ab"));
-    expect(result.current[0].isDirty).toBe(true);
-    act(() => actions.setTouched("email", true));
-    await waitFor(() => expect(result.current[0].errors.email).toBeTruthy());
-
-    act(() => actions.setValue("email", "user@example.com"));
-    act(() => actions.setValues({ name: "new" }));
-    act(() => actions.setError("name", "err"));
-    act(() => actions.setErrors({ name: "bulk" }));
-    act(() => actions.setTouchedAll(true));
-    act(() => actions.reset());
-
-    act(() => result.current[1].setValue("email", "bad@x.com"));
-    expect(result.current[1].validateField("email")).toBe("custom");
-
-    await act(async () => {
-      await result.current[1].submit();
-    });
-    expect(onError).toHaveBeenCalled();
-
-    act(() => result.current[1].setValue("email", "ok@x.com"));
-    await act(async () => {
-      await result.current[1].submit();
-    });
-    expect(onSubmit).toHaveBeenCalled();
   });
 
   test("useLocalStorage, multi, and session storage", async () => {

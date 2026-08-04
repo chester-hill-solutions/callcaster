@@ -1,5 +1,4 @@
 import { describe, expect, test, vi } from "vitest";
-import { logger } from "@/lib/logger.client";
 import {
   coalesce,
   createApiResponse,
@@ -8,24 +7,14 @@ import {
   debounce,
   deepClone,
   executeDatabaseOperation,
-  filterArray,
-  getEnvVar,
   getNestedValue,
-  getOptionalEnvVar,
-  getProperty,
-  hasProperty,
   isArray,
   isBoolean,
   isNumber,
   isObject,
   isString,
-  mapArray,
-  measurePerformance,
-  parseFormData,
   safeAsync,
-  safeJsonParse,
   throttle,
-  validateValue,
 } from "@/lib/type-safety-utils";
 
 describe("type-safety-utils", () => {
@@ -51,61 +40,9 @@ describe("type-safety-utils", () => {
     expect(isObject([])).toBe(false);
   });
 
-  test("getEnvVar/getOptionalEnvVar", () => {
-    const key = "CC_TEST_ENV";
-    delete process.env[key];
-    expect(() => getEnvVar(key)).toThrow(`Environment variable ${key} is not defined`);
-    process.env[key] = "v";
-    expect(getEnvVar(key)).toBe("v");
-    expect(getOptionalEnvVar(key)).toBe("v");
-    delete process.env[key];
-    expect(getOptionalEnvVar(key)).toBeUndefined();
-  });
-
-  test("parseFormData parses only schema keys", () => {
-    const fd = new FormData();
-    fd.append("a", "1");
-    fd.append("b", "x");
-    fd.append("ignored", "nope");
-    const parsed = parseFormData<{ a: number; b: string }>(fd, {
-      a: (v) => Number(v),
-      b: (v) => String(v).toUpperCase(),
-    });
-    expect(parsed).toEqual({ a: 1, b: "X" });
-  });
-
-  test("safeJsonParse returns fallback on invalid JSON", () => {
-    expect(safeJsonParse("{", { ok: 1 })).toEqual({ ok: 1 });
-    expect(safeJsonParse('{"a":1}', { ok: 1 })).toEqual({ a: 1 });
-  });
-
-  test("getProperty/hasProperty", () => {
-    const obj = { a: 1, b: "x" };
-    expect(getProperty(obj, "a")).toBe(1);
-    expect(hasProperty(obj, "a")).toBe(true);
-    expect(hasProperty(obj, "nope")).toBe(false);
-  });
-
-  test("filterArray/mapArray", () => {
-    expect(filterArray([1, 2, 3], (x) => x % 2 === 1)).toEqual([1, 3]);
-    expect(mapArray([1, 2, 3], (x) => x * 2)).toEqual([2, 4, 6]);
-  });
-
   test("safeAsync returns fallback on throw", async () => {
     expect(await safeAsync(async () => 1, 0)).toBe(1);
     expect(await safeAsync(async () => { throw new Error("nope"); }, 0)).toBe(0);
-  });
-
-  test("validateValue returns error messages for failing rules", () => {
-    const res = validateValue("x", [
-      { validate: (v) => v.length > 1, message: "too short" },
-      { validate: (v) => v.startsWith("y"), message: "wrong prefix" },
-    ]);
-    expect(res).toEqual({ isValid: false, errors: ["too short", "wrong prefix"] });
-    expect(validateValue("yy", [{ validate: (v) => v.startsWith("y"), message: "no" }])).toEqual({
-      isValid: true,
-      errors: [],
-    });
   });
 
   test("executeDatabaseOperation: error from execute", async () => {
@@ -156,29 +93,6 @@ describe("type-safety-utils", () => {
       workspace_id: "w1",
       payload: { a: 1 },
     });
-  });
-
-  test("measurePerformance logs debug and returns metrics", async () => {
-    const debugSpy = vi.spyOn(logger, "debug");
-    const { result, metrics } = await measurePerformance("op", async () => 123);
-    expect(result).toBe(123);
-    expect(typeof metrics.duration).toBe("number");
-    expect(typeof metrics.timestamp).toBe("number");
-    expect(debugSpy).toHaveBeenCalledTimes(1);
-  });
-
-  test("measurePerformance includes memoryUsage when performance.memory is available", async () => {
-    const perfAny = performance as typeof performance & { memory?: { usedJSHeapSize: number } };
-    const prevMemory = perfAny.memory;
-    perfAny.memory = { usedJSHeapSize: 100 };
-
-    const { metrics } = await measurePerformance("mem", async () => {
-      perfAny.memory!.usedJSHeapSize = 150;
-      return "ok";
-    });
-    expect(metrics.memoryUsage).toBe(50);
-
-    perfAny.memory = prevMemory;
   });
 
   test("debounce delays calls", () => {

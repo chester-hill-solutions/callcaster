@@ -1,24 +1,18 @@
 export { loader } from "./queue.loader.server";
 export { action } from "./queue.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
-import { Suspense, useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import { toast } from "sonner";
+import { redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
+import { Suspense, useState, type Dispatch, type SetStateAction } from "react";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 
 import { Spinner } from "@/components/ui/spinner";
 import { Button } from "@/components/ui/button";
-import { Audience, QueueItem, MessageCampaign, IVRCampaign, LiveCampaign, Campaign , Contact } from "@/lib/types";
+import { Audience, QueueItem, Contact, Campaign, IVRCampaign, MessageCampaign, LiveCampaign } from "@/lib/types";
 import { QueueContent } from "@/components/queue/QueueContent";
-import { SupabaseClient } from "@supabase/supabase-js";
 import { ContactSearchDialog } from "@/components/queue/ContactSearchDialog";
+import { CampaignPlaceNav } from "@/components/campaign/CampaignPlaceNav";
 import type { AppError } from "@/lib/errors.server";
-import {
-    applyQueueStatusFilter,
-    COMPLETED_QUEUE_COUNT_FILTER,
-    QUEUE_STATUS_QUEUED,
-    type QueueStatusFilter,
-} from "@/lib/queue-status";
 
 interface QueueResponse {
     queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
@@ -45,47 +39,12 @@ interface LoaderData {
     campaignId: string;
 }
 
-export const filteredSearch = (query: string, filters: { name: string, phone: string, email: string, address: string, audiences: string, disposition: string, queueStatus: string }, supabaseClient: SupabaseClient, returnFields: string[] | null = null, campaignId: string) => {
-    let searchQuery = supabaseClient.from("campaign_queue").select(returnFields ? returnFields.join(',') : '*', { count: 'exact' }).eq('campaign_id', Number(campaignId));
-    if (query) {
-        searchQuery = searchQuery.or(`firstname.ilike.%${query}%,surname.ilike.%${query}%`, { foreignTable: 'contact' });
-    }
-    if (filters.name) {
-        searchQuery = searchQuery.or(`firstname.ilike.%${filters.name}%,surname.ilike.%${filters.name}%`, { foreignTable: 'contact' });
-    }
-    if (filters.phone) {
-        searchQuery = searchQuery.ilike('contact.phone', `%${filters.phone}%`);
-    }
-    if (filters.disposition) {
-        if (filters.disposition === 'unknown') {
-            searchQuery = searchQuery.is('contact.outreach_attempt.disposition', null);
-        } else {
-            searchQuery = searchQuery.eq('contact.outreach_attempt.disposition', filters.disposition);
-        }
-    }
-    if (filters.queueStatus) {
-        const queueStatus = filters.queueStatus as QueueStatusFilter;
-        searchQuery = applyQueueStatusFilter(searchQuery, queueStatus);
-    }
-    if (filters.audiences) {
-        const audienceId = Number(filters.audiences);
-        searchQuery = searchQuery.in('contact.contact_audience.audience_id', [audienceId]);
-    }
-    if (filters.email) {
-        searchQuery = searchQuery.ilike('contact.email', `%${filters.email}%`);
-    }
-    if (filters.address) {
-        searchQuery = searchQuery.ilike('contact.address', `%${filters.address}%`);
-    }
-    return searchQuery;
-}
-
 export function ErrorBoundary() {
     const error = useRouteError() as { message?: string };
     return (
         <div className="flex flex-col items-center justify-center p-8">
             <h2 className="text-xl font-semibold mb-4">Error Loading Queue</h2>
-            <p className="text-gray-600 mb-4">There was a problem loading the queue data. Please try again.</p>
+            <p className="mb-4 text-muted-foreground">There was a problem loading the queue data. Please try again.</p>
             <div>{error?.message || "An unknown error occurred"}</div>
             <Button onClick={() => window.location.reload()}>
                 Retry
@@ -178,8 +137,7 @@ function QueueResolvedContent({
     campaignId,
     selectedAudienceIds,
     audiences,
-    supabase,
-    campaignWorkspace,
+        campaignWorkspace,
     isSelectingAudience,
     selectedAudience,
     setIsSelectingAudience,
@@ -193,7 +151,6 @@ function QueueResolvedContent({
     campaignId: string;
     selectedAudienceIds: number[];
     audiences: NonNullable<Audience>[];
-    supabase: SupabaseClient;
     campaignWorkspace: string;
     isSelectingAudience: boolean;
     selectedAudience: number | null;
@@ -210,29 +167,24 @@ function QueueResolvedContent({
         queueError: queueValue.queueError || null,
     } as QueueResponse;
 
-    useEffect(() => {
-        if (queueActions.queueFetcher.state !== "idle" || !queueActions.queueFetcher.data) {
-            return;
-        }
-        const data = queueActions.queueFetcher.data as {
-            error?: string;
-            warning?: string;
-            success?: boolean;
-            partial?: boolean;
-            enqueued?: number;
-        };
-        if (data.error) {
-            toast.error(data.error);
-            return;
-        }
-        if (data.warning) {
-            toast.warning(data.warning);
-            return;
-        }
-        if (data.success && typeof data.enqueued === "number" && data.enqueued > 0) {
-            toast.success(`Added ${data.enqueued} contacts to the queue`);
-        }
-    }, [queueActions.queueFetcher.state, queueActions.queueFetcher.data]);
+    useActionFeedback(queueActions.queueFetcher.data, {
+        enabled: queueActions.queueFetcher.state === "idle",
+        getWarning: (data) =>
+            data && typeof data === "object" && "warning" in data
+                ? (data as { warning?: string }).warning
+                : undefined,
+        getSuccess: (data) =>
+            Boolean(
+                data &&
+                    typeof data === "object" &&
+                    "success" in data &&
+                    (data as { success?: boolean }).success &&
+                    typeof (data as { enqueued?: number }).enqueued === "number" &&
+                    ((data as { enqueued?: number }).enqueued ?? 0) > 0,
+            ),
+        successMessage: (data) =>
+            `Added ${(data as { enqueued?: number }).enqueued} contacts to the queue`,
+    });
 
     return (
         <>
@@ -258,24 +210,25 @@ function QueueResolvedContent({
                 setIsAllFilteredSelected={setIsAllFilteredSelected}
                 selectedAudienceIds={selectedAudienceIds}
                 campaignId={campaignId}
-                supabase={supabase}
                 handleFilterChange={queueActions.handleFilterChange}
                 clearFilter={queueActions.clearFilter}
                 addContactToQueue={queueActions.handleAddContactToQueue}
                 removeContactsFromQueue={queueActions.handleRemoveContactsFromQueue}
                 queueFetcher={queueActions.queueFetcher}
             />
+            <div className="px-4 pb-6">
+                <CampaignPlaceNav current="queue" />
+            </div>
         </>
     );
 }
 
 export default function Queue() {
-    const { campaignData, campaignDetails, audiences, supabase } = useOutletContext<{
+    const { campaignData, campaignDetails, audiences } = useOutletContext<{
         campaignData: NonNullable<Campaign> & { workspace: string },
         campaignDetails: IVRCampaign | MessageCampaign | LiveCampaign,
         audiences: NonNullable<Audience>[],
-        supabase: SupabaseClient
-    }>();
+            }>();
     const { queuePromise, campaignId, selectedAudienceIds } = useLoaderData<LoaderData>();
     const [isAllFilteredSelected, setIsAllFilteredSelected] = useState(false);
     const [isSelectingAudience, setIsSelectingAudience] = useState(false);
@@ -292,7 +245,6 @@ export default function Queue() {
                             campaignId={campaignId}
                             selectedAudienceIds={selectedAudienceIds}
                             audiences={audiences}
-                            supabase={supabase}
                             campaignWorkspace={campaignData.workspace}
                             isSelectingAudience={isSelectingAudience}
                             selectedAudience={selectedAudience}

@@ -1,18 +1,16 @@
-import {
-  rejectMissingTwilioSignatureHeader,
-  validateTwilioWebhookForPhoneCandidates,
-} from "@/lib/twilio-webhook.server";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { getWorkspacePhoneNumbers } from "@/lib/database.server";
+import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
+import { updateWorkspaceNumberCapabilitiesByPhone } from "@/lib/inbound-call-db.server";
 import {
   applyOnboardingStepsWithWorkspaceNumbers,
   getWorkspaceMessagingOnboardingState,
   updateMessagingServiceSenders,
   updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
+import { env } from "@/lib/env.server";
+import { defineAction } from "@/lib/handler.server";
 
 interface FormData {
   VerificationStatus: string;
@@ -32,112 +30,77 @@ interface Capabilities {
   emergency_compliance_status: string;
 }
 
-import type { ActionFunctionArgs } from "react-router";
+export const action = defineAction({
+  auth: async ({ request }) => {
+    const formData = await request.clone().formData();
+    const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const missingHeader = rejectMissingTwilioSignatureHeader(request);
-  if (missingHeader) {
-    return missingHeader;
-  }
+    const forbidden = await requireTwilioSignature(request, { phoneNumber: parsedBody.To });
+    if (forbidden) return forbidden;
 
-  const formData = await request.formData();
-  const parsedBody: FormData = Object.fromEntries(formData) as FormData;
+    return parsedBody;
+  },
+  sideEffects: ["db-write"],
+  handler: async ({ auth }) => {
+    const parsedBody = auth;
 
-  const supabase: SupabaseClient = createClient(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
-  );
+    try {
+      if (
+        parsedBody.VerificationStatus === "success" ||
+        parsedBody.VerificationStatus === "failed"
+      ) {
+        const capabilities: Capabilities = {
+          fax: false,
+          mms: parsedBody.VerificationStatus === "success",
+          sms: parsedBody.VerificationStatus === "success",
+          voice: parsedBody.VerificationStatus === "success",
+          verification_status: parsedBody.VerificationStatus,
+          emergency_address_status: "not_started",
+          emergency_address_sid: null,
+          emergency_eligible: false,
+          emergency_compliance_status: "not_started",
+        };
 
-  try {
-    const { data: candidateNumbers, error: candidateError } = await supabase
-      .from("workspace_number")
-      .select("workspace(twilio_data)")
-      .eq("phone_number", parsedBody.To);
+        const numberRequest = await updateWorkspaceNumberCapabilitiesByPhone(
+          parsedBody.To,
+          capabilities as unknown as Record<string, unknown>,
+        );
 
-    if (candidateError) {
-      throw new Error(`Database error: ${candidateError.message}`);
-    }
-
-    const isValidTwilioRequest = validateTwilioWebhookForPhoneCandidates({
-      request,
-      params: parsedBody,
-      candidates: (candidateNumbers ?? []).map((row) => ({
-        twilioData: (row as { workspace?: { twilio_data?: unknown } }).workspace
-          ?.twilio_data,
-      })),
-    });
-
-    if (!isValidTwilioRequest) {
-      return routeData({ error: "Invalid Twilio signature" }, { status: 403 });
-    }
-
-    if (
-      parsedBody.VerificationStatus === "success" ||
-      parsedBody.VerificationStatus === "failed"
-    ) {
-      const capabilities: Capabilities = {
-        fax: false,
-        mms: parsedBody.VerificationStatus === "success",
-        sms: parsedBody.VerificationStatus === "success",
-        voice: parsedBody.VerificationStatus === "success",
-        verification_status: parsedBody.VerificationStatus,
-        emergency_address_status: "not_started",
-        emergency_address_sid: null,
-        emergency_eligible: false,
-        emergency_compliance_status: "not_started",
-      };
-
-      const { data: numberRequest, error: numberError } = await supabase
-        .from("workspace_number")
-        .update({ capabilities })
-        .eq("phone_number", parsedBody.To)
-        .select();
-
-      if (numberError) {
-        throw new Error(`Database error: ${numberError.message}`);
-      }
-
-      if (!numberRequest || numberRequest.length === 0) {
-        throw new Error("No matching record found");
-      }
-
-      if (parsedBody.VerificationStatus === "success") {
-        const updatedNumber = numberRequest[0] as { workspace?: string };
-        const workspaceId = updatedNumber.workspace;
-        if (workspaceId) {
-          const [current, phoneNumbersResult] = await Promise.all([
-            getWorkspaceMessagingOnboardingState({
-              supabaseClient: supabase,
-              workspaceId,
-            }),
-            getWorkspacePhoneNumbers({
-              supabaseClient: supabase,
-              workspaceId,
-            }),
-          ]);
-          let nextState = updateMessagingServiceSenders(current, parsedBody.To);
-          nextState = applyOnboardingStepsWithWorkspaceNumbers(
-            nextState,
-            phoneNumbersResult.data ?? [],
-          );
-          await updateWorkspaceMessagingOnboardingState({
-            supabaseClient: supabase,
-            workspaceId,
-            updates: nextState,
-            actorUserId: null,
-          });
+        if (numberRequest.length === 0) {
+          throw new Error("No matching record found");
         }
+
+        if (parsedBody.VerificationStatus === "success") {
+          const updatedNumber = numberRequest[0]!;
+          const workspaceId = updatedNumber.workspace;
+          if (workspaceId) {
+            const [current, phoneNumbersResult] = await Promise.all([
+              getWorkspaceMessagingOnboardingState({ workspaceId }),
+              getWorkspacePhoneNumbers({ workspaceId }),
+            ]);
+            let nextState = updateMessagingServiceSenders(current, parsedBody.To);
+            nextState = applyOnboardingStepsWithWorkspaceNumbers(
+              nextState,
+              phoneNumbersResult.data ?? [],
+            );
+            await updateWorkspaceMessagingOnboardingState({
+              workspaceId,
+              updates: nextState,
+              actorUserId: null,
+            });
+          }
+        }
+
+        return routeData(numberRequest[0]);
       }
 
-      return routeData(numberRequest[0]);
+      return routeData(parsedBody);
+    } catch (error) {
+      logger.error("Error processing request:", error);
+      return routeData(
+        { error: "An error occurred while processing the request" },
+        { status: 500 },
+      );
     }
-
-    return routeData(parsedBody);
-  } catch (error) {
-    logger.error("Error processing request:", error);
-    return routeData(
-      { error: "An error occurred while processing the request" },
-      { status: 500 },
-    );
-  }
-};
+  },
+});

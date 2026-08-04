@@ -1,8 +1,8 @@
 export { loader } from "./signin.loader.server";
 export { action } from "./signin.action.server";
 
-import { data as routeData, redirect, Form, NavLink, useActionData } from "react-router";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { redirect, Form, NavLink, useActionData } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ import { Text } from "@/components/ui/typography";
 
 
 
+
+export const meta: MetaFunction = () => [{ title: "Sign In — CallCaster" }];
 
 export default function SignIn() {
   const actionData = useActionData();
@@ -32,7 +34,7 @@ export default function SignIn() {
         id="login-hero"
       >
         {actionData?.error ? (
-          <Text className="block text-center text-destructive sm:hidden">
+          <Text className="block text-center text-destructive">
             {actionData.error}
           </Text>
         ) : null}
@@ -47,7 +49,6 @@ export default function SignIn() {
               type="text"
               name="email"
               id="email"
-              className="border-border bg-white/90 dark:bg-background/80"
             />
           </FormField>
 
@@ -57,7 +58,6 @@ export default function SignIn() {
               type="password"
               name="password"
               id="password"
-              className="border-border bg-white/90 dark:bg-background/80"
             />
           </FormField>
         </Form>
@@ -69,19 +69,22 @@ export default function SignIn() {
         >
           Login
         </Button>
-        <NavLink
-          to={"/signup"}
-          className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-foreground transition-all duration-150 hover:text-brand-primary hover:underline dark:text-secondary-foreground dark:hover:text-brand-primary"
-        >
-          Don't Have an Account Yet? Click{" "}
-          <span className="text-brand-primary">HERE</span> to Sign-Up!
-        </NavLink>
-        <NavLink
-          to={"/remember"}
-          className="font-Zilla-Slab text-xl font-bold tracking-[1px] text-muted-foreground hover:text-brand-primary hover:underline dark:text-brand-tertiary"
-        >
-          I forgot my password
-        </NavLink>
+        <div className="flex flex-col space-y-3">
+          <NavLink
+            to={"/signup"}
+            className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-foreground transition-colors duration-150 hover:text-brand-primary hover:underline"
+          >
+            Don't Have an Account Yet? Click{" "}
+            <span className="text-brand-primary">HERE</span> to Sign-Up!
+          </NavLink>
+          <Button
+            asChild
+            variant="outline"
+            className="min-h-[44px] w-full font-Zilla-Slab text-lg font-bold tracking-[1px]"
+          >
+            <NavLink to="/remember">Forgot password?</NavLink>
+          </Button>
+        </div>
       </AuthCard>
       <img
         alt="background"
@@ -91,3 +94,5 @@ export default function SignIn() {
     </main>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

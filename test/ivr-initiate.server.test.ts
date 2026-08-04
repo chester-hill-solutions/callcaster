@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const twilioCreate = vi.hoisted(() => vi.fn().mockResolvedValue({ sid: "CA123" }));
 
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   createWorkspaceTwilioInstance: vi.fn().mockResolvedValue({
     calls: { create: twilioCreate },
   }),
@@ -11,8 +11,8 @@ vi.mock("@/lib/database.server", () => ({
 
 vi.mock("@/lib/env.server", () => ({
   env: {
-    SUPABASE_URL: () => "https://example.supabase.co",
-    SUPABASE_SERVICE_KEY: () => "service-key",
+    BETTER_AUTH_URL: () => "https://example.adminDb.co",
+    BETTER_AUTH_SERVICE_KEY: () => "service-key",
     BASE_URL: () => "https://app.example.com",
   },
 }));
@@ -26,23 +26,16 @@ vi.mock("@/lib/twilio-ivr-runtime.server", () => ({
   })),
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(() => ({
-    rpc: vi.fn().mockResolvedValue({ data: 99, error: null }),
-    from: vi.fn((table: string) => {
-      if (table === "call") {
-        return { insert: vi.fn().mockResolvedValue({ error: null }) };
-      }
-      if (table === "campaign_queue") {
-        return {
-          update: vi.fn(() => ({
-            eq: vi.fn().mockResolvedValue({ error: null }),
-          })),
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    }),
-  })),
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcCreateOutreachAttempt: vi.fn().mockResolvedValue(99),
+}));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  insertCallForWorkspace: vi.fn().mockResolvedValue({ id: 1 }),
+}));
+
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueCampaignQueueById: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("initiateIvrCall", () => {
@@ -54,7 +47,6 @@ describe("initiateIvrCall", () => {
   test("returns call SID when Twilio and RPC succeed", async () => {
     const { initiateIvrCall } = await import("@/lib/ivr-initiate.server");
     const result = await initiateIvrCall({
-      userSupabase: {} as never,
       user: { id: "user-1" },
       workspace_id: "ws-1",
       campaign_id: 1,

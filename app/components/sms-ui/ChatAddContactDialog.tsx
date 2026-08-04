@@ -1,11 +1,12 @@
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { ContactForm } from "@/components/contact/ContactForm";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Contact } from "@/lib/types";
 
 const getDisplayName = (contact: Partial<Contact>) => {
@@ -39,9 +40,17 @@ const ChatAddContactDialog = ({
     existingContact || { phone: contact_number },
   );
 
-  useEffect(() => {
+  const [prevContactSource, setPrevContactSource] = useState({
+    existingContact,
+    contact_number,
+  });
+  if (
+    prevContactSource.existingContact !== existingContact ||
+    prevContactSource.contact_number !== contact_number
+  ) {
+    setPrevContactSource({ existingContact, contact_number });
     setContact(existingContact || { phone: contact_number });
-  }, [existingContact, contact_number]);
+  }
 
   const handleUpdateContact = (e: React.ChangeEvent<HTMLInputElement>) => {
     setContact((curr) => ({
@@ -54,25 +63,31 @@ const ChatAddContactDialog = ({
     setDialog(false);
   };
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setDialog}>
-      <DialogContent className="flex w-[450px] flex-col items-center bg-card">
-        <DialogHeader>
-          <DialogTitle className="text-center text-xl">
+    <Sheet open={isDialogOpen} onOpenChange={setDialog}>
+      <SheetContent className="flex w-full flex-col overflow-y-auto sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>
             {existingContact?.id
               ? `Edit ${getDisplayName(contact)}`
               : `Add ${contact_number} to contacts`}
-          </DialogTitle>
-        </DialogHeader>
-        <ContactForm
-          isNew={!(contact?.id)}
-          newContact={contact}
-          handleInputChange={handleUpdateContact}
-          handleSaveContact={handleSaveContact}
-          workspace_id={workspace_id}
-          audience_id={null}
-        />
-      </DialogContent>
-    </Dialog>
+          </SheetTitle>
+          <SheetDescription className="sr-only">
+            Contact details form
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex flex-1 flex-col items-center py-4">
+          <ContactForm
+            isNew={!(contact?.id)}
+            newContact={contact}
+            handleInputChange={handleUpdateContact}
+            handleSaveContact={handleSaveContact}
+            workspace_id={workspace_id}
+            audience_id={null}
+            assignToDefaultSmsAudience={!(contact?.id)}
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 };
 

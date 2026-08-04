@@ -1,12 +1,13 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
+
 import {
   Pagination,
   PaginationContent,
   PaginationEllipsis,
   PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
 } from "@/components/ui/pagination";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type TablePaginationProps = {
   currentPage: number;
@@ -17,9 +18,9 @@ type TablePaginationProps = {
   pageSize?: number;
   showSummary?: boolean;
 };
-const TablePagination = ({ 
-  currentPage, 
-  totalPages, 
+const TablePagination = ({
+  currentPage,
+  totalPages,
   onPageChange,
   maxVisiblePages = 5,
   pageSize,
@@ -48,16 +49,18 @@ const TablePagination = ({
     for (let i = startPage; i <= endPage; i++) {
       items.push(
         <PaginationItem key={i} className="text-muted-foreground">
-          <PaginationLink
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              onPageChange(i);
-            }}
-            isActive={i === currentPage}
+          <button
+            type="button"
+            aria-label={`Go to page ${i}`}
+            aria-current={i === currentPage ? "page" : undefined}
+            className={buttonVariants({
+              variant: i === currentPage ? "outline" : "ghost",
+              size: "icon",
+            })}
+            onClick={() => onPageChange(i)}
           >
             {i}
-          </PaginationLink>
+          </button>
         </PaginationItem>
       );
     }
@@ -84,29 +87,43 @@ const TablePagination = ({
       <Pagination className="mx-0 justify-start sm:justify-end">
         <PaginationContent>
           <PaginationItem className="text-muted-foreground">
-            <PaginationPrevious
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
+            <button
+              type="button"
+              aria-label="Go to previous page"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "default" }),
+                "gap-1 pl-2.5",
+              )}
+              disabled={currentPage === 1}
+              onClick={() => {
                 if (currentPage > 1) {
                   onPageChange(currentPage - 1);
                 }
               }}
-              className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-            />
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span>Previous</span>
+            </button>
           </PaginationItem>
           {renderPaginationItems()}
           <PaginationItem className="text-muted-foreground">
-            <PaginationNext
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
+            <button
+              type="button"
+              aria-label="Go to next page"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "default" }),
+                "gap-1 pr-2.5",
+              )}
+              disabled={currentPage >= totalPages}
+              onClick={() => {
                 if (currentPage < totalPages) {
                   onPageChange(currentPage + 1);
                 }
               }}
-              className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-            />
+            >
+              <span>Next</span>
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </PaginationItem>
         </PaginationContent>
       </Pagination>

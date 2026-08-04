@@ -2,40 +2,52 @@ import {
   estimateCampaignCredits,
   type CampaignBillingSummary,
 } from "../../shared/campaign-billing";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import { and, eq, inArray, ne } from "drizzle-orm";
+import {
+  call as callTable,
+  message as messageTable,
+  transaction_history as transactionHistoryTable,
+} from "@/db/schema";
+import { TERMINAL_BILLABLE_SMS_STATUSES } from "@/lib/pricing";
+import {
+  smsKey,
+  callKey,
+  legacyCallKeys,
+  bucketFromIdempotencyKey,
+} from "@/lib/billing-keys";
+import { createTenantDb } from "@/server/tenant-db";
 
 export type { CampaignBillingSummary };
 
-const TERMINAL_SMS_STATUSES = ["delivered", "failed", "undelivered"] as const;
+const TERMINAL_SMS_STATUSES = TERMINAL_BILLABLE_SMS_STATUSES;
 
 export async function loadCampaignBillingSummary(args: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   campaignId: number;
   campaignType: string | null | undefined;
   queuedCount: number;
 }): Promise<CampaignBillingSummary> {
   const estimate = estimateCampaignCredits(args.campaignType, args.queuedCount);
+  const tdb = createTenantDb(args.workspaceId);
 
-  const [messagesResult, callsResult] = await Promise.all([
-    args.supabaseClient
-      .from("message")
-      .select("sid")
-      .eq("campaign_id", args.campaignId)
-      .eq("workspace", args.workspaceId)
-      .neq("direction", "inbound")
-      .in("status", [...TERMINAL_SMS_STATUSES]),
-    args.supabaseClient
-      .from("call")
-      .select("sid")
-      .eq("campaign_id", args.campaignId)
-      .eq("workspace", args.workspaceId),
+  const [messageRows, callRows] = await Promise.all([
+    tdb.message.findMany({
+      where: and(
+        eq(messageTable.campaign_id, args.campaignId),
+        ne(messageTable.direction, "inbound"),
+        inArray(messageTable.status, [...TERMINAL_SMS_STATUSES]),
+      ),
+      columns: { sid: true },
+    }),
+    tdb.call.findMany({
+      where: eq(callTable.campaign_id, args.campaignId),
+      columns: { sid: true },
+    }),
   ]);
 
   const idempotencyKeys = [
-    ...(messagesResult.data ?? []).map((row) => `sms:${row.sid}`),
-    ...(callsResult.data ?? []).map((row) => `call:${row.sid}`),
+    ...messageRows.map((row) => smsKey(row.sid)),
+    ...callRows.flatMap((row) => [callKey(row.sid), ...legacyCallKeys(row.sid)]),
   ];
 
   let smsDebitCredits = 0;
@@ -44,24 +56,21 @@ export async function loadCampaignBillingSummary(args: {
   let voiceDebitEvents = 0;
 
   if (idempotencyKeys.length > 0) {
-    const { data: debits, error } = await args.supabaseClient
-      .from("transaction_history")
-      .select("amount, idempotency_key")
-      .eq("workspace", args.workspaceId)
-      .eq("type", "DEBIT")
-      .in("idempotency_key", idempotencyKeys);
+    const debits = await tdb.transaction_history.findMany({
+      where: and(
+        eq(transactionHistoryTable.type, "DEBIT"),
+        inArray(transactionHistoryTable.idempotency_key, idempotencyKeys),
+      ),
+      columns: { amount: true, idempotency_key: true },
+    });
 
-    if (error) {
-      throw error;
-    }
-
-    for (const row of debits ?? []) {
+    for (const row of debits) {
       const credits = Math.abs(row.amount);
-      const key = row.idempotency_key ?? "";
-      if (key.startsWith("sms:")) {
+      const bucket = bucketFromIdempotencyKey(row.idempotency_key);
+      if (bucket === "sms") {
         smsDebitCredits += credits;
         smsDebitEvents += 1;
-      } else if (key.startsWith("call:")) {
+      } else if (bucket === "voice") {
         voiceDebitCredits += credits;
         voiceDebitEvents += 1;
       }

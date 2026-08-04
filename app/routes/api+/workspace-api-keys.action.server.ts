@@ -1,20 +1,17 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import {
   createApiKeyBodySchema,
   deleteApiKeyBodySchema,
 } from "@/lib/schemas/api/platform-workspace-admin";
-import {
-  createWorkspaceApiKey,
+import { createWorkspaceApiKey,
   deleteWorkspaceApiKey,
   listWorkspaceApiKeys,
 } from "@/lib/platform-members.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { defineAction, defineLoader } from "@/lib/handler.server";
 import { z } from "zod";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
 const legacyCreateApiKeySchema = createApiKeyBodySchema.extend({
   workspace_id: z.string().uuid(),
@@ -24,79 +21,78 @@ const legacyDeleteApiKeySchema = deleteApiKeyBodySchema.extend({
   workspace_id: z.string().uuid(),
 });
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
+export const loader = defineLoader({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-read"],
+  handler: async ({ auth, url }) => {
+    const workspaceId = url.searchParams.get("workspace_id");
+    if (!workspaceId) {
+      return jsonError("workspace_id is required", 400);
+    }
 
-  const url = new URL(request.url);
-  const workspaceId = url.searchParams.get("workspace_id");
-  if (!workspaceId) {
-    return jsonError("workspace_id is required", 400);
-  }
-
-  const result = await listWorkspaceApiKeys(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
-    workspaceId,
-  );
-
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
-
-  return jsonResponse({ keys: result.keys }, 200);
-};
-
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  const supabase = getAuthSupabaseClient(auth);
-
-  if (request.method === "POST") {
-    const parsed = await parseJsonBodyOrResponse(request, legacyCreateApiKeySchema);
-    if (parsed instanceof Response) return parsed;
-
-    const result = await createWorkspaceApiKey(
-      supabase,
-      auth.user.id,
-      parsed.workspace_id,
-      parsed.name,
+    const result = await listWorkspaceApiKeys(    auth.user.id,
+      workspaceId,
     );
 
     if (!result.ok) {
       return jsonError(result.error, result.status);
     }
 
-    return jsonResponse(
-      {
-        key: result.key,
-        id: result.api_key.id,
-        name: result.api_key.name,
-        key_prefix: result.api_key.key_prefix,
-        created_at: result.api_key.created_at,
-      },
-      201,
-    );
-  }
+    return jsonResponse({ keys: result.keys }, 200);
+  },
+});
 
-  if (request.method === "DELETE") {
-    const parsed = await parseJsonBodyOrResponse(request, legacyDeleteApiKeySchema);
-    if (parsed instanceof Response) return parsed;
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
+    if (request.method === "POST") {
+      const parsed = await parseJsonBodyOrResponse(request, legacyCreateApiKeySchema);
+      if (parsed instanceof Response) return parsed;
 
-    const result = await deleteWorkspaceApiKey(
-      supabase,
-      auth.user.id,
-      parsed.workspace_id,
-      parsed.id,
-    );
+      const result = await createWorkspaceApiKey(
+        auth.user.id,
+        parsed.workspace_id,
+        parsed.name,
+        parsed.scopes,
+        parsed.expires_in_days,
+      );
 
-    if (!result.ok) {
-      return jsonError(result.error, result.status);
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse(
+        {
+          key: result.key,
+          id: result.api_key.id,
+          name: result.api_key.name,
+          key_prefix: result.api_key.key_prefix,
+          created_at: result.api_key.created_at,
+          scopes: result.api_key.scopes,
+          expires_at: result.api_key.expires_at,
+        },
+        201,
+      );
     }
 
-    return jsonResponse({ success: true }, 200);
-  }
+    if (request.method === "DELETE") {
+      const parsed = await parseJsonBodyOrResponse(request, legacyDeleteApiKeySchema);
+      if (parsed instanceof Response) return parsed;
 
-  return jsonError("Method not allowed", 405);
-};
+      const result = await deleteWorkspaceApiKey(
+        auth.user.id,
+        parsed.workspace_id,
+        parsed.id,
+      );
+
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse({ success: true }, 200);
+    }
+
+    return jsonError("Method not allowed", 405);
+  },
+});

@@ -1,29 +1,91 @@
 /**
  * Workspace-related database functions
  */
-import Twilio from "twilio";
-import { PostgrestError, SupabaseClient, Session } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import type Twilio from "twilio";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import {
+  audience,
+  campaign,
+  workspace,
+  workspace_invite,
+  workspace_member,
+  workspace_number,
+} from "@/db/schema";
+import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
 import { WorkspaceData, WorkspaceNumbers } from "../types";
-import { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
+import type { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
-import { logger } from "../logger.server";
-import { data as routeData } from "react-router";
-import { createStripeContact } from "./stripe.server";
-import { AppError, ErrorCode } from "@/lib/errors.server";
 import {
-  buildOnboardingStepsForState,
-  DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-  mergeWorkspaceMessagingOnboardingState,
+  getWorkspaceTwilioDataVersion,
+  invalidateWorkspaceTwilioData,
+} from "@/lib/merge-workspace-twilio-data.server";
+import { logger } from "../logger.server";
+import {
+  rpcGetWorkspaceUsers,
+  rpcUpdateUserWorkspaceLastAccessTime,
+} from "@/lib/db-rpc.server";
+import {
+  getWorkspaceMessagingOnboardingState,
+  updateWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
-import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
+import { adminDb } from "@/server/admin-db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { data as routeData } from "react-router";
+import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
+import { TWILIO_REQUEST_TIMEOUT_MS } from "@/lib/twilio-client-options";
+import {
+  addUserToWorkspace,
+  getUserRole,
+  memberRoleToRoleId,
+  requireWorkspaceAccess,
+  workspaceMemberId,
+} from "@/lib/workspace-membership.server";
+export {
+  addUserToWorkspace,
+  getUserRole,
+  memberRoleToRoleId,
+  requireWorkspaceAccess,
+  workspaceMemberId,
+};
+
+type DbQueryError = { message: string; code?: string; details?: string };
+
+async function loadTwilioSdk() {
+  const { default: TwilioSdk } = await import("twilio");
+  return TwilioSdk;
+}
+
+function toDbError(error: unknown): DbQueryError {
+  if (error instanceof Error) {
+    return { message: error.message, details: error.message };
+  }
+  return { message: String(error) };
+}
+
+function parseTwilioDataColumn(raw: unknown): unknown {
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as unknown;
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
+}
+
+function notFoundError(message = "Row not found"): Error & { code: string } {
+  const err = new Error(message) as Error & { code: string };
+  err.code = "PGRST116";
+  return err;
+}
 
 export {
   normalizeWorkspaceTwilioOpsConfig,
   getWorkspaceTwilioPortalConfigFromTwilioData,
   getEffectiveWorkspaceTwilioPortalConfig,
+  getEffectiveWorkspaceTwilioPortalConfigForWorkspace,
   normalizeWorkspaceTwilioSyncSnapshot,
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
   getWorkspaceTwilioPortalConfig,
@@ -34,31 +96,28 @@ export {
   getWorkspaceTwilioPortalSnapshot,
 } from "./workspace-twilio.server";
 
-export async function getUserWorkspaces({
-  supabaseClient,
-}: {
-  supabaseClient: SupabaseClient<Database>;
-}) {
-  const {
-    data: { session },
-  } = await supabaseClient.auth.getSession();
-  if (session == null) {
+export async function getUserWorkspaces({ userId }: { userId: string }) {
+  if (!userId) {
     return { data: null, error: "No user session found" };
   }
 
-  const workspacesQuery = supabaseClient
-    .from("workspace")
-    .select("*")
-    .order("created_at", { ascending: false });
+  try {
+    const rows = await adminDb
+      .select({ workspace })
+      .from(workspace_member)
+      .innerJoin(
+        workspace,
+        eqChsTextToUuid(workspace_member.workspace_id, workspace.id),
+      )
+      .where(eq(workspace_member.user_id, userId))
+      .orderBy(desc(workspace.created_at));
 
-  const { data, error }: { data: WorkspaceData; error: PostgrestError | null } =
-    await workspacesQuery;
-
-  if (error) {
+    const data = rows.map((row) => row.workspace) as WorkspaceData;
+    return { data, error: null };
+  } catch (error) {
     logger.error("Error on function getUserWorkspaces: ", error);
+    return { data: null, error: toDbError(error) };
   }
-
-  return { data, error };
 }
 
 export async function createKeys({
@@ -70,7 +129,8 @@ export async function createKeys({
   sid: string;
   token: string;
 }): Promise<NewKeyInstance> {
-  const twilio = new Twilio.Twilio(sid, token);
+  const TwilioSdk = await loadTwilioSdk();
+  const twilio = new TwilioSdk.Twilio(sid, token);
   try {
     const newKey = await twilio.newKeys.create({ friendlyName: workspace_id });
     return newKey;
@@ -85,7 +145,8 @@ export async function createSubaccount({
 }: {
   workspace_id: string;
 }) {
-  const twilio = new Twilio.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
+  const TwilioSdk = await loadTwilioSdk();
+  const twilio = new TwilioSdk.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
   const account = await twilio.api.v2010.accounts
     .create({
       friendlyName: workspace_id,
@@ -97,7 +158,7 @@ export async function createSubaccount({
 }
 
 /** Twilio `AccountInstance` is not JSON-serializable (circular `_version`); tests may return plain objects without `toJSON`. */
-function twilioAccountToPersistableJson(account: unknown): Record<string, unknown> {
+export function twilioAccountToPersistableJson(account: unknown): Record<string, unknown> {
   if (
     typeof account === "object" &&
     account !== null &&
@@ -132,263 +193,108 @@ function twilioAccountToPersistableJson(account: unknown): Record<string, unknow
   return out;
 }
 
-export async function createNewWorkspace({
-  supabaseClient,
-  workspaceName,
-  user_id,
-}: {
-  supabaseClient: SupabaseClient<Database>;
-  workspaceName: string;
-  user_id: string;
-}): Promise<{
-  data: string | null;
-  error: string | null;
-  provisioningWarning?: string | null;
-}> {
-  let workspaceId: string | null = null;
-  const provisioningWarnings: string[] = [];
-
-  try {
-    const { data: insertWorkspaceData, error: insertWorkspaceError } =
-      await supabaseClient.rpc("create_new_workspace", {
-        new_workspace_name: workspaceName,
-        user_id,
-      });
-    if (insertWorkspaceError) {
-      throw insertWorkspaceError;
-    }
-    if (!insertWorkspaceData) {
-      throw new Error("Workspace creation RPC returned no workspace id");
-    }
-
-    workspaceId = insertWorkspaceData;
-
-    let account: Awaited<ReturnType<typeof createSubaccount>> | null = null;
-    try {
-      account = await createSubaccount({
-        workspace_id: workspaceId,
-      });
-      if (!account) {
-        provisioningWarnings.push("Twilio subaccount was not created");
-      }
-    } catch (subaccountError) {
-      logger.error("Twilio subaccount creation failed after workspace insert:", subaccountError);
-      provisioningWarnings.push("Twilio subaccount creation failed");
-    }
-
-    let newKey: Awaited<ReturnType<typeof createKeys>> | null = null;
-    if (account) {
-      try {
-        newKey = await createKeys({
-          workspace_id: workspaceId,
-          sid: account.sid,
-          token: account.authToken,
-        });
-        if (!newKey) {
-          provisioningWarnings.push("Twilio API keys were not created");
-        }
-      } catch (keyError) {
-        logger.error("Twilio API key creation failed after workspace insert:", keyError);
-        provisioningWarnings.push("Twilio API key creation failed");
-      }
-    }
-
-    let stripeCustomerId: string | null = null;
-    try {
-      const newStripeCustomer = await createStripeContact({
-        supabaseClient,
-        workspace_id: workspaceId,
-      });
-      stripeCustomerId = newStripeCustomer.id;
-    } catch (stripeError) {
-      logger.error("Stripe customer creation failed after workspace insert:", stripeError);
-      provisioningWarnings.push("Stripe customer creation failed");
-    }
-
-    const seededOnboarding = mergeWorkspaceMessagingOnboardingState(
-      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-      {
-        subaccountBootstrap: {
-          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.subaccountBootstrap,
-          callbackBaseUrl: env.BASE_URL(),
-          inboundVoiceUrl: `${env.BASE_URL()}/api/inbound`,
-          inboundSmsUrl: `${env.BASE_URL()}/api/inbound-sms`,
-          statusCallbackUrl: `${env.BASE_URL()}/api/caller-id/status`,
-          status: "provisioning",
-        },
-        status: "provisioning",
-        currentStep: "messaging_service",
-        lastUpdatedBy: user_id,
-      },
-    );
-    seededOnboarding.steps = buildOnboardingStepsForState(seededOnboarding);
-
-    const workspaceUpdate: Database["public"]["Tables"]["workspace"]["Update"] = {
-      twilio_data: account
-        ? ({
-            ...twilioAccountToPersistableJson(account),
-            onboarding: seededOnboarding,
-          } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"])
-        : ({
-            onboarding: seededOnboarding,
-          } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"]),
-    };
-    if (newKey) {
-      workspaceUpdate.key = newKey.sid;
-      workspaceUpdate.token = newKey.secret;
-    }
-    if (stripeCustomerId) {
-      workspaceUpdate.stripe_id = stripeCustomerId;
-    }
-
-    const { error: insertWorkspaceUsersError } = await supabaseClient
-      .from("workspace")
-      .update(workspaceUpdate)
-      .eq("id", workspaceId);
-    if (insertWorkspaceUsersError) {
-      logger.error(
-        "Workspace metadata update failed after workspace insert:",
-        insertWorkspaceUsersError,
-      );
-      provisioningWarnings.push("Workspace provisioning metadata update failed");
-    }
-
-    if (account && newKey) {
-      try {
-        await ensureWorkspaceTwilioBootstrap({
-          supabaseClient,
-          workspaceId,
-          actorUserId: user_id,
-        });
-      } catch (bootstrapError) {
-        logger.error(
-          "Workspace Twilio bootstrap failed after workspace creation:",
-          bootstrapError,
-        );
-        provisioningWarnings.push("Twilio bootstrap is still running");
-      }
-    }
-
-    return {
-      data: workspaceId,
-      error: null,
-      provisioningWarning:
-        provisioningWarnings.length > 0 ? provisioningWarnings.join("; ") : null,
-    };
-  } catch (error) {
-    logger.error("Error in createNewWorkspace:", error);
-    if (workspaceId) {
-      return {
-        data: workspaceId,
-        error: null,
-        provisioningWarning:
-          error instanceof Error
-            ? `Workspace created but provisioning failed: ${error.message}`
-            : "Workspace created but provisioning failed",
-      };
-    }
-    return {
-      data: null,
-      error:
-        error instanceof Error ? error.message : "An unexpected error occurred",
-      provisioningWarning: null,
-    };
-  }
-}
-
 export async function getWorkspaceInfo({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string | undefined;
+  null?: never;
 }) {
   if (workspaceId == null) return { error: "No workspace id" };
 
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("name")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    logger.error(`Error on function getWorkspaceInfo: ${error.details}`);
+  try {
+    const data = await adminDb.query.workspace.findFirst({
+      where: eq(workspace.id, workspaceId),
+      columns: { name: true },
+    });
+    return { data: data ?? null, error: null };
+  } catch (error) {
+    const dbError = toDbError(error);
+    logger.error(`Error on function getWorkspaceInfo: ${dbError.details ?? dbError.message}`);
+    return { data: null, error: dbError };
   }
-
-  return { data, error };
 }
 
-export type WorkspaceInfoWithDetails = {
-  workspace: WorkspaceData & { workspace_users: { role: MemberRole }[] };
-  workspace_users: { role: MemberRole }[];
-  campaigns: unknown[];
-  phoneNumbers: Partial<WorkspaceNumbers[]>;
-  audiences: unknown[];
-};
-
 export async function getWorkspaceInfoWithDetails({
-  supabaseClient,
   workspaceId,
   userId,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   userId: string;
+  tdb?: TenantDb;
+  null?: never;
 }) {
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select(
-      `id, name, credits, 
-        workspace_users(id, role), 
-        campaign(*), 
-        workspace_number(id, phone_number, capabilities), 
-        audience(id, name)`,
-    )
-    .eq("id", workspaceId)
-    .eq("workspace_users.user_id", userId)
-    .single();
-  if (workspaceError) throw workspaceError;
-  const { campaign, workspace_number, audience, ...rest } = workspace;
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+
+  const workspaceRow = await adminDb.query.workspace.findFirst({
+    where: eq(workspace.id, workspaceId),
+    columns: { id: true, name: true, credits: true },
+  });
+  if (!workspaceRow) {
+    throw notFoundError();
+  }
+
+  const membership = await tdb.workspace_member.findFirst({
+    where: eq(workspace_member.user_id, userId),
+    columns: { id: true, role_id: true },
+  });
+  if (!membership) {
+    throw notFoundError();
+  }
+
+  const [campaigns, phoneNumbers, audiences] = await Promise.all([
+    tdb.campaign.findMany(),
+    tdb.workspace_number.findMany({
+      columns: { id: true, phone_number: true, capabilities: true },
+    }),
+    tdb.audience.findMany({
+      columns: { id: true, name: true },
+    }),
+  ]);
+
+  const workspace_users_list = [{ role: membership.role_id as MemberRole }];
+
   return {
-    workspace: rest,
-    campaigns: campaign,
-    phoneNumbers: workspace_number,
-    audiences: audience,
+    workspace: {
+      ...workspaceRow,
+      workspace_users: workspace_users_list,
+    },
+    campaigns,
+    phoneNumbers,
+    audiences,
   } as unknown as WorkspaceInfoWithDetails;
 }
 
 export async function getWorkspaceUsers({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const { data, error } = await supabaseClient.rpc("get_workspace_users", {
-    selected_workspace_id: workspaceId,
-  });
-  if (error) {
+  try {
+    const data = await rpcGetWorkspaceUsers(workspaceId);
+    return { data, error: null };
+  } catch (error) {
     logger.error("Error on function getWorkspaceUsers", error);
+    return { data: null, error: error as Error };
   }
-
-  return { data, error };
 }
 
 export async function getWorkspacePhoneNumbers({
-  supabaseClient,
   workspaceId,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
+  tdb?: TenantDb;
+  null?: never;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace_number")
-    .select()
-    .eq(`workspace`, workspaceId);
-  if (error) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  try {
+    const data = await tdb.workspace_number.findMany();
+    return { data, error: null };
+  } catch (error) {
     logger.error("Error on function getWorkspacePhoneNumbers", error);
+    return { data: null, error: toDbError(error) };
   }
-  return { data, error };
 }
 
 /**
@@ -396,276 +302,318 @@ export async function getWorkspacePhoneNumbers({
  * Used by the handset page to show which number to call.
  */
 export async function getHandsetNumberForWorkspace({
-  supabaseClient,
   workspaceId,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
+  tdb?: TenantDb;
+  null?: never;
 }): Promise<{
   data: { id: number; phone_number: string | null } | null;
-  error: PostgrestError | null;
+  error: DbQueryError | null;
 }> {
-  const { data: handset } = await supabaseClient
-    .from("workspace_number")
-    .select("id, phone_number")
-    .eq("workspace", workspaceId)
-    .eq("handset_enabled", true)
-    .limit(1)
-    .maybeSingle();
-  if (handset) return { data: handset, error: null };
-  const { data: first } = await supabaseClient
-    .from("workspace_number")
-    .select("id, phone_number")
-    .eq("workspace", workspaceId)
-    .limit(1)
-    .maybeSingle();
-  return { data: first, error: null };
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  try {
+    const handset = await tdb.workspace_number.findFirst({
+      where: eq(workspace_number.handset_enabled, true),
+      columns: { id: true, phone_number: true },
+    });
+    if (handset) return { data: handset, error: null };
+
+    const first = await tdb.workspace_number.findFirst({
+      columns: { id: true, phone_number: true },
+    });
+    return { data: first ?? null, error: null };
+  } catch (error) {
+    return { data: null, error: toDbError(error) };
+  }
 }
 
 export async function updateWorkspacePhoneNumber({
-  supabaseClient,
   workspaceId,
   numberId,
   updates,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   numberId: string | number;
   updates: Partial<NonNullable<WorkspaceNumbers>>;
+  tdb?: TenantDb;
+  null?: never;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace_number")
-    .update(updates)
-    .eq("id", Number(numberId))
-    .eq("workspace", workspaceId)
-    .select()
-    .single();
-  return { data, error };
-}
-
-export async function addUserToWorkspace({
-  supabaseClient,
-  workspaceId,
-  userId,
-  role,
-}: {
-  supabaseClient: SupabaseClient<Database>;
-  workspaceId: string;
-  userId: string;
-  role: "owner" | "admin" | "caller" | "member";
-}) {
-  const { data, error } = await supabaseClient
-    .from("workspace_users")
-    .insert({ workspace_id: workspaceId, user_id: userId, role })
-    .select()
-    .single();
-  if (error) {
-    logger.error("Failed to join workspace", error);
-    return { data: null, error };
-  }
-  return { data, error: null };
-}
-
-export async function getUserRole({
-  supabaseClient,
-  user,
-  workspaceId,
-}: {
-  supabaseClient: SupabaseClient;
-  user: { id: string } | null;
-  workspaceId: string;
-}) {
-  if (!user) {
-    return null;
-  }
-
-  const { data: userRole, error: userRoleError } = await supabaseClient
-    .from("workspace_users")
-    .select("role")
-    .eq("user_id", user.id)
-    .eq("workspace_id", workspaceId)
-    .single();
-  if (userRoleError) {
-    const errorCode = (userRoleError as { code?: string }).code;
-    if (errorCode !== "PGRST116") {
-      logger.error("Failed to load user role for workspace", {
-        workspaceId,
-        userId: user.id,
-        code: errorCode,
-        message: userRoleError.message,
-      });
-    }
-  }
-
-  return userRole;
-}
-
-/**
- * Verify that the user has access to the workspace. Throws AppError with 403 if not.
- * Use as defense-in-depth when workspace_id comes from request body.
- */
-export async function requireWorkspaceAccess({
-  supabaseClient,
-  user,
-  workspaceId,
-}: {
-  supabaseClient: SupabaseClient;
-  user: { id: string };
-  workspaceId: string;
-}): Promise<void> {
-  const role = await getUserRole({
-    supabaseClient,
-    user,
-    workspaceId,
-  });
-  if (!role || !["owner", "admin", "member", "caller"].includes(role.role)) {
-    throw new AppError("Access denied to workspace", 403, ErrorCode.FORBIDDEN);
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  try {
+    const rows = await tdb.workspace_number.update({
+      set: updates,
+      where: eq(workspace_number.id, Number(numberId)),
+    });
+    const data = rows[0] ?? null;
+    return { data, error: data ? null : toDbError(new Error("Not found")) };
+  } catch (error) {
+    return { data: null, error: toDbError(error) };
   }
 }
 
 export async function updateUserWorkspaceAccessDate({
   workspaceId,
-  supabaseClient,
+  userId,
 }: {
   workspaceId: string;
-  supabaseClient: SupabaseClient<Database>;
+  userId: string;
 }): Promise<void> {
-  const { data: updatedTime, error: updatedTimeError } =
-    await supabaseClient.rpc("update_user_workspace_last_access_time", {
-      selected_workspace_id: workspaceId,
-    });
-
-  if (updatedTimeError) {
+  try {
+    await rpcUpdateUserWorkspaceLastAccessTime(userId, workspaceId);
+  } catch (updatedTimeError) {
     logger.error("Error updating user access time: ", updatedTimeError);
   }
-
-  return;
 }
 
 export async function handleExistingUserSession(
-  supabaseClient: SupabaseClient,
-  serverSession: Session,
+  serverSession: { user: { id: string } },
   headers: Headers,
 ) {
-  const { data: invites, error: inviteError } = await supabaseClient
-    .from("workspace_invite")
-    .select()
-    .eq("user_id", serverSession.user.id);
-  if (inviteError)
+  try {
+    const invites = await adminDb
+      .select()
+      .from(workspace_invite)
+      .where(eq(workspace_invite.user_id, serverSession.user.id));
+    return routeData({ newSession: serverSession, invites, error: null }, { headers });
+  } catch (inviteError) {
     return routeData(
       { error: inviteError, newSession: null, invites: [] },
       { headers },
     );
-  return routeData({ newSession: serverSession, invites, error: null }, { headers });
+  }
 }
 
 export async function handleNewUserOTPVerification(
-  supabaseClient: SupabaseClient,
+  request: Request,
   token_hash: string,
   type: "signup" | "invite" | "magiclink" | "recovery" | "email_change",
   headers: Headers,
 ) {
+  void type;
   if (!token_hash) {
     return routeData({ error: "Invalid invitation link" }, { headers });
   }
 
-  const { data, error } = await supabaseClient.auth.verifyOtp({
-    token_hash,
-    type: type as
-      | "signup"
-      | "invite"
-      | "magiclink"
-      | "recovery"
-      | "email_change",
-  });
+  try {
+    const [{ auth }, { mergeBetterAuthSetCookieHeaders }] = await Promise.all([
+      import("@/server/auth-instance"),
+      import("@/lib/better-auth-headers.server"),
+    ]);
+    const result = (await auth.api.verifyEmail({
+      query: { token: token_hash },
+      headers: request.headers,
+      returnHeaders: true,
+    })) as unknown as { headers?: Headers; response?: { user?: { id: string } } };
+    const mergedHeaders = mergeBetterAuthSetCookieHeaders(result?.headers, headers);
+    const user = result?.response?.user;
 
-  if (error) return routeData({ error }, { headers });
+    if (!user) {
+      return routeData({ error: "Failed to create session" }, { headers: mergedHeaders });
+    }
 
-  const newSession = data.session;
-
-  if (newSession) {
-    const { error: sessionError } =
-      await supabaseClient.auth.setSession(newSession);
-    if (sessionError) return routeData({ error: sessionError }, { headers });
-
-    const { data: invites, error: inviteError } = await supabaseClient
-      .from("workspace_invite")
-      .select()
-      .eq("user_id", newSession.user.id);
-
-    if (inviteError) return routeData({ error: inviteError }, { headers });
-
-    return routeData({ newSession, invites }, { headers });
-  } else {
-    return routeData({ error: "Failed to create session" }, { headers });
+    try {
+      const invites = await adminDb
+        .select()
+        .from(workspace_invite)
+        .where(eq(workspace_invite.user_id, user.id));
+      return routeData(
+        { newSession: { user }, invites },
+        { headers: mergedHeaders },
+      );
+    } catch (inviteError) {
+      return routeData({ error: inviteError }, { headers: mergedHeaders });
+    }
+  } catch (error) {
+    return routeData({ error }, { headers });
   }
 }
 
+/**
+ * Per-process TTL cache of constructed `Twilio.Twilio` clients, keyed by
+ * workspace id. `createWorkspaceTwilioInstance` is called on essentially
+ * every workspace-scoped Twilio REST call, and building a client means both
+ * a DB round trip for credentials and constructing a new `Twilio.Twilio`
+ * instance; neither is needed on every call since credentials rarely
+ * change.
+ *
+ * Entries are tagged with the workspace's Twilio-data version (from
+ * merge-workspace-twilio-data.server.ts) so a credential write anywhere in
+ * the app invalidates the memoized client immediately, without waiting out
+ * the TTL — the TTL alone only bounds staleness for writes this cache can't
+ * observe directly (see loadWorkspaceTwilioData's cache comment). This does
+ * not touch the separate parent/global Twilio client singleton in
+ * app/twilio.server.ts.
+ */
+const WORKSPACE_TWILIO_CLIENT_CACHE_TTL_MS = 60_000;
+
+
+type WorkspaceTwilioClientCacheEntry = {
+  client: Twilio.Twilio;
+  version: number;
+  expiresAt: number;
+};
+
+const workspaceTwilioClientCache = new Map<string, WorkspaceTwilioClientCacheEntry>();
+
 export async function createWorkspaceTwilioInstance({
-  supabase,
   workspace_id,
 }: {
-  supabase: SupabaseClient;
   workspace_id: string;
+  client?: never;
 }) {
-  const { data, error } = await supabase
-    .from("workspace")
-    .select("twilio_data, key, token")
-    .eq("id", workspace_id)
-    .single();
-  if (error) throw error;
-  const creds = readTwilioWorkspaceCredentials(data.twilio_data);
+  const currentVersion = getWorkspaceTwilioDataVersion(workspace_id);
+  const cached = workspaceTwilioClientCache.get(workspace_id);
+  if (
+    cached &&
+    cached.version === currentVersion &&
+    cached.expiresAt > Date.now()
+  ) {
+    return cached.client;
+  }
+
+  const data = await adminDb.query.workspace.findFirst({
+    where: eq(workspace.id, workspace_id),
+    columns: { twilio_data: true, key: true, token: true },
+  });
+  if (!data) {
+    throw new Error("No workspace found");
+  }
+  const creds = readTwilioWorkspaceCredentials(parseTwilioDataColumn(data.twilio_data));
   if (!creds) {
     throw new Error("Workspace missing Twilio credentials");
   }
-  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
+  // ADR-0011: REST calls use workspace API keys (workspace.key/workspace.token)
+  // when present; auth token is only used for webhook signature validation.
+  // Twilio SDK API-key auth: `new Twilio(apiKey, apiSecret, { accountSid })`.
+  const apiKey = typeof data.key === "string" ? data.key.trim() : "";
+  const apiSecret = typeof data.token === "string" ? data.token.trim() : "";
+  const TwilioSdk = await loadTwilioSdk();
+  // Without an explicit timeout the SDK waits indefinitely. The worker is a
+  // single-threaded poll loop, so one hung socket stalls EVERY queued job; on
+  // the web side it holds a request and one of only ten DB pool slots.
+  // withTwilioRetry already handles retries, so this only bounds one attempt.
+  const twilio =
+    apiKey && apiSecret
+      ? new TwilioSdk.Twilio(apiKey, apiSecret, {
+          accountSid: creds.sid,
+          timeout: TWILIO_REQUEST_TIMEOUT_MS,
+        })
+      : new TwilioSdk.Twilio(creds.sid, creds.authToken, {
+          timeout: TWILIO_REQUEST_TIMEOUT_MS,
+        });
+
+  workspaceTwilioClientCache.set(workspace_id, {
+    client: twilio,
+    version: currentVersion,
+    expiresAt: Date.now() + WORKSPACE_TWILIO_CLIENT_CACHE_TTL_MS,
+  });
+
   return twilio;
 }
 
 export async function removeWorkspacePhoneNumber({
-  supabaseClient,
   workspaceId,
   numberId,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   numberId: bigint;
+  tdb?: TenantDb;
+  null?: never;
 }) {
   const normalizedNumberId = Number(numberId);
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
   try {
-    const { data: number, error: numberError } = await supabaseClient
-      .from("workspace_number")
-      .select()
-      .eq("id", normalizedNumberId)
-      .single();
-    if (numberError) throw numberError;
+    const number = await tdb.workspace_number.findFirst({
+      where: eq(workspace_number.id, normalizedNumberId),
+    });
+    if (!number) {
+      throw new Error("Number not found");
+    }
     const twilio = await createWorkspaceTwilioInstance({
-      supabase: supabaseClient,
       workspace_id: workspaceId,
     });
-    if (!number.friendly_name) {
-      throw new Error("Friendly name is required");
+
+    // Prefer the stored Twilio IncomingPhoneNumber SID for a direct,
+    // SID-based release. Only fall back to friendly_name matching for legacy
+    // rows that predate the twilio_phone_number_sid column.
+    const storedSid = number.twilio_phone_number_sid ?? null;
+    let incomingSids: string[];
+    if (storedSid) {
+      incomingSids = [storedSid];
+    } else {
+      if (!number.friendly_name) {
+        throw new Error("Friendly name is required");
+      }
+      const incomingIds = await twilio.incomingPhoneNumbers.list({
+        friendlyName: number.friendly_name,
+      });
+      incomingSids = incomingIds.map((id) => id.sid);
     }
-    const outgoingIds = await twilio.outgoingCallerIds.list({
-      friendlyName: number.friendly_name,
+
+    // Explicitly detach from the workspace Messaging Service before releasing
+    // the number, so the MS sender pool does not hold a dangling reference.
+    const onboarding = await getWorkspaceMessagingOnboardingState({
+      workspaceId,
     });
-    const incomingIds = await twilio.incomingPhoneNumbers.list({
-      friendlyName: number.friendly_name,
-    });
+    const msSid = onboarding.messagingService.serviceSid;
+    if (msSid) {
+      for (const sid of incomingSids) {
+        try {
+          await twilio.messaging.v1.services(msSid).phoneNumbers(sid).remove();
+        } catch (detachError) {
+          // Ignore "not attached" / already-detached errors.
+          logger.warn(
+            `MS detach skipped for ${sid}: ${
+              detachError instanceof Error
+                ? detachError.message
+                : String(detachError)
+            }`,
+          );
+        }
+      }
+    }
+
+    // Outgoing caller-ID cleanup (match by friendly_name when available).
+    const outgoingIds = number.friendly_name
+      ? await twilio.outgoingCallerIds.list({
+          friendlyName: number.friendly_name,
+        })
+      : [];
+
     await Promise.all([
       ...outgoingIds.map(async (id) => {
         return await twilio.outgoingCallerIds(id.sid).remove();
       }),
-      ...incomingIds.map(async (id) => {
-        return await twilio.incomingPhoneNumbers(id.sid).remove();
+      ...incomingSids.map(async (sid) => {
+        return await twilio.incomingPhoneNumbers(sid).remove();
       }),
     ]);
-    const { error: deletionError } = await supabaseClient
-      .from("workspace_number")
-      .delete()
-      .eq("id", normalizedNumberId);
+    await tdb.workspace_number.delete({
+      where: eq(workspace_number.id, normalizedNumberId),
+    });
 
-    if (deletionError) throw deletionError;
+    // Drop the released number from the Messaging Service attached senders.
+    if (number.phone_number) {
+      const releasedPhone = number.phone_number;
+      await updateWorkspaceMessagingOnboardingState({
+        workspaceId,
+        updates: {
+          messagingService: {
+            ...onboarding.messagingService,
+            attachedSenderPhoneNumbers:
+              onboarding.messagingService.attachedSenderPhoneNumbers.filter(
+                (p) => p !== releasedPhone,
+              ),
+          },
+        },
+        actorUserId: null,
+      });
+    }
+
     return { error: null };
   } catch (error) {
     return { error };
@@ -673,20 +621,18 @@ export async function removeWorkspacePhoneNumber({
 }
 
 export async function updateCallerId({
-  supabaseClient,
   workspaceId,
   number,
   friendly_name,
 }: {
-  supabaseClient: SupabaseClient;
   workspaceId: string;
   number: WorkspaceNumbers;
   friendly_name: string;
+  null?: never;
 }) {
   if (!number || !number.phone_number) return { error: null };
   try {
     const twilio = await createWorkspaceTwilioInstance({
-      supabase: supabaseClient,
       workspace_id: workspaceId,
     });
 
@@ -719,32 +665,44 @@ export async function updateCallerId({
 }
 
 export async function fetchWorkspaceData(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
+  tdbIn?: TenantDb,
 ) {
-  const { data: workspace, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select(`*, workspace_number(*)`)
-    .eq("id", workspaceId)
-    .eq("workspace_number.type", "rented")
-    .single();
-
-  return { workspace, workspaceError };
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  try {
+    const workspaceRow = await adminDb.query.workspace.findFirst({
+      where: eq(workspace.id, workspaceId),
+    });
+    if (!workspaceRow) {
+      return { workspace: null, workspaceError: toDbError(new Error("Not found")) };
+    }
+    const numbers = await tdb.workspace_number.findMany({
+      where: eq(workspace_number.type, "rented"),
+    });
+    return {
+      workspace: { ...workspaceRow, workspace_number: numbers },
+      workspaceError: null,
+    };
+  } catch (error) {
+    return { workspace: null, workspaceError: toDbError(error) };
+  }
 }
 
 export async function getWorkspaceScripts({
   workspace,
-  supabase,
+  tdb: tdbIn,
 }: {
   workspace: string;
-  supabase: SupabaseClient;
+  tdb?: TenantDb;
+  client?: never;
 }) {
-  const { data, error } = await supabase
-    .from("script")
-    .select()
-    .eq("workspace", workspace);
-  if (error) logger.error("Error fetching scripts", error);
-  return data;
+  const tdb = tdbIn ?? createTenantDb(workspace);
+  try {
+    return await tdb.script.findMany();
+  } catch (error) {
+    logger.error("Error fetching scripts", error);
+    return undefined;
+  }
 }
 
 export {
@@ -759,7 +717,6 @@ export {
 } from "./workspace-conversations.server";
 
 export async function acceptWorkspaceInvitations(
-  supabaseClient: SupabaseClient<Database>,
   invitationIds: string[],
   userId: string,
 ) {
@@ -768,12 +725,25 @@ export async function acceptWorkspaceInvitations(
     return { errors };
   }
 
-  const { data: inviteRows, error: inviteQueryError } = await supabaseClient
-    .from("workspace_invite")
-    .select("id, workspace, role")
-    .in("id", invitationIds);
-
-  if (inviteQueryError) {
+  let inviteRows: { id: string; workspace: string; role: string }[];
+  try {
+    // SEC-03 stopgap: only invites addressed to this user are selectable.
+    // Foreign/missing IDs are omitted from processing (no membership insert);
+    // callers see them as invite errors without distinguishing ownership.
+    inviteRows = await adminDb
+      .select({
+        id: workspace_invite.id,
+        workspace: workspace_invite.workspace,
+        role: workspace_invite.role,
+      })
+      .from(workspace_invite)
+      .where(
+        and(
+          inArray(workspace_invite.id, invitationIds),
+          eq(workspace_invite.user_id, userId),
+        ),
+      );
+  } catch {
     return {
       errors: invitationIds.map((invitationId) => ({
         invitationId,
@@ -783,13 +753,14 @@ export async function acceptWorkspaceInvitations(
   }
 
   const invitesById = new Map(
-    (inviteRows ?? []).map((invite) => [String(invite.id), invite]),
+    inviteRows.map((invite) => [String(invite.id), invite]),
   );
 
   const processableInvites = invitationIds
     .map((invitationId) => {
       const invite = invitesById.get(invitationId);
       if (!invite) {
+        // Missing and foreign invite IDs share this path (no existence leak).
         errors.push({ invitationId, type: "invite" });
         return null;
       }
@@ -812,23 +783,26 @@ export async function acceptWorkspaceInvitations(
     processableInvites.map(async ({ invitationId, invite }) => {
       const invitationErrors: Array<{ invitationId: string; type: string }> =
         [];
+      const tdb = createTenantDb(invite.workspace);
 
       const { error: workspaceError } = await addUserToWorkspace({
-        supabaseClient,
         workspaceId: invite.workspace,
         userId,
         role: invite.role,
+        tdb,
       });
       if (workspaceError) {
         invitationErrors.push({ invitationId, type: "workspace" });
       }
 
-      const { error: deletionError } = await supabaseClient
-        .from("workspace_invite")
-        .delete()
-        .eq("id", invitationId);
-
-      if (deletionError) {
+      try {
+        await tdb.workspace_invite.delete({
+          where: and(
+            eq(workspace_invite.id, invitationId),
+            eq(workspace_invite.user_id, userId),
+          ),
+        });
+      } catch {
         invitationErrors.push({ invitationId, type: "deletion" });
       }
 
@@ -843,14 +817,9 @@ export async function acceptWorkspaceInvitations(
   return { errors };
 }
 
-export async function getInvitesByUserId(
-  supabase: SupabaseClient,
-  user_id: string,
-) {
-  const { data, error } = await supabase
-    .from("workspace_invite")
+export async function getInvitesByUserId(user_id: string) {
+  return adminDb
     .select()
-    .eq("user_id", user_id);
-  if (error) throw error;
-  return data;
+    .from(workspace_invite)
+    .where(eq(workspace_invite.user_id, user_id));
 }

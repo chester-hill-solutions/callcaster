@@ -1,8 +1,7 @@
 import { Link, NavLink, Params, useLocation } from "react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { User, WorkspaceData, WorkspaceInvite } from "@/lib/types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,20 +10,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FaBars, FaUserAlt } from "react-icons/fa";
-import { MdOutlineLogout } from "react-icons/md";
+import { Check, ChevronDown, Menu, User as UserIcon, LogOut } from "lucide-react";
 import { capitalize } from "@/lib/utils";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { MobileMenu } from "./Navbar.MobileMenu";
+import type {
+  RootNavbarUser,
+  RootWorkspaceSummary,
+} from "@/root.loader.server";
 
 type NavbarProps = {
   className?: string;
   handleSignOut: () => Promise<
     { success: string | null; error: string | null }
   >;
-  workspaces: WorkspaceData[] | null;
+  workspaces: RootWorkspaceSummary[] | null;
   isSignedIn: boolean;
-  user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
+  user: RootNavbarUser | null;
   params: Params<string>;
 };
 
@@ -40,10 +43,12 @@ export const NavButton = ({
   <NavLink
     to={to}
     className={({ isActive }) =>
-      `rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-bold transition-colors duration-150 ease-in-out ${
+      `inline-flex h-10 items-center rounded-lg border px-2.5 font-Zilla-Slab text-sm font-bold transition-colors duration-150 ease-in-out ${
         isActive
-          ? "border-brand-primary bg-brand-primary text-white"
-          : "border-transparent bg-background/70 text-brand-primary hover:border-border hover:bg-background"
+          ? "border-brand-primary bg-brand-primary text-primary-foreground"
+          : // The navbar keeps its pale brand-blue in both themes, so the pills
+            // stay light regardless of theme rather than following bg-background.
+            "border-transparent bg-white/70 text-brand-primary hover:border-brand-primary/30 hover:bg-white"
       } ${className}`
     }
   >
@@ -51,12 +56,92 @@ export const NavButton = ({
   </NavLink>
 );
 
+const WorkspacePicker = ({
+  workspaces,
+  activeWorkspaceId,
+}: {
+  workspaces: RootWorkspaceSummary[];
+  activeWorkspaceId: string | undefined;
+}) => {
+  const active = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          data-testid="navbar-workspace-picker"
+          aria-label={active ? `Switch workspace, current: ${active.name}` : "Workspaces"}
+          className="flex h-10 max-w-[200px] items-center gap-1 rounded-lg border border-transparent bg-white/70 px-2.5 font-Zilla-Slab text-sm font-bold text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white"
+        >
+          <span className="truncate">{active ? active.name : "Workspaces"}</span>
+          <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-64">
+        <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {workspaces.map((workspace) => (
+          <DropdownMenuItem key={workspace.id} asChild>
+            <Link
+              to={`/workspaces/${workspace.id}`}
+              className="flex items-center justify-between gap-2"
+            >
+              <span className="min-w-0 truncate">{workspace.name}</span>
+              {workspace.id === activeWorkspaceId ? (
+                <Check className="h-4 w-4 shrink-0" aria-hidden />
+              ) : null}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/workspaces">All workspaces</Link>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+/**
+ * Admin+ credit readout for the active workspace. Freshness comes from the
+ * workspace-tree `transaction_history` subscription in `workspaces+/$id.tsx`,
+ * which revalidates root + workspace loaders together.
+ */
+const NavbarCredits = ({
+  workspace,
+}: {
+  workspace: RootWorkspaceSummary & { credits: number };
+}) => (
+  <Link
+    to={`/workspaces/${workspace.id}/billing`}
+    data-testid="navbar-credits"
+    aria-label={`Credits: ${workspace.credits.toLocaleString()}. Open billing.`}
+    className="inline-flex h-10 items-center rounded-lg border border-transparent bg-white/70 px-2.5 font-Zilla-Slab text-sm font-bold text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white"
+  >
+    Credits&nbsp;
+    <span className="tabular-nums">{workspace.credits.toLocaleString()}</span>
+  </Link>
+);
+
+/** Show credits only for Admin+ members; the server nulls credits otherwise. */
+function creditWorkspaceFor(
+  workspaces: RootWorkspaceSummary[] | null,
+  activeWorkspaceId: string | undefined,
+): (RootWorkspaceSummary & { credits: number }) | null {
+  if (!workspaces || !activeWorkspaceId) return null;
+  const active = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
+  if (!active) return null;
+  if (typeof active.credits !== "number") return null;
+  if (!hasMinRole(active.role, MemberRole.Admin)) return null;
+  return { ...active, credits: active.credits };
+}
+
 const UserDropdownMenu = ({
   user,
   handleSignOut,
   workspaceId,
 }: {
-  user: (User & { workspace_invite: WorkspaceInvite[] }) | null;
+  user: RootNavbarUser | null;
   handleSignOut: () => Promise<
     { success: string | null; error: string | null }
   >;
@@ -68,11 +153,25 @@ const UserDropdownMenu = ({
         <Button
           data-testid="navbar-user-menu"
           variant="outline"
-          className="relative border border-border bg-background/90 transition-colors duration-150 hover:border-foreground hover:bg-accent dark:text-secondary-foreground dark:hover:bg-accent"
+          aria-label={
+            user.workspace_invite.length > 0
+              ? `Account menu, ${user.workspace_invite.length} pending invitation${
+                  user.workspace_invite.length === 1 ? "" : "s"
+                }`
+              : "Account menu"
+          }
+          // The navbar surface stays pale brand-blue in both themes, so this
+          // control cannot follow bg-background/foreground the way the rest of
+          // the app does — dark:text-secondary-foreground put near-black text
+          // on a near-black button. Mirror ModeToggle, its neighbour.
+          className="relative border border-transparent bg-white/70 text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white dark:bg-black/70 dark:text-brand-secondary dark:hover:bg-black"
         >
-          <FaUserAlt size="20px" />
+          <UserIcon className="h-5 w-5" aria-hidden />
           {user.workspace_invite.length > 0 && (
-            <div className="text-dd absolute -right-1 -top-2 h-5 w-5 items-center rounded-full bg-primary font-Zilla-Slab text-white">
+            <div
+              aria-hidden
+              className="absolute -right-1 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary font-Zilla-Slab text-xs text-primary-foreground"
+            >
               {user.workspace_invite.length}
             </div>
           )}
@@ -89,37 +188,42 @@ const UserDropdownMenu = ({
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
+          <Link to="/account">
+            <UserIcon className="mr-2 h-4 w-4" />
+            Account
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
           <NavLink
             to={"/accept-invite"}
             className={
               user.workspace_invite.length > 0 ? "bg-primary text-white" : ""
             }
           >
-            {user.workspace_invite.length} Pending Invitation
-            {user.workspace_invite.length !== 1 ? "s" : ""}
+            {`${user.workspace_invite.length} Pending Invitation${user.workspace_invite.length === 1 ? "" : "s"}`}
           </NavLink>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Button
-            id="logoutButton"
-            variant="ghost"
-            className="w-full justify-start font-Zilla-Slab"
-            onClick={handleSignOut}
-          >
-            <MdOutlineLogout className="mr-2 h-4 w-4" />
-            <span>Log Out</span>
-          </Button>
         </DropdownMenuItem>
         {workspaceId && (
           <>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Workspace Settings</DropdownMenuLabel>
             <DropdownMenuItem asChild>
-              <Link to={`/workspaces/${workspaceId}/settings`}>Users</Link>
+              <Link to={`/workspaces/${workspaceId}/settings`}>
+                Workspace settings
+              </Link>
             </DropdownMenuItem>
           </>
         )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          id="logoutButton"
+          data-testid="logout-button"
+          onSelect={() => {
+            void handleSignOut();
+          }}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Log Out</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -134,22 +238,21 @@ export default function Navbar({
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const workspaceId = params.id;
+  const creditWorkspace = creditWorkspaceFor(workspaces, workspaceId);
   const location = useLocation();
-  const [loc, setLoc] = useState(location);
+  const [prevPathname, setPrevPathname] = useState(location.pathname);
 
-  useEffect(() => {
-    if (location.pathname !== loc.pathname) {
-      setMobileMenuOpen(false);
-      setLoc(location);
-    }
-  }, [loc, location]);
-  return loc.pathname.endsWith("call") ||
-    (loc.pathname.includes("survey") &&
-      !loc.pathname.includes("workspaces")) ? (
+  if (prevPathname !== location.pathname) {
+    setPrevPathname(location.pathname);
+    setMobileMenuOpen(false);
+  }
+  return location.pathname.endsWith("call") ||
+    (location.pathname.includes("survey") &&
+      !location.pathname.includes("workspaces")) ? (
     <div></div>
   ) : (
     <header className={`w-full border-b border-border/70 ${className}`}>
-      <nav className="relative mx-auto flex w-full max-w-[1500px] items-center justify-between px-4 py-3 sm:h-[80px] sm:px-6">
+      <nav className="relative mx-auto flex w-full items-center justify-between px-4 py-3 sm:h-[80px] sm:px-6">
         <Link
           to="/"
           className="hidden font-Tabac-Slab text-4xl font-black text-brand-primary sm:block"
@@ -162,18 +265,24 @@ export default function Navbar({
         >
           CC
         </Link>
-        <div className="hidden items-center space-x-3 sm:flex">
-          <NavButton to="/pricing">Pricing</NavButton>
-          {/* <NavButton to="/">Home</NavButton> */}
-          {/*           <NavButton to="/services">Services</NavButton>
-           */}{" "}
+        <div className="hidden items-center gap-2 sm:flex">
+          <NavButton to="/docs">Docs</NavButton>
           {!isSignedIn && (
             <>
               <NavButton to="/signin">Sign In</NavButton>
-              <NavButton to="/signup">Sign Up</NavButton>
+              <NavButton to="/signup">Get started</NavButton>
             </>
           )}
-          {workspaces && <NavButton to={"/workspaces"}>Workspaces</NavButton>}
+          {isSignedIn &&
+            (workspaces && workspaces.length > 0 ? (
+              <WorkspacePicker
+                workspaces={workspaces}
+                activeWorkspaceId={workspaceId}
+              />
+            ) : (
+              <NavButton to={"/workspaces"}>Workspaces</NavButton>
+            ))}
+          {creditWorkspace ? <NavbarCredits workspace={creditWorkspace} /> : null}
           {user && (
             <UserDropdownMenu
               user={user}
@@ -183,21 +292,32 @@ export default function Navbar({
           )}
           <ModeToggle />
         </div>
-        <button
-          className="rounded-md border border-border bg-background/80 p-2 text-2xl sm:hidden"
-          onClick={() => setMobileMenuOpen(true)}
-        >
-          <FaBars />
-        </button>
+        <div className="flex items-center gap-2 sm:hidden">
+          <ModeToggle />
+          <button
+            type="button"
+            className="rounded-md border border-border bg-background/80 p-2 text-2xl"
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Open navigation menu"
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation-menu"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+        </div>
       </nav>
-      {mobileMenuOpen && (
+      <div id="mobile-navigation-menu">
         <MobileMenu
+          open={mobileMenuOpen}
+          onOpenChange={setMobileMenuOpen}
           isSignedIn={isSignedIn}
           user={user ?? null}
           handleSignOut={handleSignOut}
-          onClose={() => setMobileMenuOpen(false)}
+          workspaces={workspaces}
+          activeWorkspaceId={workspaceId}
+          creditWorkspace={creditWorkspace}
         />
-      )}
+      </div>
     </header>
   );
 }

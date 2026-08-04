@@ -1,139 +1,215 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { resetRateLimitsForTests } from "@/lib/platform-rate-limit.server";
+import { createRespondentToken } from "@/lib/survey-respondent-token.server";
 
-const mocks = vi.hoisted(() => {
-  return {
-    createSupabaseServerClient: vi.fn(),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
-  };
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+  process.env.BETTER_AUTH_SECRET ??= "test-better-auth-secret";
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: (...args: any[]) => mocks.createSupabaseServerClient(...args),
+const surveyDbMocks = vi.hoisted(() => ({
+  completeSurveyResponse: vi.fn(async () => ({
+    ok: true as const,
+    result_id: "R1",
+  })),
+  getActiveSurveyByPublicId: vi.fn(async () => ({
+    id: 1,
+    is_active: true,
+    workspace: "ws-1",
+  })),
+  loadSurveyRespondentContact: vi.fn(async () => ({
+    id: 100,
+    workspace: "ws-1",
+  })),
+}));
+
+const mocks = vi.hoisted(() => ({
+  logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock("@/lib/survey-db.server", () => ({
+  completeSurveyResponse: (...args: unknown[]) => surveyDbMocks.completeSurveyResponse(...args),
+  getActiveSurveyByPublicId: (...args: unknown[]) => surveyDbMocks.getActiveSurveyByPublicId(...args),
+}));
+
+vi.mock("@/lib/survey-respondent.server", () => ({
+  loadSurveyRespondentContact: (...args: unknown[]) =>
+    surveyDbMocks.loadSurveyRespondentContact(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-function makeSupabase(opts: {
-  survey?: any;
-  surveyError?: any;
-  updateError?: any;
-}) {
-  return {
-    from: vi.fn((table: string) => {
-      if (table === "survey") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({ data: opts.survey ?? null, error: opts.surveyError ?? null }),
-            }),
-          }),
-        };
-      }
-      if (table === "survey_response") {
-        return {
-          update: () => ({
-            eq: async () => ({ error: opts.updateError ?? null }),
-          }),
-        };
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    }),
-  };
+function makeReq(body: Record<string, string | Blob>) {
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(body)) fd.set(k, v);
+  return new Request("http://x", { method: "POST", body: fd });
 }
 
 describe("app/routes/api+/survey-complete/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.createSupabaseServerClient.mockReset();
+    resetRateLimitsForTests();
     mocks.logger.error.mockReset();
+    surveyDbMocks.completeSurveyResponse.mockReset();
+    surveyDbMocks.completeSurveyResponse.mockResolvedValue({
+      ok: true,
+      result_id: "R1",
+    });
+    surveyDbMocks.getActiveSurveyByPublicId.mockReset();
+    surveyDbMocks.getActiveSurveyByPublicId.mockResolvedValue({
+      id: 1,
+      is_active: true,
+      workspace: "ws-1",
+    });
+    surveyDbMocks.loadSurveyRespondentContact.mockReset();
+    surveyDbMocks.loadSurveyRespondentContact.mockResolvedValue({
+      id: 100,
+      workspace: "ws-1",
+    });
   });
 
   test("returns 405 for non-POST", async () => {
-    mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
     const mod = await import("../app/routes/api+/survey-complete");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "GET" }) } as any));
     expect(res.status).toBe(405);
   });
 
   test("validates required fields", async () => {
-    mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
     const mod = await import("../app/routes/api+/survey-complete");
     const fd = new FormData();
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects honeypot field", async () => {
+    const mod = await import("../app/routes/api+/survey-complete");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({
+        surveyId: "S1",
+        resultId: "R1",
+        completed: "true",
+        website: "filled",
+      }),
+    } as any));
+    expect(res.status).toBe(400);
+  });
+
+  test("rejects invalid respondent token", async () => {
+    const mod = await import("../app/routes/api+/survey-complete");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://x?respondent_token=bad-token", {
+        method: "POST",
+        body: new FormData(),
+      }),
+    } as any));
+    expect(res.status).toBe(400);
+  });
+
+  test("generates a respondent token when none is provided", async () => {
+    const mod = await import("../app/routes/api+/survey-complete");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({
+        surveyId: "S1",
+        completed: "true",
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.respondent_token).toBeDefined();
+    expect(json.respondent_token).toContain(".");
+    expect(surveyDbMocks.completeSurveyResponse).toHaveBeenCalledWith({
+      surveyInternalId: 1,
+      resultId: expect.any(String),
+      completed: true,
+    });
+  });
+
+  test("uses provided respondent token and marks response complete", async () => {
+    const mod = await import("../app/routes/api+/survey-complete");
+    const { token } = await createRespondentToken(1, "ws-1");
+    const fd = new FormData();
     fd.set("surveyId", "S1");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
+    fd.set("completed", "false");
+    const res = await asRouteResponse(mod.action({
+      request: new Request(`http://x?respondent_token=${encodeURIComponent(token)}`, {
+        method: "POST",
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.respondent_token).toBe(token);
+    expect(surveyDbMocks.completeSurveyResponse).toHaveBeenCalledWith({
+      surveyInternalId: 1,
+      resultId: expect.any(String),
+      completed: false,
+    });
+  });
+
+  test("rate limits by IP", async () => {
+    const mod = await import("../app/routes/api+/survey-complete");
+
+    function makeBody() {
+      const fd = new FormData();
+      fd.set("surveyId", "S1");
+      fd.set("completed", "true");
+      return fd;
+    }
+
+    for (let i = 0; i < 10; i++) {
+      const r = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
+      expect(r.status).toBe(200);
+    }
+
+    const limited = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: makeBody() }) } as any));
+    expect(limited.status).toBe(429);
+  });
+
+  test("rejects contact outside survey workspace", async () => {
+    // Scoped at the query, so a contact in another workspace does not resolve.
+    surveyDbMocks.loadSurveyRespondentContact.mockResolvedValueOnce(null);
+    const mod = await import("../app/routes/api+/survey-complete");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({
+        surveyId: "S1",
+        completed: "true",
+        contactId: "100",
+      }),
+    } as any));
     expect(res.status).toBe(400);
   });
 
   test("returns 404 when survey not found and 400 when inactive", async () => {
     const mod = await import("../app/routes/api+/survey-complete");
 
-    mocks.createSupabaseServerClient.mockReturnValueOnce({
-      supabaseClient: makeSupabase({ survey: null, surveyError: null }),
-    });
-    const fd1 = new FormData();
-    fd1.set("surveyId", "S1");
-    fd1.set("resultId", "R1");
-    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
+    surveyDbMocks.getActiveSurveyByPublicId.mockResolvedValueOnce(null);
+    const r1 = await asRouteResponse(mod.action({
+      request: makeReq({ surveyId: "S1", resultId: "R1" }),
+    } as any));
     expect(r1.status).toBe(404);
 
-    mocks.createSupabaseServerClient.mockReturnValueOnce({
-      supabaseClient: makeSupabase({ survey: { id: 1, is_active: false } }),
+    surveyDbMocks.getActiveSurveyByPublicId.mockResolvedValueOnce({
+      id: 1,
+      is_active: false,
+      workspace: "ws-1",
     });
-    const fd2 = new FormData();
-    fd2.set("surveyId", "S1");
-    fd2.set("resultId", "R1");
-    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
+    const r2 = await asRouteResponse(mod.action({
+      request: makeReq({ surveyId: "S1", resultId: "R1" }),
+    } as any));
     expect(r2.status).toBe(400);
   });
 
-  test("updates completed_at when completed=true and when completed!=true", async () => {
-    const mod = await import("../app/routes/api+/survey-complete");
-    const supabase = makeSupabase({ survey: { id: 1, is_active: true } });
-    mocks.createSupabaseServerClient.mockReturnValue({ supabaseClient: supabase });
-
-    const fd1 = new FormData();
-    fd1.set("surveyId", "S1");
-    fd1.set("resultId", "R1");
-    fd1.set("completed", "true");
-    const r1 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
-    expect(r1.status).toBe(200);
-
-    const fd2 = new FormData();
-    fd2.set("surveyId", "S1");
-    fd2.set("resultId", "R2");
-    fd2.set("completed", "false");
-    const r2 = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
-    expect(r2.status).toBe(200);
-  });
-
-  test("returns 500 when update fails and logs", async () => {
-    mocks.createSupabaseServerClient.mockReturnValueOnce({
-      supabaseClient: makeSupabase({ survey: { id: 1, is_active: true }, updateError: { message: "u" } }),
+  test("returns 500 when completion fails and logs", async () => {
+    surveyDbMocks.completeSurveyResponse.mockResolvedValueOnce({
+      ok: false,
+      error: "Failed to complete survey",
+      status: 500,
     });
     const mod = await import("../app/routes/api+/survey-complete");
-    const fd = new FormData();
-    fd.set("surveyId", "S1");
-    fd.set("resultId", "R1");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any));
-    expect(res.status).toBe(500);
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error completing survey:", { message: "u" });
-  });
-
-  test("returns 500 on unexpected error (formData throws) and logs", async () => {
-    mocks.createSupabaseServerClient.mockReturnValueOnce({ supabaseClient: makeSupabase({}) });
-    const mod = await import("../app/routes/api+/survey-complete");
-    const res = await asRouteResponse(await mod.action({
-      request: {
-        method: "POST",
-        formData: async () => {
-          throw new Error("boom");
-        },
-      } as any,
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ surveyId: "S1", resultId: "R1" }),
     } as any));
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toEqual({ error: "Internal server error" });
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error in handleCompleteSurvey:", expect.anything());
   });
 });
-

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useFetcher,
   useLoaderData,
@@ -7,15 +7,14 @@ import {
   useOutletContext,
   useRevalidator,
 } from "react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import {
   handleCall,
   handleConference,
 } from "@/lib/callscreenActions";
-import { useSupabaseRealtime, useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
+import { useWorkspaceRealtime, useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
-import useSupabaseRoom from "@/hooks/call/useSupabaseRoom";
+import useCallRoom from "@/hooks/call/useCallRoom";
 import { useTwilioDevice } from "@/hooks/call/useTwilioDevice";
 import { useStartConferenceAndDial } from "@/hooks/call/useStartConferenceAndDial";
 import { useCallState } from "@/hooks/call/useCallState";
@@ -30,16 +29,17 @@ import {
 } from "@/hooks/call/useCampaignDialActions";
 import { usePredictiveCallSync } from "@/hooks/call/usePredictiveCallSync";
 import { useNextRecipientSync } from "@/hooks/call/useNextRecipientSync";
-import { getCallSid } from "@/lib/twilio/twilio-call-adapter.client";
+import { getCallSid } from "@/lib/twilio/twilio-call-params";
+import { KEYPAD_KEYS } from "@/lib/dtmf";
 import type {
   AppUser,
   LoaderData,
   QueueItem,
-  UseSupabaseRealtimeProps,
+  UseWorkspaceRealtimeProps,
 } from "@/lib/types";
 
 export function useCallScreen() {
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
+  useOutletContext<{ }>();
   const { state: navState } = useNavigation();
   const isBusy = navState !== "idle";
   const {
@@ -61,14 +61,32 @@ export function useCallScreen() {
     isActive,
     hasAccess,
     verifiedNumbers,
+    featureFlags,
+    initialCoaching,
   } = useLoaderData<LoaderData>();
   const revalidator = useRevalidator();
-  useSupabaseRealtimeSubscription({
-    supabase,
+  useWorkspaceEventSubscription({
+    workspaceId,
     table: "campaign",
     filter: campaign?.id ? `id=eq.${campaign.id}` : "id=eq.-1",
     onChange: () => revalidator.revalidate(),
   });
+
+  /**
+   * @effect Periodically revalidate the call-screen loader data every 50
+   * minutes so stale workspace/campaign info is refreshed during long sessions.
+   * @effect-deps revalidator (re-subscribes when the revalidator instance changes)
+   * @effect-side-effects timer (setInterval) + fetch (revalidator.revalidate);
+   * cleared on unmount or revalidator change
+   * @effect-why-not-loader Polling for client-side freshness; a loader
+   * cannot self-schedule periodic re-fetches.
+   */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      revalidator.revalidate();
+    }, 50 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [revalidator]);
 
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(initialNextRecipient);
   const [update, setUpdate] = useState<Record<string, unknown> | null>(null);
@@ -80,8 +98,7 @@ export function useCallScreen() {
   });
 
   const phoneVerification = usePhoneVerification({
-    workspaceId,
-    callerId: campaign?.caller_id,
+    verifiedNumbers,
   });
 
   const { state, context, send } = useCallState();
@@ -100,6 +117,7 @@ export function useCallScreen() {
     callDuration,
     setCallDuration,
     deviceIsBusy,
+    error: deviceError,
   } = useTwilioDevice(
     token,
     phoneVerification.selectedDevice,
@@ -117,8 +135,7 @@ export function useCallScreen() {
     status: liveStatus,
     users: onlineUsers,
     predictiveState,
-  } = useSupabaseRoom({
-    supabase,
+  } = useCallRoom({
     workspace: workspaceId,
     campaign: campaign?.id,
     userId: user.id,
@@ -139,9 +156,8 @@ export function useCallScreen() {
     householdMap,
     nextRecipient,
     setNextRecipient,
-  } = useSupabaseRealtime({
+  } = useWorkspaceRealtime({
     user: user as unknown as AppUser,
-    supabase,
     init: {
       predictiveQueue: campaign?.dial_type === "predictive" ? initialQueue : [],
       queue: campaign?.dial_type === "call" ? initialQueue : [],
@@ -157,7 +173,8 @@ export function useCallScreen() {
     predictive: campaign?.dial_type === "predictive",
     setCallDuration,
     setUpdate,
-  } as UseSupabaseRealtimeProps);
+    workspace: workspaceId,
+  } as UseWorkspaceRealtimeProps);
 
   const callSid = getCallSid(activeCall) ?? recentCall?.sid ?? null;
 
@@ -168,7 +185,6 @@ export function useCallScreen() {
     activeCall,
     recentAttemptDisposition: recentAttempt?.disposition,
     predictiveState,
-    setDisposition,
     send: send as unknown as (action: { type: string }) => void,
   });
 
@@ -184,7 +200,10 @@ export function useCallScreen() {
 
   const fetcher = useFetcher<{ creditsError?: boolean }>();
   const submit = fetcher.submit;
-  const creditsError = fetcher.data?.creditsError || conferenceCreditsError;
+  const creditsError =
+    fetcher.data?.creditsError ||
+    conferenceCreditsError ||
+    (credits ?? 0) <= 0;
 
   const { startCall } = handleCall({ submit });
   const { handleConferenceEnd } = handleConference({
@@ -236,6 +255,7 @@ export function useCallScreen() {
     deviceIsBusy,
     incomingCall,
     deviceStatus,
+    callState,
     begin,
     startCall,
     nextRecipient,
@@ -243,6 +263,7 @@ export function useCallScreen() {
     workspaceId,
     recentAttempt,
     selectedDevice: phoneVerification.selectedDevice,
+    send: send as unknown as (action: { type: string }) => void,
   });
 
   const handleDequeueNext = useCampaignDequeueActions({
@@ -287,19 +308,30 @@ export function useCallScreen() {
 
   const house = householdMap[nextRecipient?.contact?.address || ""];
 
+  const handleDTMFRef = useRef(audioControls.handleDTMF);
+  handleDTMFRef.current = audioControls.handleDTMF;
+
+  /**
+   * @effect Let the physical/OS keyboard send DTMF digits during an active
+   * call by listening for global keypress events matching the keypad keys.
+   * @effect-deps [] — intentionally mount-once; the handler always calls
+   * through handleDTMFRef (kept fresh every render just above), so it doesn't
+   * need audioControls.handleDTMF in the deps to stay current.
+   * @effect-side-effects dom (window "keypress" event listener), removed on
+   * unmount.
+   * @effect-why-not-loader DOM event subscription, not request/response data.
+   */
   useEffect(() => {
     const handleKeypress = (e: KeyboardEvent) => {
-      ["1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#"].includes(
-        e.key,
-      )
-        ? audioControls.handleDTMF(e.key)
-        : null;
+      if (KEYPAD_KEYS.includes(e.key)) {
+        handleDTMFRef.current(e.key);
+      }
     };
 
     window.addEventListener("keypress", handleKeypress);
 
     return () => window.removeEventListener("keypress", handleKeypress);
-  }, [activeCall, audioControls.handleDTMF]);
+  }, []);
 
   useNextRecipientSync({
     nextRecipient,
@@ -317,14 +349,15 @@ export function useCallScreen() {
     setUpdate,
   });
 
-  useEffect(() => {
-    if (phoneVerification.selectedDevice !== "computer") {
-      phoneVerification.handlePhoneDeviceSelection(
-        phoneVerification.selectedDevice,
+  const handleDeviceSelect = useCallback(
+    (device: string) => {
+      void phoneVerification.handlePhoneDeviceSelection(
+        device,
         audioControls.requestMicrophoneAccess,
       );
-    }
-  }, [phoneVerification.selectedDevice]);
+    },
+    [phoneVerification, audioControls.requestMicrophoneAccess],
+  );
 
   const currentState = {
     callState,
@@ -363,6 +396,7 @@ export function useCallScreen() {
     recentAttempt,
     availableCredits,
     creditState,
+    deviceError,
   };
 
   const queueControls = {
@@ -398,6 +432,8 @@ export function useCallScreen() {
 
   const audioControlsGroup = {
     stream: audioControls.stream,
+    selectedMicrophone: audioControls.microphone,
+    selectedSpeaker: audioControls.output,
     availableMicrophones: audioControls.availableMicrophones,
     availableSpeakers: audioControls.availableSpeakers,
     handleMicrophoneChange: audioControls.handleMicrophoneChange,
@@ -423,12 +459,19 @@ export function useCallScreen() {
     device,
     currentState,
     creditsError,
+    deviceError,
     callControls,
     queueControls,
     formState,
     dialogControls,
     audioControls: audioControlsGroup,
-    phoneVerification,
+    phoneVerification: {
+      ...phoneVerification,
+      setSelectedDevice: handleDeviceSelect,
+    },
+    featureFlags,
+    callSid,
+    initialCoaching,
   };
 }
 

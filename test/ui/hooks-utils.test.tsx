@@ -1,15 +1,20 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { createMockFetcher, createSupabaseRealtimeMock } from "./hooks-test-helpers";
+import { createMockFetcher, createWorkspaceRealtimeMock } from "./hooks-test-helpers";
 
 vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
 const mockUseFetcher = vi.fn();
+const mockUseBlocker = vi.fn();
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
-  return { ...actual, useFetcher: () => mockUseFetcher() };
+  return {
+    ...actual,
+    useFetcher: () => mockUseFetcher(),
+    useBlocker: (fn: unknown) => mockUseBlocker(fn),
+  };
 });
 
 vi.mock("sonner", () => ({
@@ -143,5 +148,97 @@ describe("utils hooks", () => {
     act(() => result.current.saveSnapshot());
     rerenderCollection({ data: { error: true } });
     expect(setItems).toHaveBeenCalled();
+  });
+
+  describe("useUnsavedChangesGuard", () => {
+    afterEach(() => {
+      mockUseBlocker.mockReset();
+    });
+
+    test("blocker predicate only blocks when changed and navigating to a different path", async () => {
+      mockUseBlocker.mockReturnValue({ state: "unblocked" });
+      const { useUnsavedChangesGuard } = await import(
+        "@/hooks/utils/useUnsavedChangesGuard"
+      );
+
+      renderHook(() => useUnsavedChangesGuard(true));
+      const predicate = mockUseBlocker.mock.calls[0]?.[0] as (args: {
+        currentLocation: { pathname: string };
+        nextLocation: { pathname: string };
+      }) => boolean;
+
+      expect(
+        predicate({
+          currentLocation: { pathname: "/a" },
+          nextLocation: { pathname: "/b" },
+        }),
+      ).toBe(true);
+      expect(
+        predicate({
+          currentLocation: { pathname: "/a" },
+          nextLocation: { pathname: "/a" },
+        }),
+      ).toBe(false);
+    });
+
+    test("proceeds when the user confirms leaving a blocked navigation", async () => {
+      const proceed = vi.fn();
+      const reset = vi.fn();
+      mockUseBlocker.mockReturnValue({ state: "blocked", proceed, reset });
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+      const { useUnsavedChangesGuard } = await import(
+        "@/hooks/utils/useUnsavedChangesGuard"
+      );
+      renderHook(() => useUnsavedChangesGuard(true));
+
+      expect(confirmSpy).toHaveBeenCalled();
+      expect(proceed).toHaveBeenCalled();
+      expect(reset).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
+
+    test("resets when the user cancels leaving a blocked navigation", async () => {
+      const proceed = vi.fn();
+      const reset = vi.fn();
+      mockUseBlocker.mockReturnValue({ state: "blocked", proceed, reset });
+      const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+      const { useUnsavedChangesGuard } = await import(
+        "@/hooks/utils/useUnsavedChangesGuard"
+      );
+      renderHook(() => useUnsavedChangesGuard(true));
+
+      expect(reset).toHaveBeenCalled();
+      expect(proceed).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
+
+    test("warns on beforeunload only while changes are unsaved", async () => {
+      mockUseBlocker.mockReturnValue({ state: "unblocked" });
+      const { useUnsavedChangesGuard } = await import(
+        "@/hooks/utils/useUnsavedChangesGuard"
+      );
+
+      const { rerender } = renderHook(
+        ({ isChanged }) => useUnsavedChangesGuard(isChanged),
+        { initialProps: { isChanged: true } },
+      );
+
+      const event = new Event("beforeunload", {
+        cancelable: true,
+      }) as BeforeUnloadEvent;
+      const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+      window.dispatchEvent(event);
+      expect(preventDefaultSpy).toHaveBeenCalled();
+
+      rerender({ isChanged: false });
+      const event2 = new Event("beforeunload", {
+        cancelable: true,
+      }) as BeforeUnloadEvent;
+      const preventDefaultSpy2 = vi.spyOn(event2, "preventDefault");
+      window.dispatchEvent(event2);
+      expect(preventDefaultSpy2).not.toHaveBeenCalled();
+    });
   });
 });

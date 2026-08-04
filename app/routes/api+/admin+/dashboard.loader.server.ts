@@ -1,12 +1,13 @@
 import { requireSudo } from "@/lib/api-auth.server";
 import { jsonResponse } from "@/lib/platform-api.server";
 import { getAdminDashboard } from "@/lib/platform-admin.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const auth = await requireSudo(request);
-  if (auth instanceof Response) return auth;
-
-  const dashboard = await getAdminDashboard(auth.supabaseClient);
-  return jsonResponse(dashboard, 200);
-}
+export const loader = defineLoader({
+  auth: ({ request }) => requireSudo(request),
+  sideEffects: ["db-read"],
+  handler: async () => {
+    const dashboard = await getAdminDashboard();
+    return jsonResponse(dashboard, 200);
+  },
+});

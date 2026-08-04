@@ -1,5 +1,5 @@
-import { isRecord } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 
 export function hasVoiceCapability(capabilities: unknown) {
-  return isRecord(capabilities) && (capabilities.voice === true || capabilities.voice === "true");
+  return isObject(capabilities) && (capabilities.voice === true || capabilities.voice === "true");
 }

@@ -1,109 +1,130 @@
 import { data as routeData } from "react-router";
+import { and, eq, inArray } from "drizzle-orm";
+import {
+  deleteCampaignQueueByIds,
+} from "@/lib/campaign-queue-db.server";
+import { searchCampaignQueueIds } from "@/lib/campaign-queue-search.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
-import { filteredSearch } from "@/lib/queue-filter-search.server";
-import { parseRequestData } from "@/lib/database.server";
-import { safeNumber } from "@/lib/type-utils";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { parseRequestData } from "@/lib/request-utils.server";
+import { safeNumber } from "@/lib/type-safety-utils";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { resolveCampaignWorkspaceId } from "@/lib/platform-telephony.server";
+import { contact as contactTable } from "@/db/schema";
+import { AppError } from "@/lib/errors.server";
+import { defineAction } from "@/lib/handler.server";
+// campaign_queue is a join table without a workspace column; tdb cannot scope it.
+// eslint-disable-next-line no-restricted-imports
+import { db } from "@/server/db";
+import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
 
-import type { ActionFunctionArgs } from "react-router";
 import type { CampaignQueue } from "@/lib/types";
 
-interface ContactMapping {
-  id: number;
-  contact_id: number;
-  campaign_id: number;
-  status: string;
-  created_at: string;
-  contact: {
-    id: number;
-    firstname: string | null;
-    surname: string | null;
-    phone: string | null;
-    email: string | null;
-    [key: string]: unknown;
-  };
-}
+const BATCH_SIZE = 100;
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
-  const supabaseClient = getDualAuthSupabase(auth);
-  const user = getDualAuthUser(auth);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
-  const data = await parseRequestData(request);
+export const action = defineAction({
+  auth: ({ request }) => requireDualAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
+    const user = getDualAuthUser(auth);
+    if (!user) {
+      return routeData({ error: "Unauthorized" }, { status: 401 });
+    }
+    const data = await parseRequestData(request);
 
-  if (request.method === "POST") {
-    const { ids, campaign_id, startOrder = 0, requeue = false } = data;
-    const contactIds = ids.map((id: string | number) =>
-      typeof id === "string" ? parseInt(id, 10) : id,
-    );
-    await enqueueContactsForCampaign(
-      supabaseClient,
-      Number(campaign_id),
-      contactIds,
-      { startOrder, requeue },
-    );
-    return routeData({ success: true });
-  }
-  if (request.method === "DELETE") {
-    const { ids, campaign_id, filters } = data;
-    const BATCH_SIZE = 100;
+    try {
+      if (request.method === "POST") {
+        const { ids, campaign_id, startOrder = 0, requeue = false } = data;
+        const contactIds = ids.map((id: string | number) =>
+          typeof id === "string" ? parseInt(id, 10) : id,
+        );
+        const campaignIdNum = Number(campaign_id);
+        const workspaceId = await resolveCampaignWorkspaceId(campaignIdNum);
+        if (!workspaceId) {
+          return routeData({ error: "Campaign not found" }, { status: 404 });
+        }
+        await requireWorkspaceAccess({ user, workspaceId });
 
-    if (ids) {
-      const results = [];
-      for (let i = 0; i < ids.length; i += BATCH_SIZE) {
-        const batch = ids.slice(i, i + BATCH_SIZE);
-        const { data: deletedContacts, error } = await supabaseClient
-          .from("campaign_queue")
-          .delete()
-          .eq("campaign_id", Number(campaign_id))
-          .in("id", batch)
-          .select();
+        const validContactIds = await db
+          .select({ id: contactTable.id })
+          .from(contactTable)
+          .where(
+            and(
+              inArray(contactTable.id, contactIds),
+              eq(contactTable.workspace, workspaceId),
+            ),
+          );
+        if (validContactIds.length !== contactIds.length) {
+          return routeData(
+            { error: "One or more contacts do not belong to the campaign workspace" },
+            { status: 400 },
+          );
+        }
 
-        if (error) return routeData({ error: error.message }, { status: 500 });
-        results.push(...(deletedContacts as CampaignQueue[]));
+        await enqueueContactsForCampaign(
+          campaignIdNum,
+          contactIds,
+          { startOrder, requeue },
+        );
+        return routeData({ success: true });
       }
-      return routeData({ data: results });
+
+      if (request.method === "DELETE") {
+        const { ids, campaign_id, filters } = data;
+        const campaignIdNum = Number(campaign_id);
+        const workspaceId = await resolveCampaignWorkspaceId(campaignIdNum);
+        if (!workspaceId) {
+          return routeData({ error: "Campaign not found" }, { status: 404 });
+        }
+        await requireWorkspaceAccess({ user, workspaceId });
+
+        try {
+          if (ids) {
+            const results: CampaignQueue[] = [];
+            for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+              const batch = ids
+                .slice(i, i + BATCH_SIZE)
+                .map((id: string | number) => (typeof id === "string" ? parseInt(id, 10) : id))
+                .filter((id: number) => Number.isFinite(id));
+
+              const deleted = await deleteCampaignQueueByIds(batch, workspaceId);
+              results.push(...(deleted as CampaignQueue[]));
+            }
+            return routeData({ data: results });
+          }
+
+          const deleteIds = await searchCampaignQueueIds({
+            campaignId: campaignIdNum,
+            filters: (filters ?? {}) as QueueSearchFilters,
+            workspaceId,
+          });
+
+          const validDeleteIds = deleteIds
+            .map((id) => safeNumber(id))
+            .filter((id) => id > 0);
+
+          const results: CampaignQueue[] = [];
+          for (let i = 0; i < validDeleteIds.length; i += BATCH_SIZE) {
+            const batch = validDeleteIds.slice(i, i + BATCH_SIZE);
+            const deleted = await deleteCampaignQueueByIds(batch, workspaceId);
+            results.push(...(deleted as CampaignQueue[]));
+          }
+
+          return routeData({ data: results });
+        } catch (error) {
+          return routeData(
+            { error: error instanceof Error ? error.message : "Failed to delete queue rows" },
+            { status: 500 },
+          );
+        }
+      }
+
+      return routeData({ error: "Method not allowed" }, { status: 405 });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return routeData({ error: error.message }, { status: error.statusCode });
+      }
+      throw error;
     }
-
-    const { data: contactsToDelete, error: lookupError } = await filteredSearch(
-      "",
-      filters,
-      supabaseClient,
-      ["id"],
-      campaign_id,
-    );
-    if (lookupError) return routeData({ error: lookupError.message }, { status: 500 });
-
-    const results = [];
-    const contacts =
-      (contactsToDelete as unknown as ContactMapping[] | null)?.map((item) => ({
-        id: item.id,
-        contact_id: item.contact_id,
-        campaign_id: item.campaign_id,
-        status: item.status,
-        created_at: item.created_at,
-        contact: item.contact,
-      })) || [];
-
-    const deleteIds = contacts
-      .map((contact: unknown) => safeNumber((contact as { id: unknown }).id))
-      .filter((id) => id > 0);
-
-    for (let i = 0; i < deleteIds.length; i += BATCH_SIZE) {
-      const batch = deleteIds.slice(i, i + BATCH_SIZE);
-      const { data: deletedContacts, error } = await supabaseClient
-        .from("campaign_queue")
-        .delete()
-        .in("id", batch)
-        .select();
-
-      if (error) return routeData({ error: error.message }, { status: 500 });
-      results.push(...(deletedContacts as CampaignQueue[]));
-    }
-    return routeData({ data: results });
-  }
-  return routeData({ error: "Method not allowed" }, { status: 405 });
-};
+  },
+});

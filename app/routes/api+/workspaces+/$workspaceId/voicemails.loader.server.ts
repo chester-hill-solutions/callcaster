@@ -1,34 +1,36 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
-} from "@/lib/api-auth.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import { listWorkspaceVoicemailsApi } from "@/lib/platform-media.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-
-  try {
-    const result = await listWorkspaceVoicemailsApi(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
-      workspaceId,
-    );
-
-    if (!result.ok) {
-      return jsonError(result.error, result.status);
+export const loader = defineLoader({
+  auth: ({ params, context }: Pick<LoaderFunctionArgs, "params" | "context">) => {
+    const workspaceId = params.workspaceId;
+    if (!workspaceId) {
+      return jsonError("workspaceId is required", 400);
     }
+    const { userId } = getDataPlaneRouteContext(context, workspaceId);
+    if (!userId) {
+      return jsonError("Unauthorized", 401);
+    }
+    return { workspaceId, userId };
+  },
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    try {
+      const result = await listWorkspaceVoicemailsApi(      auth.userId,
+        auth.workspaceId,
+      );
 
-    return jsonResponse({ voicemails: result.audios }, 200);
-  } catch (error) {
-    return createErrorResponse(error, "Failed to list voicemails");
-  }
-}
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse({ voicemails: result.audios }, 200);
+    } catch (error) {
+      return createErrorResponse(error, "Failed to list voicemails");
+    }
+  },
+});

@@ -1,64 +1,60 @@
 import type { WorkspaceOnboardingStepState } from "@/lib/types";
+export {
+  WIZARD_ONBOARDING_STEP_IDS,
+  isWizardOnboardingStepId,
+  resolvePersistedWizardStep,
+  type WizardOnboardingStepId,
+} from "@/lib/messaging-onboarding/wizard-steps";
 
-export const WORKSPACE_MESSAGING_ONBOARDING_VERSION = 2;
-
-/** Steps shown in the guided onboarding wizard (single screen each). */
-export const WIZARD_ONBOARDING_STEP_IDS = [
-  "business_profile",
-  "path_selection",
-  "messaging_service",
-  "first_number",
-  "provider_provisioning",
-  "launch_checks",
-] as const;
-
-export type WizardOnboardingStepId = (typeof WIZARD_ONBOARDING_STEP_IDS)[number];
-
-export function isWizardOnboardingStepId(value: string): value is WizardOnboardingStepId {
-  return (WIZARD_ONBOARDING_STEP_IDS as readonly string[]).includes(value);
-}
+export const WORKSPACE_MESSAGING_ONBOARDING_VERSION = 3;
 
 export const DEFAULT_WORKSPACE_ONBOARDING_STEPS: WorkspaceOnboardingStepState[] = [
   {
     id: "business_profile",
     label: "Business basics",
     status: "pending",
-    description: "Start with the legal business identity, website, and support contact details.",
-  },
-  {
-    id: "use_case",
-    label: "Messaging use case",
-    status: "pending",
-    description: "Explain what you send, how people opt in, and include sample messages.",
+    description: "Share the business identity and contact details used across campaigns.",
   },
   {
     id: "path_selection",
-    label: "Channel selection",
+    label: "Your goal",
     status: "pending",
-    description: "Choose which messaging and voice tracks this workspace actually needs.",
+    description: "Choose whether you are setting up a live call session, IVR, or SMS blast.",
   },
   {
-    id: "messaging_service",
-    label: "Messaging Service",
+    id: "audience",
+    label: "Audience",
     status: "pending",
-    description: "Provision or confirm the shared Messaging Service used for sending.",
+    description: "Upload the contacts you plan to reach.",
   },
   {
     id: "first_number",
-    label: "Your first number",
+    label: "Phone number",
     status: "pending",
-    description: "Rent a Canadian number to send and receive calls and texts.",
+    description: "Rent or verify a phone number for this workspace.",
   },
   {
-    id: "provider_provisioning",
-    label: "Provider provisioning",
+    id: "script",
+    label: "Script",
     status: "pending",
-    description: "Create provider resources and track carrier or provider review.",
+    description: "Create the call flow or message content for your campaign.",
+  },
+  {
+    id: "campaign_info",
+    label: "Campaign info",
+    status: "pending",
+    description: "Name the campaign and connect audience, number, and script.",
+  },
+  {
+    id: "credits",
+    label: "Credits",
+    status: "pending",
+    description: "Add workspace credits for calls, texts, and number rental.",
   },
   {
     id: "launch_checks",
-    label: "Launch checks",
+    label: "Ready to launch",
     status: "pending",
-    description: "Confirm sender attachment, readiness, and compatibility.",
+    description: "Review setup progress and open the workspace.",
   },
 ];

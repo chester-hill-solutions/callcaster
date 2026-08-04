@@ -1,52 +1,29 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
-import { getUserRole } from "@/lib/database.server";
+import { getUserRole } from "@/lib/database/workspace.server";
+import { loadInboundQueueSettings } from "@/lib/inbound-queue-db.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import type { LoaderFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
+export const loader = defineLoader({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-read"],
+  handler: async ({ params, url, auth }) => {
+    const workspaceId = url.searchParams.get("workspace_id") || params.id;
+    if (!workspaceId) {
+      return jsonError("workspace_id required", 400);
+    }
 
-  const supabaseClient = getAuthSupabaseClient(auth);
-  const url = new URL(request.url);
-  const workspaceId = url.searchParams.get("workspace_id") || params.id;
-  if (!workspaceId) {
-    return jsonError("workspace_id required", 400);
-  }
+    const userRole = await getUserRole({
+      user: { id: auth.user.id },
+      workspaceId,
+    });
+    if (!userRole) {
+      return jsonError("Not a member", 403);
+    }
 
-  const userRole = await getUserRole({
-    supabaseClient,
-    user: { id: auth.user.id },
-    workspaceId,
-  });
-  if (!userRole) {
-    return jsonError("Not a member", 403);
-  }
+    const { queues, members, numbers } = await loadInboundQueueSettings(workspaceId);
 
-  const { data: queues } = await supabaseClient
-    .from("inbound_queue")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .order("name");
-
-  const queueIds = (queues || []).map((q) => q.id);
-  let members: Database["public"]["Tables"]["inbound_queue_member"]["Row"][] = [];
-  if (queueIds.length > 0) {
-    const { data: memberData } = await supabaseClient
-      .from("inbound_queue_member")
-      .select("*")
-      .in("queue_id", queueIds);
-    members = memberData || [];
-  }
-
-  const { data: numbers } = await supabaseClient
-    .from("workspace_number")
-    .select("id, phone_number, friendly_name, inbound_queue_id")
-    .eq("workspace", workspaceId);
-
-  return jsonResponse({ queues, members, numbers }, 200);
-};
+    return jsonResponse({ queues, members, numbers }, 200);
+  },
+});

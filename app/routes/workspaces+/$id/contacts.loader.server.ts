@@ -1,18 +1,18 @@
-import { buildContactSearchFilter } from "@/lib/contacts/search.server";
+import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { getUserRole } from "@/lib/database.server";
 import { logger } from "@/lib/logger.server";
-import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { Database } from "@/lib/database.types";
-import type { LoaderFunctionArgs } from "react-router";
-import type { User } from "@/lib/types";
+import { listWorkspaceContactsApi } from "@/lib/platform-data.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
+import { listWorkspaceCampaignOptions } from "@/lib/database/campaign.server";
+import { createTenantDb } from "@/server/tenant-db";
+import { defineLoader } from "@/lib/handler.server";
 
 const ITEMS_PER_PAGE = 20;
 const MAX_PAGE_SIZE = 100;
 
 import type { ContactsLoaderData, ContactsPagination, ContactListRow } from "@/lib/contacts-loader.types";
 export type { ContactsLoaderData, ContactsPagination, ContactListRow } from "@/lib/contacts-loader.types";
+import { MemberRole } from "@/lib/member-role";
 
 function errorPayload(
   partial: Omit<ContactsLoaderData, "pagination"> & {
@@ -37,18 +37,13 @@ function errorPayload(
   };
 }
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = defineLoader({
+  sideEffects: ["db-read"],
+  handler: async ({ context, url }) => {
   try {
-    const { supabaseClient, headers, user } = await verifyAuth(request);
-    const url = new URL(request.url);
-    const rawSearchQuery = url.searchParams.get("q") ?? "";
-    const searchQuery = rawSearchQuery.trim().replaceAll(",", " ");
-
-    const pageParam = url.searchParams.get("page");
-    const page = Math.max(1, parseInt(pageParam || "1"));
+    const { headers, user, workspaceId, userRole: roleStr } = getWorkspaceRouteContext(context);
     const pageSize = Math.min(ITEMS_PER_PAGE, MAX_PAGE_SIZE);
 
-    const workspaceId = params.id;
     if (!workspaceId) {
       return routeData(
         errorPayload(
@@ -87,72 +82,23 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       );
     }
 
-    const countQuery = supabaseClient
-      .from("contact")
-      .select("*", { count: "exact", head: true })
-      .eq("workspace", workspaceId);
+    const pageParam = url.searchParams.get("page");
+    const page = Math.max(1, parseInt(pageParam || "1", 10));
 
-    const contactsQuery = supabaseClient
-      .from("contact")
-      .select(
-        "id, firstname, surname, phone, email, address, city, other_data, created_at",
-      )
-      .eq("workspace", workspaceId)
-      .range((page - 1) * pageSize, page * pageSize - 1)
-      .order("created_at", { ascending: false });
-
-    const campaignsQuery = supabaseClient
-      .from("campaign")
-      .select("id, title, status")
-      .eq("workspace", workspaceId)
-      .order("created_at", { ascending: false });
-
-    if (searchQuery) {
-      const searchFilter = buildContactSearchFilter(searchQuery);
-      if (searchFilter) {
-        countQuery.or(searchFilter);
-        contactsQuery.or(searchFilter);
-      }
-    }
+    const tdb = createTenantDb(workspaceId);
 
     const [
-      userRoleResult,
-      workspaceResult,
-      flagsResult,
-      countResult,
+      workspace,
+      campaigns,
       contactsResult,
-      campaignsResult,
     ] = await Promise.all([
-      getUserRole({
-        supabaseClient,
-        user: user as unknown as User,
-        workspaceId,
-      }),
-      supabaseClient
-        .from("workspace")
-        .select("id, name, credits, feature_flags")
-        .eq("id", workspaceId)
-        .single(),
-      supabaseClient
-        .from("workspace")
-        .select("feature_flags")
-        .eq("id", workspaceId)
-        .single(),
-      countQuery,
-      contactsQuery,
-      campaignsQuery,
+      getWorkspaceForClient(workspaceId),
+      listWorkspaceCampaignOptions(tdb),
+      listWorkspaceContactsApi(workspaceId, url.searchParams),
     ]);
 
-    const userRole = userRoleResult?.role || null;
-    const { data: workspace, error: workspaceError } = workspaceResult;
-    const { data: flags, error: flagsError } = flagsResult;
-    const { count: totalCount, error: countError } = countResult;
-    const { data: contacts, error: contactError } = contactsResult;
-    const { data: navCampaigns, error: campaignsError } = campaignsResult;
-    if (campaignsError) {
-      logger.error("Failed to load campaigns for workspace nav:", campaignsError);
-    }
-    const campaigns = navCampaigns ?? [];
+    const userRole = roleStr as MemberRole;
+    const flags = workspace ? { feature_flags: workspace.feature_flags } : null;
 
     if (!userRole) {
       return routeData(
@@ -177,7 +123,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       );
     }
 
-    if (workspaceError || !workspace) {
+    if (!workspace) {
       return routeData(
         errorPayload(
           {
@@ -200,9 +146,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       );
     }
 
-    const errors = [contactError, countError, flagsError].filter(Boolean);
-    if (errors.length > 0) {
-      logger.error("Database errors:", errors);
+    if (!contactsResult.ok) {
+      logger.error("Failed to load contacts:", contactsResult.error);
       return routeData(
         errorPayload(
           {
@@ -225,8 +170,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       );
     }
 
-    const totalCountValue = totalCount || 0;
-    const totalPages = Math.ceil(totalCountValue / pageSize);
+    if (flags == null) {
+      logger.error("Database errors: workspace feature_flags missing");
+    }
+
+    const { contacts, pagination, search_query: searchQuery } = contactsResult;
+    const totalPages = pagination.total_pages;
+    const totalCountValue = pagination.total_count;
 
     if (page > totalPages && totalPages > 0) {
       return routeData(
@@ -253,19 +203,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
     return routeData(
       {
-        contacts: contacts || [],
+        contacts,
         workspace,
         error: null,
         userRole,
         flags,
         campaigns,
         pagination: {
-          currentPage: page,
+          currentPage: pagination.page,
           totalPages,
           totalCount: totalCountValue,
-          pageSize,
+          pageSize: pagination.page_size,
         },
-        searchQuery,
+        searchQuery: searchQuery ?? "",
       } satisfies ContactsLoaderData,
       { headers },
     );
@@ -286,4 +236,5 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       { status: 500 },
     );
   }
-};
+  },
+});

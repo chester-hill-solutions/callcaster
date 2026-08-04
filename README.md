@@ -1,12 +1,47 @@
 # CallCaster
 
-Version 1
+CallCaster is a contact-center platform for calling and SMS campaigns: campaign scripts and IVR, live power dialing, surveys, audiences/contacts, billing by credits, and a public integrator API. Built with React Router 8, a Bun production server, Railway Postgres (Drizzle ORM), S3-compatible object storage, Twilio, Stripe, and Resend.
+
+## Quickstart
+
+Prerequisites: **Node 22.x** (the repo pins it and CI uses it; other majors
+produce test failures that don't reproduce in CI), **Bun >= 1.2.15**, **Docker**,
+and **psql**.
+
+```bash
+npm install
+npm run setup     # services, .env, database schema, storage bucket, seed data
+npm run dev       # http://localhost:3000
+```
+
+`npm run setup` is idempotent — re-run it any time to repair a broken local
+environment. It starts Postgres/MinIO/mail via docker compose, creates `.env`
+from the example if missing, applies the full database schema, creates the
+object-storage bucket, and seeds test users and workspaces. Sign in with a
+seeded account from [`e2e/fixtures/seed.ts`](./e2e/fixtures/seed.ts).
+
+Already running the services elsewhere? `npm run setup -- --skip-docker`.
+
+Outbound calling additionally needs a public tunnel so Twilio can reach your
+machine — see [docs/local-development.md](./docs/local-development.md), and note
+the shared-TwiML-App hazard documented there before pointing Twilio at a tunnel.
+
+Verify your setup:
+
+```bash
+npm run typecheck   # react-router typegen + tsc
+npm run lint
+npm test            # vitest node + UI suites, plus bun server-runtime tests
+npm run test:e2e:compose   # full E2E against compose Postgres + MinIO
+```
+
+Production entry points: `npm start` (Bun server, `server/bun.ts`) and `npm run worker` (job worker, `worker/index.ts`); images build from `Dockerfile` and `Dockerfile.worker`.
 
 ## Documentation
 
 - **[Docs index](docs/README.md)** - Central index for active docs and archived root notes.
 - **[Archive index](archive/README.md)** - Location and purpose of deprecated/legacy files moved out of root.
-- **[Local development](docs/local-development.md)** - Run the app locally, including Supabase, Localtunnel, and Twilio calling setup.
+- **[Local development](docs/local-development.md)** - Run the app locally, including Postgres, Localtunnel, and Twilio calling setup.
 - **[Script structure](docs/script-structure.md)** – How campaign scripts are stored (`steps`), pages vs blocks, and IVR navigation.
 - **[Script JSON format](docs/script-json-format.md)** – Script structure for campaigns (pages, blocks); field reference and examples.
 - **[API overview](docs/api-overview.md)** – Public integrator API boundary, auth, and endpoint list.
@@ -16,3 +51,4 @@ Version 1
 - **[Public API test drift](docs/public-api-test-drift.md)** – Tracked gaps and verification commands for the integrator API surface.
 - **Interactive API docs** – Public spec at **[`/docs`](/docs)**; complete classified surface at **[`/docs?spec=complete`](/docs?spec=complete)**. Raw JSON: `/api/docs/openapi`, `/api/docs/openapi/all`.
 - **[Stripe webhook](docs/stripe-webhook.md)** – Configure Stripe to send `checkout.session.completed` to `/api/stripe-webhook`; requires `STRIPE_WEBHOOK_SECRET`.
+- **[Link shortening](docs/link-shortening.md)** – One-time Twilio Console setup that activates the already-shipped `shortenUrls` support (halves segments on link-bearing sends).

@@ -1,95 +1,93 @@
+import { data as routeData } from "react-router";
 import {
-    filterWorkspaceAdminRows,
-    sortWorkspaceAdminRows,
-    type WorkspaceAdminRow,
-    type WorkspaceSortKey,
-} from "@/lib/admin-workspaces";
-import { data as routeData, redirect } from "react-router";
-import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
-import { syncWorkspaceTwilioSnapshot } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { ActionFunctionArgs } from "react-router";
+  disableUser,
+  repointAllWorkspacesTwilioWebhooks,
+  repointWorkspaceTwilioWebhooksForAdmin,
+  syncAllWorkspacesTwilio,
+  syncWorkspaceTwilio,
+  toggleWorkspaceStatus,
+} from "@/lib/platform-admin.server";
+import { adminRouteAuth } from "@/lib/admin-route.server";
+import { defineAction } from "@/lib/handler.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: adminRouteAuth,
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request }) => {
+  const formData = await request.formData();
+  const actionType = formData.get("_action") as string;
 
-    const { supabaseClient, user } = await verifyAuth(request);
+  if (actionType === "toggle_workspace_status") {
+    const workspaceId = formData.get("workspaceId") as string;
+    const currentStatus = formData.get("currentStatus") === "true";
+    const result = await toggleWorkspaceStatus(workspaceId, !currentStatus);
 
-    if (!user) {
-        throw redirect("/signin");
+    if (!result.ok) {
+      return routeData({ error: result.error });
     }
 
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+    return routeData({
+      success: `Workspace ${currentStatus ? "enabled" : "disabled"} successfully`,
+    });
+  }
 
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
+  if (actionType === "sync_workspace_twilio") {
+    const workspaceId = formData.get("workspaceId") as string;
+    const result = await syncWorkspaceTwilio(workspaceId);
+
+    if (!result.ok) {
+      return routeData({ error: result.error });
     }
 
-    const formData = await request.formData();
-    const action = formData.get("_action") as string;
+    return routeData({ success: "Workspace Twilio sync completed" });
+  }
 
-    if (action === "toggle_workspace_status") {
-        const workspaceId = formData.get("workspaceId") as string;
-        const currentStatus = formData.get("currentStatus") === "true";
-        
-        const { error } = await supabaseClient
-            .from("workspace")
-            .update({ disabled: !currentStatus })
-            .eq("id", workspaceId);
+  if (actionType === "sync_all_workspaces_twilio") {
+    const result = await syncAllWorkspacesTwilio();
 
-        if (error) {
-            return routeData({ error: error.message });
-        }
-
-        return routeData({ success: `Workspace ${currentStatus ? 'enabled' : 'disabled'} successfully` });
+    if (!result.ok) {
+      return routeData({ error: result.error });
     }
 
-    if (action === "sync_workspace_twilio") {
-        const workspaceId = formData.get("workspaceId") as string;
-        try {
-            await syncWorkspaceTwilioSnapshot({
-                supabaseClient,
-                workspaceId,
-            });
-            return routeData({ success: "Workspace Twilio sync completed" });
-        } catch (error) {
-            return routeData({
-                error: error instanceof Error ? error.message : "Failed to sync workspace Twilio data",
-            });
-        }
+    return routeData({ success: "Workspace Twilio sync started for all workspaces" });
+  }
+
+  if (actionType === "repoint_twilio_webhooks") {
+    const workspaceId = formData.get("workspaceId") as string | null;
+    const result = workspaceId
+      ? await repointWorkspaceTwilioWebhooksForAdmin(workspaceId)
+      : await repointAllWorkspacesTwilioWebhooks();
+
+    if (!result.ok) {
+      return routeData({ error: result.error });
     }
 
-    if (action === "sync_all_workspaces_twilio") {
-        const { error } = await supabaseClient.functions.invoke("workspace-twilio-sync", {
-            body: {},
-        });
-
-        if (error) {
-            return routeData({ error: error.message });
-        }
-
-        return routeData({ success: "Workspace Twilio sync started for all workspaces" });
-    }
-    
-    if (action === "toggle_user_status") {
-        const userId = formData.get("userId") as string;
-        
-        // For now, we'll just disable users by setting access_level to 'disabled'
-        // This assumes the system will check for this value elsewhere
-        const { error } = await supabaseClient
-            .from("user")
-            .update({ access_level: 'disabled' })
-            .eq("id", userId);
-
-        if (error) {
-            return routeData({ error: error.message });
-        }
-
-        return routeData({ success: `User disabled successfully` });
+    if ("result" in result) {
+      return routeData({
+        success: `Repointed ${result.result.updated} Twilio resources (${result.result.skipped} unchanged)`,
+      });
     }
 
-    return routeData({ error: "Invalid action" });
-}
+    const totalUpdated = result.results.reduce(
+      (sum: number, row: { updated: number }) => sum + row.updated,
+      0,
+    );
+    return routeData({
+      success: `Repointed ${totalUpdated} Twilio resources across ${result.results.length} workspaces`,
+    });
+  }
+
+  if (actionType === "toggle_user_status") {
+    const userId = formData.get("userId") as string;
+    const result = await disableUser(userId);
+
+    if (!result.ok) {
+      return routeData({ error: result.error });
+    }
+
+    return routeData({ success: "User disabled successfully" });
+  }
+
+  return routeData({ error: "Invalid action" });
+  },
+});

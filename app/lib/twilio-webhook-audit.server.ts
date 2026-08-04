@@ -1,10 +1,10 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import {
   getWorkspaceMessagingOnboardingFromTwilioData,
 } from "@/lib/messaging-onboarding.server";
 import { createWorkspaceTwilioClient } from "@/lib/twilio-client.server";
+import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import type { TwilioAccountData } from "@/lib/types";
 
 export type TwilioWebhookDriftSeverity = "error" | "warning" | "info";
@@ -24,7 +24,7 @@ export type TwilioWebhookAuditResult = {
   driftMessages: string[];
   entries: TwilioWebhookDriftEntry[];
   ivrRuntimeHint: "remix" | "edge" | "mixed" | "unknown";
-  smsStatusCanonical: "edge" | "remix_legacy" | "unknown";
+  smsStatusCanonical: "edge" | "remix" | "remix_legacy" | "unknown";
 };
 
 function normalizeUrl(url: string | null | undefined): string | null {
@@ -47,39 +47,29 @@ function compareField(
 }
 
 export async function auditWorkspaceTwilioWebhooks({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }): Promise<TwilioWebhookAuditResult> {
   const baseUrl = env.BASE_URL().replace(/\/$/, "");
-  const edgeSmsStatus = `${env.SUPABASE_URL().replace(/\/$/, "")}/functions/v1/sms-status`;
+  const expectedSmsStatus = `${baseUrl}/api/sms/status`;
+  const legacyEdgeSmsStatus = `${baseUrl}/functions/v1/sms-status`;
 
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) throw error;
-
-  const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
+  const twilioData = (await loadWorkspaceTwilioData(
+    workspaceId,
+  )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
   const expected = {
     inboundVoice: `${baseUrl}/api/inbound`,
     inboundSms: `${baseUrl}/api/inbound-sms`,
     callerIdStatus: `${baseUrl}/api/caller-id/status`,
     ivrRemixStatus: `${baseUrl}/api/ivr/status`,
-    ivrEdgeFlow: `${env.SUPABASE_URL().replace(/\/$/, "")}/functions/v1/ivr-flow`,
-    ivrEdgeStatus: `${env.SUPABASE_URL().replace(/\/$/, "")}/functions/v1/ivr-status`,
   };
 
   const entries: TwilioWebhookDriftEntry[] = [];
   const driftMessages: string[] = [];
 
   const twilio = await createWorkspaceTwilioClient({
-    supabase: supabaseClient,
     workspaceId,
   });
 
@@ -102,11 +92,15 @@ export async function auditWorkspaceTwilioWebhooks({
       live: number.smsUrl ?? null,
       severity: "error",
     });
+    // The number-level statusCallback is the SMS delivery status callback and
+    // is expected on /api/sms/status. Caller-ID *verification* uses a distinct
+    // callback on /api/caller-id/status (expected.callerIdStatus) driven by the
+    // validationRequests flow, not the number's statusCallback field.
     compareField(entries, driftMessages, {
       resourceType: "phone_number",
       resourceSid: number.sid,
       field: "statusCallback",
-      expected: expected.callerIdStatus,
+      expected: expectedSmsStatus,
       live: number.statusCallback ?? null,
       severity: "warning",
     });
@@ -119,10 +113,25 @@ export async function auditWorkspaceTwilioWebhooks({
       resourceType: "messaging_service",
       resourceSid: serviceSid,
       field: "statusCallback",
-      expected: expected.callerIdStatus,
+      expected: expectedSmsStatus,
       live: service.statusCallback ?? null,
-      severity: "warning",
+      severity: "error",
     });
+  }
+
+  for (const number of numbers) {
+    if (!number.sid) continue;
+    const liveStatus = normalizeUrl(number.statusCallback);
+    if (liveStatus === legacyEdgeSmsStatus) {
+      compareField(entries, driftMessages, {
+        resourceType: "phone_number",
+        resourceSid: number.sid,
+        field: "statusCallback (sms)",
+        expected: expectedSmsStatus,
+        live: number.statusCallback ?? null,
+        severity: "error",
+      });
+    }
   }
 
   let remixIvrSignals = 0;
@@ -144,8 +153,143 @@ export async function auditWorkspaceTwilioWebhooks({
     driftMessages,
     entries,
     ivrRuntimeHint,
-    smsStatusCanonical: "edge",
+    smsStatusCanonical: "remix",
   };
+}
+
+const LEGACY_EDGE_PATH_MARKERS = [
+  "/functions/v1/sms-status",
+  "/functions/v1/ivr-flow",
+  "/functions/v1/ivr-status",
+  "/functions/v1/ivr-recording",
+  "/functions/v1/acd-router",
+];
+
+function isLegacyEdgeUrl(url: string | null | undefined): boolean {
+  const normalized = normalizeUrl(url);
+  if (!normalized) return false;
+  return LEGACY_EDGE_PATH_MARKERS.some((marker) => normalized.includes(marker));
+}
+
+export type TwilioWebhookRepointResult = {
+  workspaceId: string;
+  updated: number;
+  skipped: number;
+  errors: string[];
+};
+
+/** Rewrite live Twilio webhook URLs from Supabase Edge paths to Remix `/api/*` routes. */
+export async function repointWorkspaceTwilioWebhooks({
+  workspaceId,
+}: {
+  workspaceId: string;
+}): Promise<TwilioWebhookRepointResult> {
+  const baseUrl = env.BASE_URL().replace(/\/$/, "");
+  const expected = {
+    inboundVoice: `${baseUrl}/api/inbound`,
+    inboundSms: `${baseUrl}/api/inbound-sms`,
+    callerIdStatus: `${baseUrl}/api/caller-id/status`,
+    smsStatus: `${baseUrl}/api/sms/status`,
+  };
+
+  const twilioData = (await loadWorkspaceTwilioData(
+    workspaceId,
+  )) as unknown as TwilioAccountData;
+  const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
+
+  const twilio = await createWorkspaceTwilioClient({ workspaceId });
+  const result: TwilioWebhookRepointResult = {
+    workspaceId,
+    updated: 0,
+    skipped: 0,
+    errors: [],
+  };
+
+  const numbers = await twilio.incomingPhoneNumbers.list({ limit: 200 });
+  for (const number of numbers) {
+    if (!number.sid) continue;
+
+    const updates: Record<string, string> = {};
+    if (isLegacyEdgeUrl(number.voiceUrl)) {
+      updates.voiceUrl = expected.inboundVoice;
+    }
+    if (isLegacyEdgeUrl(number.smsUrl)) {
+      updates.smsUrl = expected.inboundSms;
+    }
+    // Number-level statusCallback is the SMS delivery status callback: repair
+    // any legacy Edge URL or the stale remix caller-ID value to /api/sms/status.
+    // Caller-ID *verification* (validationRequests) is a separate flow and is
+    // not repointed here.
+    const statusNorm = normalizeUrl(number.statusCallback);
+    if (
+      statusNorm &&
+      statusNorm !== expected.smsStatus &&
+      (isLegacyEdgeUrl(number.statusCallback) ||
+        statusNorm === expected.callerIdStatus)
+    ) {
+      updates.statusCallback = expected.smsStatus;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      result.skipped += 1;
+      continue;
+    }
+
+    try {
+      await twilio.incomingPhoneNumbers(number.sid).update(updates);
+      result.updated += 1;
+    } catch (error) {
+      result.errors.push(
+        `${number.sid}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  const serviceSid = onboarding.messagingService.serviceSid;
+  if (serviceSid) {
+    try {
+      const service = await twilio.messaging.v1.services(serviceSid).fetch();
+      if (isLegacyEdgeUrl(service.statusCallback)) {
+        await twilio.messaging.v1.services(serviceSid).update({
+          statusCallback: expected.smsStatus,
+        });
+        result.updated += 1;
+      } else {
+        result.skipped += 1;
+      }
+    } catch (error) {
+      result.errors.push(
+        `messaging_service ${serviceSid}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return result;
+}
+
+export async function repointAllWorkspaceTwilioWebhooks(): Promise<{
+  ok: true;
+  results: TwilioWebhookRepointResult[];
+} | {
+  ok: false;
+  error: string;
+}> {
+  try {
+    const { listAllWorkspacesOrdered } = await import(
+      "@/lib/workspace-members-db.server"
+    );
+    const workspaces = await listAllWorkspacesOrdered();
+    const results: TwilioWebhookRepointResult[] = [];
+    for (const ws of workspaces) {
+      results.push(await repointWorkspaceTwilioWebhooks({ workspaceId: ws.id }));
+    }
+    return { ok: true, results };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Failed to repoint webhooks",
+    };
+  }
 }
 
 export function formatTwilioWebhookAuditSummary(

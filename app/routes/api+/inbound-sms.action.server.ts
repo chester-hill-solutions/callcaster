@@ -3,205 +3,250 @@ import {
   parseTrimmedString,
   resolveInboundWorkspaceContext,
 } from "@/lib/inbound-sms-context.server";
-import {
-  rejectMissingTwilioSignatureHeader,
-  validateWorkspaceTwilioWebhook,
-} from "@/lib/twilio-webhook.server";
-import { createClient } from "@supabase/supabase-js";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
-import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import { inArray } from "drizzle-orm";
+import { contact as contactTable } from "@/db/schema";
+import { createTenantDb } from "@/server/tenant-db";
+import { uploadObject } from "@/lib/object-storage.server";
+import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
+import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
+import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
+import { defineAction } from "@/lib/handler.server";
+import { emitChatMessageEvent } from "@/lib/workspace-events.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const missingHeader = rejectMissingTwilioSignatureHeader(request);
-  if (missingHeader) {
-    return missingHeader;
-  }
+export const action = defineAction({
+  auth: async ({ request }) => {
+    // Clone before reading: Bun returns an empty body from clone()/re-read after
+    // the original is consumed, which makes Twilio signature validation fail
+    // (403 → Twilio Error 11200) and drops inbound messages from chats.
+    const formData = await request.clone().formData();
+    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+    const toNumber = parseTrimmedString(params.To);
+    const messagingServiceSid = parseTrimmedString(params.MessagingServiceSid);
 
-  const supabase = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
-  );
-
-  const formData = await request.formData();
-  const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const toNumber = parseTrimmedString(params.To);
-  const messagingServiceSid = parseTrimmedString(params.MessagingServiceSid);
-
-  const resolved = await resolveInboundWorkspaceContext(supabase, {
-    toRaw: toNumber,
-    messagingServiceSid,
-  });
-
-  if (!resolved.ok) {
-    return resolved.response;
-  }
-
-  const workspaceNumber = resolved.ctx;
-  logger.info("Inbound SMS workspace attribution", {
-    path: resolved.attributionPath,
-    workspace: workspaceNumber.workspace,
-    messagingServiceSid: messagingServiceSid || null,
-  });
-
-  const inboundTwilioCreds = readTwilioWorkspaceCredentials(
-    workspaceNumber.twilio_data,
-  );
-  const validation = validateWorkspaceTwilioWebhook({
-    request,
-    params,
-    twilioData: workspaceNumber.twilio_data,
-  });
-  if (!validation.ok) {
-    if (validation.response.status === 500) {
-      logger.error("Workspace missing Twilio credentials for inbound SMS", {
-        workspace: workspaceNumber.workspace,
-        attributionPath: resolved.attributionPath,
-      });
-    }
-    return validation.response;
-  }
-  const authToken = validation.authToken;
-
-  const data = params as Record<string, unknown>;
-  const fromNumber = parseTrimmedString(data.From);
-  const messageSid = parseTrimmedString(data.MessageSid);
-  const accountSid = parseTrimmedString(data.AccountSid);
-  const body = typeof data.Body === "string" ? data.Body : "";
-  const status = parseTrimmedString(data.Status);
-  const numMedia = Number.parseInt(typeof data.NumMedia === "string" ? data.NumMedia : "0", 10) || 0;
-  const numSegments =
-    Number.parseInt(typeof data.NumSegments === "string" ? data.NumSegments : "0", 10) || 0;
-
-  const credsForRest =
-    inboundTwilioCreds ??
-    (authToken && process.env.NODE_ENV !== "production"
-      ? { sid: env.TWILIO_SID(), authToken }
-      : null);
-
-  const media: string[] = [];
-  const now = new Date();
-  const nowIso = now.toISOString();
-  if (numMedia > 0 && !credsForRest) {
-    logger.warn("Skipping inbound SMS MMS fetch: no Twilio REST credentials", {
-      workspace: workspaceNumber.workspace,
-      messageSid,
+    const resolved = await resolveInboundWorkspaceContext({
+      toRaw: toNumber,
+      messagingServiceSid,
     });
-  }
-  for (let i = 0; i < numMedia; i++) {
-    if (!credsForRest) {
-      continue;
+
+    if (!resolved.ok) {
+      return { kind: "early" as const, response: resolved.response };
     }
-    try {
-      const mediaResponse = await fetch(data[`MediaUrl${i}`] as string, {
-        headers: {
-          Authorization: `Basic ${Buffer.from(`${credsForRest.sid}:${credsForRest.authToken}`).toString("base64")}`,
-        },
-      });
 
-      if (!mediaResponse.ok) {
-        throw new Error(`Failed to fetch media: ${mediaResponse.statusText}`);
-      }
+    const workspaceNumber = resolved.ctx;
+    logger.info("Inbound SMS workspace attribution", {
+      path: resolved.attributionPath,
+      workspace: workspaceNumber.workspace,
+      messagingServiceSid: messagingServiceSid || null,
+    });
 
-      const newMedia = await mediaResponse.blob();
-      const fileName = `${workspaceNumber.workspace}/sms-${messageSid}-${i}-${now.toISOString()}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("messageMedia")
-        .upload(fileName, newMedia, {
-          cacheControl: "60",
-          upsert: false,
-          contentType: data[`MediaContentType${i}`] as string,
+    const inboundTwilioCreds = readTwilioWorkspaceCredentials(
+      workspaceNumber.twilio_data,
+    );
+
+    const forbidden = await requireTwilioSignature(request, {
+      workspaceId: workspaceNumber.workspace,
+      params,
+    });
+    if (forbidden) {
+      if (forbidden.status === 500) {
+        logger.error("Workspace missing Twilio credentials for inbound SMS", {
+          workspace: workspaceNumber.workspace,
+          attributionPath: resolved.attributionPath,
         });
+      }
+      return forbidden;
+    }
 
-      if (uploadError) {
-        logger.error("Upload error:", uploadError);
+    return {
+      kind: "ok" as const,
+      params,
+      toNumber,
+      messagingServiceSid,
+      workspaceNumber,
+      inboundTwilioCreds,
+    };
+  },
+  sideEffects: ["db-write", "twilio", "external"],
+  handler: async ({ auth }) => {
+    if (auth.kind === "early") {
+      return auth.response;
+    }
+    const { params, toNumber, messagingServiceSid, workspaceNumber, inboundTwilioCreds } = auth;
+
+    const data = params as Record<string, unknown>;
+    const fromNumber = parseTrimmedString(data.From);
+    const messageSid = parseTrimmedString(data.MessageSid);
+    const accountSid = parseTrimmedString(data.AccountSid);
+    const body = typeof data.Body === "string" ? data.Body : "";
+    const status = parseTrimmedString(data.Status);
+    const numMedia = Number.parseInt(typeof data.NumMedia === "string" ? data.NumMedia : "0", 10) || 0;
+    const numSegments =
+      Number.parseInt(typeof data.NumSegments === "string" ? data.NumSegments : "0", 10) || 0;
+
+    const credsForRest = inboundTwilioCreds;
+
+    const media: string[] = [];
+    const now = new Date();
+    const nowIso = now.toISOString();
+    if (numMedia > 0 && !credsForRest) {
+      logger.warn("Skipping inbound SMS MMS fetch: no Twilio REST credentials", {
+        workspace: workspaceNumber.workspace,
+        messageSid,
+      });
+    }
+    for (let i = 0; i < numMedia; i++) {
+      if (!credsForRest) {
         continue;
       }
-      if (uploadData?.path) {
-        media.push(uploadData.path);
+      try {
+        const mediaResponse = await fetch(data[`MediaUrl${i}`] as string, {
+          headers: {
+            Authorization: `Basic ${Buffer.from(`${credsForRest.sid}:${credsForRest.authToken}`).toString("base64")}`,
+          },
+        });
+
+        if (!mediaResponse.ok) {
+          throw new Error(`Failed to fetch media: ${mediaResponse.statusText}`);
+        }
+
+        const newMedia = await mediaResponse.blob();
+        const fileName = `${workspaceNumber.workspace}/sms-${messageSid}-${i}-${now.toISOString()}`;
+        try {
+          await uploadObject("messageMedia", fileName, newMedia, {
+            cacheControl: "60",
+            contentType: data[`MediaContentType${i}`] as string,
+          });
+          media.push(fileName);
+        } catch (uploadError) {
+          logger.error("Upload error:", uploadError);
+          continue;
+        }
+      } catch (error) {
+        logger.error(`Error processing media ${i}:`, error);
       }
+    }
+
+    const matchingContactIds = await findMatchingContactIds(
+      workspaceNumber.workspace,
+      fromNumber,
+    );
+    const matchedContactId =
+      matchingContactIds.length === 1 ? matchingContactIds[0] : null;
+
+    const messagePayload = {
+      sid: messageSid,
+      account_sid: accountSid,
+      body,
+      from: fromNumber,
+      to: toNumber,
+      num_media: String(numMedia),
+      num_segments: String(numSegments),
+      direction: "inbound" as const,
+      date_created: nowIso,
+      date_sent: nowIso,
+      status: "received" as const,
+      ...(messagingServiceSid ? { messaging_service_sid: messagingServiceSid } : {}),
+      ...(media.length > 0 ? { inbound_media: media } : {}),
+      ...(matchedContactId != null ? { contact_id: matchedContactId } : {}),
+    };
+
+    const tdb = createTenantDb(workspaceNumber.workspace);
+    let message: unknown[] | null = null;
+    let messageError: { message: string } | null = null;
+    try {
+      message = await tdb.message.insert(messagePayload);
     } catch (error) {
-      logger.error(`Error processing media ${i}:`, error);
+      messageError = { message: error instanceof Error ? error.message : String(error) };
     }
-  }
 
-  const matchingContactIds = await findMatchingContactIds(
-    supabase,
-    workspaceNumber.workspace,
-    fromNumber,
-  );
-  const matchedContactId =
-    matchingContactIds.length === 1 ? matchingContactIds[0] : null;
-
-  const messagePayload: Database["public"]["Tables"]["message"]["Insert"] = {
-    sid: messageSid,
-    account_sid: accountSid,
-    body,
-    from: fromNumber,
-    to: toNumber,
-    num_media: String(numMedia),
-    num_segments: String(numSegments),
-    workspace: workspaceNumber.workspace,
-    direction: "inbound",
-    date_created: nowIso,
-    date_sent: nowIso,
-    status: "received",
-    ...(messagingServiceSid ? { messaging_service_sid: messagingServiceSid } : {}),
-    ...(media.length > 0 ? { inbound_media: media } : {}),
-    ...(matchedContactId != null ? { contact_id: matchedContactId } : {}),
-  };
-
-  const { data: message, error: messageError } = await supabase
-    .from("message")
-    .insert(messagePayload)
-    .select();
-
-  if (body.toLowerCase() === "stop" || body.toLowerCase() === '"stop"') {
-    if (matchingContactIds.length > 0) {
-      await supabase.from("contact").update({
-        opt_out: true,
-      }).in("id", matchingContactIds);
+    let optOutKeywords = parseOptOutKeywords(null);
+    try {
+      const onboarding = await getWorkspaceMessagingOnboardingState({
+        workspaceId: workspaceNumber.workspace,
+      });
+      optOutKeywords = parseOptOutKeywords(onboarding.businessProfile.optOutKeywords);
+    } catch (error) {
+      logger.error("Error loading workspace opt-out keywords for inbound SMS:", error);
     }
-  } else if (body.toLowerCase() === "start" || body.toLowerCase() === '"start"') {
-    if (matchingContactIds.length > 0) {
-      await supabase.from("contact").update({
-        opt_out: false,
-      }).in("id", matchingContactIds);
+
+    if (isOptOutMessage(body, optOutKeywords)) {
+      if (matchingContactIds.length > 0) {
+        await tdb.contact.update({
+          set: { opt_out: true },
+          where: inArray(contactTable.id, matchingContactIds),
+        });
+        // Opted-out contacts must also leave every campaign queue in the
+        // workspace; log-don't-throw so the inbound message is still recorded.
+        try {
+          for (const contactId of matchingContactIds) {
+            await dequeueCampaignQueueByContact({
+              contactId,
+              userId: null,
+              reason: "Contact opted out via SMS",
+              workspaceId: workspaceNumber.workspace,
+            });
+          }
+        } catch (error) {
+          logger.error(
+            "Failed to dequeue opted-out contact from campaign queues:",
+            error,
+          );
+        }
+      }
+    } else if (body.toLowerCase() === "start" || body.toLowerCase() === '"start"') {
+      // Onboarding only configures opt-out keywords today (no configurable
+      // opt-in list), so re-subscribe stays hardcoded to Twilio's "START".
+      if (matchingContactIds.length > 0) {
+        await tdb.contact.update({
+          set: { opt_out: false },
+          where: inArray(contactTable.id, matchingContactIds),
+        });
+      }
     }
-  }
 
-  if (messageError) {
-    logger.error("Message insert error:", messageError);
-    return routeData({ messageError }, 400);
-  }
+    if (messageError) {
+      logger.error("Message insert error:", messageError);
+      return routeData({ messageError }, 400);
+    }
 
-  const smsWebhook = workspaceNumber.webhook
-    .map((webhook) =>
-      (webhook.events ?? []).filter((event) => event.category === "inbound_sms"),
-    )
-    .flat();
-  if (smsWebhook.length > 0) {
-    await sendWebhookNotification({
-      eventCategory: "inbound_sms",
-      eventType: "INSERT",
-      workspaceId: workspaceNumber.workspace,
-      payload: {
-        message_sid: messageSid,
-        from: fromNumber,
-        to: toNumber,
-        body,
-        status,
-        num_media: numMedia,
-        media_urls: media.length > 0 ? media : null,
-        timestamp: now.toISOString(),
-      },
-      supabaseClient: supabase,
-    });
-  }
+    const insertedMessage = Array.isArray(message) ? message[0] : null;
+    if (insertedMessage) {
+      await emitChatMessageEvent(
+        workspaceNumber.workspace,
+        "INSERT",
+        insertedMessage as Record<string, unknown>,
+        null,
+      );
+    }
 
-  return routeData({ message }, 201);
-};
+    const smsWebhook = workspaceNumber.webhook
+      .map((webhook) =>
+        (webhook.events ?? []).filter((event) => event.category === "inbound_sms"),
+      )
+      .flat();
+    if (smsWebhook.length > 0) {
+      await sendWebhookNotification({
+        eventCategory: "inbound_sms",
+        eventType: "INSERT",
+        workspaceId: workspaceNumber.workspace,
+        payload: {
+          message_sid: messageSid,
+          from: fromNumber,
+          to: toNumber,
+          body,
+          status,
+          num_media: numMedia,
+          media_urls: media.length > 0 ? media : null,
+          timestamp: now.toISOString(),
+        },
+      });
+    }
+
+    return routeData({ message }, 201);
+  },
+});

@@ -1,26 +1,55 @@
 export { loader } from "./numbers.loader.server";
 export { action } from "./numbers.action.server";
 
-import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Form, Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
-import { useCallback, useState } from "react";
-import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
+import { Link, useActionData, useFetcher, useLoaderData, useOutletContext } from "react-router";
+import { useRef, useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
+import {
+  useActionFeedback,
+  useFetcherOnIdle,
+  useSearchParamFlash,
+} from "@/hooks/utils";
+import {
+  flashSearchParamWarning,
+  flashServiceAddressSavedParam,
+  useWorkspaceNumberSettingsMutations,
+} from "@/hooks/phone";
+import { Section, SectionHeader } from "@/components/shared/Section";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { PageShell } from "@/components/ui/page-shell";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 
-import { useSupabaseRealtime } from "@/hooks/realtime/useSupabaseRealtime";
-import { NumbersTable } from "@/components/phone-numbers/NumbersTable";
+import { useWorkspaceRealtime } from "@/hooks/realtime/useWorkspaceRealtime";
+import {
+  NumberSummaryList,
+} from "@/components/phone-numbers/NumberSummaryList";
 import { NumberCallerId } from "@/components/phone-numbers/NumberCallerId";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
+import { ServiceAddressGate } from "@/components/phone-numbers/ServiceAddressGate";
+import { SmsComplianceGate } from "@/components/phone-numbers/SmsComplianceGate";
 import {
   CallerIdVerificationDialog,
   type CallerIdValidationRequest,
 } from "@/components/phone-numbers/CallerIdVerificationDialog";
 import { User, WorkspaceNumbers } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
+import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
 
 
 
@@ -49,15 +78,6 @@ type CallerIDResponse = {
   error?: string;
 };
 
-interface FormData {
-  formName: string;
-  numberId?: string;
-  incomingActivity?: string;
-  incomingVoiceMessage?: string;
-  callerId?: string;
-  [key: string]: unknown;
-}
-
 type LoaderData = {
   phoneNumbers: WorkspaceNumbers;
   workspaceId: string;
@@ -67,6 +87,8 @@ type LoaderData = {
   queues: { id: number; name: string }[];
   scripts: { id: number; name: string }[];
   creditsBalance: number;
+  onboarding: WorkspaceMessagingOnboardingState;
+  userRole: string | null | undefined;
 };
 
 const WorkspaceSettings = () => {
@@ -79,17 +101,58 @@ const WorkspaceSettings = () => {
     queues,
     scripts,
     creditsBalance,
+    onboarding,
+    userRole,
   } = useLoaderData<LoaderData>();
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient }>();
+  useOutletContext<{ }>();
+  const isReadOnly = userRole !== "owner" && userRole !== "admin";
   const actionData = useActionData<CallerIDResponse>();
   const [isDialogOpen, setDialog] = useState<boolean>(
     !!actionData?.validationRequest,
   );
   const fetcher = useFetcher<NumbersSearchFetcherData>();
-  const updateFetcher = useFetcher();
+  const {
+    fetcher: updateFetcher,
+    isBusy,
+    onIncomingActivityChange,
+    onIncomingVoiceMessageChange,
+    onCallerIdChange,
+    onHandsetChange,
+    onInboundRingCountChange,
+    onInboundQueueChange,
+    onInboundScriptChange,
+    onApplyPreset,
+    onNumberRemoval,
+  } = useWorkspaceNumberSettingsMutations(workspaceId);
+  const [numberPendingRemoval, setNumberPendingRemoval] = useState<
+    number | null
+  >(null);
 
-  const { phoneNumbers, setPhoneNumbers } = useSupabaseRealtime({
-    supabase,
+  // Toast the outcome of inline row edits (and removals), which otherwise
+  // save silently through updateFetcher. formData is only present while the
+  // submission is in flight, so mirror the form name into a ref for the
+  // idle callback.
+  const pendingFormNameRef = useRef<string | null>(null);
+  if (updateFetcher.formData) {
+    pendingFormNameRef.current = String(
+      updateFetcher.formData.get("formName") ?? "",
+    );
+  }
+  useFetcherOnIdle(updateFetcher, (data) => {
+    const formName = pendingFormNameRef.current;
+    if (!formName) return;
+    pendingFormNameRef.current = null;
+    const error = (data as { error?: string } | null)?.error;
+    if (error) {
+      toast.error(error);
+    } else if (formName === "remove-number") {
+      toast.success("Number released");
+    } else {
+      toast.success("Number settings saved");
+    }
+  });
+
+  const { phoneNumbers, setPhoneNumbers } = useWorkspaceRealtime({
     user,
     workspace: workspaceId,
     init: {
@@ -120,91 +183,19 @@ const WorkspaceSettings = () => {
     successMessage: undefined,
   });
 
-  const handleIncomingActivityChange = (numberId: number, value: string) => {
-    updateFetcher.submit(
-      {
-        formName: "update-incoming-activity",
-        numberId: String(numberId),
-        incomingActivity: value,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleIncomingVoiceMessageChange = (
-    numberId: number,
-    value: string,
-  ) => {
-    updateFetcher.submit(
-      {
-        formName: "update-incoming-voice-message",
-        numberId: String(numberId),
-        incomingVoiceMessage: value,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleCallerIdChange = (numberId: number, value: string) => {
-    updateFetcher.submit(
-      {
-        formName: "update-caller-id",
-        numberId: String(numberId),
-        friendly_name: value,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleHandsetChange = (numberId: number, enabled: boolean) => {
-    updateFetcher.submit(
-      {
-        formName: "update-handset",
-        numberId: String(numberId),
-        handsetEnabled: String(enabled),
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleInboundRingCountChange = (numberId: number, value: string) => {
-    updateFetcher.submit(
-      {
-        formName: "update-inbound-ring-count",
-        numberId: String(numberId),
-        inboundRingCount: value,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleInboundQueueChange = (numberId: number, queueId: string) => {
-    updateFetcher.submit(
-      {
-        formName: "update-inbound-queue",
-        numberId: String(numberId),
-        inboundQueueId: queueId,
-      },
-      { method: "POST" },
-    );
-  };
-
-  const handleInboundScriptChange = (numberId: number, scriptId: string) => {
-    updateFetcher.submit(
-      {
-        formName: "update-inbound-script",
-        numberId: String(numberId),
-        inboundScriptId: scriptId,
-      },
-      { method: "POST" },
-    );
-  };
+  useSearchParamFlash({
+    saved: flashServiceAddressSavedParam,
+    warning: flashSearchParamWarning,
+  });
 
   const handleNumberRemoval = (numberId: number) => {
-    updateFetcher.submit(
-      { formName: "remove-number", numberId: String(numberId) },
-      { method: "POST" },
-    );
+    setNumberPendingRemoval(numberId);
+  };
+
+  const confirmNumberRemoval = () => {
+    if (numberPendingRemoval == null) return;
+    onNumberRemoval(numberPendingRemoval);
+    setNumberPendingRemoval(null);
   };
 
   return (
@@ -214,71 +205,115 @@ const WorkspaceSettings = () => {
         onOpenChange={setDialog}
         validationRequest={actionData?.validationRequest}
       />
-      <div className="flex min-h-screen flex-col">
-        <BackButton disabled={updateFetcher.state !== "idle"} />
-        <div className="flex flex-wrap gap-4 p-4">
-          <Panel className="flex-shrink-0 flex-grow basis-full lg:basis-[calc(66.666%-1rem)]">
-            <NumbersTable
+      <Dialog
+        open={numberPendingRemoval != null}
+        onOpenChange={(open) => {
+          if (!open) setNumberPendingRemoval(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Release this phone number?</DialogTitle>
+          </DialogHeader>
+          <DialogDescription>
+            Releasing this number removes it from your workspace. Inbound calls
+            and texts to it will stop, and you may not be able to get the same
+            number back.
+          </DialogDescription>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setNumberPendingRemoval(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmNumberRemoval}
+              disabled={isBusy}
+            >
+              Release number
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <PageShell
+        title="Phone numbers"
+        description="Manage inbound routing, rent numbers, and verify caller IDs."
+        actions={
+          <Button
+            asChild
+            disabled={isBusy}
+            variant="outline"
+            size="sm"
+          >
+            <Link to=".." relative="path">
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Back
+            </Link>
+          </Button>
+        }
+      >
+        <div className="flex min-w-0 flex-col gap-0">
+          <Section variant="flat" className="min-w-0">
+            <SectionHeader
+              branded={false}
+              compact
+              title="Your numbers"
+              description="Set how each number routes inbound calls."
+            />
+            <NumberSummaryList
               phoneNumbers={phoneNumbers || []}
               users={users}
               mediaNames={mediaNames}
               queues={queues}
               scripts={scripts}
-              onIncomingActivityChange={handleIncomingActivityChange}
-              onIncomingVoiceMessageChange={handleIncomingVoiceMessageChange}
-              onCallerIdChange={handleCallerIdChange}
-              onHandsetChange={handleHandsetChange}
-              onInboundRingCountChange={handleInboundRingCountChange}
-              onInboundQueueChange={handleInboundQueueChange}
-              onInboundScriptChange={handleInboundScriptChange}
+              onIncomingActivityChange={onIncomingActivityChange}
+              onIncomingVoiceMessageChange={onIncomingVoiceMessageChange}
+              onCallerIdChange={onCallerIdChange}
+              onHandsetChange={onHandsetChange}
+              onInboundRingCountChange={onInboundRingCountChange}
+              onInboundQueueChange={onInboundQueueChange}
+              onInboundScriptChange={onInboundScriptChange}
               onNumberRemoval={handleNumberRemoval}
-              isBusy={updateFetcher.state !== "idle"}
+              onApplyPreset={onApplyPreset}
+              isBusy={isBusy}
             />
-          </Panel>
-          <div className="flex flex-shrink-0 flex-grow basis-full flex-col gap-4 lg:basis-[calc(33.333%-1rem)]">
-            <Panel className="">
-              <NumberCallerId />
-            </Panel>
-            <Panel className="">
+          </Section>
+          <div className="min-w-0 space-y-6">
+            <ServiceAddressGate
+              workspaceId={workspaceId ?? ""}
+              onboarding={onboarding}
+              isReadOnly={isReadOnly}
+            />
+            <SmsComplianceGate
+              workspaceId={workspaceId ?? ""}
+              onboarding={onboarding}
+              isReadOnly={isReadOnly}
+            />
+            <Section variant="flat" className="min-w-[300px]">
+              <SectionHeader branded={false} compact title="Rent a number" />
               <NumberPurchase
                 fetcher={fetcher}
                 workspaceId={workspaceId ?? ""}
                 creditsBalance={creditsBalance}
               />
-            </Panel>
+            </Section>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="caller-id" className="border-border/60">
+                <AccordionTrigger className="py-3 text-sm hover:no-underline">
+                  Caller ID verification
+                </AccordionTrigger>
+                <AccordionContent>
+                  <NumberCallerId />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
         </div>
-      </div>
+      </PageShell>
     </>
   );
 };
 
-const BackButton = ({ disabled }: { disabled: boolean }) => (
-  <div className="flex justify-end pr-4 pt-4">
-    <Button
-      asChild
-      disabled={disabled}
-      variant="outline"
-      className="h-full w-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-2xl font-semibold text-white dark:border-white"
-    >
-      <Link to=".." relative="path">
-        Back
-      </Link>
-    </Button>
-  </div>
-);
-
-const Panel = ({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className: string;
-}) => (
-  <div
-    className={`rounded-sm bg-brand-secondary px-8 pb-10 pt-6 dark:border-2 dark:border-white dark:bg-transparent dark:text-white ${className}`}
-  >
-    {children}
-  </div>
-);
 export default WorkspaceSettings;

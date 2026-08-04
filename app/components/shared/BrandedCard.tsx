@@ -18,7 +18,7 @@ export const BrandedCard = React.forwardRef<HTMLDivElement, BrandedCardProps>(
     <UiCard
       ref={ref}
       className={cn(
-        "relative rounded-lg border-border/80 bg-card shadow-md dark:shadow-none",
+        "relative rounded-lg border-border/80 bg-card shadow-sm dark:shadow-none",
         bgColor,
         bgColorClassName,
         className,
@@ -29,14 +29,24 @@ export const BrandedCard = React.forwardRef<HTMLDivElement, BrandedCardProps>(
 );
 BrandedCard.displayName = "BrandedCard";
 
+export interface BrandedCardTitleProps
+  extends React.HTMLAttributes<HTMLHeadingElement> {
+  /**
+   * Heading tag. Defaults to "h2" for a card nested inside a page that already
+   * has an h1; pass "h1" when the card IS the page and this is its only
+   * heading. Size is unaffected — `level` stays at 2 either way.
+   */
+  as?: "h1" | "h2" | "h3";
+}
+
 export const BrandedCardTitle = React.forwardRef<
   HTMLHeadingElement,
-  React.HTMLAttributes<HTMLHeadingElement>
->(({ children, className, ...props }, ref) => (
+  BrandedCardTitleProps
+>(({ as = "h2", children, className, ...props }, ref) => (
   <UiCardHeader className="pb-0">
     <Heading
       ref={ref}
-      as="h2"
+      as={as}
       level={2}
       branded
       className={cn("text-center", className)}

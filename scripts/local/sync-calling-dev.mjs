@@ -3,7 +3,7 @@
 
 import "dotenv/config";
 
-import { createClient } from "@supabase/supabase-js";
+import postgres from "postgres";
 import Twilio from "twilio";
 
 const LOCAL_APP_URL = process.env.LOCAL_APP_URL ?? "http://127.0.0.1:3000";
@@ -24,7 +24,9 @@ async function main() {
     url: LOCAL_APP_URL,
   });
 
-  const twimlApp = await syncTwimlApp(baseUrl);
+  const twimlApp = await syncTwimlApp(baseUrl, {
+    allowSharedApp: args.allowSharedApp,
+  });
   const workspaceResults = await syncWorkspaceTargets({
     allWorkspaces: args.allWorkspaces,
     workspaceIds: args.workspaceIds,
@@ -45,6 +47,7 @@ async function main() {
 function parseArgs(argv) {
   const parsed = {
     allWorkspaces: false,
+    allowSharedApp: false,
     baseUrl: null,
     help: false,
     workspaceIds: [],
@@ -56,6 +59,9 @@ function parseArgs(argv) {
     switch (arg) {
       case "--all-workspaces":
         parsed.allWorkspaces = true;
+        break;
+      case "--allow-shared-app":
+        parsed.allowSharedApp = true;
         break;
       case "--base-url":
         parsed.baseUrl = argv[index + 1] ?? null;
@@ -102,6 +108,13 @@ The script resolves the public base URL in this order:
   3. ngrok local API at ${NGROK_API_URL} (fallback only)
 
 For Localtunnel, set BASE_URL in .env or pass --base-url explicitly.
+
+Flags:
+  --allow-shared-app  Repoint the TwiML App even when its current voice URL is
+                      not a localhost/tunnel URL. Refused by default, because a
+                      TwiML App holds one voice URL and repointing a deployed
+                      environment's app breaks browser calling for its users.
+                      Prefer giving local dev its own TwiML App instead.
 `.trim());
 }
 
@@ -213,13 +226,84 @@ function requireEnv(name) {
   return value;
 }
 
-async function syncTwimlApp(baseUrl) {
+/**
+ * Hosts a local dev tunnel can legitimately live on. A TwiML App already
+ * pointing at one of these is someone's dev app and is safe to repoint.
+ */
+const DEV_TUNNEL_HOST_PATTERNS = [
+  /^localhost$/i,
+  /^127\.0\.0\.1$/,
+  /\.loca\.lt$/i,
+  /\.ngrok\.io$/i,
+  /\.ngrok\.app$/i,
+  /\.ngrok-free\.app$/i,
+  /\.trycloudflare\.com$/i,
+  /\.serveo\.net$/i,
+];
+
+function isDevTunnelUrl(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return false;
+  }
+
+  let hostname;
+  try {
+    hostname = new URL(value).hostname;
+  } catch {
+    return false;
+  }
+
+  return DEV_TUNNEL_HOST_PATTERNS.some((pattern) => pattern.test(hostname));
+}
+
+/**
+ * A TwiML App holds exactly one voice URL, so repointing one that a deployed
+ * environment is using silently breaks browser calling for every user of that
+ * environment until someone notices. Twilio's only symptom is a spoken
+ * "an unexpected error has occurred" (error 11200), which gives no hint at the
+ * cause, so refuse rather than rely on the operator spotting it.
+ */
+async function assertTwimlAppIsSafeToRepoint({ application, appSid, allowSharedApp }) {
+  const currentVoiceUrl = application.voiceUrl ?? "";
+
+  if (allowSharedApp || isDevTunnelUrl(currentVoiceUrl)) {
+    return;
+  }
+
+  throw new Error(
+    [
+      `Refusing to repoint TwiML App ${appSid} ("${application.friendlyName ?? "unnamed"}").`,
+      ``,
+      `Its voice URL is currently:`,
+      `  ${currentVoiceUrl || "(unset)"}`,
+      ``,
+      `That is not a localhost or tunnel URL, so a deployed environment is almost`,
+      `certainly using this app. Repointing it at your tunnel would break browser`,
+      `calling for everyone on that environment, and would keep breaking it after`,
+      `your tunnel closes.`,
+      ``,
+      `Give local dev its own TwiML App and point TWILIO_APP_SID in .env at it:`,
+      `  https://console.twilio.com/us1/develop/voice/manage/twiml-apps`,
+      ``,
+      `If you are certain this app is not shared, re-run with --allow-shared-app.`,
+    ].join("\n"),
+  );
+}
+
+async function syncTwimlApp(baseUrl, { allowSharedApp = false } = {}) {
   const client = new Twilio.Twilio(
     requireEnv("TWILIO_SID"),
     requireEnv("TWILIO_AUTH_TOKEN"),
   );
   const appSid = requireEnv("TWILIO_APP_SID");
   const voiceUrl = `${baseUrl}/api/call`;
+
+  const existing = await client.applications(appSid).fetch();
+  await assertTwimlAppIsSafeToRepoint({
+    application: existing,
+    appSid,
+    allowSharedApp,
+  });
 
   const application = await client.applications(appSid).update({
     voiceMethod: "POST",
@@ -228,6 +312,7 @@ async function syncTwimlApp(baseUrl) {
 
   return {
     sid: application.sid,
+    previousVoiceUrl: existing.voiceUrl ?? null,
     voiceUrl,
   };
 }
@@ -237,35 +322,29 @@ async function syncWorkspaceTargets({ allWorkspaces, workspaceIds, baseUrl }) {
     return [];
   }
 
-  const supabase = createClient(
-    requireEnv("SUPABASE_URL"),
-    requireEnv("SUPABASE_SERVICE_KEY"),
-  );
-  const workspaces = await loadWorkspaces({
-    allWorkspaces,
-    supabase,
-    workspaceIds,
-  });
-  const results = [];
+  const sql = postgres(requireEnv("DATABASE_URL"));
+  try {
+    const workspaces = await loadWorkspaces({
+      allWorkspaces,
+      sql,
+      workspaceIds,
+    });
+    const results = [];
 
-  for (const workspace of workspaces) {
-    results.push(await syncWorkspace({ baseUrl, supabase, workspace }));
+    for (const workspace of workspaces) {
+      results.push(await syncWorkspace({ baseUrl, sql, workspace }));
+    }
+
+    return results;
+  } finally {
+    await sql.end();
   }
-
-  return results;
 }
 
-async function loadWorkspaces({ allWorkspaces, supabase, workspaceIds }) {
-  const query = supabase.from("workspace").select("id, name, twilio_data");
-  const response = allWorkspaces
-    ? await query
-    : await query.in("id", workspaceIds);
-
-  if (response.error) {
-    throw response.error;
-  }
-
-  const rawWorkspaces = Array.isArray(response.data) ? response.data : [];
+async function loadWorkspaces({ allWorkspaces, sql, workspaceIds }) {
+  const rawWorkspaces = allWorkspaces
+    ? await sql`SELECT id, name, twilio_data FROM workspace`
+    : await sql`SELECT id, name, twilio_data FROM workspace WHERE id = ANY(${workspaceIds})`;
 
   if (!allWorkspaces) {
     const loadedWorkspaceIds = new Set(rawWorkspaces.map((workspace) => workspace.id));
@@ -311,7 +390,7 @@ function hasTwilioCredentials(twilioData) {
   );
 }
 
-async function syncWorkspace({ baseUrl, supabase, workspace }) {
+async function syncWorkspace({ baseUrl, sql, workspace }) {
   const result = {
     errors: [],
     id: workspace.id,
@@ -325,14 +404,9 @@ async function syncWorkspace({ baseUrl, supabase, workspace }) {
       workspace.twilioData.sid,
       workspace.twilioData.authToken,
     );
-    const { data: workspaceNumbers, error } = await supabase
-      .from("workspace_number")
-      .select("phone_number")
-      .eq("workspace", workspace.id);
-
-    if (error) {
-      throw error;
-    }
+    const workspaceNumbers = await sql`
+      SELECT phone_number FROM workspace_number WHERE workspace = ${workspace.id}
+    `;
 
     const phoneNumbers = Array.isArray(workspaceNumbers) ? workspaceNumbers : [];
 
@@ -367,7 +441,7 @@ async function syncWorkspace({ baseUrl, supabase, workspace }) {
 
     await updateWorkspaceOnboardingMetadata({
       baseUrl,
-      supabase,
+      sql,
       workspace,
     });
   } catch (error) {
@@ -377,7 +451,7 @@ async function syncWorkspace({ baseUrl, supabase, workspace }) {
   return result;
 }
 
-async function updateWorkspaceOnboardingMetadata({ baseUrl, supabase, workspace }) {
+async function updateWorkspaceOnboardingMetadata({ baseUrl, sql, workspace }) {
   const currentTwilioData = workspace.twilioData;
   const onboarding = asRecord(currentTwilioData.onboarding);
   const subaccountBootstrap = asRecord(onboarding.subaccountBootstrap);
@@ -397,14 +471,11 @@ async function updateWorkspaceOnboardingMetadata({ baseUrl, supabase, workspace 
     },
   };
 
-  const { error } = await supabase
-    .from("workspace")
-    .update({ twilio_data: nextTwilioData })
-    .eq("id", workspace.id);
-
-  if (error) {
-    throw error;
-  }
+  await sql`
+    UPDATE workspace
+    SET twilio_data = ${JSON.stringify(nextTwilioData)}
+    WHERE id = ${workspace.id}
+  `;
 }
 
 function asRecord(value) {
@@ -420,6 +491,10 @@ function printSummary({ baseUrl, twimlApp, workspaceResults }) {
   console.log("Calling dev sync complete.");
   console.log(`Base URL: ${baseUrl}`);
   console.log(`TwiML App: ${twimlApp.sid} -> ${twimlApp.voiceUrl}`);
+
+  if (twimlApp.previousVoiceUrl && twimlApp.previousVoiceUrl !== twimlApp.voiceUrl) {
+    console.log(`  (was: ${twimlApp.previousVoiceUrl})`);
+  }
 
   if (workspaceResults.length === 0) {
     console.log("Workspace numbers: skipped (no workspace target provided).");

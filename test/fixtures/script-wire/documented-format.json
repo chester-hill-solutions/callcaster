@@ -1,0 +1,51 @@
+{
+  "pages": {
+    "page_1": {
+      "id": "page_1",
+      "title": "Introduction",
+      "blocks": ["block_1", "block_2"]
+    },
+    "page_2": {
+      "id": "page_2",
+      "title": "Main Questions",
+      "blocks": ["block_3", "block_4"]
+    }
+  },
+  "blocks": {
+    "block_1": {
+      "id": "block_1",
+      "type": "textarea",
+      "title": "Introduction Script",
+      "content": "Hello, my name is [Agent Name]. I'm calling from [Company].",
+      "options": [],
+      "audioFile": ""
+    },
+    "block_2": {
+      "id": "block_2",
+      "type": "select",
+      "title": "Initial Response",
+      "content": "Is this a good time to talk?",
+      "options": [
+        { "content": "Yes", "next": "block_3" },
+        { "content": "No", "next": "block_4" }
+      ],
+      "audioFile": ""
+    },
+    "block_3": {
+      "id": "block_3",
+      "type": "textarea",
+      "title": "Positive Response",
+      "content": "Great! Let me tell you about our offer.",
+      "options": [],
+      "audioFile": ""
+    },
+    "block_4": {
+      "id": "block_4",
+      "type": "textarea",
+      "title": "Negative Response",
+      "content": "No problem, thanks for your time.",
+      "options": [],
+      "audioFile": ""
+    }
+  }
+}

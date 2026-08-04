@@ -6,7 +6,11 @@ import {
   TEST_WORKSPACE_ID_ALT,
 } from "./helpers/public-api-fixtures";
 
-let currentSupabase: any = null;
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
+let currentClient: any = null;
 const defaultPortalConfig = {
   trafficClass: "unknown",
   throughputProduct: "none",
@@ -29,7 +33,7 @@ const defaultPortalConfig = {
 
 const mocks = vi.hoisted(() => {
   return {
-    createClient: vi.fn(() => currentSupabase),
+    createClient: vi.fn(() => currentClient),
     verifyApiKeyOrSession: vi.fn(),
     parseJsonBodyOrResponse: vi.fn(),
     getCampaignQueueById: vi.fn(),
@@ -37,16 +41,41 @@ const mocks = vi.hoisted(() => {
     createWorkspaceTwilioInstance: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     processTemplateTags: vi.fn((text: string) => text),
+    dequeueCampaignQueueById: vi.fn(async () => []),
+    loadCampaignSmsDispatchData: vi.fn(),
+    countCampaignMessagesToPhone: vi.fn(),
+    updateOutreachAttemptForWorkspace: vi.fn(),
+    rpcCreateOutreachAttempt: vi.fn(),
+    getWorkspaceCreditsBalance: vi.fn(async () => 100),
     env: {
-      SUPABASE_URL: vi.fn(() => "http://supabase"),
-      SUPABASE_SERVICE_KEY: vi.fn(() => "service-key"),
+      BETTER_AUTH_URL: vi.fn(() => "http://client"),
+      BETTER_AUTH_SERVICE_KEY: vi.fn(() => "service-key"),
+      BASE_URL: vi.fn(() => "https://app.example"),
     },
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...args: any[]) => mocks.createClient(...args),
+}));
+
+// The recipient calling window is wall-clock dependent; pin it open so these
+// tests are not time-of-day sensitive (window logic is covered in
+// test/recipient-calling-window.test.ts).
+vi.mock("@/lib/recipient-calling-window", () => ({
+  recipientCallingWindowStatus: vi.fn(() => ({
+    allowed: true,
+    timezone: "America/Toronto",
+    reason: "in_window",
+  })),
+  isWithinRecipientCallingWindow: vi.fn(() => true),
+}));
+
+
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
 }));
 
 vi.mock("@/lib/api-auth.server", () => ({
@@ -57,16 +86,30 @@ vi.mock("@/lib/api-parse.server", () => ({
   parseJsonBodyOrResponse: (...args: any[]) => mocks.parseJsonBodyOrResponse(...args),
 }));
 
-vi.mock("../app/lib/database.server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/database.server")>();
+vi.mock("../app/lib/database/campaign.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../app/lib/database/campaign.server")
+    >();
   return {
     ...actual,
-    getCampaignQueueById: (...args: any[]) => mocks.getCampaignQueueById(...args),
+    getCampaignQueueById: (...args: any[]) =>
+      mocks.getCampaignQueueById(...args),
+  };
+});
+vi.mock("../app/lib/database/workspace.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../app/lib/database/workspace.server")
+    >();
+  return {
+    ...actual,
     getWorkspaceTwilioPortalConfig: (...args: any[]) =>
       mocks.getWorkspaceTwilioPortalConfig(...args),
     createWorkspaceTwilioInstance: (...args: any[]) =>
       mocks.createWorkspaceTwilioInstance(...args),
-    requireWorkspaceAccess: (...args: any[]) => mocks.requireWorkspaceAccess(...args),
+    requireWorkspaceAccess: (...args: any[]) =>
+      mocks.requireWorkspaceAccess(...args),
   };
 });
 
@@ -85,7 +128,48 @@ vi.mock("@/lib/utils", () => ({
 }));
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
-vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+import { configureTenantDbStub, createTenantDbMock, tenantDbStubState } from "./helpers/tenant-db-stub";
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => createTenantDbMock(),
+}));
+
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueCampaignQueueById: (...args: unknown[]) => mocks.dequeueCampaignQueueById(...args),
+}));
+
+vi.mock("@/lib/sms-campaign-db.server", () => ({
+  loadCampaignSmsDispatchData: (...args: unknown[]) => mocks.loadCampaignSmsDispatchData(...args),
+}));
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcCreateOutreachAttempt: (...args: unknown[]) => mocks.rpcCreateOutreachAttempt(...args),
+}));
+vi.mock("@/lib/object-storage.server", () => ({
+  createSignedObjectUrl: (...args: unknown[]) => Promise.resolve("http://signed-1"),
+}));
+
+vi.mock("@/lib/message-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/message-db.server")>();
+  return {
+    ...actual,
+    countCampaignMessagesToPhone: (...args: unknown[]) =>
+      mocks.countCampaignMessagesToPhone(...args),
+  };
+});
+
+vi.mock("@/lib/telephony-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony-db.server")>();
+  return {
+    ...actual,
+    updateOutreachAttemptForWorkspace: (...args: unknown[]) =>
+      mocks.updateOutreachAttemptForWorkspace(...args),
+  };
+});
+
+vi.mock("@/lib/workspace-credits.server", () => ({
+  getWorkspaceCreditsBalance: (...args: any[]) => mocks.getWorkspaceCreditsBalance(...args),
+}));
 vi.mock("@/lib/twilio-readiness.server", () => ({
   assertWorkspaceCanSendSms: vi.fn(async () => undefined),
 }));
@@ -93,16 +177,79 @@ vi.mock("@/lib/twilio-client.server", () => ({
   withTwilioRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
-function makeSupabase(opts: {
+function campaignRowFromOpts(opts?: { campaign?: any }) {
+  const campaign =
+    opts?.campaign ??
+    ({
+      body_text: "hi",
+      message_media: [],
+      campaign: {
+        end_time: new Date().toISOString(),
+        sms_send_mode: null,
+        sms_messaging_service_sid: null,
+        caller_id: "+15550001111",
+      },
+    } as const);
+  return {
+    body_text: campaign.body_text,
+    message_media: campaign.message_media ?? [],
+    end_date: campaign.campaign?.end_time ?? new Date().toISOString(),
+    sms_send_mode: campaign.campaign?.sms_send_mode ?? null,
+    sms_messaging_service_sid: campaign.campaign?.sms_messaging_service_sid ?? null,
+    caller_id: campaign.campaign?.caller_id ?? "+15550001111",
+  };
+}
+
+function dispatchDataFromOpts(opts?: { campaign?: any }) {
+  const row = campaignRowFromOpts(opts);
+  return {
+    body_text: row.body_text,
+    message_media: row.message_media,
+    campaign: {
+      end_time: row.end_date,
+      sms_send_mode: row.sms_send_mode,
+      sms_messaging_service_sid: row.sms_messaging_service_sid,
+      caller_id: row.caller_id,
+    },
+  };
+}
+
+function makeDbClient(opts: {
   campaign?: any;
   campaignError?: any;
   rpcResult?: { data: any; error: any };
   outreachUpdate?: { data: any; error: any };
   messageInsert?: any;
   messageCount?: number;
-  queueUpdate?: any;
   signedUrls?: Array<string | undefined>;
 } = {}) {
+  configureTenantDbStub({
+    messageInsertResult: opts?.messageInsert?.data ?? [{ sid: "SM1" }],
+    messageInsertError:
+      opts?.messageInsert?.error != null
+        ? new Error(String(opts.messageInsert.error.message ?? opts.messageInsert.error))
+        : null,
+  });
+
+  if (opts.campaignError) {
+    mocks.loadCampaignSmsDispatchData.mockRejectedValue(
+      new Error(`Campaign fetch failed: ${opts.campaignError.message}`),
+    );
+  } else {
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue(dispatchDataFromOpts(opts));
+  }
+  mocks.countCampaignMessagesToPhone.mockResolvedValue(opts.messageCount ?? 0);
+  if (opts.outreachUpdate?.error) {
+    mocks.updateOutreachAttemptForWorkspace.mockResolvedValue(
+      new Response(
+        `Error updating outreach attempt: ${opts.outreachUpdate.error.message}`,
+        { status: 500 },
+      ),
+    );
+  } else {
+    mocks.updateOutreachAttemptForWorkspace.mockResolvedValue({ id: "oa1" });
+  }
+
   const signedUrls = opts.signedUrls ?? [];
   let signedUrlIdx = 0;
 
@@ -116,65 +263,12 @@ function makeSupabase(opts: {
       })),
     },
     rpc: vi.fn(async () => opts.rpcResult ?? { data: "oa1", error: null }),
-    from: vi.fn((table: string) => {
-      if (table === "message_campaign") {
-        const single = vi.fn(async () => ({
-          data:
-            opts.campaign ??
-            ({
-              body_text: "hi",
-              message_media: [],
-              campaign: {
-                end_time: new Date().toISOString(),
-                sms_send_mode: null,
-                sms_messaging_service_sid: null,
-                caller_id: "+15550001111",
-              },
-            } as any),
-          error: opts.campaignError ?? null,
-        }));
-        const q: any = {
-          select: () => q,
-          eq: () => q,
-          single,
-        };
-        return q;
-      }
-      if (table === "outreach_attempt") {
-        return {
-          update: () => ({
-            eq: vi.fn(async () => opts.outreachUpdate ?? { data: [], error: null }),
-          }),
-        };
-      }
-      if (table === "message") {
-        const dedupeQuery: any = {
-          select: () => dedupeQuery,
-          eq: () => dedupeQuery,
-          then: (resolve: (value: any) => any) =>
-            resolve({ count: opts.messageCount ?? 0, error: null }),
-        };
-        return {
-          select: () => dedupeQuery,
-          insert: () => ({
-            select: vi.fn(async () => opts.messageInsert ?? ({ data: [], error: null } as any)),
-          }),
-        };
-      }
-      if (table === "campaign_queue") {
-        return {
-          update: () => ({
-            eq: vi.fn(async () => opts.queueUpdate ?? ({ data: [], error: null } as any)),
-          }),
-        };
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    }),
   };
 }
 
 describe("app/routes/api+/sms/route.tsx", () => {
   beforeEach(() => {
+    configureTenantDbStub();
     vi.resetModules();
     mocks.verifyApiKeyOrSession.mockReset();
     mocks.parseJsonBodyOrResponse.mockReset();
@@ -183,29 +277,39 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.processTemplateTags.mockReset();
+    mocks.dequeueCampaignQueueById.mockReset();
+    mocks.loadCampaignSmsDispatchData.mockReset();
+    mocks.countCampaignMessagesToPhone.mockReset();
+    mocks.updateOutreachAttemptForWorkspace.mockReset();
+    mocks.rpcCreateOutreachAttempt.mockReset();
+    mocks.getWorkspaceCreditsBalance.mockReset();
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(100);
     mocks.logger.error.mockReset();
     mocks.createClient.mockClear();
     mocks.verifyApiKeyOrSession.mockResolvedValue({
       authType: "api_key",
       workspaceId: TEST_WORKSPACE_ID,
-      supabase: {},
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.dispatch"],
     });
     mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue(defaultPortalConfig);
+    mocks.rpcCreateOutreachAttempt.mockResolvedValue("oa1");
 
     (globalThis as any).fetch = vi.fn(async () => ({ ok: true, text: async () => "http://tiny" }));
   });
 
   test("returns auth error response", async () => {
-    currentSupabase = makeSupabase({});
+    currentClient = makeDbClient({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({ error: "Unauthorized", status: 401 });
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "Unauthorized" });
   });
 
   test("rejects api_key workspace mismatch", async () => {
-    currentSupabase = makeSupabase({});
+    currentClient = makeDbClient({});
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c1",
       workspace_id: TEST_WORKSPACE_ID_ALT,
@@ -213,13 +317,49 @@ describe("app/routes/api+/sms/route.tsx", () => {
       user_id: "u1",
     });
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toEqual({ error: "workspace_id does not match API key" });
   });
 
+  test("returns 402 with creditsError when workspace balance is depleted, gated once before loading audience", async () => {
+    currentClient = makeDbClient({});
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(0);
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
+      campaign_id: "c-credits",
+      workspace_id: TEST_WORKSPACE_ID,
+      caller_id: "+15551234567",
+      user_id: "u1",
+    });
+    const mod = await import("../app/routes/api+/sms");
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toEqual({
+      creditsError: true,
+      error: "Insufficient credits",
+    });
+    // Gated once at entry: never reached campaign/audience loading or dispatch.
+    expect(mocks.loadCampaignSmsDispatchData).not.toHaveBeenCalled();
+    expect(mocks.getCampaignQueueById).not.toHaveBeenCalled();
+  });
+
+  test("returns 402 with creditsError when workspace balance is unknown (fail closed)", async () => {
+    currentClient = makeDbClient({});
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(null);
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
+      campaign_id: "c-credits-null",
+      workspace_id: TEST_WORKSPACE_ID,
+      caller_id: "+15551234567",
+      user_id: "u1",
+    });
+    const mod = await import("../app/routes/api+/sms");
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toMatchObject({ creditsError: true });
+  });
+
   test("happy path shortens URLs, signs media, templates body, and sends with mediaUrl", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: {
         body_text: "Hello https://example.com",
         message_media: ["m1.png"],
@@ -265,7 +405,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveProperty("responses");
@@ -282,7 +422,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("no URLs and no media: does not include mediaUrl; skips template tags when body_text empty", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: {
         body_text: "",
         message_media: undefined,
@@ -302,14 +442,14 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(mocks.processTemplateTags).not.toHaveBeenCalled();
     expect(create).toHaveBeenCalledWith(expect.not.objectContaining({ mediaUrl: expect.anything() }));
   });
 
   test("twilio send failure returns per-member success=false but overall 200", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -327,7 +467,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]).toHaveProperty("3");
@@ -336,7 +476,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("skips send when duplicate exists for campaign and phone", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
       messageCount: 1,
     });
@@ -353,7 +493,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["12"]).toMatchObject({
@@ -365,7 +505,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("sends when campaign+phone duplicate does not exist", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
       messageCount: 0,
     });
@@ -382,16 +522,16 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledTimes(1);
   });
 
   test("createOutreachAttempt rpc error returns per-member success=false", async () => {
-    currentSupabase = makeSupabase({
-      rpcResult: { data: null, error: { message: "rpc-bad" } },
+    currentClient = makeDbClient({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
+    mocks.rpcCreateOutreachAttempt.mockRejectedValueOnce(new Error("rpc-bad"));
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c4",
       workspace_id: TEST_WORKSPACE_ID,
@@ -406,7 +546,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["4"].success).toBe(false);
@@ -414,7 +554,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("updateOutreach error returns per-member success=false", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       outreachUpdate: { data: null, error: { message: "update-bad" } },
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
@@ -432,15 +572,17 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.responses[0]["5"].success).toBe(false);
-    expect(body.responses[0]["5"].error).toBe("update-bad");
+    expect(body.responses[0]["5"].error).toBe(
+      "Error updating outreach attempt: update-bad",
+    );
   });
 
   test("preserves URLs in body for from-number sends (Twilio shortening uses Messaging Service)", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: { body_text: "Go https://example.com", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -456,13 +598,13 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(expect.objectContaining({ body: expect.stringContaining("https://example.com") }));
   });
 
   test("uses Twilio shortenUrls when messaging service send mode includes URLs", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: {
         body_text: "Go https://example.com",
         message_media: [],
@@ -491,7 +633,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -503,8 +645,8 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("message.sid falsy uses failed-* fallback", async () => {
-    vi.spyOn(Date, "now").mockReturnValueOnce(123);
-    currentSupabase = makeSupabase({
+    const dateNowSpy = vi.spyOn(Date, "now").mockReturnValue(123);
+    currentClient = makeDbClient({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -520,38 +662,15 @@ describe("app/routes/api+/sms/route.tsx", () => {
       messages: { create: vi.fn(async () => ({ sid: "", body: "Hi", to: "+15551234567" })) },
     });
 
-    // observe insert payload sid
-    const inserted: any[] = [];
-    currentSupabase.from = vi.fn((table: string) => {
-      if (table === "message_campaign") return makeSupabase({ campaign: { body_text: "Hi", message_media: [], campaign: { end_time: "" } } }).from("message_campaign");
-      if (table === "outreach_attempt") return makeSupabase({}).from("outreach_attempt");
-      if (table === "campaign_queue") return makeSupabase({}).from("campaign_queue");
-      if (table === "message") {
-        const dedupeQuery: any = {
-          select: () => dedupeQuery,
-          eq: () => dedupeQuery,
-          then: (resolve: (value: any) => any) => resolve({ count: 0, error: null }),
-        };
-        return {
-          select: () => dedupeQuery,
-          insert: (row: any) => {
-            inserted.push(row);
-            return { select: vi.fn(async () => ({ data: [], error: null })) };
-          },
-        };
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    });
-
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
-    expect(inserted[0].sid).toBe("failed-+15551234567-123");
-    (Date.now as any).mockRestore?.();
+    expect(tenantDbStubState.messageInsertCalls[0]?.sid).toBe("failed-+15551234567-123");
+    dateNowSpy.mockRestore();
   });
 
   test("uses messaging service and explicit message intent overrides", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: { body_text: "Priority update", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -596,7 +715,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -608,7 +727,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("allows empty caller_id when campaign sms_send_mode is messaging_service", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: {
         body_text: "Hi",
         message_media: [],
@@ -654,7 +773,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({ messagingServiceSid: "MG123" }),
@@ -662,7 +781,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("rejects empty caller_id when campaign requires from number", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: {
         body_text: "Hi",
         message_media: [],
@@ -683,7 +802,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.getCampaignQueueById.mockResolvedValueOnce([]);
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       error: "caller_id is required for this campaign",
@@ -691,7 +810,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("campaign fetch error returns 500", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaignError: { message: "nope" },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -703,14 +822,14 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.getCampaignQueueById.mockResolvedValueOnce([]);
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error).toContain("Campaign fetch failed:");
   });
 
   test("normalizePhoneNumber throw (bad contact phone) triggers overall 500", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -727,12 +846,12 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
   });
 
   test("missing contact.phone uses '' fallback and triggers overall 500", async () => {
-    currentSupabase = makeSupabase({
+    currentClient = makeDbClient({
       campaign: { body_text: "Hi", message_media: [], campaign: { end_time: new Date().toISOString() } },
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
@@ -749,24 +868,25 @@ describe("app/routes/api+/sms/route.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
   });
 
   test("api_key requires user_id", async () => {
-    currentSupabase = makeSupabase({});
+    currentClient = makeDbClient({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: "550e8400-e29b-41d4-a716-446655440000",
-      supabase: {},
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.dispatch"],
     });
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
       campaign_id: "c1",
       workspace_id: "550e8400-e29b-41d4-a716-446655440000",
     });
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(
-      await mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -775,11 +895,13 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("returns 400 when request body fails schema validation", async () => {
-    currentSupabase = makeSupabase({});
+    currentClient = makeDbClient({});
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
       authType: "api_key",
       workspaceId: "550e8400-e29b-41d4-a716-446655440000",
-      supabase: {},
+      client: {},
+      keyId: "k1",
+      scopes: ["campaigns.dispatch"],
     });
     mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
       const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(
@@ -788,8 +910,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
       return actual.parseJsonBodyOrResponse(request, schema);
     });
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://x", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -804,12 +925,11 @@ describe("app/routes/api+/sms/route.tsx", () => {
   });
 
   test("parseJsonBodyOrResponse throws returns 500 with Unknown error handling", async () => {
-    currentSupabase = makeSupabase({});
+    currentClient = makeDbClient({});
     mocks.parseJsonBodyOrResponse.mockRejectedValueOnce("nope");
     const mod = await import("../app/routes/api+/sms");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "Unknown error" });
   });
 });
-

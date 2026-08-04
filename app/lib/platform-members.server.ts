@@ -1,43 +1,142 @@
 import { randomBytes } from "crypto";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   API_KEY_PREFIX_LENGTH,
   hashApiKeyForStorage,
 } from "@/lib/api-auth.server";
-import { getUserRole, getWorkspaceUsers, requireWorkspaceAccess } from "@/lib/database.server";
-import type { Database } from "@/lib/database.types";
+import {
+  API_KEY_DEFAULT_TTL_DAYS,
+  API_KEY_MAX_TTL_DAYS,
+  isProductCapabilityId,
+  type ProductCapabilityId,
+} from "@/lib/capabilities";
+import {
+  getUserRole,
+  getWorkspaceUsers,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
+import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import { MemberRole } from "@/lib/member-role";
-import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
+import { WORKSPACE_ROLE_RANK } from "@/lib/workspace-route.server";
+import { requireTwoFactorForPrivilegedRoleAssignment } from "@/lib/two-factor.server";
+import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
+import { assertSafeOutboundUrl, safeOutboundFetch } from "@/lib/safe-outbound-url.server";
+import { env } from "@/lib/env.server";
+import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
 import type {
   upsertWebhookBodySchema,
 } from "@/lib/schemas/api/platform-workspace-admin";
+import {
+  deleteWorkspaceApiKeyRow,
+  findUserIdByUsername,
+  findWorkspaceInviteForUser,
+  findWorkspaceMembership,
+  getWorkspaceWebhookRow,
+  insertWorkspaceApiKeyRow,
+  listWorkspaceApiKeyRows,
+  listWorkspaceInvitesEnriched,
+  listWorkspaceMembersEnriched,
+  removeWorkspaceInviteForUser,
+  removeWorkspaceMember as removeWorkspaceMemberRow,
+  updateWorkspaceMemberRole as updateWorkspaceMemberRoleRow,
+  upsertWorkspaceWebhookRow,
+} from "@/lib/workspace-members-db.server";
 import type { z } from "zod";
 
-const KEY_SECRET_LENGTH = 32;
 const KEY_PREFIX = "cc_live_";
+const KEY_PREFIX_RANDOM_LENGTH = 16;
+const KEY_SECRET_LENGTH = 48;
 
 type UpsertWebhookInput = z.infer<typeof upsertWebhookBodySchema>;
 
 async function requireMemberManager(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
-): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+): Promise<
+  | { ok: true; actorRole: string }
+  | { ok: false; error: string; status: number }
+> {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
   const userRole = await getUserRole({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
   if (!userRole || userRole.role === MemberRole.Caller) {
     return { ok: false, error: "Not authorized", status: 403 };
+  }
+
+  return { ok: true, actorRole: userRole.role };
+}
+
+/**
+ * Prevent privilege escalation: an actor may never grant a role that outranks
+ * their own. Without this, a `member` (who can manage members) could promote
+ * themselves or anyone to `admin`/`owner`. Applies to both role edits and
+ * invites.
+ */
+function assertNoRoleEscalation(
+  actorRole: string,
+  assignedRole: string,
+): { ok: true } | { ok: false; error: string; status: number } {
+  const actorRank = WORKSPACE_ROLE_RANK[actorRole] ?? 0;
+  const assignedRank = WORKSPACE_ROLE_RANK[assignedRole] ?? 0;
+  if (assignedRank > actorRank) {
+    return {
+      ok: false,
+      error: "You cannot grant a role higher than your own.",
+      status: 403,
+    };
+  }
+  return { ok: true };
+}
+
+async function getWorkspaceOwners(workspaceId: string) {
+  const members = await listWorkspaceMembersEnriched(workspaceId);
+  return members.filter((member) => member.role === MemberRole.Owner);
+}
+
+async function requireOwnerForOwnerChange(
+  actorUserId: string,
+  workspaceId: string,
+  targetUserId: string,
+  newRole?: string,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const targetMembership = await findWorkspaceMembership(workspaceId, targetUserId);
+  if (!targetMembership) {
+    return { ok: false, error: "Member not found", status: 404 };
+  }
+
+  const isOwnerChange =
+    newRole === MemberRole.Owner || targetMembership.role === MemberRole.Owner;
+  if (!isOwnerChange) {
+    return { ok: true };
+  }
+
+  const actorMembership = await findWorkspaceMembership(workspaceId, actorUserId);
+  if (actorMembership?.role !== MemberRole.Owner) {
+    return { ok: false, error: "Only workspace owners can change owner roles", status: 403 };
+  }
+
+  return { ok: true };
+}
+
+async function requireSoleOwnerProtection(
+  workspaceId: string,
+  targetUserId: string,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const targetMembership = await findWorkspaceMembership(workspaceId, targetUserId);
+  if (targetMembership?.role !== MemberRole.Owner) {
+    return { ok: true };
+  }
+
+  const owners = await getWorkspaceOwners(workspaceId);
+  if (owners.length <= 1) {
+    return { ok: false, error: "Cannot remove the sole owner", status: 403 };
   }
 
   return { ok: true };
@@ -59,68 +158,58 @@ function normalizeCustomHeaders(
 
 function generateApiKey(): { key: string; keyPrefix: string; keyHash: string } {
   const secret = randomBytes(KEY_SECRET_LENGTH).toString("base64url");
-  const key = `${KEY_PREFIX}${secret}`;
-  const keyPrefix = key.slice(0, API_KEY_PREFIX_LENGTH);
+  const prefixPart = secret.slice(0, KEY_PREFIX_RANDOM_LENGTH);
+  const restPart = secret.slice(KEY_PREFIX_RANDOM_LENGTH);
+  const key = `${KEY_PREFIX}${prefixPart}_${restPart}`;
+  const keyPrefix = `${KEY_PREFIX}${prefixPart}`;
   const keyHash = hashApiKeyForStorage(key);
   return { key, keyPrefix, keyHash };
 }
 
 export async function listWorkspaceMembers(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select(
-      "workspace_users(role, user(id, username, first_name, last_name)), workspace_invite(*, user(id, username, first_name, last_name))",
-    )
-    .eq("id", workspaceId)
-    .single();
+  try {
+    const [members, pending_invites] = await Promise.all([
+      listWorkspaceMembersEnriched(workspaceId),
+      listWorkspaceInvitesEnriched(workspaceId),
+    ]);
 
-  if (error) {
+    return {
+      ok: true as const,
+      members,
+      pending_invites,
+    };
+  } catch (error) {
     logger.error("listWorkspaceMembers error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load members",
+      status: 500,
+    };
   }
-
-  const members =
-    workspace.workspace_users?.map((entry) => ({
-      user_id: entry.user?.id ?? null,
-      username: entry.user?.username ?? null,
-      first_name: entry.user?.first_name ?? null,
-      last_name: entry.user?.last_name ?? null,
-      role: entry.role,
-    })) ?? [];
-
-  return {
-    ok: true as const,
-    members,
-    pending_invites: workspace.workspace_invite ?? [],
-  };
 }
 
-export async function inviteWorkspaceMember(
-  supabaseClient: SupabaseClient<Database>,
-  userId: string,
+async function inviteWorkspaceMemberWithActorRole(
+  actorRole: string,
   workspaceId: string,
   email: string,
   role: "owner" | "admin" | "member" | "caller",
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
-  if (!access.ok) return access;
+  const escalation = assertNoRoleEscalation(actorRole, role);
+  if (!escalation.ok) return escalation;
 
   const cleanedEmail = email.toLowerCase().trim();
   const { data: users } = await getWorkspaceUsers({
-    supabaseClient,
     workspaceId,
   });
-  const existingMember = users?.find((user) => user.username === cleanedEmail);
+  const existingMember = users?.find((user: { username?: string | null }) => user.username === cleanedEmail);
   if (existingMember) {
     return {
       ok: false as const,
@@ -129,20 +218,10 @@ export async function inviteWorkspaceMember(
     };
   }
 
-  const { data: existingUser } = await supabaseClient
-    .from("user")
-    .select("id")
-    .eq("username", cleanedEmail)
-    .maybeSingle();
+  const existingUserId = await findUserIdByUsername(cleanedEmail);
 
-  if (existingUser?.id) {
-    const { data: pendingInvite } = await supabaseClient
-      .from("workspace_invite")
-      .select("id")
-      .eq("workspace", workspaceId)
-      .eq("user_id", existingUser.id)
-      .maybeSingle();
-
+  if (existingUserId) {
+    const pendingInvite = await findWorkspaceInviteForUser(workspaceId, existingUserId);
     if (pendingInvite) {
       return {
         ok: true as const,
@@ -151,174 +230,204 @@ export async function inviteWorkspaceMember(
     }
   }
 
-  const { data: inviteData, error: inviteUserError } =
-    await supabaseClient.functions.invoke("invite-user-by-email", {
-      body: {
-        workspaceId,
-        email: cleanedEmail,
-        role,
-      },
-    });
+  const result = await inviteUserByEmail({
+    workspaceId,
+    email: cleanedEmail,
+    role,
+  });
 
-  if (inviteUserError) {
-    if (existingUser?.id) {
-      const { data: pendingInvite } = await supabaseClient
-        .from("workspace_invite")
-        .select("id")
-        .eq("workspace", workspaceId)
-        .eq("user_id", existingUser.id)
-        .maybeSingle();
-      if (pendingInvite) {
-        return {
-          ok: true as const,
-          invite: inviteData,
-          warning: "Invite was created but email delivery may have failed.",
-        };
-      }
-    }
-    return { ok: false as const, error: inviteUserError.message, status: 400 };
+  if (!result.ok) {
+    return { ok: false as const, error: result.error, status: 400 };
   }
 
-  return { ok: true as const, invite: inviteData };
+  return { ok: true as const, invite: result.invite };
+}
+
+export async function inviteWorkspaceMember(
+  userId: string,
+  workspaceId: string,
+  email: string,
+  role: "owner" | "admin" | "member" | "caller",
+) {
+  const access = await requireMemberManager(userId, workspaceId);
+  if (!access.ok) return access;
+
+  return inviteWorkspaceMemberWithActorRole(
+    access.actorRole,
+    workspaceId,
+    email,
+    role,
+  );
+}
+
+/**
+ * Invite via API key with `members.invite`. Role assignment follows the admin
+ * subordination policy (member/caller only) until members.assign.* scopes exist.
+ */
+export async function inviteWorkspaceMemberAsApiKey(
+  workspaceId: string,
+  email: string,
+  role: "owner" | "admin" | "member" | "caller",
+) {
+  return inviteWorkspaceMemberWithActorRole("admin", workspaceId, email, role);
 }
 
 export async function updateWorkspaceMemberRole(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   targetUserId: string,
   role: "owner" | "admin" | "member" | "caller",
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
-  const { data, error } = await supabaseClient
-    .from("workspace_users")
-    .update({ role })
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", targetUserId)
-    .select()
-    .single();
+  // Owner-role transitions keep their specific owner-only gate first.
+  const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId, role);
+  if (!ownerCheck.ok) return ownerCheck;
 
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  // No privilege escalation: an actor cannot grant a role above their own.
+  // This is what stops a `member` (who may manage members) from promoting
+  // themselves or anyone to `admin`.
+  const escalation = assertNoRoleEscalation(access.actorRole, role);
+  if (!escalation.ok) return escalation;
+
+  const soleOwnerCheck = await requireSoleOwnerProtection(workspaceId, targetUserId);
+  if (!soleOwnerCheck.ok) return soleOwnerCheck;
+
+  const mfaCheck = await requireTwoFactorForPrivilegedRoleAssignment(targetUserId, role);
+  if (!mfaCheck.ok) return mfaCheck;
+
+  try {
+    const data = await updateWorkspaceMemberRoleRow({
+      workspaceId,
+      userId: targetUserId,
+      role,
+    });
+    if (!data) {
+      return { ok: false as const, error: "Member not found", status: 404 };
+    }
+    return { ok: true as const, member: data };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to update member",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, member: data };
 }
 
 export async function removeWorkspaceMember(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   targetUserId: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
-  const { data, error } = await supabaseClient
-    .from("workspace_users")
-    .delete()
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", targetUserId)
-    .select()
-    .single();
+  const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId);
+  if (!ownerCheck.ok) return ownerCheck;
 
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  const soleOwnerCheck = await requireSoleOwnerProtection(workspaceId, targetUserId);
+  if (!soleOwnerCheck.ok) return soleOwnerCheck;
+
+  try {
+    const data = await removeWorkspaceMemberRow({
+      workspaceId,
+      userId: targetUserId,
+    });
+    if (!data) {
+      return { ok: false as const, error: "Member not found", status: 404 };
+    }
+    return { ok: true as const, member: data };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to remove member",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, member: data };
 }
 
 export async function cancelWorkspaceInvite(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   inviteUserId: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
-  const { data, error } = await supabaseClient
-    .from("workspace_invite")
-    .delete()
-    .eq("workspace", workspaceId)
-    .eq("user_id", inviteUserId)
-    .select();
-
-  if (error) {
+  try {
+    const data = await removeWorkspaceInviteForUser({
+      workspaceId,
+      userId: inviteUserId,
+    });
+    return { ok: true as const, invites: data };
+  } catch (error) {
     logger.error("cancelWorkspaceInvite error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to cancel invite",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, invites: data };
 }
 
 export async function getWorkspaceWebhook(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
-  const { data, error } = await supabaseClient
-    .from("webhook")
-    .select("*")
-    .eq("workspace", workspaceId)
-    .maybeSingle();
-
-  if (error) {
-    return { ok: false as const, error: error.message, status: 500 };
+  try {
+    const data = await getWorkspaceWebhookRow(workspaceId);
+    return { ok: true as const, webhook: data ?? null };
+  } catch (error) {
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to load webhook",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, webhook: data };
 }
 
 export async function upsertWorkspaceWebhook(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   input: UpsertWebhookInput,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {
-    assertSafeOutboundUrl(input.destination_url);
+    await assertSafeOutboundUrl(input.destination_url);
   } catch (urlError) {
     const message =
       urlError instanceof Error ? urlError.message : "Destination URL is not allowed";
     return { ok: false as const, error: message, status: 400 };
   }
 
-  const custom_headers = normalizeCustomHeaders(input.custom_headers);
-  const updateData: Database["public"]["Tables"]["webhook"]["Insert"] = {
-    destination_url: input.destination_url,
-    updated_at: new Date().toISOString(),
-    updated_by: userId,
-    custom_headers,
-    event: input.events,
-    workspace: workspaceId,
-  };
-
-  if (input.webhook_id !== undefined) {
-    updateData.id = input.webhook_id;
-  }
-
-  const { data, error } = await supabaseClient
-    .from("webhook")
-    .upsert(updateData)
-    .select()
-    .single();
-
-  if (error) {
+  try {
+    const data = await upsertWorkspaceWebhookRow({
+      workspaceId,
+      userId,
+      destinationUrl: input.destination_url,
+      customHeaders: normalizeCustomHeaders(input.custom_headers),
+      events: input.events,
+      webhookId: input.webhook_id,
+    });
+    if (!data) {
+      return { ok: false as const, error: "Failed to save webhook", status: 500 };
+    }
+    return { ok: true as const, webhook: data };
+  } catch (error) {
     logger.error("upsertWorkspaceWebhook error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to save webhook",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, webhook: data };
 }
 
 export async function testWorkspaceWebhook(
@@ -327,7 +436,7 @@ export async function testWorkspaceWebhook(
   testData: Record<string, unknown>,
 ) {
   try {
-    assertSafeOutboundUrl(destinationUrl);
+    await assertSafeOutboundUrl(destinationUrl);
   } catch (urlError) {
     const message =
       urlError instanceof Error ? urlError.message : "Destination URL is not allowed";
@@ -337,13 +446,14 @@ export async function testWorkspaceWebhook(
   const headersObject = normalizeCustomHeaders(customHeaders);
 
   try {
-    const response = await fetch(destinationUrl, {
+    const response = await safeOutboundFetch(destinationUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...headersObject,
       },
       body: JSON.stringify(testData),
+      signal: AbortSignal.timeout(10000),
     });
 
     let data: unknown;
@@ -371,81 +481,157 @@ export async function testWorkspaceWebhook(
 }
 
 export async function listWorkspaceApiKeys(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
-  const { data: keys, error } = await supabaseClient
-    .from("workspace_api_key")
-    .select("id, name, key_prefix, created_at, last_used_at")
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
+  try {
+    const keys = await listWorkspaceApiKeyRows(workspaceId);
+    return { ok: true as const, keys };
+  } catch (error) {
     logger.error("listWorkspaceApiKeys error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to list API keys",
+      status: 500,
+    };
   }
-
-  return { ok: true as const, keys: keys ?? [] };
 }
 
 export async function createWorkspaceApiKey(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   name: string,
+  scopes: readonly string[],
+  expiresInDays: number = API_KEY_DEFAULT_TTL_DAYS,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
-  const { key, keyPrefix, keyHash } = generateApiKey();
-
-  const { data: row, error } = await supabaseClient
-    .from("workspace_api_key")
-    .insert({
-      workspace_id: workspaceId,
-      name: name.trim(),
-      key_prefix: keyPrefix,
-      key_hash: keyHash,
-      created_by: userId,
-    })
-    .select("id, name, key_prefix, created_at")
-    .single();
-
-  if (error) {
-    logger.error("createWorkspaceApiKey error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+  const normalizedScopes = [
+    ...new Set(scopes.map((s) => s.trim()).filter(Boolean)),
+  ];
+  if (normalizedScopes.length === 0) {
+    return {
+      ok: false as const,
+      error: "At least one capability scope is required",
+      status: 400,
+    };
+  }
+  const invalid = normalizedScopes.filter((s) => !isProductCapabilityId(s));
+  if (invalid.length > 0) {
+    return {
+      ok: false as const,
+      error: `Unknown capability scopes: ${invalid.join(", ")}`,
+      status: 400,
+    };
   }
 
-  return {
-    ok: true as const,
-    key,
-    api_key: row,
-  };
+  const ttlDays = Number.isFinite(expiresInDays)
+    ? Math.trunc(expiresInDays)
+    : API_KEY_DEFAULT_TTL_DAYS;
+  if (ttlDays < 1 || ttlDays > API_KEY_MAX_TTL_DAYS) {
+    return {
+      ok: false as const,
+      error: `expires_in_days must be between 1 and ${API_KEY_MAX_TTL_DAYS}`,
+      status: 400,
+    };
+  }
+
+  const { key, keyPrefix, keyHash } = generateApiKey();
+  const expiresAt = new Date(
+    Date.now() + ttlDays * 24 * 60 * 60 * 1000,
+  ).toISOString();
+
+  try {
+    const row = await insertWorkspaceApiKeyRow({
+      workspaceId,
+      userId,
+      name,
+      keyPrefix,
+      keyHash,
+      scopes: normalizedScopes as ProductCapabilityId[],
+      expiresAt,
+    });
+    if (!row) {
+      return { ok: false as const, error: "Failed to create API key", status: 500 };
+    }
+
+    await safeRecordWorkspaceAuditEvent({
+      workspaceId,
+      actorType: "session",
+      actorId: userId,
+      action: "api_keys.create",
+      targetType: "api_key",
+      targetId: String(row.id),
+      outcome: "success",
+      metadata: {
+        name: row.name,
+        key_prefix: row.key_prefix,
+        scopes: normalizedScopes,
+        expires_at: expiresAt,
+      },
+    });
+
+    return {
+      ok: true as const,
+      key,
+      api_key: {
+        id: row.id,
+        name: row.name,
+        key_prefix: row.key_prefix,
+        created_at: row.created_at,
+        scopes: row.scopes ?? normalizedScopes,
+        expires_at: row.expires_at ?? expiresAt,
+      },
+    };
+  } catch (error) {
+    logger.error("createWorkspaceApiKey error", error);
+    // DrizzleQueryError message is only "Failed query: … params: …"; the Postgres
+    // detail (missing column, FK, unique) lives on `.cause`.
+    const cause =
+      error instanceof Error && error.cause instanceof Error
+        ? error.cause.message
+        : null;
+    const message =
+      cause ??
+      (error instanceof Error ? error.message : "Failed to create API key");
+    return {
+      ok: false as const,
+      error: message,
+      status: 500,
+    };
+  }
 }
 
 export async function deleteWorkspaceApiKey(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   keyId: string,
 ) {
-  const access = await requireMemberManager(supabaseClient, userId, workspaceId);
+  const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
-  const { error } = await supabaseClient
-    .from("workspace_api_key")
-    .delete()
-    .eq("id", keyId)
-    .eq("workspace_id", workspaceId);
-
-  if (error) {
+  try {
+    await deleteWorkspaceApiKeyRow({ workspaceId, keyId });
+    await safeRecordWorkspaceAuditEvent({
+      workspaceId,
+      actorType: "session",
+      actorId: userId,
+      action: "api_keys.delete",
+      targetType: "api_key",
+      targetId: keyId,
+      outcome: "success",
+    });
+    return { ok: true as const };
+  } catch (error) {
     logger.error("deleteWorkspaceApiKey error", error);
-    return { ok: false as const, error: error.message, status: 500 };
+    return {
+      ok: false as const,
+      error: error instanceof Error ? error.message : "Failed to delete API key",
+      status: 500,
+    };
   }
-
-  return { ok: true as const };
 }

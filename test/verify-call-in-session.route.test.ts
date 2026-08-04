@@ -1,90 +1,60 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { queueJsonAuthSession } from "./helpers/route-auth-mock";
+
 const mocks = vi.hoisted(() => ({
-  verifyAuth: vi.fn(),
   env: {
     VERIFICATION_PHONE_NUMBER: vi.fn(),
   },
+  insertVerificationSession: vi.fn(),
 }));
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
-  }),
-}));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
-
-function makeSupabase(opts: { insertResult?: { data: unknown; error: unknown } }) {
-  return {
-    from: vi.fn((table: string) => {
-      if (table === "verification_session") {
-        return {
-          insert: vi.fn(() => ({
-            select: vi.fn(() => ({
-              single: vi.fn(
-                async () =>
-                  opts.insertResult ?? {
-                    data: {
-                      id: "vs-1",
-                      user_id: "u1",
-                      expected_caller: "+15551234567",
-                      status: "pending",
-                      expires_at: new Date().toISOString(),
-                      created_at: new Date().toISOString(),
-                    },
-                    error: null,
-                  }
-              ),
-            })),
-          })),
-        };
-      }
-      throw new Error(`Unexpected table ${table}`);
-    }),
-  };
-}
+vi.mock("@/lib/verification-db.server", () => ({
+  insertVerificationSession: (...args: unknown[]) => mocks.insertVerificationSession(...args),
+}));
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers() }),
+}));
 
 describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReset();
+    mocks.insertVerificationSession.mockReset();
   });
 
   test("loader returns 401 when user missing", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabase({}),
       headers: new Headers(),
       user: null,
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=+15551234567"
       ),
-    } as never));
+    } as never)));
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({ error: "Unauthorized" });
   });
 
   test("loader returns 503 when VERIFICATION_PHONE_NUMBER not configured", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabase({}),
       headers: new Headers(),
       user: { id: "u1" },
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue(undefined);
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=+15551234567"
       ),
-    } as never));
+    } as never)));
     expect(res.status).toBe(503);
     await expect(res.json()).resolves.toEqual({
       error: "Call-in verification is not configured",
@@ -93,16 +63,15 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
 
   test("loader returns 400 when phoneNumber missing", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabase({}),
       headers: new Headers(),
       user: { id: "u1" },
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request("http://x/api/verify-call-in-session"),
-    } as never));
+    } as never)));
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
       error: "Valid phone number is required",
@@ -111,48 +80,41 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
 
   test("loader returns 400 when phoneNumber invalid", async () => {
     queueJsonAuthSession({
-      supabaseClient: makeSupabase({}),
       headers: new Headers(),
       user: { id: "u1" },
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=123"
       ),
-    } as never));
+    } as never)));
     expect(res.status).toBe(400);
   });
 
   test("loader success creates session and returns phone number", async () => {
-    const supabase = makeSupabase({
-      insertResult: {
-        data: {
-          id: "vs-abc",
-          user_id: "u1",
-          expected_caller: "+15551234567",
-          status: "pending",
-          expires_at: "2025-03-11T12:00:00Z",
-          created_at: "2025-03-11T11:50:00Z",
-        },
-        error: null,
-      },
-    });
     queueJsonAuthSession({
-      supabaseClient: supabase,
       headers: new Headers(),
       user: { id: "u1" },
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
+    mocks.insertVerificationSession.mockResolvedValueOnce({
+      id: "vs-abc",
+      userId: "u1",
+      expectedCaller: "+15551234567",
+      status: "pending",
+      expiresAt: "2025-03-11T12:00:00Z",
+      createdAt: "2025-03-11T11:50:00Z",
+    });
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=%2B15551234567"
       ),
-    } as never));
+    } as never)));
 
     expect(res.status).toBe(200);
     const data = await res.json();
@@ -162,25 +124,28 @@ describe("app/routes/api+/verify-call-in-session/route.tsx", () => {
       phoneNumber: "+15550001111",
     });
     expect(data.expiresAt).toBeDefined();
+    expect(mocks.insertVerificationSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "u1",
+        expectedCaller: "+15551234567",
+      }),
+    );
   });
 
   test("loader returns 500 when insert fails", async () => {
-    const supabase = makeSupabase({
-      insertResult: { data: null, error: { message: "db error" } },
-    });
     queueJsonAuthSession({
-      supabaseClient: supabase,
       headers: new Headers(),
       user: { id: "u1" },
     });
     mocks.env.VERIFICATION_PHONE_NUMBER.mockReturnValue("+15550001111");
+    mocks.insertVerificationSession.mockRejectedValueOnce(new Error("db error"));
 
     const mod = await import("../app/routes/api+/verify-call-in-session");
-    const res = await asRouteResponse(await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
       request: new Request(
         "http://x/api/verify-call-in-session?phoneNumber=%2B15551234567"
       ),
-    } as never));
+    } as never)));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toEqual({ error: "db error" });

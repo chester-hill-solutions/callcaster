@@ -3,9 +3,15 @@ import { asRouteResponse } from "./helpers/route-result";
 
 const bulkCreateContacts = vi.fn(async () => ({ insert: [], audience_insert: [] }));
 const getWorkspacePhoneNumbers = vi.fn(async () => ({ data: [], error: null }));
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/database.server")>("@/lib/database.server");
-  return { ...actual, bulkCreateContacts, getWorkspacePhoneNumbers };
+
+vi.mock("@/lib/database/contact.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/database/contact.server")
+  >("@/lib/database/contact.server");
+  return { ...actual, bulkCreateContacts };
+});
+vi.mock("@/lib/database/workspace.server", async () => {
+  return { getWorkspacePhoneNumbers };
 });
 
 const enqueueContactsForCampaign = vi.fn(async () => undefined);
@@ -18,12 +24,62 @@ vi.mock("@/lib/logger.server", () => {
   return { logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() } };
 });
 
+const tenantDbState = vi.hoisted(() => ({
+  audienceId: 10,
+  campaignId: 2,
+  campaignInsertError: null as Error | null,
+  campaignInsertErrorCode: null as string | null,
+  insertedCampaign: null as Record<string, unknown> | null,
+  campaignAudienceInsertError: null as Error | null,
+}));
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => ({
+    audience: {
+      insert: vi.fn(async (values: any) => {
+        if (values?.name === "boom") throw "boom";
+        return [{ id: tenantDbState.audienceId, ...values }];
+      }),
+    },
+    campaign: {
+      insert: vi.fn(async (values: any) => {
+        tenantDbState.insertedCampaign = values;
+        if (tenantDbState.campaignInsertError) {
+          const err: any = tenantDbState.campaignInsertError;
+          if (tenantDbState.campaignInsertErrorCode) err.code = tenantDbState.campaignInsertErrorCode;
+          throw err;
+        }
+        return [{ id: tenantDbState.campaignId, ...values }];
+      }),
+    },
+  })),
+}));
+
+vi.mock("@/server/db", () => ({
+  db: {
+    insert: vi.fn(() => ({
+      values: vi.fn(async () => {
+        if (tenantDbState.campaignAudienceInsertError) {
+          throw tenantDbState.campaignAudienceInsertError;
+        }
+        return [];
+      }),
+    })),
+  },
+}));
+
 describe("WorkspaceSelectedNewUtils", () => {
   beforeEach(() => {
     bulkCreateContacts.mockReset();
     enqueueContactsForCampaign.mockReset();
     getWorkspacePhoneNumbers.mockReset();
     getWorkspacePhoneNumbers.mockResolvedValue({ data: [], error: null });
+    tenantDbState.audienceId = 10;
+    tenantDbState.campaignId = 2;
+    tenantDbState.campaignInsertError = null;
+    tenantDbState.campaignInsertErrorCode = null;
+    tenantDbState.insertedCampaign = null;
+    tenantDbState.campaignAudienceInsertError = null;
   });
 
   test("handleNewAudience success with no campaign and no contacts", async () => {
@@ -31,22 +87,9 @@ describe("WorkspaceSelectedNewUtils", () => {
     const headers = new Headers({ "x": "y" });
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
+    tenantDbState.audienceId = 10;
 
-    const supabaseClient: any = {
-      from: (table: string) => {
-        expect(table).toBe("audience");
-        return {
-          insert: () => ({
-            select: () => ({
-              single: async () => ({ data: { id: 10 }, error: null }),
-            }),
-          }),
-        };
-      },
-    };
-
-    const res = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient,
+    const res = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -62,29 +105,11 @@ describe("WorkspaceSelectedNewUtils", () => {
     const headers = new Headers();
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
+    tenantDbState.audienceId = 11;
 
     bulkCreateContacts.mockResolvedValueOnce({ insert: [{ id: 1 }, { id: 2 }], audience_insert: [] });
 
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "audience") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 11 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "campaign_audience") {
-          return { insert: async () => ({ error: null }) };
-        }
-        throw new Error(`unexpected table ${table}`);
-      },
-    };
-
-    const res = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient,
+    const res = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -95,7 +120,7 @@ describe("WorkspaceSelectedNewUtils", () => {
     }));
     expect(res.status).toBe(302);
     expect(bulkCreateContacts).toHaveBeenCalled();
-    expect(enqueueContactsForCampaign).toHaveBeenCalledWith(supabaseClient, 123, [1, 2], { requeue: false });
+    expect(enqueueContactsForCampaign).toHaveBeenCalledWith(123, [1, 2], { requeue: false });
   });
 
   test("handleNewAudience does not enqueue when insert list is empty", async () => {
@@ -103,29 +128,11 @@ describe("WorkspaceSelectedNewUtils", () => {
     const headers = new Headers();
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
+    tenantDbState.audienceId = 14;
 
     bulkCreateContacts.mockResolvedValueOnce({ insert: [], audience_insert: [] });
 
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "audience") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 14 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "campaign_audience") {
-          return { insert: async () => ({ error: null }) };
-        }
-        throw new Error(`unexpected table ${table}`);
-      },
-    };
-
-    const res = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient,
+    const res = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -143,30 +150,10 @@ describe("WorkspaceSelectedNewUtils", () => {
     const headers = new Headers();
     const fd = new FormData();
     fd.set("audience-name", "New Audience");
+    tenantDbState.audienceId = 12;
+    tenantDbState.campaignAudienceInsertError = new Error("link");
 
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "audience") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 12 }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "campaign_audience") {
-          return {
-            insert: async () => ({ error: new Error("link") }),
-            delete: () => ({ eq: async () => ({ error: null }) }),
-          };
-        }
-        throw new Error(`unexpected table ${table}`);
-      },
-    };
-
-    const res = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient,
+    const res = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -182,19 +169,9 @@ describe("WorkspaceSelectedNewUtils", () => {
     const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
     const fd = new FormData();
-    fd.set("audience-name", "New Audience");
+    fd.set("audience-name", "boom");
 
-    const supabaseClientErr: any = {
-      from: () => ({
-        insert: () => ({
-          select: () => ({
-            single: async () => ({ data: null, error: new Error("create") }),
-          }),
-        }),
-      }),
-    };
-    const res1 = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient: supabaseClientErr,
+    const res1 = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -203,25 +180,12 @@ describe("WorkspaceSelectedNewUtils", () => {
     }));
     expect(res1.status).toBe(500);
 
+    fd.set("audience-name", "New Audience");
+    tenantDbState.audienceId = 13;
     bulkCreateContacts.mockImplementationOnce(async () => {
       throw "boom";
     });
-    const supabaseClientOk: any = {
-      from: (table: string) => {
-        if (table === "audience") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: { id: 13 }, error: null }),
-              }),
-            }),
-          };
-        }
-        return { insert: async () => ({ error: null }) };
-      },
-    };
-    const res2 = await asRouteResponse(await mod.handleNewAudience({
-      supabaseClient: supabaseClientOk,
+    const res2 = await asRouteResponse(mod.handleNewAudience({
       formData: fd,
       workspaceId: "w1",
       headers,
@@ -234,98 +198,107 @@ describe("WorkspaceSelectedNewUtils", () => {
     expect(body.error).toBe("An unexpected error occurred");
   });
 
-  test("handleNewCampaign covers duplicate-name, generic error, invalid type, details error, and success redirect", async () => {
+  test("handleNewCampaign covers duplicate-name, generic error, and success redirect", async () => {
     const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
-
     const fd = new FormData();
     fd.set("campaign-name", "C");
     fd.set("campaign-type", "live_call");
 
-    const insertSingle = vi.fn();
-    const detailsInsert = vi.fn();
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "campaign") {
-          return {
-            insert: () => ({
-              select: () => ({
-                single: insertSingle,
-              }),
-            }),
-          };
-        }
-        return { insert: detailsInsert };
-      },
-    };
-
-    insertSingle.mockResolvedValueOnce({ data: null, error: { code: "23505" } });
-    const r1 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
+    tenantDbState.campaignInsertError = new Error("duplicate");
+    tenantDbState.campaignInsertErrorCode = "23505";
+    const r1 = await asRouteResponse(mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
     expect((await r1.json()).error.message).toContain("already a campaign");
 
-    insertSingle.mockResolvedValueOnce({ data: null, error: { code: "X", message: "nope" } });
-    const r2 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
+    tenantDbState.campaignInsertError = new Error("nope");
+    tenantDbState.campaignInsertErrorCode = "X";
+    const r2 = await asRouteResponse(mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
     expect((await r2.json()).error).toMatchObject({ code: "X", message: "nope" });
 
-    const fdBad = new FormData();
-    fdBad.set("campaign-name", "C");
-    fdBad.set("campaign-type", "bad");
-    insertSingle.mockResolvedValueOnce({ data: { id: 1 }, error: null });
-    const r3 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fdBad, workspaceId: "w1", headers }));
-    expect((await r3.json()).error).toBe("Invalid campaign type");
-
-    insertSingle.mockResolvedValueOnce({ data: { id: 2 }, error: null });
-    detailsInsert.mockResolvedValueOnce({ error: { message: "details" } });
-    const r4 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
-    expect(r4.status).toBe(302);
-    expect(r4.headers.get("Location")).toBe("/workspaces/w1/campaigns/2/settings");
-
-    insertSingle.mockResolvedValueOnce({ data: { id: 3 }, error: null });
-    detailsInsert.mockResolvedValueOnce({ error: null });
-    const r5 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fd, workspaceId: "w1", headers }));
-    expect(r5.status).toBe(302);
-    expect(r5.headers.get("Location")).toBe("/workspaces/w1/campaigns/3/settings");
+    tenantDbState.campaignInsertError = null;
+    tenantDbState.campaignId = 2;
+    const r3 = await asRouteResponse(mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
+    expect(r3.status).toBe(302);
+    expect(r3.headers.get("Location")).toBe("/workspaces/w1/campaigns/2/settings");
   });
 
-  test("handleNewCampaign selects correct details table for message and robocall", async () => {
+  test("handleNewCampaign creates message and robocall without subtype table inserts", async () => {
     const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
     const headers = new Headers();
+    tenantDbState.campaignInsertError = null;
 
-    const insertSingle = vi.fn();
-    const insertsByTable: string[] = [];
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "campaign") {
-          return {
-            insert: () => ({
-              select: () => ({ single: insertSingle }),
-            }),
-          };
-        }
-        return {
-          insert: async () => {
-            insertsByTable.push(table);
-            return { error: null };
-          },
-        };
-      },
-    };
-
-    insertSingle.mockResolvedValue({ data: { id: 99 }, error: null });
+    tenantDbState.campaignId = 99;
     const fdMsg = new FormData();
     fdMsg.set("campaign-name", "C");
     fdMsg.set("campaign-type", "message");
-    const r1 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fdMsg, workspaceId: "w1", headers }));
+    const r1 = await asRouteResponse(mod.handleNewCampaign({ formData: fdMsg, workspaceId: "w1", headers }));
     expect(r1.status).toBe(302);
 
-    insertSingle.mockResolvedValue({ data: { id: 100 }, error: null });
+    tenantDbState.campaignId = 100;
     const fdRobo = new FormData();
     fdRobo.set("campaign-name", "C");
     fdRobo.set("campaign-type", "robocall");
-    const r2 = await asRouteResponse(await mod.handleNewCampaign({ supabaseClient, formData: fdRobo, workspaceId: "w1", headers }));
+    const r2 = await asRouteResponse(mod.handleNewCampaign({ formData: fdRobo, workspaceId: "w1", headers }));
     expect(r2.status).toBe(302);
+  });
 
-    expect(insertsByTable).toEqual(["message_campaign", "ivr_campaign"]);
+  test.each([
+    ["live_calling", "live_call"],
+    ["text_campaign", "message"],
+    ["automated_phone_menu", "robocall"],
+  ] as const)(
+    "handleNewCampaign maps %s goal to %s",
+    async (goal, expectedType) => {
+      const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
+      const fd = new FormData();
+      fd.set("campaign-name", `${goal} campaign`);
+      fd.set("campaign-goal", goal);
+
+      const response = await asRouteResponse(
+        mod.handleNewCampaign({
+          formData: fd,
+          workspaceId: "w1",
+          headers: new Headers(),
+        }),
+      );
+
+      expect(response.status).toBe(302);
+      expect(tenantDbState.insertedCampaign).toMatchObject({
+        type: expectedType,
+      });
+    },
+  );
+
+  test("handleNewCampaign accepts legacy campaign-type posts and rejects invalid goals", async () => {
+    const mod = await import("../app/lib/workspace-selector/WorkspaceSelectedNewUtils.server");
+    const legacy = new FormData();
+    legacy.set("campaign-name", "Advanced menu");
+    legacy.set("campaign-type", "simple_ivr");
+
+    const legacyResponse = await asRouteResponse(
+      mod.handleNewCampaign({
+        formData: legacy,
+        workspaceId: "w1",
+        headers: new Headers(),
+      }),
+    );
+    expect(legacyResponse.status).toBe(302);
+    expect(tenantDbState.insertedCampaign).toMatchObject({ type: "simple_ivr" });
+
+    const invalid = new FormData();
+    invalid.set("campaign-name", "Invalid");
+    invalid.set("campaign-goal", "email");
+    const invalidResponse = await asRouteResponse(
+      mod.handleNewCampaign({
+        formData: invalid,
+        workspaceId: "w1",
+        headers: new Headers(),
+      }),
+    );
+    expect(invalidResponse.status).toBe(400);
+    expect(await invalidResponse.json()).toMatchObject({
+      error: { message: "Choose a campaign goal" },
+    });
   });
 
   test("handleNewCampaign seeds schedule, dates, and auto caller_id for a single workspace number", async () => {
@@ -334,47 +307,36 @@ describe("WorkspaceSelectedNewUtils", () => {
     const fd = new FormData();
     fd.set("campaign-name", "First Campaign");
     fd.set("campaign-type", "live_call");
+    tenantDbState.campaignInsertError = null;
+    tenantDbState.campaignId = 55;
 
     getWorkspacePhoneNumbers.mockResolvedValue({
       data: [{ phone_number: "+15555550100" }],
       error: null,
     });
 
-    let insertedCampaign: Record<string, unknown> | null = null;
-    const supabaseClient: any = {
-      from: (table: string) => {
-        if (table === "campaign") {
-          return {
-            insert: (payload: Record<string, unknown>) => {
-              insertedCampaign = payload;
-              return {
-                select: () => ({
-                  single: async () => ({ data: { id: 55 }, error: null }),
-                }),
-              };
-            },
-          };
-        }
-        return { insert: async () => ({ error: null }) };
-      },
-    };
-
-    const res = await asRouteResponse(await mod.handleNewCampaign({
-      supabaseClient,
+    const res = await asRouteResponse(mod.handleNewCampaign({
       formData: fd,
       workspaceId: "w1",
       headers,
     }));
 
     expect(res.status).toBe(302);
-    expect(insertedCampaign).toMatchObject({
+    expect(tenantDbState.insertedCampaign).toMatchObject({
       caller_id: "+15555550100",
       schedule: expect.objectContaining({
-        monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
+        monday: expect.objectContaining({ active: true }),
+        saturday: expect.objectContaining({ active: false }),
+        sunday: expect.objectContaining({ active: false }),
       }),
     });
-    expect(insertedCampaign?.start_date).toBeTruthy();
-    expect(insertedCampaign?.end_date).toBeTruthy();
+    const mondayInterval =
+      tenantDbState.insertedCampaign?.schedule?.monday?.intervals?.[0];
+    expect(mondayInterval?.start).toMatch(/^\d{2}:\d{2}$/);
+    expect(mondayInterval?.end).toMatch(/^\d{2}:\d{2}$/);
+    // Must be local business hours converted to UTC, not the all-day sentinel.
+    expect(mondayInterval).not.toEqual({ start: "00:00", end: "23:59" });
+    expect(tenantDbState.insertedCampaign?.start_date).toBeTruthy();
+    expect(tenantDbState.insertedCampaign?.end_date).toBeTruthy();
   });
 });
-

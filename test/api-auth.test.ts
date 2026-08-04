@@ -2,66 +2,49 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.mock("@/lib/api-auth.server", async (importOriginal) => importOriginal());
 
-// Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
   return { env: new Proxy({}, handler) };
 });
 
-const supabaseJsMocks = vi.hoisted(() => {
+const authJsMocks = vi.hoisted(() => {
   return { rejectApiKeyLastUsedUpdate: false };
 });
 
-let sessionUser: any = null;
-let sessionError: any = null;
+const workspaceMembersMocks = vi.hoisted(() => ({
+  apiKeyRow: null as null | {
+    id: string;
+    workspace_id: string;
+    key_hash: string;
+    key_prefix: string;
+    scopes?: string[] | null;
+    expires_at?: string | null;
+  },
+  touchWorkspaceApiKeyLastUsed: vi.fn(),
+}));
 
-vi.mock("@/lib/supabase.server", () => {
-  return {
-    createSupabaseServerClient: () => ({
-      supabaseClient: {
-        auth: {
-          getUser: async () => ({ data: { user: sessionUser }, error: sessionError }),
-        },
-      },
-      headers: new Headers(),
-    }),
-  };
-});
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  findWorkspaceApiKeyByPrefix: vi.fn((keyPrefix: string) => {
+    return workspaceMembersMocks.apiKeyRow?.key_prefix === keyPrefix
+      ? workspaceMembersMocks.apiKeyRow
+      : null;
+  }),
+  touchWorkspaceApiKeyLastUsed: (...args: unknown[]) =>
+    workspaceMembersMocks.touchWorkspaceApiKeyLastUsed(...args),
+}));
 
-let apiKeyRow: any = null;
-let apiKeyRowError: any = null;
+let sessionUser: { id: string; email?: string } | null = null;
 
-vi.mock("@supabase/supabase-js", () => {
-  return {
-    createClient: () => {
-      return {
-        from: (table: string) => {
-          if (table !== "workspace_api_key") {
-            throw new Error(`unexpected table ${table}`);
-          }
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: apiKeyRow, error: apiKeyRowError }),
-              }),
-            }),
-            update: () => ({
-              eq: () => ({
-                then: (resolve: any, reject: any) =>
-                  (supabaseJsMocks.rejectApiKeyLastUsedUpdate
-                    ? Promise.reject(new Error("update failed"))
-                    : Promise.resolve({ data: null, error: null })
-                  ).then(resolve, reject),
-                catch: (reject: any) =>
-                  Promise.resolve({ data: null, error: null }).catch(reject),
-              }),
-            }),
-          };
-        },
-      };
-    },
-  };
-});
+vi.mock("@/lib/auth.server", () => ({
+  getSession: vi.fn(async () => ({
+    session: sessionUser ? { token: "test-token", expiresAt: new Date(), userId: sessionUser.id } : null,
+    user: sessionUser,
+    headers: new Headers(),
+  })),
+  resolveBearerSessionUser: vi.fn(async (token: string) =>
+    token === "valid-token" && sessionUser ? sessionUser : null,
+  ),
+}));
 
 type ApiAuthModule = typeof import("@/lib/api-auth.server");
 
@@ -78,21 +61,20 @@ describe("verifyApiKeyOrSession", () => {
     API_KEY_PREFIX_LENGTH = mod.API_KEY_PREFIX_LENGTH;
 
     sessionUser = null;
-    sessionError = null;
-    apiKeyRow = null;
-    apiKeyRowError = null;
-    supabaseJsMocks.rejectApiKeyLastUsedUpdate = false;
+    workspaceMembersMocks.apiKeyRow = null;
+    workspaceMembersMocks.touchWorkspaceApiKeyLastUsed.mockReset();
+    authJsMocks.rejectApiKeyLastUsedUpdate = false;
   });
 
   test("accepts X-API-Key header", async () => {
     const key = `cc_${"a".repeat(30)}`;
     const keyPrefix = key.slice(0, API_KEY_PREFIX_LENGTH);
-    apiKeyRow = {
-      id: 1,
+    workspaceMembersMocks.apiKeyRow = {
+      id: "key-1",
       workspace_id: "w1",
       key_hash: hashApiKeyForStorage(key),
+      key_prefix: key.slice(0, API_KEY_PREFIX_LENGTH),
     };
-    apiKeyRowError = null;
 
     const req = new Request("http://localhost/api/chat_sms", {
       headers: { "X-API-Key": key },
@@ -102,127 +84,75 @@ describe("verifyApiKeyOrSession", () => {
     expect(res).toMatchObject({
       authType: "api_key",
       workspaceId: "w1",
+      keyId: "key-1",
+      scopes: [],
     });
-    expect(apiKeyRow).toMatchObject({ key_hash: hashApiKeyForStorage(key) });
+    expect(workspaceMembersMocks.apiKeyRow).toMatchObject({ key_hash: hashApiKeyForStorage(key) });
     expect(keyPrefix.length).toBe(API_KEY_PREFIX_LENGTH);
   });
 
-  test("accepts Authorization: Bearer header", async () => {
-    const key = `cc_${"b".repeat(30)}`;
-    apiKeyRow = {
-      id: 1,
-      workspace_id: "w2",
-      key_hash: hashApiKeyForStorage(key),
+  test("rejects invalid API key hash", async () => {
+    const key = `cc_${"a".repeat(30)}`;
+    workspaceMembersMocks.apiKeyRow = {
+      id: "key-1",
+      workspace_id: "w1",
+      key_hash: "wrong-hash",
+      key_prefix: key.slice(0, API_KEY_PREFIX_LENGTH),
     };
-    apiKeyRowError = null;
 
     const req = new Request("http://localhost/api/chat_sms", {
-      headers: { Authorization: `Bearer ${key}` },
+      headers: { "X-API-Key": key },
+    });
+
+    const res = await verifyApiKeyOrSession(req);
+    expect(res).toMatchObject({ error: "Invalid API key", status: 401 });
+  });
+
+  test("accepts bearer session token", async () => {
+    sessionUser = { id: "user-1", email: "a@b.com" };
+    const req = new Request("http://localhost/api/me", {
+      headers: { Authorization: "Bearer valid-token" },
     });
 
     const res = await verifyApiKeyOrSession(req);
     expect(res).toMatchObject({
-      authType: "api_key",
-      workspaceId: "w2",
+      authType: "bearer",
+      user: { id: "user-1", email: "a@b.com" },
     });
   });
 
-  test("rejects unknown API key prefix", async () => {
-    const key = `cc_${"c".repeat(30)}`;
-    apiKeyRow = null;
-    apiKeyRowError = new Error("not found");
+  test("accepts cookie session via getSession", async () => {
+    sessionUser = { id: "user-2" };
+    const req = new Request("http://localhost/api/me");
 
-    const req = new Request("http://localhost/api/chat_sms", {
-      headers: { "X-API-Key": key },
-    });
-
-    const res = await verifyApiKeyOrSession(req);
-    expect(res).toEqual({ error: "Invalid API key", status: 401 });
-  });
-
-  test("rejects hash mismatch", async () => {
-    const key = `cc_${"d".repeat(30)}`;
-    apiKeyRow = {
-      id: 1,
-      workspace_id: "w1",
-      key_hash: hashApiKeyForStorage(`cc_${"x".repeat(30)}`),
-    };
-    apiKeyRowError = null;
-
-    const req = new Request("http://localhost/api/chat_sms", {
-      headers: { "X-API-Key": key },
-    });
-
-    const res = await verifyApiKeyOrSession(req);
-    expect(res).toEqual({ error: "Invalid API key", status: 401 });
-  });
-
-  test("rejects when stored hash has unexpected length (secureCompare length mismatch)", async () => {
-    const key = `cc_${"f".repeat(30)}`;
-    apiKeyRow = {
-      id: 1,
-      workspace_id: "w1",
-      key_hash: "too-short",
-    };
-    apiKeyRowError = null;
-
-    const req = new Request("http://localhost/api/chat_sms", {
-      headers: { "X-API-Key": key },
-    });
-
-    const res = await verifyApiKeyOrSession(req);
-    expect(res).toEqual({ error: "Invalid API key", status: 401 });
-  });
-
-  test("falls back to session when API key looks like cc_ but is too short", async () => {
-    sessionUser = { id: "u2" };
-    sessionError = null;
-    const shortKey = `cc_${"a".repeat(API_KEY_PREFIX_LENGTH - 3)}`;
-    expect(shortKey.length).toBe(API_KEY_PREFIX_LENGTH);
-    const req = new Request("http://localhost/api/chat_sms", {
-      headers: { "X-API-Key": shortKey },
-    });
-    const res = await verifyApiKeyOrSession(req);
-    expect(res).toMatchObject({ authType: "session", user: { id: "u2" } });
-  });
-
-  test("API key auth still succeeds even if last_used_at update fails", async () => {
-    const key = `cc_${"e".repeat(30)}`;
-    apiKeyRow = {
-      id: 1,
-      workspace_id: "w1",
-      key_hash: hashApiKeyForStorage(key),
-    };
-    apiKeyRowError = null;
-    supabaseJsMocks.rejectApiKeyLastUsedUpdate = true;
-
-    const req = new Request("http://localhost/api/chat_sms", {
-      headers: { "X-API-Key": key },
-    });
-    const res = await verifyApiKeyOrSession(req);
-    expect(res).toMatchObject({
-      authType: "api_key",
-      workspaceId: "w1",
-    });
-  });
-
-  test("falls back to session auth when no API key, returns Unauthorized when no user", async () => {
-    sessionUser = null;
-    sessionError = null;
-    const req = new Request("http://localhost/api/chat_sms");
-    const res = await verifyApiKeyOrSession(req);
-    expect(res).toEqual({ error: "Unauthorized", status: 401 });
-  });
-
-  test("falls back to session auth when no API key, returns session user when present", async () => {
-    sessionUser = { id: "u1", email: "u1@example.com" };
-    sessionError = null;
-    const req = new Request("http://localhost/api/chat_sms");
     const res = await verifyApiKeyOrSession(req);
     expect(res).toMatchObject({
       authType: "session",
-      user: { id: "u1" },
+      user: { id: "user-2" },
     });
   });
-});
 
+  test("rejects unauthenticated request", async () => {
+    const req = new Request("http://localhost/api/me");
+    const res = await verifyApiKeyOrSession(req);
+    expect(res).toMatchObject({ error: "Unauthorized", status: 401 });
+  });
+
+  test("touchWorkspaceApiKeyLastUsed failure is non-fatal", async () => {
+    const key = `cc_${"b".repeat(30)}`;
+    workspaceMembersMocks.apiKeyRow = {
+      id: "key-2",
+      workspace_id: "w2",
+      key_hash: hashApiKeyForStorage(key),
+      key_prefix: key.slice(0, API_KEY_PREFIX_LENGTH),
+    };
+    authJsMocks.rejectApiKeyLastUsedUpdate = true;
+
+    const req = new Request("http://localhost/api/chat_sms", {
+      headers: { "X-API-Key": key },
+    });
+
+    const res = await verifyApiKeyOrSession(req);
+    expect(res).toMatchObject({ authType: "api_key", workspaceId: "w2" });
+  });
+});

@@ -136,6 +136,10 @@ describe("billing-reconciliation", () => {
         billableCalls: 1,
         debitedCalls: 1,
         callGap: 0,
+        // One 4-credit staffed call = one started minute. Twilio reports 45
+        // minutes, so the variance is 44 — measured minutes against minutes,
+        // not minutes against a count of ledger rows.
+        billedVoiceMinutes: 1,
       },
     });
 
@@ -148,5 +152,98 @@ describe("billing-reconciliation", () => {
     const snapshot = buildBillingReconciliationSnapshot(report, "admin");
     expect(snapshot.materialVariance).toBe(true);
     expect(snapshot.smsVariance).toBe(118);
+  });
+
+  test("SMS variance measures segments to segments, not rows to segments", () => {
+    // Regression: a multi-segment SMS creates a ledger row, so old code comparing
+    // event count (1 row) to Twilio segments (3) would report false drift even with
+    // perfect balance. New code compares credits (3, since SMS_SEGMENT_CREDITS is 1)
+    // to segments (3), which correctly shows variance of 0.
+    const ledgerRows = [
+      {
+        type: "DEBIT",
+        amount: -1, // one-segment SMS = 1 credit
+        idempotency_key: "sms:SM1",
+        created_at: "2026-05-10T12:00:00.000Z",
+      },
+      {
+        type: "DEBIT",
+        amount: -3, // three-segment SMS = 3 credits
+        idempotency_key: "sms:SM2",
+        created_at: "2026-05-11T12:00:00.000Z",
+      },
+    ];
+
+    const report = buildBillingReconciliationReport({
+      period,
+      twilioUsage: [
+        {
+          category: "sms-outbound",
+          description: "SMS",
+          usage: "4", // Twilio reports 4 segments total
+          usageUnit: "segments",
+          price: "0.06",
+        },
+      ],
+      ledgerRows,
+      entityAudit: {
+        billableMessages: 2,
+        debitedMessages: 2,
+        messageGap: 0,
+        billableCalls: 0,
+        debitedCalls: 0,
+        callGap: 0,
+        billedVoiceMinutes: 0,
+      },
+    });
+
+    // Correct: variance is 0 (4 segments - 4 credits).
+    // Broken: would be 2 (4 segments - 2 rows) if using event count.
+    expect(report.categories.sms.variance).toBe(0);
+    expect(report.categories.sms.ledgerCredits).toBe(4);
+    expect(report.categories.sms.ledgerEvents).toBe(2);
+  });
+
+  test("voice variance measures minutes to minutes, not rows to minutes", () => {
+    // Regression: a single long call has one ledger row but many minutes. Old code
+    // comparing event count (1) to Twilio minutes (10) would report 9 minutes of
+    // false drift. New code compares billedVoiceMinutes (10) to minutes (10),
+    // which correctly shows variance of 0.
+    const ledgerRows = [
+      {
+        type: "DEBIT",
+        amount: -10, // 10-minute staffed call = 10 credits (1 per minute)
+        idempotency_key: "call:CA1",
+        created_at: "2026-05-10T12:00:00.000Z",
+      },
+    ];
+
+    const report = buildBillingReconciliationReport({
+      period,
+      twilioUsage: [
+        {
+          category: "calls-outbound",
+          description: "Calls",
+          usage: "10", // Twilio reports 10 minutes
+          usageUnit: "minutes",
+          price: "1.70",
+        },
+      ],
+      ledgerRows,
+      entityAudit: {
+        billableMessages: 0,
+        debitedMessages: 0,
+        messageGap: 0,
+        billableCalls: 1,
+        debitedCalls: 1,
+        callGap: 0,
+        billedVoiceMinutes: 10, // This call billed for 10 started minutes
+      },
+    });
+
+    // Correct: variance is 0 (10 minutes - 10 minutes).
+    // Broken: would be 9 (10 minutes - 1 row) if using event count.
+    expect(report.categories.voice.variance).toBe(0);
+    expect(report.categories.voice.ledgerEvents).toBe(1);
   });
 });

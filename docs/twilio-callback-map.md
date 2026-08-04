@@ -18,6 +18,10 @@
 | `ivr-flow/index.ts` | `${baseUrl}/ivr-flow` | Edge ivr-flow (self) | Yes | Edge | Active (Edge path) |
 | `ivr-flow/index.ts` | `${baseUrl}/ivr-status` | Edge ivr-status | Yes | Edge | Active (Edge path) |
 | `ivr-recording/index.ts` | redirects to `/ivr-flow` | Edge ivr-flow | Yes | Edge | Active (Edge path) |
+| `inbound.action.server.ts` | `${SUPABASE_URL}/functions/v1/acd-router` | Edge acd-router (waitUrl) | Yes | Edge | Canonical |
+| `inbound.action.server.ts` | `${SUPABASE_URL}/functions/v1/acd-router/complete` | Edge acd-router (queue action) | Yes | Edge | Canonical |
+| `acd-router/index.ts` (dialAgent) | `${SUPABASE_URL}/functions/v1/acd-router/agent-bridge` | Edge acd-router (agent leg TwiML) | Yes | Edge | Canonical |
+| `acd-router/index.ts` (dialAgent) | `${SUPABASE_URL}/functions/v1/acd-router/agent-status` | Edge acd-router (agent leg status) | Yes | Edge | Canonical |
 | `ivr/.../blockId.action.server.ts` | (TwiML redirects to Remix IVR URLs) | Remix IVR block | Yes (after fix) | App | Active (Remix path) |
 | `call.action.server.ts` | `${BASE_URL}/api/call-status/` | Remix call status | Partial | App | Classify before change |
 | `dial/$number.action.server.ts` | `/api/call-status/` | Remix call status | Yes | App | Canonical |

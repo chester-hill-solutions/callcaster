@@ -2,17 +2,21 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 function seedRequiredEnv() {
   process.env.NODE_ENV = "test";
-  process.env.SUPABASE_URL = "http://localhost";
-  process.env.SUPABASE_ANON_KEY = "a";
-  process.env.SUPABASE_SERVICE_KEY = "b";
-  process.env.SUPABASE_PUBLISHABLE_KEY = "c";
+  process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+  process.env.BASE_URL = "http://localhost";
+  process.env.BETTER_AUTH_SECRET = "test-better-auth-secret";
   process.env.TWILIO_SID = "d";
   process.env.TWILIO_AUTH_TOKEN = "e";
   process.env.TWILIO_APP_SID = "f";
   process.env.TWILIO_PHONE_NUMBER = "+15555550100";
-  process.env.BASE_URL = "http://localhost";
   process.env.STRIPE_SECRET_KEY = "sk";
   process.env.RESEND_API_KEY = "re";
+  process.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL = "compliance@callcaster.ca";
+  process.env.S3_ENDPOINT = "http://localhost:9000";
+  process.env.S3_REGION = "us-east-1";
+  process.env.S3_ACCESS_KEY_ID = "test-access-key";
+  process.env.S3_SECRET_ACCESS_KEY = "test-secret-key";
+  process.env.S3_BUCKET = "callcaster-test";
 }
 
 describe("env.server", () => {
@@ -23,12 +27,12 @@ describe("env.server", () => {
 
   test("required env getters throw when missing", async () => {
     vi.resetModules();
-    delete process.env.SUPABASE_URL;
+    delete process.env.BASE_URL;
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const mod = await import("../app/lib/env.server");
-      expect(() => mod.env.SUPABASE_URL()).toThrow(
-        /Missing required environment variable: SUPABASE_URL/,
+      expect(() => mod.env.BASE_URL()).toThrow(
+        /Missing required environment variable: BASE_URL/,
       );
     } finally {
       err.mockRestore();
@@ -37,18 +41,30 @@ describe("env.server", () => {
 
   test("optional env getter returns undefined when missing", async () => {
     vi.resetModules();
-    delete process.env.OPENAI_API_KEY;
     seedRequiredEnv();
 
     const mod = await import("../app/lib/env.server");
-    expect(mod.env.OPENAI_API_KEY()).toBeUndefined();
     expect(mod.env.STRIPE_WEBHOOK_SECRET()).toBeUndefined();
+  });
+
+  test("compliance notify email falls back to the platform inbox when unset", async () => {
+    vi.resetModules();
+    seedRequiredEnv();
+    delete process.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL;
+
+    const mod = await import("../app/lib/env.server");
+    expect(mod.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL()).toBe("info@callcaster.ca");
+
+    process.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL = "override@callcaster.ca";
+    expect(mod.env.TWILIO_COMPLIANCE_NOTIFY_EMAIL()).toBe(
+      "override@callcaster.ca",
+    );
   });
 
   test("server import logs validation errors instead of throwing", async () => {
     vi.resetModules();
     process.env.NODE_ENV = "development";
-    delete process.env.SUPABASE_URL;
+    delete process.env.BASE_URL;
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
 
     await expect(import("../app/lib/env.server")).resolves.toBeDefined();
@@ -77,26 +93,25 @@ describe("env.server", () => {
   test("all getters return values when present and revalidateEnv passes", async () => {
     vi.resetModules();
     seedRequiredEnv();
-    process.env.OPENAI_API_KEY = "oa";
     process.env.STRIPE_WEBHOOK_SECRET = "whsec_1";
     process.env.VERIFICATION_PHONE_NUMBER = "+15551234567";
 
     const mod = await import("../app/lib/env.server");
 
-    expect(mod.env.SUPABASE_URL()).toBe("http://localhost");
-    expect(mod.env.SUPABASE_ANON_KEY()).toBe("a");
-    expect(mod.env.SUPABASE_SERVICE_KEY()).toBe("b");
-    expect(mod.env.SUPABASE_PUBLISHABLE_KEY()).toBe("c");
+    expect(mod.env.BASE_URL()).toBe("http://localhost");
     expect(mod.env.TWILIO_SID()).toBe("d");
     expect(mod.env.TWILIO_AUTH_TOKEN()).toBe("e");
     expect(mod.env.TWILIO_APP_SID()).toBe("f");
     expect(mod.env.TWILIO_PHONE_NUMBER()).toBe("+15555550100");
-    expect(mod.env.BASE_URL()).toBe("http://localhost");
     expect(mod.env.STRIPE_SECRET_KEY()).toBe("sk");
     expect(mod.env.RESEND_API_KEY()).toBe("re");
-    expect(mod.env.OPENAI_API_KEY()).toBe("oa");
     expect(mod.env.STRIPE_WEBHOOK_SECRET()).toBe("whsec_1");
     expect(mod.env.VERIFICATION_PHONE_NUMBER()).toBe("+15551234567");
+
+    // env reads process.env on every call; it does not cache.
+    process.env.BASE_URL = "https://example.com";
+    expect(mod.env.BASE_URL()).toBe("https://example.com");
+    process.env.BASE_URL = "http://localhost";
 
     expect(() => mod.revalidateEnv()).not.toThrow();
   });
@@ -105,7 +120,7 @@ describe("env.server", () => {
     vi.resetModules();
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.stubGlobal("window", { location: { hostname: "example.com" } } as any);
-    delete process.env.SUPABASE_URL;
+    delete process.env.BASE_URL;
 
     await import("../app/lib/env.server");
     expect(err).not.toHaveBeenCalled();
@@ -121,5 +136,127 @@ describe("env.server", () => {
     expect(() => mod.env.VERIFICATION_PHONE_NUMBER()).toThrow(
       /Missing required environment variable: VERIFICATION_PHONE_NUMBER/,
     );
+  });
+
+  test("getStripeKeyMode detects test, live, and unknown key prefixes", async () => {
+    vi.resetModules();
+    seedRequiredEnv();
+
+    const mod = await import("../app/lib/env.server");
+    expect(mod.getStripeKeyMode("sk_test_abc123")).toBe("test");
+    expect(mod.getStripeKeyMode("rk_test_abc123")).toBe("test");
+    expect(mod.getStripeKeyMode("sk_live_abc123")).toBe("live");
+    expect(mod.getStripeKeyMode("rk_live_abc123")).toBe("live");
+    expect(mod.getStripeKeyMode("whsec_abc123")).toBe("unknown");
+    expect(mod.getStripeKeyMode("")).toBe("unknown");
+    expect(mod.getStripeKeyMode(undefined)).toBe("unknown");
+  });
+
+  test("logs a prominent structured error at boot when production uses a Stripe test key", async () => {
+    vi.resetModules();
+    seedRequiredEnv();
+    process.env.NODE_ENV = "production";
+    process.env.STRIPE_SECRET_KEY = "sk_test_abc123";
+
+    try {
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+      const mod = await import("../app/lib/env.server");
+
+      const guardCalls = err.mock.calls.filter(
+        ([message]) =>
+          typeof message === "string" &&
+          message.includes("STRIPE MISCONFIGURATION"),
+      );
+      expect(guardCalls).toHaveLength(1);
+      expect(guardCalls[0][1]).toMatchObject({
+        guard: "stripe-key-mode-mismatch",
+        keyMode: "test",
+        nodeEnv: "production",
+      });
+
+      // Re-checks still report the mismatch but only log once per process.
+      expect(mod.warnIfStripeKeyModeMismatch()).toBe(true);
+      expect(mod.env.STRIPE_SECRET_KEY()).toBe("sk_test_abc123");
+      expect(
+        err.mock.calls.filter(
+          ([message]) =>
+            typeof message === "string" &&
+            message.includes("STRIPE MISCONFIGURATION"),
+        ),
+      ).toHaveLength(1);
+      err.mockRestore();
+    } finally {
+      process.env.NODE_ENV = "test";
+    }
+  });
+
+  test("does not log the Stripe mode guard for live keys in production", async () => {
+    vi.resetModules();
+    seedRequiredEnv();
+    process.env.NODE_ENV = "production";
+    process.env.STRIPE_SECRET_KEY = "sk_live_abc123";
+
+    try {
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+      const mod = await import("../app/lib/env.server");
+      expect(mod.warnIfStripeKeyModeMismatch()).toBe(false);
+      expect(mod.env.STRIPE_SECRET_KEY()).toBe("sk_live_abc123");
+      expect(
+        err.mock.calls.filter(
+          ([message]) =>
+            typeof message === "string" &&
+            message.includes("STRIPE MISCONFIGURATION"),
+        ),
+      ).toHaveLength(0);
+      err.mockRestore();
+    } finally {
+      process.env.NODE_ENV = "test";
+    }
+  });
+
+  test("does not log the Stripe mode guard for test keys outside production", async () => {
+    vi.resetModules();
+    seedRequiredEnv();
+    process.env.STRIPE_SECRET_KEY = "sk_test_abc123";
+
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const mod = await import("../app/lib/env.server");
+    expect(mod.warnIfStripeKeyModeMismatch()).toBe(false);
+    expect(mod.env.STRIPE_SECRET_KEY()).toBe("sk_test_abc123");
+    expect(
+      err.mock.calls.filter(
+        ([message]) =>
+          typeof message === "string" &&
+          message.includes("STRIPE MISCONFIGURATION"),
+      ),
+    ).toHaveLength(0);
+    err.mockRestore();
+  });
+
+  test("isSignupOpen is true only when SIGNUP_OPEN is true or 1", async () => {
+    vi.resetModules();
+    seedRequiredEnv();
+
+    delete process.env.SIGNUP_OPEN;
+    let mod = await import("../app/lib/env.server");
+    expect(mod.isSignupOpen()).toBe(false);
+
+    vi.resetModules();
+    seedRequiredEnv();
+    process.env.SIGNUP_OPEN = "false";
+    mod = await import("../app/lib/env.server");
+    expect(mod.isSignupOpen()).toBe(false);
+
+    vi.resetModules();
+    seedRequiredEnv();
+    process.env.SIGNUP_OPEN = "true";
+    mod = await import("../app/lib/env.server");
+    expect(mod.isSignupOpen()).toBe(true);
+
+    vi.resetModules();
+    seedRequiredEnv();
+    process.env.SIGNUP_OPEN = "1";
+    mod = await import("../app/lib/env.server");
+    expect(mod.isSignupOpen()).toBe(true);
   });
 });

@@ -1,17 +1,8 @@
 import { data as routeData, redirect } from "react-router";
 import { logger } from "@/lib/logger.server";
-import type { PostgrestError } from "@supabase/supabase-js";
-
-/**
- * Standard error response structure
- */
-export interface ErrorResponse {
-  error: string;
-  message?: string;
-  details?: unknown;
-  code?: string;
-  statusCode: number;
-}
+import { captureException } from "@/lib/sentry.server";
+import { recordServerError } from "@/lib/error-rate.server";
+import type { ErrorPayload } from "./type-safety-utils";
 
 /**
  * Error codes for different error types
@@ -37,7 +28,7 @@ export enum ErrorCode {
   // External Services
   EXTERNAL_SERVICE_ERROR = "EXTERNAL_SERVICE_ERROR",
   TWILIO_ERROR = "TWILIO_ERROR",
-  SUPABASE_ERROR = "SUPABASE_ERROR",
+  AUTH_ERROR = "AUTH_ERROR",
   
   // Server
   INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR",
@@ -62,7 +53,7 @@ export class AppError extends Error {
     this.name = "AppError";
   }
 
-  toJSON(): ErrorResponse {
+  toJSON(): ErrorPayload {
     return {
       error: this.message,
       code: this.code,
@@ -81,7 +72,7 @@ export function createErrorResponse(
   defaultStatusCode: number = 500,
   options?: { headers?: Headers }
 ): ReturnType<typeof routeData> {
-  let errorResponse: ErrorResponse;
+  let errorResponse: ErrorPayload;
 
   if (error instanceof AppError) {
     errorResponse = {
@@ -110,7 +101,25 @@ export function createErrorResponse(
     };
   }
 
-  logger.error("Error response:", errorResponse, error);
+  // Severity by status: a 404 or a validation 400 is not an application error,
+  // and logging every one of them at error level is why no meaningful error
+  // signal existed. Only 5xx counts as something broken.
+  const isServerError = errorResponse.statusCode >= 500;
+  const logAtLevel = isServerError ? logger.error : logger.warn;
+  logAtLevel("http.error_response", {
+    statusCode: errorResponse.statusCode,
+    code: errorResponse.code,
+    errorMessage: errorResponse.error,
+    ...(isServerError && error instanceof Error ? { err: error } : {}),
+  });
+
+  if (isServerError) {
+    captureException(error, {
+      statusCode: errorResponse.statusCode,
+      code: errorResponse.code,
+    });
+    recordServerError();
+  }
 
   return routeData(errorResponse, { status: errorResponse.statusCode, headers: options?.headers });
 }
@@ -118,7 +127,7 @@ export function createErrorResponse(
 /**
  * Handle database errors
  */
-export function handleDatabaseError(error: PostgrestError | null, context?: string): never {
+export function handleDatabaseError(error: { code?: string; message?: string; details?: string } | null, context?: string): never {
   if (!error) {
     throw new AppError(
       "Database operation failed",
@@ -232,17 +241,5 @@ export function withErrorHandling<T extends (...args: unknown[]) => Promise<unkn
       );
     }
   }) as T;
-}
-
-/**
- * Safe JSON parse with error handling
- */
-export function safeJsonParse<T>(jsonString: string, fallback: T): T {
-  try {
-    return JSON.parse(jsonString) as T;
-  } catch (error) {
-    logger.error("Failed to parse JSON:", error);
-    return fallback;
-  }
 }
 

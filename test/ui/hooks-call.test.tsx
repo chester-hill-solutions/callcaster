@@ -159,6 +159,65 @@ describe("call hooks", () => {
     expect(noToken.result.current.error?.message).toMatch(/token/i);
   });
 
+  test("useTwilioConnection register() rejecting with undefined does not throw and surfaces a fallback error", async () => {
+    // Regression test for the handset crash (audit-C P2): Twilio's Voice SDK
+    // can reject device.register() with `undefined` instead of an Error for
+    // signaling-level auth failures. The old `(err: Error) => ... err.message`
+    // handler chain crashed with "Cannot read properties of undefined
+    // (reading 'message')"; useTwilioConnection.ts must normalize the
+    // rejection to a real Error before it reaches any downstream onError.
+    const { useTwilioConnection } = await import("@/hooks/call/useTwilioConnection");
+    const onError = vi.fn();
+
+    mockTwilioDevice.register.mockImplementationOnce(() => Promise.reject(undefined));
+
+    expect(() => {
+      renderHook(() => useTwilioConnection({ token: "tok", onError }));
+    }).not.toThrow();
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    const receivedError = onError.mock.calls[0]?.[0];
+    expect(receivedError).toBeInstanceOf(Error);
+    expect(receivedError?.message).toBeTruthy();
+  });
+
+  test("useSoftphoneController's onError wiring survives an undefined/messageless connection error", async () => {
+    // Defense-in-depth companion to the useTwilioConnection regression test
+    // above: even if some future caller passes an err without a `.message`
+    // straight to useSoftphoneController's onError wiring, it must not throw.
+    const { useSoftphoneController } = await import(
+      "@/hooks/call/useSoftphoneController"
+    );
+    const onError = vi.fn();
+
+    const { result } = renderHook(() =>
+      useSoftphoneController({
+        token: "tok",
+        workspaceId: "ws",
+        clientIdentity: "agent-1",
+        endSession: vi.fn(),
+        onNavigateBack: vi.fn(),
+        onError,
+      }),
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(() => {
+      act(() => mockTwilioDevice.emit("error", undefined));
+    }).not.toThrow();
+    expect(onError).toHaveBeenCalled();
+    expect(typeof onError.mock.calls.at(-1)?.[0]).toBe("string");
+    expect(result.current.connection).toBeTruthy();
+  });
+
   test("useCallHandling call lifecycle", async () => {
     const { useCallHandling } = await import("@/hooks/call/useCallHandling");
     const { hangupCall } = await import("@/lib/services/hooks-api");
@@ -290,5 +349,55 @@ describe("call hooks", () => {
     act(() => result.current.setCallDuration(3));
     act(() => result.current.setIsBusy(true));
     expect(result.current.deviceIsBusy).toBe(true);
+  });
+
+  test("autoAcceptIncoming accepts client-ringed outbound legs and never surfaces the incoming box", async () => {
+    const { useCallHandling } = await import("@/hooks/call/useCallHandling");
+
+    const { result } = renderHook(() =>
+      useCallHandling({
+        device: mockTwilioDevice as any,
+        workspaceId: "ws",
+        autoAcceptIncoming: true,
+      }),
+    );
+
+    const incoming = createMockTwilioCall({
+      parameters: { CallSid: "CA-auto", To: "client:u" },
+    });
+    act(() => result.current.receiveIncoming(incoming));
+    expect(incoming.accept).toHaveBeenCalledTimes(1);
+    expect(result.current.activeCall).toBe(incoming);
+    expect(result.current.incomingCall).toBeNull();
+    expect(result.current.callState).toBe("connected");
+
+    const nonClient = createMockTwilioCall({
+      parameters: { CallSid: "CA-sip", To: "sip:x" },
+    });
+    act(() => result.current.receiveIncoming(nonClient));
+    expect(nonClient.accept).not.toHaveBeenCalled();
+    expect(result.current.incomingCall).toBe(nonClient);
+  });
+
+  test("useTwilioDevice auto-answers client-ringed outbound legs (no incoming box)", async () => {
+    const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
+    const send = vi.fn();
+
+    const { result } = renderHook(() =>
+      useTwilioDevice("tok", "computer", "ws", send),
+    );
+
+    await act(async () => {
+      await mockTwilioDevice.register();
+    });
+
+    const incoming = createMockTwilioCall({
+      parameters: { CallSid: "CA-dial", To: "client:u" },
+    });
+    act(() => mockTwilioDevice.emit("incoming", incoming));
+    expect(incoming.accept).toHaveBeenCalledTimes(1);
+    expect(result.current.activeCall).toBe(incoming);
+    expect(result.current.incomingCall).toBeNull();
+    expect(send).toHaveBeenCalledWith({ type: "CONNECT" });
   });
 });

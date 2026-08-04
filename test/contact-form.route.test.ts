@@ -34,25 +34,43 @@ describe("app/routes/api+/contact-form/route.tsx", () => {
 
     const fd1 = new FormData();
     // omit email entirely to cover String(data.email ?? "") branch
-    let res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }), params: { id: "1" } } as any));
+    let res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }), params: { id: "1" } } as any));
     expect(res.status).toBe(400);
 
     const fd2 = new FormData();
     fd2.set("email", "bad");
-    res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }), params: { id: "1" } } as any));
+    res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }), params: { id: "1" } } as any));
     expect(res.status).toBe(400);
 
     const fd3 = new FormData();
     fd3.set("email", "a@b.com");
     fd3.set("name", "x".repeat(201));
-    res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd3 }), params: { id: "1" } } as any));
+    res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd3 }), params: { id: "1" } } as any));
     expect(res.status).toBe(400);
 
     const fd4 = new FormData();
     fd4.set("email", "a@b.com");
     fd4.set("message", "x".repeat(5001));
-    res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "POST", body: fd4 }), params: { id: "1" } } as any));
+    res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd4 }), params: { id: "1" } } as any));
     expect(res.status).toBe(400);
+  });
+
+  test("silently drops submissions that fill the honeypot field", async () => {
+    const mod = await import("../app/routes/api+/contact-form");
+
+    const fd = new FormData();
+    fd.set("email", "a@b.com");
+    fd.set("name", "A");
+    fd.set("message", "Hi");
+    fd.set("company_website", "https://spam.example");
+
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://x", { method: "POST", body: fd }),
+      params: { id: "1" },
+    } as any));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ success: true });
+    expect(mocks.send).not.toHaveBeenCalled();
   });
 
   test("sends email (signup vs normal subject) and returns success", async () => {
@@ -65,7 +83,7 @@ describe("app/routes/api+/contact-form/route.tsx", () => {
     fd.set("message", "Hi");
     fd.set("signup", "1");
 
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
       params: { id: "1" },
     } as any));
@@ -84,7 +102,7 @@ describe("app/routes/api+/contact-form/route.tsx", () => {
     const mod = await import("../app/routes/api+/contact-form");
     const fd = new FormData();
     fd.set("email", "a@b.com");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
       params: { id: "1" },
     } as any));

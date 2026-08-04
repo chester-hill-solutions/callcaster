@@ -1,17 +1,23 @@
-import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
+import type {
+  WorkspaceMessagingOnboardingState,
+  WorkspaceOperatingCountry,
+  WorkspaceOnboardingChannel,
+  WorkspaceOnboardingGoal,
+} from "@/lib/types";
 import {
   WORKSPACE_ONBOARDING_CHANNEL_VALUES,
+  WORKSPACE_ONBOARDING_GOAL_VALUES,
   WORKSPACE_ONBOARDING_STATUS_VALUES,
+  WORKSPACE_OPERATING_COUNTRY_VALUES,
 } from "@/lib/types";
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 import {
   DEFAULT_WORKSPACE_ONBOARDING_STEPS,
   WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "@/lib/messaging-onboarding/defaults.server";
 import { buildOnboardingStepsForState } from "@/lib/messaging-onboarding/readiness.server";
-import type { WorkspaceOnboardingChannel } from "@/lib/types";
 import {
-  mergeStoredOnboardingSteps,
   normalizeA2p10dlcSection,
   normalizeBusinessProfile,
   normalizeEmergencyAddress,
@@ -29,7 +35,6 @@ export {
   parseStringArray,
   pickEnumValue,
   normalizeStep,
-  mergeStoredOnboardingSteps,
   normalizeEmergencyAddress,
   normalizeReviewState,
 } from "@/lib/messaging-onboarding/normalize-sections.server";
@@ -37,8 +42,10 @@ export {
 export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnboardingState = {
   version: WORKSPACE_MESSAGING_ONBOARDING_VERSION,
   status: "not_started",
-  currentStep: "business_profile",
-  selectedChannels: ["a2p10dlc", "voice_compliance"],
+  currentStep: "business_identity",
+  operatingCountry: "CA",
+  selectedChannels: [],
+  selectedGoal: null,
   steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS,
   businessProfile: {
     legalBusinessName: "",
@@ -54,6 +61,15 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
     optOutKeywords: "",
     helpKeywords: "",
     sampleMessages: [],
+    doingBusinessAs: "",
+    businessRegistrationNumber: "",
+    ageGatedContent: false,
+    ein: "",
+    industry: "",
+    authorizedRepName: "",
+    authorizedRepEmail: "",
+    authorizedRepPhone: "",
+    authorizedRepTitle: "",
   },
   messagingService: {
     desiredSendMode: "messaging_service",
@@ -63,7 +79,7 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
     attachedSenderPhoneNumbers: [],
     supportedChannels: [],
     stickySenderEnabled: true,
-    advancedOptOutEnabled: true,
+    advancedOptOutEnabled: false,
     lastProvisionedAt: null,
     lastError: null,
   },
@@ -134,13 +150,21 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
   lastUpdatedBy: null,
 };
 
+function inferOperatingCountryFromAddress(
+  countryCode: string,
+): WorkspaceOperatingCountry {
+  const code = countryCode.trim().toUpperCase();
+  if (code === "CA" || code === "CANADA") return "CA";
+  if (code === "US" || code === "USA" || code === "UNITED STATES") return "US";
+  return "CA";
+}
+
 export function normalizeWorkspaceMessagingOnboardingState(
   value: unknown,
 ): WorkspaceMessagingOnboardingState {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     const defaultState = {
       ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-      steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => ({ ...step })),
     };
 
     return {
@@ -149,17 +173,19 @@ export function normalizeWorkspaceMessagingOnboardingState(
     };
   }
 
-  const steps =
-    Array.isArray(value.steps) && value.steps.length > 0
-      ? mergeStoredOnboardingSteps(value.steps)
-      : DEFAULT_WORKSPACE_ONBOARDING_STEPS.map((step) => ({ ...step }));
-
   const selectedChannels = parseStringArray(value.selectedChannels).filter(
     (channel): channel is WorkspaceOnboardingChannel =>
       WORKSPACE_ONBOARDING_CHANNEL_VALUES.includes(
         channel as WorkspaceOnboardingChannel,
       ),
   );
+
+  const selectedGoalRaw = parseOptionalString(value.selectedGoal);
+  const selectedGoal: WorkspaceOnboardingGoal | null =
+    selectedGoalRaw &&
+    WORKSPACE_ONBOARDING_GOAL_VALUES.includes(selectedGoalRaw as WorkspaceOnboardingGoal)
+      ? (selectedGoalRaw as WorkspaceOnboardingGoal)
+      : null;
 
   const businessProfile = normalizeBusinessProfile(
     value.businessProfile,
@@ -201,12 +227,19 @@ export function normalizeWorkspaceMessagingOnboardingState(
       WORKSPACE_ONBOARDING_STATUS_VALUES,
       "not_started",
     ),
-    currentStep: parseOptionalString(value.currentStep) ?? "business_profile",
+    currentStep: parseOptionalString(value.currentStep) ?? "business_identity",
+    operatingCountry: pickEnumValue(
+      value.operatingCountry,
+      WORKSPACE_OPERATING_COUNTRY_VALUES,
+      // Grandfather existing persisted states (which predate operatingCountry)
+      // by inferring from the saved emergency-voice address country.
+      inferOperatingCountryFromAddress(emergencyVoice.address.countryCode),
+    ),
     selectedChannels:
       selectedChannels.length > 0
         ? selectedChannels
         : DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.selectedChannels,
-    steps,
+    selectedGoal,
     businessProfile,
     messagingService,
     subaccountBootstrap,

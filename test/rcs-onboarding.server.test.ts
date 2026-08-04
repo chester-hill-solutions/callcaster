@@ -1,4 +1,39 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
+
+const twilioDataMocks = vi.hoisted(() => ({
+  data: {} as Record<string, unknown>,
+  loadError: null as Error | null,
+  persistError: null as Error | null,
+  persistCalls: [] as unknown[],
+}));
+
+const rcsFlagMock = vi.hoisted(() => ({
+  enabled: true,
+}));
+
+vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
+  loadWorkspaceTwilioData: vi.fn(async () => {
+    if (twilioDataMocks.loadError) {
+      throw twilioDataMocks.loadError;
+    }
+    return twilioDataMocks.data;
+  }),
+  persistWorkspaceTwilioData: vi.fn(async (_workspaceId: string, data: unknown) => {
+    if (twilioDataMocks.persistError) {
+      throw twilioDataMocks.persistError;
+    }
+    twilioDataMocks.persistCalls.push(data);
+  }),
+}));
+
+// The real flag defaults to enabled now that RCS onboarding has shipped. Individual
+// tests can flip `rcsFlagMock.enabled` to exercise the disabled (kill-switch) path.
+vi.mock("@/lib/rcs-onboarding-flags", () => ({
+  get RCS_ONBOARDING_ENABLED() {
+    return rcsFlagMock.enabled;
+  },
+  isRcsOnboardingEnabled: () => rcsFlagMock.enabled,
+}));
 
 import {
   DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
@@ -12,32 +47,32 @@ import {
   updateWorkspaceRcsOnboarding,
 } from "../app/lib/rcs-onboarding.server";
 
-function makeSupabase(
+function configureTwilioData(
   twilioData: unknown,
   options?: { selectError?: unknown; updateError?: unknown },
 ) {
-  const updateEq = vi.fn(async () => ({ error: options?.updateError ?? null }));
-  return {
-    from: vi.fn((table: string) => {
-      if (table !== "workspace") throw new Error(`Unexpected table: ${table}`);
-      return {
-        select: () => ({
-          eq: () => ({
-            single: vi.fn(async () => ({
-              data: { twilio_data: twilioData },
-              error: options?.selectError ?? null,
-            })),
-          }),
-        }),
-        update: () => ({ eq: updateEq }),
-      };
-    }),
-    _updateEq: updateEq,
-  };
+  twilioDataMocks.data = (twilioData ?? {}) as Record<string, unknown>;
+  twilioDataMocks.loadError = options?.selectError instanceof Error ? options.selectError : null;
+  twilioDataMocks.persistError = options?.updateError instanceof Error ? options.updateError : null;
+  twilioDataMocks.persistCalls = [];
+  return {} as const;
 }
 
 describe("RCS onboarding helpers", () => {
+  afterEach(() => {
+    rcsFlagMock.enabled = true;
+  });
+
+  test("stripDisabledRcsChannel keeps rcs while workspace onboarding is enabled", () => {
+    expect(stripDisabledRcsChannel(["a2p10dlc", "rcs", "voice_compliance"])).toEqual([
+      "a2p10dlc",
+      "rcs",
+      "voice_compliance",
+    ]);
+  });
+
   test("stripDisabledRcsChannel removes rcs while workspace onboarding is disabled", () => {
+    rcsFlagMock.enabled = false;
     expect(stripDisabledRcsChannel(["a2p10dlc", "rcs", "voice_compliance"])).toEqual([
       "a2p10dlc",
       "voice_compliance",
@@ -45,6 +80,7 @@ describe("RCS onboarding helpers", () => {
   });
 
   test("hydrateWorkspaceRcsOnboardingState is a no-op when RCS onboarding is disabled", () => {
+    rcsFlagMock.enabled = false;
     const input = mergeWorkspaceMessagingOnboardingState(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
       {
@@ -63,6 +99,24 @@ describe("RCS onboarding helpers", () => {
     expect(hydrated.messagingService.supportedChannels).toEqual(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService.supportedChannels,
     );
+  });
+
+  test("hydrateWorkspaceRcsOnboardingState hydrates when RCS onboarding is enabled", () => {
+    const input = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        selectedChannels: ["rcs"],
+        businessProfile: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.businessProfile,
+          legalBusinessName: "Acme Health",
+        },
+      },
+    );
+
+    const hydrated = hydrateWorkspaceRcsOnboardingState(input);
+
+    expect(hydrated).not.toBe(input);
+    expect(hydrated.rcs.displayName).toBe("Acme Health");
   });
 
   test("hydrates the RCS draft from saved business details", () => {
@@ -176,11 +230,10 @@ describe("RCS onboarding helpers", () => {
         },
       ),
     };
-    const supabase = makeSupabase(starting);
+    const client = configureTwilioData(starting);
 
     const result = await updateWorkspaceRcsOnboarding({
-      supabaseClient: supabase as any,
-      workspaceId: "w1",
+            workspaceId: "w1",
       actorUserId: "u1",
       provider: null,
       displayName: "Acme Alerts",
@@ -206,17 +259,17 @@ describe("RCS onboarding helpers", () => {
     expect(result.rcs.displayName).toBe("Acme Alerts");
     expect(result.rcs.provider).toBe("Twilio");
     expect(result.rcs.lastSubmittedAt).toMatch(/T/);
-    expect(supabase._updateEq).toHaveBeenCalled();
+    expect(twilioDataMocks.persistCalls.length).toBeGreaterThan(0);
   });
 
   test("updateWorkspaceRcsOnboarding throws on read/write errors", async () => {
     const selectError = new Error("select failed");
     const updateError = new Error("update failed");
+    configureTwilioData({}, { selectError });
 
     await expect(
       updateWorkspaceRcsOnboarding({
-        supabaseClient: makeSupabase({}, { selectError }) as any,
-        workspaceId: "w1",
+                workspaceId: "w1",
         actorUserId: null,
         provider: null,
         displayName: "",
@@ -238,10 +291,10 @@ describe("RCS onboarding helpers", () => {
       }),
     ).rejects.toThrow("select failed");
 
+    configureTwilioData({}, { updateError });
     await expect(
       updateWorkspaceRcsOnboarding({
-        supabaseClient: makeSupabase({}, { updateError }) as any,
-        workspaceId: "w1",
+                workspaceId: "w1",
         actorUserId: null,
         provider: null,
         displayName: "",

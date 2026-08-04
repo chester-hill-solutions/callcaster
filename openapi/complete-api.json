@@ -37,10 +37,6 @@
       "description": "Public Form endpoints."
     },
     {
-      "name": "Security Gap",
-      "description": "Security Gap endpoints."
-    },
-    {
       "name": "User API",
       "description": "User API endpoints."
     },
@@ -614,7 +610,7 @@
       "get": {
         "operationId": "getAuth_callback",
         "summary": "GET /api/auth/callback",
-        "description": "Supabase auth callback; sets session cookies and redirects.",
+        "description": "Postgres auth callback; sets session cookies and redirects.",
         "tags": [
           "Public Form",
           "auth"
@@ -659,72 +655,7 @@
         }
       }
     },
-    "/api/auto-dial": {
-      "post": {
-        "operationId": "postAuto_dial",
-        "summary": "POST /api/auto-dial",
-        "description": "Start auto-dial session for workspace.",
-        "tags": [
-          "User API",
-          "dialer"
-        ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
-        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auto-dial/:roomId": {
+    "/api/auto-dial/{roomId}": {
       "post": {
         "operationId": "postAuto_dial_roomId",
         "summary": "POST /api/auto-dial/:roomId",
@@ -763,67 +694,6 @@
           },
           "401": {
             "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auto-dial/dialer": {
-      "post": {
-        "operationId": "postAuto_dial_dialer",
-        "summary": "POST /api/auto-dial/dialer",
-        "description": "Predictive/auto-dial worker endpoint.\n\n**Security:** No user/API-key auth; trusts workspace_id/user_id in JSON body via service role.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
-        "tags": [
-          "Internal Trusted",
-          "dialer"
-        ],
-        "x-callcaster-supported": false,
-        "x-callcaster-exposure": "internalOnly",
-        "x-callcaster-auth-class": "internalTrusted",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -1787,15 +1657,81 @@
         }
       }
     },
+    "/api/coaching-ack": {
+      "post": {
+        "operationId": "postCoaching_ack",
+        "summary": "POST /api/coaching-ack",
+        "description": "",
+        "tags": [
+          "User API",
+          "telephony"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/campaigns/create-with-script": {
       "post": {
         "operationId": "createCampaignWithScript",
         "summary": "Create campaign with script and phone number (one-shot)",
-        "description": "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both.",
+        "description": "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both. Requires the campaigns.write capability for API keys.",
         "tags": [
           "Integrator API",
           "Campaigns"
         ],
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -1907,11 +1843,12 @@
       "post": {
         "operationId": "sendChatSms",
         "summary": "Send a single SMS",
-        "description": "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body.",
+        "description": "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
         "tags": [
           "Integrator API",
           "Messaging"
         ],
+        "x-callcaster-capability": "messages.send",
         "security": [
           {
             "sessionCookie": []
@@ -1994,7 +1931,7 @@
         }
       }
     },
-    "/api/connect-campaign-conference/:workspaceId/:campaignId": {
+    "/api/connect-campaign-conference/{workspaceId}/{campaignId}": {
       "get": {
         "operationId": "getConnect_campaign_conference_workspaceId_campaignId",
         "summary": "GET /api/connect-campaign-conference/:workspaceId/:campaignId",
@@ -2497,19 +2434,19 @@
         }
       }
     },
-    "/api/dial/:number": {
+    "/api/dial/{number}": {
       "post": {
         "operationId": "postDial_number",
         "summary": "POST /api/dial/:number",
-        "description": "Returns TwiML.\n\n**Security:** Twilio TwiML sub-route without signature validation.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Twilio TwiML sub-route; requires a valid Twilio signature. Returns TwiML.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
         "tags": [
-          "Security Gap",
+          "Provider Webhook",
           "telephony"
         ],
         "x-callcaster-supported": false,
-        "x-callcaster-exposure": "internalOnly",
-        "x-callcaster-auth-class": "weakUnknown",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
         "security": [],
         "requestBody": {
           "required": true,
@@ -2592,67 +2529,6 @@
           },
           "403": {
             "description": "Invalid Twilio signature",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/disconnect": {
-      "post": {
-        "operationId": "postDisconnect",
-        "summary": "POST /api/disconnect",
-        "description": "**Security:** Twilio Device disconnect using account credentials; no session or signature check.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
-        "tags": [
-          "Security Gap",
-          "telephony"
-        ],
-        "x-callcaster-supported": false,
-        "x-callcaster-exposure": "internalOnly",
-        "x-callcaster-auth-class": "weakUnknown",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "additionalProperties": true
-              },
-              "description": "Request body; see human docs for field details."
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -3026,7 +2902,7 @@
         }
       }
     },
-    "/api/inbound-ivr/:numberId/:pageId": {
+    "/api/inbound-ivr/{numberId}/{pageId}": {
       "post": {
         "operationId": "postInbound_ivr_numberId_pageId",
         "summary": "POST /api/inbound-ivr/:numberId/:pageId",
@@ -3076,7 +2952,7 @@
         }
       }
     },
-    "/api/inbound-ivr/:numberId/:pageId/:blockId": {
+    "/api/inbound-ivr/{numberId}/{pageId}/{blockId}": {
       "post": {
         "operationId": "postInbound_ivr_numberId_pageId_blockId",
         "summary": "POST /api/inbound-ivr/:numberId/:pageId/:blockId",
@@ -3132,7 +3008,7 @@
         }
       }
     },
-    "/api/inbound-ivr/:numberId/:pageId/:blockId/response": {
+    "/api/inbound-ivr/{numberId}/{pageId}/{blockId}/response": {
       "post": {
         "operationId": "postInbound_ivr_numberId_pageId_blockId_response",
         "summary": "POST /api/inbound-ivr/:numberId/:pageId/:blockId/response",
@@ -3552,7 +3428,7 @@
       "post": {
         "operationId": "postInbound_verification",
         "summary": "POST /api/inbound-verification",
-        "description": "Returns TwiML.\n\n**Security:** Call-in verification TwiML; service role, no Twilio signature.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Returns TwiML.\n\n**Security:** Call-in verification TwiML; validated with main-account Twilio signature.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
         "tags": [
           "Internal Trusted",
           "inbound"
@@ -3637,6 +3513,250 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/low-credit-notify": {
+      "post": {
+        "operationId": "postJobs_low_credit_notify",
+        "summary": "POST /api/jobs/low-credit-notify",
+        "description": "Cron-triggered low-credit email sweep; authenticated via x-cron-secret header (process.env.CRON_SECRET).\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "tags": [
+          "Internal Trusted",
+          "billing"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "internalTrusted",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/number-rental-billing": {
+      "post": {
+        "operationId": "postJobs_number_rental_billing",
+        "summary": "POST /api/jobs/number-rental-billing",
+        "description": "Cron-triggered monthly number-rental billing; authenticated via x-cron-secret header (process.env.CRON_SECRET).\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "tags": [
+          "Internal Trusted",
+          "billing"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "internalTrusted",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/billing-reconcile": {
+      "post": {
+        "operationId": "postJobs_billing_reconcile",
+        "summary": "POST /api/jobs/billing-reconcile",
+        "description": "Cron-triggered billing reconciliation snapshot; authenticated via x-cron-secret header (process.env.CRON_SECRET).\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "tags": [
+          "Internal Trusted",
+          "billing"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "internalTrusted",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/twilio-open-sync": {
+      "post": {
+        "operationId": "postJobs_twilio_open_sync",
+        "summary": "POST /api/jobs/twilio-open-sync",
+        "description": "Cron-triggered sync of open Twilio calls/messages; authenticated via x-cron-secret header (process.env.CRON_SECRET).\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "tags": [
+          "Internal Trusted",
+          "telephony"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "internalTrusted",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -3834,7 +3954,7 @@
         }
       }
     },
-    "/api/ivr/:campaignId/:pageId": {
+    "/api/ivr/{campaignId}/{pageId}": {
       "post": {
         "operationId": "postIvr_campaignId_pageId",
         "summary": "POST /api/ivr/:campaignId/:pageId",
@@ -3884,7 +4004,7 @@
         }
       }
     },
-    "/api/ivr/:campaignId/:pageId/:blockId": {
+    "/api/ivr/{campaignId}/{pageId}/{blockId}": {
       "post": {
         "operationId": "postIvr_campaignId_pageId_blockId",
         "summary": "POST /api/ivr/:campaignId/:pageId/:blockId",
@@ -3940,7 +4060,7 @@
         }
       }
     },
-    "/api/ivr/:campaignId/:pageId/:blockId/response": {
+    "/api/ivr/{campaignId}/{pageId}/{blockId}/response": {
       "post": {
         "operationId": "postIvr_campaignId_pageId_blockId_response",
         "summary": "POST /api/ivr/:campaignId/:pageId/:blockId/response",
@@ -4369,20 +4489,24 @@
         }
       }
     },
-    "/api/outreach_attempts/:id": {
+    "/api/outreach_attempts/{id}": {
       "post": {
         "operationId": "postOutreach_attempts_id",
         "summary": "POST /api/outreach_attempts/:id",
-        "description": "Updates outreach_attempt table.\n\n**Security:** Session cookie client only; no verifyAuth. Duplicate legacy route also registered.\n\nDuplicate/legacy route registration.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Session-scoped outreach attempt updates via requireJsonAuthForOutreachAttempt.",
         "tags": [
-          "Security Gap",
+          "User API",
           "campaigns"
         ],
-        "x-callcaster-supported": false,
-        "x-callcaster-exposure": "unsupported",
-        "x-callcaster-auth-class": "weakUnknown",
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4499,16 +4623,20 @@
       "get": {
         "operationId": "getQueues",
         "summary": "GET /api/queues",
-        "description": "**Security:** Uses session client but does not require authenticated user on all code paths.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
         "tags": [
-          "Security Gap",
+          "User API",
           "queues"
         ],
-        "x-callcaster-supported": false,
+        "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "weakUnknown",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -4546,16 +4674,20 @@
       "post": {
         "operationId": "postQueues",
         "summary": "POST /api/queues",
-        "description": "**Security:** Uses session client but does not require authenticated user on all code paths.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
         "tags": [
-          "Security Gap",
+          "User API",
           "queues"
         ],
-        "x-callcaster-supported": false,
+        "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "weakUnknown",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4605,16 +4737,20 @@
       "delete": {
         "operationId": "deleteQueues",
         "summary": "DELETE /api/queues",
-        "description": "**Security:** Uses session client but does not require authenticated user on all code paths.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Campaign queue dequeue and reset; requires session auth and workspace access.",
         "tags": [
-          "Security Gap",
+          "User API",
           "queues"
         ],
-        "x-callcaster-supported": false,
+        "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "weakUnknown",
-        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
-        "security": [],
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-telephony-control.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",
@@ -4840,11 +4976,12 @@
       "post": {
         "operationId": "dispatchCampaignSms",
         "summary": "Dispatch SMS to queued campaign contacts",
-        "description": "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user.",
+        "description": "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user. Requires the campaigns.dispatch capability for API keys.",
         "tags": [
           "Integrator API",
           "Messaging"
         ],
+        "x-callcaster-capability": "campaigns.dispatch",
         "security": [
           {
             "sessionCookie": []
@@ -5511,11 +5648,11 @@
         }
       }
     },
-    "/api/verify-audio-pin/:pin": {
+    "/api/verify-audio-pin/{pin}": {
       "get": {
         "operationId": "getVerify_audio_pin_pin",
         "summary": "GET /api/verify-audio-pin/:pin",
-        "description": "Static TwiML gather entry; returns TwiML.",
+        "description": "Retired audio PIN flow; returns 410.",
         "tags": [
           "Public Form",
           "telephony"
@@ -5527,17 +5664,28 @@
         "security": [],
         "responses": {
           "200": {
-            "description": "TwiML XML response",
+            "description": "Success",
             "content": {
-              "text/xml": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "type": "object",
+                  "additionalProperties": true
                 }
               }
             }
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -5553,7 +5701,7 @@
       "get": {
         "operationId": "getVerify_audio_session",
         "summary": "GET /api/verify-audio-session",
-        "description": "**Security:** GET requires session; POST action returns TwiML without auth check.",
+        "description": "Retired audio PIN flow; both methods return 410.",
         "tags": [
           "User API",
           "telephony"
@@ -5604,7 +5752,7 @@
       "post": {
         "operationId": "postVerify_audio_session",
         "summary": "POST /api/verify-audio-session",
-        "description": "**Security:** GET requires session; POST action returns TwiML without auth check.",
+        "description": "Retired audio PIN flow; both methods return 410.",
         "tags": [
           "User API",
           "telephony"
@@ -5722,7 +5870,7 @@
       "post": {
         "operationId": "postVerify_pin_input",
         "summary": "POST /api/verify-pin-input",
-        "description": "Returns TwiML.\n\n**Security:** Twilio gather callback; service role, no Twilio signature.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "description": "Retired audio PIN flow; returns 410.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
         "tags": [
           "Internal Trusted",
           "telephony"
@@ -5746,17 +5894,28 @@
         },
         "responses": {
           "200": {
-            "description": "TwiML XML response",
+            "description": "Success",
             "content": {
-              "text/xml": {
+              "application/json": {
                 "schema": {
-                  "type": "string"
+                  "type": "object",
+                  "additionalProperties": true
                 }
               }
             }
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/json": {
                 "schema": {
@@ -5946,24 +6105,76 @@
         }
       }
     },
-    "/api/workspace": {
+    "/api/twilio/trusthub/status": {
       "post": {
-        "operationId": "postWorkspace",
-        "summary": "POST /api/workspace",
-        "description": "",
+        "operationId": "postTwilio_trusthub_status",
+        "summary": "POST /api/twilio/trusthub/status",
+        "description": "Trust Hub status_callback receiver; resolves workspace by customer-profile bundle SID and reconciles compliance status.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
         "tags": [
-          "Workspace Admin",
-          "workspace"
+          "Provider Webhook",
+          "messaging"
         ],
-        "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
-        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
-        "security": [
-          {
-            "sessionCookie": []
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Form fields (JSON or multipart where noted in human docs)."
+            }
           }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Invalid Twilio signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/twilio/a2p/events": {
+      "post": {
+        "operationId": "postTwilio_a2p_events",
+        "summary": "POST /api/twilio/a2p/events",
+        "description": "A2P Event Streams sink receiver (JSON body), gated by the TWILIO_EVENTS_SINK_SECRET shared secret (?token=… on the sink URL). Parses brand/campaign lifecycle events and reconciles workspace onboarding status.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "tags": [
+          "Internal Trusted",
+          "messaging"
         ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "internalTrusted",
+        "x-callcaster-docs-guide": "docs/api-internal-unsupported.md",
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
@@ -6794,11 +7005,11 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId": {
+    "/api/workspaces/{workspaceId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId",
         "summary": "GET /api/workspaces/:workspaceId",
-        "description": "",
+        "description": "Middleware layout for nested workspace API routes; no direct handler.\n\nDuplicate/legacy route registration.",
         "tags": [
           "User API",
           "workspace"
@@ -6860,18 +7071,21 @@
       "patch": {
         "operationId": "patchWorkspaces_workspaceId",
         "summary": "PATCH /api/workspaces/:workspaceId",
-        "description": "",
+        "description": "Child index under data-plane layout middleware. GET supports session or API key with campaigns.read; PATCH requires admin+ session; DELETE requires owner session.",
         "tags": [
-          "User API",
+          "Integrator API",
           "workspace"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
+        "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "apiKey": []
           }
         ],
         "requestBody": {
@@ -6923,18 +7137,21 @@
       "delete": {
         "operationId": "deleteWorkspaces_workspaceId",
         "summary": "DELETE /api/workspaces/:workspaceId",
-        "description": "",
+        "description": "Child index under data-plane layout middleware. GET supports session or API key with campaigns.read; PATCH requires admin+ session; DELETE requires owner session.",
         "tags": [
-          "User API",
+          "Integrator API",
           "workspace"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
+        "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "apiKey": []
           }
         ],
         "responses": {
@@ -6972,7 +7189,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/transfer-ownership": {
+    "/api/workspaces/{workspaceId}/transfer-ownership": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_transfer_ownership",
         "summary": "POST /api/workspaces/:workspaceId/transfer-ownership",
@@ -7037,7 +7254,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/billing": {
+    "/api/workspaces/{workspaceId}/billing": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_billing",
         "summary": "GET /api/workspaces/:workspaceId/billing",
@@ -7101,7 +7318,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/billing/checkout-session": {
+    "/api/workspaces/{workspaceId}/billing/checkout-session": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_billing_checkout_session",
         "summary": "POST /api/workspaces/:workspaceId/billing/checkout-session",
@@ -7166,7 +7383,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/billing/sessions/:sessionId": {
+    "/api/workspaces/{workspaceId}/billing/sessions/{sessionId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_billing_sessions_sessionId",
         "summary": "GET /api/workspaces/:workspaceId/billing/sessions/:sessionId",
@@ -7230,7 +7447,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/onboarding": {
+    "/api/workspaces/{workspaceId}/onboarding": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_onboarding",
         "summary": "GET /api/workspaces/:workspaceId/onboarding",
@@ -7357,7 +7574,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/onboarding/actions": {
+    "/api/workspaces/{workspaceId}/onboarding/actions": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_onboarding_actions",
         "summary": "POST /api/workspaces/:workspaceId/onboarding/actions",
@@ -7422,7 +7639,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/numbers": {
+    "/api/workspaces/{workspaceId}/numbers": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_numbers",
         "summary": "GET /api/workspaces/:workspaceId/numbers",
@@ -7549,7 +7766,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/numbers/:numberId": {
+    "/api/workspaces/{workspaceId}/numbers/{numberId}": {
       "patch": {
         "operationId": "patchWorkspaces_workspaceId_numbers_numberId",
         "summary": "PATCH /api/workspaces/:workspaceId/numbers/:numberId",
@@ -7665,7 +7882,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/webhook": {
+    "/api/workspaces/{workspaceId}/webhook": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_webhook",
         "summary": "GET /api/workspaces/:workspaceId/webhook",
@@ -7855,11 +8072,11 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/members": {
+    "/api/workspaces/{workspaceId}/members": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_members",
         "summary": "GET /api/workspaces/:workspaceId/members",
-        "description": "",
+        "description": "GET/PATCH/DELETE are session-only. POST invite accepts session or API key with members.invite.",
         "tags": [
           "Workspace Admin",
           "workspace"
@@ -7921,7 +8138,7 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_members",
         "summary": "POST /api/workspaces/:workspaceId/members",
-        "description": "",
+        "description": "GET/PATCH/DELETE are session-only. POST invite accepts session or API key with members.invite.",
         "tags": [
           "Workspace Admin",
           "workspace"
@@ -7930,6 +8147,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "workspaceAdmin",
         "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "x-callcaster-capability": "members.invite",
         "security": [
           {
             "sessionCookie": []
@@ -7984,7 +8202,7 @@
       "patch": {
         "operationId": "patchWorkspaces_workspaceId_members",
         "summary": "PATCH /api/workspaces/:workspaceId/members",
-        "description": "",
+        "description": "GET/PATCH/DELETE are session-only. POST invite accepts session or API key with members.invite.",
         "tags": [
           "Workspace Admin",
           "workspace"
@@ -8047,7 +8265,7 @@
       "delete": {
         "operationId": "deleteWorkspaces_workspaceId_members",
         "summary": "DELETE /api/workspaces/:workspaceId/members",
-        "description": "",
+        "description": "GET/PATCH/DELETE are session-only. POST invite accepts session or API key with members.invite.",
         "tags": [
           "Workspace Admin",
           "workspace"
@@ -8096,7 +8314,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/api-keys": {
+    "/api/workspaces/{workspaceId}/api-keys": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_api_keys",
         "summary": "GET /api/workspaces/:workspaceId/api-keys",
@@ -8274,19 +8492,20 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/campaigns": {
+    "/api/workspaces/{workspaceId}/audit-events": {
       "get": {
-        "operationId": "getWorkspaces_workspaceId_campaigns",
-        "summary": "GET /api/workspaces/:workspaceId/campaigns",
-        "description": "",
+        "operationId": "getWorkspaces_workspaceId_audit_events",
+        "summary": "GET /api/workspaces/:workspaceId/audit-events",
+        "description": "Requires owner session (via role matrix) or an API key with audit.read.",
         "tags": [
           "Integrator API",
-          "campaigns"
+          "workspace"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
-        "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
+        "x-callcaster-capability": "audit.read",
         "security": [
           {
             "sessionCookie": []
@@ -8341,7 +8560,75 @@
         }
       }
     },
-    "/api/campaigns/:campaignId": {
+    "/api/workspaces/{workspaceId}/campaigns": {
+      "get": {
+        "operationId": "getWorkspaces_workspaceId_campaigns",
+        "summary": "GET /api/workspaces/:workspaceId/campaigns",
+        "description": "",
+        "tags": [
+          "Integrator API",
+          "campaigns"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope (required for session auth)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaignId}": {
       "get": {
         "operationId": "getCampaigns_campaignId",
         "summary": "GET /api/campaigns/:campaignId",
@@ -8354,6 +8641,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -8408,6 +8696,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -8463,7 +8752,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/queue": {
+    "/api/campaigns/{campaignId}/queue": {
       "get": {
         "operationId": "getCampaigns_campaignId_queue",
         "summary": "GET /api/campaigns/:campaignId/queue",
@@ -8476,6 +8765,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -8530,6 +8820,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -8585,25 +8876,22 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/results": {
+    "/api/campaigns/{campaignId}/results": {
       "get": {
         "operationId": "getCampaigns_campaignId_results",
         "summary": "GET /api/campaigns/:campaignId/results",
         "description": "",
         "tags": [
-          "Integrator API",
+          "User API",
           "analytics"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "responses": {
@@ -8641,7 +8929,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/call-session": {
+    "/api/campaigns/{campaignId}/call-session": {
       "get": {
         "operationId": "getCampaigns_campaignId_call_session",
         "summary": "GET /api/campaigns/:campaignId/call-session",
@@ -8694,7 +8982,7 @@
         }
       }
     },
-    "/api/campaigns/:campaignId/call-session/release": {
+    "/api/campaigns/{campaignId}/call-session/release": {
       "post": {
         "operationId": "postCampaigns_campaignId_call_session_release",
         "summary": "POST /api/campaigns/:campaignId/call-session/release",
@@ -8759,7 +9047,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/contacts": {
+    "/api/workspaces/{workspaceId}/contacts": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_contacts",
         "summary": "GET /api/workspaces/:workspaceId/contacts",
@@ -8772,6 +9060,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -8826,7 +9115,7 @@
         }
       }
     },
-    "/api/contacts/:contactId": {
+    "/api/contacts/{contactId}": {
       "get": {
         "operationId": "getContacts_contactId",
         "summary": "GET /api/contacts/:contactId",
@@ -8839,6 +9128,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -8893,6 +9183,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.write",
         "security": [
           {
             "sessionCookie": []
@@ -8936,7 +9227,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audiences": {
+    "/api/workspaces/{workspaceId}/audiences": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audiences",
         "summary": "GET /api/workspaces/:workspaceId/audiences",
@@ -8949,6 +9240,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9003,7 +9295,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audiences/:audienceId": {
+    "/api/workspaces/{workspaceId}/audiences/{audienceId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audiences_audienceId",
         "summary": "GET /api/workspaces/:workspaceId/audiences/:audienceId",
@@ -9016,6 +9308,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9070,7 +9363,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audience-uploads/:uploadId": {
+    "/api/workspaces/{workspaceId}/audience-uploads/{uploadId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audience_uploads_uploadId",
         "summary": "GET /api/workspaces/:workspaceId/audience-uploads/:uploadId",
@@ -9083,6 +9376,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9137,7 +9431,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/scripts": {
+    "/api/workspaces/{workspaceId}/scripts": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_scripts",
         "summary": "GET /api/workspaces/:workspaceId/scripts",
@@ -9150,6 +9444,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9204,7 +9499,7 @@
         }
       }
     },
-    "/api/scripts/:scriptId": {
+    "/api/scripts/{scriptId}": {
       "get": {
         "operationId": "getScripts_scriptId",
         "summary": "GET /api/scripts/:scriptId",
@@ -9217,6 +9512,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9260,7 +9556,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/surveys": {
+    "/api/workspaces/{workspaceId}/surveys": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_surveys",
         "summary": "GET /api/workspaces/:workspaceId/surveys",
@@ -9273,6 +9569,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9327,7 +9624,7 @@
         }
       }
     },
-    "/api/surveys/:surveyId": {
+    "/api/surveys/{surveyId}": {
       "get": {
         "operationId": "getSurveys_surveyId",
         "summary": "GET /api/surveys/:surveyId",
@@ -9340,6 +9637,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9383,7 +9681,7 @@
         }
       }
     },
-    "/api/surveys/:surveyId/responses": {
+    "/api/surveys/{surveyId}/responses": {
       "get": {
         "operationId": "getSurveys_surveyId_responses",
         "summary": "GET /api/surveys/:surveyId/responses",
@@ -9396,6 +9694,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9439,25 +9738,22 @@
         }
       }
     },
-    "/api/surveys/:surveyId/responses/export": {
+    "/api/surveys/{surveyId}/responses/export": {
       "get": {
         "operationId": "getSurveys_surveyId_responses_export",
         "summary": "GET /api/surveys/:surveyId/responses/export",
         "description": "",
         "tags": [
-          "Integrator API",
+          "User API",
           "analytics"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "responses": {
@@ -9495,7 +9791,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/conversations": {
+    "/api/workspaces/{workspaceId}/conversations": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_conversations",
         "summary": "GET /api/workspaces/:workspaceId/conversations",
@@ -9508,6 +9804,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9562,7 +9859,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/conversations/:contactNumber": {
+    "/api/workspaces/{workspaceId}/conversations/{contactNumber}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_conversations_contactNumber",
         "summary": "GET /api/workspaces/:workspaceId/conversations/:contactNumber",
@@ -9575,6 +9872,7 @@
         "x-callcaster-exposure": "sessionOnly",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -9629,25 +9927,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/audios": {
+    "/api/workspaces/{workspaceId}/audios": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_audios",
         "summary": "GET /api/workspaces/:workspaceId/audios",
         "description": "",
         "tags": [
-          "Integrator API",
+          "User API",
           "media"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -9700,19 +9995,16 @@
         "summary": "POST /api/workspaces/:workspaceId/audios",
         "description": "",
         "tags": [
-          "Integrator API",
+          "User API",
           "media"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "requestBody": {
@@ -9762,25 +10054,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/voicemails": {
+    "/api/workspaces/{workspaceId}/voicemails": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_voicemails",
         "summary": "GET /api/workspaces/:workspaceId/voicemails",
         "description": "",
         "tags": [
-          "Integrator API",
+          "User API",
           "media"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -9829,25 +10118,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/analytics": {
+    "/api/workspaces/{workspaceId}/analytics": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_analytics",
         "summary": "GET /api/workspaces/:workspaceId/analytics",
         "description": "",
         "tags": [
-          "Integrator API",
+          "User API",
           "analytics"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -9896,25 +10182,22 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/exports": {
+    "/api/workspaces/{workspaceId}/exports": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_exports",
         "summary": "GET /api/workspaces/:workspaceId/exports",
         "description": "",
         "tags": [
-          "Integrator API",
+          "User API",
           "analytics"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "parameters": [
@@ -9967,19 +10250,16 @@
         "summary": "POST /api/workspaces/:workspaceId/exports",
         "description": "",
         "tags": [
-          "Integrator API",
+          "User API",
           "analytics"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-analytics-export.md",
         "security": [
           {
             "sessionCookie": []
-          },
-          {
-            "apiKey": []
           }
         ],
         "requestBody": {
@@ -10029,7 +10309,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/calls": {
+    "/api/workspaces/{workspaceId}/calls": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_calls",
         "summary": "GET /api/workspaces/:workspaceId/calls",
@@ -10093,7 +10373,7 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/calls/listening": {
+    "/api/workspaces/{workspaceId}/calls/listening": {
       "post": {
         "operationId": "postWorkspaces_workspaceId_calls_listening",
         "summary": "POST /api/workspaces/:workspaceId/calls/listening",
@@ -10209,7 +10489,145 @@
         }
       }
     },
-    "/api/workspaces/:workspaceId/handset/session": {
+    "/api/workspaces/{workspaceId}/calls/{callSid}/disconnect": {
+      "post": {
+        "operationId": "postWorkspaces_workspaceId_calls_callSid_disconnect",
+        "summary": "POST /api/workspaces/:workspaceId/calls/:callSid/disconnect",
+        "description": "Workspace-scoped call disconnect using workspace Twilio credentials. Capability: calls.control.",
+        "tags": [
+          "Integrator API",
+          "telephony"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
+        "x-callcaster-capability": "calls.control",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start": {
+      "post": {
+        "operationId": "postWorkspaces_workspaceId_campaigns_campaignId_dialer_start",
+        "summary": "POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start",
+        "description": "Start predictive/manual auto-dial conference for authenticated caller+ agent. Capability: calls.start.",
+        "tags": [
+          "Integrator API",
+          "dialer"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
+        "x-callcaster-capability": "calls.start",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/handset/session": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_handset_session",
         "summary": "GET /api/workspaces/:workspaceId/handset/session",
@@ -10432,7 +10850,7 @@
         }
       }
     },
-    "/api/admin/users/:userId": {
+    "/api/admin/users/{userId}": {
       "get": {
         "operationId": "getAdmin_users_userId",
         "summary": "GET /api/admin/users/:userId",
@@ -10540,7 +10958,7 @@
         }
       }
     },
-    "/api/admin/users/:userId/workspaces": {
+    "/api/admin/users/{userId}/workspaces": {
       "get": {
         "operationId": "getAdmin_users_userId_workspaces",
         "summary": "GET /api/admin/users/:userId/workspaces",
@@ -10648,7 +11066,7 @@
         }
       }
     },
-    "/api/admin/workspaces/:workspaceId/twilio": {
+    "/api/admin/workspaces/{workspaceId}/twilio": {
       "post": {
         "operationId": "postAdmin_workspaces_workspaceId_twilio",
         "summary": "POST /api/admin/workspaces/:workspaceId/twilio",
@@ -10674,6 +11092,446 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/*": {
+      "get": {
+        "operationId": "getAuth_*",
+        "summary": "GET /api/auth/*",
+        "description": "Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min.",
+        "tags": [
+          "Public Form",
+          "auth"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
+        "x-callcaster-docs-guide": "docs/api-auth-matrix.md",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postAuth_*",
+        "summary": "POST /api/auth/*",
+        "description": "Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min.",
+        "tags": [
+          "Public Form",
+          "auth"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
+        "x-callcaster-docs-guide": "docs/api-auth-matrix.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acd-router": {
+      "post": {
+        "operationId": "postAcd_router",
+        "summary": "POST /api/acd-router",
+        "description": "Twilio ACD wait URL.",
+        "tags": [
+          "Provider Webhook",
+          "telephony"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acd-router/agent-bridge": {
+      "post": {
+        "operationId": "postAcd_router_agent_bridge",
+        "summary": "POST /api/acd-router/agent-bridge",
+        "description": "",
+        "tags": [
+          "Provider Webhook",
+          "telephony"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acd-router/agent-status": {
+      "post": {
+        "operationId": "postAcd_router_agent_status",
+        "summary": "POST /api/acd-router/agent-status",
+        "description": "",
+        "tags": [
+          "Provider Webhook",
+          "telephony"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/acd-router/complete": {
+      "post": {
+        "operationId": "postAcd_router_complete",
+        "summary": "POST /api/acd-router/complete",
+        "description": "",
+        "tags": [
+          "Provider Webhook",
+          "telephony"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "internalOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/audiences/{audienceId}/uploads": {
+      "get": {
+        "operationId": "getWorkspaces_workspaceId_audiences_audienceId_uploads",
+        "summary": "GET /api/workspaces/:workspaceId/audiences/:audienceId/uploads",
+        "description": "",
+        "tags": [
+          "Integrator API",
+          "audiences"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "apiKeyOrSession",
+        "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope (required for session auth)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/workspaces/{workspaceId}/events": {
+      "get": {
+        "operationId": "getWorkspaces_workspaceId_events",
+        "summary": "GET /api/workspaces/:workspaceId/events",
+        "description": "SSE stream for workspace events (activity log).",
+        "tags": [
+          "User API",
+          "misc"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope (required for session auth)."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Success",

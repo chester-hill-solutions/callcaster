@@ -3,9 +3,11 @@ import { describe, expect, test } from "vitest";
 import {
   estimateIvrCampaignOutbound,
   estimateMessageCampaignOutbound,
-  IVR_PIPELINE_DIAL_ATTEMPTS_PER_SECOND,
-  MESSAGE_PIPELINE_MESSAGES_PER_SECOND,
 } from "../app/lib/campaign-outbound-estimate";
+import {
+  LEGACY_IVR_PIPELINE_CPS,
+  LEGACY_MESSAGE_PIPELINE_MPS,
+} from "../app/lib/throughput-config";
 import type { WorkspaceTwilioSyncSnapshot } from "../app/lib/types";
 import { makePortalConfig } from "./fixtures/workspace-twilio-portal-config";
 
@@ -41,7 +43,7 @@ describe("campaign-outbound-estimate", () => {
     });
 
     expect(estimate.pipelineMessagesPerSecond).toBeCloseTo(
-      MESSAGE_PIPELINE_MESSAGES_PER_SECOND,
+      LEGACY_MESSAGE_PIPELINE_MPS,
     );
     expect(estimate.twilioAssumedMessagesPerSecond).toBeGreaterThan(
       estimate.pipelineMessagesPerSecond,
@@ -82,7 +84,7 @@ describe("campaign-outbound-estimate", () => {
     });
 
     expect(estimate.pipelineDialAttemptsPerSecond).toBeCloseTo(
-      IVR_PIPELINE_DIAL_ATTEMPTS_PER_SECOND,
+      LEGACY_IVR_PIPELINE_CPS,
     );
   });
 
@@ -139,8 +141,5 @@ describe("campaign-outbound-estimate", () => {
     });
 
     expect(estimate.configuredDispatcherMessagesPerSecond).toBe(3);
-    expect(estimate.warnings.some((warning) =>
-      warning.includes("Legacy sequential dispatch"),
-    )).toBe(false);
   });
 });

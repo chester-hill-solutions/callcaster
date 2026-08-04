@@ -1,18 +1,21 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router";
 import {
-  MdBarChart,
-  MdCampaign,
-  MdCall,
-  MdChat,
-  MdCreditCard,
-  MdGraphicEq,
-  MdHeadsetMic,
-  MdPeople,
-  MdSettings,
-  MdTextSnippet,
-  MdUploadFile,
-} from "react-icons/md";
+  BarChart3,
+  CalendarDays,
+  ClipboardList,
+  CreditCard,
+  FileText,
+  Headset,
+  Megaphone,
+  MessageSquare,
+  Phone,
+  Settings,
+  Upload,
+  Users,
+  AudioLines,
+  Voicemail,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -23,46 +26,118 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { MemberRole } from "./TeamMember";
-import { workspacePanelHeightClass } from "./workspace-panel-classes";
+import { useUnreadConversationsCount } from "@/hooks/chats/useUnreadConversationsCount";
+import {
+  CampaignQueueProgress,
+  type CampaignQueueProgressCounts,
+} from "@/components/campaign/CampaignQueueProgress";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
+import { workspaceSidebarHeightClass } from "./workspace-panel-classes";
+
+function formatUnreadBadgeCount(count: number): string {
+  return count > 99 ? "99+" : String(count);
+}
 
 interface NavItem {
   name: string;
   path: string;
   end?: boolean;
-  callerHidden?: boolean;
+  minRole?: MemberRole;
   icon: React.ComponentType<{ className?: string }>;
   subItems?: Array<{
     name: string;
     path: string;
+    minRole?: MemberRole;
   }>;
+}
+
+interface NavGroup {
+  name: string;
+  items: NavItem[];
 }
 
 type CampaignNavSubItem = {
   name: string;
   path: string;
   status?: string | null;
+  campaignId?: string | number;
 };
 
-const NAV_ITEMS: NavItem[] = [
+const NAV_GROUPS: NavGroup[] = [
   {
-    name: "Campaigns",
-    path: "",
-    end: true,
-    icon: MdCampaign,
-    subItems: [
-      { name: "New Campaign", path: "campaigns/new" },
-      { name: "Archived Campaigns", path: "campaigns/archive" },
+    name: "Work",
+    items: [
+      { name: "Today", path: "", end: true, icon: CalendarDays },
+      {
+        name: "Campaigns",
+        path: "campaigns",
+        icon: Megaphone,
+        subItems: [
+          {
+            name: "New Campaign",
+            path: "campaigns/new",
+            minRole: MemberRole.Admin,
+          },
+          { name: "Archived Campaigns", path: "campaigns/archive" },
+        ],
+      },
+      { name: "Messages", path: "chats", icon: MessageSquare },
+      { name: "Call History", path: "calls", icon: Phone },
+      { name: "Voicemails", path: "voicemails", icon: Voicemail },
+      { name: "Handset", path: "handset", icon: Headset },
     ],
   },
-  { name: "Chats", path: "chats", icon: MdChat },
-  { name: "Calls", path: "calls", icon: MdCall },
-  { name: "Analytics", path: "analytics", icon: MdBarChart },
-  { name: "Handset", path: "handset", icon: MdHeadsetMic },
-  { name: "Scripts", path: "scripts", callerHidden: true, icon: MdTextSnippet },
-  { name: "Audio", path: "audios", callerHidden: true, icon: MdGraphicEq },
-  { name: "Audiences", path: "audiences", callerHidden: true, icon: MdPeople },
-  { name: "Exports", path: "exports", callerHidden: true, icon: MdUploadFile },
+  {
+    name: "Prepare",
+    items: [
+      {
+        name: "Scripts",
+        path: "scripts",
+        minRole: MemberRole.Member,
+        icon: FileText,
+      },
+      {
+        name: "Surveys",
+        path: "surveys",
+        minRole: MemberRole.Member,
+        icon: ClipboardList,
+      },
+      {
+        name: "Audio",
+        path: "audios",
+        minRole: MemberRole.Member,
+        icon: AudioLines,
+      },
+      {
+        name: "People",
+        path: "audiences",
+        minRole: MemberRole.Member,
+        icon: Users,
+        subItems: [
+          { name: "Call lists", path: "audiences" },
+          { name: "Contacts", path: "contacts" },
+        ],
+      },
+    ],
+  },
+  {
+    name: "Review",
+    items: [
+      { name: "Analytics", path: "analytics", icon: BarChart3 },
+      {
+        name: "Exports",
+        path: "exports",
+        minRole: MemberRole.Member,
+        icon: Upload,
+      },
+    ],
+  },
+  {
+    name: "Setup",
+    items: [
+      { name: "Settings", path: "settings", icon: Settings },
+    ],
+  },
 ];
 
 interface WorkspaceNavProps {
@@ -76,6 +151,7 @@ interface WorkspaceNavProps {
     title?: string | null;
     status?: string | null;
   }>;
+  campaignQueueProgress?: Record<string, CampaignQueueProgressCounts>;
   userRole: MemberRole;
   className?: string;
 }
@@ -83,17 +159,18 @@ interface WorkspaceNavProps {
 const WorkspaceNav = ({
   workspace,
   campaigns,
+  campaignQueueProgress = {},
   userRole,
   className = "",
 }: WorkspaceNavProps) => {
   const location = useLocation();
-  const userIsCaller = userRole === MemberRole.Caller;
-  const isAdmin =
-    userRole === MemberRole.Admin || userRole === MemberRole.Owner;
+  const unreadChatsCount = useUnreadConversationsCount(workspace.id);
+  const isAdmin = hasMinRole(userRole, MemberRole.Admin);
   const baseUrl = `/workspaces/${workspace.id}`;
-  const filteredItems = NAV_ITEMS.filter(
-    (item) => !userIsCaller || !item.callerHidden,
-  );
+  const visibleGroups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => hasMinRole(userRole, item.minRole)),
+  })).filter((group) => group.items.length > 0);
 
   const primaryLinkClass = ({ isActive }: { isActive: boolean }) =>
     `group flex items-center gap-3 rounded-lg border px-3 py-2 font-Zilla-Slab text-base font-semibold transition-colors ${
@@ -143,113 +220,160 @@ const WorkspaceNav = ({
     return normalized.charAt(0).toUpperCase() + normalized.slice(1);
   };
 
-  const isWithinWorkspace =
-    location.pathname === baseUrl ||
-    location.pathname.startsWith(`${baseUrl}/`);
   const isCampaignsParentActive =
-    location.pathname === baseUrl ||
-    location.pathname.startsWith(`${baseUrl}/campaigns`);
+    location.pathname === `${baseUrl}/campaigns` ||
+    location.pathname.startsWith(`${baseUrl}/campaigns/`);
+  const isPeopleParentActive =
+    location.pathname === `${baseUrl}/audiences` ||
+    location.pathname.startsWith(`${baseUrl}/audiences/`) ||
+    location.pathname === `${baseUrl}/contacts` ||
+    location.pathname.startsWith(`${baseUrl}/contacts/`);
 
   const navBody = (
     <>
-      <div className="border-b border-border/60 px-4 py-4">
+      {/* px-6 = body px-3 + item px-3, so this text lines up with nav item text. */}
+      <div className="border-b border-border/60 px-6 py-4">
         <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
           Workspace
         </p>
-        <h2 className="mt-1 truncate font-Tabac-Slab text-2xl font-black text-brand-primary dark:text-brand-secondary">
+        <h2 className="mt-1 truncate font-Tabac-Slab text-xl font-black text-brand-primary dark:text-brand-secondary">
           {workspace.name}
         </h2>
       </div>
 
-      <div className="flex flex-1 flex-col justify-between gap-6 px-3 py-4">
-        <nav className="space-y-1">
-          {filteredItems.map((item) => {
-            const Icon = item.icon;
-            const itemTo = `${baseUrl}${item.path ? `/${item.path}` : ""}`;
-            const showCampaignSubNav =
-              item.name === "Campaigns" && isWithinWorkspace;
-            const campaignSubItems: CampaignNavSubItem[] =
-              item.name === "Campaigns"
-                ? [
-                    ...(item.subItems ?? []),
-                    ...campaigns.map((campaign) => ({
-                      name:
-                        campaign.title?.trim() ||
-                        `Campaign ${String(campaign.id)}`,
-                      path: `campaigns/${campaign.id}`,
-                      status: campaign.status,
-                    })),
-                  ]
-                : item.subItems ?? [];
+      <div className="flex min-h-0 flex-1 flex-col justify-between gap-4 px-3 py-4">
+        <nav
+          aria-label="Workspace sections"
+          className="min-h-0 space-y-5 overflow-y-auto pr-1"
+        >
+          {visibleGroups.map((group) => (
+            <section key={group.name} aria-label={group.name}>
+              <h3 className="mb-1 px-3 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                {group.name}
+              </h3>
+              <div className="space-y-1">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const itemTo = `${baseUrl}${item.path ? `/${item.path}` : ""}`;
+                  const isCampaignsItem = item.path === "campaigns";
+                  const isPeopleItem = item.name === "People";
+                  const showCampaignSubNav =
+                    isCampaignsItem && isCampaignsParentActive;
+                  const showSubNav =
+                    showCampaignSubNav || isPeopleItem;
+                  const visibleStaticSubItems = (item.subItems ?? []).filter(
+                    (subItem) => hasMinRole(userRole, subItem.minRole),
+                  );
+                  const campaignSubItems: CampaignNavSubItem[] =
+                    isCampaignsItem
+                      ? [
+                          ...visibleStaticSubItems,
+                          // Archived campaigns live in the dedicated Archive
+                          // view; keep them out of the everyday nav (#1072).
+                          ...campaigns
+                            .filter((campaign) => campaign.status !== "archived")
+                            .map((campaign) => ({
+                            name:
+                              campaign.title?.trim() ||
+                              `Campaign ${String(campaign.id)}`,
+                            path: `campaigns/${campaign.id}`,
+                            status: campaign.status,
+                            campaignId: campaign.id,
+                          })),
+                        ]
+                      : visibleStaticSubItems;
 
-            return (
-              <div key={item.name} className="space-y-1">
-                <NavLink
-                  to={itemTo}
-                  className={(navState) =>
-                    primaryLinkClass({
-                      isActive:
-                        item.name === "Campaigns"
-                          ? isCampaignsParentActive
-                          : navState.isActive,
-                    })
-                  }
-                  end={item.end}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </NavLink>
-                {campaignSubItems.length > 0 && showCampaignSubNav ? (
-                  <div className="ml-4 space-y-1 border-l border-border/70 pl-3">
-                    {campaignSubItems.map((subItem) => {
-                      const subItemTo = subItem.path
-                        ? `${baseUrl}/${subItem.path}`
-                        : baseUrl;
-                      return (
-                        <NavLink
-                          key={subItem.path || subItem.name}
-                          to={subItemTo}
-                          className={subLinkClass}
-                        >
-                          <span className="min-w-0 truncate">{subItem.name}</span>
-                          {subItem.status ? (
-                            <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${campaignStatusClass(
-                                subItem.status,
-                              )}`}
-                            >
-                              {formatCampaignStatus(subItem.status)}
-                            </span>
-                          ) : null}
-                        </NavLink>
-                      );
-                    })}
-                  </div>
-                ) : null}
+                  return (
+                    <div key={item.name} className="space-y-1">
+                      <NavLink
+                        to={itemTo}
+                        className={(navState) =>
+                          primaryLinkClass({
+                            isActive: isCampaignsItem
+                              ? isCampaignsParentActive
+                              : isPeopleItem
+                                ? isPeopleParentActive
+                              : navState.isActive,
+                          })
+                        }
+                        end={item.end}
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span>{item.name}</span>
+                        {item.path === "chats" && unreadChatsCount > 0 ? (
+                          <span
+                            data-testid="chats-unread-badge"
+                            className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground"
+                          >
+                            {formatUnreadBadgeCount(unreadChatsCount)}
+                          </span>
+                        ) : null}
+                      </NavLink>
+                      {campaignSubItems.length > 0 && showSubNav ? (
+                        <div className="ml-4 space-y-1 border-l border-border/70 pl-3">
+                          {campaignSubItems.map((subItem) => {
+                            const subItemTo = subItem.path
+                              ? `${baseUrl}/${subItem.path}`
+                              : baseUrl;
+                            const progress =
+                              subItem.campaignId != null
+                                ? campaignQueueProgress[String(subItem.campaignId)]
+                                : undefined;
+                            return (
+                              <NavLink
+                                key={subItem.path || subItem.name}
+                                to={subItemTo}
+                                className={subLinkClass}
+                              >
+                                <span className="min-w-0 truncate">
+                                  {subItem.name}
+                                </span>
+                                {progress?.totalCount || subItem.status ? (
+                                  <span className="flex shrink-0 items-center gap-1.5">
+                                    {progress?.totalCount ? (
+                                      <CampaignQueueProgress
+                                        completedCount={progress.completedCount}
+                                        totalCount={progress.totalCount}
+                                        className="text-[10px] font-semibold uppercase tracking-wide"
+                                      />
+                                    ) : null}
+                                    {subItem.status ? (
+                                      <span
+                                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${campaignStatusClass(
+                                          subItem.status,
+                                        )}`}
+                                      >
+                                        {formatCampaignStatus(subItem.status)}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                ) : null}
+                              </NavLink>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
-            );
-          })}
+            </section>
+          ))}
         </nav>
 
-        <div className="rounded-lg border border-border/80 bg-card/70 p-2">
-          <NavLink to={`${baseUrl}/settings`} className={utilityLinkClass} end>
-            <span className="inline-flex items-center gap-2">
-              <MdSettings className="h-4 w-4" />
-              Settings
-            </span>
-          </NavLink>
-          {isAdmin ? (
+        {isAdmin ? (
+          <div className="shrink-0 rounded-lg border border-border/80 bg-card/70 p-2">
             <NavLink to={`${baseUrl}/billing`} className={utilityLinkClass}>
               <span className="inline-flex items-center gap-2">
-                <MdCreditCard className="h-4 w-4" />
+                <CreditCard className="h-4 w-4" />
                 Credits
               </span>
               <span className="rounded-md bg-brand-secondary/40 px-2 py-0.5 text-xs text-foreground">
                 {workspace.credits}
               </span>
             </NavLink>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
     </>
   );
@@ -257,7 +381,7 @@ const WorkspaceNav = ({
   return (
     <>
       <aside
-        className={`hidden ${workspacePanelHeightClass} w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex ${className}`}
+        className={`hidden ${workspaceSidebarHeightClass} w-full max-w-[252px] shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-card via-card to-brand-secondary/10 shadow-sm lg:sticky lg:top-6 lg:flex ${className}`}
       >
         <div className="flex h-full w-full flex-col">{navBody}</div>
       </aside>
@@ -267,13 +391,13 @@ const WorkspaceNav = ({
           <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
             Workspace
           </p>
-          <h2 className="truncate font-Tabac-Slab text-2xl font-black text-brand-primary dark:text-brand-secondary">
+          <h2 className="line-clamp-2 break-words font-Tabac-Slab text-2xl font-black text-brand-primary dark:text-brand-secondary">
             {workspace.name}
           </h2>
         </div>
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="outline" className="font-Zilla-Slab font-semibold">
+            <Button variant="outline" size="sm" className="font-Zilla-Slab font-semibold">
               Browse Workspace
             </Button>
           </SheetTrigger>

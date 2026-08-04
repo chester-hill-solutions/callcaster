@@ -38,4 +38,10 @@ pnpm-debug.log*
 # Local tooling
 .cursor/
 .agents/
+.opencode/
 skills-lock.json
+
+# Secrets — never commit
+app/transcribe.json
+*.serviceaccount.json
+scripts/dev/certs/

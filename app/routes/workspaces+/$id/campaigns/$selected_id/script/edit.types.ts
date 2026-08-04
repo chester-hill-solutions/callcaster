@@ -1,5 +1,5 @@
 import type { Script } from "@/lib/types";
-import { isObject } from "@/lib/type-utils";
+import { isObject } from "@/lib/type-safety-utils";
 
 export type CampaignType =
   | "live_call"
@@ -17,6 +17,9 @@ export type BaseCampaignDetails = {
   script?: Script;
   mediaLinks?: Array<string | { [key: string]: string }>;
   message_media?: string[];
+  /** SMS body for message campaigns. Omitting it here made the compose textarea
+   *  load blank regardless of the stored value (silent overwrite on save). */
+  body_text?: string | null;
   disposition_options?: Record<string, unknown>;
   questions?: Record<string, unknown>;
   voicedrop_audio?: string | null;

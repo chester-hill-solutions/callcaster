@@ -1,96 +1,76 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { data as routeData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import {
+  loadExistingResponseWithAnswers,
+  loadSurveyDetailByPublicId,
+} from "@/lib/survey-db.server";
+import { loadSurveyRespondentContact } from "@/lib/survey-respondent.server";
+import {
+  checkRateLimit,
+  clientRateLimitKey,
+  rateLimitResponse,
+} from "@/lib/platform-rate-limit.server";
+import { defineLoader } from "@/lib/handler.server";
 
-type ExistingAnswerRow = {
-  answer_value: string;
-  survey_question: { question_id: string };
-};
+/**
+ * `?contact=` is a bare integer on links already in the wild, so it cannot be
+ * replaced with a signed token without breaking them. Scoping the lookup to the
+ * survey's own workspace makes a cross-tenant read impossible; this limit is
+ * what stops an attacker walking ids *within* that workspace.
+ */
+const CONTACT_LOOKUP_RATE_LIMIT = { limit: 20, windowMs: 60_000 };
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { surveyId } = params;
-  const url = new URL(request.url);
-  const contactId = url.searchParams.get("contact");
+export const loader = defineLoader({
+  sideEffects: ["db-read"],
+  handler: async ({ request, params, url }) => {
+    const { surveyId } = params;
+    const contactIdParam = url.searchParams.get("contact");
 
-  if (!surveyId) {
-    throw new Response("Survey ID is required", { status: 400 });
-  }
-
-  const { supabaseClient } = createSupabaseServerClient(request);
-
-  const { data: survey, error: surveyError } = await supabaseClient
-    .from("survey")
-    .select(`
-      *,
-      survey_page(
-        *,
-        survey_question(
-          *,
-          question_option(*)
-        )
-      )
-    `)
-    .eq("survey_id", surveyId)
-    .eq("is_active", true)
-    .single();
-
-  if (surveyError || !survey) {
-    throw new Response("Survey not found or inactive", { status: 404 });
-  }
-
-  let contact = null;
-  if (contactId) {
-    const { data: contactData, error: contactError } = await supabaseClient
-      .from("contact")
-      .select("*")
-      .eq("id", parseInt(contactId))
-      .single();
-
-    if (!contactError && contactData) {
-      contact = contactData;
+    if (!surveyId) {
+      throw new Response("Survey ID is required", { status: 400 });
     }
-  }
 
-  const resultId = `result_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-  let existingResponse = null;
-  let existingAnswers = {};
-
-  if (contact?.id) {
-    const { data: response, error: responseError } = await supabaseClient
-      .from("survey_response")
-      .select(`
-        *,
-        response_answer(
-          *,
-          survey_question(question_id)
-        )
-      `)
-      .eq("survey_id", survey.id)
-      .eq("contact_id", contact.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!responseError && response) {
-      existingResponse = response;
-      existingAnswers =
-        (response.response_answer as ExistingAnswerRow[] | undefined)?.reduce(
-          (acc: Record<string, string | string[]>, answer) => {
-            const questionId = answer.survey_question.question_id.toString();
-            acc[questionId] = answer.answer_value as string | string[];
-            return acc;
-          },
-          {},
-        ) || {};
+    const survey = await loadSurveyDetailByPublicId(surveyId, { activeOnly: true });
+    if (!survey) {
+      throw new Response("Survey not found or inactive", { status: 404 });
     }
-  }
 
-  return routeData({
-    survey,
-    resultId: existingResponse?.result_id || resultId,
-    contact,
-    existingResponse,
-    existingAnswers,
-  });
-}
+    let contact = null;
+    if (contactIdParam) {
+      const contactId = parseInt(contactIdParam, 10);
+      if (!Number.isNaN(contactId)) {
+        const rate = await checkRateLimit({
+          key: clientRateLimitKey(request, "survey:contact-lookup"),
+          ...CONTACT_LOOKUP_RATE_LIMIT,
+        });
+        if (!rate.ok) {
+          throw rateLimitResponse(rate.retryAfterSeconds);
+        }
+        // Scoped to the survey's workspace: a contact from any other tenant
+        // resolves to null rather than being returned to an anonymous caller.
+        contact = await loadSurveyRespondentContact(contactId, survey.workspace);
+      }
+    }
+
+    const resultId = `result_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    let existingResponse = null;
+    let existingAnswers: Record<string, string | string[]> = {};
+
+    if (contact?.id) {
+      const existing = await loadExistingResponseWithAnswers({
+        surveyInternalId: survey.id,
+        contactId: contact.id,
+      });
+      existingResponse = existing.response;
+      existingAnswers = existing.answers;
+    }
+
+    return routeData({
+      survey,
+      resultId: existingResponse?.result_id || resultId,
+      contact,
+      existingResponse,
+      existingAnswers,
+    });
+  },
+});

@@ -1,27 +1,39 @@
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
 import { createBillingCheckoutSession } from "@/lib/platform-billing.server";
-import type { ActionFunctionArgs } from "react-router";
+import { MemberRole } from "@/lib/member-role";
+import { defineAction } from "@/lib/handler.server";
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const { supabaseClient, user } = await verifyAuth(request);
-  const workspaceId = params.id;
-  if (!workspaceId) throw new Error("Workspace ID is required");
+export const action = defineAction({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-write", "external"],
+  handler: async ({ request, params, url, auth }) => {
+    const { user, userRole, headers } = auth;
 
-  const formData = await request.formData();
-  const amount = Math.floor(Number(formData.get("amount")));
+    if (!hasMinRole(userRole, MemberRole.Admin)) {
+      return routeData(
+        { error: "You don't have permission to perform this action" },
+        { headers, status: 403 },
+      );
+    }
 
-  const result = await createBillingCheckoutSession({
-    supabase: supabaseClient,
-    userId: user.id,
-    workspaceId,
-    amount,
-    requestUrl: request.url,
-  });
+    const workspaceId = params.id;
+    if (!workspaceId) throw new Error("Workspace ID is required");
 
-  if (!result.ok) {
-    return routeData({ error: result.error }, { status: result.status });
-  }
+    const formData = await request.formData();
+    const amount = Math.floor(Number(formData.get("amount")));
 
-  return redirect(result.checkout_url);
-}
+    const result = await createBillingCheckoutSession({
+      userId: user.id,
+      workspaceId,
+      amount,
+      requestUrl: url.href,
+    });
+
+    if (!result.ok) {
+      return routeData({ error: result.error }, { status: result.status });
+    }
+
+    return redirect(result.checkout_url);
+  },
+});

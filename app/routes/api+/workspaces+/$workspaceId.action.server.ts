@@ -1,69 +1,50 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
-} from "@/lib/api-auth.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
-import {
-  transferOwnershipBodySchema,
-  updateWorkspaceBodySchema,
-} from "@/lib/schemas/api/platform-auth";
+import { getSession } from "@/lib/auth.server";
+import { requireDataPlaneRouteCapability } from "@/lib/capability-guard.server";
+import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { updateWorkspaceBodySchema } from "@/lib/schemas/api/platform-auth";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import {
   deleteWorkspaceApi,
-  getWorkspaceDetail,
-  transferWorkspaceOwnershipApi,
+  getWorkspaceDetailForDataPlane,
   updateWorkspaceName,
 } from "@/lib/platform-workspace.server";
+import { defineAction, defineLoader } from "@/lib/handler.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
+async function resolveDataPlaneWorkspaceAuth({
+  params,
+  context,
+}: Pick<LoaderFunctionArgs, "params" | "context">) {
   const workspaceId = params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
 
-  const result = await getWorkspaceDetail(
-    getAuthSupabaseClient(auth),
-    auth.user.id,
-    workspaceId,
-  );
-
-  if (!result.ok) {
-    return jsonError(result.error, result.status);
-  }
-
-  return jsonResponse({ workspace: result.workspace }, 200);
+  return requireDataPlaneRouteCapability(context, workspaceId, "campaigns.read");
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  const workspaceId = params.workspaceId;
+function requireSessionUser(
+  args: Pick<ActionFunctionArgs, "params" | "context">,
+) {
+  const workspaceId = args.params.workspaceId;
   if (!workspaceId) {
     return jsonError("workspaceId is required", 400);
   }
+  const auth = getDataPlaneRouteContext(args.context, workspaceId);
+  if (!auth.userId) {
+    return jsonError("Unauthorized", 401);
+  }
+  return { workspaceId, userId: auth.userId };
+}
 
-  const { headers } = createSupabaseServerClient(request);
-  const supabase = getAuthSupabaseClient(auth);
-
-  if (request.method === "PATCH") {
-    const parsed = await parseJsonBodyOrResponse(request, updateWorkspaceBodySchema);
-    if (parsed instanceof Response) return parsed;
-
-    if (!parsed.name) {
-      return jsonError("name is required", 400);
-    }
-
-    const result = await updateWorkspaceName(
-      supabase,
-      auth.user.id,
-      workspaceId,
-      parsed.name,
+export const loader = defineLoader({
+  auth: resolveDataPlaneWorkspaceAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const result = await getWorkspaceDetailForDataPlane(
+      auth.auth.userId,
+      auth.workspaceId,
     );
 
     if (!result.ok) {
@@ -71,22 +52,49 @@ export async function action({ request, params }: ActionFunctionArgs) {
     }
 
     return jsonResponse({ workspace: result.workspace }, 200);
-  }
+  },
+});
 
-  if (request.method === "DELETE") {
-    const result = await deleteWorkspaceApi(
-      supabase,
-      auth.user.id,
-      workspaceId,
-      headers,
-    );
+export const action = defineAction({
+  auth: requireSessionUser,
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
+    const { headers } = await getSession(request);
+    if (request.method === "PATCH") {
+      const parsed = await parseJsonBodyOrResponse(request, updateWorkspaceBodySchema);
+      if (parsed instanceof Response) return parsed;
 
-    if (!result.ok) {
-      return jsonError(result.error, result.status);
+      if (!parsed.name) {
+        return jsonError("name is required", 400);
+      }
+
+      const result = await updateWorkspaceName(
+        auth.userId,
+        auth.workspaceId,
+        parsed.name,
+      );
+
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse({ workspace: result.workspace }, 200);
     }
 
-    return jsonResponse({ success: true }, 200);
-  }
+    if (request.method === "DELETE") {
+      const result = await deleteWorkspaceApi(
+        auth.userId,
+        auth.workspaceId,
+        headers,
+      );
 
-  return jsonError("Method not allowed", 405);
-}
+      if (!result.ok) {
+        return jsonError(result.error, result.status);
+      }
+
+      return jsonResponse({ success: true }, 200);
+    }
+
+    return jsonError("Method not allowed", 405);
+  },
+});

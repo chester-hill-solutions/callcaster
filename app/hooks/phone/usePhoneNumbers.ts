@@ -6,7 +6,7 @@ import { logger } from "@/lib/logger.client";
  * Hook for managing workspace phone numbers state
  * 
  * Provides state management for workspace phone numbers with realtime update support.
- * Handles INSERT, UPDATE, and DELETE events from Supabase realtime subscriptions,
+ * Handles INSERT, UPDATE, and DELETE events from Postgres realtime subscriptions,
  * automatically filtering updates to only include numbers for the specified workspace.
  * 
  * @param initialPhoneNumbers - Initial list of phone numbers for the workspace
@@ -25,8 +25,8 @@ import { logger } from "@/lib/logger.client";
  * );
  * 
  * // Use in realtime subscription handler
- * useSupabaseRealtimeSubscription({
- *   supabase,
+ * useWorkspaceEventSubscription({
+ *   client,
  *   table: 'workspace_number',
  *   onChange: (payload) => {
  *     updateWorkspaceNumbers({

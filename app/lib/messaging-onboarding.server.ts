@@ -1,10 +1,12 @@
 export {
   WIZARD_ONBOARDING_STEP_IDS,
   isWizardOnboardingStepId,
+  resolvePersistedWizardStep,
   DEFAULT_WORKSPACE_ONBOARDING_STEPS,
   WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "@/lib/messaging-onboarding/defaults.server";
 export type { WizardOnboardingStepId } from "@/lib/messaging-onboarding/defaults.server";
+export { isWorkspaceIntakeComplete } from "@/lib/messaging-onboarding/intake";
 
 export {
   DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
@@ -24,8 +26,24 @@ export {
   countVerifiedCallerIdNumbers,
   workspaceHasFirstNumber,
   applyOnboardingStepsWithWorkspaceNumbers,
+  WORKSPACE_READINESS_PREDICATES,
+  BUSINESS_PROFILE_REQUIRED_FIELDS,
+  evaluateWorkspaceReadiness,
+  evaluateWorkspaceReadinessByIds,
+  evaluateWorkspaceReadinessForChannels,
+  predicatePassed,
 } from "@/lib/messaging-onboarding/readiness.server";
-export type { BuildOnboardingStepsContext } from "@/lib/messaging-onboarding/readiness.server";
+export type {
+  BuildOnboardingStepsContext,
+  ReadinessResult,
+  WorkspaceReadinessChannel,
+  WorkspaceReadinessContext,
+  WorkspaceReadinessPredicate,
+  WorkspaceReadinessSenderPool,
+  WorkspaceReadinessNumber,
+  ReadinessResultSeverity,
+  EvaluateWorkspaceReadinessOptions,
+} from "@/lib/messaging-onboarding/readiness.server";
 
 export {
   getWorkspaceMessagingOnboardingFromTwilioData,

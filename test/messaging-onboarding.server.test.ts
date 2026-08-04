@@ -1,5 +1,25 @@
 import { describe, expect, test, vi } from "vitest";
 
+const twilioDataMocks = vi.hoisted(() => ({
+  data: {} as unknown,
+  persist: vi.fn(async (_client: unknown, _workspaceId: string, next: unknown) => {
+    twilioDataMocks.data = next;
+  }),
+}));
+
+vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
+  loadWorkspaceTwilioData: vi.fn(async () => twilioDataMocks.data),
+  persistWorkspaceTwilioData: (...args: unknown[]) => twilioDataMocks.persist(...args),
+}));
+
+// These cases document the pre-RCS (flag-off) behavior; the flag-on paths are
+// covered by test/rcs-onboarding.server.test.ts. Pin the flag so flipping the
+// production default doesn't rewrite this suite's meaning.
+vi.mock("@/lib/rcs-onboarding-flags", () => ({
+  RCS_ONBOARDING_ENABLED: false,
+  isRcsOnboardingEnabled: () => false,
+}));
+
 import {
   applyWorkspaceOnboardingChannelPolicy,
   buildOnboardingStepsForState,
@@ -14,39 +34,17 @@ import {
   WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "../app/lib/messaging-onboarding.server";
 
-function makeSupabase(
-  twilioData: unknown,
-  options?: { selectError?: unknown; updateError?: unknown },
-) {
-  const updateEq = vi.fn(async () => ({ error: options?.updateError ?? null }));
-  return {
-    from: vi.fn((table: string) => {
-      if (table !== "workspace") throw new Error(`Unexpected table: ${table}`);
-      return {
-        select: () => ({
-          eq: () => ({
-            single: vi.fn(async () => ({
-              data: { twilio_data: twilioData },
-              error: options?.selectError ?? null,
-            })),
-          }),
-        }),
-        update: () => ({ eq: updateEq }),
-      };
-    }),
-    _updateEq: updateEq,
-  };
-}
-
 describe("messaging onboarding helpers", () => {
   test("normalizes a complete default onboarding state", () => {
     const state = normalizeWorkspaceMessagingOnboardingState(null);
 
-    expect(state.selectedChannels).toEqual(["a2p10dlc", "voice_compliance"]);
+    expect(state.selectedChannels).toEqual([]);
     expect(state.messagingService.desiredSendMode).toBe("messaging_service");
     expect(state.emergencyVoice.address.status).toBe("not_started");
-    expect(state.steps).toHaveLength(7);
+    expect(state.steps).toHaveLength(8);
+    expect(state.selectedGoal).toBeNull();
     expect(state.steps.some((step) => step.id === "first_number")).toBe(true);
+    expect(state.steps.some((step) => step.id === "audience")).toBe(true);
   });
 
   test("derives onboarding readiness for new workspaces and legacy workspaces", () => {
@@ -57,10 +55,43 @@ describe("messaging onboarding helpers", () => {
       workspaceNumbers: [],
       recentOutboundCount: 0,
     });
+    // Fresh workspaces without business basics + goal redirect into onboarding.
     expect(newWorkspaceReadiness.shouldRedirectToOnboarding).toBe(true);
     expect(newWorkspaceReadiness.legacyMode).toBe(false);
     expect(newWorkspaceReadiness.sendMode).toBe("from_number");
     expect(newWorkspaceReadiness.warnings).toContain("No phone number yet.");
+
+    const intakeCompleteState = mergeWorkspaceMessagingOnboardingState(state, {
+      status: "collecting_business",
+      selectedGoal: "live_call",
+      selectedChannels: ["local_number", "voice_compliance"],
+      businessProfile: {
+        ...state.businessProfile,
+        legalBusinessName: "Acme Health",
+        websiteUrl: "https://acme.example",
+        useCaseSummary: "Appointment reminders for patients.",
+        sampleMessages: ["Your appointment is tomorrow."],
+      },
+    });
+    const afterIntake = deriveWorkspaceMessagingReadiness({
+      onboarding: intakeCompleteState,
+      workspaceNumbers: [],
+      recentOutboundCount: 0,
+      launchContext: {
+        audienceCount: 0,
+        scriptCount: 0,
+        campaignCount: 0,
+        creditsBalance: 0,
+      },
+    });
+    // Missing number no longer force-redirects after business + goal.
+    expect(afterIntake.shouldRedirectToOnboarding).toBe(false);
+    expect(afterIntake.shouldShowOnboardingBanner).toBe(true);
+
+    // NOTE: the profile above includes useCaseSummary/sampleMessages, which the
+    // wizard only ever collects for the SMS goal. That is why this assertion
+    // kept passing while non-SMS customers were trapped — see the dedicated
+    // test below, which supplies only what the Identity screen can produce.
 
     const legacyWorkspaceReadiness = deriveWorkspaceMessagingReadiness({
       onboarding: state,
@@ -74,6 +105,24 @@ describe("messaging onboarding helpers", () => {
     expect(legacyWorkspaceReadiness.warnings).toContain(
       "Only verified caller IDs are present. Outbound is supported, but inbound SMS and calls require a rented number.",
     );
+  });
+
+  test("does not redirect a workspace with real message history but zero current numbers", () => {
+    // Regression test: a workspace that has released/lost its numbers but has
+    // genuine outbound message history should still be classified as legacy
+    // (and therefore not force-redirected into onboarding), matching the
+    // "real message history but zero current numbers" bug this guards
+    // against.
+    const state = normalizeWorkspaceMessagingOnboardingState(null);
+
+    const readiness = deriveWorkspaceMessagingReadiness({
+      onboarding: state,
+      workspaceNumbers: [],
+      recentOutboundCount: 12,
+    });
+
+    expect(readiness.legacyMode).toBe(true);
+    expect(readiness.shouldRedirectToOnboarding).toBe(false);
   });
 
   test("counts verified caller IDs as first-number readiness", () => {
@@ -143,7 +192,12 @@ describe("messaging onboarding helpers", () => {
         },
       },
     );
-    const steps = buildOnboardingStepsForState(nextState, { hasFirstNumber: true });
+    const steps = buildOnboardingStepsForState(nextState, {
+      hasFirstNumber: true,
+      audienceCount: 1,
+      campaignCount: 1,
+      creditsBalance: 100,
+    });
     const readiness = deriveWorkspaceMessagingReadiness({
       onboarding: { ...nextState, steps },
       workspaceNumbers: [
@@ -184,12 +238,12 @@ describe("messaging onboarding helpers", () => {
 
     expect(malformed.status).toBe("not_started");
     expect(malformed.selectedChannels).toEqual(["rcs"]);
-    expect(malformed.steps).toHaveLength(7);
+    expect(malformed.steps).toHaveLength(8);
     expect(malformed.messagingService.desiredSendMode).toBe("from_number");
     expect(malformed.messagingService.stickySenderEnabled).toBe(true);
     expect(malformed.subaccountBootstrap.authMode).toBe("mixed");
     expect(malformed.emergencyVoice.enabled).toBe(false);
-    expect(malformed.emergencyVoice.address.countryCode).toBe("US");
+    expect(malformed.emergencyVoice.address.countryCode).toBe("CA");
     expect(malformed.a2p10dlc.status).toBe("not_started");
     expect(malformed.rcs.status).toBe("not_started");
     expect(malformed.reviewState.blockingIssues).toEqual(["ok"]);
@@ -202,11 +256,8 @@ describe("messaging onboarding helpers", () => {
       "bad" as any,
     );
 
-    expect(fromNull.currentStep).toBe("business_profile");
-    expect(fromPrimitive.selectedChannels).toEqual([
-      "a2p10dlc",
-      "voice_compliance",
-    ]);
+    expect(fromNull.currentStep).toBe("business_identity");
+    expect(fromPrimitive.selectedChannels).toEqual([]);
   });
 
   test("mergeWorkspaceMessagingOnboardingState preserves nested arrays unless overridden", () => {
@@ -273,19 +324,18 @@ describe("messaging onboarding helpers", () => {
     ]);
   });
 
-  test("get/update workspace onboarding state read and write through Supabase", async () => {
-    const supabase = makeSupabase({
+  test("get/update workspace onboarding state read and write through Postgres", async () => {
+    twilioDataMocks.data = {
       onboarding: DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
-    });
+    };
+    twilioDataMocks.persist.mockClear();
 
     const loaded = await getWorkspaceMessagingOnboardingState({
-      supabaseClient: supabase as any,
       workspaceId: "w1",
     });
-    expect(loaded.currentStep).toBe("business_profile");
+    expect(loaded.currentStep).toBe("business_identity");
 
     const updated = await updateWorkspaceMessagingOnboardingState({
-      supabaseClient: supabase as any,
       workspaceId: "w1",
       updates: {
         status: "collecting_business",
@@ -300,7 +350,7 @@ describe("messaging onboarding helpers", () => {
     expect(updated.status).toBe("collecting_business");
     expect(updated.lastUpdatedBy).toBe("u1");
     expect(updated.lastUpdatedAt).toMatch(/T/);
-    expect(supabase._updateEq).toHaveBeenCalled();
+    expect(twilioDataMocks.persist).toHaveBeenCalled();
   });
 
   test("applyWorkspaceOnboardingChannelPolicy strips rcs from selected channels", () => {
@@ -316,27 +366,56 @@ describe("messaging onboarding helpers", () => {
     expect(adjusted.selectedChannels).toEqual(["a2p10dlc"]);
   });
 
-  test("provider provisioning ignores the RCS gate when RCS onboarding is disabled", () => {
-    const state = mergeWorkspaceMessagingOnboardingState(
+  test("goal checklist omits script for live call and keeps it for IVR", () => {
+    const liveCall = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      { selectedGoal: "live_call", selectedChannels: ["local_number", "voice_compliance"] },
+    );
+    const ivr = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      { selectedGoal: "ivr", selectedChannels: ["local_number"] },
+    );
+
+    const liveSteps = buildOnboardingStepsForState(liveCall, { hasFirstNumber: true });
+    const ivrSteps = buildOnboardingStepsForState(ivr, { hasFirstNumber: true });
+
+    expect(liveSteps.find((step) => step.id === "script")).toBeUndefined();
+    expect(ivrSteps.find((step) => step.id === "script")?.status).toBe("in_progress");
+    expect(liveSteps).toHaveLength(7);
+    expect(ivrSteps).toHaveLength(8);
+  });
+
+  test("rent_number checklist omits audience/script/campaign and launch ignores them", () => {
+    const rentNumber = mergeWorkspaceMessagingOnboardingState(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
       {
-        selectedChannels: ["rcs"],
+        selectedGoal: "rent_number",
+        selectedChannels: ["local_number"],
         messagingService: {
           ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
           serviceSid: "MG123",
         },
-        rcs: {
-          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.rcs,
-          status: "not_started",
-        },
       },
     );
 
-    const steps = buildOnboardingStepsForState(state, { hasFirstNumber: true });
+    const steps = buildOnboardingStepsForState(rentNumber, {
+      hasFirstNumber: true,
+      audienceCount: 0,
+      campaignCount: 0,
+      creditsBalance: 10,
+    });
 
-    expect(steps.find((step) => step.id === "provider_provisioning")?.status).toBe(
-      "complete",
-    );
+    expect(steps.find((step) => step.id === "audience")).toBeUndefined();
+    expect(steps.find((step) => step.id === "script")).toBeUndefined();
+    expect(steps.find((step) => step.id === "campaign_info")).toBeUndefined();
+    expect(steps.map((step) => step.id)).toEqual([
+      "business_profile",
+      "path_selection",
+      "first_number",
+      "credits",
+      "launch_checks",
+    ]);
+    expect(steps.find((step) => step.id === "launch_checks")?.status).toBe("complete");
   });
 
   test("marks first_number complete when hasFirstNumber is true", () => {
@@ -361,7 +440,7 @@ describe("messaging onboarding helpers", () => {
     );
   });
 
-  test("merges stored steps by id when first_number was not persisted", () => {
+  test("recomputes steps from state and ignores stored steps", () => {
     const legacySteps = DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.steps.filter(
       (step) => step.id !== "first_number",
     );
@@ -370,29 +449,28 @@ describe("messaging onboarding helpers", () => {
       steps: legacySteps,
     });
 
-    expect(normalized.steps).toHaveLength(7);
+    expect(normalized.steps).toHaveLength(8);
     expect(normalized.steps.find((step) => step.id === "first_number")?.label).toBe(
-      "Your first number",
+      "Phone number",
     );
+    expect(normalized.selectedGoal).toBeNull();
   });
 
-  test("get/update workspace onboarding propagate Supabase errors", async () => {
+  test("get/update workspace onboarding propagate Postgres errors", async () => {
+    const { loadWorkspaceTwilioData } = await import("@/lib/merge-workspace-twilio-data.server");
+    vi.mocked(loadWorkspaceTwilioData).mockRejectedValueOnce(new Error("select failed"));
+
     await expect(
       getWorkspaceMessagingOnboardingState({
-        supabaseClient: makeSupabase(
-          {},
-          { selectError: new Error("select failed") },
-        ) as any,
         workspaceId: "w1",
       }),
     ).rejects.toThrow("select failed");
 
+    twilioDataMocks.data = { onboarding: DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE };
+    twilioDataMocks.persist.mockRejectedValueOnce(new Error("update failed"));
+
     await expect(
       updateWorkspaceMessagingOnboardingState({
-        supabaseClient: makeSupabase(
-          {},
-          { updateError: new Error("update failed") },
-        ) as any,
         workspaceId: "w1",
         updates: {},
         actorUserId: null,
@@ -434,6 +512,8 @@ describe("messaging onboarding helpers", () => {
     const state = mergeWorkspaceMessagingOnboardingState(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
       {
+        operatingCountry: "US",
+        selectedChannels: ["a2p10dlc"],
         messagingService: {
           ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.messagingService,
           serviceSid: "MG123",
@@ -455,5 +535,68 @@ describe("messaging onboarding helpers", () => {
     });
 
     expect(readiness.warnings).toContain("A2P 10DLC registration is not approved yet.");
+  });
+});
+
+/**
+ * Regression guard for the onboarding trap.
+ *
+ * The intake gate demanded four business-profile fields while the Identity
+ * screen collects two, and the screen collecting the other two is shown only
+ * for the SMS goal. Every calling / IVR / rent-a-number workspace therefore
+ * failed the gate forever and was bounced back into the wizard.
+ *
+ * These cases deliberately supply ONLY what the Identity screen can produce —
+ * the mistake in the pre-existing coverage was hand-building a profile the UI
+ * could never generate, which is why it stayed green through the outage.
+ */
+describe("intake completes with only what the Identity screen collects", () => {
+  const nonSmsGoals = ["live_call", "ivr", "rent_number"] as const;
+
+  for (const goal of nonSmsGoals) {
+    test(`${goal}: identity fields alone clear the redirect gate`, () => {
+      const base = normalizeWorkspaceMessagingOnboardingState(null);
+      const onboarding = mergeWorkspaceMessagingOnboardingState(base, {
+        status: "collecting_business",
+        selectedGoal: goal,
+        businessProfile: {
+          ...base.businessProfile,
+          legalBusinessName: "Acme Health",
+          websiteUrl: "https://acme.example",
+          // No useCaseSummary, no sampleMessages: the wizard never asks a
+          // non-SMS workspace for them.
+        },
+      });
+
+      const readiness = deriveWorkspaceMessagingReadiness({
+        onboarding,
+        // No numbers and no traffic: the "Skip for now" path, which is the
+        // case that had no escape at all.
+        workspaceNumbers: [],
+        recentOutboundCount: 0,
+      });
+
+      expect(readiness.shouldRedirectToOnboarding).toBe(false);
+    });
+  }
+
+  test("a workspace with no goal still goes to onboarding", () => {
+    const base = normalizeWorkspaceMessagingOnboardingState(null);
+    const onboarding = mergeWorkspaceMessagingOnboardingState(base, {
+      status: "collecting_business",
+      businessProfile: {
+        ...base.businessProfile,
+        legalBusinessName: "Acme Health",
+        websiteUrl: "https://acme.example",
+      },
+    });
+
+    const readiness = deriveWorkspaceMessagingReadiness({
+      onboarding,
+      workspaceNumbers: [],
+      recentOutboundCount: 0,
+    });
+
+    expect(readiness.shouldRedirectToOnboarding).toBe(true);
   });
 });

@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
-import { useLoaderData, useOutletContext, useSubmit } from "react-router";
+import { useCallback, useRef, useState } from "react";
+import { useLoaderData, useSubmit } from "react-router";
+import { toast } from "sonner";
 
 import ContactDetails from "@/components/contact/ContactDetails";
+import type { ContactDetailsHandle } from "@/components/contact/ContactDetails";
 import { Button } from "@/components/ui/button";
-import type { Contact } from "@/lib/types";
+import { PageShell } from "@/components/ui/page-shell";
 
 import type { ContactIdLoaderData } from "./$contactId.loader.server";
 
@@ -14,10 +16,8 @@ export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteEr
 export default function ContactScreen() {
   const { contact, selected_id, userRole, audiences } =
     useLoaderData<ContactIdLoaderData>();
-  const { setContact } = useOutletContext<{
-    setContact: (contact: Contact) => void;
-  }>();
   const submit = useSubmit();
+  const detailsRef = useRef<ContactDetailsHandle>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -25,31 +25,30 @@ export default function ContactScreen() {
   const handleSave = useCallback((): void => {
     try {
       setIsSaving(true);
-      submit({}, { method: "post" });
-    } catch (error) {
-      console.error("Error saving contact:", error);
+      const values = detailsRef.current?.getFormValues() ?? {};
+      const formData = new FormData();
+      for (const [key, value] of Object.entries(values)) {
+        formData.set(key, value ?? "");
+      }
+      submit(formData, { method: "post" });
+    } catch {
+      toast.error("Couldn't save the contact. Please try again.");
     } finally {
       setIsSaving(false);
     }
   }, [submit]);
 
   const handleReset = useCallback((): void => {
+    detailsRef.current?.reset();
     setHasChanges(false);
   }, []);
 
-  useEffect(() => {
-    if (contact && typeof contact.id === "number") {
-      setContact(contact);
-    }
-  }, [contact, setContact]);
-
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">
-          {selected_id === "new" ? "New Contact" : "Edit Contact"}
-        </h1>
-        <div className="flex items-center space-x-2">
+    <PageShell
+      title={selected_id === "new" ? "New Contact" : "Edit Contact"}
+      maxWidth="content"
+      actions={
+        <>
           <Button
             onClick={handleReset}
             disabled={!hasChanges}
@@ -57,22 +56,20 @@ export default function ContactScreen() {
           >
             Reset
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={!hasChanges || isSaving}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
+          <Button onClick={handleSave} disabled={!hasChanges || isSaving}>
             {isSaving ? "Saving..." : "Save"}
           </Button>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       <ContactDetails
+        ref={detailsRef}
         contact={contact ?? undefined}
         audiences={audiences}
         userRole={userRole}
         onChangesChange={setHasChanges}
+        startEditable={selected_id === "new"}
       />
-    </div>
+    </PageShell>
   );
 }

@@ -35,13 +35,27 @@ test.describe("Auth @smoke", () => {
     const signIn = new SignInPage(page);
     await signIn.goto();
     await signIn.login(E2E_USERS.authflow.email);
-    await page.getByTestId("navbar-user-menu").click();
-    await page.locator("#logoutButton").click();
-    await expect(page).toHaveURL(/\/\/127\.0\.0\.1:3100\/?$/);
+    await expect(page).toHaveURL(/\/workspaces/);
+    await page.evaluate(async () => {
+      const response = await fetch("/api/auth/signout", {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error(`Sign out failed with status ${response.status}`);
+      }
+    });
+    await page.goto("/");
+    // Signed out: stays on the marketing root instead of bouncing to
+    // /workspaces. Port-agnostic — the harness may run on a non-default
+    // E2E_PORT.
+    await expect(page).toHaveURL(/\/\/127\.0\.0\.1:\d+\/?$/);
   });
 
-  test("AUTH-08 invite-only signup UI", async ({ page }) => {
+  test("AUTH-08 open signup UI when SIGNUP_OPEN is enabled", async ({ page }) => {
     await page.goto("/signup");
-    await expect(page.getByText("Request Access")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Create Account" })).toBeVisible();
+    await expect(page.getByLabel("Email")).toBeVisible();
+    await expect(page.getByLabel("Password")).toBeVisible();
   });
 });

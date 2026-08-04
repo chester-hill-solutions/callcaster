@@ -1,36 +1,39 @@
-import { data as routeData } from "react-router";
-import { handleNewAudience } from "@/lib/workspace-selector/WorkspaceSelectedNewUtils.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
+import { data as routeData, redirect } from "react-router";
+import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ params, auth }) => {
+    const { headers, user, workspaceId } = auth;
+    const campaignId = params.campaign_id;
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+    if (workspaceId == null || campaignId == null) {
+      return routeData(
+        {
+          campaign: null,
+          error:
+            workspaceId == null ? "Workspace not found" : "Campaign not found",
+        },
+        { headers },
+      );
+    }
 
-  const workspaceId = params.id;
-  const campaignId = params.campaign_id;
+    const campaignData = await findCampaignInWorkspace(workspaceId, parseInt(campaignId, 10));
 
-  if (workspaceId == null || campaignId == null) {
-    return routeData(
-      {
-        campaign: null,
-        error:
-          workspaceId == null ? "Workspace not found" : "Campaign not found",
-      },
+    if (!campaignData) {
+      return routeData({ campaign: null, error: "Campaign not found" }, { headers, status: 404 });
+    }
+
+    const query = new URLSearchParams({
+      campaignId,
+      returnTo: `/workspaces/${workspaceId}/campaigns/${campaignId}`,
+    });
+    return redirect(
+      `/workspaces/${workspaceId}/audiences/new?${query.toString()}`,
       { headers },
     );
-  }
-
-  const { data: campaignData, error: campaignError } = await supabaseClient
-    .from("campaign")
-    .select()
-    .eq("id", parseInt(campaignId))
-    .eq("workspace", workspaceId)
-    .single();
-
-  if (campaignError) {
-    return routeData({ campaign: null, error: campaignError }, { headers });
-  }
-
-  return routeData({ campaign: campaignData, error: null }, { headers });
-}
+  },
+});

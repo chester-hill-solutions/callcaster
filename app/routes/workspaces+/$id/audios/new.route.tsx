@@ -4,14 +4,18 @@ export { action } from "./new.action.server";
 import { Form, Link, useActionData, useNavigation } from "react-router";
 import { useState } from "react";
 import { FaPlus } from "react-icons/fa";
-import { Card, CardActions, CardContent, CardTitle } from "@/components/shared/CustomCard";
+import { Section } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { PageShell } from "@/components/ui/page-shell";
+import { Text } from "@/components/ui/typography";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 
 export default function Media() {
   const actionData = useActionData();
   const [pendingFileName, setPendingFileName] = useState("");
-  const {state} = useNavigation();
+  const { state } = useNavigation();
 
   const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;
@@ -19,79 +23,59 @@ export default function Media() {
   };
 
   return (
-      <section
-        id="form"
-        className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
-        >
-      <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
-      <CardTitle>Add Audio</CardTitle>
-      {actionData?.error != null && (
-            <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
-              Error: {typeof actionData.error === "string" ? actionData.error : actionData.error.message}
-            </p>
-          )}
-          <CardContent>
-            <Form
-              method="POST"
-              className="space-y-6"
-              encType="multipart/form-data"
-            >
-              <label
-                htmlFor="media-name"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-                >
-                Audio Name
+    <section id="form">
+      <PageShell title="Add Audio" maxWidth="narrow">
+        {actionData?.error != null ? (
+          <Text className="text-center text-destructive">
+            Error:{" "}
+            {typeof actionData.error === "string"
+              ? actionData.error
+              : actionData.error.message}
+          </Text>
+        ) : null}
+        <Form method="POST" className="space-y-6" encType="multipart/form-data">
+          <Section variant="flat" className="space-y-6">
+            <FormField htmlFor="media-name" label="Audio Name">
+              <Input type="text" name="media-name" id="media-name" />
+            </FormField>
+            <FormField htmlFor="media" label="Upload">
+              <div className="flex w-full items-center justify-center rounded-xl border-2 border-border py-8 transition-colors duration-150 ease-in-out hover:bg-muted">
+                {pendingFileName === "" ? (
+                  <FaPlus size={"26px"} />
+                ) : (
+                  <p>{pendingFileName}</p>
+                )}
                 <input
-                  type="text"
-                  name="media-name"
-                  id="media-name"
-                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-                  />
-              </label>
-              <label
-                htmlFor="media"
-                className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-                >
-                Upload:
-                <div className="flex w-full items-center justify-center rounded-xl border-2 border-black py-8 transition-colors duration-150 ease-in-out hover:bg-zinc-800 dark:border-white">
-                  {pendingFileName === "" ? (
-                    <FaPlus size={"26px"} />
-                  ) : (
-                    <p>{pendingFileName}</p>
-                  )}
-                  <input
-                    type="file"
-                    name="media"
-                    id="media"
-                    accept={getAudioUploadAcceptValue()}
-                    className="hidden"
-                    onChange={displayFileToUpload}
-                  />
-                </div>
-              </label>
-
-              <CardActions>
-                <Button
-                  className="h-fit min-h-[48px] rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-lg font-bold tracking-[1px] text-white
-            transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black w-full"
-                  type="submit"
-                  disabled={state !== "idle"}
-                >
-                  Upload Audio
-                </Button>
-                <Button
-                  asChild
-                  variant="outline"
-                  className="h-fit border-0 border-black bg-zinc-600 font-Zilla-Slab text-lg font-semibold text-white dark:border-white"
-                >
-                  <Link to=".." relative="path">
-                    Back
-                  </Link>
-                </Button>
-                </CardActions>
-            </Form>
-          </CardContent>
-        </Card>
-      </section>
+                  type="file"
+                  name="media"
+                  id="media"
+                  accept={getAudioUploadAcceptValue()}
+                  className="hidden"
+                  onChange={displayFileToUpload}
+                />
+              </div>
+            </FormField>
+          </Section>
+          <div className="flex flex-col gap-2">
+            <Button
+              className="h-fit min-h-[48px] w-full rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-lg font-bold tracking-[1px] text-white transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
+              type="submit"
+              disabled={state !== "idle"}
+            >
+              Upload Audio
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              className="h-fit w-full border-0 border-black bg-zinc-600 font-Zilla-Slab text-lg font-semibold text-white dark:border-white"
+            >
+              <Link to=".." relative="path">
+                Back
+              </Link>
+            </Button>
+          </div>
+        </Form>
+      </PageShell>
+    </section>
   );
 }

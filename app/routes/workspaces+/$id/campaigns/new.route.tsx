@@ -1,108 +1,184 @@
 export { action } from "./new.action.server";
 
-import { data as routeData, ActionFunctionArgs, Form, Link, useActionData, useOutletContext } from "react-router";
-import { CardAction } from "twilio/lib/rest/content/v1/content";
 import {
-  Card,
-  CardActions,
-  CardContent,
-  CardTitle,
-} from "@/components/shared/CustomCard";
+  Form,
+  Link,
+  useActionData,
+  useOutletContext,
+  useParams,
+  useSearchParams,
+} from "react-router";
+import type { MetaFunction } from "react-router";
+import { useState } from "react";
+import { Section } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { PageShell } from "@/components/ui/page-shell";
+import { Text } from "@/components/ui/typography";
+import {
+  CAMPAIGN_PRODUCT_GOAL_OPTIONS,
+  CAMPAIGN_PRODUCT_GOAL_VALUES,
+  type CampaignProductGoal,
+} from "@/lib/campaign-goals";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
+import { validatePeopleReturnPath } from "@/lib/people-return-path";
 
-import { Flags } from "@/lib/types";
+export const meta: MetaFunction = () => [{ title: "New Campaign — CallCaster" }];
 
 export default function CampaignsNew() {
-  const { flags }:{flags:Flags} = useOutletContext();
-  const isLiveCallEnabled = true //flags?.call?.campaign === true;
-  const isMessageEnabled = true //flags?.sms?.campaign === true;
-  const isRobocallEnabled = true //flags?.ivr?.campaign === true;
+  const { userRole } = useOutletContext<{ userRole?: string | null }>();
+  // Creating a campaign is gated to Admin+ server-side (new.action.server.ts).
+  // The nav entry point is already hidden for callers; this covers anyone who
+  // still lands here directly (bookmark, shared link, back button) so the
+  // write form isn't shown to a role that will always get a 403 on submit.
+  const canCreate = hasMinRole(userRole ?? undefined, MemberRole.Admin);
 
-  const actionData = useActionData();
+  const actionData = useActionData<{ error?: unknown }>();
+  const params = useParams();
+  const [searchParams] = useSearchParams();
+  const workspaceId = params.id;
+  const returnTo = workspaceId
+    ? validatePeopleReturnPath(searchParams.get("returnTo"), workspaceId)
+    : null;
+  const requestedGoal = searchParams.get("goal");
+  const initialGoal = CAMPAIGN_PRODUCT_GOAL_VALUES.includes(
+    requestedGoal as CampaignProductGoal,
+  )
+    ? (requestedGoal as CampaignProductGoal)
+    : "live_calling";
+  const [campaignGoal, setCampaignGoal] =
+    useState<CampaignProductGoal>(initialGoal);
+  const [nameMissing, setNameMissing] = useState(false);
+
+  if (!canCreate) {
+    return (
+      <section id="form">
+        <PageShell title="Create campaign" maxWidth="narrow">
+          <Section variant="flat">
+            <Text variant="muted">
+              Contact a workspace administrator to create a campaign.
+            </Text>
+          </Section>
+          <div className="flex flex-col gap-2">
+            <Button asChild variant="outline" className="w-full">
+              <Link to=".." relative="path">
+                Back
+              </Link>
+            </Button>
+          </div>
+        </PageShell>
+      </section>
+    );
+  }
+
   return (
-    <section
-      id="form"
-      className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
-    >
-      {actionData?.error != null && (
-        <p className="absolute bottom-4 text-center font-Zilla-Slab text-2xl font-bold text-red-500">
-          Error:{" "}
-          {typeof actionData.error === "object" &&
-          actionData.error !== null &&
-          "message" in actionData.error
-            ? String(actionData.error.message)
-            : String(actionData.error)}
-        </p>
-      )}
-      <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
-        <CardTitle>Add Campaign</CardTitle>
+    <section id="form">
+      <PageShell title="Create campaign" maxWidth="narrow">
+        {actionData?.error != null ? (
+          <Text className="text-center text-destructive">
+            {typeof actionData.error === "object" &&
+            actionData.error !== null &&
+            "message" in actionData.error
+              ? String(actionData.error.message)
+              : String(actionData.error)}
+          </Text>
+        ) : null}
         <Form method="POST" className="space-y-6">
-          <CardContent>
+          <Section variant="flat" className="space-y-6">
             <input type="hidden" name="formAction" value="newCampaign" />
-            <label
+            {returnTo ? (
+              <input type="hidden" name="return-to" value={returnTo} />
+            ) : null}
+            <FormField
               htmlFor="campaign-name"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-200"
+              label="Campaign Name"
+              error={nameMissing ? "Campaign name is required." : undefined}
             >
-              Campaign Name
-              <input
+              <Input
                 type="text"
                 name="campaign-name"
                 id="campaign-name"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-              />
-            </label>
-            <label
-              htmlFor="campaign-type"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >
-              Campaign Type
-              <select
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-                name="campaign-type"
-                id="campaign-type"
                 required
-                
-              >
-                {isLiveCallEnabled && (
-                  <option value="live_call" className="dark:bg-black">
-                    Live Call
-                  </option>
-                )}
-                {isMessageEnabled && (
-                  <option value="message" className="dark:bg-black">
-                    Message
-                  </option>
-                )}
-                {isRobocallEnabled && (
-                  <option value="robocall" className="dark:bg-black">
-                    Interactive Voice Recording
-                  </option>
-                )}
-              </select>
-            </label>
-          </CardContent>
-          <CardActions>
-            <div className="flex items-center gap-4">
-              <Button
-                size="lg"
-                className="w-full bg-brand-primary font-Zilla-Slab text-white hover:bg-brand-secondary"
-                type="submit"
-              >
-                Add Campaign
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="w-full rounded-md bg-gray-200 px-4 py-2 text-center font-Zilla-Slab font-bold text-gray-700 transition duration-150 ease-in-out hover:bg-gray-300 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
-              >
-                <Link to=".." relative="path">
-                  Back
-                </Link>
-              </Button>
-            </div>
-          </CardActions>
+                aria-invalid={nameMissing || undefined}
+                onInvalid={(e) => {
+                  e.preventDefault();
+                  setNameMissing(true);
+                }}
+                onChange={(e) => {
+                  if (e.target.value.trim()) setNameMissing(false);
+                }}
+              />
+            </FormField>
+            <fieldset className="space-y-3">
+              <legend className="text-sm font-medium">What do you want to do?</legend>
+              <div className="grid gap-3" data-testid="campaign-goals">
+                {CAMPAIGN_PRODUCT_GOAL_OPTIONS.map((option) => {
+                  const checked = campaignGoal === option.id;
+                  return (
+                    <label
+                      key={option.id}
+                      htmlFor={`campaign-goal-${option.id}`}
+                      aria-label={`${option.label}: ${option.description}`}
+                      className={`cursor-pointer rounded-lg border p-4 transition-colors ${
+                        checked
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "bg-background hover:border-primary/50"
+                      }`}
+                    >
+                      <span className="flex items-start gap-3">
+                        <input
+                          id={`campaign-goal-${option.id}`}
+                          type="radio"
+                          name="campaign-goal"
+                          value={option.id}
+                          checked={checked}
+                          onChange={() => setCampaignGoal(option.id)}
+                          className="mt-1 h-4 w-4"
+                          data-testid={`campaign-goal-${option.id}`}
+                        />
+                        <span>
+                          <span className="block font-medium">{option.label}</span>
+                          <span className="mt-1 block text-sm text-muted-foreground">
+                            {option.description}
+                          </span>
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+            {campaignGoal === "text_campaign" ? (
+              <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
+                <p className="font-medium text-foreground">
+                  Toll-free setup requires a Business Number (BN)
+                </p>
+                <p className="mt-1">
+                  To set up Canadian toll-free texting you need your CRA business number
+                  (e.g. 123456789RC0001). Add it in workspace onboarding or Settings → Business
+                  before you rent a toll-free number. Local numbers send at lower volume and
+                  skip BN verification.
+                </p>
+              </div>
+            ) : null}
+          </Section>
+          <div className="flex flex-col gap-2">
+            <Button
+              size="lg"
+              className="w-full bg-brand-primary font-Zilla-Slab text-white hover:bg-brand-secondary"
+              type="submit"
+            >
+              Create campaign
+            </Button>
+            <Button asChild variant="outline" className="w-full">
+              <Link to=".." relative="path">
+                Back
+              </Link>
+            </Button>
+          </div>
         </Form>
-      </Card>
+      </PageShell>
     </section>
   );
 }

@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "include": ["**/*.ts"],
+  "compilerOptions": {
+    "lib": ["ES2022"],
+    "types": ["bun"],
+    "jsx": "react-jsx"
+  }
+}

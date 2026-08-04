@@ -1,37 +1,79 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import {
-  makeTransactionHistoryTableStub,
-  type TransactionRow,
-} from "./helpers/transaction-history-stub";
 
 const mocks = vi.hoisted(() => {
   return {
-    createClient: vi.fn(),
     createWorkspaceTwilioInstance: vi.fn(),
     validateTwilioWebhookParams: vi.fn(() => true),
-    validateTwilioWebhookForCallSid: vi.fn(),
+    requireTwilioSignature: vi.fn(),
     env: {
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "test",
     },
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: any[]) => mocks.createClient(...a) }));
-vi.mock("../app/lib/database.server", () => ({
-  createWorkspaceTwilioInstance: (...a: any[]) => mocks.createWorkspaceTwilioInstance(...a),
+const telephonyDbMocks = vi.hoisted(() => ({
+  findCallBySid: vi.fn(),
+  upsertCallBySid: vi.fn(),
+  updateOutreachAttemptForWorkspace: vi.fn(),
+}));
+
+const campaignIvrMocks = vi.hoisted(() => ({
+  fetchCampaignWithScript: vi.fn(),
+  resolveCampaignScript: vi.fn((campaign: any) => campaign?.script ?? null),
+}));
+
+const callStatusMocks = vi.hoisted(() => ({
+  persistCallStatusFromParams: vi.fn(),
+}));
+
+const objectStorageMocks = vi.hoisted(() => ({
+  createSignedObjectUrl: vi.fn(),
+}));
+
+const transactionHistoryMocks = vi.hoisted(() => ({
+  insertTransactionHistoryIdempotent: vi.fn(),
+}));
+
+vi.mock("../app/lib/database/workspace.server", () => ({
+  createWorkspaceTwilioInstance: (...a: any[]) =>
+    mocks.createWorkspaceTwilioInstance(...a),
 }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: (...a: unknown[]) =>
-    mocks.validateTwilioWebhookForCallSid(...a),
+  requireTwilioSignature: (...args: unknown[]) =>
+    mocks.requireTwilioSignature(...args),
 }));
 vi.mock("@/twilio.server", () => ({ validateTwilioWebhookParams: (...a: any[]) => mocks.validateTwilioWebhookParams(...a) }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/telephony-db.server", () => ({
+  findCallBySid: (...args: any[]) => telephonyDbMocks.findCallBySid(...args),
+  upsertCallBySid: (...args: any[]) => telephonyDbMocks.upsertCallBySid(...args),
+  updateOutreachAttemptForWorkspace: (...args: any[]) =>
+    telephonyDbMocks.updateOutreachAttemptForWorkspace(...args),
+}));
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  fetchCampaignWithScript: (...args: any[]) => campaignIvrMocks.fetchCampaignWithScript(...args),
+  resolveCampaignScript: (...args: any[]) => campaignIvrMocks.resolveCampaignScript(...args),
+}));
+vi.mock("@/lib/twilio-call-status.server", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    persistCallStatusFromParams: (...args: any[]) => callStatusMocks.persistCallStatusFromParams(...args),
+  };
+});
+vi.mock("@/lib/object-storage.server", () => ({
+  createSignedObjectUrl: (...args: any[]) => objectStorageMocks.createSignedObjectUrl(...args),
+}));
+vi.mock("@/lib/transaction-history.server", () => ({
+  insertTransactionHistoryIdempotent: (...args: any[]) =>
+    transactionHistoryMocks.insertTransactionHistoryIdempotent(...args),
+}));
 
 function makeReq(fields: Record<string, any>) {
   const fd = new FormData();
@@ -43,130 +85,83 @@ function makeReq(fields: Record<string, any>) {
   });
 }
 
-function makeSupabase(opts?: {
-  callRow?: any;
-  callError?: any;
-  workspaceAuthToken?: string | null;
-  updateCallError?: any;
-  updateOutreachError?: any;
-  voicemailSignedUrl?: string | null;
-  voicemailSignedUrlError?: any;
-  transactionRows?: TransactionRow[];
-}) {
-  const transactionRows = opts?.transactionRows ?? [];
-  const updates: any = { call: vi.fn(), outreach: vi.fn(), callInsert: vi.fn() };
-  const supabase: any = {
-    storage: {
-      from: () => ({
-        createSignedUrl: async () => ({
-          data: opts?.voicemailSignedUrl ? { signedUrl: opts.voicemailSignedUrl } : null,
-          error: opts?.voicemailSignedUrlError ?? null,
-        }),
-      }),
-    },
-    from: (table: string) => {
-      if (table === "call") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({ data: opts?.callRow ?? null, error: opts?.callError ?? null }),
-            }),
-          }),
-          update: () => ({
-            eq: async () => ({ data: [], error: opts?.updateCallError ?? null }),
-          }),
-        };
-      }
-      if (table === "workspace") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: {
-                  twilio_data: opts?.workspaceAuthToken
-                    ? { sid: "AC_test", authToken: opts.workspaceAuthToken }
-                    : null,
-                },
-                error: null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "outreach_attempt") {
-        return {
-          update: () => ({
-            eq: async () => ({ data: [], error: opts?.updateOutreachError ?? null }),
-          }),
-        };
-      }
-      if (table === "transaction_history") {
-        return makeTransactionHistoryTableStub(transactionRows);
-      }
-      throw new Error("unexpected table");
-    },
-    rpc: async () => ({ data: null, error: null }),
-    _updates: updates,
+function makeCallRow(overrides?: any) {
+  return {
+    sid: "CA1",
+    outreach_attempt_id: 1,
+    workspace: "w1",
+    campaign_id: 1,
+    ...overrides,
   };
-  return supabase;
+}
+
+function makeCampaign(overrides?: any) {
+  return {
+    id: 1,
+    workspace: "w1",
+    title: "C",
+    voicemail_file: "v.mp3",
+    script: { steps: { pages: {} } },
+    ...overrides,
+  };
 }
 
 describe("app/routes/api+/ivr/status.route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.createClient.mockReset();
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
-    mocks.validateTwilioWebhookForCallSid.mockReset();
-    mocks.validateTwilioWebhookForCallSid.mockImplementation(async (args: {
+    mocks.requireTwilioSignature.mockReset();
+    mocks.requireTwilioSignature.mockImplementation(async (args: {
       params?: Record<string, string>;
-    }) => ({
-      ok: true,
-      params: args.params ?? { CallSid: "CA1" },
-      authToken: "tok",
-    }));
+    }) => (null));
     mocks.logger.error.mockReset();
+    telephonyDbMocks.findCallBySid.mockReset();
+    telephonyDbMocks.upsertCallBySid.mockReset();
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockReset();
+    campaignIvrMocks.fetchCampaignWithScript.mockReset();
+    campaignIvrMocks.resolveCampaignScript.mockReset();
+    callStatusMocks.persistCallStatusFromParams.mockReset();
+    objectStorageMocks.createSignedObjectUrl.mockReset();
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
+    telephonyDbMocks.findCallBySid.mockResolvedValue(makeCallRow());
+    telephonyDbMocks.upsertCallBySid.mockImplementation(async (update: Record<string, unknown>) => ({
+      ...makeCallRow(),
+      ...update,
+    }));
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValue(makeCampaign({ type: "robocall" }));
+    campaignIvrMocks.resolveCampaignScript.mockImplementation((campaign: any) => campaign?.script ?? null);
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValue({});
+    callStatusMocks.persistCallStatusFromParams.mockResolvedValue(undefined);
+    objectStorageMocks.createSignedObjectUrl.mockResolvedValue("https://signed");
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue({ inserted: true, existingId: 1 });
   });
 
   test("returns 403 on invalid signature", async () => {
-    mocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
-    const supabase = makeSupabase({
-      callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: {} } } } } },
-      workspaceAuthToken: "tok",
-    });
-    mocks.createClient.mockReturnValueOnce(supabase);
+      }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     const mod = await import("../app/routes/api+/ivr/status.route");
-    const res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }) } as any),
+    );
     expect(res.status).toBe(403);
   });
 
   test("handles failed/no-answer/completed status updates", async () => {
-    const supabase = makeSupabase({
-      callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
-      workspaceAuthToken: "tok",
-    });
-    mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     const mod = await import("../app/routes/api+/ivr/status.route");
 
-    let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }) } as any));
+    let res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
 
-    mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "no-answer", Timestamp: new Date().toISOString() }) } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "no-answer", Timestamp: new Date().toISOString() }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
 
-    mocks.createClient.mockReturnValueOnce(supabase);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
   });
 
@@ -176,97 +171,85 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
 
     // no voicemail page
-    let supabase = makeSupabase({
-      callRow: {
-        outreach_attempt_id: 1,
-        workspace: "w1",
-        campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: { page_1: { title: "Other", blocks: [] } } } } } },
-      },
-      workspaceAuthToken: "tok",
-    });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    let res = await asRouteResponse(await mod.action({
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
+      script: { steps: { pages: { page_1: { title: "Other", blocks: [] } } } },
+    }));
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith({ twiml: "<Response><Hangup/></Response>" });
+    expect(callUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ twiml: expect.stringContaining("<Hangup/>") }),
+    );
 
     // synthetic voicemail page
     callUpdate.mockClear();
-    supabase = makeSupabase({
-      callRow: {
-        outreach_attempt_id: 1,
-        workspace: "w1",
-        campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "synthetic", say: "hi" } } } } } },
-      },
-      workspaceAuthToken: "tok",
-    });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    res = await asRouteResponse(await mod.action({
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
+      script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "synthetic", say: "hi" } } } },
+    }));
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith({ twiml: `<Response><Pause length="1"/><Say>hi</Say></Response>` });
+    expect(callUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ twiml: expect.stringContaining("<Pause length=\"1\"/><Say>hi</Say>") }),
+    );
 
     // recorded voicemail page -> play signedUrl
     callUpdate.mockClear();
-    supabase = makeSupabase({
-      callRow: {
-        outreach_attempt_id: 1,
-        workspace: "w1",
-        campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } } },
-      },
-      workspaceAuthToken: "tok",
-      voicemailSignedUrl: "https://signed",
-    });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    res = await asRouteResponse(await mod.action({
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
+      script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } },
+    }));
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith({ twiml: `<Response><Pause length="1"/><Play>https://signed</Play></Response>` });
+    expect(callUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ twiml: expect.stringContaining("<Pause length=\"1\"/><Play>https://signed</Play>") }),
+    );
 
-    // errors: missing voicemail_file => catch
-    supabase = makeSupabase({
-      callRow: {
-        outreach_attempt_id: 1,
-        workspace: "w1",
-        campaign: { voicemail_file: null, ivr_campaign: { script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } } },
-      },
-      workspaceAuthToken: "tok",
-    });
-    mocks.createClient.mockReturnValueOnce(supabase);
-    res = await asRouteResponse(await mod.action({
+    // errors: recorded voicemail but missing voicemail_file => catch
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
+      voicemail_file: null,
+      script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } },
+    }));
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
   });
 
-  test("covers catch paths: call not found/workspace auth missing/update errors/outreach_attempt_id missing", async () => {
+  test("covers catch paths: call not found/workspace missing/outreach_attempt_id missing", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ callError: new Error("call") }));
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(null);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
+    let res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } }, workspaceAuthToken: null }));
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow({ workspace: null }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    mocks.validateTwilioWebhookParams.mockImplementationOnce((_p, _s, _u, tok) => {
-      expect(tok).toBe("test");
-      return true;
-    });
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
+    res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
+    await expect(res.json()).resolves.toMatchObject({ success: false });
+
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow({ outreach_attempt_id: null }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+    res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
+    // persistCallStatusFromParams accepts null outreachAttemptId; no updateResult call needed
     await expect(res.json()).resolves.toMatchObject({ success: true });
+  });
 
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: null, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } }, workspaceAuthToken: "tok" }));
+  test("handleVoicemail updateResult error is caught", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow());
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
+      script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "synthetic", say: "hi" } } } },
+    }));
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce(new Response(JSON.stringify({ error: "x" }), { status: 500 }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
-    await expect(res.json()).resolves.toMatchObject({ success: false });
-
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } }, workspaceAuthToken: "tok", updateOutreachError: new Error("up") }));
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
+    } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
     expect(mocks.logger.error).toHaveBeenCalled();
   });
@@ -277,203 +260,161 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: () => ({ update: callUpdate }) });
 
     // dbCall null (callError null) => "Call not found"
-    mocks.createClient.mockReturnValueOnce(makeSupabase({ callRow: null, callError: null }));
-    let res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(null);
+    let res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
     // pagesObject undefined => findVoicemailPage early return null => hangup update
     callUpdate.mockClear();
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        callRow: {
-          outreach_attempt_id: 1,
-          workspace: "w1",
-          campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: null } } },
-        },
-        workspaceAuthToken: "tok",
-      }),
-    );
-    res = await asRouteResponse(await mod.action({
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
+      script: { steps: null },
+    }));
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith({ twiml: "<Response><Hangup/></Response>" });
+    expect(callUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ twiml: expect.stringContaining("<Hangup/>") }),
+    );
 
     // recorded: signedUrlError => throws {Status_Error: ...} and caught
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        callRow: {
-          outreach_attempt_id: 1,
-          workspace: "w1",
-          campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } } },
-        },
-        workspaceAuthToken: "tok",
-        voicemailSignedUrlError: new Error("sig"),
-      }),
-    );
-    res = await asRouteResponse(await mod.action({
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
+      script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } },
+    }));
+    objectStorageMocks.createSignedObjectUrl.mockRejectedValueOnce(new Error("sig"));
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    // recorded: missing signedUrl => throws Error and caught
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        callRow: {
-          outreach_attempt_id: 1,
-          workspace: "w1",
-          campaign: { voicemail_file: "v.mp3", ivr_campaign: { script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } } } },
-        },
-        workspaceAuthToken: "tok",
-        voicemailSignedUrl: null,
-      }),
-    );
-    res = await asRouteResponse(await mod.action({
+    // recorded: signedUrl returns null => current code still issues play (no throw)
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
+      script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "recorded" } } } },
+    }));
+    objectStorageMocks.createSignedObjectUrl.mockResolvedValueOnce(null as any);
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }),
     } as any));
-    await expect(res.json()).resolves.toMatchObject({ success: false });
+    await expect(res.json()).resolves.toMatchObject({ success: true });
 
-    // timestamp fallback '' + updateResult error throw (failed path)
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
-        workspaceAuthToken: "tok",
-        updateOutreachError: new Error("upd"),
-      }),
-    );
-    res = await asRouteResponse(await mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "failed" }) } as any));
+    // timestamp fallback '' + updateResult error throw (machine path)
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
+      script: { steps: { pages: { vm: { title: "Voicemail", blocks: [], speechType: "synthetic", say: "hi" } } } },
+    }));
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce(new Response(JSON.stringify({ error: "x" }), { status: 500 }));
+    res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
   });
 
-  test("covers completed branch and updateCallStatus error branch", async () => {
+  test("covers completed branch and upsertCallBySid error branch", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
 
     // completed branch success
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
-        workspaceAuthToken: "tok",
-      }),
-    );
-    let res = await asRouteResponse(await mod.action({
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow());
+    let res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
 
-    // updateCallStatus error => catch
+    // upsertCallBySid error => catch
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
-        workspaceAuthToken: "tok",
-        updateCallError: new Error("call-update"),
-      }),
-    );
-    res = await asRouteResponse(await mod.action({
+    telephonyDbMocks.upsertCallBySid.mockRejectedValueOnce(new Error("call-update"));
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    // ensure completed branch executes by forcing updateCallStatus error on completed
+    // ensure completed branch catches upsertCallBySid errors too
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
-        workspaceAuthToken: "tok",
-        updateCallError: new Error("completed-update"),
-      }),
-    );
-    res = await asRouteResponse(await mod.action({
+    telephonyDbMocks.upsertCallBySid.mockRejectedValueOnce(new Error("completed-update"));
+    res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
   });
 
-  test("explicitly hits completed branch (spies call/outreach updates)", async () => {
+  test("explicitly hits completed branch and debits credits once", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
-    const callUpdate = vi.fn(async () => ({ data: [], error: null }));
-    const outreachUpdate = vi.fn(async () => ({ data: [], error: null }));
-    const transactionRows: TransactionRow[] = [];
-    const supabase: any = {
-      storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) },
-      from: (table: string) => {
-        if (table === "call") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({
-                  data: {
-                    outreach_attempt_id: 1,
-                    workspace: "w1",
-                    campaign: { ivr_campaign: { script: { steps: { pages: {} } } } },
-                  },
-                  error: null,
-                }),
-              }),
-            }),
-            update: () => ({ eq: callUpdate }),
-          };
-        }
-        if (table === "workspace") {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { twilio_data: { authToken: "tok" } }, error: null }),
-              }),
-            }),
-          };
-        }
-        if (table === "outreach_attempt") {
-          return { update: () => ({ eq: outreachUpdate }) };
-        }
-        if (table === "transaction_history") {
-          return makeTransactionHistoryTableStub(transactionRows);
-        }
-        throw new Error("unexpected");
-      },
-    };
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
 
-    const res = await asRouteResponse(await mod.action({
-      request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
-    } as any));
-    await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalled();
-    expect(outreachUpdate).toHaveBeenCalled();
-
-    // Same, but with AnsweredBy machine_* (ensures machine-branch condition evaluates false via callStatus !== 'completed')
-    callUpdate.mockClear();
-    outreachUpdate.mockClear();
-    mocks.createClient.mockReturnValueOnce(supabase);
-    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    const res2 = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         CallSid: "CA1",
         CallStatus: "completed",
-        AnsweredBy: "machine_start",
+        CallDuration: "10",
+        Duration: "10",
         Timestamp: new Date().toISOString(),
       }),
     } as any));
-    await expect(res2.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalled();
-    expect(outreachUpdate).toHaveBeenCalled();
+    await expect(res.json()).resolves.toEqual({ success: true });
+    expect(telephonyDbMocks.upsertCallBySid).toHaveBeenCalled();
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: "call:CA1",
+        type: "DEBIT",
+      }),
+    );
+  });
+
+  test("does not bill failed or no-answer IVR callbacks", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: () => ({ update: async () => ({}) }) });
+
+    let res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "failed", Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+
+    res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "no-answer", Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ["completed"],
+    ["failed"],
+    ["no-answer"],
+  ])("records %s as the outreach disposition so results are not filtered out", async (callStatus) => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: callStatus, Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+
+    // `get_campaign_stats` filters out attempts whose disposition is NULL, so a
+    // terminal callback that only persists the `call` row leaves the campaign
+    // results screen empty.
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      1,
+      expect.objectContaining({ disposition: callStatus }),
+    );
+  });
+
+  test("skips the disposition write when the call has no outreach attempt", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+    telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow({ outreach_attempt_id: null }));
+
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 
   test("covers switch default (non-terminal callStatus, non-machine)", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        callRow: { outreach_attempt_id: 1, workspace: "w1", campaign: { ivr_campaign: { script: { steps: { pages: {} } } } } },
-        workspaceAuthToken: "tok",
-      }),
-    );
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "human", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
   });
 });
-

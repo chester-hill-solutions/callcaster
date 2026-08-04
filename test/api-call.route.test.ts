@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 import { asRouteResponse } from "./helpers/route-result";
 
 const twilioMocks = vi.hoisted(() => {
@@ -11,10 +15,56 @@ const twilioMocks = vi.hoisted(() => {
   };
 });
 
-const supabaseMocks = vi.hoisted(() => {
+const loggerMocks = vi.hoisted(() => ({ warn: vi.fn() }));
+
+const handsetState = vi.hoisted(() => ({
+  activeSession: true,
+  handsetNumber: null as string | null,
+}));
+
+const workspaceMocks = vi.hoisted(() => ({
+  workspace: { feature_flags: {} } as { feature_flags: Record<string, unknown> },
+}));
+
+const telephonyDbMocks = vi.hoisted(() => ({
+  insertCallForWorkspace: vi.fn(async () => ({})),
+}));
+
+vi.mock("@/lib/handset/handset-session.server", () => ({
+  findActiveHandsetSession: vi.fn(async () =>
+    handsetState.activeSession ? { workspace_id: "w1", user_id: "u1" } : null,
+  ),
+}));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  insertCallForWorkspace: (...args: any[]) => telephonyDbMocks.insertCallForWorkspace(...args),
+}));
+
+vi.mock("@/lib/database/workspace.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/database/workspace.server")
+  >("@/lib/database/workspace.server");
   return {
-    createClient: vi.fn(),
-    logger: { warn: vi.fn() },
+    ...actual,
+    getHandsetNumberForWorkspace: vi.fn(async () => ({
+      data: handsetState.handsetNumber
+        ? { id: 1, phone_number: handsetState.handsetNumber }
+        : null,
+      error: null,
+    })),
+  };
+});
+
+// The route reads the workspace to decide whether to attach a live
+// transcription <Stream> to the TwiML. Unmocked this reaches a real database
+// and every handset call 500s.
+vi.mock("@/lib/workspace-members-db.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/workspace-members-db.server")
+  >("@/lib/workspace-members-db.server");
+  return {
+    ...actual,
+    getWorkspaceById: vi.fn(async () => workspaceMocks.workspace),
   };
 });
 
@@ -54,71 +104,11 @@ vi.mock("@/lib/env.server", () => {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: (...args: any[]) => supabaseMocks.createClient(...args),
+vi.mock("@/lib/logger.server", () => ({ logger: loggerMocks }));
+
+vi.mock("@/lib/twilio-webhook.server", () => ({
+  requireTwilioSignature: vi.fn(async () => null),
 }));
-
-vi.mock("@/lib/logger.server", () => ({ logger: supabaseMocks.logger }));
-
-function makeSupabase(options?: {
-  activeSession?: boolean;
-  handsetNumber?: string | null;
-  fallbackNumber?: string | null;
-}) {
-  const activeSession = options?.activeSession ?? true;
-  const handsetNumber = options?.handsetNumber ?? null;
-  const fallbackNumber = options?.fallbackNumber ?? null;
-
-  const from = (table: string) => {
-    if (table === "handset_session") {
-      return {
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              eq: () => ({
-                gt: () => ({
-                  maybeSingle: async () => ({
-                    data: activeSession ? { workspace_id: "w1" } : null,
-                  }),
-                }),
-              }),
-            }),
-          }),
-        }),
-      };
-    }
-    if (table === "workspace_number") {
-      return {
-        select: () => {
-          const state = { handsetEnabledFilter: false };
-          const chain = {
-            eq: (col: string, value: any) => {
-              if (col === "handset_enabled" && value === true) {
-                state.handsetEnabledFilter = true;
-              }
-              return chain;
-            },
-            limit: () => ({
-              maybeSingle: async () => ({
-                data: state.handsetEnabledFilter
-                  ? handsetNumber
-                    ? { phone_number: handsetNumber }
-                    : null
-                  : fallbackNumber
-                    ? { phone_number: fallbackNumber }
-                    : null,
-              }),
-            }),
-          };
-          return chain;
-        },
-      };
-    }
-    throw new Error(`Unexpected table ${table}`);
-  };
-
-  return { from };
-}
 
 describe("app/routes/api+/call/route.tsx", () => {
   beforeEach(() => {
@@ -126,8 +116,10 @@ describe("app/routes/api+/call/route.tsx", () => {
     twilioMocks.say.mockReset();
     twilioMocks.dial.mockReset();
     twilioMocks.toString.mockClear();
-    supabaseMocks.createClient.mockReset();
-    supabaseMocks.logger.warn.mockReset();
+    loggerMocks.warn.mockReset();
+    handsetState.activeSession = true;
+    handsetState.handsetNumber = null;
+    telephonyDbMocks.insertCallForWorkspace.mockReset();
     vi.resetModules();
   });
 
@@ -135,7 +127,7 @@ describe("app/routes/api+/call/route.tsx", () => {
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "+15555550100");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -158,10 +150,11 @@ describe("app/routes/api+/call/route.tsx", () => {
   });
 
   test("action says invalid when To contains invalid chars", async () => {
+    twilioMocks.dial.mockClear();
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "not-a-phone");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -176,15 +169,14 @@ describe("app/routes/api+/call/route.tsx", () => {
   });
 
   test("handset flow rejects when no active handset session", async () => {
-    supabaseMocks.createClient.mockReturnValue(
-      makeSupabase({ activeSession: false, handsetNumber: "+15551230000" }),
-    );
+    handsetState.activeSession = false;
+    handsetState.handsetNumber = "+15551230000";
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
     fd.set("client_identity", "client-abc");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -196,22 +188,18 @@ describe("app/routes/api+/call/route.tsx", () => {
       "Your handset session has expired. Please refresh the page.",
     );
     expect(twilioMocks.dial).not.toHaveBeenCalled();
-    expect(supabaseMocks.logger.warn).toHaveBeenCalled();
+    expect(loggerMocks.warn).toHaveBeenCalled();
   });
 
-  test("handset flow dials with workspace caller id and normalized destination", async () => {
-    supabaseMocks.createClient.mockReturnValue(
-      makeSupabase({
-        activeSession: true,
-        handsetNumber: "+15559876543",
-      }),
-    );
+  test("handset flow persists call row and dials with workspace caller id", async () => {
+    handsetState.handsetNumber = "+15559876543";
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
     fd.set("client_identity", "client-abc");
-    const res = await asRouteResponse(await mod.action({
+    fd.set("CallSid", "CA_HANDSET");
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -220,6 +208,17 @@ describe("app/routes/api+/call/route.tsx", () => {
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     await res.text();
+    expect(telephonyDbMocks.insertCallForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      expect.objectContaining({
+        sid: "CA_HANDSET",
+        workspace: "w1",
+        user_id: "u1",
+        to: "+15555550100",
+        from: "+15559876543",
+        status: "initiated",
+      }),
+    );
     expect(twilioMocks.dial).toHaveBeenCalledWith(
       expect.objectContaining({
         callerId: "+15559876543",
@@ -235,19 +234,13 @@ describe("app/routes/api+/call/route.tsx", () => {
   });
 
   test("handset flow says no caller id when workspace has no valid number", async () => {
-    supabaseMocks.createClient.mockReturnValue(
-      makeSupabase({
-        activeSession: true,
-        handsetNumber: null,
-        fallbackNumber: "bad",
-      }),
-    );
+    handsetState.handsetNumber = null;
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
     fd.set("client_identity", "client-abc");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -266,7 +259,7 @@ describe("app/routes/api+/call/route.tsx", () => {
     const fd = new FormData();
     fd.set("To", "+15555550100");
     fd.set("workspace_id", "w1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,
@@ -282,7 +275,7 @@ describe("app/routes/api+/call/route.tsx", () => {
   test("says invalid when To is missing", async () => {
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/call", {
         method: "POST",
         body: fd,

@@ -1,4 +1,8 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  rpcHandleCampaignQueueEntry,
+  rpcReserveCampaignQueueOrderRange,
+} from "@/lib/db-rpc.server";
+import { db } from "@/server/db";
 
 const BATCH_SIZE = 100;
 const RPC_CONCURRENCY = 10;
@@ -9,34 +13,6 @@ function parseFiniteNumber(
   const parsedValue =
     typeof value === "string" ? Number.parseInt(value, 10) : value;
   return Number.isFinite(parsedValue) ? parsedValue : undefined;
-}
-
-async function reserveQueueOrderRange(args: {
-  supabaseClient: SupabaseClient;
-  campaignId: number;
-  count: number;
-}): Promise<number> {
-  const { data, error } = await args.supabaseClient.rpc(
-    "reserve_campaign_queue_order_range",
-    {
-      p_campaign_id: args.campaignId,
-      p_count: args.count,
-    },
-  );
-
-  if (error) {
-    throw new Error(
-      `Failed to reserve queue order range for campaign ${args.campaignId}: ${error.message}`,
-    );
-  }
-
-  if (typeof data !== "number" || !Number.isFinite(data)) {
-    throw new Error(
-      `Invalid start queue order returned for campaign ${args.campaignId}`,
-    );
-  }
-
-  return data;
 }
 
 function chunkArray<T>(items: T[], chunkSize: number): T[][] {
@@ -52,7 +28,6 @@ function chunkArray<T>(items: T[], chunkSize: number): T[][] {
  * Handles deduplication, ordering, and requeue semantics consistently.
  */
 export async function enqueueContactsForCampaign(
-  supabaseClient: SupabaseClient,
   campaignId: number,
   contactIds: number[],
   options?: { startOrder?: number | string; requeue?: boolean },
@@ -63,8 +38,7 @@ export async function enqueueContactsForCampaign(
   let startOrder = parseFiniteNumber(options?.startOrder);
 
   if (startOrder === undefined) {
-    startOrder = await reserveQueueOrderRange({
-      supabaseClient,
+    startOrder = await rpcReserveCampaignQueueOrderRange(db, {
       campaignId,
       count: contactIds.length,
     });
@@ -83,19 +57,18 @@ export async function enqueueContactsForCampaign(
       const groupResults = await Promise.allSettled(
         group.map(async ({ contactId, indexInBatch }) => {
           const queueOrder = resolvedStartOrder + i + indexInBatch;
-          const { error } = await supabaseClient.rpc(
-            "handle_campaign_queue_entry",
-            {
-              p_contact_id: contactId,
-              p_campaign_id: campaignId,
-              p_queue_order: queueOrder,
-              p_requeue: requeue,
-            },
-          );
-
-          if (error) {
+          try {
+            await rpcHandleCampaignQueueEntry(db, {
+              contactId,
+              campaignId,
+              queueOrder,
+              requeue,
+            });
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
             throw new Error(
-              `Failed to enqueue contact ${contactId} for campaign ${campaignId}: ${error.message}`,
+              `Failed to enqueue contact ${contactId} for campaign ${campaignId}: ${message}`,
             );
           }
         }),

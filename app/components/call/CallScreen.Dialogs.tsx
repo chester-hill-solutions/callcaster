@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -7,8 +7,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Form, NavLink, useFetcher, useNavigate, useNavigation } from "react-router";
+import { Form, NavLink, useFetcher, useNavigate } from "react-router";
 import { QueueItem } from "@/lib/types";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 interface CampaignDialogsProps {
   isDialogOpen: boolean;
@@ -21,13 +22,12 @@ interface CampaignDialogsProps {
     title: string;
     dial_type: string;
     voicemail_file: boolean;
+    status: string | null;
   };
   currentState: Record<string, unknown>;
   fetchMore: (params: Record<string, unknown>) => void;
   householdMap: Record<string, QueueItem[]>;
   isActive: boolean;
-  creditsError?: boolean;
-  hasAccess: boolean;
 }
 
 export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
@@ -42,13 +42,9 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   householdMap,
   currentState,
   isActive,
-  creditsError,
-  hasAccess
 }) => {
   const [errorDescription, setErrorDescription] = useState<string>('');
-  const [isCreditsDialogOpen, setCreditsDialogOpen] = useState(!!creditsError);
-  const { state } = useNavigation();
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<{ success?: boolean; message?: string; error?: string }>();
   const navigate = useNavigate();
   const handleSubmitError = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -65,23 +61,33 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
     );
   };
 
-  useEffect(() => {
-    if (state === 'idle') {
-      setCreditsDialogOpen(!!creditsError)
-    }
-  }, [creditsError, state])
+  useActionFeedback(fetcher.data, {
+    successMessage: "Report sent",
+    onSuccess: () => {
+      setReportDialog(false);
+      setErrorDescription("");
+    },
+  });
 
   return (
     <>
       <Dialog onOpenChange={() => { navigate(-1) }} open={!isActive}>
-        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+        <DialogContent className="flex w-full max-w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
-              This campaign is currently inactive.
+              {campaign.status === "draft" || campaign.status === "pending"
+                ? "This campaign is not live yet."
+                : campaign.status === "paused"
+                  ? "This campaign is paused."
+                  : "This campaign is currently inactive."}
             </DialogTitle>
-            <div className="my-4 w-[400px]">
+            <div className="my-4 w-full">
               <p className="mb-2">
-                It is currently outside of the designated calling window for this campaign. Please check with your team for calling times.
+                {campaign.status === "draft" || campaign.status === "pending"
+                  ? "Go to the Launch page and click \"Start calling\" to activate this campaign."
+                  : campaign.status === "paused"
+                    ? "Resume the campaign from the Launch page to start calling."
+                    : "It is currently outside of the designated calling window for this campaign. Please check with your team for calling times."}
               </p>
             </div>
           </DialogHeader>
@@ -94,12 +100,12 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       </Dialog>
 
       <Dialog onOpenChange={setDialog} open={isDialogOpen && !!isActive}>
-        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+        <DialogContent className="flex w-full max-w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
               Welcome to {campaign.title}.
             </DialogTitle>
-            <div className="my-4 w-[400px]">
+            <div className="my-4 w-full">
               <p>
                 This is a{" "}
                 {campaign.dial_type === "call"
@@ -134,12 +140,12 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       </Dialog>
 
       <Dialog onOpenChange={setErrorDialog} open={isErrorDialogOpen}>
-        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+        <DialogContent className="flex w-full max-w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
               NO SCRIPT SET UP
             </DialogTitle>
-            <div className="my-4 w-[400px]">
+            <div className="my-4 w-full">
               <p>
                 This campaign has not been configured with a script. Contact
                 your administrator to get one set up
@@ -157,12 +163,12 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
       </Dialog>
 
       <Dialog onOpenChange={setReportDialog} open={isReportDialogOpen}>
-        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
+        <DialogContent className="flex w-full max-w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
               Report an Issue
             </DialogTitle>
-            <div className="my-4 w-[400px]">
+            <div className="my-4 w-full">
               <Form onSubmit={handleSubmitError}>
                 <p className="mb-2">
                   Please provide a detailed description of your issue, as well
@@ -185,7 +191,9 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
                   >
                     Cancel
                   </Button>
-                  <Button type="submit">Submit Report</Button>
+                  <Button type="submit" disabled={fetcher.state !== "idle"}>
+                    {fetcher.state !== "idle" ? "Sending..." : "Submit Report"}
+                  </Button>
                 </div>
               </Form>
             </div>
@@ -193,27 +201,6 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
         </DialogContent>
       </Dialog>
 
-      <Dialog onOpenChange={setCreditsDialogOpen} open={isCreditsDialogOpen}>
-        <DialogContent className="flex w-[450px] flex-col items-center bg-card">
-          <DialogHeader>
-            <DialogTitle className="text-center font-Zilla-Slab text-2xl">
-              {hasAccess ? 'No Credits Remaining' : 'Campaign Disabled'}
-            </DialogTitle>
-            <div className="my-6 w-[400px]">
-              <p>
-                You have no credits remaining for this campaign. {hasAccess ? 'Purchase more credits to continue this campaign.' : 'Please contact your administrator to enable the campaign.'}
-              </p>
-            </div>
-            <DialogFooter>
-              <Button asChild>
-                <NavLink to={hasAccess ? "../../../billing" : ".."} relative="path">
-                  {hasAccess ? 'Purchase Credits' : 'Go Back'}
-                </NavLink>
-              </Button>
-            </DialogFooter>
-          </DialogHeader>
-        </DialogContent>
-      </Dialog>
     </>
   );
 };

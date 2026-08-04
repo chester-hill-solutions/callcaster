@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { getPublicOpenApiEntries } from "../app/lib/api-surface";
 import { openApiSpec } from "../app/lib/openapi";
+import { toOpenApiPath } from "../app/lib/openapi-build";
 import {
   INTEGRATOR_API_PATHS,
   INTEGRATOR_API_TAG,
@@ -9,6 +10,7 @@ import {
 import { createWithScriptBodySchema } from "../app/lib/schemas/api/create-with-script";
 import { chatSmsBodySchema } from "../app/lib/schemas/api/chat-sms";
 import { campaignSmsDispatchBodySchema } from "../app/lib/schemas/api/sms";
+import { tokenBodySchema } from "../app/lib/schemas/api/platform-auth";
 
 const scriptCampaignTypes = [
   "live_call",
@@ -25,7 +27,7 @@ describe("openapi spec", () => {
 
   test("includes user-facing workspace and campaign routes", () => {
     expect(openApiSpec.paths).toHaveProperty("/api/campaigns");
-    expect(openApiSpec.paths).toHaveProperty("/api/workspace");
+    expect(openApiSpec.paths).toHaveProperty("/api/workspaces/{workspaceId}");
     expect(openApiSpec.paths).toHaveProperty("/api/contacts");
     expect(Object.keys(openApiSpec.paths).length).toBeGreaterThan(40);
   });
@@ -39,8 +41,17 @@ describe("openapi spec", () => {
   test("matches publicOpenApi inventory entries", () => {
     for (const entry of getPublicOpenApiEntries()) {
       if (entry.duplicate && entry.routeModule.endsWith(".js")) continue;
-      expect(openApiSpec.paths).toHaveProperty(entry.path);
+      expect(openApiSpec.paths).toHaveProperty(toOpenApiPath(entry.path));
     }
+  });
+
+  test("path keys use OpenAPI 3.0 {param} templating, not Express :param", () => {
+    for (const pathKey of Object.keys(openApiSpec.paths)) {
+      expect(pathKey, pathKey).not.toMatch(/:[A-Za-z0-9_]+/);
+    }
+    expect(openApiSpec.paths).toHaveProperty(
+      "/api/workspaces/{workspaceId}/analytics",
+    );
   });
 
   test("documents all integrator API paths with detailed schemas", () => {
@@ -116,6 +127,18 @@ describe("openapi spec", () => {
     ).toBe(true);
   });
 
+  test("auth token request fields match Zod schema", () => {
+    const required = openApiSpec.components.schemas.TokenRequest.required;
+    expect(required).toEqual(expect.arrayContaining(["email", "password"]));
+    expect(
+      tokenBodySchema.safeParse({
+        email: "user@example.com",
+        password: "secret",
+      }).success,
+    ).toBe(true);
+    expect(openApiSpec.paths).toHaveProperty("/api/auth/token");
+  });
+
   test("create-with-script operation description documents XOR rule", () => {
     const op =
       openApiSpec.paths["/api/campaigns/create-with-script"].post;
@@ -143,5 +166,117 @@ describe("openapi spec", () => {
   test("dispatchCampaignSms description mentions queue/batch caveat", () => {
     const op = openApiSpec.paths["/api/sms"].post;
     expect(op?.description).toMatch(/queue|batch|dequeue/i);
+  });
+
+  test("cutover telephony routes have stable operationIds and dual auth", () => {
+    const dialer =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/campaigns/{campaignId}/dialer/start"]
+        .post;
+    const disconnect =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/calls/{callSid}/disconnect"].post;
+
+    expect(dialer?.operationId).toBe("startCampaignDialer");
+    expect(disconnect?.operationId).toBe("disconnectWorkspaceCall");
+    expect(dialer?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(disconnect?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(dialer?.["x-callcaster-capability"]).toBe("calls.start");
+    expect(disconnect?.["x-callcaster-capability"]).toBe("calls.control");
+    expect(dialer?.requestBody?.required).toBe(true);
+    expect(
+      dialer?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("DialerStartResponse");
+  });
+
+  test("audit events route documents dual auth with audit.read capability", () => {
+    const audit =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/audit-events"].get;
+
+    expect(audit?.operationId).toBe("listWorkspaceAuditEvents");
+    expect(audit?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(audit?.["x-callcaster-capability"]).toBe("audit.read");
+    expect(
+      audit?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("WorkspaceAuditEventListResponse");
+  });
+
+  test("CreateApiKeyRequest requires scopes and documents expiry", () => {
+    const schema = openApiSpec.components.schemas.CreateApiKeyRequest;
+    expect(schema.required).toEqual(expect.arrayContaining(["name", "scopes"]));
+    expect(schema.properties.scopes.minItems).toBe(1);
+    expect(schema.properties.expires_in_days.maximum).toBe(365);
+    expect(
+      openApiSpec.components.schemas.ProductCapabilityId.enum,
+    ).toContain("campaigns.read");
+  });
+
+  test("integrator operations declare required capabilities", () => {
+    expect(
+      openApiSpec.paths["/api/campaigns/create-with-script"].post?.[
+        "x-callcaster-capability"
+      ],
+    ).toBe("campaigns.write");
+    expect(
+      openApiSpec.paths["/api/chat_sms"].post?.["x-callcaster-capability"],
+    ).toBe("messages.send");
+    expect(openApiSpec.paths["/api/sms"].post?.["x-callcaster-capability"]).toBe(
+      "campaigns.dispatch",
+    );
+  });
+
+  test("workspace scoped routes have stable operationIds and mixed auth", () => {
+    const workspace = openApiSpec.paths["/api/workspaces/{workspaceId}"];
+
+    expect(workspace.get?.operationId).toBe("getWorkspace");
+    expect(workspace.patch?.operationId).toBe("updateWorkspace");
+    expect(workspace.delete?.operationId).toBe("deleteWorkspace");
+    expect(workspace.get?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(workspace.patch?.security).toEqual([{ sessionCookie: [] }]);
+    expect(workspace.delete?.security).toEqual([{ sessionCookie: [] }]);
+    expect(
+      workspace.patch?.requestBody?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("UpdateWorkspaceRequest");
+    expect(
+      workspace.get?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
+    ).toContain("WorkspaceDetailResponse");
+  });
+
+  test("workspace admin routes have stable operationIds and session auth", () => {
+    const apiKeys = openApiSpec.paths["/api/workspaces/{workspaceId}/api-keys"];
+    const members = openApiSpec.paths["/api/workspaces/{workspaceId}/members"];
+    const webhook = openApiSpec.paths["/api/workspaces/{workspaceId}/webhook"];
+    const numbers = openApiSpec.paths["/api/workspaces/{workspaceId}/numbers"];
+    const transfer =
+      openApiSpec.paths["/api/workspaces/{workspaceId}/transfer-ownership"].post;
+
+    expect(apiKeys.get?.operationId).toBe("listWorkspaceApiKeys");
+    expect(apiKeys.post?.operationId).toBe("createWorkspaceApiKey");
+    expect(apiKeys.delete?.operationId).toBe("deleteWorkspaceApiKey");
+    expect(members.post?.operationId).toBe("inviteWorkspaceMember");
+    expect(members.post?.["x-callcaster-capability"]).toBe("members.invite");
+    expect(webhook.put?.operationId).toBe("upsertWorkspaceWebhook");
+    expect(webhook.post?.operationId).toBe("testWorkspaceWebhook");
+    expect(transfer?.operationId).toBe("transferWorkspaceOwnership");
+    expect(numbers.get?.operationId).toBe("listWorkspaceNumbers");
+    expect(numbers.post?.operationId).toBe("purchaseWorkspaceNumber");
+    expect(
+      openApiSpec.paths["/api/workspaces/{workspaceId}/numbers/{numberId}"].patch
+        ?.operationId,
+    ).toBe("patchWorkspaceNumber");
+
+    for (const pathItem of [apiKeys, webhook, numbers]) {
+      for (const op of Object.values(pathItem)) {
+        if (op && typeof op === "object" && "security" in op) {
+          expect(op.security).toEqual([{ sessionCookie: [] }]);
+        }
+      }
+    }
+    expect(members.get?.security).toEqual([{ sessionCookie: [] }]);
+    expect(members.post?.security).toEqual([
+      { sessionCookie: [] },
+      { apiKey: [] },
+    ]);
+    expect(members.patch?.security).toEqual([{ sessionCookie: [] }]);
+    expect(members.delete?.security).toEqual([{ sessionCookie: [] }]);
+    expect(transfer?.security).toEqual([{ sessionCookie: [] }]);
   });
 });

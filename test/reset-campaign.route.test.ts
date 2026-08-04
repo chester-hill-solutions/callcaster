@@ -1,79 +1,90 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
+import { queueJsonAuthSession, setJsonAuthSession } from "./helpers/route-auth-mock";
 
-const mocks = vi.hoisted(() => {
-  return {
-    verifyAuth: vi.fn(),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
-  };
-});
-
-vi.mock("@/lib/supabase.server", () => ({
-  verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
+const mocks = vi.hoisted(() => ({
+  rpcResetCampaign: vi.fn(),
+  logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
+
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcResetCampaign: (...args: unknown[]) => mocks.rpcResetCampaign(...args),
+}));
+vi.mock("@/lib/platform-telephony.server", () => ({
+  resolveCampaignWorkspaceId: vi.fn(async () => "w1"),
+}));
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    execute: vi.fn(async () => []),
+  }),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: vi.fn(async () => undefined),
+}));
 
 describe("app/routes/api+/reset_campaign/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
+    mocks.rpcResetCampaign.mockReset();
     mocks.logger.error.mockReset();
   });
 
   test("returns error when campaign_id missing or not string", async () => {
-    const supabaseClient = { rpc: vi.fn() };
-    setDualAuthSession({ supabaseClient, user: { id: "u1" } });
+    setJsonAuthSession({ user: { id: "u1" } });
     const mod = await import("../app/routes/api+/reset_campaign");
 
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST", body: new FormData() }),
     } as any));
     await expect(r1.json()).resolves.toEqual({ error: "Missing campaign_id" });
 
     const fd2 = new FormData();
-    fd2.set("campaign_id", new File(["x"], "x.txt"));
-    const r2 = await asRouteResponse(await mod.action({
+    fd2.set("campaign_id", new File(["x"], "x.txt") as any);
+    const r2 = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST", body: fd2 }),
     } as any));
     await expect(r2.json()).resolves.toEqual({ error: "Missing campaign_id" });
   }, 30000);
 
   test("returns error when campaign_id is not a number", async () => {
-    const supabaseClient = { rpc: vi.fn() };
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "nope");
     const mod = await import("../app/routes/api+/reset_campaign");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
     await expect(res.json()).resolves.toEqual({ error: "Invalid campaign_id" });
   }, 30000);
 
-  test("throws when supabase rpc errors", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ error: { message: "bad" } });
-    queueDualAuthSession({ supabaseClient: { rpc }, user: { id: "u1" } });
+  test("returns a mapped 500 when rpc errors", async () => {
+    mocks.rpcResetCampaign.mockRejectedValueOnce({ message: "bad" });
+    queueJsonAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");
-    await expect(
-      mod.action({ request: new Request("http://x", { method: "POST", body: fd }) } as any),
-    ).rejects.toEqual({ message: "bad" });
+    // The handler factory maps rethrown errors through createErrorResponse
+    // instead of letting them propagate to the framework.
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://x", { method: "POST", body: fd }),
+    } as any));
+    expect(res.status).toBe(500);
+    await expect(res.json()).resolves.toMatchObject({ error: "bad" });
     expect(mocks.logger.error).toHaveBeenCalledWith("Error resetting campaign:", { message: "bad" });
   }, 30000);
 
   test("returns success true when rpc succeeds", async () => {
-    const rpc = vi.fn().mockResolvedValueOnce({ error: null });
-    queueDualAuthSession({ supabaseClient: { rpc }, user: { id: "u1" } });
+    mocks.rpcResetCampaign.mockResolvedValueOnce(undefined);
+    queueJsonAuthSession({ user: { id: "u1" } });
     const fd = new FormData();
     fd.set("campaign_id", "10");
     const mod = await import("../app/routes/api+/reset_campaign");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(rpc).toHaveBeenCalledWith("reset_campaign", { campaign_id_prop: 10 });
+    expect(mocks.rpcResetCampaign).toHaveBeenCalledWith(expect.anything(), 10);
   }, 30000);
 });
-

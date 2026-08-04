@@ -1,83 +1,31 @@
-import { createSupabaseServerClient } from "@/lib/supabase.server";
-import { bulkCreateContacts, createContact, handleError, parseRequestData, updateContact } from "@/lib/database.server";
-import { Contact } from "@/lib/types";
+import {
+  bulkCreateContacts,
+  createContact,
+  updateContact,
+} from "@/lib/database/contact.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { handleError, parseRequestData } from "@/lib/request-utils.server";
+import { findAudienceWorkspaceById } from "@/lib/audience-upload-db.server";
+import { searchContactsLoader } from "./contacts.loader.server";
 import { data as routeData } from "react-router";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { getSession } from "@/lib/auth.server";
+import { AppError } from "@/lib/errors.server";
+import { defineAction, defineLoader } from "@/lib/handler.server";
 
-import type { ActionFunctionArgs } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs , LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = defineLoader({
+  sideEffects: ["db-read"],
+  handler: ({ request }: LoaderFunctionArgs) => searchContactsLoader(request),
+});
 
-  const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
-  const supabase = getDualAuthSupabase(auth);
-  const user = getDualAuthUser(auth);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
-  const url = new URL(request.url);
-  const searchQuery = url.searchParams.get("q")?.toLowerCase() || "";
-  const workspaceId = url.searchParams.get("workspace_id") || "";
-  const campaignId = url.searchParams.get("campaign_id") || "";
+export const action = defineAction({
+  auth: ({ request }: ActionFunctionArgs) => requireDualAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
 
-  if (!searchQuery) {
-    return routeData({ data: [] });
-  }
-
-  try {
-    const [
-      { data: contacts, error },
-      { data: phoneContacts, error: phoneError },
-      { data: emailContacts, error: emailError }
-    ] = await Promise.all([
-      supabase
-        .from('contact')
-        .select(`*, contact_audience(audience_id)`)
-        .textSearch('fullname', searchQuery)
-        .eq('workspace', workspaceId)
-        .limit(10),
-      supabase
-        .from('contact')
-        .select('*, contact_audience(audience_id)')
-        .ilike('phone', `%${searchQuery}%`)
-        .eq('workspace', workspaceId)
-        .limit(10),
-      supabase
-        .from('contact')
-        .select('*, contact_audience(audience_id)')
-        .ilike('email', `%${searchQuery}%`)
-        .eq('workspace', workspaceId)
-        .limit(10)
-    ]);
-    if (error || phoneError || emailError) throw error || phoneError || emailError;
-    const allContacts = [...contacts, ...phoneContacts, ...emailContacts].filter(Boolean) as Contact[];
-    if (allContacts.length === 0) {
-      return routeData({ contacts: [] });
-    } else {
-      const { data: queuedContacts, error: queuedError } = await supabase
-        .from('campaign_queue')
-        .select('contact_id')
-        .eq('campaign_id', Number(campaignId))
-        .in('contact_id', allContacts.map((contact) => contact?.id))
-      if (queuedError) throw queuedError;
-      const contacts = allContacts.map((contact) => ({
-        ...contact,
-        queued: queuedContacts.some((queuedContact) => queuedContact.contact_id === contact?.id)
-      }));
-      return routeData({ contacts });
-    }
-  } catch (err) {
-    return handleError(err instanceof Error ? err : new Error(String(err)), 'Error searching contacts');
-  }
-};
-
-export const action = async ({ request }: ActionFunctionArgs) => {
-
-  const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
-  const { headers } = createSupabaseServerClient(request);
-  const supabase = getDualAuthSupabase(auth);
+  const { headers } = await getSession(request);
   const user = getDualAuthUser(auth);
   if (!user) {
     return routeData({ error: "Unauthorized" }, { status: 401 });
@@ -86,21 +34,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   try {
     const data = await parseRequestData(request);
+    const workspaceId = String(data.workspace_id ?? "");
+    if (!workspaceId) {
+      return routeData({ error: "Workspace ID is required" }, { status: 400 });
+    }
+    await requireWorkspaceAccess({ user, workspaceId });
 
     switch (method) {
       case 'PATCH': {
-        const updatedContact = await updateContact(supabase, data);
+        const updatedContact = await updateContact(workspaceId, data);
         return routeData({ data: updatedContact }, { status: 200 });
       }
 
-      case 'POST':
+      case 'POST': {
+        const audienceId = data.audience_id != null ? Number(data.audience_id) : undefined;
+        if (audienceId != null && !isNaN(audienceId)) {
+          const audienceWorkspaceId = await findAudienceWorkspaceById(audienceId);
+          if (audienceWorkspaceId !== workspaceId) {
+            return routeData({ error: "Audience not found" }, { status: 404 });
+          }
+        }
         if (Array.isArray(data.contacts)) {
-            const bulkResult = await bulkCreateContacts(supabase, data.contacts, data.workspace_id, data.audience_id, user.id);
+            const bulkResult = await bulkCreateContacts(
+              data.contacts,
+              workspaceId,
+              data.audience_id,
+              user.id,
+            );
           return routeData(bulkResult);
         } else {
-          const newContact = await createContact(supabase, data, data.audience_id, user.id);
+          const newContact = await createContact(data, data.audience_id, user.id, {
+            assignDefaultAudienceIfMissing: data.assign_default_sms_audience === "true",
+          });
           return routeData(newContact);
         }
+      }
 
       default:
         return routeData({ error: 'Unsupported request method' }, { status: 400 });
@@ -109,6 +77,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (err instanceof Error && err.message === 'Unsupported content type') {
       return routeData({ error: 'Unsupported content type' }, { status: 415 });
     }
+    if (err instanceof AppError) {
+      return routeData({ error: err.message }, { status: err.statusCode });
+    }
     return handleError(err instanceof Error ? err : new Error(String(err)), 'An unexpected error occurred');
   }
-}
+  },
+});

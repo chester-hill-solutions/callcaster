@@ -100,7 +100,9 @@ Notes:
 
 - **Supabase server helpers**: `app/lib/supabase.server.ts`
   - **Tests**: `test/supabase.server.test.ts`
-- **Database entrypoint helpers** (parsers, Twilio queue cancellation, legacy conference end): `app/lib/database.server.ts`
+- **Request helpers** (body parsers, error responder): `app/lib/request-utils.server.ts`
+  - **Tests**: `test/database.server.test.ts`
+- **Call/message actions** (Twilio queue cancellation, legacy conference end): `app/lib/database/call-actions.server.ts`
   - **Tests**: `test/database.server.test.ts`
 - **Server logger**: `app/lib/logger.server.ts`
   - **Tests**: `test/logger.server.test.ts`
@@ -132,7 +134,7 @@ High-signal status:
 Top remaining blockers (smallest surface area first — use strict report for exact order):
 
 - **Near-100% lib modules (branch gaps)**:
-  - `app/lib/database.server.ts`
+  - `app/lib/request-utils.server.ts`, `app/lib/database/call-actions.server.ts`
   - `app/lib/errors.server.ts`
   - `app/lib/supabase.server.ts`
   - `app/lib/database/contact.server.ts`

@@ -1,5 +1,4 @@
-import { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+import type { Database } from "@/lib/db-types";
 import {
   type TwilioAccountData,
   type TwilioMessageIntent,
@@ -22,8 +21,14 @@ import {
   defaultVoiceConcurrentCallLimit,
   defaultVoiceTargetCps,
 } from "@/lib/throughput-config.server";
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
-import { mergeWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
+import { mergeWorkspaceTwilioData, loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
+import {
+  classifyPhoneNumberSenderType,
+  inferSmsSenderClassFromSenderTypes,
+} from "@/lib/twilio-sender-class.server";
 
 export const DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG: WorkspaceTwilioOpsConfig = {
   trafficClass: "unknown",
@@ -61,7 +66,7 @@ function parseAuditTrail(value: unknown): WorkspaceTwilioOpsAuditEntry[] {
   }
 
   return value
-    .filter(isRecord)
+    .filter(isObject)
     .map((entry) => ({
       changedAt:
         typeof entry.changedAt === "string"
@@ -107,7 +112,7 @@ function mapOnboardingStateToPortalStatus(
 export function normalizeWorkspaceTwilioOpsConfig(
   value: unknown,
 ): WorkspaceTwilioOpsConfig {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
   }
 
@@ -197,7 +202,7 @@ export function normalizeWorkspaceTwilioOpsConfig(
 export function getWorkspaceTwilioPortalConfigFromTwilioData(
   twilioData: TwilioAccountData,
 ): WorkspaceTwilioOpsConfig {
-  if (!twilioData || !isRecord(twilioData)) {
+  if (!twilioData || !isObject(twilioData)) {
     return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
   }
 
@@ -207,7 +212,7 @@ export function getWorkspaceTwilioPortalConfigFromTwilioData(
 export function getEffectiveWorkspaceTwilioPortalConfig(
   twilioData: TwilioAccountData,
 ): WorkspaceTwilioOpsConfig {
-  if (!twilioData || !isRecord(twilioData)) {
+  if (!twilioData || !isObject(twilioData)) {
     return { ...DEFAULT_WORKSPACE_TWILIO_OPS_CONFIG };
   }
 
@@ -294,53 +299,44 @@ function buildTwilioPortalAuditSummary(
 }
 
 export async function getWorkspaceTwilioPortalConfig({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
+  const twilioData = await loadWorkspaceTwilioData(workspaceId);
 
   return getWorkspaceTwilioPortalConfigFromTwilioData(
-    (data?.twilio_data ?? null) as TwilioAccountData,
+    twilioData as TwilioAccountData,
+  );
+}
+
+export async function getEffectiveWorkspaceTwilioPortalConfigForWorkspace({
+  workspaceId,
+}: {
+  workspaceId: string;
+}) {
+  const twilioData = await loadWorkspaceTwilioData(workspaceId);
+
+  return getEffectiveWorkspaceTwilioPortalConfig(
+    twilioData as TwilioAccountData,
   );
 }
 
 export async function updateWorkspaceTwilioPortalConfig({
-  supabaseClient,
   workspaceId,
   updates,
   actorUserId,
   actorUsername,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   updates: Partial<WorkspaceTwilioOpsConfig>;
   actorUserId: string | null;
   actorUsername: string | null;
 }) {
-  const { data, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  const currentTwilioData = isRecord(data?.twilio_data) ? data.twilio_data : {};
+  const twilioData = await loadWorkspaceTwilioData(workspaceId);
+  const currentTwilioData = isObject(twilioData) ? twilioData : {};
   const currentConfig = getWorkspaceTwilioPortalConfigFromTwilioData(
-    (data?.twilio_data ?? null) as TwilioAccountData,
+    twilioData as TwilioAccountData,
   );
 
   const mergedConfig = normalizeWorkspaceTwilioOpsConfig({
@@ -369,10 +365,98 @@ export async function updateWorkspaceTwilioPortalConfig({
     auditTrail: [auditEntry, ...currentConfig.auditTrail].slice(0, 10),
   };
 
-  await mergeWorkspaceTwilioData(supabaseClient, workspaceId, (currentTwilioData) => ({
+  await mergeWorkspaceTwilioData(workspaceId, (currentTwilioData) => ({
     ...currentTwilioData,
     portalConfig: nextConfig,
   }));
 
   return nextConfig;
+}
+
+/**
+ * Sentinel `actorUsername` written to the portal-config audit trail whenever
+ * {@link deriveAndPersistWorkspaceThroughput} applies an update. Used to tell
+ * an auto-derived value apart from an explicit admin edit, since
+ * `WorkspaceTwilioOpsConfig` itself (app/lib/types.ts) has no dedicated
+ * "auto-derived" flag we're allowed to add.
+ */
+export const THROUGHPUT_AUTO_DERIVE_ACTOR_USERNAME = "system:auto-derived-throughput";
+
+export type DeriveWorkspaceThroughputResult = {
+  applied: boolean;
+  smsSenderClass: TwilioSmsSenderClass;
+  smsTargetMps: number;
+  reason: "seeded_unknown" | "reapplied_auto" | "unchanged" | "admin_override";
+};
+
+/**
+ * Derives `smsSenderClass`/`smsTargetMps` from the workspace's current number
+ * inventory (reusing the same sender-type classification used at Twilio sync
+ * time) and persists them via `updateWorkspaceTwilioPortalConfig`.
+ *
+ * Safe to call after every number purchase / path-selection event: it only
+ * overwrites the config when the current `smsSenderClass` is `"unknown"`
+ * (never configured) or when the most recent audit entry shows the last write
+ * was itself an auto-derive (i.e. no admin has overridden it since). An
+ * explicit admin edit — anything that leaves a different actor in the top
+ * audit slot — is never clobbered.
+ */
+export async function deriveAndPersistWorkspaceThroughput({
+  workspaceId,
+}: {
+  workspaceId: string;
+}): Promise<DeriveWorkspaceThroughputResult> {
+  const currentConfig = await getWorkspaceTwilioPortalConfig({ workspaceId });
+
+  const lastAuditEntry = currentConfig.auditTrail[0];
+  const currentIsAutoOrUnset =
+    currentConfig.smsSenderClass === "unknown" ||
+    lastAuditEntry?.actorUsername === THROUGHPUT_AUTO_DERIVE_ACTOR_USERNAME;
+
+  const { data: phoneNumbers } = await getWorkspacePhoneNumbers({ workspaceId });
+  const senderTypes = (phoneNumbers ?? [])
+    .map((number) => number?.phone_number)
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .map(classifyPhoneNumberSenderType);
+
+  const derivedSenderClass = inferSmsSenderClassFromSenderTypes(senderTypes);
+  const derivedTargetMps = defaultSmsTargetMps(derivedSenderClass);
+
+  if (!currentIsAutoOrUnset) {
+    return {
+      applied: false,
+      smsSenderClass: currentConfig.smsSenderClass,
+      smsTargetMps: currentConfig.smsTargetMps,
+      reason: "admin_override",
+    };
+  }
+
+  if (
+    currentConfig.smsSenderClass === derivedSenderClass &&
+    currentConfig.smsTargetMps === derivedTargetMps
+  ) {
+    return {
+      applied: false,
+      smsSenderClass: derivedSenderClass,
+      smsTargetMps: derivedTargetMps,
+      reason: "unchanged",
+    };
+  }
+
+  const nextConfig = await updateWorkspaceTwilioPortalConfig({
+    workspaceId,
+    updates: {
+      smsSenderClass: derivedSenderClass,
+      smsTargetMps: derivedTargetMps,
+    },
+    actorUserId: null,
+    actorUsername: THROUGHPUT_AUTO_DERIVE_ACTOR_USERNAME,
+  });
+
+  return {
+    applied: true,
+    smsSenderClass: nextConfig.smsSenderClass,
+    smsTargetMps: nextConfig.smsTargetMps,
+    reason: currentConfig.smsSenderClass === "unknown" ? "seeded_unknown" : "reapplied_auto",
+  };
 }

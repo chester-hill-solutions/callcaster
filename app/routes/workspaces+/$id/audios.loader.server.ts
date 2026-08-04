@@ -1,102 +1,88 @@
 import { data as routeData } from "react-router";
-import { getUserRole } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
-import { User } from "@/lib/types";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { listAudioMetadata } from "@/lib/database/workspace-audio-metadata.server";
+import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
+import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export const loader = defineLoader({
+  auth: workspaceLoaderAuth,
+  sideEffects: ["db-read", "external"],
+  handler: async ({ auth: access }) => {
+    if (!access.ok) {
+      return access.response;
+    }
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+    const { headers, user, workspaceId, userRole } = access.ctx;
 
-  const workspaceId = params.id;
-  if (workspaceId == null) {
-    return routeData(
-      {
-        audioMedia: null,
-        workspace: null,
-        error: "Workspace does not exist",
-        userRole: null,
-      },
-      { headers },
+    const workspaceData = await getWorkspaceForClient(workspaceId);
+
+    if (!workspaceData) {
+      return routeData(
+        {
+          audioMedia: null,
+          workspace: null,
+          error: "Workspace not found",
+          userRole,
+        },
+        { headers, status: 404 },
+      );
+    }
+
+    const mediaResult = await listWorkspaceAudiosApi(
+      user.id,
+      workspaceId,
     );
-  }
 
-  const userRole = getUserRole({ supabaseClient, user: user as unknown as User, workspaceId });
+    if (!mediaResult.ok) {
+      return routeData(
+        {
+          audioMedia: null,
+          workspace: workspaceData,
+          error: mediaResult.error,
+          userRole,
+        },
+        { headers },
+      );
+    }
 
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-  if (workspaceError) {
-    return routeData(
-      {
-        audioMedia: null,
-        workspace: null,
-        error: workspaceError.message,
-        userRole,
-      },
-      { headers },
+    if (mediaResult.audios.length === 0) {
+      return routeData(
+        {
+          audioMedia: null,
+          workspace: workspaceData,
+          error: "No Audio in Workspace",
+          userRole,
+        },
+        { headers },
+      );
+    }
+
+    // One batched lookup, not one probe per object: measuring duration means
+    // downloading the file, so a per-row probe would pull the whole library on
+    // every page view. Objects with no sidecar row render as "—".
+    const metadataByFileName = await listAudioMetadata(
+      workspaceId,
+      mediaResult.audios.map((audio) => audio.name),
     );
-  }
 
-  const { data: mediaData, error: mediaError } = await supabaseClient.storage
-    .from("workspaceAudio")
-    .list(workspaceId);
-
-  if (mediaError) {
-    logger.warn("Media Error:", mediaError);
-    return routeData(
-      {
-        audioMedia: null,
-        workspace: workspaceData,
-        error: mediaError.message,
-        userRole,
-      },
-      { headers },
-    );
-  }
-
-  if (mediaData.length === 0) {
-    logger.debug("No workspace folder exists");
-    return routeData(
-      {
-        audioMedia: null,
-        workspace: workspaceData,
-        error: "No Audio in Workspace",
-        userRole,
-      },
-      { headers },
-    );
-  }
-
-  const mediaPaths = mediaData.map((media) => `${workspaceId}/${media.name}`);
-  const { data: signedUrls, error: signedUrlsError } =
-    await supabaseClient.storage
-      .from("workspaceAudio")
-      .createSignedUrls(mediaPaths, 60);
-
-  if (signedUrlsError) {
-    logger.warn("SignedUrls Error:", signedUrlsError);
-    return routeData({
-      audioMedia: null,
-      workspace: workspaceData,
-      error: signedUrlsError.message,
-      userRole,
+    const audioMedia = mediaResult.audios.map((audio) => {
+      const metadata = metadataByFileName.get(audio.name);
+      return {
+        name: audio.name,
+        id: audio.id,
+        created_at: audio.created_at,
+        updated_at: audio.updated_at,
+        signedUrl: audio.signed_url,
+        durationMs: metadata?.duration_ms ?? null,
+        sizeBytes: metadata?.size_bytes ?? null,
+        sourceFileName: metadata?.source_file_name ?? null,
+      };
     });
-  }
 
-  const mediaWithSignedUrls = mediaData.map((media) => {
-    const signedUrl = signedUrls.find(
-      (mediaUrl) => mediaUrl.path === `${workspaceId}/${media.name}`,
-    )?.signedUrl;
-
-    return signedUrl ? { ...media, signedUrl } : media;
-  });
-
-  return routeData(
-    { audioMedia: mediaWithSignedUrls, workspace: workspaceData, error: null, userRole },
-    { headers },
-  );
-}
+    return routeData(
+      { audioMedia, workspace: workspaceData, error: null, userRole },
+      { headers },
+    );
+  },
+});

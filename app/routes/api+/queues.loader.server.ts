@@ -1,22 +1,21 @@
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
   resolveCampaignWorkspaceId,
 } from "@/lib/platform-telephony.server";
+import { fetchCampaignQueueRowsByIds } from "@/lib/campaign-queue-db.server";
+import { rpcSelectAndUpdateCampaignContacts } from "@/lib/db-rpc.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { data as routeData } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  const supabase = getAuthSupabaseClient(auth);
-  const url = new URL(request.url);
+export const loader = defineLoader({
+  auth: ({ request }: LoaderFunctionArgs) => requireJsonAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ url, auth }) => {
   const campaignId = url.searchParams.get("campaign_id");
   const workspaceIdParam = url.searchParams.get("workspace_id");
   const limit = url.searchParams.get("limit") ?? "10";
@@ -26,7 +25,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
 
   try {
-    const campaignWorkspace = await resolveCampaignWorkspaceId(supabase, campaignId);
+    const campaignWorkspace = await resolveCampaignWorkspaceId(campaignId);
     if (!campaignWorkspace) {
       return jsonError("Campaign not found", 404);
     }
@@ -35,8 +34,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return jsonError("workspace_id does not match campaign", 403);
     }
 
-    await requireWorkspaceAccess({ supabaseClient: supabase,
-      user: auth.user,
+    await requireWorkspaceAccess({ user: auth.user,
       workspaceId: campaignWorkspace,
     });
 
@@ -44,28 +42,22 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       return jsonResponse([], 200);
     }
 
-    const { data: newQueue } = await supabase.rpc(
-      "select_and_update_campaign_contacts",
-      {
-        p_campaign_id: Number(campaignId),
-        p_initial_limit: parseInt(limit, 10),
-      },
-    );
+    const newQueue = await rpcSelectAndUpdateCampaignContacts(auth.user.id, {
+      campaignId: Number(campaignId),
+      limit: parseInt(limit, 10),
+    });
 
     if (!newQueue || !newQueue.length) {
       return jsonResponse([], 200);
     }
 
-    const { data: queueItems } = await supabase
-      .from("campaign_queue")
-      .select("*, contact(*)")
-      .in(
-        "id",
-        newQueue.map((item: { queue_id: number }) => item.queue_id),
-      );
+    const queueItems = await fetchCampaignQueueRowsByIds(
+      newQueue.map((item: { queue_id: number }) => item.queue_id),
+    );
 
-    return routeData(queueItems ?? []);
+    return routeData(queueItems);
   } catch (error) {
     return createErrorResponse(error, "Failed to load queue");
   }
-};
+  },
+});

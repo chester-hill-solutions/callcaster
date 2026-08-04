@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
+import { AdminTableOverflow } from "@/components/admin/AdminTableOverflow";
 
 import type { CampaignWithWorkspace, WorkspaceWithCampaigns } from "../admin.types";
 
@@ -92,7 +93,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
                 </CardHeader>
                 <CardContent>
                     <div className="flex flex-wrap gap-3 mb-4">
-                        <div className="flex-1 min-w-[200px]">
+                        <div className="min-w-0 flex-1 basis-full sm:min-w-[200px]">
                             <div className="relative">
                                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
@@ -103,7 +104,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
                                 />
                             </div>
                         </div>
-                        <div className="w-[150px]">
+                        <div className="w-full min-w-0 sm:w-[150px]">
                             <Select
                                 value={filter.status}
                                 onValueChange={(value) => setFilter((prev) => ({ ...prev, status: value }))}
@@ -121,7 +122,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="w-[150px]">
+                        <div className="w-full min-w-0 sm:w-[150px]">
                             <Select
                                 value={filter.type}
                                 onValueChange={(value) => setFilter((prev) => ({ ...prev, type: value }))}
@@ -139,7 +140,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="w-[200px]">
+                        <div className="w-full min-w-0 sm:w-[200px]">
                             <Select
                                 value={filter.workspace}
                                 onValueChange={(value) => setFilter((prev) => ({ ...prev, workspace: value }))}
@@ -167,6 +168,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
                         </Button>
                     </div>
 
+                    <AdminTableOverflow>
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -244,6 +246,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
                             )}
                         </TableBody>
                     </Table>
+                    </AdminTableOverflow>
 
                     {filteredCampaigns.length > 0 && (
                         <div className="flex items-center justify-between mt-4">

@@ -9,8 +9,9 @@ import { Buffer } from "buffer-polyfill";
 import { startTransition, StrictMode } from "react";
 import { hydrateRoot } from "react-dom/client";
 
+globalThis.Buffer = Buffer as unknown as BufferConstructor;
+
 startTransition(() => {
-  globalThis.Buffer = Buffer as unknown as BufferConstructor;
   hydrateRoot(
     document,
     <StrictMode>

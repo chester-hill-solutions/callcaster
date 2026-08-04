@@ -12,11 +12,20 @@ export type {
   NumberSearchQuery,
 } from "@/lib/schemas/api/numbers-search";
 
+import {
+  normalizeAddressRequirement,
+  type AddressRequirement,
+} from "@/lib/number-address-requirements";
+
 export type AvailableNumberRecord = {
   phoneNumber: string;
   friendlyName: string;
   region?: string;
   locality?: string;
+  /** ISO country of the available number (e.g. "CA"). */
+  isoCountry?: string;
+  /** Q43: Twilio regulatory address requirement (none|any|local|foreign). */
+  addressRequirements: AddressRequirement;
   capabilities: Record<string, boolean>;
 };
 
@@ -30,6 +39,8 @@ export function mapTwilioAvailableNumbers(
     friendlyName?: string;
     region?: string;
     locality?: string;
+    isoCountry?: string;
+    addressRequirements?: string;
     capabilities?: Record<string, boolean>;
   }>,
 ): AvailableNumberRecord[] {
@@ -40,6 +51,8 @@ export function mapTwilioAvailableNumbers(
       friendlyName: n.friendlyName!,
       region: n.region,
       locality: n.locality,
+      isoCountry: n.isoCountry,
+      addressRequirements: normalizeAddressRequirement(n.addressRequirements),
       capabilities: n.capabilities ?? {},
     }));
 }

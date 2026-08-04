@@ -1,7 +1,7 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database } from "@/lib/database.types";
-import { isRecord, parseOptionalString } from "@/lib/parse-utils.server";
+import type { Database } from "@/lib/db-types";
+import { parseOptionalString } from "@/lib/parse-utils.server";
+import { isObject } from "@/lib/type-safety-utils";
 import { patchWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import {
   buildBillingReconciliationSnapshot,
@@ -26,11 +26,11 @@ const DEFAULT_SNAPSHOT: BillingReconciliationSnapshot = {
 export function normalizeBillingReconciliationSnapshot(
   value: unknown,
 ): BillingReconciliationSnapshot | null {
-  if (!isRecord(value)) {
+  if (!isObject(value)) {
     return null;
   }
 
-  const period = isRecord(value.period) ? value.period : null;
+  const period = isObject(value.period) ? value.period : null;
   const lastRunAt = parseOptionalString(value.lastRunAt);
   if (!lastRunAt) {
     return null;
@@ -59,7 +59,7 @@ export function normalizeBillingReconciliationSnapshot(
 export function getWorkspaceBillingReconciliationSnapshot(
   twilioData: unknown,
 ): BillingReconciliationSnapshot | null {
-  if (!isRecord(twilioData)) {
+  if (!isObject(twilioData)) {
     return null;
   }
   return (
@@ -70,14 +70,12 @@ export function getWorkspaceBillingReconciliationSnapshot(
 }
 
 export async function persistWorkspaceBillingReconciliationSnapshot(args: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   report: BillingReconciliationReport;
   source: BillingReconciliationSnapshot["lastRunSource"];
 }): Promise<BillingReconciliationSnapshot> {
   const snapshot = buildBillingReconciliationSnapshot(args.report, args.source);
   await patchWorkspaceTwilioData(
-    args.supabaseClient,
     args.workspaceId,
     {
       billingReconciliationSnapshot: snapshot,

@@ -1,40 +1,31 @@
 export { loader } from "./$selected_id.loader.server";
 export { action } from "./$selected_id.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, redirect } from "react-router";
-import { Await, Outlet, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
-import { Suspense, useRef } from "react";
-
+import { Outlet, useLoaderData, useLocation, useOutletContext, useRevalidator } from "react-router";
+import { useMemo, useRef } from "react";
 
 import { MemberRole } from "@/components/workspace/TeamMember";
 import {
   ResultsDisplay,
   NoResultsYet,
   ErrorLoadingResults,
-  LoadingResults,
 } from "@/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay";
 import { CampaignInstructions } from "@/components/campaign/home/CampaignHomeScreen/CampaignInstructions";
 import { CampaignHeader } from "@/components/campaign/home/CampaignHomeScreen/CampaignHeader";
-import { NavigationLinks } from "@/components/campaign/home/CampaignHomeScreen/CampaignNav";
+import { CampaignStatusRail } from "@/components/campaign/home/CampaignStatusRail";
+import { CampaignShellDirtyProvider } from "@/components/campaign/home/CampaignShellDirty";
+import { buildCampaignStatusRail } from "@/lib/campaign-status-rail";
 import {
   Audience,
   Campaign,
-  IVRCampaign,
-  LiveCampaign,
-  MessageCampaign,
-  Schedule,
   WorkspaceData,
   WorkspaceNumbers,
 } from "@/lib/types";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { useSupabaseRealtimeSubscription } from "@/hooks/realtime/useSupabaseRealtime";
-import { useRealtimeData } from "@/hooks/realtime/useRealtimeData";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import type { CampaignStatus } from "@/lib/db-types";
+import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceRealtime";
 
 import type { CampaignState } from "@/lib/campaign-home.types";
 export type { CampaignState } from "@/lib/campaign-home.types";
-
-type CampaignTable = "live_campaign" | "message_campaign" | "ivr_campaign";
 
 /** Tables whose row changes affect dashboard queue + disposition counts from the loader. */
 const CAMPAIGN_DASHBOARD_COUNT_TABLES = [
@@ -44,35 +35,25 @@ const CAMPAIGN_DASHBOARD_COUNT_TABLES = [
   "message",
 ] as const;
 
-const getTable = (
-  campaignType: string | null | undefined,
-): CampaignTable | null => {
-  return campaignType === "live_call"
-    ? "live_campaign"
-    : campaignType === "message"
-      ? "message_campaign"
-      : campaignType &&
-          ["robocall", "simple_ivr", "complex_ivr"].includes(campaignType)
-        ? "ivr_campaign"
-        : null;
-};
-
 export default function CampaignScreen() {
   const {
     hasAccess,
     campaignDetails: initialCampaignDetails,
     results,
+    ivrResponses,
     selected_id,
     queueCounts,
+    readiness,
+    joinDisabled,
+    scheduleDisabled,
   } = useLoaderData();
-  const { audiences, campaigns, phoneNumbers, workspace, supabase } =
+  const { audiences, campaigns, phoneNumbers, workspace } =
     useOutletContext<{
       audiences: Audience[];
       campaigns: Campaign[];
       phoneNumbers: WorkspaceNumbers[];
       userRole: MemberRole;
       workspace: WorkspaceData;
-      supabase: SupabaseClient;
     }>();
   const campaignData = campaigns.find((c) => c?.id.toString() === selected_id);
   const location = useLocation();
@@ -80,25 +61,61 @@ export default function CampaignScreen() {
   const isCampaignParentRoute = route.length === 5;
   const revalidator = useRevalidator();
   const lastRevalidateRef = useRef(0);
-  const realtimeTable = getTable(campaignData?.type) ?? "live_campaign";
   const workspaceRouteId = route[2] ?? "";
   const safeQueueCounts = {
     fullCount: queueCounts.fullCount ?? 0,
     queuedCount: queueCounts.queuedCount ?? 0,
+    completedCount: queueCounts.completedCount ?? 0,
   };
-  const { data: campaignDetailsArray } = useRealtimeData(
-    supabase,
-    workspaceRouteId,
-    realtimeTable,
-    [initialCampaignDetails],
-  );
-  const campaignDetails = campaignDetailsArray?.[0];
+  const campaignQueueProgress =
+    safeQueueCounts.fullCount > 0
+      ? {
+          completedCount: safeQueueCounts.completedCount,
+          totalCount: safeQueueCounts.fullCount,
+        }
+      : null;
+  const campaignDetails = initialCampaignDetails;
 
-  useSupabaseRealtimeSubscription({
-    supabase,
-    channelTopic: selected_id
-      ? `campaign-dashboard-counts-${selected_id}`
-      : "campaign-dashboard-counts-none",
+  const railItems = useMemo(() => {
+    if (!campaignData || !workspaceRouteId || !selected_id) {
+      return [];
+    }
+    const workspaceId =
+      typeof workspace === "object" && workspace && "id" in workspace
+        ? String((workspace as { id?: string }).id ?? workspaceRouteId)
+        : workspaceRouteId;
+
+    return buildCampaignStatusRail({
+      workspaceId,
+      campaignId: selected_id,
+      campaignData,
+      campaignDetails,
+      readinessIssues: readiness?.issues ?? [],
+      queueCount: safeQueueCounts.queuedCount,
+      hasAccess,
+      pathname: location.pathname,
+      hash: location.hash,
+      joinDisabled,
+      hasResults: results.length > 0 || ivrResponses.length > 0,
+    });
+  }, [
+    campaignData,
+    campaignDetails,
+    hasAccess,
+    ivrResponses.length,
+    joinDisabled,
+    location.hash,
+    location.pathname,
+    readiness?.issues,
+    results.length,
+    safeQueueCounts.queuedCount,
+    selected_id,
+    workspace,
+    workspaceRouteId,
+  ]);
+
+  useWorkspaceEventSubscription({
+    workspaceId: workspaceRouteId,
     table: [...CAMPAIGN_DASHBOARD_COUNT_TABLES],
     filter: selected_id ? `campaign_id=eq.${selected_id}` : "campaign_id=eq.-1",
     onChange: () => {
@@ -109,86 +126,75 @@ export default function CampaignScreen() {
     },
   });
 
-  const readiness = getCampaignReadiness(campaignData, campaignDetails, {
-    queueCount: safeQueueCounts.queuedCount ?? safeQueueCounts.fullCount,
-  });
-  const joinDisabled = readiness.startDisabledReason
-    ? readiness.startDisabledReason
-    : campaignData?.status === "scheduled"
-      ? "Campaign scheduled."
-      : !campaignData?.is_active
-        ? "It is currently outside of the campaign's calling hours"
-        : null;
-
-  const scheduleDisabled = readiness.scheduleDisabledReason;
   return (
-    <div className="flex h-full w-full flex-col">
-      <CampaignHeader
-        title={campaignData?.title || ""}
-        status={campaignData?.status || "pending"}
-        isDesktop={false}
-      />
-      <div className="flex flex-col items-start justify-between gap-3 border-b border-border/70 pb-4 sm:flex-row sm:items-center">
+    <CampaignShellDirtyProvider>
+      <div className="flex h-full w-full flex-col">
         <CampaignHeader
           title={campaignData?.title || ""}
-          isDesktop
-          status={campaignData?.status || "pending"}
+          status={(campaignData?.status as CampaignStatus) || "pending"}
+          isDesktop={false}
+          queueProgress={campaignQueueProgress}
         />
-        <NavigationLinks
-          hasAccess={hasAccess}
-          data={campaignData}
-          joinDisabled={joinDisabled}
-        />
-      </div>
-      {hasAccess && isCampaignParentRoute && (
-        <Suspense fallback={<LoadingResults />}>
-          <Await resolve={results} errorElement={<ErrorLoadingResults />}>
-            {(resolvedResults) => {
-              if (!campaignData) {
-                return <ErrorLoadingResults />;
-              }
-              return resolvedResults.length < 1 ? (
-                <NoResultsYet />
-              ) : (
-                <ResultsDisplay
-                  results={resolvedResults}
-                  campaign={campaignData}
-                  hasAccess={hasAccess}
-                  queueCounts={safeQueueCounts}
-                />
-              );
-            }}
-          </Await>
-        </Suspense>
-      )}
-      {isCampaignParentRoute &&
-        !hasAccess &&
-        campaignData &&
-        (campaignData.type === "live_call" || !campaignData.type) && (
-          <CampaignInstructions
-            campaignData={
-              campaignData as {
-                [key: string]: unknown;
-                instructions?: { join?: string; script?: string };
-              }
-            }
-            totalCalls={safeQueueCounts.queuedCount}
-            expectedTotal={safeQueueCounts.fullCount}
-            joinDisabled={joinDisabled}
+        <div className="border-b border-border/70 pb-4">
+          <CampaignHeader
+            title={campaignData?.title || ""}
+            isDesktop
+            status={(campaignData?.status as CampaignStatus) || "pending"}
           />
-        )}
-      <Outlet
-        context={{
-          supabase,
-          joinDisabled,
-          audiences,
-          campaignData,
-          campaignDetails,
-          scheduleDisabled,
-          phoneNumbers,
-          workspace,
-        }}
-      />
-    </div>
+        </div>
+        {railItems.length > 0 ? (
+          <div className="pb-4">
+            <CampaignStatusRail items={railItems} />
+          </div>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          {hasAccess &&
+            isCampaignParentRoute &&
+            (!campaignData ? (
+              <ErrorLoadingResults />
+            ) : results.length < 1 && ivrResponses.length < 1 ? (
+              <NoResultsYet
+                expectedTotal={safeQueueCounts.fullCount}
+                campaignType={campaignData.type}
+              />
+            ) : (
+              <ResultsDisplay
+                results={results}
+                campaign={campaignData}
+                hasAccess={hasAccess}
+                queueCounts={safeQueueCounts}
+                ivrResponses={ivrResponses}
+              />
+            ))}
+          {isCampaignParentRoute &&
+            !hasAccess &&
+            campaignData &&
+            (campaignData.type === "live_call" || !campaignData.type) && (
+              <CampaignInstructions
+                campaignData={
+                  campaignData as {
+                    [key: string]: unknown;
+                    instructions?: { join?: string; script?: string };
+                  }
+                }
+                totalCalls={safeQueueCounts.queuedCount}
+                expectedTotal={safeQueueCounts.fullCount}
+                joinDisabled={joinDisabled}
+              />
+            )}
+          <Outlet
+            context={{
+              joinDisabled,
+              audiences,
+              campaignData,
+              campaignDetails,
+              scheduleDisabled,
+              phoneNumbers,
+              workspace,
+            }}
+          />
+        </div>
+      </div>
+    </CampaignShellDirtyProvider>
   );
 }

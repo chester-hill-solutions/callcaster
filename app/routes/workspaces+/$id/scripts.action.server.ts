@@ -1,57 +1,58 @@
 import { data as routeData } from "react-router";
-import { formatDateToLocale } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { ActionFunctionArgs } from "react-router";
-import type { Json , Database } from "@/lib/database.types";
-import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
-import type { User } from "@/lib/types";
+import { getScriptExportFields } from "@/lib/script-api-db.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
+import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
+import { defineAction } from "@/lib/handler.server";
 
-export async function action({ request }: ActionFunctionArgs) {
+export const action = defineAction({
+  auth: workspaceLoaderAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ request, auth: access }) => {
+    if (!access.ok) {
+      return access.response;
+    }
+    const { headers, workspaceId } = access.ctx;
 
-  const { supabaseClient, headers } = await verifyAuth(request);
+    const data = await parseActionRequest(request);
 
-  const formData = await request.formData();
-  const data = Object.fromEntries(formData.entries());
+    const idValue = data["id"];
+    if (!idValue) {
+      return routeData({ error: "Script ID is required" }, { status: 400, headers });
+    }
 
-  const idValue = data["id"];
-  if (!idValue) {
-    return routeData({ error: "Script ID is required" }, { status: 400 });
-  }
+    const scriptId = Number(idValue) || 0;
+    let script: { name: string; steps: unknown } | null;
+    try {
+      script = await getScriptExportFields(workspaceId, scriptId);
+    } catch (error) {
+      logger.error("Error fetching script:", error);
+      return routeData({ error: "Error fetching script" }, { status: 500, headers });
+    }
 
-  const { data: script, error: scriptError } = await supabaseClient
-    .from("script")
-    .select("name, steps")
-    .eq("id", Number(idValue) || 0)
-    .single();
+    if (!script) {
+      return routeData({ error: "Script not found" }, { status: 404, headers });
+    }
 
-  if (scriptError) {
-    logger.error("Error fetching script:", scriptError);
-    return routeData({ error: "Error fetching script" }, { status: 500 });
-  }
+    const scriptJson = JSON.stringify(script.steps, null, 2);
 
-  if (!script) {
-    return routeData({ error: "Script not found" }, { status: 404 });
-  }
+    const fileName = script.name
+      ? `${script.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`
+      : `callcaster_script_${new Date().toISOString().split("T")[0]}.json`;
 
-  const scriptJson = JSON.stringify(script.steps, null, 2);
-
-  const fileName = script.name
-    ? `${script.name.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.json`
-    : `callcaster_script_${new Date().toISOString().split("T")[0]}.json`;
-
-  return routeData(
-    {
-      fileContent: scriptJson,
-      fileName: fileName,
-      contentType: "application/json",
-    },
-    {
-      headers: {
-        ...headers,
-        "Content-Disposition": `attachment; filename="${fileName}"`,
-        "Content-Type": "application/json",
+    return routeData(
+      {
+        fileContent: scriptJson,
+        fileName: fileName,
+        contentType: "application/json",
       },
-    },
-  );
-}
+      {
+        headers: {
+          ...headers,
+          "Content-Disposition": `attachment; filename="${fileName}"`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+  },
+});

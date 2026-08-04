@@ -3,7 +3,7 @@ import { FetcherWithComponents } from "react-router";
 import { getNextContact } from "./getNextContact";
 import { Campaign, Contact, QueueItem, ActiveCall, OutreachAttempt, Call   } from "./types";
 import { isRecent } from "./utils";
-import { isObject } from "./type-utils";
+import { isObject } from "./type-safety-utils";
 import { logger } from "@/lib/logger.client";
 
 const getRecentAttempt = ({

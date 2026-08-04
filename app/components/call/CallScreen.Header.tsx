@@ -1,5 +1,22 @@
-import React from 'react';
+import React from "react";
 import { Button } from "@/components/ui/button";
+import { Heading, Text } from "@/components/ui/typography";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { FormField } from "@/components/ui/form-field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { AUDIO_DEVICE_UNAVAILABLE_VALUE } from "@/hooks/call/audio-device-selection";
 import {
   Mic,
   MicOff,
@@ -8,10 +25,19 @@ import {
   Headphones,
   Phone,
   Monitor,
-  Plus
+  Plus,
+  MoreHorizontal,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface CampaignHeaderProps {
+  className?: string;
+  settingsOnly?: boolean;
   campaign: {
     title: string;
   };
@@ -20,6 +46,8 @@ interface CampaignHeaderProps {
   mediaStream: MediaStream | null;
   availableMicrophones: MediaDeviceInfo[];
   availableSpeakers: MediaDeviceInfo[];
+  selectedMicrophone: string | null;
+  selectedSpeaker: string | null;
   onLeaveCampaign: () => void;
   onReportError: () => void;
   handleMicrophoneChange: (event: React.ChangeEvent<HTMLSelectElement>) => void;
@@ -29,7 +57,7 @@ interface CampaignHeaderProps {
   availableCredits: number;
   creditState: "GOOD" | "WARNING" | "BAD";
   hasAccess: boolean;
-  phoneStatus: 'disconnected' | 'connecting' | 'connected';
+  phoneStatus: "disconnected" | "connecting" | "connected";
   selectedDevice: string;
   onDeviceSelect: (device: string) => void;
   verifiedNumbers: string[];
@@ -39,16 +67,35 @@ interface CampaignHeaderProps {
   newPhoneNumber: string;
   onNewPhoneNumberChange: (value: string) => void;
   onVerifyNewNumber: () => void;
-  pin: string;
+  verificationPhoneNumber: string;
 }
 
+const creditBadgeClass: Record<CampaignHeaderProps["creditState"], string> = {
+  GOOD: "bg-success text-success-foreground",
+  WARNING: "bg-warning text-warning-foreground",
+  BAD: "bg-destructive text-destructive-foreground",
+};
+
+const creditLabel: Record<CampaignHeaderProps["creditState"], string> = {
+  GOOD: "Healthy",
+  WARNING: "Running Low",
+  BAD: "Critical",
+};
+
+const deviceSelectClass =
+  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+
 export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
+  className,
+  settingsOnly = false,
   campaign,
   count,
   completed,
   mediaStream: _mediaStream,
   availableMicrophones,
   availableSpeakers,
+  selectedMicrophone,
+  selectedSpeaker,
   onLeaveCampaign,
   onReportError,
   handleMicrophoneChange,
@@ -68,190 +115,348 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   newPhoneNumber,
   onNewPhoneNumberChange,
   onVerifyNewNumber,
-  pin
+  verificationPhoneNumber,
 }) => {
   const microphoneSelectId = "campaign-microphone-select";
   const speakerSelectId = "campaign-speaker-select";
-  const defaultMicrophoneId = availableMicrophones[0]?.deviceId ?? "";
-  const defaultSpeakerId = availableSpeakers[0]?.deviceId ?? "";
 
   return (
-    <div className="flex flex-col gap-6 p-6 w-full">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold font-Zilla-Slab text-gray-900">{campaign.title}</h1>
-          <p className="text-gray-600 mt-1">
-            {count - completed} of {count} remaining
-          </p>
-          {hasAccess && <p className="text-gray-600 mt-1 flex items-center gap-2">
-            {availableCredits} credits remaining
-            <span className={`px-2 py-0.5 rounded-full text-sm ${creditState === "GOOD" ? "bg-green-100 text-green-800" :
-                creditState === "WARNING" ? "bg-yellow-100 text-yellow-800" :
-                  "bg-red-100 text-red-800"
-              }`}>
-              {creditState === "GOOD" ? "Healthy" :
-                creditState === "WARNING" ? "Running Low" :
-                  "Critical"}
-            </span>
-          </p>}
-        </div>
-        <div className="flex gap-3">
-          <Button
-            variant="destructive"
-            onClick={onLeaveCampaign}
-            className="flex items-center gap-2"
-          >
-            <PhoneOff size={16} />
-            Leave Campaign
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onReportError}
-            className="flex items-center gap-2"
-          >
-            <AlertTriangle size={16} />
-            Report Issue
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="flex flex-col gap-2">
-          <label
-            htmlFor={microphoneSelectId}
-            className="text-sm font-medium text-gray-700 flex items-center gap-2"
-          >
-            <Mic size={16} /> Microphone
-          </label>
-          <select
-            id={microphoneSelectId}
-            defaultValue={defaultMicrophoneId}
-            onChange={handleMicrophoneChange}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {availableMicrophones.map((microphone) => (
-              <option
-                key={microphone.deviceId}
-                value={microphone.deviceId}
+    <div className={cn("flex w-full flex-col gap-4 p-4", className)}>
+      {!settingsOnly ? (
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <Heading as="h1" level={2} branded={false}>
+              {campaign.title}
+            </Heading>
+            <Text variant="muted" className="mt-1">
+              {count - completed} of {count} remaining
+            </Text>
+            {hasAccess ? (
+              <Text
+                variant="muted"
+                className="mt-1 flex flex-wrap items-center gap-2"
               >
-                {microphone.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label
-            htmlFor={speakerSelectId}
-            className="text-sm font-medium text-gray-700 flex items-center gap-2"
-          >
-            <Headphones size={16} /> Speaker
-          </label>
-          <select
-            id={speakerSelectId}
-            defaultValue={defaultSpeakerId}
-            onChange={handleSpeakerChange}
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {availableSpeakers.map((speaker) => (
-              <option
-                key={speaker.deviceId}
-                value={speaker.deviceId}
-              >
-                {speaker.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex items-end">
-          <Button
-            onClick={handleMuteMicrophone}
-            variant={isMicrophoneMuted ? "destructive" : "outline"}
-            className="w-full flex items-center justify-center gap-2"
-          >
-            {isMicrophoneMuted ? <MicOff size={16} /> : <Mic size={16} />}
-            {isMicrophoneMuted ? "Unmute Microphone" : "Mute Microphone"}
-          </Button>
-        </div>
-      </div>
-
-      <div className="flex items-center space-x-4 mt-4">
-        <div className="relative inline-block">
-          <select
-            value={selectedDevice}
-            onChange={(e) => onDeviceSelect(e.target.value)}
-            className="flex items-center space-x-2 px-3 py-2 rounded-md bg-gray-100 hover:bg-gray-200 pr-8 appearance-none cursor-pointer"
-          >
-            <option value="computer" className="flex items-center">
-              Computer Audio
-            </option>
-            {verifiedNumbers.map((number) => (
-              <option key={number} value={number}>
-                {number}
-              </option>
-            ))}
-          </select>
-          <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
-            {selectedDevice === 'computer' ? <Monitor size={16} /> : <Phone size={16} />}
+                {availableCredits} credits remaining
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-sm font-medium",
+                    creditBadgeClass[creditState],
+                  )}
+                >
+                  {creditLabel[creditState]}
+                </span>
+              </Text>
+            ) : null}
           </div>
-          {phoneStatus === 'connecting' && (
-            <span className="ml-2 text-yellow-500">Connecting...</span>
-          )}
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="destructive"
+              onClick={onLeaveCampaign}
+              className="flex items-center gap-2"
+            >
+              <PhoneOff size={16} />
+              Leave Campaign
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onReportError}
+              className="flex items-center gap-2"
+            >
+              <AlertTriangle size={16} />
+              Report Issue
+            </Button>
+          </div>
         </div>
+      ) : null}
 
-        <Button
-          variant="outline"
-          onClick={onAddNumberClick}
-          className="flex items-center gap-2"
-        >
-          <Plus size={16} />
-          Add Phone Number
-        </Button>
+      <Accordion
+        type="single"
+        collapsible
+        defaultValue={settingsOnly ? "devices" : undefined}
+        className="w-full"
+      >
+        <AccordionItem value="devices" className="border-border/60">
+          <AccordionTrigger
+            className={cn(
+              "py-2 text-sm font-medium hover:no-underline",
+              settingsOnly && "sr-only",
+            )}
+          >
+            Audio & phone settings
+          </AccordionTrigger>
+          <AccordionContent className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <FormField
+                htmlFor={microphoneSelectId}
+                label={
+                  <span className="flex items-center gap-2">
+                    <Mic size={16} /> Microphone
+                  </span>
+                }
+              >
+                <Select
+                  value={selectedMicrophone ?? AUDIO_DEVICE_UNAVAILABLE_VALUE}
+                  onValueChange={(value) =>
+                    handleMicrophoneChange({
+                      target: { value },
+                    } as React.ChangeEvent<HTMLSelectElement>)
+                  }
+                >
+                  <SelectTrigger
+                    id={microphoneSelectId}
+                    className={deviceSelectClass}
+                  >
+                    <SelectValue placeholder="Select microphone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMicrophones.map((microphone) => (
+                      <SelectItem
+                        key={microphone.deviceId}
+                        value={microphone.deviceId}
+                      >
+                        {microphone.label}
+                      </SelectItem>
+                    ))}
+                    {availableMicrophones.length === 0 ? (
+                      <SelectItem
+                        value={AUDIO_DEVICE_UNAVAILABLE_VALUE}
+                        disabled
+                      >
+                        Microphone unavailable
+                      </SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              </FormField>
 
-        {/* Add Number Dialog */}
-        {isAddingNumber && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-              <h2 className="text-xl font-semibold mb-4">Add Phone Number</h2>
-              <p className="text-gray-600 mb-4">
-                Enter your phone number to verify it for making calls.
-              </p>
-              <input
-                type="tel"
-                value={newPhoneNumber}
-                onChange={(e) => onNewPhoneNumberChange(e.target.value)}
-                placeholder="+1234567890"
-                className="w-full px-3 py-2 border rounded-md mb-4"
-              />
-              <div className="flex space-x-3">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onVerifyNewNumber();
-                  }}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              <FormField
+                htmlFor={speakerSelectId}
+                label={
+                  <span className="flex items-center gap-2">
+                    <Headphones size={16} /> Speaker
+                  </span>
+                }
+              >
+                <Select
+                  value={selectedSpeaker ?? AUDIO_DEVICE_UNAVAILABLE_VALUE}
+                  onValueChange={(value) =>
+                    handleSpeakerChange({
+                      target: { value },
+                    } as React.ChangeEvent<HTMLSelectElement>)
+                  }
                 >
-                  Verify Number
-                </button>
-                <button
-                  onClick={onAddNumberCancel}
-                  className="px-4 py-2 border rounded hover:bg-gray-50"
+                  <SelectTrigger
+                    id={speakerSelectId}
+                    className={deviceSelectClass}
+                  >
+                    <SelectValue placeholder="Select speaker" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSpeakers.map((speaker) => (
+                      <SelectItem
+                        key={speaker.deviceId}
+                        value={speaker.deviceId}
+                      >
+                        {speaker.label}
+                      </SelectItem>
+                    ))}
+                    {availableSpeakers.length === 0 ? (
+                      <SelectItem
+                        value={AUDIO_DEVICE_UNAVAILABLE_VALUE}
+                        disabled
+                      >
+                        Speaker unavailable
+                      </SelectItem>
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              </FormField>
+
+              <div className="flex items-end">
+                <Button
+                  onClick={handleMuteMicrophone}
+                  variant={isMicrophoneMuted ? "destructive" : "outline"}
+                  className="flex w-full items-center justify-center gap-2"
                 >
-                  Cancel
-                </button>
+                  {isMicrophoneMuted ? <MicOff size={16} /> : <Mic size={16} />}
+                  {isMicrophoneMuted ? "Unmute Microphone" : "Mute Microphone"}
+                </Button>
               </div>
             </div>
-          </div>
-        )}
-        {pin &&
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-              <p className="text-gray-600 mb-4">On your phone, enter the PIN: {pin}</p>  
+
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="relative inline-block">
+                <Select value={selectedDevice} onValueChange={onDeviceSelect}>
+                  <SelectTrigger
+                    className={cn(deviceSelectClass, "cursor-pointer pr-8")}
+                  >
+                    <SelectValue placeholder="Select device" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="computer">Computer Audio</SelectItem>
+                    {verifiedNumbers.map((number) => (
+                      <SelectItem key={number} value={number}>
+                        {number}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2">
+                  {selectedDevice === "computer" ? (
+                    <Monitor size={16} />
+                  ) : (
+                    <Phone size={16} />
+                  )}
+                </div>
+                {phoneStatus === "connecting" ? (
+                  <span className="ml-2 text-warning">Connecting...</span>
+                ) : null}
+              </div>
+
+              {!isAddingNumber && !verificationPhoneNumber ? (
+                <Button
+                  variant="outline"
+                  onClick={onAddNumberClick}
+                  className="flex items-center gap-2"
+                >
+                  <Plus size={16} />
+                  Add Phone Number
+                </Button>
+              ) : null}
             </div>
-          </div>
-        }
-      </div>
+
+            {isAddingNumber ? (
+              <div
+                className="mt-4 space-y-3 rounded-md border border-border bg-muted/30 p-4"
+                data-testid="add-phone-inline"
+              >
+                <div>
+                  <p className="text-sm font-medium">Add Phone Number</p>
+                  <p className="text-sm text-muted-foreground">
+                    Enter your phone number to verify it for making calls.
+                  </p>
+                </div>
+                <input
+                  type="tel"
+                  value={newPhoneNumber}
+                  onChange={(e) => onNewPhoneNumberChange(e.target.value)}
+                  placeholder="+1234567890"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={onVerifyNewNumber}>
+                    Verify Number
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={onAddNumberCancel}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {verificationPhoneNumber ? (
+              <div
+                className="mt-4 space-y-2 rounded-md border border-border bg-muted/30 p-4"
+                data-testid="verify-phone-inline"
+              >
+                <p className="text-sm font-medium">Verify by calling in</p>
+                <p className="text-sm text-muted-foreground">
+                  Call {verificationPhoneNumber} from {newPhoneNumber} within 10
+                  minutes. Your number will be verified when the call connects.
+                </p>
+              </div>
+            ) : null}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
     </div>
   );
 };
+
+interface TopChromeProps {
+  campaign: { title: string };
+  count: number;
+  completed: number;
+  availableCredits: number;
+  creditState: CampaignHeaderProps["creditState"];
+  hasAccess: boolean;
+  predictive: boolean;
+  onLeaveCampaign: () => void;
+  onReportError: () => void;
+  children?: React.ReactNode;
+}
+
+export function TopChrome({
+  campaign,
+  count,
+  completed,
+  availableCredits,
+  creditState,
+  hasAccess,
+  predictive,
+  onLeaveCampaign,
+  onReportError,
+  children,
+}: TopChromeProps) {
+  return (
+    <header className="sticky top-0 z-20 rounded-xl border bg-background/95 px-3 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/85">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <Heading as="h1" level={3} branded={false} className="truncate">
+            {campaign.title}
+          </Heading>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              {count - completed} of {count} remaining
+            </span>
+            <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-foreground">
+              {predictive ? "Power dialing" : "Manual dialing"}
+            </span>
+            {hasAccess ? (
+              <span
+                className={cn(
+                  "rounded-full px-2 py-0.5 font-medium",
+                  creditBadgeClass[creditState],
+                )}
+              >
+                {availableCredits} credits
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          {children}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Campaign actions"
+              >
+                <MoreHorizontal className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={onReportError}>
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Report Issue
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={onLeaveCampaign}
+                className="text-destructive focus:text-destructive"
+              >
+                <PhoneOff className="mr-2 h-4 w-4" />
+                Leave Campaign
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </header>
+  );
+}

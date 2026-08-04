@@ -1,14 +1,24 @@
-import { Call, Campaign, IVRCampaign, OutreachAttempt, Script, type Block } from "@/lib/types";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { Call, Campaign, OutreachAttempt, Script, type Block } from "@/lib/types";
+import { resolveCampaignScript, fetchCampaignWithScript } from "@/lib/campaign-ivr.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
-import { voiceCreditsFromDurationSeconds } from "@/lib/pricing";
-import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import {
+  hangupTwiml,
+  pausePlayTwiml,
+  pauseSayTwiml,
+} from "@/lib/twilio-twiml.server";
+import {
+  buildCallUpsertFromTwilioParams,
+  processCallStatusWebhook,
+  twilioParamsToUnderCase,
+} from "@/lib/twilio-call-status.server";
+import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import { defineAction } from "@/lib/handler.server";
+import type Twilio from "twilio";
 
 export interface CallEvent {
     Called: string;
@@ -45,23 +55,14 @@ export interface CallEvent {
     FromState: string;
   }
 
-  const updateResult = async (supabase: SupabaseClient, outreach_attempt_id: number | null | undefined, update: Partial<OutreachAttempt>): Promise<void> => {
+  const updateResult = async (workspaceId: string, outreach_attempt_id: number | null | undefined, update: Partial<OutreachAttempt>): Promise<void> => {
     if (!outreach_attempt_id) {
         throw new Error("outreach_attempt_id is undefined");
     }
-    const { error } = await supabase
-        .from('outreach_attempt')
-        .update(update)
-        .eq('id', outreach_attempt_id);
-    if (error) throw error;
-};
-
-const updateCallStatus = async (supabase: SupabaseClient, callSid: string, status: string, timestamp: string): Promise<void> => {
-    const { error } = await supabase
-        .from('call')
-        .update({ end_time: new Date(timestamp).toISOString(), status })
-        .eq('sid', callSid);
-    if (error) throw error;
+    const result = await updateOutreachAttemptForWorkspace(workspaceId, outreach_attempt_id, update);
+    if (result instanceof Response) {
+        throw new Error("Failed to update outreach attempt");
+    }
 };
 
 interface ScriptSteps {
@@ -83,97 +84,64 @@ function findVoicemailPage(pagesObject: Record<string, { title: string; blocks: 
     return null;
 }
 
-const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { ivr_campaign: IVRCampaign & { script: Script } }, supabase: SupabaseClient): Promise<void> => {
+const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { script: Script | Script[] | null }): Promise<void> => {
     const call = twilio.calls(callSid);
-    await updateResult(supabase, dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
-    const scriptSteps = (campaign.ivr_campaign.script?.steps as unknown) as ScriptSteps | null | undefined;
+    await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
+    const scriptSteps = (resolveCampaignScript(campaign)?.steps as unknown) as ScriptSteps | null | undefined;
     const step = findVoicemailPage(scriptSteps?.pages);
     if (!step) {
-        await call.update({
-            twiml: `<Response><Hangup/></Response>`
-        });
+        await call.update({ twiml: hangupTwiml() });
     } else {
         if (step.speechType === 'synthetic') {
-            await call.update({
-                twiml: `<Response><Pause length="1"/><Say>${step.say}</Say></Response>`
-            });
+            await call.update({ twiml: pauseSayTwiml(step.say ?? "") });
         } else {
             if (!campaign.voicemail_file) {
                 throw new Error("Voicemail file is undefined");
             }
-            const { data, error } = await supabase.storage
-                .from(`workspaceAudio`)
-                .createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600);
-            if (error) throw { 'Status_Error': error };
-            if (!data?.signedUrl) {
-                throw new Error("Failed to create signed URL for voicemail file");
-            }
-            await call.update({
-                twiml: `<Response><Pause length="1"/><Play>${data.signedUrl}</Play></Response>`
-            });
+            const signedUrl = await createSignedObjectUrl(
+                "workspaceAudio",
+                `${dbCall.workspace}/${campaign.voicemail_file}`,
+                3600,
+            );
+            await call.update({ twiml: pausePlayTwiml(signedUrl) });
         }
     }
 };
 
-const handleCallStatusUpdate = async (supabase: SupabaseClient, callSid: string, status: string, timestamp: string, outreach_attempt_id: number | null | undefined, disposition: string): Promise<void> => {
-    await Promise.all([
-        updateCallStatus(supabase, callSid, status, timestamp),
-        updateResult(supabase, outreach_attempt_id, { disposition })
-    ]);
-};
-
-const debitIvrCallCredits = async (
-    supabase: SupabaseClient,
-    args: {
-        callSid: string;
-        workspaceId: string;
-        campaignName: string;
-        durationSeconds: number;
+export const action = defineAction({
+    auth: async ({ request }) => {
+        const formData = await request.clone().formData();
+        const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+        const underCase = twilioParamsToUnderCase(params);
+        const callSid = typeof underCase.call_sid === "string" ? underCase.call_sid : null;
+        if (!callSid) {
+            // Preserve the original order: the handler throws "Missing CallSid"
+            // (caught into `{ success: false }`) before any signature check.
+            return { params, underCase, callSid };
+        }
+        const forbidden = await requireTwilioSignature(request, { callSid });
+        return forbidden ?? { params, underCase, callSid };
     },
-): Promise<void> => {
-    const credits = voiceCreditsFromDurationSeconds(args.durationSeconds, "ivr");
-    await insertTransactionHistoryIdempotent({
-        supabase,
-        workspaceId: args.workspaceId,
-        type: "DEBIT",
-        amount: -credits,
-        note: `IVR Call ${args.callSid}, Campaign ${args.campaignName}, Duration ${args.durationSeconds}s`,
-        idempotencyKey: `call:${args.callSid}`,
-    });
-};
-
-export const action = async ({ request }: ActionFunctionArgs) => {
-    const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
-    const formData = await request.formData();
-    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    const parsedBody = params as unknown as CallEvent;
-    const callSid = parsedBody.CallSid;
+    sideEffects: ["db-write", "credit", "twilio", "external"],
+    handler: async ({ auth }) => {
+    const { params, underCase, callSid } = auth;
 
     try {
-        const validation = await validateTwilioWebhookForCallSid({
-            request,
-            supabase,
-            callSid,
-            params,
-        });
-        if (!validation.ok) {
-            return validation.response;
+        if (!callSid) {
+            throw new Error("Missing CallSid");
         }
 
-        const { data: dbCall, error: callError } = await supabase
-            .from('call')
-            .select('outreach_attempt_id, workspace, campaign(*, ivr_campaign(*, script(*)))')
-            .eq('sid', callSid)
-            .single();
-        if (callError) throw callError;
+        const dbCall = await findCallBySid(callSid);
         if (!dbCall) throw new Error("Call not found");
+        if (!dbCall.workspace) throw new Error("Call missing workspace");
+        const campaignData = await fetchCampaignWithScript(dbCall.campaign_id);
 
-        const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id: dbCall.workspace as string});
-        
-        const callStatus = parsedBody.CallStatus;
-        const timestamp = String(parsedBody.Timestamp || '');
+        const twilio = await createWorkspaceTwilioInstance({ workspace_id: dbCall.workspace });
 
-        const answeredBy = parsedBody.AnsweredBy;
+        const callStatus = typeof underCase.call_status === "string" ? underCase.call_status : "";
+        const timestamp = typeof underCase.timestamp === "string" ? underCase.timestamp : '';
+
+        const answeredBy = typeof underCase.answered_by === "string" ? underCase.answered_by : "";
         const isMachine =
             Boolean(answeredBy) &&
             answeredBy.includes('machine') &&
@@ -181,63 +149,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             callStatus !== 'completed';
 
         if (isMachine) {
-            await handleVoicemail(
-                twilio,
-                callSid,
-                dbCall as unknown as Call,
-                dbCall.campaign as unknown as Campaign & { ivr_campaign: IVRCampaign & { script: Script } },
-                supabase,
-            );
-        } else {
-            switch (callStatus) {
-                case 'failed': {
-                    await handleCallStatusUpdate(
-                        supabase,
-                        callSid,
-                        callStatus,
-                        timestamp,
-                        dbCall.outreach_attempt_id as number | null,
-                        'failed',
-                    );
-                    break;
-                }
-                case 'no-answer': {
-                    await handleCallStatusUpdate(
-                        supabase,
-                        callSid,
-                        callStatus,
-                        timestamp,
-                        dbCall.outreach_attempt_id as number | null,
-                        'no-answer',
-                    );
-                    break;
-                }
-                case 'completed': {
-                    await handleCallStatusUpdate(
-                        supabase,
-                        callSid,
-                        callStatus,
-                        timestamp,
-                        dbCall.outreach_attempt_id as number | null,
-                        'completed',
-                    );
-                    const durationSeconds = Math.max(
-                        Number(parsedBody.CallDuration) || 0,
-                        Number(parsedBody.Duration) || 0,
-                    );
-                    if (dbCall.workspace) {
-                        const campaign = dbCall.campaign as { name?: string } | null;
-                        await debitIvrCallCredits(supabase, {
-                            callSid,
-                            workspaceId: String(dbCall.workspace),
-                            campaignName: campaign?.name ?? "unknown",
-                            durationSeconds,
-                        });
-                    }
-                    break;
-                }
-                default:
-                    break;
+            // `dbCall` is already typed as `Call` (`Call` and `findCallBySid`'s
+            // `CallRow` both alias the same Drizzle-inferred `call` row via
+            // `@/lib/db-types`), so it needs no cast here. `fetchCampaignWithScript`'s
+            // `script` field can be `undefined` (a `script_id` set on the campaign
+            // with no matching `script` row), which `handleVoicemail`'s
+            // `Script | Script[] | null` parameter type doesn't cover — normalize
+            // that one field to `null` instead of casting the whole shape away, so
+            // a genuinely ill-shaped campaign/call row still fails to compile
+            // rather than silently becoming `undefined` at runtime.
+            await handleVoicemail(twilio, callSid, dbCall, {
+                ...campaignData,
+                script: campaignData.script ?? null,
+            });
+        } else if (['failed', 'no-answer', 'completed'].includes(callStatus)) {
+            const updateData = buildCallUpsertFromTwilioParams(params);
+            await processCallStatusWebhook(updateData, {
+                campaignType: campaignData.type ?? null,
+                workspaceId: String(dbCall.workspace),
+                campaignId: dbCall.campaign_id ?? null,
+                contactId: dbCall.contact_id ?? null,
+                outreachAttemptId: dbCall.outreach_attempt_id ?? null,
+                userId: dbCall.user_id ?? null,
+                note: `IVR Call ${callSid}, Campaign ${campaignData.title ?? "unknown"}`,
+            });
+            // `processCallStatusWebhook` only persists the `call` row, so without
+            // this the attempt keeps a NULL disposition and `get_campaign_stats`
+            // filters the call out of campaign results entirely. Twilio's
+            // terminal statuses are already valid disposition values; a machine
+            // answer that later reports `completed` keeps its `voicemail`
+            // disposition via the terminal-transition guard in
+            // `updateOutreachAttemptForWorkspace`.
+            if (dbCall.outreach_attempt_id) {
+                await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, {
+                    disposition: callStatus,
+                });
             }
         }
     } catch (error) {
@@ -245,4 +191,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         return routeData({ success: false, error });
     }
     return routeData({ success: true });
-};
+    },
+});

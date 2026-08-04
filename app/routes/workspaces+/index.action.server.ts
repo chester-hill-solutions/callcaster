@@ -1,38 +1,76 @@
-import { createNewWorkspace } from "@/lib/database.server";
+import { createNewWorkspace } from "@/lib/database/workspace-provisioning.server";
 import { logger } from "@/lib/logger.server";
-import { redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { ActionFunctionArgs } from "react-router";
+import { data as routeData, redirect } from "react-router";
+import { getSession } from "@/lib/auth.server";
+import { defineAction } from "@/lib/handler.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+const MAX_WORKSPACE_NAME_LENGTH = 200;
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+function resolveRequestId(request: Request): string {
+  return (
+    request.headers.get("x-request-id") ??
+    (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `req-${Date.now()}`)
+  );
+}
 
-  const formData = await request.formData();
+export const action = defineAction({
+  auth: async ({ request }) => {
+    const { headers, user } = await getSession(request);
+    if (!user) {
+      throw redirect("/signin");
+    }
+    return { headers, user };
+  },
+  // createNewWorkspace applies the welcome-credits grant to the ledger.
+  sideEffects: ["db-write", "credit", "twilio", "external"],
+  handler: async ({ request, auth }) => {
+    const { headers, user } = auth;
+    const requestId = resolveRequestId(request);
 
-  const newWorkspaceName = formData.get("newWorkspaceName") as string;
-  const userId = formData.get("userId") as string;
+    const formData = await request.formData();
+    const rawName = formData.get("newWorkspaceName");
+    const newWorkspaceName =
+      typeof rawName === "string" ? rawName.trim() : "";
 
-  if (!newWorkspaceName || !userId) {
-    return { error: "Workspace name or User Id missing!" };
-  }
+    if (!newWorkspaceName) {
+      return routeData(
+        { error: "Workspace name is required." },
+        { status: 400, headers },
+      );
+    }
 
-  const { data: newWorkspaceId, error, provisioningWarning } = await createNewWorkspace({
-    supabaseClient,
-    workspaceName: newWorkspaceName,
-    user_id: userId,
-  });
-  if (error) {
-    logger.error("Error creating workspace:", error);
-    return { error: "Failed to create Workspace" };
-  }
+    if (newWorkspaceName.length > MAX_WORKSPACE_NAME_LENGTH) {
+      return routeData(
+        {
+          error: `Workspace name must be ${MAX_WORKSPACE_NAME_LENGTH} characters or fewer.`,
+        },
+        { status: 400, headers },
+      );
+    }
 
-  if (newWorkspaceId) {
+    const { data: newWorkspaceId, error, provisioningWarning } =
+      await createNewWorkspace({
+        workspaceName: newWorkspaceName,
+        user_id: user.id,
+      });
+
+    if (error || !newWorkspaceId) {
+      logger.error("Error creating workspace", {
+        requestId,
+        userId: user.id,
+        error,
+      });
+      return routeData(
+        { error: "Failed to create workspace. Please try again." },
+        { status: 500, headers },
+      );
+    }
+
     const redirectUrl = provisioningWarning
       ? `/workspaces/${newWorkspaceId}?provisioning=continues`
       : `/workspaces/${newWorkspaceId}`;
     return redirect(redirectUrl, { headers });
-  }
-
-  return { ok: true, error: null };
-}
+  },
+});

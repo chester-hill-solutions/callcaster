@@ -16,6 +16,12 @@ export const SaveBar = ({
   isSaving = false,
   message = 'You have unsaved changes'
 }: SaveBarProps) => {
+  /**
+   * @effect Wire a global Cmd/Ctrl+S keyboard shortcut to trigger onSave while there are unsaved changes.
+   * @effect-deps isChanged, isSaving, onSave — the handler must see current values to guard the save and avoid double-submits.
+   * @effect-side-effects dom (document keydown listener; removed on cleanup/re-run)
+   * @effect-why-not-loader A global keyboard shortcut requires a document-level event listener; there's no loader/fetcher equivalent for DOM key events.
+   */
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 's') {
@@ -33,7 +39,7 @@ export const SaveBar = ({
   if (!isChanged && !isSaving) return null;
 
   return (
-    <div className="sticky top-0 z-50 bg-white border-b px-4 py-2 flex items-center justify-between">
+    <div className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b bg-background px-4 py-2">
       <span className="text-sm">{message}</span>
       <div className="flex gap-2">
         {onReset && (
@@ -46,12 +52,7 @@ export const SaveBar = ({
             Reset
           </Button>
         )}
-        <Button
-          onClick={onSave}
-          size="sm"
-          className="bg-red-600 hover:bg-red-700 text-white"
-          disabled={isSaving}
-        >
+        <Button onClick={onSave} size="sm" disabled={isSaving}>
           {isSaving ? "Saving..." : "Save Changes"}
         </Button>
       </div>

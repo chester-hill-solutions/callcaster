@@ -17,7 +17,7 @@ export function processTemplateTags(text: string, contact: Contact): string {
           value = contact.surname || "";
           break;
         case "fullname":
-          value = contact.fullname || `${contact.firstname || ""} ${contact.surname || ""}`.trim();
+          value = `${contact.firstname || ""} ${contact.surname || ""}`.trim();
           break;
         case "phone":
           value = contact.phone || "";

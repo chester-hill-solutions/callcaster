@@ -2,7 +2,7 @@ import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router";
-import { noop, SmokeRouter, DataSmokeRouter } from "./_helpers/component-smoke";
+import { SmokeRouter, DataSmokeRouter } from "./_helpers/component-smoke";
 
 vi.mock("next-themes", () => ({
   useTheme: () => ({ setTheme: vi.fn(), theme: "light", resolvedTheme: "light" }),
@@ -41,47 +41,6 @@ describe("app/components/shared/BrandedCard.tsx", () => {
       </BrandedCard>,
     );
     expect(screen.getByText("Title")).toBeInTheDocument();
-  });
-});
-
-describe("app/components/shared/ErrorBoundary.tsx", () => {
-  test("renders children when no error", async () => {
-    const { ErrorBoundary } = await import("@/components/shared/ErrorBoundary");
-    render(
-      <ErrorBoundary>
-        <span>ok</span>
-      </ErrorBoundary>,
-    );
-    expect(screen.getByText("ok")).toBeInTheDocument();
-  });
-
-  test("shows fallback on child error", async () => {
-    const { ErrorBoundary } = await import("@/components/shared/ErrorBoundary");
-    const boundary = new ErrorBoundary({
-      children: <span>ok</span>,
-      fallback: <div>fallback</div>,
-    });
-    boundary.state = ErrorBoundary.getDerivedStateFromError(new Error("boom"));
-
-    render(<>{boundary.render()}</>);
-    expect(screen.getByText("fallback")).toBeInTheDocument();
-  });
-});
-
-describe("app/components/shared/Icons.tsx", () => {
-  test("renders exported icons", async () => {
-    const Icons = await import("@/components/shared/Icons");
-    for (const [name, Icon] of Object.entries(Icons)) {
-      if (typeof Icon !== "function") continue;
-      const { unmount } = render(<Icon />);
-      unmount();
-      if (name === "SignIcon") {
-        render(<Icon fill="#f00" height="12px" width="34px" text="A" />);
-      }
-      if (name === "EditIcon") {
-        render(<Icon fill="#0f0" height="1px" width="2px" />);
-      }
-    }
   });
 });
 
@@ -245,7 +204,7 @@ describe("app/components/layout/Navbar.tsx", () => {
         />
       </SmokeRouter>,
     );
-    expect(screen.getByText(/Home|WS|user/i)).toBeTruthy();
+    expect(screen.getAllByText(/Home|WS|user/i).length).toBeGreaterThan(0);
   });
 
   test("signed-out navbar", async () => {
@@ -267,18 +226,46 @@ describe("app/components/layout/Navbar.tsx", () => {
 describe("app/components/layout/Navbar.MobileMenu.tsx", () => {
   test("mobile menu toggles", async () => {
     const { MobileMenu } = await import("@/components/layout/Navbar.MobileMenu");
-    render(
-      <SmokeRouter>
-        <MobileMenu
-          isSignedIn
-          user={{ id: "u1", username: "user", workspace_invite: [] } as never}
-          handleSignOut={async () => ({ success: null, error: null })}
-          onClose={noop}
-        />
-      </SmokeRouter>,
-    );
-    const menuBtn = screen.getAllByRole("button")[0];
-    fireEvent.click(menuBtn);
+
+    // MobileMenu is a controlled Sheet: it renders nothing until `open`, and asks
+    // its owner to close via `onOpenChange`. Drive it the way Navbar.tsx does.
+    function Harness() {
+      const [open, setOpen] = React.useState(false);
+      return (
+        <SmokeRouter>
+          <button type="button" onClick={() => setOpen(true)}>
+            Open navigation menu
+          </button>
+          <MobileMenu
+            open={open}
+            onOpenChange={setOpen}
+            isSignedIn
+            user={
+              {
+                id: "u1",
+                first_name: "ada",
+                username: "user",
+                workspace_invite: [],
+              } as never
+            }
+            handleSignOut={async () => ({ success: null, error: null })}
+            workspaces={null}
+            activeWorkspaceId={undefined}
+            creditWorkspace={null}
+          />
+        </SmokeRouter>
+      );
+    }
+    render(<Harness />);
+
+    expect(screen.queryByRole("link", { name: "Workspaces" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open navigation menu" }));
+    expect(screen.getByRole("link", { name: "Workspaces" })).toBeInTheDocument();
+
+    // Picking a destination has to close the sheet, or it covers the page it navigated to.
+    fireEvent.click(screen.getByRole("link", { name: "Workspaces" }));
+    expect(screen.queryByRole("link", { name: "Workspaces" })).toBeNull();
   });
 });
 
@@ -294,22 +281,58 @@ describe("app/components/file-assets/columns.tsx", () => {
   test("column defs render cells", async () => {
     const { mediaColumns } = await import("@/components/file-assets/columns");
     expect(mediaColumns.length).toBeGreaterThan(0);
+    // Sidecar-backed columns read row.original; the Edit action renders a Link,
+    // so these cells need a router.
+    const original = {
+      name: "f.mp3",
+      id: "f.mp3",
+      created_at: new Date().toISOString(),
+      signedUrl: "https://cdn.example/a.mp3",
+      durationMs: 125_000,
+      sizeBytes: 2048,
+      sourceFileName: "intro.mp3",
+    };
     const row = {
-      getValue: (k: string) =>
-        k === "created_at"
-          ? new Date().toISOString()
-          : k === "signedUrl"
-            ? "https://cdn.example/a.mp3"
-            : "f.mp3",
+      original,
+      getValue: (k: string) => (original as Record<string, unknown>)[k],
     };
     for (const col of mediaColumns) {
       if (col.cell && typeof col.cell === "function") {
         render(
-          <>
+          <MemoryRouter>
             {(col.cell as (ctx: { row: typeof row }) => React.ReactNode)({ row })}
-          </>,
+          </MemoryRouter>,
         );
       }
     }
+    expect(screen.getByText("2:05")).toBeInTheDocument();
+    expect(screen.getByText("intro.mp3")).toBeInTheDocument();
+    expect(screen.getByText("2 KB")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Edit" })).toBeInTheDocument();
+  });
+
+  test("sidecar columns show a dash rather than zero when metadata is absent", async () => {
+    const { mediaColumns } = await import("@/components/file-assets/columns");
+    // Objects predating the sidecar have no row: "unknown", not "0:00".
+    const original = {
+      name: "legacy.mp3",
+      id: "legacy.mp3",
+      created_at: new Date().toISOString(),
+      signedUrl: null,
+      durationMs: null,
+      sizeBytes: null,
+      sourceFileName: null,
+    };
+    const row = {
+      original,
+      getValue: (k: string) => (original as Record<string, unknown>)[k],
+    };
+    const lengthColumn = mediaColumns.find((c) => c.id === "durationMs" || (c as { accessorKey?: string }).accessorKey === "durationMs");
+    render(
+      <MemoryRouter>
+        {(lengthColumn?.cell as (ctx: { row: typeof row }) => React.ReactNode)({ row })}
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 });

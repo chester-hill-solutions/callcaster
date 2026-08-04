@@ -68,6 +68,8 @@ export const testWebhookBodySchema = z.object({
 
 export const createApiKeyBodySchema = z.object({
   name: z.string().min(1).max(200),
+  scopes: z.array(z.string().min(1)).min(1),
+  expires_in_days: z.number().int().min(1).max(365).optional(),
 });
 
 export const deleteApiKeyBodySchema = z.object({

@@ -1,68 +1,45 @@
-import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { loadInboundIvrPageContext } from "@/lib/inbound-ivr-db.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { requireTwilioSignatureForIvrPage } from "@/lib/ivr-webhook-auth.server";
+import { findCallBySid } from "@/lib/telephony-db.server";
+import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<string, unknown>;
 }
 
-export const action = async ({ params, request }: ActionFunctionArgs) => {
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+export const action = defineAction({
+  auth: ({ request, params }) =>
+    requireTwilioSignatureForIvrPage(request, [params.numberId, params.pageId]),
+  sideEffects: ["db-read"],
+  handler: async ({ params, auth }) => {
   const twiml = new Twilio.twiml.VoiceResponse();
   const { numberId, pageId } = params as { numberId: string; pageId: string };
-  const formData = await request.formData();
-  const paramsObj = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const callSid = paramsObj.CallSid ?? null;
-
-  if (!callSid || !numberId || !pageId) {
-    return new Response("Missing required parameters", { status: 400 });
-  }
-
-  const validation = await validateTwilioWebhookForCallSid({
-    request,
-    supabase,
-    callSid,
-    params: paramsObj,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const { callSid } = auth;
 
   try {
-    const { data: number } = await supabase
-      .from("workspace_number")
-      .select("id, inbound_script_id")
-      .eq("id", Number(numberId))
-      .single();
-
-    if (!number?.inbound_script_id) {
-      twiml.say("There was an error in the IVR flow. Goodbye.");
-      twiml.hangup();
-      return new Response(twiml.toString(), {
-        headers: { "Content-Type": "application/xml" },
+    const call = await findCallBySid(callSid);
+    if (!call?.to) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
       });
     }
 
-    const { data: script } = await supabase
-      .from("script")
-      .select("steps")
-      .eq("id", number.inbound_script_id)
-      .single();
+    const context = await loadInboundIvrPageContext(Number(numberId));
 
-    const steps = script?.steps as Script | null | undefined;
-    if (!steps?.pages) {
+    if (!context || call.to !== context.phoneNumber) {
       twiml.say("There was an error in the IVR flow. Goodbye.");
       twiml.hangup();
       return new Response(twiml.toString(), {
-        headers: { "Content-Type": "application/xml" },
+        headers: { "Content-Type": "text/xml" },
       });
     }
 
+    const steps = context.steps as Script;
     const currentPage = steps.pages[pageId];
     if (currentPage && currentPage.blocks.length > 0) {
       const firstBlockId = currentPage.blocks[0];
@@ -78,7 +55,7 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   }
 
   return new Response(twiml.toString(), {
-    headers: { "Content-Type": "application/xml" },
+    headers: { "Content-Type": "text/xml" },
   });
-
-};
+  },
+});

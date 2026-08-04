@@ -11,10 +11,10 @@ const sessionStorage = createCookieSessionStorage({
     httpOnly: true,
     sameSite: "lax",
     secrets: ["asdkjflqkwemr"],
-    // Set domain and secure only if in production
-    ...(isProduction
-      ? { domain: "your-production-domain.com", secure: true }
-      : {}),
+    // No explicit domain: a Domain attribute that doesn't match the host makes
+    // browsers silently drop the cookie (the previous placeholder value meant
+    // theme preferences never persisted in production).
+    ...(isProduction ? { secure: true } : {}),
   },
 });
 

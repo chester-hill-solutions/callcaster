@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
-import { Device as TwilioDevice } from "@twilio/voice-sdk";
 import { logger } from "@/lib/logger.client";
 import { attachTwilioListener } from "@/lib/twilio/call-listener-utils.client";
-
-const getTwilioSDK = () => {
-  if (typeof window === "undefined") return null;
-  return { Device: TwilioDevice };
-};
 
 export type DeviceOptions = {
   allowIncomingWhileBusy?: boolean;
@@ -58,6 +52,21 @@ export function useTwilioConnection({
   onCallStateChangeRef.current = onCallStateChange;
   onDeviceBusyChangeRef.current = onDeviceBusyChange;
 
+  /**
+   * @effect Create and register a Twilio Voice SDK `Device` for the given auth
+   * token, lazily loading the SDK, and wire all device-level lifecycle events
+   * (registered/unregistered/connecting/connected/disconnected/cancel/error/
+   * incoming) to the latest caller-supplied callbacks.
+   * @effect-deps token, deviceOptions (a new/changed token or device options
+   * means a new Device must be created and registered; callback props are read
+   * via refs so they don't need to be deps and don't retrigger setup)
+   * @effect-side-effects subscription (Twilio Device event listeners) + network
+   * (lazy SDK import, device.register()/unregister()); all listeners detached
+   * and the device unregistered in the cleanup function.
+   * @effect-why-not-loader Establishes and tears down a stateful, imperative
+   * WebRTC device registration with the Twilio SDK that must persist for the
+   * component's lifetime; it isn't a request/response data fetch.
+   */
   useEffect(() => {
     if (!token) {
       logger.error("No token provided");
@@ -68,82 +77,110 @@ export function useTwilioConnection({
 
     if (typeof window === "undefined") return;
 
-    const SDK = getTwilioSDK();
-    if (!SDK) return;
+    let cancelled = false;
+    let device: Device | null = null;
+    let listenerCleanups: Array<() => void> = [];
 
-    const device = new SDK.Device(token, deviceOptions ?? undefined);
-    deviceRef.current = device;
+    const setupDevice = async () => {
+      // Load the Twilio Voice SDK lazily so it isn't bundled into routes
+      // that merely render call UI but never actually connect a call.
+      const { Device: TwilioDevice } = await import("@twilio/voice-sdk");
+      if (cancelled) return;
 
-    const handleRegistered = () => {
-      setStatus("Registered");
-      onStatusChangeRef.current?.("Registered");
-      onDeviceBusyChangeRef.current?.(false);
+      device = new TwilioDevice(token, deviceOptions ?? undefined);
+      deviceRef.current = device;
+
+      const handleRegistered = () => {
+        setStatus("Registered");
+        onStatusChangeRef.current?.("Registered");
+        onDeviceBusyChangeRef.current?.(false);
+      };
+
+      const handleUnregistered = () => {
+        setStatus("Unregistered");
+        onStatusChangeRef.current?.("Unregistered");
+      };
+
+      const handleConnecting = () => {
+        setStatus("Connecting");
+        onStatusChangeRef.current?.("Connecting");
+      };
+
+      const handleConnected = () => {
+        setStatus("Connected");
+        onStatusChangeRef.current?.("Connected");
+        onCallStateChangeRef.current?.("connected");
+      };
+
+      const handleDisconnected = () => {
+        setStatus("Disconnected");
+        onDeviceBusyChangeRef.current?.(false);
+        logger.debug("Call ended");
+        device?.disconnectAll();
+      };
+
+      const handleCancel = () => {
+        setStatus("Cancelled");
+        onStatusChangeRef.current?.("Cancelled");
+        onDeviceBusyChangeRef.current?.(false);
+      };
+
+      const handleError = (err: unknown) => {
+        const error = err instanceof Error ? err : new Error("Twilio device error");
+        logger.error("Twilio Device Error:", error);
+        onDeviceBusyChangeRef.current?.(false);
+        setStatus("Error");
+        setError(error);
+        onErrorRef.current?.(error);
+        onCallStateChangeRef.current?.("failed");
+      };
+
+      const handleIncoming = (call: unknown) => {
+        onIncomingCallRef.current?.(call as Call);
+      };
+
+      listenerCleanups = [
+        attachTwilioListener(device, "registered", handleRegistered),
+        attachTwilioListener(device, "unregistered", handleUnregistered),
+        attachTwilioListener(device, "connecting", handleConnecting),
+        attachTwilioListener(device, "connected", handleConnected),
+        attachTwilioListener(device, "disconnected", handleDisconnected),
+        attachTwilioListener(device, "cancel", handleCancel),
+        attachTwilioListener(device, "error", handleError),
+        attachTwilioListener(device, "incoming", handleIncoming),
+      ];
+
+      device.register().catch((err: unknown) => {
+        // Twilio's Voice SDK can reject register() with `undefined` (not an
+        // Error) for signaling-level auth failures — the real error is
+        // delivered separately via the device "error" event. The
+        // `(err: Error)` annotation this replaced was a lie: at runtime
+        // `err` could be undefined, and passing it straight through crashed
+        // downstream `err.message` accesses (see useSoftphoneController.ts).
+        const error =
+          err instanceof Error ? err : new Error("Twilio device registration failed");
+        logger.error("Failed to register device:", error);
+        setError(error);
+        setStatus("RegistrationFailed");
+        onErrorRef.current?.(error);
+        onCallStateChangeRef.current?.("failed");
+      });
     };
 
-    const handleUnregistered = () => {
-      setStatus("Unregistered");
-      onStatusChangeRef.current?.("Unregistered");
-    };
-
-    const handleConnecting = () => {
-      setStatus("Connecting");
-      onStatusChangeRef.current?.("Connecting");
-    };
-
-    const handleConnected = () => {
-      setStatus("Connected");
-      onStatusChangeRef.current?.("Connected");
-      onCallStateChangeRef.current?.("connected");
-    };
-
-    const handleDisconnected = () => {
-      setStatus("Disconnected");
-      onDeviceBusyChangeRef.current?.(false);
-      logger.debug("Call ended");
-      device.disconnectAll();
-    };
-
-    const handleCancel = () => {
-      setStatus("Cancelled");
-      onStatusChangeRef.current?.("Cancelled");
-      onDeviceBusyChangeRef.current?.(false);
-    };
-
-    const handleError = (err: unknown) => {
-      const error = err instanceof Error ? err : new Error("Twilio device error");
-      logger.error("Twilio Device Error:", error);
-      onDeviceBusyChangeRef.current?.(false);
-      setStatus("Error");
+    setupDevice().catch((err: unknown) => {
+      if (cancelled) return;
+      const error =
+        err instanceof Error ? err : new Error("Failed to load Twilio Voice SDK");
+      logger.error("Failed to load Twilio Voice SDK:", error);
       setError(error);
+      setStatus("Error");
       onErrorRef.current?.(error);
-      onCallStateChangeRef.current?.("failed");
-    };
-
-    const handleIncoming = (call: unknown) => {
-      onIncomingCallRef.current?.(call as Call);
-    };
-
-    const listenerCleanups = [
-      attachTwilioListener(device, "registered", handleRegistered),
-      attachTwilioListener(device, "unregistered", handleUnregistered),
-      attachTwilioListener(device, "connecting", handleConnecting),
-      attachTwilioListener(device, "connected", handleConnected),
-      attachTwilioListener(device, "disconnected", handleDisconnected),
-      attachTwilioListener(device, "cancel", handleCancel),
-      attachTwilioListener(device, "error", handleError),
-      attachTwilioListener(device, "incoming", handleIncoming),
-    ];
-
-    device.register().catch((err: Error) => {
-      logger.error("Failed to register device:", err);
-      setError(err);
-      setStatus("RegistrationFailed");
-      onErrorRef.current?.(err);
       onCallStateChangeRef.current?.("failed");
     });
 
     return () => {
-      if (device.state === "registered") {
+      cancelled = true;
+      if (device && device.state === "registered") {
         device.unregister().catch((err: Error) =>
           logger.error("Error unregistering device:", err),
         );

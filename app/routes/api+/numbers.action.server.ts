@@ -1,13 +1,11 @@
 import { createErrorResponse } from "@/lib/errors.server";
-import { parseActionRequest } from "@/lib/database.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
 import { purchaseWorkspaceNumber } from "@/lib/platform-workspace-numbers.server";
-import {
-  getAuthSupabaseClient,
-  requireJsonAuth,
+import { requireJsonAuth,
 } from "@/lib/api-auth.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { z } from "zod";
-import type { ActionFunctionArgs } from "react-router";
+import { defineAction } from "@/lib/handler.server";
 
 const purchaseBodySchema = z
   .object({
@@ -19,55 +17,56 @@ const purchaseBodySchema = z
     message: "phone_number is required",
   });
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-
-  if (request.method !== "POST") {
-    return jsonError("Method not allowed", 405);
-  }
-
-  try {
-    const raw = await parseActionRequest(request);
-    const parsed = purchaseBodySchema.safeParse(raw);
-    if (!parsed.success) {
-      return jsonError(
-        parsed.error.issues.map((issue) => issue.message).join("; "),
-        400,
-      );
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  // No `input:` schema — the body may be form-encoded (parseActionRequest
+  // handles both), and the parse-error response shape must stay as-is.
+  sideEffects: ["db-write", "credit", "twilio"],
+  handler: async ({ request, auth }) => {
+    if (request.method !== "POST") {
+      return jsonError("Method not allowed", 405);
     }
 
-    const workspaceId = parsed.data.workspace_id;
-    const phoneNumber = parsed.data.phone_number ?? parsed.data.phoneNumber!;
-
-    const result = await purchaseWorkspaceNumber(
-      getAuthSupabaseClient(auth),
-      auth.user.id,
-      workspaceId,
-      phoneNumber,
-    );
-
-    if (!result.ok) {
-      if ("creditsError" in result && result.creditsError) {
-        return jsonResponse({ creditsError: true }, result.status);
+    try {
+      const raw = await parseActionRequest(request);
+      const parsed = purchaseBodySchema.safeParse(raw);
+      if (!parsed.success) {
+        return jsonError(
+          parsed.error.issues.map((issue) => issue.message).join("; "),
+          400,
+        );
       }
-      return createErrorResponse(
-        new Error(result.error),
-        "Failed to register number",
+
+      const workspaceId = parsed.data.workspace_id;
+      const phoneNumber = parsed.data.phone_number ?? parsed.data.phoneNumber!;
+
+      const result = await purchaseWorkspaceNumber(
+        auth.user.id,
+        workspaceId,
+        phoneNumber,
       );
+
+      if (!result.ok) {
+        if ("creditsError" in result && result.creditsError) {
+          return jsonResponse({ creditsError: true }, result.status);
+        }
+        return createErrorResponse(
+          new Error(result.error),
+          "Failed to register number",
+        );
+      }
+
+      return jsonResponse(
+        {
+          newNumber: result.number,
+          messagingServiceAttached: result.messagingServiceAttached,
+          messagingServiceAttachError: result.messagingServiceAttachError,
+          partialSuccess: result.partialSuccess,
+        },
+        result.status,
+      );
+    } catch (error) {
+      return createErrorResponse(error, "Failed to register number");
     }
-
-    return jsonResponse(
-      {
-        newNumber: result.number,
-        messagingServiceAttached: result.messagingServiceAttached,
-        messagingServiceAttachError: result.messagingServiceAttachError,
-        partialSuccess: result.partialSuccess,
-      },
-      result.status,
-    );
-  } catch (error) {
-    return createErrorResponse(error, "Failed to register number");
-  }
-};
-
+  },
+});

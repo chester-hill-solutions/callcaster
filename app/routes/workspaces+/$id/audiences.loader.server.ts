@@ -1,43 +1,49 @@
 import { data as routeData } from "react-router";
-import { getUserRole } from "@/lib/database.server";
-import { User } from "@/lib/types";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { listWorkspaceAudiencesApi } from "@/lib/platform-data.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
+import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
+export const loader = defineLoader({
+  auth: workspaceLoaderAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ auth: access }) => {
+    if (!access.ok) {
+      return access.response;
+    }
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
+    const { headers, workspaceId, userRole } = access.ctx;
 
-  const workspaceId = params.id;
-  if (workspaceId == null) {
+    const workspaceData = await getWorkspaceForClient(workspaceId);
+
+    if (!workspaceData) {
+      return routeData(
+        { workspace: null, error: "Workspace not found", userRole },
+        { headers, status: 404 },
+      );
+    }
+
+    const audiencesResult = await listWorkspaceAudiencesApi(workspaceId);
+    if (!audiencesResult.ok) {
+      return routeData(
+        {
+          workspace: workspaceData,
+          error: audiencesResult.error,
+          userRole,
+          audienceData: null,
+        },
+        { headers, status: audiencesResult.status },
+      );
+    }
+
     return routeData(
-      { workspace: null, error: "Workspace does not exist", userRole: null },
+      {
+        audienceData: audiencesResult.audiences,
+        workspace: workspaceData,
+        error: null,
+        userRole,
+      },
       { headers },
     );
-  }
-
-  const userRole = getUserRole({ supabaseClient, user: user as unknown as User, workspaceId });
-
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-
-  const { data: audienceData, error: audienceError } = await supabaseClient
-    .from("audience")
-    .select()
-    .eq("workspace", workspaceId);
-
-  if (workspaceError) {
-    return routeData(
-      { workspace: null, error: workspaceError.message, userRole },
-      { headers },
-    );
-  }
-
-  return routeData(
-    { audienceData, workspace: workspaceData, error: null, userRole },
-    { headers },
-  );
-}
+  },
+});

@@ -1,51 +1,12 @@
 import type { ApiSurfaceEntry } from "@/lib/api-surface-types";
+import { PLATFORM_GUIDE as GUIDE, platformSeed } from "@/lib/api-surface-seeds";
+import { PLATFORM_API_SURFACE_2 } from "@/lib/api-surface-platform-2";
 
-type Op = {
-  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
-  handler: "loader" | "action";
-  bodyType: "json" | "query" | "form" | "multipart" | "twiml" | "rawWebhook";
-};
-
-type PlatformSeed = {
-  path: string;
-  routeModule: string;
-  authClass: ApiSurfaceEntry["authClass"];
-  ownerArea: ApiSurfaceEntry["ownerArea"];
-  exposure: ApiSurfaceEntry["exposure"];
-  docsGuide: string;
-  operations: Op[];
-  notes?: string;
-  workspaceScoped?: boolean;
-};
-
-function platformSeed(input: PlatformSeed): ApiSurfaceEntry {
-  return {
-    path: input.path,
-    routeModule: input.routeModule,
-    authClass: input.authClass,
-    ownerArea: input.ownerArea,
-    exposure: input.exposure,
-    supported: true,
-    specTarget: "publicOpenApi",
-    docsGuide: input.docsGuide,
-    operations: input.operations,
-    notes: input.notes,
-    workspaceScoped: input.workspaceScoped,
-  };
-}
-
-const GUIDE = {
-  auth: "docs/api-auth-matrix.md",
-  platform: "docs/api-agent-quickstart.md",
-  workspace: "docs/api-workspace-admin.md",
-  data: "docs/api-data-plane.md",
-  analytics: "docs/api-analytics-export.md",
-  telephony: "docs/api-telephony-provisioning.md",
-  live: "docs/api-live-operations.md",
-  admin: "docs/api-admin.md",
-} as const;
-
-/** Platform / agent-friendly CaaS routes added for full API parity. */
+/**
+ * Platform (agent-friendly CaaS) API surface entries. Part 1 of 2 — the rest
+ * live in api-surface-platform-2.ts (positional split for the app file-size
+ * gate, #1048); entry order feeds generated output and must be preserved.
+ */
 export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   platformSeed({
     path: "/api/auth/register",
@@ -148,17 +109,36 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId.route.tsx",
-    authClass: "session",
+    routeModule: "app/routes/api+/workspaces+/$workspaceId/route.tsx",
+    authClass: "apiKeyOrSession",
     ownerArea: "workspace",
     exposure: "sessionOnly",
     docsGuide: GUIDE.platform,
     workspaceScoped: true,
     operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      },
       { method: "PATCH", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
+    notes:
+      "Child index under data-plane layout middleware. GET supports session or API key with campaigns.read; PATCH requires admin+ session; DELETE requires owner session.",
+  }),
+  platformSeed({
+    path: "/api/workspaces/:workspaceId",
+    routeModule: "app/routes/api+/workspaces+/$workspaceId.tsx",
+    authClass: "session",
+    ownerArea: "workspace",
+    exposure: "sessionOnly",
+    docsGuide: GUIDE.platform,
+    workspaceScoped: true,
+    duplicate: true,
+    notes: "Middleware layout for nested workspace API routes; no direct handler.",
+    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/transfer-ownership",
@@ -279,10 +259,17 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     workspaceScoped: true,
     operations: [
       { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "POST", handler: "action", bodyType: "json" },
+      {
+        method: "POST",
+        handler: "action",
+        bodyType: "json",
+        capability: "members.invite",
+      },
       { method: "PATCH", handler: "action", bodyType: "json" },
       { method: "DELETE", handler: "action", bodyType: "json" },
     ],
+    notes:
+      "GET/PATCH/DELETE are session-only. POST invite accepts session or API key with members.invite.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/api-keys",
@@ -299,6 +286,25 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     ],
   }),
   platformSeed({
+    path: "/api/workspaces/:workspaceId/audit-events",
+    routeModule: "app/routes/api+/workspaces+/$workspaceId/audit-events.route.tsx",
+    authClass: "apiKeyOrSession",
+    ownerArea: "workspace",
+    exposure: "sessionOnly",
+    docsGuide: GUIDE.workspace,
+    workspaceScoped: true,
+    operations: [
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "audit.read",
+      },
+    ],
+    notes:
+      "Requires owner session (via role matrix) or an API key with audit.read.",
+  }),
+  platformSeed({
     path: "/api/workspaces/:workspaceId/campaigns",
     routeModule: "app/routes/api+/workspaces+/$workspaceId/campaigns.route.tsx",
     authClass: "apiKeyOrSession",
@@ -306,7 +312,14 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      },
+    ],
   }),
   platformSeed({
     path: "/api/campaigns/:campaignId",
@@ -316,8 +329,18 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "POST", handler: "action", bodyType: "json" },
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      },
+      {
+        method: "POST",
+        handler: "action",
+        bodyType: "json",
+        capability: "campaigns.write",
+      },
     ],
   }),
   platformSeed({
@@ -328,14 +351,24 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "PATCH", handler: "action", bodyType: "json" },
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      },
+      {
+        method: "PATCH",
+        handler: "action",
+        bodyType: "json",
+        capability: "campaigns.write",
+      },
     ],
   }),
   platformSeed({
     path: "/api/campaigns/:campaignId/results",
     routeModule: "app/routes/api+/campaigns+/$campaignId/results.route.tsx",
-    authClass: "apiKeyOrSession",
+    authClass: "session",
     ownerArea: "analytics",
     exposure: "sessionOnly",
     docsGuide: GUIDE.analytics,
@@ -368,260 +401,12 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     exposure: "sessionOnly",
     docsGuide: GUIDE.data,
     workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    operations: [{
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      }],
   }),
-  platformSeed({
-    path: "/api/contacts/:contactId",
-    routeModule: "app/routes/api+/contacts/$contactId.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "contacts",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "DELETE", handler: "action", bodyType: "json" },
-    ],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/audiences",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId/audiences.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "audiences",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/audiences/:audienceId",
-    routeModule:
-      "app/routes/api+/workspaces+/$workspaceId/audiences/$audienceId.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "audiences",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/audience-uploads/:uploadId",
-    routeModule:
-      "app/routes/api+/workspaces+/$workspaceId/audience-uploads/$uploadId.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "audiences",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/scripts",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId/scripts.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "scripts",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/scripts/:scriptId",
-    routeModule: "app/routes/api+/scripts/$scriptId.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "scripts",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/surveys",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId/surveys.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "surveys",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/surveys/:surveyId",
-    routeModule: "app/routes/api+/surveys/$surveyId.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "surveys",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/surveys/:surveyId/responses",
-    routeModule: "app/routes/api+/surveys/$surveyId/responses.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "surveys",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/surveys/:surveyId/responses/export",
-    routeModule:
-      "app/routes/api+/surveys+/$surveyId/responses/export.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "analytics",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.analytics,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/conversations",
-    routeModule:
-      "app/routes/api+/workspaces+/$workspaceId/conversations.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "messaging",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/conversations/:contactNumber",
-    routeModule:
-      "app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "messaging",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.data,
-    workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/audios",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId/audios.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "media",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.analytics,
-    workspaceScoped: true,
-    operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "POST", handler: "action", bodyType: "multipart" },
-    ],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/voicemails",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId/voicemails.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "media",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.analytics,
-    workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/analytics",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId/analytics.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "analytics",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.analytics,
-    workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/exports",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId/exports.route.tsx",
-    authClass: "apiKeyOrSession",
-    ownerArea: "analytics",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.analytics,
-    workspaceScoped: true,
-    operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "POST", handler: "action", bodyType: "json" },
-    ],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/calls",
-    routeModule: "app/routes/api+/workspaces+/$workspaceId/calls.route.tsx",
-    authClass: "session",
-    ownerArea: "telephony",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.live,
-    workspaceScoped: true,
-    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/calls/listening",
-    routeModule:
-      "app/routes/api+/workspaces+/$workspaceId/calls/listening.route.tsx",
-    authClass: "session",
-    ownerArea: "telephony",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.live,
-    workspaceScoped: true,
-    operations: [
-      { method: "POST", handler: "action", bodyType: "json" },
-      { method: "DELETE", handler: "action", bodyType: "json" },
-    ],
-  }),
-  platformSeed({
-    path: "/api/workspaces/:workspaceId/handset/session",
-    routeModule:
-      "app/routes/api+/workspaces+/$workspaceId/handset/session.route.tsx",
-    authClass: "session",
-    ownerArea: "telephony",
-    exposure: "sessionOnly",
-    docsGuide: GUIDE.live,
-    workspaceScoped: true,
-    operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "DELETE", handler: "action", bodyType: "json" },
-    ],
-  }),
-  platformSeed({
-    path: "/api/admin/dashboard",
-    routeModule: "app/routes/api+/admin+/dashboard.route.tsx",
-    authClass: "internalTrusted",
-    ownerArea: "misc",
-    exposure: "internalOnly",
-    docsGuide: GUIDE.admin,
-    operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "POST", handler: "action", bodyType: "json" },
-    ],
-    notes: "Sudo-only admin dashboard and actions.",
-  }),
-  platformSeed({
-    path: "/api/admin/users/:userId",
-    routeModule: "app/routes/api+/admin+/users+/$userId.route.tsx",
-    authClass: "internalTrusted",
-    ownerArea: "misc",
-    exposure: "internalOnly",
-    docsGuide: GUIDE.admin,
-    operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "PATCH", handler: "action", bodyType: "json" },
-    ],
-  }),
-  platformSeed({
-    path: "/api/admin/users/:userId/workspaces",
-    routeModule: "app/routes/api+/admin+/users+/$userId/workspaces.route.tsx",
-    authClass: "internalTrusted",
-    ownerArea: "misc",
-    exposure: "internalOnly",
-    docsGuide: GUIDE.admin,
-    operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "POST", handler: "action", bodyType: "json" },
-    ],
-  }),
-  platformSeed({
-    path: "/api/admin/workspaces/:workspaceId/twilio",
-    routeModule:
-      "app/routes/api+/admin+/workspaces+/$workspaceId/twilio.route.tsx",
-    authClass: "internalTrusted",
-    ownerArea: "misc",
-    exposure: "internalOnly",
-    docsGuide: GUIDE.admin,
-    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
-  }),
+  ...PLATFORM_API_SURFACE_2,
 ];

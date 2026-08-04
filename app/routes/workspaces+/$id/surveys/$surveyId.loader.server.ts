@@ -1,128 +1,40 @@
-import { 
-  Calendar, 
-  Users, 
-  CheckCircle, 
-  XCircle, 
-  Edit, 
-  Trash2, 
-  Copy,
-  ExternalLink,
-  MessageSquare
-} from "lucide-react";
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData } from "react-router";
-import { getUserRole } from "@/lib/database.server";
-import { logger } from "@/lib/logger.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
-import type { SurveyWithPages } from "@/lib/types";
+import { getSurveyDetailApi } from "@/lib/platform-data.server";
+import { loadRecentSurveyResponses } from "@/lib/survey-db.server";
+import { defineLoader } from "@/lib/handler.server";
 
-interface SurveyPage {
-  id: number;
-  page_id: string;
-  title: string;
-  page_order: number;
-  survey_question?: SurveyQuestion[];
-}
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ params, auth, url }) => {
+    const { surveyId } = params;
+    const { user, workspaceId, userRole } = auth;
 
-interface SurveyQuestion {
-  id: number;
-  question_id: string;
-  question_text: string;
-  question_type: string;
-  is_required: boolean;
-  question_order: number;
-  question_option?: SurveyQuestionOption[];
-}
+    if (!workspaceId || !surveyId) {
+      throw new Response("Workspace ID and Survey ID are required", { status: 400 });
+    }
+    if (!userRole) {
+      throw new Response("Unauthorized", { status: 403 });
+    }
 
-interface SurveyQuestionOption {
-  id: number;
-  option_value: string;
-  option_label: string;
-  option_order: number;
-}
+    const result = await getSurveyDetailApi(surveyId, workspaceId);
+    if (!result.ok) {
+      throw new Response(result.error, { status: result.status });
+    }
 
-interface SurveyResponse {
-  id: number;
-  created_at: string;
-  completed_at?: string;
-  last_page_completed?: number;
-  contact?: {
-    firstname?: string;
-    surname?: string;
-    phone?: string;
-  };
-}
+    const recentResponses = await loadRecentSurveyResponses(result.survey.id, 10);
 
-interface Survey {
-  survey_id: string;
-  title: string;
-  is_active: boolean;
-  created_at: string;
-  survey_page?: SurveyPage[];
-}
-
-export async function loader({ request, params }: LoaderFunctionArgs) {
-
-  const { supabaseClient, user } = await verifyAuth(request);
-  const { id: workspaceId, surveyId } = params;
-
-  if (!workspaceId || !surveyId) {
-    throw new Response("Workspace ID and Survey ID are required", { status: 400 });
-  }
-
-  // Get user role for this workspace
-  const userRole = await getUserRole({
-    supabaseClient,
-    user,
-    workspaceId,
-  });
-
-  if (!userRole) {
-    throw new Response("Unauthorized", { status: 403 });
-  }
-
-  // Get survey with pages and questions
-  const { data: survey, error: surveyError } = await supabaseClient
-    .from("survey")
-    .select(`
-      *,
-      survey_page(
-        *,
-        survey_question(
-          *,
-          question_option(*)
-        )
-      ),
-      survey_response(count)
-    `)
-    .eq("survey_id", surveyId)
-    .eq("workspace", workspaceId)
-    .single();
-
-  if (surveyError || !survey) {
-    throw new Response("Survey not found", { status: 404 });
-  }
-
-  // Get recent responses
-  const { data: recentResponses, error: responsesError } = await supabaseClient
-    .from("survey_response")
-    .select(`
-      *,
-      contact(firstname, surname, phone)
-    `)
-    .eq("survey_id", survey.id)
-    .order("created_at", { ascending: false })
-    .limit(10);
-
-  if (responsesError) {
-    logger.error("Error fetching responses:", responsesError);
-  }
-
-  return routeData({
-    survey,
-    recentResponses: recentResponses || [],
-    workspaceId,
-    user,
-    userRole,
-  });
-}
+    return routeData({
+      survey: result.survey,
+      recentResponses,
+      workspaceId,
+      user,
+      userRole,
+      // The public survey link is built from this. It must come from the
+      // request, not `window.location` — reading window during render crashed
+      // SSR outright (ReferenceError: window is not defined -> 500).
+      origin: url.origin,
+    });
+  },
+});

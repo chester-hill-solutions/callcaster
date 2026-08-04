@@ -245,4 +245,110 @@ describe("app/lib/audio.server.ts", () => {
 
     await expect(pending).resolves.toEqual(Buffer.from("ok"));
   });
+
+  test("trims a range to canonical mp3 output", async () => {
+    const mod = await import("../app/lib/audio.server");
+    const runAudioTool = vi.fn(async () => Buffer.from("clip-mp3"));
+
+    await expect(
+      mod.trimAudioBuffer(Buffer.from("source"), { startMs: 1000, endMs: 3000 }, {
+        runAudioTool,
+      }),
+    ).resolves.toEqual({
+      buffer: Buffer.from("clip-mp3"),
+      contentType: "audio/mpeg",
+      extension: "mp3",
+    });
+
+    // Output-side seek (-ss after -i) with a relative -t duration: stdin is not
+    // seekable, so input-side -ss would not be sample accurate.
+    const args = runAudioTool.mock.calls[0][1] as string[];
+    expect(args.indexOf("-ss")).toBeGreaterThan(args.indexOf("pipe:0"));
+    expect(args[args.indexOf("-ss") + 1]).toBe("1.000");
+    expect(args[args.indexOf("-t") + 1]).toBe("2.000");
+    expect(args).not.toContain("-to");
+  });
+
+  test("rejects invalid trim ranges before spawning ffmpeg", async () => {
+    const mod = await import("../app/lib/audio.server");
+    const runAudioTool = vi.fn();
+    const source = Buffer.from("source");
+
+    await expect(
+      mod.trimAudioBuffer(source, { startMs: 3000, endMs: 1000 }, { runAudioTool }),
+    ).rejects.toMatchObject({ message: "Clip end must be after clip start." });
+
+    await expect(
+      mod.trimAudioBuffer(source, { startMs: -1, endMs: 1000 }, { runAudioTool }),
+    ).rejects.toMatchObject({ message: "Clip start cannot be negative." });
+
+    await expect(
+      mod.trimAudioBuffer(source, { startMs: 0, endMs: 50 }, { runAudioTool }),
+    ).rejects.toMatchObject({ message: "Clips must be at least 100ms long." });
+
+    await expect(
+      mod.trimAudioBuffer(source, { startMs: 0, endMs: Number.NaN }, { runAudioTool }),
+    ).rejects.toMatchObject({ message: "Clip start and end must be numbers." });
+
+    expect(runAudioTool).not.toHaveBeenCalled();
+  });
+
+  test("fails when trimming produces an empty clip", async () => {
+    const mod = await import("../app/lib/audio.server");
+
+    await expect(
+      mod.trimAudioBuffer(
+        Buffer.from("source"),
+        { startMs: 0, endMs: 1000 },
+        { runAudioTool: vi.fn(async () => Buffer.alloc(0)) },
+      ),
+    ).rejects.toMatchObject({
+      message: "Audio trimming produced an empty clip.",
+      status: 500,
+    });
+  });
+
+  test("probes duration from a seekable temp file, not a pipe", async () => {
+    const mod = await import("../app/lib/audio.server");
+    const runAudioTool = vi.fn(async () => Buffer.from("5.042000\n"));
+
+    await expect(
+      mod.probeAudioDurationMs(Buffer.from("mp3"), { runAudioTool }),
+    ).resolves.toBe(5042);
+
+    // MP3 has no header duration, so ffprobe reports N/A for pipe input.
+    const args = runAudioTool.mock.calls[0][1] as string[];
+    expect(args).not.toContain("pipe:0");
+    expect(args.at(-1)).toMatch(/callcaster-probe-.*\.mp3$/);
+  });
+
+  test("returns null when duration is unreadable", async () => {
+    const mod = await import("../app/lib/audio.server");
+
+    await expect(
+      mod.probeAudioDurationMs(Buffer.from("mp3"), {
+        runAudioTool: vi.fn(async () => Buffer.from("N/A\n")),
+      }),
+    ).resolves.toBeNull();
+  });
+
+  test("removes the temp file even when probing fails", async () => {
+    const rm = vi.fn(async () => undefined);
+    vi.doMock("node:fs/promises", () => ({
+      rm,
+      writeFile: vi.fn(async () => undefined),
+    }));
+
+    const mod = await import("../app/lib/audio.server");
+
+    await expect(
+      mod.probeAudioDurationMs(Buffer.from("mp3"), {
+        runAudioTool: vi.fn(async () => {
+          throw new Error("ffprobe exploded");
+        }),
+      }),
+    ).rejects.toThrow("ffprobe exploded");
+
+    expect(rm).toHaveBeenCalledTimes(1);
+  });
 });

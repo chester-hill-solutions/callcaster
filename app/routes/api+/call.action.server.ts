@@ -1,44 +1,52 @@
-import { createClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
+import { getHandsetNumberForWorkspace } from "@/lib/database/workspace.server";
+import { findActiveHandsetSession } from "@/lib/handset/handset-session.server";
+import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
 import { isPhoneNumber, normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";
-import Twilio from 'twilio';
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { insertCallForWorkspace } from "@/lib/telephony-db.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { defineAction } from "@/lib/handler.server";
+import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
 
 function isAValidPhoneNumber(number: string): boolean {
   return /^[\d+\-() ]+$/.test(number);
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+type CallAuth = {
+  toNumber: string;
+  workspaceId: string | null;
+  clientIdentity: string | null;
+  callSid: string;
+};
 
-  const formData = await request.formData();
-  const toNumber = (formData.get("To") as string) ?? "";
-  const workspaceId = formData.get("workspace_id") as string | null;
-  const clientIdentity = formData.get("client_identity") as string | null;
-  const baseUrl = env.BASE_URL();
-  const twiml = new Twilio.twiml.VoiceResponse();
+export const action = defineAction({
+  auth: async ({ request }: ActionFunctionArgs): Promise<CallAuth | Response> => {
+    const formData = await request.clone().formData();
+    const toNumber = (formData.get("To") as string) ?? "";
+    const workspaceId = formData.get("workspace_id") as string | null;
+    const clientIdentity = formData.get("client_identity") as string | null;
+    const callSid = String(formData.get("CallSid") ?? "");
+
+    const forbidden = await requireTwilioSignature(
+      request,
+      workspaceId ? { workspaceId } : {},
+    );
+    if (forbidden) return forbidden;
+
+    return { toNumber, workspaceId, clientIdentity, callSid };
+  },
+  sideEffects: ["twilio", "db-write"],
+  handler: async ({ auth }) => {
+    const { toNumber, workspaceId, clientIdentity, callSid } = auth;
+    const baseUrl = env.BASE_URL();
+    const twiml = new Twilio.twiml.VoiceResponse();
 
   // Handset outbound: validate session and use workspace handset number as callerId
-  if (
-    workspaceId &&
-    clientIdentity &&
-    toNumber &&
-    isPhoneNumber(toNumber)
-  ) {
-    const supabase = createClient<Database>(
-      env.SUPABASE_URL(),
-      env.SUPABASE_SERVICE_KEY()
-    );
-    const now = new Date().toISOString();
-    const { data: session } = await supabase
-      .from("handset_session")
-      .select("workspace_id")
-      .eq("workspace_id", workspaceId)
-      .eq("client_identity", clientIdentity)
-      .eq("status", "active")
-      .gt("expires_at", now)
-      .maybeSingle();
+  if (workspaceId && clientIdentity && toNumber && isPhoneNumber(toNumber)) {
+    const session = await findActiveHandsetSession({ workspaceId, clientIdentity });
 
     if (!session) {
       logger.warn("Handset outbound: no active session", {
@@ -51,24 +59,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       });
     }
 
-    const { data: handset } = await supabase
-      .from("workspace_number")
-      .select("phone_number")
-      .eq("workspace", workspaceId)
-      .eq("handset_enabled", true)
-      .limit(1)
-      .maybeSingle();
-
-    const callerId =
-      handset?.phone_number ??
-      (
-        await supabase
-          .from("workspace_number")
-          .select("phone_number")
-          .eq("workspace", workspaceId)
-          .limit(1)
-          .maybeSingle()
-      ).data?.phone_number;
+    const { data: handset } = await getHandsetNumberForWorkspace({ workspaceId });
+    const callerId = handset?.phone_number;
 
     if (!callerId || !isPhoneNumber(callerId)) {
       twiml.say("No caller ID is configured for this workspace.");
@@ -78,6 +70,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     const normalizedTo = normalizePhoneNumber(toNumber);
+
+    if (callSid) {
+      await insertCallForWorkspace(workspaceId, {
+        sid: callSid,
+        workspace: workspaceId,
+        user_id: session.user_id,
+        to: normalizedTo,
+        from: callerId,
+        status: "initiated",
+        direction: "outbound",
+        is_last: false,
+      });
+    }
+
+    const workspace = await getWorkspaceById(workspaceId);
+    appendLiveTranscriptionStreamTwiml({
+      twiml,
+      featureFlags: workspace?.feature_flags as Record<string, unknown> | undefined,
+      params: {
+        workspaceId,
+        userId: session.user_id,
+        direction: "outbound",
+        callSid: callSid || null,
+        streamName: callSid ? `call-${callSid}` : undefined,
+      },
+    });
+
     const dial = twiml.dial({
       callerId,
       record: "record-from-answer",
@@ -86,12 +105,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       transcribe: true,
       transcribeCallback: `${baseUrl}/api/transcribe`,
     } as Record<string, unknown>);
-    dial.number({
-      machineDetection: "Enable",
-      amdStatusCallback: `${baseUrl}/api/dial/status`,
-      statusCallback: `${baseUrl}/api/call-status/`,
-      statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
-    }, normalizedTo);
+    dial.number(
+      {
+        machineDetection: "Enable",
+        amdStatusCallback: `${baseUrl}/api/dial/status`,
+        statusCallback: `${baseUrl}/api/call-status/`,
+        statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
+      },
+      normalizedTo,
+    );
     return new Response(twiml.toString(), {
       headers: { "Content-Type": "text/xml" },
     });
@@ -115,4 +137,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "text/xml" },
   });
-}
+  },
+});

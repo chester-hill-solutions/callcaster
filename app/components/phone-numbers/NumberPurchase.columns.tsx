@@ -5,17 +5,22 @@ import { numberRentalPriceLabel } from "@/lib/number-rental";
 import type { AvailableNumber } from "@/components/phone-numbers/NumberPurchase.constants";
 import type { ColumnDef } from "@tanstack/react-table";
 
+const CAPABILITY_ORDER = ["voice", "sms", "mms", "fax"];
+
 function capabilityBadges(capabilities: Record<string, boolean>) {
-  const entries = Object.entries(capabilities).filter(
-    ([key, enabled]) =>
-      enabled && ["voice", "sms", "mms", "fax"].includes(key),
+  // Twilio mixes key casing ("voice" but "SMS"/"MMS"), so match case-insensitively.
+  const enabled = new Set(
+    Object.entries(capabilities)
+      .filter(([, on]) => on)
+      .map(([key]) => key.toLowerCase()),
   );
-  if (entries.length === 0) {
+  const caps = CAPABILITY_ORDER.filter((cap) => enabled.has(cap));
+  if (caps.length === 0) {
     return <Text variant="muted">—</Text>;
   }
   return (
     <div className="flex flex-wrap gap-1">
-      {entries.map(([cap]) => (
+      {caps.map((cap) => (
         <Badge key={cap} variant="secondary" className="text-xs uppercase">
           {cap}
         </Badge>

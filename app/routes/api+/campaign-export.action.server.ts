@@ -1,27 +1,35 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { requireWorkspaceAccess } from "@/lib/database.server";
-import { getDualAuthSupabase, getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { findCampaignExportMeta } from "@/lib/campaign-ivr.server";
 import {
   generateCampaignExportId,
   processCallCampaignExport,
   processMessageCampaignExport,
 } from "@/lib/campaign-export.server";
+import { defineAction } from "@/lib/handler.server";
+import { trackBackgroundFailure } from "@/lib/background-task.server";
+import { toUserMessage } from "@/lib/user-message";
 
-import type { ActionFunctionArgs } from "react-router";
+const unauthorized = () =>
+  new Response(JSON.stringify({ error: "Unauthorized" }), {
+    status: 401,
+    headers: { "content-type": "application/json" },
+  });
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const auth = await requireDualAuth(request);
-  if (auth instanceof Response) return auth;
-  const supabaseClient = getDualAuthSupabase(auth);
-  const user = getDualAuthUser(auth);
-  if (!user) {
-    return routeData({ error: "Unauthorized" }, { status: 401 });
-  }
-  if (!user) {
-    return new Response("Unauthorized", { status: 401 });
-  }
-
+export const action = defineAction({
+  auth: async ({ request }) => {
+    const auth = await requireDualAuth(request);
+    if (auth instanceof Response) return auth;
+    const user = getDualAuthUser(auth);
+    if (!user) {
+      return unauthorized();
+    }
+    return user;
+  },
+  sideEffects: ["db-write", "external"],
+  handler: async ({ request, auth: user }) => {
   try {
     const formData = await request.formData();
     const campaignId = formData.get("campaignId");
@@ -32,40 +40,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
 
     await requireWorkspaceAccess({
-      supabaseClient,
       user,
       workspaceId: workspaceId.toString(),
     });
 
-    const { data: campaignRow, error: campaignRowError } = await supabaseClient
-      .from("campaign")
-      .select("id, type, title, workspace")
-      .eq("id", Number(campaignId))
-      .single();
-    if (campaignRowError || !campaignRow) {
+    const campaignRow = await findCampaignExportMeta(
+      workspaceId.toString(),
+      Number(campaignId),
+    );
+    if (!campaignRow) {
       return new Response("Campaign not found", { status: 404 });
-    }
-    if (campaignRow.workspace !== workspaceId.toString()) {
-      return new Response("Forbidden", { status: 403 });
     }
 
     const exportId = generateCampaignExportId();
 
     if (campaignRow.type === "message") {
-      void processMessageCampaignExport(
-        supabaseClient,
-        Number(campaignId),
-        workspaceId.toString(),
-        exportId,
-        campaignRow.title || "",
+      trackBackgroundFailure(
+        processMessageCampaignExport(
+          Number(campaignId),
+          workspaceId.toString(),
+          exportId,
+          campaignRow.title || "",
+        ),
+        "campaign_export.background_failed",
+        { exportId, campaignId, workspaceId },
       );
     } else if (campaignRow.type === "live_call" || campaignRow.type === "robocall") {
-      void processCallCampaignExport(
-        supabaseClient,
-        Number(campaignId),
-        workspaceId.toString(),
-        exportId,
-        campaignRow.title || "",
+      trackBackgroundFailure(
+        processCallCampaignExport(
+          Number(campaignId),
+          workspaceId.toString(),
+          exportId,
+          campaignRow.title || "",
+        ),
+        "campaign_export.background_failed",
+        { exportId, campaignId, workspaceId },
       );
     } else {
       return new Response("Invalid campaign type", { status: 400 });
@@ -80,9 +89,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     logger.error("Export request error:", error);
     return routeData(
       {
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: toUserMessage(error, "Unknown error"),
       },
       { status: 500 },
     );
   }
-};
+  },
+});

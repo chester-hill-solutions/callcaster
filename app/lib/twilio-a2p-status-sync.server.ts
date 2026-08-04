@@ -1,11 +1,13 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import {
   getWorkspaceMessagingOnboardingFromTwilioData,
   mergeWorkspaceMessagingOnboardingState,
 } from "@/lib/messaging-onboarding.server";
-import { patchWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import {
+  loadWorkspaceTwilioData,
+  patchWorkspaceTwilioData,
+} from "@/lib/merge-workspace-twilio-data.server";
 import { createWorkspaceTwilioClient } from "@/lib/twilio-client.server";
 import type { TwilioAccountData, WorkspaceOnboardingStatus } from "@/lib/types";
 
@@ -18,23 +20,15 @@ function mapBrandStatus(raw: string | undefined): WorkspaceOnboardingStatus {
 }
 
 export async function syncWorkspaceA2pStatus({
-  supabaseClient,
   workspaceId,
   actorUserId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
 }) {
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select("twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) throw error;
-
-  const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
+  const twilioData = (await loadWorkspaceTwilioData(
+    workspaceId,
+  )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
   const brandSid = onboarding.a2p10dlc.brandSid;
   const campaignSid = onboarding.a2p10dlc.campaignSid;
@@ -44,7 +38,6 @@ export async function syncWorkspaceA2pStatus({
   }
 
   const twilio = await createWorkspaceTwilioClient({
-    supabase: supabaseClient,
     workspaceId,
   });
 
@@ -91,7 +84,7 @@ export async function syncWorkspaceA2pStatus({
     lastUpdatedBy: actorUserId,
   });
 
-  await patchWorkspaceTwilioData(supabaseClient, workspaceId, {
+  await patchWorkspaceTwilioData(workspaceId, {
     onboarding: nextOnboarding,
   });
 

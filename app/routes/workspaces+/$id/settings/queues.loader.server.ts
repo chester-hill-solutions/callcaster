@@ -1,49 +1,32 @@
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import { getUserRole } from "@/lib/database.server";
+import { loadInboundQueueSettings } from "@/lib/inbound-queue-db.server";
 import { MemberRole } from "@/lib/member-role";
-import type { LoaderFunctionArgs } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-  const workspaceId = params.id;
-  if (!user || !workspaceId) {
-    return redirect("/signin");
-  }
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const { headers, user, workspaceId, userRole } = auth;
+    if (!user || !workspaceId) {
+      return redirect("/signin");
+    }
+    if (!userRole || userRole === MemberRole.Caller) {
+      return redirect("..");
+    }
 
-  const userRole = await getUserRole({ supabaseClient, user, workspaceId });
-  if (!userRole || userRole.role === MemberRole.Caller) {
-    return redirect("..");
-  }
+    const { queues, members, numbers, agents } = await loadInboundQueueSettings(workspaceId);
 
-  const { data: queues } = await supabaseClient
-    .from("inbound_queue")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .order("name");
-
-  const queueIds = (queues || []).map((q) => q.id);
-  let members: { id: number; queue_id: number; user_id: string; workspace_id: string }[] = [];
-  if (queueIds.length > 0) {
-    const { data: memberData } = await supabaseClient
-      .from("inbound_queue_member")
-      .select("*")
-      .in("queue_id", queueIds);
-    members = (memberData || []) as typeof members;
-  }
-
-  const { data: numbers } = await supabaseClient
-    .from("workspace_number")
-    .select("id, phone_number, friendly_name, inbound_queue_id")
-    .eq("workspace", workspaceId);
-
-  return routeData(
-    {
-      queues: queues || [],
-      members,
-      numbers: numbers || [],
-      workspaceId,
-    },
-    { headers },
-  );
-};
+    return routeData(
+      {
+        queues,
+        members,
+        numbers,
+        agents,
+        workspaceId,
+      },
+      { headers },
+    );
+  },
+});

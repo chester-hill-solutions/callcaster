@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
+import { AdminTableOverflow } from "@/components/admin/AdminTableOverflow";
 import {
     filterWorkspaceAdminRows,
     sortWorkspaceAdminRows,
@@ -83,7 +84,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
         <TabsContent value="workspaces">
             <Card>
                 <CardHeader>
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <CardTitle>Workspaces</CardTitle>
                             <CardDescription>
@@ -104,7 +105,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                 </CardHeader>
                 <CardContent>
                     <div className="mb-4 flex flex-wrap gap-3">
-                        <div className="min-w-[240px] flex-1">
+                        <div className="min-w-0 flex-1 basis-full sm:min-w-[240px]">
                             <div className="relative">
                                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
@@ -115,7 +116,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                                 />
                             </div>
                         </div>
-                        <div className="w-[160px]">
+                        <div className="w-full min-w-0 sm:w-[160px]">
                             <Select
                                 value={filter.status}
                                 onValueChange={(value: "all" | "active" | "disabled") =>
@@ -225,6 +226,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                         <span>{sortedRows.length} workspaces</span>
                     </div>
 
+                    <AdminTableOverflow>
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -318,7 +320,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                                                 </Button>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="outline" size="icon" className="h-8 w-8">
+                                                        <Button variant="outline" size="icon" className="h-8 w-8" aria-label="Workspace actions">
                                                             <MoreHorizontal className="h-4 w-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
@@ -378,6 +380,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                             )}
                         </TableBody>
                     </Table>
+                    </AdminTableOverflow>
 
                     {sortedRows.length > 0 && (
                         <div className="mt-4 flex items-center justify-between">

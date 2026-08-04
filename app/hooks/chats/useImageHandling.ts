@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useFetcher } from "react-router";
+import { toast } from "sonner";
 import { logger } from "@/lib/logger.client";
+import { useFetcherOnIdle } from "@/hooks/utils";
 import type { ImageFetcherData } from "@/lib/chats/types";
 
 export function useImageHandling(workspaceId: string) {
@@ -31,22 +33,26 @@ export function useImageHandling(workspaceId: string) {
     );
   }, []);
 
-  useEffect(() => {
-    if (imageFetcher.state === "idle" && imageFetcher.data) {
-      const fetcherData = imageFetcher.data as ImageFetcherData;
-      if (fetcherData.success && fetcherData.url) {
-        setSelectedImages((prevImages) => {
-          const newImagesSet = new Set([...prevImages, fetcherData.url]);
-          return Array.from(newImagesSet);
-        });
+  useFetcherOnIdle(imageFetcher, (data) => {
+    const fetcherData = data as ImageFetcherData | undefined;
+    if (!fetcherData) return;
+    if (fetcherData.success && fetcherData.url) {
+      setSelectedImages((prevImages) => {
+        const newImagesSet = new Set([...prevImages, fetcherData.url]);
+        return Array.from(newImagesSet);
+      });
 
-        const fileInput = document.querySelector<HTMLInputElement>("#image");
-        if (fileInput) fileInput.value = "";
-      } else if (fetcherData.error) {
-        logger.error("Image upload error:", fetcherData.error);
-      }
+      const fileInput = document.querySelector<HTMLInputElement>("#image");
+      if (fileInput) fileInput.value = "";
+    } else if (fetcherData.error) {
+      const reason =
+        typeof fetcherData.error === "string"
+          ? fetcherData.error
+          : "Upload failed. Please try again.";
+      logger.error("Image upload error:", fetcherData.error);
+      toast.error(reason);
     }
-  }, [imageFetcher]);
+  });
 
   return {
     selectedImages,

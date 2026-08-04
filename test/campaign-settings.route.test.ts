@@ -1,15 +1,24 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
+
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://local:test@127.0.0.1:5432/test";
+});
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
     parseActionRequest: vi.fn(),
     updateCampaign: vi.fn(),
     fetchCampaignAudience: vi.fn(),
+    fetchCampaignDetails: vi.fn(),
     fetchQueueCounts: vi.fn(),
-    getCampaignTableKey: vi.fn(),
     getSignedUrls: vi.fn(),
+    getCampaignQueueContactIds: vi.fn(async () => []),
+    enqueueContactsForCampaign: vi.fn(async () => undefined),
     logger: {
       debug: vi.fn(),
       error: vi.fn(),
@@ -19,30 +28,79 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
 
-vi.mock("@/lib/database.server", () => ({
-  fetchCampaignAudience: (...args: any[]) => mocks.fetchCampaignAudience(...args),
+vi.mock("@/lib/database/campaign.server", () => ({
+  fetchCampaignAudience: (...args: any[]) =>
+    mocks.fetchCampaignAudience(...args),
+  fetchCampaignDetails: (...args: any[]) => mocks.fetchCampaignDetails(...args),
   fetchQueueCounts: (...args: any[]) => mocks.fetchQueueCounts(...args),
-  getCampaignTableKey: (...args: any[]) => mocks.getCampaignTableKey(...args),
-  getSignedUrls: (...args: any[]) => mocks.getSignedUrls(...args),
-  parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
   updateCampaign: (...args: any[]) => mocks.updateCampaign(...args),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  getSignedUrls: (...args: any[]) => mocks.getSignedUrls(...args),
+  getWorkspacePhoneNumbers: vi.fn(async () => ({
+    data: [
+      {
+        phone_number: "+15555550100",
+        capabilities: { sms: true, voice: true },
+      },
+    ],
+    error: null,
+  })),
+}));
+vi.mock("@/lib/platform-media.server", () => ({
+  listWorkspaceAudiosApi: vi.fn(async () => ({ ok: true, audios: [] })),
+}));
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: vi.fn(() => ({
+    script: { findMany: vi.fn(async () => [{ id: 7 }]) },
+  })),
+}));
+vi.mock("@/lib/request-utils.server", () => ({
+  parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
+}));
+
+const campaignIvrMocks = vi.hoisted(() => ({
+  findCampaignInWorkspace: vi.fn(),
+  updateCampaignStatusInWorkspace: vi.fn(),
+  insertCampaignForWorkspace: vi.fn(),
+}));
+
+vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
+  return {
+    ...actual,
+    findCampaignInWorkspace: (...args: unknown[]) =>
+      campaignIvrMocks.findCampaignInWorkspace(...args),
+    updateCampaignStatusInWorkspace: (...args: unknown[]) =>
+      campaignIvrMocks.updateCampaignStatusInWorkspace(...args),
+    insertCampaignForWorkspace: (...args: unknown[]) =>
+      campaignIvrMocks.insertCampaignForWorkspace(...args),
+  };
+});
+
+vi.mock("@/lib/survey-db.server", () => ({
+  loadActiveSurveysForWorkspace: vi.fn(async () => []),
 }));
 
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  getCampaignQueueContactIds: (...args: unknown[]) => mocks.getCampaignQueueContactIds(...args),
+}));
+vi.mock("@/lib/queue.server", () => ({
+  enqueueContactsForCampaign: (...args: unknown[]) => mocks.enqueueContactsForCampaign(...args),
+}));
 
-function makeSupabaseForSettingsRoute(options?: {
+function makeDbClientForSettingsRoute(options?: {
   campaign?: any;
   details?: any;
-  statusUpdateError?: any;
-  duplicateInsertError?: any;
+  statusUpdateError?: Error | null;
+  duplicateInsertError?: Error | null;
 }) {
   const campaign =
     options?.campaign ??
@@ -60,65 +118,24 @@ function makeSupabaseForSettingsRoute(options?: {
         },
       },
     } as any);
-  const details = options?.details ?? ({ body_text: "Hello there", message_media: [] } as any);
-  const statusUpdate = vi.fn(async () => ({ error: options?.statusUpdateError ?? null }));
-  const duplicateInsertSingle = vi.fn(async () => ({
-    data: options?.duplicateInsertError ? null : { id: 123 },
-    error: options?.duplicateInsertError ?? null,
-  }));
 
-  const supabaseClient = {
-    from: vi.fn((table: string) => {
-      if (table === "campaign") {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                single: async () => ({ data: campaign, error: null }),
-              }),
-            }),
-          }),
-          update: () => ({
-            eq: () => ({
-              eq: statusUpdate,
-            }),
-          }),
-          insert: () => ({
-            select: () => ({
-              single: duplicateInsertSingle,
-            }),
-          }),
-        };
-      }
+  campaignIvrMocks.findCampaignInWorkspace.mockImplementation(async () => campaign);
+  campaignIvrMocks.updateCampaignStatusInWorkspace.mockImplementation(async () => {
+    if (options?.statusUpdateError) {
+      throw options.statusUpdateError;
+    }
+    return campaign;
+  });
+  campaignIvrMocks.insertCampaignForWorkspace.mockImplementation(async () => {
+    if (options?.duplicateInsertError) {
+      throw options.duplicateInsertError;
+    }
+    return { id: 123 };
+  });
 
-      if (table === "message_campaign") {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({ data: details, error: null }),
-              }),
-            }),
-          }),
-          insert: async () => ({ data: null, error: null }),
-        };
-      }
+  const dbClient = {};
 
-      if (table === "campaign_queue") {
-        return {
-          select: () => ({
-            eq: async () => ({ data: [], error: null }),
-          }),
-        };
-      }
-
-      throw new Error(`unexpected table ${table}`);
-    }),
-    statusUpdate,
-    duplicateInsertSingle,
-  };
-
-  return supabaseClient;
+  return null;
 }
 
 describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
@@ -127,18 +144,26 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     mocks.parseActionRequest.mockReset();
     mocks.updateCampaign.mockReset();
     mocks.fetchCampaignAudience.mockReset();
+    mocks.fetchCampaignDetails.mockReset();
     mocks.fetchQueueCounts.mockReset();
-    mocks.getCampaignTableKey.mockReset();
     mocks.getSignedUrls.mockReset();
+    mocks.getCampaignQueueContactIds.mockReset();
+    mocks.enqueueContactsForCampaign.mockReset();
+    campaignIvrMocks.findCampaignInWorkspace.mockReset();
+    campaignIvrMocks.updateCampaignStatusInWorkspace.mockReset();
+    campaignIvrMocks.insertCampaignForWorkspace.mockReset();
     mocks.logger.debug.mockReset();
     mocks.logger.error.mockReset();
-    mocks.getCampaignTableKey.mockReturnValue("message_campaign");
+    mocks.fetchCampaignDetails.mockResolvedValue({
+      campaign_id: 99,
+      body_text: "Hello",
+      message_media: [],
+    });
   });
 
   test("blocks invalid start requests with the shared readiness message", async () => {
-    const supabaseClient = makeSupabaseForSettingsRoute();
+    const dbClient = makeDbClientForSettingsRoute();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -148,10 +173,10 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     mocks.fetchQueueCounts.mockResolvedValueOnce({ queuedCount: 0, fullCount: 0 });
 
     const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
-    } as any));
+    })));
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
@@ -159,13 +184,12 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       actionType: "status",
       error: "Add at least one contact before starting or scheduling",
     });
-    expect(supabaseClient.statusUpdate).not.toHaveBeenCalled();
+    expect(campaignIvrMocks.updateCampaignStatusInWorkspace).not.toHaveBeenCalled();
   });
 
   test("updates status when the campaign is ready", async () => {
-    const supabaseClient = makeSupabaseForSettingsRoute();
+    const dbClient = makeDbClientForSettingsRoute();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -176,20 +200,59 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     mocks.fetchQueueCounts.mockResolvedValueOnce({ queuedCount: 2, fullCount: 2 });
 
     const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
-    } as any));
+    })));
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, actionType: "status", status: "running" });
-    expect(supabaseClient.statusUpdate).toHaveBeenCalled();
+    expect(campaignIvrMocks.updateCampaignStatusInWorkspace).toHaveBeenCalled();
+  });
+
+  test("blocks activation when the configured script is not in the workspace", async () => {
+    makeDbClientForSettingsRoute({
+      campaign: {
+        id: 99,
+        workspace: "w1",
+        type: "live_call",
+        caller_id: "+15555550100",
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+        schedule: {
+          monday: {
+            active: true,
+            intervals: [{ start: "13:00", end: "21:00" }],
+          },
+        },
+      },
+    });
+    mocks.fetchCampaignDetails.mockResolvedValueOnce({
+      campaign_id: 99,
+      script_id: 999,
+    });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "status",
+      status: "running",
+    });
+    mocks.fetchQueueCounts.mockResolvedValueOnce({ queuedCount: 2, fullCount: 2 });
+
+    const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+      request: new Request("http://x", { method: "POST" }),
+      params: { id: "w1", selected_id: "99" },
+    })));
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({
+      error: "The configured script is unavailable in this workspace",
+    });
+    expect(campaignIvrMocks.updateCampaignStatusInWorkspace).not.toHaveBeenCalled();
   });
 
   test("returns a save-specific error when save payload is incomplete", async () => {
-    const supabaseClient = makeSupabaseForSettingsRoute();
+    const dbClient = makeDbClientForSettingsRoute();
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -198,10 +261,10 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
 
     const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
-    } as any));
+    })));
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
@@ -210,12 +273,11 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
   });
 
-  test("returns a duplicate-specific error when cloning fails", async () => {
-    const supabaseClient = makeSupabaseForSettingsRoute({
+  test("returns a duplicate-specific, non-technical error when cloning fails", async () => {
+    const dbClient = makeDbClientForSettingsRoute({
       duplicateInsertError: new Error("duplicate failed"),
     });
     mocks.verifyAuth.mockResolvedValueOnce({
-      supabaseClient,
       user: { id: "u1" },
     });
     mocks.parseActionRequest.mockResolvedValueOnce({
@@ -224,16 +286,86 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     });
 
     const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
       request: new Request("http://x", { method: "POST" }),
       params: { id: "w1", selected_id: "99" },
-    } as any));
+    })));
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toMatchObject({
       success: false,
       actionType: "duplicate",
-      error: "duplicate failed",
+      error: "Campaign could not be duplicated",
     });
+  });
+
+  test("duplicate copies the source campaign's actual script_id, ignoring a mismatched client-supplied value", async () => {
+    makeDbClientForSettingsRoute({
+      campaign: {
+        id: 99,
+        workspace: "w1",
+        type: "robocall",
+        script_id: 42,
+      },
+    });
+    mocks.verifyAuth.mockResolvedValueOnce({
+      user: { id: "u1" },
+    });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "duplicate",
+      // Client sends a stale/tampered script_id that doesn't belong to this
+      // campaign's script — the server must ignore it and use the source's.
+      campaignData: JSON.stringify({
+        title: "Copy me",
+        type: "robocall",
+        script_id: 950001,
+      }),
+    });
+
+    const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+      request: new Request("http://x", { method: "POST" }),
+      params: { id: "w1", selected_id: "99" },
+    })));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      actionType: "duplicate",
+    });
+    expect(campaignIvrMocks.insertCampaignForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      expect.objectContaining({ script_id: 42 }),
+    );
+  });
+
+  test("duplicate nulls out script_id when the source campaign has none", async () => {
+    makeDbClientForSettingsRoute({
+      campaign: {
+        id: 99,
+        workspace: "w1",
+        type: "message",
+        script_id: null,
+      },
+    });
+    mocks.verifyAuth.mockResolvedValueOnce({
+      user: { id: "u1" },
+    });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "duplicate",
+      campaignData: JSON.stringify({ title: "Copy me", type: "message" }),
+    });
+
+    const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+      request: new Request("http://x", { method: "POST" }),
+      params: { id: "w1", selected_id: "99" },
+    })));
+
+    expect(res.status).toBe(200);
+    expect(campaignIvrMocks.insertCampaignForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      expect.objectContaining({ script_id: null }),
+    );
   });
 });

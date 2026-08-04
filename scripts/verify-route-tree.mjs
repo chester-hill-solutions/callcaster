@@ -1,31 +1,41 @@
 #!/usr/bin/env node
 import { execSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 const ROOT = process.cwd();
 const BASELINE = path.join(ROOT, "scripts/baselines/route-tree.txt");
 const update = process.argv.includes("--update-baseline");
 
-let out;
+// Redirect to a file instead of capturing the pipe: the react-router CLI can
+// exit before its stdout pipe flushes, silently truncating output at 8KB.
+const tmpFile = path.join(os.tmpdir(), `route-tree-${process.pid}.txt`);
+let out = "";
 try {
-  out = execSync("npx react-router routes 2>/dev/null", {
+  execSync(`npx react-router routes > ${JSON.stringify(tmpFile)} 2>/dev/null`, {
     cwd: ROOT,
-    encoding: "utf8",
-    maxBuffer: 10 * 1024 * 1024,
   });
-} catch (e) {
-  out = (e.stdout ?? "") + (e.stderr ?? "");
+  out = fs.readFileSync(tmpFile, "utf8");
+} catch {
+  out = fs.existsSync(tmpFile) ? fs.readFileSync(tmpFile, "utf8") : "";
+} finally {
+  fs.rmSync(tmpFile, { force: true });
 }
 
-const normalized = out
-  .split("\n")
-  .map((l) => l.trim())
-  .filter((l) => l.includes('path="'))
-  .map((l) => l.match(/path="([^"]+)"/)?.[1])
-  .filter(Boolean)
-  .sort()
-  .join("\n");
+const normalized = [...new Set(
+  out
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.includes('path="'))
+    .map((l) => l.match(/path="([^"]+)"/)?.[1])
+    .filter(Boolean),
+)].sort().join("\n");
+
+if (!normalized) {
+  console.error("react-router routes produced empty output; check if the build succeeded");
+  process.exit(1);
+}
 
 if (update) {
   fs.mkdirSync(path.dirname(BASELINE), { recursive: true });
@@ -39,7 +49,7 @@ if (!fs.existsSync(BASELINE)) {
   process.exit(1);
 }
 
-const prev = fs.readFileSync(BASELINE, "utf8").trim().split("\n").sort().join("\n");
+const prev = [...new Set(fs.readFileSync(BASELINE, "utf8").trim().split("\n"))].sort().join("\n");
 if (prev === normalized) {
   console.log("route tree matches baseline");
   process.exit(0);

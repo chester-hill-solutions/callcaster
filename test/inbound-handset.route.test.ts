@@ -3,24 +3,33 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
-  createClient: vi.fn(),
-  validateTwilioWebhookForPhoneNumber: vi.fn(),
+  requireTwilioSignature: vi.fn(),
+  findWorkspaceNumberByPhoneNumber: vi.fn(),
   env: {
-    SUPABASE_URL: () => "https://sb.example",
-    SUPABASE_SERVICE_KEY: () => "svc",
+    BETTER_AUTH_URL: () => "https://sb.example",
+    BETTER_AUTH_SERVICE_KEY: () => "svc",
   },
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: (...args: unknown[]) => mocks.createClient(...args),
+const handsetSessionMocks = vi.hoisted(() => ({
+  findActiveHandsetSessionClientIdentity: vi.fn(async () => "agent-1"),
 }));
+
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForPhoneNumber: (...args: unknown[]) =>
-    mocks.validateTwilioWebhookForPhoneNumber(...args),
+  requireTwilioSignature: (...args: unknown[]) =>
+    mocks.requireTwilioSignature(...args),
+}));
+vi.mock("@/lib/inbound-call-db.server", () => ({
+  findWorkspaceNumberByPhoneNumber: (...args: unknown[]) =>
+    mocks.findWorkspaceNumberByPhoneNumber(...args),
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/handset/handset-session.server", () => ({
+  findActiveHandsetSessionClientIdentity: (...args: unknown[]) =>
+    handsetSessionMocks.findActiveHandsetSessionClientIdentity(...args),
+}));
 
 vi.mock("twilio", () => {
   class VoiceResponse {
@@ -45,36 +54,6 @@ vi.mock("twilio", () => {
   return { default: { twiml: { VoiceResponse } } };
 });
 
-function makeSupabase(opts?: {
-  session?: { client_identity: string } | null;
-}) {
-  return {
-    from: (table: string) => {
-      if (table === "handset_session") {
-        return {
-          select: () => ({
-            eq: () => ({
-              eq: () => ({
-                gte: () => ({
-                  order: () => ({
-                    limit: () => ({
-                      maybeSingle: async () => ({
-                        data: opts?.session ?? { client_identity: "agent-1" },
-                        error: null,
-                      }),
-                    }),
-                  }),
-                }),
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error(`unexpected table ${table}`);
-    },
-  };
-}
-
 function makeRequest(called = "+15551234567") {
   const fd = new FormData();
   fd.set("Called", called);
@@ -84,45 +63,35 @@ function makeRequest(called = "+15551234567") {
 describe("app/routes/api+/inbound-handset", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.createClient.mockReset();
-    mocks.validateTwilioWebhookForPhoneNumber.mockReset();
-    mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValue({
-      ok: true,
-      params: { Called: "+15551234567" },
-      authToken: "tok",
+    handsetSessionMocks.findActiveHandsetSessionClientIdentity.mockReset();
+    handsetSessionMocks.findActiveHandsetSessionClientIdentity.mockResolvedValue("agent-1");
+    mocks.requireTwilioSignature.mockReset();
+    mocks.requireTwilioSignature.mockResolvedValue(null);
+    mocks.findWorkspaceNumberByPhoneNumber.mockReset();
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValue({
+      workspace: "w1",
       workspaceId: "w1",
-      twilioData: { sid: "AC1", authToken: "tok" },
-      numberRow: { workspace: "w1", handset_enabled: true },
-    });
+      handset_enabled: true,
+    } as any);
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {
-    mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+      }));
     const mod = await import("../app/routes/api+/inbound-handset");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeRequest() } as never),
+    const res = await asRouteResponse(mod.action({ request: makeRequest() } as never),
     );
     expect(res.status).toBe(403);
   });
 
   test("returns 403 when Called is empty", async () => {
-    mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Missing phone number" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Missing phone number" }), {
         status: 403,
-      }),
-    });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+      }));
     const mod = await import("../app/routes/api+/inbound-handset");
     const fd = new FormData();
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action({
         request: new Request("http://localhost/api/inbound-handset", {
           method: "POST",
           body: fd,
@@ -133,26 +102,35 @@ describe("app/routes/api+/inbound-handset", () => {
   });
 
   test("returns 403 when phone number is not found", async () => {
-    mocks.validateTwilioWebhookForPhoneNumber.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
+      }));
     const mod = await import("../app/routes/api+/inbound-handset");
-    const res = await asRouteResponse(
-      await mod.action({ request: makeRequest("+19999999999") } as never),
+    const res = await asRouteResponse(mod.action({ request: makeRequest("+19999999999") } as never),
     );
     expect(res.status).toBe(403);
   });
 
   test("returns TwiML dialing client on happy path", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase());
     const mod = await import("../app/routes/api+/inbound-handset");
-    const res = await asRouteResponse(await mod.action({ request: makeRequest() } as never));
+    const res = await asRouteResponse(mod.action({ request: makeRequest() } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();
     expect(text).toContain("client:agent-1");
+  });
+
+  test("returns fallback TwiML (not an HTML error page) when an unexpected error is thrown", async () => {
+    mocks.findWorkspaceNumberByPhoneNumber.mockRejectedValueOnce(new Error("db down"));
+    const mod = await import("../app/routes/api+/inbound-handset");
+    const res = await asRouteResponse(mod.action({ request: makeRequest() } as never));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("text/xml");
+    const text = await res.text();
+    expect(text).toContain("say:");
+    expect(text).toContain("hangup");
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Unhandled error in api.inbound-handset",
+      expect.objectContaining({ error: "db down" }),
+    );
   });
 });

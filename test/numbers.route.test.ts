@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { queueDualAuthSession, queueJsonAuthSession, setDualAuthSession, setJsonAuthSession } from "./helpers/route-auth-mock";
 
 const listMock = vi.fn();
@@ -22,27 +22,25 @@ const mocks = vi.hoisted(() => {
     insertTransactionHistoryIdempotent: vi.fn(),
     attachPhoneNumberToMessagingService: vi.fn(async () => ({})),
     env: {
-      SUPABASE_URL: vi.fn(() => "http://supabase"),
-      SUPABASE_SERVICE_KEY: vi.fn(() => "service"),
-      SUPABASE_PUBLISHABLE_KEY: vi.fn(() => "publishable"),
+      BETTER_AUTH_URL: vi.fn(() => "http://client"),
+      BETTER_AUTH_SERVICE_KEY: vi.fn(() => "service"),
+      BETTER_AUTH_PUBLISHABLE_KEY: vi.fn(() => "publishable"),
       BASE_URL: vi.fn(() => "http://base"),
       TWILIO_SID: vi.fn(() => process.env.TWILIO_SID ?? "sid"),
       TWILIO_AUTH_TOKEN: vi.fn(() => process.env.TWILIO_AUTH_TOKEN ?? "token"),
     },
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
   };
 });
 
-vi.mock("twilio", () => ({
-  default: { Twilio: twilioCtor },
+vi.mock("twilio/lib/rest/Twilio.js", () => ({
+  default: twilioCtor,
 }));
 vi.mock("@/lib/platform-workspace-numbers.server", () => ({
   purchaseWorkspaceNumber: (...args: unknown[]) =>
     mocks.purchaseWorkspaceNumber(...args),
 }));
-vi.mock("../app/lib/database.server", () => ({
-  parseActionRequest: async (request: Request) =>
-    Object.fromEntries((await request.formData()).entries()),
+vi.mock("../app/lib/database/workspace.server", () => ({
   createWorkspaceTwilioInstance: (...args: any[]) =>
     mocks.createWorkspaceTwilioInstance(...args),
   getWorkspaceUsers: (...args: any[]) => mocks.getWorkspaceUsers(...args),
@@ -50,6 +48,10 @@ vi.mock("../app/lib/database.server", () => ({
     mocks.getWorkspacePhoneNumbers(...args),
   requireWorkspaceAccess: (...args: any[]) =>
     mocks.requireWorkspaceAccess(...args),
+}));
+vi.mock("../app/lib/request-utils.server", () => ({
+  parseActionRequest: async (request: Request) =>
+    Object.fromEntries((await request.formData()).entries()),
 }));
 vi.mock("../app/lib/messaging-onboarding.server", () => ({
   getWorkspaceMessagingOnboardingState: (...args: any[]) =>
@@ -76,14 +78,12 @@ vi.mock("@/lib/transaction-history.server", () => ({
   insertTransactionHistoryIdempotent: (...args: any[]) =>
     mocks.insertTransactionHistoryIdempotent(...args),
 }));
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 
-function makeSupabaseStub(opts: {
+function makeDbClientStub(opts: {
   credits?: number;
   creditsError?: any;
   workspaceNumberInsertError?: any;
@@ -143,8 +143,8 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
     mocks.getWorkspaceMessagingOnboardingState.mockReset();
     mocks.updateWorkspaceMessagingOnboardingState.mockReset();
-    mocks.env.SUPABASE_URL.mockClear();
-    mocks.env.SUPABASE_SERVICE_KEY.mockClear();
+    mocks.env.BETTER_AUTH_URL.mockClear();
+    mocks.env.BETTER_AUTH_SERVICE_KEY.mockClear();
     mocks.env.BASE_URL.mockClear();
     mocks.logger.error.mockReset();
     mocks.insertTransactionHistoryIdempotent.mockReset();
@@ -164,16 +164,15 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       },
     });
     mocks.updateWorkspaceMessagingOnboardingState.mockResolvedValue(undefined);
-    setDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
-    setJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    setDualAuthSession({ user: { id: "u1" } });
+    setJsonAuthSession({ user: { id: "u1" } });
   });
 
   test("loader returns 400 when search query is missing", async () => {
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request("http://localhost/api/numbers?searchMode=areaCode"),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({
@@ -183,7 +182,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("loader lists local numbers with searchMode and query", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     listMock.mockResolvedValueOnce([
       {
         phoneNumber: "+14165551234",
@@ -196,12 +195,11 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     mocks.env.TWILIO_SID.mockReturnValueOnce("sid");
     mocks.env.TWILIO_AUTH_TOKEN.mockReturnValueOnce("token");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/numbers?searchMode=areaCode&query=416",
         ),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
@@ -213,15 +211,22 @@ describe("app/routes/api+/numbers/route.tsx", () => {
           region: "ON",
           locality: "Toronto",
           capabilities: { voice: true, sms: true },
+          addressRequirements: "none",
         },
       ],
     });
     expect(listMock).toHaveBeenCalledWith({ areaCode: 416, limit: 20 });
-    expect(twilioCtor).toHaveBeenCalledWith("sid", "token");
+    // Clients carry an explicit request timeout — the SDK otherwise waits
+    // forever, which stalls the single-threaded worker queue.
+    expect(twilioCtor).toHaveBeenCalledWith(
+      "sid",
+      "token",
+      expect.objectContaining({ timeout: expect.any(Number) }),
+    );
   });
 
   test("loader uses workspace Twilio when workspace_id is provided", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     listMock.mockResolvedValueOnce([
       { phoneNumber: "+1999", friendlyName: "+1999", capabilities: {} },
     ]);
@@ -229,32 +234,29 @@ describe("app/routes/api+/numbers/route.tsx", () => {
       availablePhoneNumbers: () => ({ local: { list: listMock } }),
     });
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/numbers?searchMode=areaCode&query=613&workspace_id=w1",
         ),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(200);
     expect(mocks.requireWorkspaceAccess).toHaveBeenCalled();
     expect(mocks.createWorkspaceTwilioInstance).toHaveBeenCalledWith({
-      supabase: {},
       workspace_id: "w1",
     });
     expect(twilioCtor).not.toHaveBeenCalled();
   });
 
   test("loader returns 500 and logs on Twilio error", async () => {
-    queueDualAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueDualAuthSession({ user: { id: "u1" } });
     listMock.mockRejectedValueOnce(new Error("boom"));
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(
-      await mod.loader({
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
         request: new Request(
           "http://localhost/api/numbers?searchMode=areaCode&query=416",
         ),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
@@ -268,7 +270,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("action returns 404 when no users found", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: false,
       error: "No users found for workspace",
@@ -279,12 +281,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({
@@ -292,12 +294,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     });
   });
 
-  test("action returns 400 creditsError when credits too low", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+  test("action returns 402 creditsError when credits too low", async () => {
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: false,
       error: "Insufficient credits for number rental",
-      status: 400,
+      status: 402,
       creditsError: true,
     });
 
@@ -305,19 +307,19 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(402);
     await expect(res.json()).resolves.toEqual({ creditsError: true });
   });
 
   test("action returns 201 on success (verification_status success, inbound_action owner)", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: true,
       number: { id: 9, phone_number: "+1555" },
@@ -329,12 +331,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1555");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({
@@ -344,7 +346,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("action covers pending verification_status and inbound_action null", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: true,
       number: { id: 10 },
@@ -356,19 +358,19 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1666");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000002");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({ newNumber: { id: 10 } });
   });
 
   test("action attaches purchased number to Messaging Service when workspace has one", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: true,
       number: { id: 11, phone_number: "+1999" },
@@ -380,12 +382,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1999");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000003");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(201);
     await expect(res.json()).resolves.toMatchObject({
@@ -395,7 +397,7 @@ describe("app/routes/api+/numbers/route.tsx", () => {
   });
 
   test("action returns 500 when getWorkspaceUsers returns error", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: false,
       error: "users",
@@ -406,23 +408,22 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1777");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error response:",
-      expect.anything(),
-      expect.any(Error),
+      "http.error_response",
+      expect.objectContaining({ statusCode: 500 }),
     );
   });
 
   test("action returns 500 when workspace credits query errors", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: false,
       error: "credits",
@@ -433,18 +434,18 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1888");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
   });
 
   test("action returns 500 when Twilio create rejects (logs both error sites)", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: false,
       error: "twilio",
@@ -455,23 +456,22 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1999");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error response:",
-      expect.anything(),
-      expect.any(Error),
+      "http.error_response",
+      expect.objectContaining({ statusCode: 500 }),
     );
   });
 
   test("action returns 500 when workspace_number insert errors", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: false,
       error: "insert",
@@ -482,18 +482,18 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
   });
 
   test("action returns 500 when idempotent transaction insert errors", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.purchaseWorkspaceNumber.mockResolvedValueOnce({
       ok: false,
       error: "tx",
@@ -504,12 +504,12 @@ describe("app/routes/api+/numbers/route.tsx", () => {
     fd.set("phoneNumber", "+1");
     fd.set("workspace_id", "00000000-0000-4000-8000-000000000001");
     const mod = await import("../app/routes/api+/numbers");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://localhost/api/numbers", {
         method: "POST",
         body: fd,
       }),
-    } as any));
+    } as any)));
 
     expect(res.status).toBe(500);
   });

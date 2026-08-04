@@ -20,8 +20,15 @@ export default function InfoPopover({
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
-        <TooltipTrigger>
-          <Info size={size} />
+        <TooltipTrigger asChild>
+          {/* type="button" so this never submits a surrounding <Form> (#1107). */}
+          <button
+            type="button"
+            className="inline-flex items-center justify-center rounded-sm text-muted-foreground hover:text-foreground"
+            aria-label="More information"
+          >
+            <Info size={size} />
+          </button>
         </TooltipTrigger>
         <TooltipContent align={align}>
           <p>{tooltip}</p>

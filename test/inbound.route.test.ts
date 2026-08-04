@@ -1,17 +1,26 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
+import { resolveInboundVoicemailAudio } from "@/lib/inbound-voicemail-twiml.server";
 
 const mocks = vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
   return {
     createClient: vi.fn(),
     sendWebhookNotification: vi.fn(),
     isPhoneNumber: vi.fn(),
     isEmail: vi.fn(),
+    requireTwilioSignature: vi.fn(),
     validateTwilioWebhookParams: vi.fn(() => true),
+    findWorkspaceNumberByPhoneNumber: vi.fn(),
+    upsertInboundCallRecord: vi.fn(),
+    findInboundIvrScriptSteps: vi.fn(),
+    getWorkspaceWebhookRow: vi.fn(),
+    findActiveHandsetSessionClientIdentity: vi.fn(),
     env: {
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "twilio-auth",
       BASE_URL: () => "https://base.example",
     },
@@ -19,7 +28,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({
+vi.mock("@client/client-js", () => ({
   createClient: (...a: any[]) => mocks.createClient(...a),
 }));
 vi.mock("@/lib/utils", () => ({
@@ -31,9 +40,44 @@ vi.mock("@/lib/workspace-settings/WorkspaceSettingUtils.server", () => ({
 }));
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: mocks.validateTwilioWebhookParams,
+  shouldValidateTwilioWebhooks: () => true,
 }));
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/inbound-call-db.server", () => ({
+  findWorkspaceNumberByPhoneNumber: (...a: unknown[]) =>
+    mocks.findWorkspaceNumberByPhoneNumber(...a),
+  upsertInboundCallRecord: (...a: unknown[]) => mocks.upsertInboundCallRecord(...a),
+  findInboundIvrScriptSteps: (...a: unknown[]) => mocks.findInboundIvrScriptSteps(...a),
+  workspaceWebhookHasInboundCallInsert: (webhook: { event?: string[] | null } | null) =>
+    Boolean(webhook?.event?.includes("INSERT")),
+}));
+vi.mock("@/lib/workspace-members-db.server", () => ({
+  getWorkspaceWebhookRow: (...a: unknown[]) => mocks.getWorkspaceWebhookRow(...a),
+}));
+vi.mock("@/lib/handset/handset-session.server", () => ({
+  findActiveHandsetSessionClientIdentity: (...a: unknown[]) =>
+    mocks.findActiveHandsetSessionClientIdentity(...a),
+}));
+vi.mock("@/lib/inbound-voicemail-twiml.server", () => ({
+  resolveInboundVoicemailAudio: vi.fn(),
+  appendInboundVoicemailTwiml: vi.fn(({ twiml, voicemailAudioUrl, phoneNumber }: any) => {
+    if (voicemailAudioUrl) {
+      twiml.play(voicemailAudioUrl);
+    } else {
+      twiml.say(`Thank you for calling ${phoneNumber ?? ""}, we're unable to answer your call at the moment. Please leave us a message and we'll get back to you as soon as possible.`);
+    }
+    twiml.pause({ length: 1 });
+    twiml.record({ transcribe: true, timeout: 10, playBeep: true });
+  }),
+}));
+vi.mock("@/lib/twilio-webhook.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/twilio-webhook.server")>();
+  return {
+    ...actual,
+    requireTwilioSignature: (...a: unknown[]) => mocks.requireTwilioSignature(...a),
+  };
+});
 
 vi.mock("twilio", () => {
   class VoiceResponse {
@@ -60,6 +104,9 @@ vi.mock("twilio", () => {
     record(_opts: any) {
       this.parts.push("record");
     }
+    hangup() {
+      this.parts.push("hangup");
+    }
     toString() {
       return `<Response>${this.parts.join("|")}</Response>`;
     }
@@ -67,19 +114,63 @@ vi.mock("twilio", () => {
   return { default: { twiml: { VoiceResponse } } };
 });
 
-function makeSupabase(opts?: {
-  number?: any;
-  numberError?: any;
+function defaultCallRow() {
+  return {
+    sid: "CA1",
+    from: "f",
+    to: "t",
+    status: "completed",
+    direction: "inbound",
+    start_time: "now",
+  };
+}
+
+function toInboundNumber(number: {
+  id?: number;
+  inbound_action?: string | null;
+  inbound_audio?: string | null;
+  inbound_ring_count?: number | null;
+  inbound_script_id?: number | null;
+  inbound_queue_id?: number | null;
+  handset_enabled?: boolean | null;
+  type?: string | null;
+  workspace?: { id: string } | string | null;
+}) {
+  const workspaceId =
+    number.workspace && typeof number.workspace === "object"
+      ? number.workspace.id
+      : typeof number.workspace === "string"
+        ? number.workspace
+        : "";
+  return {
+    id: number.id ?? 1,
+    handset_enabled: number.handset_enabled ?? null,
+    inbound_action: number.inbound_action ?? null,
+    inbound_audio: number.inbound_audio ?? null,
+    inbound_queue_id: number.inbound_queue_id ?? null,
+    inbound_script_id: number.inbound_script_id ?? null,
+    inbound_ring_count: number.inbound_ring_count ?? null,
+    type: number.type ?? null,
+    workspaceId,
+  };
+}
+
+function makeDbClient(opts?: {
   voicemailSignedUrl?: string | null;
   voicemailList?: { id?: string; name: string }[] | null;
-  voicemailListSpy?: (...args: any[]) => void;
-  callError?: any;
-  callRow?: any;
+  voicemailListSpy?: (...args: unknown[]) => void;
 }) {
-  const supabase: any = {
+  const client: {
+    storage: {
+      from: () => {
+        list: (...args: unknown[]) => Promise<{ data: unknown[]; error: null }>;
+        createSignedUrl: () => Promise<{ data: { signedUrl: string } | null; error: null }>;
+      };
+    };
+  } = {
     storage: {
       from: () => ({
-        list: async (...args: any[]) => {
+        list: async (...args: unknown[]) => {
           opts?.voicemailListSpy?.(...args);
           return { data: opts?.voicemailList ?? [], error: null };
         },
@@ -91,42 +182,8 @@ function makeSupabase(opts?: {
         }),
       }),
     },
-    from: (table: string) => {
-      if (table === "workspace_number") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: opts?.number ?? null,
-                error: opts?.numberError ?? null,
-              }),
-            }),
-          }),
-        };
-      }
-      if (table === "call") {
-        return {
-          upsert: () => ({
-            select: () => ({
-              single: async () => ({
-                data: opts?.callRow ?? {
-                  sid: "CA1",
-                  from: "f",
-                  to: "t",
-                  status: "completed",
-                  direction: "inbound",
-                  start_time: "now",
-                },
-                error: opts?.callError ?? null,
-              }),
-            }),
-          }),
-        };
-      }
-      throw new Error("unexpected");
-    },
   };
-  return supabase;
+  return client;
 }
 
 describe("app/routes/api+/inbound/route.tsx", () => {
@@ -136,86 +193,69 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     mocks.sendWebhookNotification.mockReset();
     mocks.isPhoneNumber.mockReset();
     mocks.isEmail.mockReset();
+    mocks.requireTwilioSignature.mockReset();
+    mocks.validateTwilioWebhookParams.mockReset();
+    mocks.findWorkspaceNumberByPhoneNumber.mockReset();
+    mocks.upsertInboundCallRecord.mockReset();
+    mocks.findInboundIvrScriptSteps.mockReset();
+    mocks.getWorkspaceWebhookRow.mockReset();
+    mocks.findActiveHandsetSessionClientIdentity.mockReset();
     mocks.validateTwilioWebhookParams.mockReset();
     mocks.validateTwilioWebhookParams.mockReturnValue(true);
+    mocks.upsertInboundCallRecord.mockResolvedValue(defaultCallRow());
+    mocks.findInboundIvrScriptSteps.mockResolvedValue(null);
+    mocks.findActiveHandsetSessionClientIdentity.mockResolvedValue(null);
     mocks.logger.error.mockReset();
     mocks.logger.warn.mockReset();
+    vi.mocked(resolveInboundVoicemailAudio).mockReset();
   });
 
   test("returns 400 when Called missing", async () => {
-    const supabase = makeSupabase();
-    mocks.createClient.mockReturnValueOnce(supabase);
+    const client = makeDbClient();
+    mocks.createClient.mockReturnValueOnce(client);
     const mod = await import("../app/routes/api+/inbound");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", {
           method: "POST",
           body: new FormData(),
         }),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(400);
   });
 
-  test("workspace number errors/not found return error responses", async () => {
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ number: null, numberError: null }),
-    );
+  test("workspace number not found returns 404", async () => {
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(null);
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
     const mod = await import("../app/routes/api+/inbound");
     const fd = new FormData();
     fd.set("Called", "+1");
-    let res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(404);
-
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        number: {
-          inbound_action: null,
-          inbound_audio: null,
-          type: null,
-          workspace: { id: "w1", twilio_data: null, webhook: [] },
-        },
-        numberError: new Error("n"),
-      }),
-    );
-    res = await asRouteResponse(
-      await mod.action({
-        request: new Request("http://x", { method: "POST", body: fd }),
-      } as any),
-    );
-    expect(res.status).toBe(500);
-    expect(mocks.logger.error).toHaveBeenCalled();
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {
-    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        number: {
-          inbound_action: null,
-          inbound_audio: null,
-          type: null,
-          workspace: {
-            id: "w1",
-            twilio_data: { account_sid: "ac", auth_token: "at" },
-            webhook: [],
-          },
-        },
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), { status: 403 }));
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(
+      toInboundNumber({
+        inbound_action: null,
+        inbound_audio: null,
+        type: null,
+        workspace: { id: "w1" },
       }),
     );
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
 
     const mod = await import("../app/routes/api+/inbound");
     const fd = new FormData();
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
-    const res = await asRouteResponse(
-      await mod.action({
+    const res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(403);
   });
@@ -233,17 +273,19 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     };
     mocks.isPhoneNumber.mockReturnValue(true);
     mocks.isEmail.mockReturnValue(false);
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ number: baseNumber }),
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValue(
+      toInboundNumber(baseNumber),
     );
+    mocks.getWorkspaceWebhookRow.mockResolvedValue({ event: ["INSERT"] });
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
 
     const fd = new FormData();
     fd.set("Called", "+1");
     fd.set("CallSid", "CA1");
     const mod = await import("../app/routes/api+/inbound");
-    let res = await asRouteResponse(await mod.action({
+    let res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any));
+    } as any)));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     expect(await res.text()).toContain("dial:+15550001111");
     expect(mocks.sendWebhookNotification).toHaveBeenCalled();
@@ -251,20 +293,17 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     // email path with voicemail signedUrl => play+record
     mocks.isPhoneNumber.mockReturnValue(false);
     mocks.isEmail.mockReturnValue(true);
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        number: {
-          ...baseNumber,
-          inbound_action: "a@b.com",
-          inbound_audio: "vm.mp3",
-        },
-        voicemailSignedUrl: "https://signed",
-        voicemailList: [{ name: "vm.mp3", id: "vm.mp3" }],
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValue(
+      toInboundNumber({
+        ...baseNumber,
+        inbound_action: "a@b.com",
+        inbound_audio: "vm.mp3",
       }),
     );
-    res = await asRouteResponse(await mod.action({
+    vi.mocked(resolveInboundVoicemailAudio).mockResolvedValueOnce({ signedUrl: "https://signed" });
+    res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any));
+    } as any)));
     const xml = await res.text();
     expect(xml).toContain("play:https://signed");
     expect(xml).toContain("record");
@@ -272,77 +311,63 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     // email path with no voicemail signedUrl => say+record
     mocks.isPhoneNumber.mockReturnValue(false);
     mocks.isEmail.mockReturnValue(true);
-    const fallbackListSpy = vi.fn();
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        number: {
-          ...baseNumber,
-          inbound_action: "a@b.com",
-          inbound_audio: "vm.mp3",
-        },
-        voicemailSignedUrl: null,
-        voicemailListSpy: fallbackListSpy,
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValue(
+      toInboundNumber({
+        ...baseNumber,
+        inbound_action: "a@b.com",
+        inbound_audio: "vm.mp3",
       }),
     );
-    res = await asRouteResponse(await mod.action({
+    vi.mocked(resolveInboundVoicemailAudio).mockResolvedValueOnce(null);
+    res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any));
+    } as any)));
     expect(await res.text()).toContain("leave us a message");
-    expect(fallbackListSpy).toHaveBeenCalledWith("w1", {
-      search: "vm.mp3",
-      limit: 20,
-      offset: 0,
-    });
 
     // else path => say "try again later"
     mocks.isPhoneNumber.mockReturnValue(false);
     mocks.isEmail.mockReturnValue(false);
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ number: { ...baseNumber, inbound_action: "noop" } }),
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(
+      toInboundNumber({ ...baseNumber, inbound_action: "noop" }),
     );
-    res = await asRouteResponse(await mod.action({
+    mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["INSERT"] });
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
+    res = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any));
+    } as any)));
     expect(await res.text()).toContain("unable to answer");
   });
 
   test("returns 400 for missing CallSid, 500 on call upsert error", async () => {
-    const baseNumber = {
-      inbound_action: null,
-      inbound_audio: null,
-      type: null,
-      workspace: {
-        id: "w1",
-        twilio_data: { account_sid: "ac", auth_token: "at" },
-        webhook: [],
-      },
-    };
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ number: baseNumber }),
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValue(
+      toInboundNumber({
+        inbound_action: null,
+        inbound_audio: null,
+        type: null,
+        workspace: { id: "w1" },
+      }),
     );
+    mocks.getWorkspaceWebhookRow.mockResolvedValue({ event: [] });
+    mocks.createClient.mockReturnValue(makeDbClient());
     const fd = new FormData();
     fd.set("Called", "+1");
     const mod = await import("../app/routes/api+/inbound");
-    let res = await asRouteResponse(
-      await mod.action({
+    let res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(400);
 
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({ number: baseNumber, callError: new Error("call") }),
-    );
+    mocks.upsertInboundCallRecord.mockResolvedValueOnce(null);
     fd.set("CallSid", "CA1");
-    res = await asRouteResponse(
-      await mod.action({
+    res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
-      } as any),
+      } as any)),
     );
     expect(res.status).toBe(500);
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Error on function insert call",
-      expect.any(Error),
+      expect.objectContaining({ sid: "CA1", workspaceId: "w1" }),
     );
   });
 
@@ -356,66 +381,47 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     // No workspace credentials => signature validation fails
     mocks.isPhoneNumber.mockReturnValue(false);
     mocks.isEmail.mockReturnValue(false);
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        number: {
-          inbound_action: null,
-          inbound_audio: null,
-          type: null,
-          workspace: null,
-        },
-      }),
-    );
-    mocks.validateTwilioWebhookParams.mockReturnValueOnce(false);
-    const res = await asRouteResponse(
-      await mod.action({
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(null);
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
+    const res = await asRouteResponse(mod.action(withRouteUrl({
         request: new Request("http://x", { method: "POST", body: fd }),
-      } as any),
+      } as any)),
     );
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
 
-    // Workspace id empty string => workspaceId fallback "" in webhook notification
     mocks.isPhoneNumber.mockReturnValue(true);
     mocks.isEmail.mockReturnValue(false);
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        number: {
-          inbound_action: null,
-          inbound_audio: null,
-          type: "inbound",
-          workspace: {
-            id: "",
-            twilio_data: { account_sid: "ac", auth_token: "at" },
-            webhook: [{ events: [{ category: "inbound_call" }] }],
-          },
-        },
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(
+      toInboundNumber({
+        inbound_action: null,
+        inbound_audio: null,
+        type: "inbound",
+        workspace: { id: "" },
       }),
     );
-    const response = await asRouteResponse(await mod.action({
+    mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["INSERT"] });
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
+    const response = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any));
+    } as any)));
     expect(await response.text()).toContain("say:");
 
     // callWebhook empty => does not send webhook
     const prevCalls = mocks.sendWebhookNotification.mock.calls.length;
     mocks.isPhoneNumber.mockReturnValue(true);
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        number: {
-          inbound_action: "+1555",
-          inbound_audio: null,
-          type: "inbound",
-          workspace: {
-            id: "w1",
-            twilio_data: { account_sid: "ac", auth_token: "at" },
-            webhook: [{ events: [{ category: "other" }] }],
-          },
-        },
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(
+      toInboundNumber({
+        inbound_action: "+1555",
+        inbound_audio: null,
+        type: "inbound",
+        workspace: { id: "w1" },
       }),
     );
-    await mod.action({
+    mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["UPDATE"] });
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
+    await mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any);
+    } as any));
     expect(mocks.sendWebhookNotification.mock.calls.length).toBe(prevCalls);
   });
 
@@ -430,30 +436,51 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     );
     mocks.isPhoneNumber.mockReturnValue(true);
     mocks.isEmail.mockReturnValue(false);
-    mocks.createClient.mockReturnValueOnce(
-      makeSupabase({
-        number: {
-          inbound_action: "+1555",
-          inbound_audio: null,
-          type: "inbound",
-          workspace: {
-            id: "w1",
-            twilio_data: { account_sid: "ac", auth_token: "at" },
-            webhook: [{ events: [{ category: "inbound_call" }] }],
-          },
-        },
+    mocks.findWorkspaceNumberByPhoneNumber.mockResolvedValueOnce(
+      toInboundNumber({
+        inbound_action: "+1555",
+        inbound_audio: null,
+        type: "inbound",
+        workspace: { id: "w1" },
       }),
     );
+    mocks.getWorkspaceWebhookRow.mockResolvedValueOnce({ event: ["INSERT"] });
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
 
-    const response = await asRouteResponse(await mod.action({
+    const response = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
-    } as any));
+    } as any)));
     expect(response.headers.get("Content-Type")).toBe("text/xml");
 
     await Promise.resolve();
     expect(mocks.logger.warn).toHaveBeenCalledWith(
       "Failed to send inbound call webhook notification",
       expect.objectContaining({ workspaceId: "w1", callSid: "CA1" }),
+    );
+  });
+
+  test("returns fallback TwiML (not an HTML error page) when an unexpected error is thrown", async () => {
+    mocks.findWorkspaceNumberByPhoneNumber.mockRejectedValueOnce(
+      new Error("db unavailable"),
+    );
+    mocks.createClient.mockReturnValueOnce(makeDbClient());
+
+    const mod = await import("../app/routes/api+/inbound");
+    const fd = new FormData();
+    fd.set("Called", "+1");
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+        request: new Request("http://x", { method: "POST", body: fd }),
+      } as any)),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("text/xml");
+    const xml = await res.text();
+    expect(xml).toContain("say:");
+    expect(xml).toContain("hangup");
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Unhandled error in api.inbound",
+      expect.objectContaining({ error: "db unavailable" }),
     );
   });
 });

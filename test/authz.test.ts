@@ -1,41 +1,38 @@
-import { describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi, beforeEach } from "vitest";
 
-// Avoid env validation noise when importing server modules in tests.
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
 vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
   return { env: new Proxy({}, handler) };
 });
 
+let membershipRole: string | null = null;
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    workspace_member: {
+      findFirst: async () =>
+        membershipRole ? { role_id: membershipRole } : null,
+    },
+  }),
+}));
+
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 
-function makeSupabaseForRole(role: string | null) {
-  return {
-    from: (table: string) => {
-      if (table !== "workspace_users") throw new Error("unexpected table");
-      return {
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              single: async () => ({
-                data: role ? { role } : null,
-                error: null,
-              }),
-            }),
-          }),
-        }),
-      };
-    },
-  } as any;
-}
-
 describe("requireWorkspaceAccess", () => {
+  beforeEach(() => {
+    membershipRole = null;
+  });
+
   test.each(["owner", "admin", "member", "caller"])(
     "permits role %s",
     async (role) => {
-      const supabaseClient = makeSupabaseForRole(role);
+      membershipRole = role;
       await expect(
         requireWorkspaceAccess({
-          supabaseClient,
           user: { id: "u1" },
           workspaceId: "w1",
         }),
@@ -43,26 +40,24 @@ describe("requireWorkspaceAccess", () => {
     },
   );
 
-  test("rejects when no membership exists", async () => {
-    const supabaseClient = makeSupabaseForRole(null);
+  test("rejects when no membership exists (404, no workspace-id inference)", async () => {
+    membershipRole = null;
     await expect(
       requireWorkspaceAccess({
-        supabaseClient,
         user: { id: "u1" },
         workspaceId: "w1",
       }),
     ).rejects.toMatchObject({
       name: "AppError",
-      statusCode: 403,
-      code: "FORBIDDEN",
+      statusCode: 404,
+      code: "NOT_FOUND",
     });
   });
 
-  test("rejects unknown role", async () => {
-    const supabaseClient = makeSupabaseForRole("viewer");
+  test("rejects unknown role (member with invalid role string -> 403)", async () => {
+    membershipRole = "viewer";
     await expect(
       requireWorkspaceAccess({
-        supabaseClient,
         user: { id: "u1" },
         workspaceId: "w1",
       }),
@@ -73,4 +68,3 @@ describe("requireWorkspaceAccess", () => {
     });
   });
 });
-

@@ -25,7 +25,7 @@ describe("edge portal-config field sync", () => {
   test("app and edge portal config defaults share the same normalized fields", async () => {
     const edgePortalConfig = await import(
       // eslint-disable-next-line import/no-unresolved -- Deno edge module; not in app tsconfig paths
-      "../../supabase/functions/_shared/portal-config.ts"
+      "../../shared/portal-config.ts"
     );
 
     const normalized = edgePortalConfig.normalizePortalOpsConfig(null);

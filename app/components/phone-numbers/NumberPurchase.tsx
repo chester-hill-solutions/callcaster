@@ -1,7 +1,12 @@
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { Text } from "@/components/ui/typography";
 import { hasCreditsForNumberRental } from "@/lib/number-rental";
-import type { AvailableNumber } from "@/components/phone-numbers/NumberPurchase.constants";
+import {
+  emptyMessageForMode,
+  type AvailableNumber,
+  type NumbersSearchFetcherData,
+  type PurchaseFetcherData,
+} from "@/components/phone-numbers/NumberPurchase.constants";
 import { useFetcher, type FetcherWithComponents } from "react-router";
 import { useMemo, useState } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
@@ -9,11 +14,6 @@ import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { buildNumberPurchaseColumns } from "./NumberPurchase.columns";
 import { NumberPurchaseConfirmDialog } from "./NumberPurchase.ConfirmDialog";
 import { NumberRentalCreditsAlert } from "./NumberRentalCreditsAlert";
-import {
-  emptyMessageForMode,
-  type NumbersSearchFetcherData,
-  type PurchaseFetcherData,
-} from "./NumberPurchase.constants";
 import { NumberPurchaseSearchForm } from "./NumberPurchase.SearchForm";
 import type { NumberSearchMode } from "@/lib/numbers-search.server";
 
@@ -37,9 +37,7 @@ export const NumberPurchase = ({
   const [query, setQuery] = useState("");
   const [filterVoice, setFilterVoice] = useState(false);
   const [filterSms, setFilterSms] = useState(false);
-  const [selectedNumber, setSelectedNumber] = useState<AvailableNumber | null>(
-    null,
-  );
+  const [selectedNumber, setSelectedNumber] = useState<AvailableNumber | null>(null);
   const [lastQuery, setLastQuery] = useState("");
 
   const canAfford = hasCreditsForNumberRental(creditsBalance);
@@ -65,7 +63,9 @@ export const NumberPurchase = ({
       getSuccess: (data) => Boolean(data?.newNumber),
       successMessage: (data) => {
         const purchased = data?.newNumber;
-        return `Number purchased: ${purchased?.friendly_name ?? purchased?.phone_number ?? "New number"}`;
+        const phone =
+          purchased?.phone_number ?? purchased?.friendly_name ?? "new number";
+        return `Your number is live — try calling ${phone}. Recordings land in Voicemails.`;
       },
       getError: (data) => data?.error,
       onSuccess: () => {

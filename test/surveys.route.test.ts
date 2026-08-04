@@ -3,6 +3,18 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 import { queueDualAuthSession, setDualAuthSession, queueJsonAuthSession, setJsonAuthSession, queueSudoAuth, setSudoAuth } from "./helpers/route-auth-mock";
 
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
+const surveyDbMocks = vi.hoisted(() => ({
+  findUserById: vi.fn(async () => ({ id: "u1" })),
+  createSurveyWithStructure: vi.fn(async () => ({ id: 1, survey_id: "S1", title: "T" })),
+  getSurveyWorkspaceByPublicId: vi.fn(async () => "w1"),
+  updateSurveyMetadata: vi.fn(async () => ({ id: 1, title: "X" })),
+  deleteSurveyByPublicId: vi.fn(async () => undefined),
+}));
+
 const mocks = vi.hoisted(() => {
   return {
     verifyAuth: vi.fn(),
@@ -21,10 +33,10 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/supabase.server", () => ({
+vi.mock("@/lib/auth.server", () => ({
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
 }));
-vi.mock("@/lib/database.server", () => ({
+vi.mock("@/lib/database/workspace.server", () => ({
   getUserRole: (...args: any[]) => mocks.getUserRole(...args),
 }));
 vi.mock("@/lib/errors.server", async (importOriginal) => {
@@ -36,12 +48,19 @@ vi.mock("@/lib/errors.server", async (importOriginal) => {
   };
 });
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/survey-db.server", () => ({
+  findUserById: (...args: unknown[]) => surveyDbMocks.findUserById(...args),
+  createSurveyWithStructure: (...args: unknown[]) => surveyDbMocks.createSurveyWithStructure(...args),
+  getSurveyWorkspaceByPublicId: (...args: unknown[]) => surveyDbMocks.getSurveyWorkspaceByPublicId(...args),
+  updateSurveyMetadata: (...args: unknown[]) => surveyDbMocks.updateSurveyMetadata(...args),
+  deleteSurveyByPublicId: (...args: unknown[]) => surveyDbMocks.deleteSurveyByPublicId(...args),
+}));
 
 function sbSingle(result: { data: any; error: any }) {
   return { single: vi.fn(async () => result) };
 }
 
-function makeSupabase(handlers: {
+function makeDbClient(handlers: {
   user?: { data: any; error: any };
   surveyInsert?: { data: any; error: any };
   pageInsert?: { data: any; error: any };
@@ -115,26 +134,36 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     mocks.handleDatabaseError.mockClear();
     mocks.createErrorResponse.mockClear();
     mocks.logger.error.mockReset();
+    surveyDbMocks.findUserById.mockReset();
+    surveyDbMocks.createSurveyWithStructure.mockReset();
+    surveyDbMocks.getSurveyWorkspaceByPublicId.mockReset();
+    surveyDbMocks.updateSurveyMetadata.mockReset();
+    surveyDbMocks.deleteSurveyByPublicId.mockReset();
+    surveyDbMocks.findUserById.mockResolvedValue({ id: "u1" });
+    surveyDbMocks.createSurveyWithStructure.mockResolvedValue({ id: 1, survey_id: "S1", title: "T" });
+    surveyDbMocks.getSurveyWorkspaceByPublicId.mockResolvedValue("w1");
+    surveyDbMocks.updateSurveyMetadata.mockResolvedValue({ id: 1, title: "X" });
+    surveyDbMocks.deleteSurveyByPublicId.mockResolvedValue(undefined);
   });
 
   test("method not allowed returns createErrorResponse", async () => {
-    queueDualAuthSession({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({ request: new Request("http://x", { method: "PUT" }) } as any));
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "PUT" }) } as any));
     expect(res.status).toBe(500);
     expect(mocks.createErrorResponse).toHaveBeenCalled();
   });
 
   test("POST validates body and unauthorized role", async () => {
-    setDualAuthSession({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
+    setDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce(null);
     const mod = await import("../app/routes/api+/surveys");
 
-    const r0 = await asRouteResponse(await mod.action({ request: reqForm("POST", {}) } as any));
+    const r0 = await asRouteResponse(mod.action({ request: reqForm("POST", {}) } as any));
     expect(r0.status).toBe(400);
 
     mocks.getUserRole.mockResolvedValueOnce({ role: "viewer" });
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({ title: "T", pages: [] }),
@@ -144,27 +173,25 @@ describe("app/routes/api+/surveys/route.tsx", () => {
   });
 
   test("POST invalid surveyData JSON and missing workspaceId return 400", async () => {
-    setDualAuthSession({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
+    setDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     const mod = await import("../app/routes/api+/surveys");
 
-    const r0 = await asRouteResponse(await mod.action({
+    const r0 = await asRouteResponse(mod.action({
       request: reqForm("POST", { workspaceId: "w1", surveyData: "not-json" }),
     } as any));
     expect(r0.status).toBe(400);
 
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: reqForm("POST", { surveyData: JSON.stringify({ title: "T" }) }),
     } as any));
     expect(r1.status).toBe(400);
   });
 
   test("POST returns 404 when db user missing", async () => {
-    queueDualAuthSession({
-      supabaseClient: makeSupabase({ user: { data: null, error: null } }),
-      user: { id: "u1" },
-    });
+    surveyDbMocks.findUserById.mockResolvedValueOnce(null);
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({ title: "T", pages: [] }),
@@ -174,14 +201,12 @@ describe("app/routes/api+/surveys/route.tsx", () => {
   });
 
   test("POST handles insert error via handleDatabaseError", async () => {
-    queueDualAuthSession({
-      supabaseClient: makeSupabase({ surveyInsert: { data: null, error: { message: "bad" } } }),
-      user: { id: "u1" },
-    });
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
+    surveyDbMocks.createSurveyWithStructure.mockRejectedValueOnce({ message: "bad" });
 
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({ title: "T", pages: [] }),
@@ -192,52 +217,12 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     expect(mocks.createErrorResponse).toHaveBeenCalled();
   });
 
-  test("POST creates survey; continues on page/question errors; inserts options", async () => {
-    const supabaseClient = makeSupabase({});
-    // override to vary page/question insert results in one request
-    let pageCall = 0;
-    (supabaseClient.from as any).mockImplementation((table: string) => {
-      if (table === "user") {
-        return { select: () => ({ eq: () => sbSingle({ data: { id: "u1" }, error: null }) }) };
-      }
-      if (table === "survey") {
-        return {
-          insert: () => ({ select: () => sbSingle({ data: { id: 1 }, error: null }) }),
-        };
-      }
-      if (table === "survey_page") {
-        return {
-          insert: () => ({
-            select: () =>
-              sbSingle(
-                pageCall++ === 0
-                  ? { data: null, error: { message: "p" } }
-                  : { data: { id: 2 }, error: null }
-              ),
-          }),
-        };
-      }
-      if (table === "survey_question") {
-        return {
-          insert: () => ({
-            select: () => sbSingle({ data: null, error: { message: "q" } }),
-          }),
-        };
-      }
-      if (table === "question_option") {
-        return { insert: vi.fn(async () => ({ error: null })) };
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    });
-
-    queueDualAuthSession({
-      supabaseClient,
-      user: { id: "u1" },
-    });
+  test("POST creates survey with nested structure", async () => {
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
 
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({
@@ -245,7 +230,7 @@ describe("app/routes/api+/surveys/route.tsx", () => {
           title: "T",
           is_active: true,
           pages: [
-            { page_id: "p0", title: "P0", page_order: 0, questions: [] }, // pageError => continue
+            { page_id: "p0", title: "P0", page_order: 0, questions: [] },
             {
               page_id: "p1",
               title: "P1",
@@ -266,43 +251,17 @@ describe("app/routes/api+/surveys/route.tsx", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error creating page:", expect.anything());
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error creating question:", expect.anything());
+    expect(surveyDbMocks.createSurveyWithStructure).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: "w1" }),
+    );
   });
 
-  test("POST creates page/question and inserts options (happy path)", async () => {
-    const supabaseClient = makeSupabase({});
-    const optionInsert = vi.fn(async () => ({ error: null }));
-    (supabaseClient.from as any).mockImplementation((table: string) => {
-      if (table === "user") {
-        return { select: () => ({ eq: () => sbSingle({ data: { id: "u1" }, error: null }) }) };
-      }
-      if (table === "survey") {
-        return {
-          insert: () => ({ select: () => sbSingle({ data: { id: 1 }, error: null }) }),
-        };
-      }
-      if (table === "survey_page") {
-        return {
-          insert: () => ({ select: () => sbSingle({ data: { id: 2 }, error: null }) }),
-        };
-      }
-      if (table === "survey_question") {
-        return {
-          insert: () => ({ select: () => sbSingle({ data: { id: 3 }, error: null }) }),
-        };
-      }
-      if (table === "question_option") {
-        return { insert: optionInsert };
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    });
-
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+  test("POST creates survey happy path", async () => {
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "member" });
 
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({
@@ -333,14 +292,13 @@ describe("app/routes/api+/surveys/route.tsx", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(optionInsert).toHaveBeenCalledTimes(2);
   });
 
   test("POST with no pages skips page/question creation", async () => {
-    queueDualAuthSession({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({ survey_id: "S1", title: "T" }),
@@ -349,21 +307,11 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     expect(res.status).toBe(200);
   });
 
-  test("POST page with no questions skips question creation", async () => {
-    const supabaseClient = makeSupabase({});
-    (supabaseClient.from as any).mockImplementation((table: string) => {
-      if (table === "user") return { select: () => ({ eq: () => sbSingle({ data: { id: "u1" }, error: null }) }) };
-      if (table === "survey") return { insert: () => ({ select: () => sbSingle({ data: { id: 1 }, error: null }) }) };
-      if (table === "survey_page") return { insert: () => ({ select: () => sbSingle({ data: { id: 2 }, error: null }) }) };
-      if (table === "survey_question") return { insert: () => ({ select: () => sbSingle({ data: { id: 3 }, error: null }) }) };
-      if (table === "question_option") return { insert: vi.fn(async () => ({ error: null })) };
-      throw new Error(`Unexpected table: ${table}`);
-    });
-
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+  test("POST page with no questions still creates survey", async () => {
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({
@@ -376,22 +324,11 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     expect(res.status).toBe(200);
   });
 
-  test("POST question with no options skips option creation", async () => {
-    const optionInsert = vi.fn(async () => ({ error: null }));
-    const supabaseClient = makeSupabase({});
-    (supabaseClient.from as any).mockImplementation((table: string) => {
-      if (table === "user") return { select: () => ({ eq: () => sbSingle({ data: { id: "u1" }, error: null }) }) };
-      if (table === "survey") return { insert: () => ({ select: () => sbSingle({ data: { id: 1 }, error: null }) }) };
-      if (table === "survey_page") return { insert: () => ({ select: () => sbSingle({ data: { id: 2 }, error: null }) }) };
-      if (table === "survey_question") return { insert: () => ({ select: () => sbSingle({ data: { id: 3 }, error: null }) }) };
-      if (table === "question_option") return { insert: optionInsert };
-      throw new Error(`Unexpected table: ${table}`);
-    });
-
-    queueDualAuthSession({ supabaseClient, user: { id: "u1" } });
+  test("POST question with no options still creates survey", async () => {
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     mocks.getUserRole.mockResolvedValueOnce({ role: "member" });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: reqForm("POST", {
         workspaceId: "w1",
         surveyData: JSON.stringify({
@@ -418,80 +355,75 @@ describe("app/routes/api+/surveys/route.tsx", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(optionInsert).not.toHaveBeenCalled();
   });
 
   test("PATCH validates, 404s missing survey, unauthorized role, update error, and success", async () => {
     const mod = await import("../app/routes/api+/surveys");
 
-    queueDualAuthSession({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    let r0 = await asRouteResponse(await mod.action({ request: reqForm("PATCH", {}) } as any));
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
+    let r0 = await asRouteResponse(mod.action({ request: reqForm("PATCH", {}) } as any));
     expect(r0.status).toBe(400);
 
-    queueDualAuthSession({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    r0 = await asRouteResponse(await mod.action({
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
+    r0 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: "not-json" }),
     } as any));
     expect(r0.status).toBe(400);
 
-    queueDualAuthSession({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    r0 = await asRouteResponse(await mod.action({
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
+    r0 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyData: JSON.stringify({ title: "X" }) }),
     } as any));
     expect(r0.status).toBe(400);
 
-    queueDualAuthSession({
-      supabaseClient: makeSupabase({ surveyLookup: { data: null, error: null } }),
-      user: { id: "u1" },
-    });
-    r0 = await asRouteResponse(await mod.action({
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
+    surveyDbMocks.getSurveyWorkspaceByPublicId.mockResolvedValueOnce(null);
+    r0 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: JSON.stringify({ title: "X", is_active: true }) }),
     } as any));
     expect(r0.status).toBe(404);
     mocks.getUserRole.mockReset();
 
     queueDualAuthSession({
-      supabaseClient: makeSupabase({ surveyLookup: { data: { workspace: "w1" }, error: null } }),
+      null: makeDbClient({}),
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "viewer" });
-    const r1 = await asRouteResponse(await mod.action({
+    const r1 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: JSON.stringify({ title: "X" }) }),
     } as any));
     expect(r1.status).toBe(403);
 
     queueDualAuthSession({
-      supabaseClient: makeSupabase({
-        surveyLookup: { data: { workspace: "w1" }, error: null },
-        surveyUpdate: { data: null, error: { message: "bad" } },
-      }),
+      null: makeDbClient({}),
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
-    const r2 = await asRouteResponse(await mod.action({
+    surveyDbMocks.updateSurveyMetadata.mockResolvedValueOnce(null);
+    const r2 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: JSON.stringify({ title: "X" }) }),
     } as any));
     expect(r2.status).toBe(500);
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error updating survey:", expect.anything());
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "Error updating survey: survey not found after update",
+    );
 
     queueDualAuthSession({
-      supabaseClient: makeSupabase({
-        surveyLookup: { data: { workspace: "w1" }, error: null },
-        surveyUpdate: { data: { id: 1, title: "X" }, error: null },
-      }),
+      null: makeDbClient({}),
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
-    const r3 = await asRouteResponse(await mod.action({
+    surveyDbMocks.updateSurveyMetadata.mockResolvedValueOnce({ id: 1, title: "X" });
+    const r3 = await asRouteResponse(mod.action({
       request: reqForm("PATCH", { surveyId: "S1", surveyData: JSON.stringify({ title: "X" }) }),
     } as any));
     expect(r3.status).toBe(200);
   });
 
   test("PATCH catch logs and returns 500 when formData throws", async () => {
-    queueDualAuthSession({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
     const mod = await import("../app/routes/api+/surveys");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: {
         method: "PATCH",
         formData: async () => {
@@ -506,38 +438,34 @@ describe("app/routes/api+/surveys/route.tsx", () => {
   test("DELETE validates, unauthorized role, delete error, and success", async () => {
     const mod = await import("../app/routes/api+/surveys");
 
-    queueDualAuthSession({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    const r0 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", {}) } as any));
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
+    const r0 = await asRouteResponse(mod.action({ request: reqForm("DELETE", {}) } as any));
     expect(r0.status).toBe(400);
 
     queueDualAuthSession({
-      supabaseClient: makeSupabase({ surveyLookup: { data: { workspace: "w1" }, error: null } }),
+      null: makeDbClient({ surveyLookup: { data: { workspace: "w1" }, error: null } }),
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "viewer" });
-    const r1 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
+    const r1 = await asRouteResponse(mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
     expect(r1.status).toBe(403);
 
     queueDualAuthSession({
-      supabaseClient: makeSupabase({
-        surveyLookup: { data: { workspace: "w1" }, error: null },
-        surveyDelete: { error: { message: "no" } },
-      }),
+      null: makeDbClient({}),
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "admin" });
-    const r2 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
+    surveyDbMocks.deleteSurveyByPublicId.mockRejectedValueOnce(new Error("no"));
+    const r2 = await asRouteResponse(mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
     expect(r2.status).toBe(500);
-    expect(mocks.logger.error).toHaveBeenCalledWith("Error deleting survey:", expect.anything());
+    expect(mocks.logger.error).toHaveBeenCalledWith("Error in handleDeleteSurvey:", expect.anything());
 
     queueDualAuthSession({
-      supabaseClient: makeSupabase({
-        surveyLookup: { data: { workspace: "w1" }, error: null },
-      }),
+      null: makeDbClient({}),
       user: { id: "u1" },
     });
     mocks.getUserRole.mockResolvedValueOnce({ role: "owner" });
-    const r3 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
+    const r3 = await asRouteResponse(mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
     expect(r3.status).toBe(200);
   });
 
@@ -545,14 +473,15 @@ describe("app/routes/api+/surveys/route.tsx", () => {
     const mod = await import("../app/routes/api+/surveys");
 
     queueDualAuthSession({
-      supabaseClient: makeSupabase({ surveyLookup: { data: null, error: null } }),
+      null: makeDbClient({}),
       user: { id: "u1" },
     });
-    const r0 = await asRouteResponse(await mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
+    surveyDbMocks.getSurveyWorkspaceByPublicId.mockResolvedValueOnce(null);
+    const r0 = await asRouteResponse(mod.action({ request: reqForm("DELETE", { surveyId: "S1" }) } as any));
     expect(r0.status).toBe(404);
 
-    queueDualAuthSession({ supabaseClient: makeSupabase({}), user: { id: "u1" } });
-    const r1 = await asRouteResponse(await mod.action({
+    queueDualAuthSession({ null: makeDbClient({}), user: { id: "u1" } });
+    const r1 = await asRouteResponse(mod.action({
       request: {
         method: "DELETE",
         formData: async () => {

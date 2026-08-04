@@ -16,7 +16,7 @@ ownerTest.describe("IVR script editor @authenticated", () => {
     await page.goto(
       workspacePath(
         E2E_WORKSPACES.ready.id,
-        `campaigns/${E2E_CAMPAIGNS.robocall.id}/settings`,
+        `campaigns/${E2E_CAMPAIGNS.robocall.id}/launch`,
       ),
     );
     await expect(page.getByTestId("campaign-readiness")).toBeVisible();

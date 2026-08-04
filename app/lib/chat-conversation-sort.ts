@@ -18,6 +18,8 @@ type ConversationMessageLike = {
   direction: string | null;
 };
 
+import { stripPhoneNumber } from "@/lib/phone";
+
 export type ChatSortOption = "recent" | "hasReplied" | "hasUnreadReply";
 
 /** Twilio / DB enum: inbound customer messages only (not outbound-reply). */
@@ -30,7 +32,7 @@ export function normalizeConversationPhone(
 ): string | null {
   if (!phone) return null;
 
-  const digits = phone.replace(/\D/g, "");
+  const digits = stripPhoneNumber(phone);
   if (!digits) return null;
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
@@ -42,7 +44,7 @@ export function getConversationPhoneKey(phone: string | null): string | null {
   const normalizedPhone = normalizeConversationPhone(phone);
   if (!normalizedPhone) return null;
 
-  const digits = normalizedPhone.replace(/\D/g, "");
+  const digits = stripPhoneNumber(normalizedPhone);
   if (digits.length === 11 && digits.startsWith("1")) return digits;
 
   return digits;
@@ -105,7 +107,7 @@ export function buildRepliedContactKeys(
   );
 }
 
-function compareByRecentActivity(
+export function compareByRecentActivity(
   left: ConversationSummary,
   right: ConversationSummary,
 ): number {

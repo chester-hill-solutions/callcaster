@@ -1,7 +1,17 @@
-import { Tables } from "@/lib/database.types";
+import { useState, useEffect, useRef } from "react";
+import type { Tables } from "@/lib/db-types";
 import { QueueItem } from "@/lib/types";
-import { formatTime } from "@/lib/utils";
+import { formatTime, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { callPanelShellClass } from "@/components/call/call-panel-classes";
+import { formatDispositionLabel } from "@/lib/outreach-disposition";
 
 type Attempt = Tables<"outreach_attempt">;
 type Call = Tables<"call">;
@@ -18,7 +28,7 @@ interface Conference {
   };
 }
 
-interface CallAreaProps {
+export interface CallAreaProps {
   isBusy: boolean;
   nextRecipient: QueueItem | null;
   activeCall: ActiveCall | null;
@@ -33,10 +43,254 @@ interface CallAreaProps {
   recentAttempt: Attempt | null;
   predictive: boolean;
   conference: Conference | null;
-  voiceDrop:boolean;
+  voiceDrop: boolean;
   displayState: string;
   callState: string;
-  callDuration: number
+  callDuration: number;
+  showDisposition?: boolean;
+}
+
+function statusBarClass(displayState: string): string {
+  if (displayState === "failed") {
+    return "bg-primary";
+  }
+  if (displayState === "connected" || displayState === "dialing") {
+    return "bg-success";
+  }
+  return "bg-muted-foreground";
+}
+
+export function StatusBar({
+  displayState,
+  callDuration,
+}: Pick<CallAreaProps, "displayState" | "callDuration">) {
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center rounded-t-[14px] px-4 py-3 font-Tabac-Slab text-xl text-white",
+        statusBarClass(displayState),
+      )}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      {displayState === "failed" && <div>Call Failed</div>}
+      {displayState === "dialing" && (
+        <div>Dialing... {formatTime(callDuration)}</div>
+      )}
+      {displayState === "connected" && (
+        <div>Connected {formatTime(callDuration)}</div>
+      )}
+      {displayState === "no-answer" && <div>No Answer</div>}
+      {displayState === "voicemail" && <div>Voicemail Left</div>}
+      {displayState === "completed" && <div>Call Completed</div>}
+      {(!displayState || displayState === "idle") && <div>Pending</div>}
+    </div>
+  );
+}
+
+export function ContactStrip({
+  nextRecipient,
+}: Pick<CallAreaProps, "nextRecipient">) {
+  if (!nextRecipient) return null;
+
+  return (
+    <div className="flex flex-col gap-1 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        <div className="font-Zilla-Slab text-lg font-bold text-foreground">
+          {nextRecipient.contact?.firstname} {nextRecipient.contact?.surname}
+        </div>
+        <div className="text-lg text-foreground">
+          {nextRecipient.contact?.phone}
+        </div>
+      </div>
+      <div className="min-w-0 text-sm text-muted-foreground sm:text-right">
+        <div className="truncate">{nextRecipient.contact?.email}</div>
+        <div className="truncate">
+          {nextRecipient.contact?.address
+            ?.split(",")
+            ?.map((part) => part.trim())
+            .join(", ")}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type CallControlsProps = Pick<
+  CallAreaProps,
+  | "isBusy"
+  | "nextRecipient"
+  | "displayState"
+  | "hangUp"
+  | "handleVoiceDrop"
+  | "handleDialNext"
+  | "predictive"
+  | "conference"
+  | "voiceDrop"
+  | "callState"
+>;
+
+export function CallControls({
+  isBusy,
+  nextRecipient,
+  displayState,
+  hangUp,
+  handleVoiceDrop,
+  handleDialNext,
+  predictive,
+  conference,
+  voiceDrop,
+  callState,
+}: CallControlsProps) {
+  const [confirmingHangUp, setConfirmingHangUp] = useState(false);
+  const confirmTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * @effect Clean up the hang-up confirmation timer on unmount to prevent
+   * a stale timeout callback from firing after the component is gone.
+   * @effect-deps [] — fire-once cleanup, no external state to track
+   * @effect-side-effects timer (clearTimeout on unmount)
+   * @effect-why-not-loader Component lifecycle cleanup, not data fetching.
+   */
+  useEffect(() => () => {
+    if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+  }, []);
+
+  const handleHangUpClick = () => {
+    if (confirmingHangUp) {
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+      setConfirmingHangUp(false);
+      hangUp();
+    } else {
+      setConfirmingHangUp(true);
+      confirmTimerRef.current = setTimeout(() => {
+        setConfirmingHangUp(false);
+      }, 3000);
+    }
+  };
+
+  const hangUpDisabled = callState !== "connected" && callState !== "dialing";
+
+  return (
+    <div className="flex flex-col gap-3 px-4 py-3">
+      {!conference && predictive && callState === "idle" ? (
+        <Button
+          disabled={isBusy}
+          onClick={handleDialNext}
+          className="self-center"
+        >
+          Start Dialing
+        </Button>
+      ) : null}
+      <div className="flex flex-1 gap-2">
+        <Button
+          onClick={handleHangUpClick}
+          variant={confirmingHangUp ? "destructive" : "destructive"}
+          className="flex-1 rounded-full"
+          disabled={hangUpDisabled}
+        >
+          {confirmingHangUp ? "Click again to hang up" : "Hang Up"}
+        </Button>
+        {voiceDrop ? (
+          <Button
+            onClick={handleVoiceDrop}
+            className="flex-1 rounded-full bg-primary text-primary-foreground"
+            disabled={callState !== "connected"}
+          >
+            Audio Drop
+          </Button>
+        ) : null}
+        <Button
+          onClick={handleDialNext}
+          disabled={
+            displayState === "dialing" ||
+            displayState === "connected" ||
+            isBusy ||
+            (!predictive && !nextRecipient)
+          }
+          data-testid="call-screen-dial"
+          className="flex-1 rounded-full bg-success text-success-foreground hover:bg-success/80"
+          title={
+            callState === "connected" ||
+            callState === "dialing" ||
+            !nextRecipient
+              ? "Load your queue to get started"
+              : `Dial ${nextRecipient?.contact?.phone}`
+          }
+        >
+          {!predictive ? "Dial" : "Start"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+type DispositionBarProps = Pick<
+  CallAreaProps,
+  | "isBusy"
+  | "nextRecipient"
+  | "handleDequeueNext"
+  | "disposition"
+  | "dispositionOptions"
+  | "setDisposition"
+>;
+
+export function DispositionBar({
+  isBusy,
+  nextRecipient,
+  handleDequeueNext,
+  disposition,
+  dispositionOptions,
+  setDisposition,
+}: DispositionBarProps) {
+  const hasValidDisposition =
+    disposition !== "idle" &&
+    dispositionOptions.some(
+      (option) =>
+        (typeof option === "string" ? option : option.value) === disposition,
+    );
+
+  return (
+    <div className="sticky bottom-0 z-10 flex gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+      <Select
+        value={disposition}
+        onValueChange={setDisposition}
+        disabled={!nextRecipient}
+      >
+        <SelectTrigger
+          data-testid="call-screen-disposition"
+          className="min-w-0 flex-[3] rounded-full border border-border bg-background px-3 py-2 text-sm text-foreground"
+        >
+          <SelectValue placeholder="Select a disposition" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="idle">Select a disposition</SelectItem>
+          {dispositionOptions?.map((option, index) => {
+            const value = typeof option === "string" ? option : option.value;
+            const label =
+              typeof option === "string"
+                ? formatDispositionLabel(option)
+                : option.label;
+            return (
+              <SelectItem value={value} key={index}>
+                {label}
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={isBusy || !hasValidDisposition}
+        onClick={handleDequeueNext}
+        className="flex-1 rounded-full text-xs"
+      >
+        Save and Next
+      </Button>
+    </div>
+  );
 }
 
 export const CallArea: React.FC<CallAreaProps> = ({
@@ -54,196 +308,35 @@ export const CallArea: React.FC<CallAreaProps> = ({
   callState: state,
   callDuration,
   dispositionOptions,
-  voiceDrop = false
-}:CallAreaProps) => {
-  const handleHangUp = () => {
-    hangUp();
-  };
-  const handleSetDisposition = (newDisposition: string) => {
-    setDisposition(newDisposition);
-  };
-
+  voiceDrop = false,
+  showDisposition = true,
+}: CallAreaProps) => {
   return (
-    <div
-      style={{
-        border: "3px solid #BCEBFF",
-        flex: "1 1 20%",
-        borderRadius: "20px",
-        backgroundColor: "hsl(var(--card))",
-        minHeight: "300px",
-        alignItems: "stretch",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        display: "flex",
-        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
-      }}
-    >
-      <div className="flex flex-1 flex-col">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderTopLeftRadius: "18px",
-            borderTopRightRadius: "18px",
-            padding: "16px",
-            marginBottom: "8px",
-            background:
-              displayState === "failed"
-                ? "hsl(var(--primary))"
-                : displayState === "connected" || displayState === "dialing"
-                  ? "#4CA83D"
-                  : "#333333",
-          }}
-          className={`font-Tabac-Slab text-xl text-white ${state === "connected" || state === "dialing" ? "bg-green-300" : "bg-slate-700"}`}
-        >
-          <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-            {displayState === "failed" && <div>Call Failed</div>}
-            {displayState === "dialing" && (
-              <div>Dialing... {formatTime(callDuration)}</div>
-            )}
-            {displayState === "connected" && (
-              <div>Connected {formatTime(callDuration)}</div>
-            )}
-            {displayState === "no-answer" && <div>No Answer</div>}
-            {displayState === "voicemail" && <div>Voicemail Left</div>}
-            {displayState === "completed" && <div>Call Completed</div>}
-            {(!displayState || displayState === "idle") && <div>Pending</div>}
-          </div>
-        </div>
-        {!conference && predictive && state === "idle" && (
-          <div className="flex h-full flex-1 justify-center align-middle">
-            <Button
-              disabled={isBusy}
-              onClick={handleDialNext}
-              className="self-center rounded-lg bg-primary px-4 py-2 font-Zilla-Slab text-xl text-white"
-            >
-              Start Dialing
-            </Button>
-          </div>
-        )}
-        {nextRecipient && (
-          <div className="flex justify-between p-4">
-            <div className="flex flex-col">
-              <div className="font-Zilla-Slab text-lg font-bold">
-                {nextRecipient.contact?.firstname}{" "}
-                {nextRecipient.contact?.surname}
-              </div>
-              <div className="text-lg">{nextRecipient.contact?.phone}</div>
-              <div>{nextRecipient.contact?.email}</div>
-              <div>
-                {nextRecipient.contact?.address
-                  ?.split(",")
-                  ?.map((t) => t.trim())
-                  .join(", ")}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      <div>
-        <div className="flex flex-col">
-          <div
-            className="flex flex-1 gap-2 px-4 py-2"
-            style={{ position: "relative" }}
-          >
-            <Button
-              onClick={handleHangUp}
-              style={{
-                flex: "1",
-                padding: "4px 8px",
-                background: "#d60000",
-                borderRadius: "20px",
-                color: "white",
-              }}
-              disabled={state !== "connected" && state !== "dialing"}
-            >
-              Hang Up
-            </Button>
-           {voiceDrop && <Button
-              onClick={handleVoiceDrop}
-              style={{
-                flex: "1",
-                padding: "4px 8px",
-                background: "#2288d8",
-                borderRadius: "20px",
-                color: "white",
-              }}
-             disabled={state !== "connected"}
-            >
-              Audio Drop
-            </Button>}
-            <Button
-              onClick={handleDialNext}
-              disabled={
-                displayState === "dialing" ||
-                displayState === "connected" ||
-                isBusy ||
-                (!predictive && !nextRecipient)
-              }
-              data-testid="call-screen-dial"
-              style={{
-                flex: "1",
-                padding: "4px 8px",
-                background: "#4CA83D",
-                borderRadius: "20px",
-                color: "white",
-              }}
-              title={
-                state === "connected" || state === "dialing" || !nextRecipient
-                  ? "Load your queue to get started"
-                  : `Dial ${nextRecipient?.contact?.phone}`
-              }
-            >
-              {!predictive ? "Dial" : "Start"}
-            </Button>
-          </div>
-          <div className="flex gap-2 px-4" style={{ paddingBottom: ".5rem" }}>
-            <select
-              disabled={!nextRecipient}
-              onChange={(e) => handleSetDisposition(e.currentTarget.value)}
-              value={disposition}
-              data-testid="call-screen-disposition"
-              style={{
-                flex: "1 1 75%",
-                padding: "4px 8px",
-                border: "1px solid #333",
-                borderRadius: "20px",
-                color: "#333",
-              }}
-            >
-              <option value="idle">Select a disposition</option>
-              {dispositionOptions?.map((option, i) => {
-                const value = typeof option === 'string' ? option : option.value;
-                const label = typeof option === 'string' ? option : option.label;
-                return (
-                  <option value={value} key={i}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-            <button
-              disabled={isBusy || disposition === "idle"}
-              onClick={() => handleDequeueNext()}
-              style={{
-                flex: "1 1 25%",
-                padding: "4px 8px",
-                border: "1px solid #4CA83D",
-                fontSize: "10px",
-                borderRadius: "20px",
-                color: "#333",
-                opacity:
-                  state === "connected" || state === "dialing" || !nextRecipient
-                    ? ".6"
-                    : "unset",
-              }}
-            >
-              Save and Next
-            </button>
-          </div>
-        </div>
-      </div>
+    <div className={cn(callPanelShellClass, "min-h-0 justify-between")}>
+      <StatusBar displayState={displayState} callDuration={callDuration} />
+      <ContactStrip nextRecipient={nextRecipient} />
+      <CallControls
+        isBusy={isBusy}
+        nextRecipient={nextRecipient}
+        displayState={displayState}
+        hangUp={hangUp}
+        handleVoiceDrop={handleVoiceDrop}
+        handleDialNext={handleDialNext}
+        predictive={predictive}
+        conference={conference}
+        voiceDrop={voiceDrop}
+        callState={state}
+      />
+      {showDisposition ? (
+        <DispositionBar
+          isBusy={isBusy}
+          nextRecipient={nextRecipient}
+          handleDequeueNext={handleDequeueNext}
+          disposition={disposition}
+          dispositionOptions={dispositionOptions}
+          setDisposition={setDisposition}
+        />
+      ) : null}
     </div>
   );
 };

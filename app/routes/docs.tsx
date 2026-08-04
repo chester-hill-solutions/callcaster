@@ -58,6 +58,12 @@ export default function DocsPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  /**
+   * @effect Dynamically import and imperatively mount the Scalar API-reference widget into containerRef for the active spec.
+   * @effect-deps config.url — remounts the widget against the newly selected spec (public vs. complete) when it changes.
+   * @effect-side-effects dom (imperative third-party widget mount) + dynamic import; instance destroyed on cleanup/re-run.
+   * @effect-why-not-loader Scalar's `createApiReference` is an imperative DOM-mounting API from a lazily-loaded client bundle, not data a loader could hand to a component tree.
+   */
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -115,11 +121,16 @@ export default function DocsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-foreground">{config.title}</p>
-            <p className="mt-1 max-w-3xl text-xs text-muted-foreground">
+      <header className="border-b bg-background/95 px-4 py-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+              CallCaster Docs
+            </p>
+            <h1 className="font-Zilla-Slab text-2xl font-bold text-foreground sm:text-3xl">
+              {config.title}
+            </h1>
+            <p className="max-w-4xl text-sm text-muted-foreground">
               {config.description}
             </p>
           </div>
@@ -158,7 +169,10 @@ export default function DocsPage() {
         </div>
       </header>
       {status === "loading" ? <DocsLoading /> : null}
-      <div ref={containerRef} className="min-h-[calc(100vh-4.5rem)]" />
+      <div
+        ref={containerRef}
+        className="mx-auto min-h-[calc(100vh-7.5rem)] w-full max-w-[1600px] [&_.sidebar]:min-w-[240px]"
+      />
     </div>
   );
 }

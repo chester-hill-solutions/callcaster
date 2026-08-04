@@ -1,11 +1,12 @@
 export { loader } from "./new.loader.server";
 
-import { data as routeData, type LoaderFunctionArgs, useLoaderData, useSubmit, useNavigate } from "react-router";
-import { useState } from "react";
+import { type LoaderFunctionArgs, useLoaderData, useFetcher, useNavigate } from "react-router";
+import { useEffect, useState } from "react";
 
 import { User , SurveyFormData, SurveyQuestionType, SurveyPageFormData, SurveyQuestionFormData, QuestionOptionFormData } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Section, SectionHeader } from "@/components/shared/Section";
+import { PageShell } from "@/components/ui/page-shell";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -13,11 +14,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Save } from "lucide-react";
 
+type CreateSurveyResult = { success: true; survey: { survey_id: string } } | { error: string };
+
 export default function NewSurveyPage() {
   const { workspaceId } = useLoaderData();
-  const submit = useSubmit();
+  const fetcher = useFetcher<CreateSurveyResult>();
   const navigate = useNavigate();
-  
+
   const [formData, setFormData] = useState<SurveyFormData>({
     survey_id: "",
     title: "",
@@ -32,14 +35,24 @@ export default function NewSurveyPage() {
     ]
   });
 
+  // /api/surveys is a resource route (no component) — submitting via a plain
+  // useSubmit() navigation lands the browser on that bare JSON response
+  // (a blank page) instead of the survey the user just created. Submit
+  // through a fetcher instead and redirect client-side once it succeeds.
+  useEffect(() => {
+    if (fetcher.state === "idle" && fetcher.data && "success" in fetcher.data && fetcher.data.success) {
+      navigate(`/workspaces/${workspaceId}/surveys/${fetcher.data.survey.survey_id}`);
+    }
+  }, [fetcher.state, fetcher.data, navigate, workspaceId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const formDataToSubmit = new FormData();
     formDataToSubmit.append("surveyData", JSON.stringify(formData));
     formDataToSubmit.append("workspaceId", workspaceId);
 
-    submit(formDataToSubmit, {
+    fetcher.submit(formDataToSubmit, {
       method: "POST",
       action: "/api/surveys",
     });
@@ -214,23 +227,19 @@ export default function NewSurveyPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Create New Survey</h1>
-        <p className="text-muted-foreground">
-          Build a new survey for your workspace
-        </p>
-      </div>
-
+    <PageShell
+      title="Create New Survey"
+      description="Build a new survey for your workspace"
+      maxWidth="narrow"
+    >
       <form onSubmit={handleSubmit}>
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Survey Details</CardTitle>
-            <CardDescription>
-              Basic information about your survey
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <Section variant="flat" className="mb-6">
+          <SectionHeader
+            compact
+            title="Survey Details"
+            description="Basic information about your survey"
+          />
+          <div className="space-y-4">
             <div>
               <Label htmlFor="survey_id">Survey ID</Label>
               <Input
@@ -259,37 +268,39 @@ export default function NewSurveyPage() {
               />
               <Label htmlFor="is_active">Active</Label>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </Section>
 
         {formData.pages.map((page, pageIndex) => (
-          <Card key={page.page_id} className="mb-6">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div className="flex-1">
-                  <Input
-                    value={page.title}
-                    onChange={(e) => updatePageField(pageIndex, "title", e.target.value)}
-                    placeholder="Page title"
-                    className="text-lg font-semibold"
-                  />
-                </div>
-                {formData.pages.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => removePage(pageIndex)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
+          <Section key={page.page_id} variant="flat" className="mb-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex-1">
+                <Input
+                  value={page.title}
+                  onChange={(e) => updatePageField(pageIndex, "title", e.target.value)}
+                  placeholder="Page title"
+                  className="text-lg font-semibold"
+                  aria-label={`Page ${pageIndex + 1} title`}
+                />
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              {formData.pages.length > 1 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  aria-label={`Remove page ${pageIndex + 1}`}
+                  onClick={() => removePage(pageIndex)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+            <div className="space-y-4">
               {page.questions.map((question, questionIndex) => (
-                <Card key={question.question_id} className="p-4 border">
-                  <div className="space-y-4">
+                <div
+                  key={question.question_id}
+                  className="space-y-4 rounded-lg border border-border/70 bg-muted/20 p-4"
+                >
                     <div className="flex justify-between items-start">
                       <div className="flex-1 space-y-4">
                         <div>
@@ -378,8 +389,7 @@ export default function NewSurveyPage() {
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
-                  </div>
-                </Card>
+                </div>
               ))}
               <Button
                 type="button"
@@ -389,9 +399,15 @@ export default function NewSurveyPage() {
                 <Plus className="w-4 h-4 mr-2" />
                 Add Question
               </Button>
-            </CardContent>
-          </Card>
+            </div>
+          </Section>
         ))}
+
+        {fetcher.data && "error" in fetcher.data && fetcher.data.error && (
+          <p role="alert" className="text-sm text-destructive mb-4">
+            {fetcher.data.error}
+          </p>
+        )}
 
         <div className="flex gap-4">
           <Button
@@ -402,12 +418,12 @@ export default function NewSurveyPage() {
             <Plus className="w-4 h-4 mr-2" />
             Add Page
           </Button>
-          <Button type="submit">
+          <Button type="submit" disabled={fetcher.state !== "idle"}>
             <Save className="w-4 h-4 mr-2" />
-            Create Survey
+            {fetcher.state !== "idle" ? "Creating..." : "Create Survey"}
           </Button>
         </div>
       </form>
-    </div>
+    </PageShell>
   );
 }

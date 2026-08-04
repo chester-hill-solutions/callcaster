@@ -1,12 +1,12 @@
 export { loader } from "./campaigns.loader.server";
 
-import { data as routeData, LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
+import { LoaderFunctionArgs, redirect, useLoaderData, Link } from "react-router";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Tables } from "@/lib/database.types";
+import type { Tables } from "@/lib/db-types";
 
 type CampaignRow = Tables<"campaign">;
 

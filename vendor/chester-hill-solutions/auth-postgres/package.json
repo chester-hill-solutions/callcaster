@@ -1,0 +1,48 @@
+{
+  "name": "@chester-hill-solutions/auth-postgres",
+  "version": "0.3.0",
+  "description": "Postgres auth provider — auth() factory, session reader, workspace invitations, feature permissions (Better Auth)",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chester-hill-solutions/chester-hill-solutions.git",
+    "directory": "packages/auth-postgres"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./schema": {
+      "types": "./dist/schema.d.ts",
+      "import": "./dist/schema.js",
+      "default": "./dist/schema.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins.d.ts",
+      "import": "./dist/plugins.js",
+      "default": "./dist/plugins.js"
+    },
+    "./drizzle-adapter": {
+      "types": "./dist/drizzle-adapter.d.ts",
+      "import": "./dist/drizzle-adapter.js",
+      "default": "./dist/drizzle-adapter.js"
+    }
+  },
+  "dependencies": {
+    "@chester-hill-solutions/auth": "file:../auth"
+  },
+  "peerDependencies": {
+    "@better-auth/drizzle-adapter": "^1.6.0",
+    "better-auth": "^1.6.0",
+    "drizzle-orm": "^0.45.0"
+  }
+}

@@ -1,20 +1,22 @@
 export { loader } from "./scripts.loader.server";
 export { action } from "./scripts.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, useLoaderData } from "react-router";
+import { ActionFunctionArgs, LoaderFunctionArgs, Link, NavLink, Outlet, useLoaderData, useOutlet, useOutletContext , useFetcher } from "react-router";
+import type { MetaFunction } from "react-router";
+import type { ContextType , User } from "@/lib/types";
+
+export const meta: MetaFunction = () => [{ title: "Scripts — CallCaster" }];
 import { MdDownload, MdEdit } from "react-icons/md";
 import { DataTable } from "@/components/workspace/tables/DataTable";
+import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
 import { Button } from "@/components/ui/button";
 
 
 import { formatDateToLocale } from "@/lib/utils";
 import { downloadBlobPart } from "@/lib/download-blob.client";
-import { useFetcher } from "react-router";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
-import type { PostgrestError , SupabaseClient } from "@supabase/supabase-js";
 
-import type { Json , Database } from "@/lib/database.types";
-import type { User } from "@/lib/types";
+import type { Json , Database } from "@/lib/db-types";
 
 type ScriptSteps = {
   pages?: Record<string, unknown>;
@@ -59,6 +61,8 @@ type LoaderData =
 // ActionData inferred from action's return via typeof action
 
 export default function WorkspaceScripts() {
+  const outlet = useOutlet();
+  const parentContext = useOutletContext<ContextType>();
   const loaderData = useLoaderData<LoaderData>();
   const downloadFetcher = useFetcher<{
     fileContent?: string;
@@ -93,34 +97,33 @@ export default function WorkspaceScripts() {
         });
       },
       successMessage: undefined,
-    },
+    }
   );
 
+  if (outlet) {
+    return <Outlet context={parentContext} />;
+  }
+
+  const workspace = "workspace" in loaderData ? loaderData.workspace : null;
   const isWorkspaceAudioEmpty = !scripts || scripts.length === 0;
+  const title = "Scripts";
 
   return (
-    <main className="flex h-full flex-col gap-4 rounded-sm ">
-      <div className="flex flex-col sm:flex-row sm:justify-between">
-      <div className="flex">
-        </div>
+    <WorkspaceResourceListShell
+      title={title}
+      error={error}
+      isEmpty={isWorkspaceAudioEmpty}
+      emptyMessage="Add Your Own Scripts to this Workspace!"
+      emptyDescription="Scripts guide your callers through each conversation and power IVR flows."
+      addAction={
         <Button asChild className="font-Zilla-Slab text-lg font-semibold">
-            <Link to={`./new`}>Add a Script</Link>
-          </Button>
-      </div>
-      {error && !isWorkspaceAudioEmpty && (
-        <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
-          {error}
-        </h4>
-      )}
-      {isWorkspaceAudioEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-black dark:text-white">
-          Add Your Own Scripts to this Workspace!
-        </h4>
-      )}
-
-      {scripts && scripts.length > 0 && (
+          <Link to="./new">Add a Script</Link>
+        </Button>
+      }
+    >
+      {scripts && scripts.length > 0 ? (
         <DataTable
-          className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
+          className="font-semibold text-foreground"
           columns={[
             {
               accessorKey: "name",
@@ -166,6 +169,7 @@ export default function WorkspaceScripts() {
                   <Button
                     variant="ghost"
                     type="button"
+                    aria-label={`Download ${script.name}`}
                     disabled={downloadFetcher.state !== "idle"}
                     onClick={() => {
                       downloadFetcher.submit(
@@ -174,7 +178,7 @@ export default function WorkspaceScripts() {
                       );
                     }}
                   >
-                    <MdDownload />
+                    <MdDownload aria-hidden />
                   </Button>
                 );
               },
@@ -185,8 +189,12 @@ export default function WorkspaceScripts() {
                 const script = row.original as ScriptWithParsedSteps;
                 return (
                   <Button variant="ghost" asChild>
-                    <NavLink to={`./${script.id}`} relative="path">
-                      <MdEdit />
+                    <NavLink
+                      to={`./${script.id}`}
+                      relative="path"
+                      aria-label={`Edit ${script.name}`}
+                    >
+                      <MdEdit aria-hidden />
                     </NavLink>
                   </Button>
                 );
@@ -195,7 +203,9 @@ export default function WorkspaceScripts() {
           ]}
           data={scripts}
         />
-      )}
-    </main>
+      ) : null}
+    </WorkspaceResourceListShell>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

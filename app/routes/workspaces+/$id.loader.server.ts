@@ -1,92 +1,173 @@
-import {
-  Campaign,
-  ContextType,
-  type WorkspaceMessagingReadiness,
-} from "@/lib/types";
+import { type WorkspaceMessagingReadiness } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
-import { deriveWorkspaceMessagingReadiness, getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
-import { getUserRole, getWorkspaceInfoWithDetails, getWorkspacePhoneNumbers } from "@/lib/database.server";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  deriveWorkspaceMessagingReadiness,
+  getWorkspaceMessagingOnboardingState,
+  isWorkspaceIntakeComplete,
+} from "@/lib/messaging-onboarding.server";
+import { workspaceHasFirstNumber } from "@/lib/messaging-onboarding/readiness.server";
+import {
+  getWorkspaceInfoWithDetails,
+  getWorkspacePhoneNumbers,
+} from "@/lib/database/workspace.server";
+import { fetchWorkspaceCampaignQueueProgressMap } from "@/lib/campaign-queue-search.server";
+import { getWorkspaceUnreadConversationCount } from "@/lib/database/workspace-conversations.server";
+import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
+import { workspaceContext } from "@/lib/route-context.server";
+import { defineLoader } from "@/lib/handler.server";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
-import type { User } from "@/lib/types";
+import {
+  selectWorkspaceToday,
+  type WorkspaceTodaySelection,
+} from "@/lib/workspace-today.server";
+import {
+  buildWorkspaceLaunchChecklist,
+  launchChecklistProgress,
+} from "@/lib/workspace-launch-checklist";
+import { buildA2pBlockingIssues } from "@/lib/twilio-a2p.server";
+import { createTenantDb } from "@/server/tenant-db";
 
 type LoaderData = {
   userRole: string | null | undefined;
-  workspaceData: Promise<WorkspaceInfoWithDetails>;
+  workspaceData: WorkspaceInfoWithDetails;
   onboardingReadiness: WorkspaceMessagingReadiness;
+  today?: WorkspaceTodaySelection;
+  complianceOnboarding?: Awaited<
+    ReturnType<typeof getWorkspaceMessagingOnboardingState>
+  >;
+  a2pBlockingIssues?: string[];
+  campaignQueueProgress: Record<string, { completedCount: number; totalCount: number }>;
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
+export const loader = defineLoader({
+  auth: ({ context }) => {
+    const ws = context.get(workspaceContext);
+    if (!ws) {
+      throw new Error("Workspace context missing");
+    }
+    return ws;
+  },
+  sideEffects: ["db-read"],
+  handler: async ({ auth: ws, url }) => {
+    const { headers, userId, userRole, workspaceId } = ws;
 
-  const { supabaseClient, headers, user } = await verifyAuth(request);
-  if (!user) {
-    throw redirect("/signin", { headers });
-  }
-
-  const workspaceId = params.id;
-  if (!workspaceId) {
-    throw new Error("No workspace found");
-  }
-
-  const userRole = (
-    await getUserRole({
-      supabaseClient: supabaseClient as SupabaseClient,
-      user: user as unknown as User,
-      workspaceId: workspaceId as string,
-    })
-  )?.role;
-  try {
-    const pathname = new URL(request.url).pathname;
-    const [onboarding, phoneNumbersResult] = await Promise.all([
-      getWorkspaceMessagingOnboardingState({
-        supabaseClient,
-        workspaceId: workspaceId as string,
-      }),
-      getWorkspacePhoneNumbers({
-        supabaseClient,
-        workspaceId: workspaceId as string,
-      }),
-    ]);
-    const readiness = deriveWorkspaceMessagingReadiness({
-      onboarding,
-      workspaceNumbers: (phoneNumbersResult.data ?? []).map((number) => ({
+    try {
+      const pathname = url.pathname;
+      const isExactWorkspaceRoot = pathname === `/workspaces/${workspaceId}`;
+      const tdb = createTenantDb(workspaceId);
+      const [
+        onboarding,
+        phoneNumbersResult,
+        recentOutboundCount,
+        workspaceData,
+        unreadCount,
+        audienceCount,
+        scriptCount,
+        campaignQueueProgressMap,
+      ] = await Promise.all([
+        getWorkspaceMessagingOnboardingState({ workspaceId }),
+        getWorkspacePhoneNumbers({ workspaceId }),
+        getWorkspaceRecentOutboundMessageCount({ workspaceId }),
+        getWorkspaceInfoWithDetails({ workspaceId, userId }),
+        isExactWorkspaceRoot
+          ? getWorkspaceUnreadConversationCount(workspaceId)
+          : Promise.resolve(0),
+        isExactWorkspaceRoot ? tdb.audience.count() : Promise.resolve(0),
+        isExactWorkspaceRoot
+          ? tdb.script.count()
+          : Promise.resolve(0),
+        fetchWorkspaceCampaignQueueProgressMap(workspaceId),
+      ]);
+      const workspaceNumbers = (phoneNumbersResult.data ?? []).map((number) => ({
         type: number?.type ?? null,
         phone_number: number?.phone_number ?? null,
         capabilities: number?.capabilities ?? null,
-      })),
-      recentOutboundCount: 0,
-    });
-    if (
-      pathname === `/workspaces/${workspaceId}` &&
-      (userRole === "owner" || userRole === "admin") &&
-      readiness.shouldRedirectToOnboarding
-    ) {
-      throw redirect(`/workspaces/${workspaceId}/onboarding`, { headers });
-    }
+      }));
+      const workspaceSummary = workspaceData.workspace as unknown as {
+        credits?: number | null;
+      };
+      const credits = Number(workspaceSummary.credits ?? 0);
+      const creditsSafe = Number.isFinite(credits) ? credits : 0;
+      const readiness = deriveWorkspaceMessagingReadiness({
+        onboarding,
+        workspaceNumbers,
+        recentOutboundCount,
+        launchContext: {
+          audienceCount,
+          scriptCount,
+          campaignCount: workspaceData.campaigns.length,
+          creditsBalance: creditsSafe,
+        },
+      });
+      // Fresh workspaces without business basics + goal go to the onboarding wizard.
+      if (
+        isExactWorkspaceRoot &&
+        (userRole === "owner" || userRole === "admin") &&
+        readiness.shouldRedirectToOnboarding
+      ) {
+        throw redirect(`/workspaces/${workspaceId}/onboarding`, { headers });
+      }
 
-    const workspacePromise = getWorkspaceInfoWithDetails({
-      supabaseClient,
-      workspaceId,
-      userId: user.id,
-    });
+      const intakeIncomplete = !isWorkspaceIntakeComplete(onboarding);
+      const launchChecklist = buildWorkspaceLaunchChecklist({
+        workspaceId,
+        onboarding,
+        audienceCount,
+        scriptCount,
+        campaignCount: workspaceData.campaigns.length,
+        creditsBalance: creditsSafe,
+        workspaceNumbers,
+        draftCampaignId: workspaceData.campaigns[0]?.id ?? null,
+      });
+      const launchChecklistIncomplete =
+        !intakeIncomplete &&
+        launchChecklistProgress(launchChecklist).hasIncompleteCurrentlyDue;
 
-    return routeData({
-      userRole: userRole,
-      workspaceData: workspacePromise,
-      onboardingReadiness: readiness,
-      headers,
-    });
-  } catch (error) {
-    if (
-      error &&
-      typeof error === "object" &&
-      "code" in error &&
-      error.code === "PGRST116"
-    ) {
-      throw redirect("/workspaces", { headers });
+      const today = isExactWorkspaceRoot
+        ? selectWorkspaceToday({
+            workspaceId,
+            userRole,
+            credits: creditsSafe,
+            intakeIncomplete,
+            launchChecklistIncomplete,
+            hasWorkspaceNumber: workspaceHasFirstNumber(workspaceNumbers),
+            campaigns: workspaceData.campaigns,
+            unreadCount,
+            selectedGoal: onboarding.selectedGoal,
+            audienceCount,
+            scriptCount,
+            launchChecklist,
+          })
+        : undefined;
+
+      return routeData({
+        userRole,
+        workspaceData,
+        onboardingReadiness: readiness,
+        ...(today ? { today } : {}),
+        ...(isExactWorkspaceRoot && !intakeIncomplete
+          ? {
+              complianceOnboarding: onboarding,
+              a2pBlockingIssues: buildA2pBlockingIssues(onboarding),
+            }
+          : {}),
+        campaignQueueProgress: Object.fromEntries(
+          [...campaignQueueProgressMap.entries()].map(([campaignId, counts]) => [
+            String(campaignId),
+            counts,
+          ]),
+        ),
+      } satisfies LoaderData, { headers });
+    } catch (error) {
+      if (
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
+        error.code === "PGRST116"
+      ) {
+        throw redirect("/workspaces", { headers });
+      }
+      throw error;
     }
-    throw error;
-  }
-}
+  },
+});

@@ -1,13 +1,24 @@
-import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
+import { data as routeData } from "react-router";
+import { createOutreachAttempt , saveCallToDatabase } from "@/lib/auto-dial.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
+import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
+import { createTenantDb } from "@/server/tenant-db";
+import { and, eq } from "drizzle-orm";
+import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { env } from "@/lib/env.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import Twilio from 'twilio';
-import type { ActionFunctionArgs } from "react-router";
-import type { TablesInsert, Database } from "@/lib/database.types";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
+import { defineAction } from "@/lib/handler.server";
+import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 
 interface DialRequest {
   to_number: string;
@@ -21,11 +32,10 @@ interface DialRequest {
   selected_device?: string;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-    const auth = await requireJsonAuth(request);
-    if (auth instanceof Response) return auth;
-
-    const supabase = getAuthSupabaseClient(auth);
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request, auth }) => {
     const user = auth.user;
     const raw = await parseActionRequest(request) as Partial<DialRequest>;
     const {
@@ -46,29 +56,32 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         typeof contact_id !== "string" ||
         typeof workspace_id !== "string" ||
         typeof queue_id !== "string" ||
-        typeof caller_id !== "string"
+        typeof caller_id !== "string" ||
+        (selected_device !== undefined && typeof selected_device !== "string")
     ) {
         throw new Response("Invalid dial payload", { status: 400 });
     }
-    await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId: workspace_id });
-
-    const { data, error } = await supabase.from('workspace').select('credits').eq('id', workspace_id).single();
-    if (error) throw error;
-    const credits = data.credits;
-    if (credits <= 0) {
-        return {
-            creditsError: true,
+    await requireWorkspaceAccess({ user, workspaceId: workspace_id });
+    if (selected_device && selected_device !== "computer") {
+        const verifiedNumbers = await getUserVerifiedAudioNumbers(user.id);
+        if (!verifiedNumbers?.includes(selected_device)) {
+            throw new Response("Selected device is not a verified phone number", { status: 400 });
         }
     }
-    const [{ data: callerIdRecord }, onboarding] = await Promise.all([
-        supabase
-            .from("workspace_number")
-            .select("type, phone_number")
-            .eq("workspace", workspace_id)
-            .eq("phone_number", caller_id)
-            .maybeSingle(),
+
+    const credits = await getWorkspaceCreditsBalance(workspace_id);
+    if (credits === null) {
+        throw new Response("Workspace not found", { status: 404 });
+    }
+    if (hasInsufficientCreditsForOutbound(credits)) {
+        return routeData({ creditsError: true }, { status: 402 });
+    }
+    const tdb = createTenantDb(workspace_id);
+    const [callerIdRecord, onboarding] = await Promise.all([
+        tdb.workspace_number.findFirst({
+            where: eq(workspaceNumberTable.phone_number, caller_id),
+        }),
         getWorkspaceMessagingOnboardingState({
-            supabaseClient: supabase,
             workspaceId: workspace_id,
         }),
     ]);
@@ -87,7 +100,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         }
     }
     const to = normalizePhoneNumber(to_number)
-    const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id });
+    const twilio = await createWorkspaceTwilioInstance({ workspace_id });
     const twiml = new Twilio.twiml.VoiceResponse();
     try {
         const call = await withTwilioRetry(
@@ -107,21 +120,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const contactId = parseInt(contact_id, 10);
         const queueId = parseInt(queue_id, 10);
         if (!outreach_id) {
-            const { data: outreachAttempt, error: outreachError } = await supabase.rpc('create_outreach_attempt',
+            outreach_attempt_id = await createOutreachAttempt(
                 {
-                    con_id: contactId,
-                    cam_id: campaignId,
                     queue_id: queueId,
-                    wks_id: workspace_id,
-                    usr_id: user_id
-                });
-            if (outreachError) throw outreachError;
-            outreach_attempt_id = typeof outreachAttempt === "number" ? outreachAttempt : Number(outreachAttempt);
+                    contact_id: contactId,
+                    contact_phone: to_number,
+                },
+                campaignId,
+                workspace_id,
+                user_id,
+            );
         } else {
             outreach_attempt_id = Number(outreach_id)
         }
-        
-        const callData: TablesInsert<"call"> = {
+
+        await saveCallToDatabase(workspace_id, {
             sid: call.sid,
             date_updated: call.dateUpdated?.toISOString() ?? new Date().toISOString(),
             parent_call_sid: call.parentCallSid ?? null,
@@ -129,13 +142,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             to: to_number,
             from: call.from ?? null,
             phone_number_sid: call.phoneNumberSid ?? null,
-            status: (call.status ?? null) as Database["public"]["Enums"]["call_status"] | null,
+            status: call.status ?? null,
             start_time: call.startTime?.toISOString() ?? null,
             end_time: call.endTime?.toISOString() ?? null,
             duration: call.duration != null ? String(call.duration) : null,
             price: call.price ?? null,
             direction: call.direction ?? null,
-            answered_by: (call.answeredBy ?? null) as Database["public"]["Enums"]["answered_by"] | null,
+            answered_by: call.answeredBy ?? null,
             api_version: call.apiVersion ?? null,
             forwarded_from: call.forwardedFrom ?? null,
             group_sid: call.groupSid ?? null,
@@ -144,11 +157,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             campaign_id: campaignId,
             contact_id: contactId,
             workspace: workspace_id,
-            outreach_attempt_id: Number.isFinite(outreach_attempt_id) ? outreach_attempt_id : null,
+            user_id: user_id,
+            outreach_attempt_id: Number.isFinite(outreach_attempt_id) ? outreach_attempt_id : undefined,
             queue_id: queueId,
-        };
-        const { error } = await supabase.from('call').upsert(callData);
-        if (error) logger.error('Error saving the call to the database:', error);
+        });
     } catch (error) {
         logger.error('Error placing call:', error);
         twiml.say('There was an error placing your call. Please try again later.');
@@ -159,4 +171,5 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             'Content-Type': 'text/xml'
         }
     });
-}
+  },
+});

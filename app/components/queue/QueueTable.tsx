@@ -1,5 +1,5 @@
 import { Audience, Contact, QueueItem } from "@/lib/types";
-import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useSearchParams, useNavigation, Form, useFetcher } from "react-router";
 import { useOptimisticMutation } from "@/hooks/utils/useOptimisticMutation";
@@ -8,6 +8,7 @@ import {
     getCoreRowModel,
     getSortedRowModel,
     getFilteredRowModel,
+    Column,
     ColumnDef,
     flexRender,
     RowSelectionState,
@@ -16,17 +17,121 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
 import { StatusDropdown } from "./StatusDropdown";
 import { QueueTablePagination } from "./QueueTablePagination";
 import {
     getQueueDisplayLabel,
     getQueueDisplayState,
     QUEUE_STATUS_FILTERS,
+    QUEUE_SETTABLE_STATUSES,
     type QueueStatusFilter,
+    type QueueSettableStatus,
 } from "@/lib/queue-status";
 
-const STATUS_OPTIONS = ["queued", "dequeued"] as const;
 const ATTEMPT_OPTIONS = ["completed", "failed", "no-answer", "voicemail", "unknown"] as const;
+
+const ALL_AUDIENCES_VALUE = "all";
+const ALL_STATUSES_VALUE = "all";
+const ALL_DISPOSITIONS_VALUE = "all";
+
+/**
+ * The chevron is the only visible content, so the column name has to come
+ * through `aria-label` — see DESIGN.md ("Icon-only buttons require aria-label").
+ */
+function QueueSortButton<TData>({
+    column,
+    label,
+    field,
+    onSortChange,
+}: {
+    column: Column<TData, unknown>;
+    /** Human-readable column name, used for the accessible name. */
+    label: string;
+    /** Server-side sort key sent back through the filter params. */
+    field: string;
+    onSortChange: (key: string, value: string) => void;
+}) {
+    const sorted = column.getIsSorted();
+    return (
+        <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Sort by ${label}`}
+            onClick={() => {
+                // Compute next sort before toggling — getIsSorted() still
+                // returns the pre-toggle value if read immediately after
+                // toggleSorting() (React state update is async).
+                const current = column.getIsSorted();
+                const next: false | "asc" | "desc" =
+                    current === false ? "asc" : current === "asc" ? "desc" : false;
+                if (next === false) {
+                    column.clearSorting();
+                } else {
+                    column.toggleSorting(next === "desc", false);
+                }
+                onSortChange("sort", next ? `${field}.${next}` : "");
+            }}
+            className="h-6 px-1"
+        >
+            {sorted === "asc" ? (
+                <ChevronUp className="h-3 w-3" aria-hidden />
+            ) : sorted === "desc" ? (
+                <ChevronDown className="h-3 w-3" aria-hidden />
+            ) : (
+                <ChevronUp className="h-3 w-3 opacity-30" aria-hidden />
+            )}
+        </Button>
+    );
+}
+
+type SupportLevel = 1 | 2 | 3 | 4 | 5;
+
+const SUPPORT_LEVEL_LABELS: Record<SupportLevel, string> = {
+    1: "Strong Support",
+    2: "Lean Support",
+    3: "Undecided",
+    4: "Lean Opposition",
+    5: "Strong Opposition",
+};
+
+const SUPPORT_LEVEL_BADGE_CLASS: Record<SupportLevel, string> = {
+    1: "bg-success/20 text-success border-success/40",
+    2: "bg-success/10 text-success border-success/30",
+    3: "bg-warning/20 text-warning border-warning/60 ring-2 ring-warning/40 font-semibold",
+    4: "bg-destructive/10 text-destructive border-destructive/30",
+    5: "bg-destructive/20 text-destructive border-destructive/40",
+};
+
+function getContactSupportLevel(contact: Contact & {
+    outreach_attempt?: Array<{ support_level?: number | null }>;
+    support_level?: number | null;
+}): SupportLevel | null {
+    const fromAttempt = contact?.outreach_attempt?.[0]?.support_level;
+    if (typeof fromAttempt === "number" && fromAttempt >= 1 && fromAttempt <= 5) {
+        return fromAttempt as SupportLevel;
+    }
+    const fromContact = contact?.support_level;
+    if (typeof fromContact === "number" && fromContact >= 1 && fromContact <= 5) {
+        return fromContact as SupportLevel;
+    }
+    return null;
+}
+
 interface QueueTableProps {
     queue: QueueItem[] | null;
     totalCount: number | null;
@@ -45,7 +150,7 @@ interface QueueTableProps {
     };
     handleFilterChange: (key: string, value: string) => void;
     clearFilter: () => void;
-    onStatusChange?: (selectedIds: string[], status: typeof STATUS_OPTIONS[number]) => void;
+    onStatusChange?: (selectedIds: string[], status: QueueSettableStatus) => void;
     onSelectAllFiltered: (isSelected: boolean) => void;
     isAllFilteredSelected: boolean;
     addContactToQueue: (contact: (Contact & { contact_audience: { audience_id: number }[] })[]) => void;
@@ -80,7 +185,7 @@ export function QueueTable({
     const [optimisticQueue, setOptimisticQueue] = useState(queue);
 
     // Add these state hooks at the top of your component
-    const [optimisticQueueStatus, setOptimisticQueueStatus] = useState("");
+    const [optimisticQueueStatus, setOptimisticQueueStatus] = useState(defaultFilters.queueStatus || "");
     const [optimisticDisposition, setOptimisticDisposition] = useState(defaultFilters.disposition || "");
     const [optimisticAudience, setOptimisticAudience] = useState(defaultFilters.audiences || "");
     const [optimisticInputs, setOptimisticInputs] = useState({
@@ -90,9 +195,11 @@ export function QueueTable({
         address: defaultFilters.address || ""
     });
 
-    useEffect(() => {
+    const [prevQueue, setPrevQueue] = useState(queue);
+    if (prevQueue !== queue) {
+        setPrevQueue(queue);
         setOptimisticQueue(queue);
-    }, [queue]);
+    }
 
     const snapshotRef = useRef<QueueItem[]>(queue ?? []);
     const fallbackFetcher = useFetcher();
@@ -105,7 +212,9 @@ export function QueueTable({
         errorMessage: "Queue update failed. Changes reverted.",
     });
 
-    useEffect(() => {
+    const [prevDefaultFilters, setPrevDefaultFilters] = useState(defaultFilters);
+    if (prevDefaultFilters !== defaultFilters) {
+        setPrevDefaultFilters(defaultFilters);
         setOptimisticInputs({
             name: defaultFilters.name || "",
             phone: defaultFilters.phone || "",
@@ -113,7 +222,9 @@ export function QueueTable({
             address: defaultFilters.address || ""
         });
         setOptimisticDisposition(defaultFilters.disposition || "");
-    }, [defaultFilters]);
+        setOptimisticAudience(defaultFilters.audiences || "");
+        setOptimisticQueueStatus(defaultFilters.queueStatus || "");
+    }
 
     const selectAllVisible = useCallback(() => {
         const newSelection: RowSelectionState = {};
@@ -159,7 +270,7 @@ export function QueueTable({
     }, [optimisticQueue, onSelectAllFiltered]);
 
     // Optimistic update handlers
-    const handleStatusChangeOptimistic = useCallback((selectedIds: string[], newStatus: typeof STATUS_OPTIONS[number]) => {
+    const handleStatusChangeOptimistic = useCallback((selectedIds: string[], newStatus: QueueSettableStatus) => {
         snapshotRef.current = optimisticQueue ?? [];
         const idsToUpdate = selectedIds.length > 0
             ? selectedIds
@@ -231,24 +342,12 @@ export function QueueTable({
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
                         <span className="font-medium text-xs">Name</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                column.toggleSorting();
-                                const sort = column.getIsSorted();
-                                handleFilterChange('sort', sort ? `name.${sort}` : '');
-                            }}
-                            className="h-6 px-1"
-                        >
-                            {column.getIsSorted() === "asc" ? (
-                                <ChevronUp className="h-3 w-3" />
-                            ) : column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-3 w-3" />
-                            ) : (
-                                <ChevronUp className="h-3 w-3 opacity-30" />
-                            )}
-                        </Button>
+                        <QueueSortButton
+                            column={column}
+                            label="Name"
+                            field="name"
+                            onSortChange={handleFilterChange}
+                        />
                     </div>
                     <div className="relative">
                         <Input
@@ -256,7 +355,7 @@ export function QueueTable({
                             placeholder="Filter names..."
                             value={optimisticInputs.name}
                             onChange={(e) => handleFilterChange('name', e.target.value)}
-                            className="h-6 w-full bg-white/50 text-xs"
+                            className="h-6 w-full bg-background/50 text-xs"
                         />
                     </div>
                 </div>
@@ -269,24 +368,12 @@ export function QueueTable({
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
                         <span className="font-medium text-xs">Phone</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                column.toggleSorting();
-                                const sort = column.getIsSorted();
-                                handleFilterChange('sort', sort ? `phone.${sort}` : '');
-                            }}
-                            className="h-6 px-1"
-                        >
-                            {column.getIsSorted() === "asc" ? (
-                                <ChevronUp className="h-3 w-3" />
-                            ) : column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-3 w-3" />
-                            ) : (
-                                <ChevronUp className="h-3 w-3 opacity-30" />
-                            )}
-                        </Button>
+                        <QueueSortButton
+                            column={column}
+                            label="Phone"
+                            field="phone"
+                            onSortChange={handleFilterChange}
+                        />
                     </div>
                     <div className="relative">
                         <Input
@@ -294,7 +381,7 @@ export function QueueTable({
                             placeholder="Filter phone..."
                             value={optimisticInputs.phone}
                             onChange={(e) => handleFilterChange('phone', e.target.value)}
-                            className="h-6 w-full bg-white/50 text-xs"
+                            className="h-6 w-full bg-background/50 text-xs"
                         />
                     </div>
                 </div>
@@ -307,24 +394,12 @@ export function QueueTable({
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
                         <span className="font-medium text-xs">Email</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                column.toggleSorting();
-                                const sort = column.getIsSorted();
-                                handleFilterChange('sort', sort ? `email.${sort}` : '');
-                            }}
-                            className="h-6 px-1"
-                        >
-                            {column.getIsSorted() === "asc" ? (
-                                <ChevronUp className="h-3 w-3" />
-                            ) : column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-3 w-3" />
-                            ) : (
-                                <ChevronUp className="h-3 w-3 opacity-30" />
-                            )}
-                        </Button>
+                        <QueueSortButton
+                            column={column}
+                            label="Email"
+                            field="email"
+                            onSortChange={handleFilterChange}
+                        />
                     </div>
                     <div className="relative">
                         <Input
@@ -332,7 +407,7 @@ export function QueueTable({
                             placeholder="Filter email..."
                             value={optimisticInputs.email}
                             onChange={(e) => handleFilterChange('email', e.target.value)}
-                            className="h-6 w-full bg-white/50 text-xs"
+                            className="h-6 w-full bg-background/50 text-xs"
                         />
                     </div>
                 </div>
@@ -345,24 +420,12 @@ export function QueueTable({
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
                         <span className="font-medium text-xs">Address</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                column.toggleSorting();
-                                const sort = column.getIsSorted();
-                                handleFilterChange('sort', sort ? `address.${sort}` : '');
-                            }}
-                            className="h-6 px-1"
-                        >
-                            {column.getIsSorted() === "asc" ? (
-                                <ChevronUp className="h-3 w-3" />
-                            ) : column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-3 w-3" />
-                            ) : (
-                                <ChevronUp className="h-3 w-3 opacity-30" />
-                            )}
-                        </Button>
+                        <QueueSortButton
+                            column={column}
+                            label="Address"
+                            field="address"
+                            onSortChange={handleFilterChange}
+                        />
                     </div>
                     <div className="relative">
                         <Input
@@ -370,7 +433,7 @@ export function QueueTable({
                             placeholder="Filter address..."
                             defaultValue={defaultFilters.address}
                             onChange={(e) => handleFilterChange('address', e.target.value)}
-                            className="h-6 w-full bg-white/50 text-xs"
+                            className="h-6 w-full bg-background/50 text-xs"
                         />
                     </div>
                 </div>
@@ -386,43 +449,39 @@ export function QueueTable({
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
                         <span className="font-medium text-xs">Audiences</span>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                                column.toggleSorting();
-                                const sort = column.getIsSorted();
-                                handleFilterChange('sort', sort ? `audiences.${sort}` : '');
-                            }}
-                            className="h-6 px-1"
-                        >
-                            {column.getIsSorted() === "asc" ? (
-                                <ChevronUp className="h-3 w-3" />
-                            ) : column.getIsSorted() === "desc" ? (
-                                <ChevronDown className="h-3 w-3" />
-                            ) : (
-                                <ChevronUp className="h-3 w-3 opacity-30" />
-                            )}
-                        </Button>
+                        <QueueSortButton
+                            column={column}
+                            label="Audiences"
+                            field="audiences"
+                            onSortChange={handleFilterChange}
+                        />
                     </div>
                     <div className="relative">
-                        <select
-                            name="audiences"
-                            value={optimisticAudience}
-                            onChange={(e) => {
-                                const newValue = e.target.value;
+                        <Select
+                            value={optimisticAudience || ALL_AUDIENCES_VALUE}
+                            onValueChange={(value) => {
+                                const newValue = value === ALL_AUDIENCES_VALUE ? "" : value;
                                 setOptimisticAudience(newValue);
                                 handleFilterChange('audiences', newValue);
                             }}
-                            className="h-6 w-full rounded border border-input bg-gray-100/50 px-2 text-xs"
                         >
-                            <option value="">Select audience...</option>
-                            {audiences?.map(audience => (
-                                <option key={audience?.id} value={audience?.id?.toString() || ''}>
-                                    {audience?.name}
-                                </option>
-                            ))}
-                        </select>
+                            <SelectTrigger
+                                className="h-6 w-full bg-muted/50 text-xs"
+                                aria-label="Filter by audience"
+                            >
+                                <SelectValue placeholder="Select audience..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ALL_AUDIENCES_VALUE}>Select audience...</SelectItem>
+                                {audiences?.map(audience => (
+                                    audience?.id != null ? (
+                                        <SelectItem key={audience.id} value={audience.id.toString()}>
+                                            {audience.name}
+                                        </SelectItem>
+                                    ) : null
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                 </div>
             ),
@@ -432,72 +491,77 @@ export function QueueTable({
             header: ({ column, table }) => {
                 const rows = rowSelection;
                 const selectedRows = Object.keys(rows).map(String);
+                const isSetStatusMode = selectedRows.length > 0 || isAllFilteredSelected;
 
                 return (
                     <div className="space-y-1">
                         <div className="flex items-center px-1 justify-between">
                             <span className="font-medium text-xs">
-                                {selectedRows.length > 0 || isAllFilteredSelected ? "Set Status" : "Status"}
+                                {isSetStatusMode ? "Set Status" : "Status"}
                             </span>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                    column.toggleSorting();
-                                    const sort = column.getIsSorted();
-                                    handleFilterChange('sort', sort ? `status.${sort}` : '');
-                                }}
-                                className="h-6 px-1"
-                            >
-                                {column.getIsSorted() === "asc" ? (
-                                    <ChevronUp className="h-3 w-3" />
-                                ) : column.getIsSorted() === "desc" ? (
-                                    <ChevronDown className="h-3 w-3" />
-                                ) : (
-                                    <ChevronUp className="h-3 w-3 opacity-30" />
-                                )}
-                            </Button>
+                            <QueueSortButton
+                                column={column}
+                                label="Status"
+                                field="status"
+                                onSortChange={handleFilterChange}
+                            />
                         </div>
-                        <select
-                            name="status"
-                            value={selectedRows.length > 0 ? "" : optimisticQueueStatus}
-                            onChange={(e) => {
-                                const newValue = e.target.value;
-                                if (selectedRows.length > 0 || isAllFilteredSelected) {
-                                    handleStatusChangeOptimistic(selectedRows, newValue as typeof STATUS_OPTIONS[number]);
+                        <Select
+                            value={
+                                isSetStatusMode
+                                    ? undefined
+                                    : (optimisticQueueStatus || ALL_STATUSES_VALUE)
+                            }
+                            onValueChange={(newValue) => {
+                                if (isSetStatusMode) {
+                                    handleStatusChangeOptimistic(
+                                        selectedRows,
+                                        newValue as QueueSettableStatus,
+                                    );
                                 } else {
-                                    setOptimisticQueueStatus(newValue);
-                                    handleFilterChange('queueStatus', newValue);
+                                    const filterValue = newValue === ALL_STATUSES_VALUE ? "" : newValue;
+                                    setOptimisticQueueStatus(filterValue);
+                                    handleFilterChange('queueStatus', filterValue);
                                 }
                             }}
-                            className="h-6 w-full rounded border border-input bg-gray-100/50 px-2 text-xs"
                         >
-                            {selectedRows.length > 0 || isAllFilteredSelected ? (
-                                <>
-                                    <option value="">Set status...</option>
-                                    {STATUS_OPTIONS.map((status) => (
-                                        <option key={status} value={status}>{status}</option>
-                                    ))}
-                                </>
-                            ) : (
-                                <>
-                                    <option value="">All statuses</option>
-                                    {QUEUE_STATUS_FILTERS.map((status) => (
-                                        <option key={status} value={status}>{status}</option>
-                                    ))}
-                                </>
-                            )}
-                        </select>
+                            <SelectTrigger
+                                className="h-6 w-full bg-muted/50 text-xs"
+                                aria-label={isSetStatusMode ? "Set status for selected contacts" : "Filter by status"}
+                            >
+                                <SelectValue
+                                    placeholder={isSetStatusMode ? "Set status..." : "All statuses"}
+                                />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {isSetStatusMode ? (
+                                    QUEUE_SETTABLE_STATUSES.map((status) => (
+                                        <SelectItem key={status} value={status}>
+                                            {status}
+                                        </SelectItem>
+                                    ))
+                                ) : (
+                                    <>
+                                        <SelectItem value={ALL_STATUSES_VALUE}>All statuses</SelectItem>
+                                        {QUEUE_STATUS_FILTERS.map((status) => (
+                                            <SelectItem key={status} value={status}>
+                                                {status}
+                                            </SelectItem>
+                                        ))}
+                                    </>
+                                )}
+                            </SelectContent>
+                        </Select>
                     </div>
                 );
             },
             cell: ({ row }) => (
                 <div className="flex items-center gap-2">
                     <span className="rounded-full bg-muted px-2 py-1 text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {getQueueDisplayLabel(row.original.status, row.original.dequeued_at)}
+                        {getQueueDisplayLabel(row.original, row.original.dequeued_at)}
                     </span>
                     <StatusDropdown
-                        currentStatus={getQueueDisplayState(row.original.status, row.original.dequeued_at)}
+                        currentStatus={getQueueDisplayState(row.original, row.original.dequeued_at)}
                         onSelect={(status) => handleStatusChangeOptimistic([row.original.id.toString()], status)}
                     />
                 </div>
@@ -505,37 +569,89 @@ export function QueueTable({
         },
         {
             accessorFn: (row) => {
-                const contact = row.contact as Contact & { outreach_attempt?: Array<{ disposition: string }> };
-                return contact?.outreach_attempt?.[0]?.disposition || '-';
+                const contact = row.contact as Contact & {
+                    outreach_attempt?: Array<{ support_level?: number | null }>;
+                    support_level?: number | null;
+                };
+                return getContactSupportLevel(contact)?.toString() ?? '-';
             },
             id: 'disposition',
             header: ({ column }) => {
                 return (
                     <div className="flex flex-col items-center px-1 space-y-1">
                         <div className="space-y-1">
-                            <span className="font-medium text-xs">Attempt</span>
+                            <span className="font-medium text-xs">Support</span>
                         </div>
                         <div className="flex items-center justify-between">
-                            <select name="disposition" value={optimisticDisposition} className="h-6 w-full rounded border border-input bg-gray-100/50 px-2 text-xs" onChange={(e) => { const v = e.target.value; setOptimisticDisposition(v); handleFilterChange('disposition', v); }}>
-                                <option value="">Select...</option>
-                                {ATTEMPT_OPTIONS.map((attempt) => (
-                                    <option key={attempt} value={attempt}>{attempt}</option>
-                                ))}
-                            </select>
+                            <Select
+                                value={optimisticDisposition || ALL_DISPOSITIONS_VALUE}
+                                onValueChange={(value) => {
+                                    const v = value === ALL_DISPOSITIONS_VALUE ? "" : value;
+                                    setOptimisticDisposition(v);
+                                    handleFilterChange('disposition', v);
+                                }}
+                            >
+                                <SelectTrigger
+                                    className="h-6 w-full bg-muted/50 text-xs"
+                                    aria-label="Filter by support level"
+                                >
+                                    <SelectValue placeholder="Select..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={ALL_DISPOSITIONS_VALUE}>Select...</SelectItem>
+                                    {ATTEMPT_OPTIONS.map((attempt) => (
+                                        <SelectItem key={attempt} value={attempt}>
+                                            {attempt}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </div>
                 )
             },
             cell: ({ row }) => {
-                const contact = row.original.contact as Contact & { outreach_attempt?: Array<{ disposition: string }> };
-                const disposition: 'completed' | 'failed' | 'no-answer' | 'voicemail' | 'unknown' = contact?.outreach_attempt?.[0]?.disposition as 'completed' | 'failed' | 'no-answer' | 'voicemail' | 'unknown' || 'unknown';
-                const badgeClass = disposition === 'completed' ? 'bg-green-500/10 text-green-800' : disposition === 'failed' ? 'bg-red-500/20 text-red-800' : disposition === 'no-answer' ? 'bg-yellow-500/20 text-yellow-800' : disposition === 'voicemail' ? 'bg-blue-500/10 text-blue-800' : 'bg-gray-500/10 text-gray-800';
+                const contact = row.original.contact as Contact & {
+                    outreach_attempt?: Array<{ support_level?: number | null }>;
+                    support_level?: number | null;
+                };
+                const level = getContactSupportLevel(contact);
+                if (level === null) {
+                    return (
+                        <span className="text-center w-full text-[8px] px-2 py-1 rounded-full bg-muted text-muted-foreground border border-border">
+                            UNKNOWN
+                        </span>
+                    );
+                }
+                const badgeClass = SUPPORT_LEVEL_BADGE_CLASS[level];
+                const label = SUPPORT_LEVEL_LABELS[level];
+                const isUndecided = level === 3;
                 return (
-                    <span className={`text-center w-full text-[8px] px-2 py-1 rounded-full ${badgeClass}`}>{disposition?.trim().toUpperCase() || '-'}</span   >
-                )
+                    <span
+                        className={`text-center w-full text-[8px] px-2 py-1 rounded-full border ${badgeClass}`}
+                        title={label}
+                        aria-label={`Support level ${level}: ${label}`}
+                    >
+                        {level} · {isUndecided ? label.toUpperCase() : label.toUpperCase()}
+                    </span>
+                );
             },
         }
-    ], [isAllFilteredSelected, onSelectAllFiltered, rowSelection, optimisticDisposition, optimisticQueueStatus]);
+    ], [
+        isAllFilteredSelected,
+        onSelectAllFiltered,
+        rowSelection,
+        optimisticDisposition,
+        optimisticQueueStatus,
+        audiences,
+        defaultFilters.address,
+        handleFilterChange,
+        handleStatusChangeOptimistic,
+        optimisticAudience,
+        optimisticInputs.email,
+        optimisticInputs.name,
+        optimisticInputs.phone,
+    ]);
 
     const table = useReactTable({
         data: optimisticQueue || [],
@@ -608,55 +724,51 @@ export function QueueTable({
             </div>
 
             {/* Table */}
-            <div className="rounded-md border">
-                <div className="relative">
-                    <div className="max-h-[800px] overflow-y-auto">
-                        <table className="w-full" data-testid="campaign-queue-table">
-                            <thead className="sticky top-0 bg-gray-100 border-b">
-                                {table.getHeaderGroups().map(headerGroup => (
-                                    <tr key={headerGroup.id}>
-                                        {headerGroup.headers.map((header, i) => (
-                                            <th
-                                                key={`${i}-${header.id}`}
-                                                className="h-10 px-2 text-left align-middle font-medium text-primary text-xs"
-                                                style={{ width: header.getSize() }}
-                                            >
-                                                {flexRender(
-                                                    header.column.columnDef.header,
-                                                    header.getContext()
-                                                )}
-                                            </th>
-                                        ))}
-                                    </tr>
+            <div className="relative max-h-[800px] overflow-auto rounded-md border">
+                <Table data-testid="campaign-queue-table">
+                    <TableHeader className="sticky top-0 z-10 bg-muted border-b">
+                        {table.getHeaderGroups().map(headerGroup => (
+                            <TableRow key={headerGroup.id}>
+                                {headerGroup.headers.map((header, i) => (
+                                    <TableHead
+                                        key={`${i}-${header.id}`}
+                                        className="h-10 whitespace-nowrap px-2 text-left align-middle font-medium text-primary text-xs"
+                                        style={{ width: header.getSize() }}
+                                    >
+                                        {flexRender(
+                                            header.column.columnDef.header,
+                                            header.getContext()
+                                        )}
+                                    </TableHead>
                                 ))}
-                            </thead>
-                            <tbody>
-                                {table.getRowModel().rows.map(row => (
-                                    <tr key={row.id} className="border-b hover:bg-muted/50 text-gray-500">
-                                        {row.getVisibleCells().map((cell, i) => (
-                                            <td key={`${i}-${cell.id}`} className="p-1 px-2 text-xs">
-                                                {flexRender(
-                                                    cell.column.columnDef.cell,
-                                                    cell.getContext()
-                                                )}
-                                            </td>
-                                        ))}
-                                    </tr>
+                            </TableRow>
+                        ))}
+                    </TableHeader>
+                    <TableBody>
+                        {table.getRowModel().rows.map(row => (
+                            <TableRow key={row.id} className="text-muted-foreground">
+                                {row.getVisibleCells().map((cell, i) => (
+                                    <TableCell key={`${i}-${cell.id}`} className="whitespace-nowrap p-1 px-2 text-xs">
+                                        {flexRender(
+                                            cell.column.columnDef.cell,
+                                            cell.getContext()
+                                        )}
+                                    </TableCell>
                                 ))}
-                                <tr className="sticky bottom-0 bg-gray-100">
-                                    <td colSpan={columns.length} className="p-2 text-xs">
-                                        {isAllFilteredSelected ?
-                                            `Selected: ${totalCount} of ${unfilteredCount}` :
-                                            Object.keys(rowSelection).length > 0 ?
-                                                `Selected: ${Object.keys(rowSelection).length} of ${unfilteredCount}` :
-                                                `Total: ${totalCount} of ${unfilteredCount}`
-                                        }
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                            </TableRow>
+                        ))}
+                        <TableRow className="sticky bottom-0 bg-muted hover:bg-muted">
+                            <TableCell colSpan={columns.length} className="p-2 text-xs">
+                                {isAllFilteredSelected ?
+                                    `Selected: ${totalCount} of ${unfilteredCount}` :
+                                    Object.keys(rowSelection).length > 0 ?
+                                        `Selected: ${Object.keys(rowSelection).length} of ${unfilteredCount}` :
+                                        `Total: ${totalCount} of ${unfilteredCount}`
+                                }
+                            </TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </div>
 
             <QueueTablePagination

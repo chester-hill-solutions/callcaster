@@ -1,24 +1,39 @@
 export { loader } from "./new.loader.server";
 export { action } from "./new.action.server";
 
-import { Form, Link, useActionData, useLoaderData } from "react-router";
+import {
+  Form,
+  Link,
+  useActionData,
+  useLoaderData,
+  useParams,
+  useSearchParams,
+} from "react-router";
 import React, { useState } from "react";
 
 import { MdAdd, MdClose } from "react-icons/md";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
+import { Section } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
-
-import { CardContent } from "@/components/ui/card";
-import { Card, CardActions, CardTitle } from "@/components/shared/CustomCard";
-import type { Json } from "@/lib/database.types";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { PageShell } from "@/components/ui/page-shell";
+import { Text } from "@/components/ui/typography";
+import { validatePeopleReturnPath } from "@/lib/people-return-path";
 
 export default function NewScript() {
   const loaderData = useLoaderData();
   const actionData = useActionData();
+  const params = useParams();
+  const [searchParams] = useSearchParams();
   const workspace = "workspace" in loaderData ? loaderData.workspace : null;
   const error = "error" in loaderData ? loaderData.error : null;
   const ref = "ref" in loaderData ? loaderData.ref : null;
   const campaignType = "campaignType" in loaderData ? loaderData.campaignType : undefined;
+  const workspaceId = params.id;
+  const returnTo = workspaceId
+    ? validatePeopleReturnPath(searchParams.get("returnTo"), workspaceId)
+    : null;
   const [pendingFileName, setPendingFileName] = useState("");
 
   useActionFeedback(actionData as { error?: unknown } | undefined, {
@@ -54,59 +69,46 @@ export default function NewScript() {
   }
 
   return (
-    <section
-      id="form"
-      className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
-    >
-      {actionData?.error != null && (
-        <p className="absolute bottom-4 text-center font-Zilla-Slab text-2xl font-bold text-red-500">
-          Error:{" "}
-          {actionData.error instanceof Error
-            ? actionData.error.message
-            : typeof actionData.error === "string"
-              ? actionData.error
-              : "An error occurred"}
-        </p>
-      )}
-      <Card bgColor="bg-brand-secondary dark:bg-zinc-900">
-        <CardTitle>Add Script</CardTitle>
-        <CardContent>
-          <Form
-            method="POST"
-            className="space-y-6"
-            encType="multipart/form-data"
-          >
-            <input hidden value={ref ?? ""} id="ref" name="ref" />
-            <label
-              htmlFor="script-name"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >
-              Script Name
-              <input
-                type="text"
-                name="script-name"
-                id="script-name"
-                required
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-              />
-            </label>
-            <label
-              htmlFor="type"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-            >
-              Script Type
+    <section id="form">
+      <PageShell title="Add Script" maxWidth="narrow">
+        {actionData?.error != null ? (
+          <Text className="text-center text-destructive">
+            Error:{" "}
+            {actionData.error instanceof Error
+              ? actionData.error.message
+              : typeof actionData.error === "string"
+                ? actionData.error
+                : "An error occurred"}
+          </Text>
+        ) : null}
+        <Form method="POST" className="space-y-6" encType="multipart/form-data">
+          <Section variant="flat" className="space-y-6">
+            <input hidden value={ref ?? ""} id="ref" name="ref" readOnly />
+            {returnTo ? (
+              <input type="hidden" name="return-to" value={returnTo} />
+            ) : null}
+            <FormField htmlFor="script-name" label="Script Name">
+              <Input type="text" name="script-name" id="script-name" required />
+            </FormField>
+            <FormField htmlFor="type" label="Script Type">
               <select
                 name="type"
                 id="type"
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
-                defaultValue={campaignType ? campaignType === "live_call" ? "script" : "ivr" : "script"}
+                defaultValue={
+                  campaignType
+                    ? campaignType === "live_call"
+                      ? "script"
+                      : "ivr"
+                    : "script"
+                }
+                className="mt-1 block w-full rounded-md border border-border bg-background px-3 py-2 text-foreground shadow-sm focus:border-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary"
               >
                 <option value="script">Live Caller Script</option>
                 <option value="ivr">Interactive Voice Recording (IVR)</option>
                 <option value="inbound_ivr">Inbound IVR Menu</option>
               </select>
-            </label>
-            <div className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+            </FormField>
+            <div className="block text-sm font-medium text-foreground">
               <div>
                 <div className="flex items-baseline gap-4">
                   <div>Upload Steps (Optional JSON file):</div>
@@ -119,7 +121,7 @@ export default function NewScript() {
                       className="hidden"
                       onChange={handleFileChange}
                     />
-                    <Button asChild variant="outline" size="icon">
+                    <Button asChild variant="outline" size="icon" aria-label="Choose a JSON file to upload">
                       <label htmlFor="steps" className="cursor-pointer">
                         <MdAdd />
                       </label>
@@ -133,6 +135,7 @@ export default function NewScript() {
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label="Remove selected file"
                       onClick={handleRemoveFile}
                     >
                       <MdClose />
@@ -144,28 +147,22 @@ export default function NewScript() {
                 If no file is uploaded, you can create the script steps later.
               </p>
             </div>
-
-            <CardActions>
-              <Button
-                className="rounded-md bg-brand-primary font-Zilla-Slab text-lg font-bold tracking-[1px] text-white
-                transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
-                type="submit"
-              >
-                Save
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="border-0 border-black bg-zinc-600 font-Zilla-Slab text-lg font-semibold text-white dark:border-white"
-              >
-                <Link to=".." relative="path">
-                  Back
-                </Link>
-              </Button>
-            </CardActions>
-          </Form>
-        </CardContent>
-      </Card>
+          </Section>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              className="rounded-md bg-brand-primary font-Zilla-Slab text-lg font-bold tracking-[1px] text-white transition-colors duration-150 ease-in-out hover:bg-brand-secondary"
+              type="submit"
+            >
+              Save
+            </Button>
+            <Button asChild variant="outline">
+              <Link to=".." relative="path">
+                Back
+              </Link>
+            </Button>
+          </div>
+        </Form>
+      </PageShell>
     </section>
   );
 }

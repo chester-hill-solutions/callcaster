@@ -4,6 +4,7 @@ import { Activity, RefreshCw, Wrench } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AdminDefinitionGrid } from "@/components/admin/AdminDefinitionGrid";
 
 import type { TwilioPageData } from "../loadTwilioData.server";
 
@@ -47,6 +48,13 @@ export function HealthPanel({ onboarding, syncSnapshot }: HealthPanelProps) {
               </Button>
             </Form>
             <Form method="post">
+              <input type="hidden" name="_action" value="attach_rcs_sender_pool" />
+              <Button variant="outline" type="submit" size="sm">
+                <Activity className="mr-2 h-4 w-4" />
+                Attach RCS sender to pool
+              </Button>
+            </Form>
+            <Form method="post">
               <input type="hidden" name="_action" value="sync_a2p_status" />
               <Button variant="outline" type="submit" size="sm">
                 Sync A2P status
@@ -56,24 +64,22 @@ export function HealthPanel({ onboarding, syncSnapshot }: HealthPanelProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border p-4 text-sm">
-            <div className="text-muted-foreground">Bootstrap status</div>
-            <div className="mt-1 font-medium">{onboarding.subaccountBootstrap.status}</div>
-            <div className="mt-2 text-xs text-muted-foreground">
-              Last synced: {onboarding.subaccountBootstrap.lastSyncedAt ?? "Never"}
-            </div>
-          </div>
-          <div className="rounded-lg border p-4 text-sm">
-            <div className="text-muted-foreground">Open sync snapshot</div>
-            <div className="mt-1 font-medium">
-              {syncSnapshot.lastSyncedAt ? "Available" : "Not synced"}
-            </div>
-            <div className="mt-2 text-xs text-muted-foreground">
-              {syncSnapshot.lastSyncedAt ?? "Run workspace Twilio sync for usage snapshot."}
-            </div>
-          </div>
-        </div>
+        <AdminDefinitionGrid
+          columns={2}
+          items={[
+            {
+              term: "Bootstrap status",
+              value: onboarding.subaccountBootstrap.status,
+              detail: `Last synced: ${onboarding.subaccountBootstrap.lastSyncedAt ?? "Never"}`,
+            },
+            {
+              term: "Open sync snapshot",
+              value: syncSnapshot.lastSyncedAt ? "Available" : "Not synced",
+              detail:
+                syncSnapshot.lastSyncedAt ?? "Run workspace Twilio sync for usage snapshot.",
+            },
+          ]}
+        />
 
         {lastError ? (
           <Alert variant="destructive">

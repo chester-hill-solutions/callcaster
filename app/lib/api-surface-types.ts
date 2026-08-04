@@ -100,6 +100,8 @@ export type ApiSurfaceOperation = {
   method: HttpMethod;
   handler: "loader" | "action";
   bodyType: BodyType;
+  /** Product capability ID enforced for this operation (SEC-07). */
+  capability?: string;
 };
 
 export type ApiSurfaceEntry = {

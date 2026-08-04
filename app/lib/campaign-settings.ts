@@ -32,6 +32,10 @@ export function normalizeCampaignData(
   return {
     ...campaignData,
     schedule: normalizeSchedule(campaignData.schedule) as Schedule | null,
+    sms_send_window: normalizeSchedule(
+      (campaignData as CampaignWithAudiences & { sms_send_window?: unknown })
+        .sms_send_window,
+    ),
   } as CampaignWithAudiences;
 }
 
@@ -42,6 +46,7 @@ export function buildCampaignDetailsForType(
   workspaceId: string,
 ): CampaignSettingsDetails {
   const sharedFields = {
+    ...currentDetails,
     campaign_id: campaignId,
     workspace: workspaceId,
   };

@@ -1,72 +1,116 @@
 import { Call } from "@/lib/types";
 import { CallInstance, CallContext } from 'twilio/lib/rest/api/v2010/account/call';
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
-import { Database, Tables } from "@/lib/database.types";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import { Database, Tables } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
-import { getServiceSupabase } from "@/lib/supabase.server";
+import { runAutoDialerTurn } from "@/lib/auto-dial.server";
+import { rpcDequeueContact } from "@/lib/db-rpc.server";
+import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
+import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
+import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
+import {
+  findCallBySid,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
+import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
 
-const getSupabase = () => getServiceSupabase();
+const getAdmin = () => null /* removed service client */;
+
+function resolveUserIdFromConferenceName(conferenceName: string): string {
+    // Conference names are generated as `${userId}~${uuid}`. The user id is a UUID,
+    // so we split on the non-hex separator to recover the original user id.
+    const sep = conferenceName.indexOf('~');
+    if (sep === -1) return conferenceName;
+    return conferenceName.slice(0, sep);
+}
 
 const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>>> => {
-  const supabase = getSupabase();
-    const { data, error } = await supabase.from('call').select('campaign_id, outreach_attempt_id, contact_id, workspace, conference_id').eq('sid', callSid).single();
-    if (error) throw new Error(`Error fetching call data: ${error.message}`);
-    return data;
+  const row = await findCallBySid(callSid);
+  if (!row) {
+    throw new Error(`Error fetching call data: call ${callSid} not found`);
+  }
+  return row;
 };
 
-const fetchCampaignData = async (campaignId: string) => {
-  const supabase = getSupabase();
-    const { data, error } = await supabase.from('campaign').select('voicemail_file, group_household_queue, caller_id').eq('id', Number(campaignId)).single();
-    if (error) throw new Error(`Error fetching campaign data: ${error.message}`);
-    return data;
+const fetchCampaignData = async (campaignId: string, workspaceId: string) => {
+  const row = await fetchCampaignByIdForWorkspace(workspaceId, campaignId);
+  return {
+    voicemail_file: row.voicemail_file,
+    group_household_queue: row.group_household_queue,
+    caller_id: row.caller_id,
+  };
 };
 
 const getVoicemailSignedUrl = async (workspace: string, voicemailFile: string) => {
-  const supabase = getSupabase();
     if (!voicemailFile) return null;
-    const { data, error } = await supabase.storage.from('workspaceAudio').createSignedUrl(`${workspace}/${voicemailFile}`, 3600);
-    if (error) throw new Error(`Error fetching voicemail file: ${error.message}`);
-    return data.signedUrl;
-};
-
-const dequeueContact = async (contactId: string, groupOnHousehold: boolean, userId: string) => {
-  const supabase = getSupabase();
-    if (groupOnHousehold) {
-        const { data, error } = await supabase.rpc('dequeue_contact', {
-            passed_contact_id: Number(contactId),
-            group_on_household: groupOnHousehold,
-            dequeued_by_id: userId,
-            dequeued_reason_text: "Auto-dial completed"
-        });
-        if (error) throw new Error(`Error dequeueing household: ${error.message}`);
-        return data;
-    } else {
-        const { data, error } = await supabase.from('campaign_queue').update({
-            status: 'dequeued',
-            dequeued_by: userId,
-            dequeued_at: new Date().toISOString(),
-            dequeued_reason: "Auto-dial completed"
-        }).eq('contact_id', Number(contactId)).select();
-        if (error) throw new Error(`Error updating queue status: ${error.message}`);
-        return data;
+    try {
+      return await createSignedObjectUrl("workspaceAudio", `${workspace}/${voicemailFile}`, 3600);
+    } catch (error) {
+      throw new Error(`Error fetching voicemail file: ${error instanceof Error ? error.message : String(error)}`);
     }
 };
 
-const updateOutreachAttempt = async (attemptId: string, update: Partial<Tables<"outreach_attempt">>) => {
-  const supabase = getSupabase();
-    const { data, error } = await supabase.from('outreach_attempt').update(update).eq('id', Number(attemptId)).select();
-    if (error) throw new Error(`Error updating outreach attempt: ${error.message}`);
-    return data;
+const dequeueContact = async (
+  contactId: string,
+  groupOnHousehold: boolean,
+  userId: string,
+  workspace: string,
+  campaignId?: number | null,
+) => {
+    if (groupOnHousehold) {
+        const tdb = createTenantDb(workspace);
+        return await rpcDequeueContact(tdb, {
+            contactId: Number(contactId),
+            groupOnHousehold,
+            dequeuedById: userId,
+            dequeuedReasonText: "Auto-dial completed",
+        });
+    }
+
+    try {
+        return await dequeueCampaignQueueByContact({
+          contactId: Number(contactId),
+          campaignId,
+          userId,
+          reason: "Auto-dial completed",
+        });
+    } catch (error) {
+        throw new Error(
+          `Error updating queue status: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
 };
 
-const triggerAutoDialer = async (conferenceId: string, campaignId: string, workspaceId: string) => {
-    await fetch(`${env.BASE_URL()}/api/auto-dial/dialer`, {
-        method: 'POST',
-        headers: { "Content-Type": 'application/json' },
-        body: JSON.stringify({ user_id: conferenceId, campaign_id: campaignId, workspace_id: workspaceId })
+const updateOutreachAttempt = async (
+  attemptId: string,
+  workspaceId: string,
+  update: Partial<Tables<"outreach_attempt">>,
+) => {
+  const result = await updateOutreachAttemptForWorkspace(workspaceId, attemptId, update);
+  if (result instanceof Response) {
+    throw new Error(`Error updating outreach attempt: ${await result.text()}`);
+  }
+  return [result];
+};
+
+const triggerAutoDialer = async (conferenceId: string, campaignId: string, workspaceId: string, userId: string) => {
+    // Call the dialer turn in-process rather than self-fetching
+    // `/api/auto-dial/dialer`: that path is matched by the Twilio webhook
+    // prefix `/api/auto-dial`, so an unsigned self-fetch would be rejected
+    // with 403 by requireTwilioSignature (always enforced in production).
+    await runAutoDialerTurn({
+        user_id: userId,
+        campaign_id: campaignId,
+        workspace_id: workspaceId,
+        conference_id: conferenceId,
     });
 };
 
@@ -86,37 +130,49 @@ const handleMachineAnswer = async (
     const twiml = new Twilio.twiml.VoiceResponse();
     const firstOutreachStatus = outreachStatus[0];
     if (!firstOutreachStatus) {
-        await call.update({ twiml: "<Response><Hangup/></Response>" });
+        await call.update({ twiml: hangupTwiml() });
         return new Response(twiml.toString(), {
             headers: { 'Content-Type': 'text/xml' }
         });
     }
 
-    await dequeueContact(dbCall.contact_id?.toString() ?? '', campaign.group_household_queue ?? false, firstOutreachStatus.user_id?.toString() ?? '');
+    await dequeueContact(
+      dbCall.contact_id?.toString() ?? "",
+      campaign.group_household_queue ?? false,
+      firstOutreachStatus.user_id?.toString() ?? "",
+      dbCall.workspace?.toString() ?? "",
+      dbCall.campaign_id ?? null,
+    );
 
-    const conferences = await twilio.conferences.list({ friendlyName: firstOutreachStatus.user_id?.toString() ?? '', status: 'in-progress' });
+    const conferenceName = dbCall.conference_id?.toString() ?? '';
+    const conferences = await twilio.conferences.list({ friendlyName: conferenceName, status: 'in-progress' });
     if (conferences.length) {
-        await triggerAutoDialer(firstOutreachStatus.user_id?.toString() ?? '', firstOutreachStatus.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
+        await triggerAutoDialer(conferenceName, firstOutreachStatus.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '', firstOutreachStatus.user_id?.toString() ?? '');
     }
 
-    const playTwiml = `<Response><Pause length="5"/><Play>${signedUrl}</Play></Response>`;
-    await call.update({ twiml: playTwiml });
+    await call.update({ twiml: pausePlayTwiml(signedUrl, 5) });
 
     return new Response(twiml.toString(), {
         headers: { 'Content-Type': 'text/xml' }
     });
 };
 
-const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, conferenceName: string, called: string) => {
+const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: string) => {
     const twiml = new Twilio.twiml.VoiceResponse();
+    const conferenceName = dbCall.conference_id?.toString() ?? '';
 
     if (dbCall.outreach_attempt_id && !called.startsWith('client')) {
-        await updateOutreachAttempt(String(dbCall.outreach_attempt_id), { answered_at: new Date().toISOString() });
+        await updateOutreachAttempt(
+          String(dbCall.outreach_attempt_id),
+          dbCall.workspace?.toString() ?? "",
+          { answered_at: new Date().toISOString() },
+        );
     }
 
     const dial = twiml.dial();
     dial.conference({
         beep: 'onExit',
+        endConferenceOnExit: true,
     }, `${conferenceName}`);
 
     return new Response(twiml.toString(), {
@@ -125,11 +181,25 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, conferenceN
 };
 
 const handleDeviceCheck = async (dbCall: NonNullable<Partial<Call>>) => {
-    return await addToConference(dbCall.conference_id?.toString() ?? '', dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
+    const conferenceId = dbCall.conference_id?.toString() ?? '';
+    const userId = resolveUserIdFromConferenceName(conferenceId);
+    return await addToConference(conferenceId, dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '', userId);
 };
 
-async function addToConference(conferenceId: string, campaignId: string, workspaceId: string) {
+async function addToConference(conferenceId: string, campaignId: string, workspaceId: string, userId: string) {
     const twiml = new Twilio.twiml.VoiceResponse();
+    const workspace = await getWorkspaceById(workspaceId);
+    appendLiveTranscriptionStreamTwiml({
+        twiml,
+        featureFlags: workspace?.feature_flags as Record<string, unknown> | undefined,
+        params: {
+            workspaceId,
+            userId,
+            direction: "predictive",
+            campaignId,
+            streamName: `conf-${conferenceId}`,
+        },
+    });
     const dial = twiml.dial();
     dial.conference({
         beep: 'false',
@@ -137,33 +207,33 @@ async function addToConference(conferenceId: string, campaignId: string, workspa
         statusCallbackEvent: ['join', 'leave', 'modify'],
         endConferenceOnExit: false,
     }, conferenceId);
-    await triggerAutoDialer(conferenceId, campaignId, workspaceId);
+    await triggerAutoDialer(conferenceId, campaignId, workspaceId, userId);
     return new Response(twiml.toString(), {
         headers: { 'Content-Type': 'text/xml' }
     });
 }
 
 const checkUserDevices = async (contactId: string, conferenceName: string, called: string, callerId: string) => {
-  const supabase = getSupabase();
-    const { data, error } = await supabase
-        .from('user')
-        .select('verified_audio_numbers')
-        .eq('id', conferenceName)
-        .single();
-    if (error) throw new Error(`Error fetching user devices: ${error.message}`);
-    if (!data || !data.verified_audio_numbers) return false;
+    const userId = resolveUserIdFromConferenceName(conferenceName);
+    const verifiedNumbers = await getUserVerifiedAudioNumbers(userId);
+    if (!verifiedNumbers?.length) return false;
     if (called.includes('client')) return true;
     if (called === callerId) return true;
-    if (!contactId && data.verified_audio_numbers.includes(called)) return true;
+    if (!contactId && verifiedNumbers.includes(called)) return true;
     return false;
 }
 
-export const action = async ({ request, params }: { request: Request, params: { roomId: string } }) => {
-  const supabase = getSupabase();
-
-    const conferenceName = params.roomId;
-    const realtime = supabase.realtime.channel(conferenceName)
-    const formData = await request.formData();
+export const action = defineAction({
+    auth: async ({ request }) => {
+        const formData = await request.clone().formData();
+        const callSid = formData.get('CallSid') as string;
+        const forbidden = await requireTwilioSignature(request, { callSid });
+        return forbidden ?? null;
+    },
+    sideEffects: ["db-write", "twilio", "external"],
+    handler: async ({ request, params }) => {
+    const conferenceName = params.roomId as string;
+    const formData = await request.clone().formData();
     const parsedBody = Object.fromEntries(formData) as Record<string, string>;
     const callSid = formData.get('CallSid') as string;
     const answeredBy = formData.get('AnsweredBy') as string;
@@ -171,61 +241,47 @@ export const action = async ({ request, params }: { request: Request, params: { 
     const called = (formData.get('Called') ?? "").toString();
 
     let response: Response;
-    
+
     try {
-        const validation = await validateTwilioWebhookForCallSid({
-            request,
-            supabase,
-            callSid,
-            params: parsedBody,
-        });
-        if (!validation.ok) {
-            return new Response(`<Response><Hangup/></Response>`, {
-                status: 403,
-                headers: { 'Content-Type': 'text/xml' }
-            });
-        }
         const dbCall = await fetchCallData(callSid);
-        const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '');
+        const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
 
         if (await checkUserDevices(dbCall.contact_id?.toString() ?? '', conferenceName, called, campaign.caller_id?.toString() ?? '')) {
             return await handleDeviceCheck(dbCall);
         } else {
             //This is a non-client device (outbound call)
-            const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id: dbCall.workspace ?? '' });
+            const twilio = await createWorkspaceTwilioInstance({ workspace_id: dbCall.workspace ?? '' });
             const call: CallContext = twilio.calls(callSid);
-            realtime.send({
-                type: "broadcast", event: "message", payload: {
-                    contact_id: dbCall.contact_id,
-                    status: callStatus
-                }
-            });
 
             if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
                 //This is an answering machine
-                const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '');
+                const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
                 const signedUrl = await getVoicemailSignedUrl(dbCall.workspace?.toString() ?? '', campaign.voicemail_file?.toString() ?? '');
-                const outreachStatus = await updateOutreachAttempt(dbCall.outreach_attempt_id?.toString() ?? '', { disposition: 'voicemail' });
-                supabase.removeChannel(realtime);
+                const outreachStatus = await updateOutreachAttempt(
+                  dbCall.outreach_attempt_id?.toString() ?? "",
+                  dbCall.workspace?.toString() ?? "",
+                  { disposition: "voicemail" },
+                );
                 if (signedUrl) {
                     response = await handleMachineAnswer(call, twilio, dbCall, campaign, signedUrl, outreachStatus);
                 } else {
                     //No voicemail file found, so we hang up
-                    response = new Response(`<Response><Hangup/></Response>`, {
+                    response = new Response(hangupTwiml(), {
                         headers: { 'Content-Type': 'text/xml' }
                     });
                 }
             } else {
                 //This is a human answer
-                response = await handleHumanAnswer(dbCall, conferenceName, called);
+                response = await handleHumanAnswer(dbCall, called);
             }
         }
     } catch (error) {
         logger.error('General error:', error);
-        response = new Response(`<Response><Hangup/></Response>`, {
+        response = new Response(hangupTwiml(), {
             headers: { 'Content-Type': 'text/xml' }
         });
     }
 
     return response;
-};
+    },
+});

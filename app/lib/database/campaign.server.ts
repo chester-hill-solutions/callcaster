@@ -1,8 +1,7 @@
 /**
  * Campaign-related database functions
  */
-import { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Json } from "../database.types";
+import { eq, inArray } from "drizzle-orm";
 import {
   Campaign,
   CampaignSchedule,
@@ -10,10 +9,16 @@ import {
   Contact,
 } from "../types";
 import { logger } from "../logger.server";
+import { fetchCampaignQueueWithContacts } from "../campaign-queue-search.server";
+import { campaign as campaignTable } from "@/db/schema";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { db, type Database } from "@/server/db";
+import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import {
-  COMPLETED_QUEUE_COUNT_FILTER,
-  QUEUE_STATUS_QUEUED,
-} from "../queue-status";
+  persistCampaignScript,
+  persistCampaignScriptWithTenantDb,
+} from "@/lib/script-persistence.server";
 
 export type CampaignType =
   | "live_call"
@@ -22,25 +27,44 @@ export type CampaignType =
   | "simple_ivr"
   | "complex_ivr";
 
+/** @deprecated Subtype tables removed — kept for callers still passing legacy table keys. */
+export type LegacyCampaignTableKey = "live_campaign" | "message_campaign" | "ivr_campaign";
+
 export interface CampaignData {
   id?: string;
   workspace: string;
   title: string;
   type: CampaignType;
-  script_id?: number;
+  script_id?: number | null;
   audiences?: Array<{ audience_id: string; campaign_id: string }>;
   [key: string]: unknown;
 }
 
 export interface CampaignDetails {
   campaign_id: string;
-  script_id?: string;
+  script_id?: string | null;
   [key: string]: unknown;
 }
 
-type CampaignTableKey = "live_campaign" | "message_campaign" | "ivr_campaign";
+const IVR_CAMPAIGN_TYPES = ["robocall", "simple_ivr", "complex_ivr"] as const;
 
-export function getCampaignTableKey(type: CampaignType): CampaignTableKey {
+export function campaignTypesForLegacyTableKey(
+  tableKey: LegacyCampaignTableKey,
+): CampaignType[] {
+  switch (tableKey) {
+    case "live_campaign":
+      return ["live_call"];
+    case "message_campaign":
+      return ["message"];
+    case "ivr_campaign":
+      return [...IVR_CAMPAIGN_TYPES];
+    default:
+      throw new Error("Invalid campaign table key");
+  }
+}
+
+/** @deprecated Use unified `campaign` row — maps type to legacy table name for transitional callers. */
+export function getCampaignTableKey(type: CampaignType): LegacyCampaignTableKey {
   switch (type) {
     case "live_call":
       return "live_campaign";
@@ -64,310 +88,293 @@ function cleanObject<T extends object>(obj: T): Partial<T> {
   }, {} as Partial<T>);
 }
 
-async function handleDatabaseOperation<T>(
-  operation: () => Promise<{ data: T; error: PostgrestError | null }>,
-  errorMessage: string,
-): Promise<T> {
-  const { data, error } = await operation();
-  if (error) {
-    throw new Error(`${errorMessage}: ${error.message}`);
-  }
-  return data;
+/**
+ * Prefer a non-empty primary string; otherwise keep the nested details value.
+ * Callers often send top-level `body_text: ""` while the real content lives on
+ * `campaignDetails` (script/message editor), and `??` would keep the empty
+ * string and wipe the message (#1115).
+ */
+function coalesceCampaignText(
+  primary: string | null | undefined,
+  fallback: string | null | undefined,
+): string {
+  if (primary != null && primary.length > 0) return primary;
+  if (fallback != null) return fallback;
+  return primary ?? "";
+}
+
+function coalesceMessageMedia(
+  primary: string[] | null | undefined,
+  fallback: string[] | null | undefined,
+): string[] {
+  if (primary != null && primary.length > 0) return primary;
+  if (fallback != null && fallback.length > 0) return fallback;
+  return primary ?? fallback ?? [];
+}
+
+function asOptionalString(value: unknown): string | null | undefined {
+  if (value === null || value === undefined) return value;
+  return typeof value === "string" ? value : undefined;
+}
+
+function asOptionalStringArray(value: unknown): string[] | null | undefined {
+  if (value === null || value === undefined) return value;
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : undefined;
+}
+
+function buildUnifiedCampaignFields(
+  campaignData: CampaignData,
+  campaignDetails: CampaignDetails,
+): Record<string, unknown> {
+  const scriptId =
+    campaignData.script_id !== undefined
+      ? campaignData.script_id
+      : campaignDetails.script_id;
+
+  return cleanObject({
+    script_id:
+      scriptId === null || scriptId === ""
+        ? null
+        : scriptId === undefined
+          ? undefined
+          : Number(scriptId),
+    body_text: coalesceCampaignText(
+      asOptionalString(campaignData.body_text),
+      asOptionalString(campaignDetails.body_text),
+    ),
+    message_media: coalesceMessageMedia(
+      asOptionalStringArray(campaignData.message_media),
+      asOptionalStringArray(campaignDetails.message_media),
+    ),
+    voicedrop_audio: campaignData.voicedrop_audio ?? campaignDetails.voicedrop_audio ?? null,
+    disposition_options: campaignDetails.disposition_options,
+    live_questions: campaignDetails.questions ?? campaignDetails.live_questions,
+  });
+}
+
+function stripCampaignMetaFields(rest: Record<string, unknown>): Record<string, unknown> {
+  return cleanObject({
+    ...rest,
+    campaign_audience: undefined,
+    campaignDetails: undefined,
+    mediaLinks: undefined,
+    script: undefined,
+    questions: undefined,
+    created_at: undefined,
+    disposition_options: undefined,
+    audience: undefined,
+    script_id: undefined,
+    body_text: undefined,
+    message_media: undefined,
+    voicedrop_audio: undefined,
+    live_questions: undefined,
+    is_active: Boolean(rest.is_active),
+  });
 }
 
 export async function getWorkspaceCampaigns({
-  supabaseClient,
   workspaceId,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
+  tdb?: TenantDb;
+  /** @deprecated ignored — use workspaceId + tdb */
+  null?: never;
 }) {
-  const { data, error } = await supabaseClient
-    .from("campaign")
-    .select("*")
-    .eq("workspace", workspaceId)
-    .order("created_at", { ascending: false });
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
 
-  if (error) {
+  try {
+    const data = await tdb.campaign.findMany({
+      orderBy: (c, { desc }) => [desc(c.created_at)],
+    });
+    return { data, error: null };
+  } catch (error) {
     logger.error("Error on function getWorkspaceCampaigns", error);
+    return { data: null, error: error as Error };
   }
+}
 
-  return { data, error };
+/**
+ * Fetch campaign dropdown options (id, title, status) for a workspace,
+ * ordered by creation date descending, limited to 200 results.
+ * These are dropdown options, not a paginated list.
+ */
+export async function listWorkspaceCampaignOptions(tdb: TenantDb) {
+  return tdb.campaign.findMany({
+    columns: { id: true, title: true, status: true },
+    orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
+    limit: 200,
+  });
 }
 
 export async function updateCampaign({
-  supabase,
   campaignData,
   campaignDetails,
+  tdb: tdbIn,
 }: {
-  supabase: SupabaseClient;
   campaignData: CampaignData;
   campaignDetails: CampaignDetails;
+  tdb?: TenantDb;
+  /** @deprecated ignored */
+  client?: never;
 }) {
   const {
-    campaign_id: id,
+    campaign_id,
+    id: legacyId,
     workspace,
     audiences,
     details,
     ...restCampaignData
   } = campaignData;
 
+  // Some callers (e.g. the script editor's PATCH /api/campaigns) only send
+  // the campaign's primary key under `id`, not `campaign_id`. Accept either,
+  // preferring `campaign_id` when both are present.
+  const id = campaign_id ?? legacyId;
+
   if (!id) throw new Error("Campaign ID is required");
-  campaignDetails.script_id = campaignData.script_id?.toString() || undefined;
-  campaignDetails.body_text = campaignData.body_text || "";
-  campaignDetails.message_media = campaignData.message_media || [];
-  campaignDetails.voicedrop_audio = campaignData.voicedrop_audio || null;
+  if (!workspace) throw new Error("Workspace is required");
 
-  const cleanCampaignData = cleanObject({
-    ...restCampaignData,
-    campaign_audience: undefined,
-    campaignDetails: undefined,
-    mediaLinks: undefined,
-    script: undefined,
-    questions: undefined,
-    created_at: undefined,
-    disposition_options: undefined,
-    audience: undefined,
-    script_id: undefined,
-    body_text: undefined,
-    message_media: undefined,
-    voicedrop_audio: undefined,
-    is_active: Boolean(restCampaignData.is_active),
+  // Resolve nested fields without mutating the caller's campaignDetails
+  // object; empty top-level placeholders must not wipe nested content (#1115).
+  const resolvedDetails: CampaignDetails = {
+    ...campaignDetails,
+    script_id:
+      campaignData.script_id === null
+        ? null
+        : campaignData.script_id?.toString() ?? campaignDetails.script_id,
+    body_text: coalesceCampaignText(
+      asOptionalString(campaignData.body_text),
+      asOptionalString(campaignDetails.body_text),
+    ),
+    message_media: coalesceMessageMedia(
+      asOptionalStringArray(campaignData.message_media),
+      asOptionalStringArray(campaignDetails.message_media),
+    ),
+    voicedrop_audio: campaignData.voicedrop_audio || null,
+  };
+
+  const tdb = tdbIn ?? createTenantDb(workspace);
+  const unifiedFields = buildUnifiedCampaignFields(campaignData, resolvedDetails);
+  const cleanCampaignData = {
+    ...stripCampaignMetaFields(restCampaignData as Record<string, unknown>),
+    ...unifiedFields,
+  };
+
+  const [updatedCampaign] = await tdb.campaign.update({
+    set: cleanCampaignData,
+    where: eq(campaignTable.id, Number(id)),
   });
-  const tableKey = getCampaignTableKey(cleanCampaignData.type!);
 
-  const cleanCampaignDetails =
-    tableKey === "message_campaign"
-      ? cleanObject({
-          ...campaignDetails,
-          mediaLinks: undefined,
-          disposition_options: undefined,
-          script: undefined,
-          questions: undefined,
-          created_at: undefined,
-          script_id: undefined,
-          voicedrop_audio: undefined,
-        })
-      : tableKey === "ivr_campaign"
-        ? cleanObject({
-            ...campaignDetails,
-            mediaLinks: undefined,
-            disposition_options: undefined,
-            script: undefined,
-            questions: undefined,
-            created_at: undefined,
-            body_text: undefined,
-            message_media: undefined,
-            step_data: undefined,
-            voicedrop_audio: undefined,
-            campaign_id: id,
-          })
-        : cleanObject({
-            ...campaignDetails,
-            mediaLinks: undefined,
-            disposition_options: undefined,
-            script: undefined,
-            questions: undefined,
-            created_at: undefined,
-            body_text: undefined,
-            message_media: undefined,
-            step_data: undefined,
-          });
-
-  const campaign = await handleDatabaseOperation(
-    async () =>
-      await supabase
-        .from("campaign")
-        .update(cleanCampaignData)
-        .eq("id", id)
-        .select()
-        .single(),
-    "Error updating campaign",
-  );
-
-  // First check if the record exists
-  const { data: existingRecord } = await supabase
-    .from(tableKey)
-    .select()
-    .eq("campaign_id", id)
-    .single();
-
-  let updatedCampaignDetails;
-  if (existingRecord) {
-    // Update if record exists
-    updatedCampaignDetails = await handleDatabaseOperation(
-      async () =>
-        await supabase
-          .from(tableKey)
-          .update(cleanCampaignDetails)
-          .eq("campaign_id", id)
-          .select()
-          .single(),
-      "Error updating campaign details",
-    );
-  } else {
-    // Insert if record doesn't exist
-    updatedCampaignDetails = await handleDatabaseOperation(
-      async () =>
-        await supabase
-          .from(tableKey)
-          .insert({ ...cleanCampaignDetails, campaign_id: id })
-          .select()
-          .single(),
-      "Error creating campaign details",
-    );
+  if (!updatedCampaign) {
+    throw new Error("Error updating campaign: row not found");
   }
 
   return {
-    campaign,
-    campaignDetails: updatedCampaignDetails,
+    campaign: updatedCampaign,
+    campaignDetails: toLegacyCampaignDetails(updatedCampaign),
   };
 }
 
 export async function deleteCampaign({
-  supabase,
+  workspaceId,
   campaignId,
+  tdb: tdbIn,
 }: {
-  supabase: SupabaseClient;
+  workspaceId: string;
   campaignId: string;
+  tdb?: TenantDb;
+  /** @deprecated ignored */
+  client?: never;
 }) {
-  const { error } = await supabase.from("campaign").delete().eq("id", campaignId);
-  if (error) throw error;
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  await tdb.campaign.delete({
+    where: eq(campaignTable.id, Number(campaignId)),
+  });
 }
 
 export async function createCampaign({
-  supabase,
   campaignData,
+  tdb: tdbIn,
 }: {
-  supabase: SupabaseClient;
   campaignData: CampaignData;
+  tdb?: TenantDb;
+  /** @deprecated ignored */
+  client?: never;
 }) {
   const { audiences, ...restCampaignData } = campaignData;
+  const workspaceId = campaignData.workspace;
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
 
-  const cleanCampaignData = cleanObject({
-    ...restCampaignData,
-    campaign_audience: undefined,
-    campaignDetails: undefined,
-    mediaLinks: undefined,
-    script: undefined,
-    questions: undefined,
-    created_at: undefined,
-    disposition_options: undefined,
-    audience: undefined,
-    script_id: undefined,
-    body_text: undefined,
-    message_media: undefined,
-    voicedrop_audio: undefined,
-    is_active: Boolean(restCampaignData.is_active),
+  const unifiedFields = buildUnifiedCampaignFields(campaignData, {
+    campaign_id: "",
+    body_text: campaignData.body_text as string | undefined,
+    message_media: campaignData.message_media as string[] | undefined,
+    voicedrop_audio: campaignData.voicedrop_audio as string | null | undefined,
+    disposition_options: campaignData.disposition_options,
+    questions: campaignData.questions,
   });
 
-  let campaign;
-  try {
-    const { data, error } = await supabase
-      .from("campaign")
-      .insert(cleanCampaignData)
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === "23505") {
-        // Handle duplicate campaign name
-        const newCampaignName = `${campaignData.title} (Copy)`;
-        const { data: retryData, error: retryError } = await supabase
-          .from("campaign")
-          .insert({
-            ...cleanCampaignData,
-            title: newCampaignName,
-            status: "draft",
-          })
-          .select()
-          .single();
-
-        if (retryError) throw retryError;
-        campaign = retryData;
-      } else {
-        throw error;
-      }
-    } else {
-      campaign = data;
-    }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    throw new Error(`Error creating campaign: ${errorMessage}`);
-  }
+  const cleanCampaignData = {
+    ...stripCampaignMetaFields(restCampaignData as Record<string, unknown>),
+    ...unifiedFields,
+  };
 
   if (!cleanCampaignData.type) {
     throw new Error("Campaign type is required");
   }
 
-  const tableKey = getCampaignTableKey(cleanCampaignData.type);
+  let createdCampaign;
+  try {
+    [createdCampaign] = await tdb.campaign.insert(cleanCampaignData);
+  } catch (error: unknown) {
+    const pgError = error as { code?: string; message?: string };
+    if (pgError.code === "23505") {
+      const newCampaignName = `${campaignData.title} (Copy)`;
+      try {
+        [createdCampaign] = await tdb.campaign.insert({
+          ...cleanCampaignData,
+          title: newCampaignName,
+          status: "draft",
+        });
+      } catch (retryError: unknown) {
+        const retryMessage =
+          retryError instanceof Error ? retryError.message : "Unknown error";
+        throw new Error(`Error creating campaign: ${retryMessage}`);
+      }
+    } else {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      throw new Error(`Error creating campaign: ${errorMessage}`);
+    }
+  }
 
-  const campaignDetails = {
-    campaign_id: campaign.id,
-    script_id: campaignData.script_id ? Number(campaignData.script_id) : null,
-    body_text: campaignData.body_text || "",
-    message_media: campaignData.message_media || [],
-    voicedrop_audio: campaignData.voicedrop_audio || null,
-    workspace: campaignData.workspace,
-  };
-
-  const cleanCampaignDetails =
-    tableKey === "message_campaign"
-      ? cleanObject({
-          ...campaignDetails,
-          mediaLinks: undefined,
-          disposition_options: undefined,
-          script: undefined,
-          questions: undefined,
-          created_at: undefined,
-          script_id: undefined,
-          voicedrop_audio: undefined,
-        })
-      : tableKey === "ivr_campaign"
-        ? cleanObject({
-            ...campaignDetails,
-            mediaLinks: undefined,
-            disposition_options: undefined,
-            script: undefined,
-            questions: undefined,
-            created_at: undefined,
-            body_text: undefined,
-            message_media: undefined,
-            step_data: undefined,
-            voicedrop_audio: undefined,
-          })
-        : cleanObject({
-            ...campaignDetails,
-            mediaLinks: undefined,
-            disposition_options: undefined,
-            script: undefined,
-            questions: undefined,
-            created_at: undefined,
-            body_text: undefined,
-            message_media: undefined,
-            step_data: undefined,
-          });
-
-  const { data: createdCampaignDetails, error: detailsError } = await supabase
-    .from(tableKey)
-    .insert(cleanCampaignDetails)
-    .select()
-    .single();
-
-  if (detailsError) {
-    logger.error("Error creating campaign details:", detailsError);
-    await supabase.from("campaign").delete().eq("id", campaign.id);
-    throw new Error(`Error creating campaign details: ${detailsError.message}`);
+  if (!createdCampaign) {
+    throw new Error("Error creating campaign: insert returned no row");
   }
 
   return {
-    campaign,
-    campaignDetails: createdCampaignDetails,
+    campaign: createdCampaign,
+    campaignDetails: toLegacyCampaignDetails(createdCampaign),
+  };
+}
+
+function toLegacyCampaignDetails(row: typeof campaignTable.$inferSelect) {
+  return {
+    campaign_id: row.id,
+    script_id: row.script_id,
+    body_text: row.body_text,
+    message_media: row.message_media,
+    voicedrop_audio: row.voicedrop_audio,
+    disposition_options: row.disposition_options,
+    questions: row.live_questions,
+    workspace: row.workspace,
   };
 }
 
 type ScriptUpdateProps = {
-  supabase: SupabaseClient;
+  workspaceId: string;
   scriptData: Script;
   saveAsCopy: boolean;
   campaignData: Campaign;
@@ -375,77 +382,244 @@ type ScriptUpdateProps = {
   created_at: string;
 };
 
+export type SplitMessageCampaignResult = {
+  segments: Array<{
+    campaignId: number;
+    title: string;
+    contactCount: number;
+  }>;
+  movedContactCount: number;
+};
+
+/**
+ * Phase F — parallel-campaign split.
+ *
+ * Clones a bulk message campaign into `segmentCount` sibling campaigns and
+ * partitions the source's queued contacts across them (round-robin, so segment
+ * sizes stay balanced). Each segment inherits the source's content, sender
+ * config, schedule, and send window, and is created as a `draft` so an operator
+ * can vary copy per segment before launching. The redistributed rows are then
+ * dequeued off the source (reason "Moved to parallel split segment") so the
+ * same contact is never sent twice.
+ *
+ * Intended to be driven by the `bulk_sender_misaligned` split wizard when a
+ * `ca_local` queue is large enough that a single sender would throttle badly.
+ */
+export async function splitMessageCampaign({
+  workspaceId,
+  sourceCampaignId,
+  segmentCount,
+  userId,
+  tdb: tdbIn,
+}: {
+  workspaceId: string;
+  sourceCampaignId: string | number;
+  segmentCount: number;
+  userId: string;
+  tdb?: TenantDb;
+}): Promise<SplitMessageCampaignResult> {
+  const normalizedSegments = Math.floor(Number(segmentCount));
+  if (!Number.isFinite(normalizedSegments) || normalizedSegments < 2) {
+    throw new Error("A campaign split needs at least 2 segments");
+  }
+  if (normalizedSegments > 20) {
+    throw new Error("A campaign split supports at most 20 segments");
+  }
+
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  const source = await tdb.campaign.findFirst({
+    where: eq(campaignTable.id, Number(sourceCampaignId)),
+  });
+  if (!source) {
+    throw new Error("Source campaign not found");
+  }
+  if (source.type !== "message") {
+    throw new Error("Only message campaigns can be split");
+  }
+
+  const members = await getCampaignQueueById({
+    campaign_id: String(sourceCampaignId),
+    onlyQueued: true,
+  });
+
+  const buckets: number[][] = Array.from(
+    { length: normalizedSegments },
+    () => [],
+  );
+  members.forEach((member, index) => {
+    buckets[index % normalizedSegments]!.push(Number(member.contact_id));
+  });
+
+  const {
+    id: _sourceId,
+    created_at: _sourceCreatedAt,
+    ...clonableFields
+  } = source;
+
+  const segments: SplitMessageCampaignResult["segments"] = [];
+  for (let index = 0; index < normalizedSegments; index++) {
+    const title = `${source.title} — Segment ${index + 1} of ${normalizedSegments}`;
+    const { campaign: created } = await createCampaign({
+      campaignData: {
+        ...(clonableFields as unknown as Record<string, unknown>),
+        workspace: workspaceId,
+        title,
+        status: "draft",
+        is_active: false,
+      } as unknown as CampaignData,
+      tdb,
+    });
+
+    const contactIds = buckets[index] ?? [];
+    if (contactIds.length > 0) {
+      await enqueueContactsForCampaign(Number(created.id), contactIds);
+    }
+
+    segments.push({
+      campaignId: Number(created.id),
+      title,
+      contactCount: contactIds.length,
+    });
+  }
+
+  // Remove the redistributed rows from the source so volume isn't double-sent.
+  let movedContactCount = 0;
+  for (const member of members) {
+    await dequeueCampaignQueueById({
+      queueId: Number(member.id),
+      userId,
+      reason: "Moved to parallel split segment",
+    });
+    movedContactCount++;
+  }
+
+  return { segments, movedContactCount };
+}
+
 export async function updateOrCopyScript({
-  supabase,
+  workspaceId,
   scriptData,
   saveAsCopy,
   campaignData,
   created_by,
   created_at,
 }: ScriptUpdateProps) {
-  const { id, ...updateData } = scriptData;
-  const { data: originalScript, error: fetchScriptError } = id
-    ? await supabase.from("script").select().eq("id", id).single()
-    : { data: null, error: null };
-  let scriptOperation;
-  const upsertData: Partial<Script> = {
-    ...scriptData,
-    name:
-      saveAsCopy && originalScript?.name === updateData.name
-        ? `${updateData.name} (Copy)`
-        : updateData.name,
-    ...(saveAsCopy || !id
-      ? { updated_by: created_by, updated_at: created_at }
-      : { created_by, created_at }),
-  };
-
-  if (saveAsCopy || !id) {
-    const { id: _unusedId, ...insertData } = upsertData;
-    scriptOperation = supabase.from("script").insert(insertData).select();
-  } else {
-    scriptOperation = supabase
-      .from("script")
-      .update(upsertData)
-      .eq("id", id)
-      .select();
+  const campaignId = Number(
+    (campaignData as Campaign & { campaign_id?: string | number }).campaign_id ??
+      campaignData.id,
+  );
+  if (!Number.isFinite(campaignId)) {
+    throw new Error("Campaign ID is required");
   }
-  const { data: updatedScript, error: scriptError } = await scriptOperation;
-  if (scriptError) {
-    if (scriptError.code === "23505") {
-      logger.error("Duplicate script conflict", scriptError);
+  try {
+    return await persistCampaignScript({
+      workspaceId,
+      campaignId,
+      scriptId: scriptData.id,
+      content: {
+        name: scriptData.name,
+        steps: scriptData.steps,
+        type: scriptData.type,
+      },
+      actorId: created_by,
+      saveAsCopy,
+      timestamp: created_at,
+    });
+  } catch (error: unknown) {
+    const pgError = error as { code?: string; message?: string };
+    if (pgError.code === "23505") {
+      logger.error("Duplicate script conflict", error);
       throw new Error(
-        `A script with this name (${upsertData.name}) already exists in the workspace`,
+        `A script with this name (${scriptData.name}) already exists in the workspace`,
       );
     }
-    throw scriptError;
+    throw error;
   }
+}
 
-  return updatedScript[0];
+export async function updateCampaignWithScript(args: {
+  workspaceId: string;
+  campaignData: CampaignData;
+  campaignDetails: CampaignDetails;
+  scriptData: Script;
+  saveAsCopy: boolean;
+  actorId: string;
+  timestamp?: string;
+  dbInstance?: Database;
+}) {
+  const campaignId = Number(args.campaignData.campaign_id ?? args.campaignData.id);
+  if (!Number.isFinite(campaignId)) {
+    throw new Error("Campaign ID is required");
+  }
+  const database = args.dbInstance ?? db;
+
+  try {
+    return await database.transaction(
+      async (txRaw) => {
+        const tdb = createTenantDb(
+          args.workspaceId,
+          txRaw as unknown as Database,
+        );
+        const script = await persistCampaignScriptWithTenantDb({
+          workspaceId: args.workspaceId,
+          campaignId,
+          scriptId: args.scriptData.id,
+          content: {
+            name: args.scriptData.name,
+            steps: args.scriptData.steps,
+            type: args.scriptData.type,
+          },
+          actorId: args.actorId,
+          saveAsCopy: args.saveAsCopy,
+          timestamp: args.timestamp,
+          tdb,
+        });
+        const campaignData = {
+          ...args.campaignData,
+          workspace: args.workspaceId,
+          script_id: script.id,
+        };
+        const updated = await updateCampaign({
+          campaignData,
+          campaignDetails: args.campaignDetails,
+          tdb,
+        });
+        return { ...updated, scriptId: script.id, script };
+      },
+      { isolationLevel: "serializable" },
+    );
+  } catch (error: unknown) {
+    const pgError = error as { code?: string };
+    if (pgError.code === "23505") {
+      logger.error("Duplicate script conflict", error);
+      throw new Error(
+        `A script with this name (${args.scriptData.name}) already exists in the workspace`,
+      );
+    }
+    throw error;
+  }
 }
 
 export async function updateCampaignScript({
-  supabase,
+  workspaceId,
   campaignId,
   scriptId,
-  campaignType,
+  tdb: tdbIn,
 }: {
-  supabase: SupabaseClient;
+  workspaceId: string;
   campaignId: string;
   scriptId: number;
-  campaignType: string;
+  /** @deprecated ignored — script lives on unified campaign row */
+  campaignType?: string;
+  tdb?: TenantDb;
+  /** @deprecated ignored */
+  client?: never;
 }) {
-  let tableKey: "live_campaign" | "ivr_campaign";
-  if (campaignType === "live_call" || !campaignType) tableKey = "live_campaign";
-  else if (["robocall", "simple_ivr", "complex_ivr"].includes(campaignType))
-    tableKey = "ivr_campaign";
-  else throw new Error("Invalid campaign type for script update");
-
-  const { error: scriptIdUpdateError } = await supabase
-    .from(tableKey)
-    .update({ script_id: scriptId })
-    .eq("campaign_id", campaignId);
-
-  if (scriptIdUpdateError) throw scriptIdUpdateError;
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  await tdb.campaign.update({
+    set: { script_id: scriptId },
+    where: eq(campaignTable.id, Number(campaignId)),
+  });
 }
 
 export {
@@ -453,51 +627,51 @@ export {
   fetchCampaignCounts,
   fetchCampaignData,
   fetchCampaignDetails,
+  fetchIvrResponseResults,
   fetchQueueCounts,
   fetchCampaignAudience,
   fetchAdvancedCampaignDetails,
 } from "./campaign-stats.server";
 
 export async function fetchCampaignsByType({
-  supabaseClient,
   workspaceId,
   type,
+  tdb: tdbIn,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
-  type: "message_campaign" | "ivr_campaign" | "live_campaign";
+  type: LegacyCampaignTableKey;
+  tdb?: TenantDb;
+  /** @deprecated ignored */
+  null?: never;
 }) {
-  const { data, error } = await supabaseClient
-    .from(type)
-    .select(`...campaign(title, id)`)
-    .eq("workspace", workspaceId);
-  if (error) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  const campaignTypes = campaignTypesForLegacyTableKey(type);
+
+  try {
+    const data = await tdb.campaign.findMany({
+      where: inArray(campaignTable.type, campaignTypes),
+      columns: { id: true, title: true },
+    });
+    return data?.map((row) => ({
+      campaign_id: row.id,
+      campaign: { id: row.id, title: row.title },
+    }));
+  } catch (error) {
     logger.error("Error fetching campaigns by type", error);
+    return null;
   }
-  return data;
 }
 
-export async function getCampaignQueueById({
-  supabaseClient,
-  campaign_id,
+export async function getCampaignQueueById({campaign_id,
   onlyQueued = false,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   campaign_id: string;
   onlyQueued?: boolean;
 }) {
-  let query = supabaseClient
-    .from("campaign_queue")
-    .select("*, contact(*)")
-    .eq("campaign_id", Number(campaign_id));
-
-  if (onlyQueued) {
-    query = query.eq("status", "queued").is("dequeued_at", null);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  return data;
+  return fetchCampaignQueueWithContacts({
+    campaignId: Number(campaign_id),
+    onlyQueued,
+  });
 }
 
 export function checkSchedule(campaignData: Campaign) {
@@ -523,7 +697,7 @@ export function checkSchedule(campaignData: Campaign) {
   if (
     !start_date ||
     !end_date ||
-    !(utcNow > new Date(start_date) && utcNow < new Date(end_date))
+    !(utcNow >= new Date(start_date) && utcNow <= new Date(end_date))
   ) {
     return false;
   }
@@ -550,6 +724,7 @@ export function checkSchedule(campaignData: Campaign) {
   const currentTime = utcNow.toISOString().slice(11, 16);
   return todaySchedule.intervals.some(
     (interval: { start: string; end: string }) => {
+      if (interval.start === interval.end) return false;
       if (interval.end < interval.start) {
         return currentTime >= interval.start || currentTime < interval.end;
       }
@@ -557,9 +732,3 @@ export function checkSchedule(campaignData: Campaign) {
     },
   );
 }
-
-export type { OutreachExportData } from "./campaign-outreach-export.server";
-export {
-  fetchOutreachData,
-  processOutreachExportData,
-} from "./campaign-outreach-export.server";

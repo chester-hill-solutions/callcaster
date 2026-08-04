@@ -1,80 +1,101 @@
-import { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../database.types";
+/**
+ * Campaign stats and aggregated reads (tenant-db for scoped tables; Postgres for RPC only).
+ */
+import { and, eq, isNotNull, ne } from "drizzle-orm";
+import type { Database } from "@/lib/db-types";
 import { Script } from "../types";
 import { logger } from "../logger.server";
+import { rpcGetCampaignStats } from "@/lib/db-rpc.server";
+import {
+  aggregateIvrResponses,
+  campaignTypeCollectsIvrResponses,
+  type IvrQuestionResults,
+  type IvrScriptShape,
+} from "@/lib/ivr-results";
 import { getSignedUrls } from "./workspace.server";
 import {
-  COMPLETED_QUEUE_COUNT_FILTER,
-  QUEUE_STATUS_QUEUED,
-} from "../queue-status";
+  countCampaignQueueRows,
+  countDialableCampaignQueueRows,
+  countDialableCompletedCampaignQueueRows,
+  countDialableQueuedCampaignQueueRows,
+  fetchDialableCampaignQueueWithContacts,
+} from "../campaign-queue-search.server";
+import {
+  campaign as campaignTable,
+  campaign_audience as campaignAudienceTable,
+  message as messageTable,
+  outreach_attempt as outreachAttemptTable,
+  script as scriptTable,
+} from "@/db/schema";
+import { db } from "@/server/db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
-type CampaignTableKey = "live_campaign" | "message_campaign" | "ivr_campaign";
+export async function fetchBasicResults({
+  workspaceId,
+  campaignId,
+  tdb: tdbIn,
+}: {
+  workspaceId: string;
+  campaignId: string;
+  tdb?: TenantDb;
+}) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
 
-export const fetchBasicResults = async (
-  supabaseClient: SupabaseClient,
-  campaignId: string,
-) => {
-  const { data, error } = await supabaseClient.rpc("get_campaign_stats", {
-    campaign_id_param: campaignId,
-  });
-  if (error) logger.error("Error fetching basic results:", error);
-  const baseResults = ((data as
-    | {
-        disposition: string;
-        count: number;
-        average_call_duration: string;
-        average_wait_time: string;
-        expected_total: number;
-      }[]
-    | null) ?? []);
+  let data: Awaited<ReturnType<typeof rpcGetCampaignStats>> | null = null;
+  try {
+    data = await rpcGetCampaignStats(db, campaignId);
+  } catch (error) {
+    logger.error("Error fetching basic results:", error);
+  }
+  const baseResults =
+    (data as
+      | {
+          disposition: string;
+          count: number;
+          average_call_duration: string;
+          average_wait_time: string;
+          expected_total: number;
+        }[]
+      | null) ?? [];
 
-  const { data: campaign } = await supabaseClient
-    .from("campaign")
-    .select("type")
-    .eq("id", Number(campaignId))
-    .maybeSingle();
+  let campaignType: string | null | undefined;
+  try {
+    const campaign = await tdb.campaign.findFirst({
+      where: eq(campaignTable.id, Number(campaignId)),
+      columns: { type: true },
+    });
+    campaignType = campaign?.type;
+  } catch (campaignError) {
+    logger.error("Error fetching campaign type for basic results:", campaignError);
+  }
 
-  if (campaign?.type !== "message") {
+  if (campaignType !== "message") {
     return baseResults;
   }
 
-  const [queueCounts, completedQueueResult, messageStatuses, attemptDispositions] = await Promise.all([
-    fetchQueueCounts(supabaseClient as SupabaseClient<Database>, campaignId),
-    supabaseClient
-      .from("campaign_queue")
-      .select("id, contact!inner(*)", { count: "exact", head: true })
-      .eq("campaign_id", Number(campaignId))
-      .or(COMPLETED_QUEUE_COUNT_FILTER)
-      .not("contact.phone", "is", null)
-      .neq("contact.phone", "")
-      .limit(1),
-    supabaseClient
-      .from("message")
-      .select("status")
-      .eq("campaign_id", Number(campaignId))
-      .not("status", "is", null),
-    supabaseClient
-      .from("outreach_attempt")
-      .select("disposition")
-      .eq("campaign_id", Number(campaignId))
-      .not("disposition", "is", null)
-      .neq("disposition", ""),
-  ]);
+  const campaignIdNum = Number(campaignId);
+  const [queueCounts, completedQueueCount, messageStatuses, attemptDispositions] =
+    await Promise.all([
+      fetchQueueCounts({ workspaceId, campaignId }),
+      countDialableCompletedCampaignQueueRows(campaignIdNum),
+      tdb.message.findMany({
+        where: and(
+          eq(messageTable.campaign_id, campaignIdNum),
+          isNotNull(messageTable.status),
+        ),
+        columns: { status: true },
+      }),
+      tdb.outreach_attempt.findMany({
+        where: and(
+          eq(outreachAttemptTable.campaign_id, campaignIdNum),
+          isNotNull(outreachAttemptTable.disposition),
+          ne(outreachAttemptTable.disposition, ""),
+        ),
+        columns: { disposition: true },
+      }),
+    ]);
 
-  if (completedQueueResult.error) {
-    logger.error("Error fetching completed queue count for message stats:", completedQueueResult.error);
-  }
-  if (messageStatuses.error) {
-    logger.error("Error fetching message statuses for message stats:", messageStatuses.error);
-  }
-  if (attemptDispositions.error) {
-    logger.error(
-      "Error fetching outreach attempt dispositions for message stats:",
-      attemptDispositions.error,
-    );
-  }
-
-  const dispositionCounts = (messageStatuses.data ?? []).reduce(
+  const dispositionCounts = messageStatuses.reduce(
     (acc, row) => {
       const disposition = row.status?.trim().toLowerCase();
       if (!disposition) return acc;
@@ -83,7 +104,7 @@ export const fetchBasicResults = async (
     },
     {} as Record<string, number>,
   );
-  const attemptDispositionCounts = (attemptDispositions.data ?? []).reduce(
+  const attemptDispositionCounts = attemptDispositions.reduce(
     (acc, row) => {
       const disposition = row.disposition?.trim().toLowerCase();
       if (!disposition) return acc;
@@ -93,18 +114,15 @@ export const fetchBasicResults = async (
     {} as Record<string, number>,
   );
 
-  // Backfill key outcome buckets from outreach_attempt when message.status lacks them.
   const outcomeFallbackKeys = ["failed", "undelivered", "delivered", "sent"] as const;
   for (const key of outcomeFallbackKeys) {
     if ((dispositionCounts[key] ?? 0) > 0) continue;
     if ((attemptDispositionCounts[key] ?? 0) > 0) {
-      dispositionCounts[key] = (attemptDispositionCounts[key] ?? 0);
+      dispositionCounts[key] = attemptDispositionCounts[key] ?? 0;
     }
   }
 
-  // Align queued with settings queue semantics.
-  dispositionCounts[QUEUE_STATUS_QUEUED] = queueCounts.queuedCount ?? 0;
-  const completedQueueCount = completedQueueResult.count ?? 0;
+  dispositionCounts.queued = queueCounts.queuedCount ?? 0;
   if (completedQueueCount > 0 && dispositionCounts.dequeued == null) {
     dispositionCounts.dequeued = completedQueueCount;
   }
@@ -129,243 +147,292 @@ export const fetchBasicResults = async (
   );
 
   return messageResults.length > 0 ? messageResults : baseResults;
-};
+}
 
-export const fetchCampaignCounts = async (
-  supabaseClient: SupabaseClient,
-  campaignId: string,
-) => {
-  const { count, error } = await supabaseClient
-    .from("campaign_queue")
-    .select("*", { count: "exact", head: true })
-    .eq("campaign_id", campaignId);
-  const { count: callCount, error: callCountError } = await supabaseClient
-    .from("outreach_attempt")
-    .select("*", { count: "exact", head: true })
-    .eq("campaign_id", campaignId);
+/**
+ * Per-question IVR response counts for a campaign.
+ *
+ * `get_campaign_stats` only aggregates `outreach_attempt.disposition`, so the
+ * responses written to `outreach_attempt.result` need a separate read to reach
+ * the results screen.
+ */
+export async function fetchIvrResponseResults({
+  workspaceId,
+  campaignId,
+  tdb: tdbIn,
+}: {
+  workspaceId: string;
+  campaignId: string;
+  tdb?: TenantDb;
+}): Promise<IvrQuestionResults[]> {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  const campaignIdNum = Number(campaignId);
 
-  if (error) {
-    logger.error("Error fetching campaign counts:", error);
+  try {
+    const campaign = await tdb.campaign.findFirst({
+      where: eq(campaignTable.id, campaignIdNum),
+      columns: { type: true, script_id: true },
+    });
+    if (!campaignTypeCollectsIvrResponses(campaign?.type)) {
+      return [];
+    }
+
+    const [attempts, script] = await Promise.all([
+      tdb.outreach_attempt.findMany({
+        where: and(
+          eq(outreachAttemptTable.campaign_id, campaignIdNum),
+          isNotNull(outreachAttemptTable.result),
+        ),
+        columns: { result: true },
+      }),
+      campaign?.script_id
+        ? tdb.script.findFirst({
+            where: eq(scriptTable.id, campaign.script_id),
+            columns: { steps: true },
+          })
+        : null,
+    ]);
+
+    return aggregateIvrResponses(
+      attempts,
+      (script?.steps as IvrScriptShape) ?? null,
+    );
+  } catch (error) {
+    logger.error("Error fetching IVR response results:", error);
+    return [];
+  }
+}
+
+export async function fetchCampaignCounts({
+  workspaceId,
+  campaignId,
+  tdb: tdbIn,
+}: {
+  workspaceId: string;
+  campaignId: string;
+  tdb?: TenantDb;
+}) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  const campaignIdNum = Number(campaignId);
+
+  let callCount: number | null = null;
+  let callCountError: unknown = null;
+  try {
+    callCount = await tdb.outreach_attempt.count({
+      where: eq(outreachAttemptTable.campaign_id, campaignIdNum),
+    });
+  } catch (error) {
+    callCountError = error;
+  }
+
+  let queueCount: number | null = null;
+  let queueCountError: unknown = null;
+  try {
+    queueCount = await countCampaignQueueRows(campaignIdNum);
+  } catch (error) {
+    queueCountError = error;
+  }
+
+  if (queueCountError) {
+    logger.error("Error fetching campaign counts:", queueCountError);
   }
   if (callCountError) {
     logger.error("Error fetching call counts:", callCountError);
   }
 
   return {
-    callCount: count,
+    callCount: queueCount,
     completedCount: callCount,
   };
-};
+}
 
-export const fetchCampaignData = async (
-  supabaseClient: SupabaseClient,
-  campaignId: string,
-) => {
-  const { data, error } = await supabaseClient
-    .from("campaign")
-    .select(
-      `
-      *,
-      campaign_audience(*)
-    `,
-    )
-    .eq("id", campaignId)
-    .single();
-  if (error) logger.error("Error fetching campaign data:", error);
-  return data;
-};
+export async function fetchCampaignData({
+  workspaceId,
+  campaignId,
+  tdb: tdbIn,
+}: {
+  workspaceId: string;
+  campaignId: string;
+  tdb?: TenantDb;
+}) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
 
-export const fetchCampaignDetails = async (
-  supabaseClient: SupabaseClient,
-  campaignId: string | number,
-  workspaceId: string,
-  tableName: CampaignTableKey,
-) => {
-  const typedClient = supabaseClient as SupabaseClient<any>;
-  const { data, error } = await typedClient
-    .from(tableName)
-    .select()
-    .eq("campaign_id", campaignId)
-    .single();
-  if (error) {
-    if (error.code === "PGRST116") {
-      const { data: newCampaign, error: newCampaignError } =
-        await typedClient
-          .from(tableName)
-          .insert({ campaign_id: campaignId, workspace: workspaceId })
-          .select()
-          .single();
-
-      if (newCampaignError) {
-        logger.error(`Error creating new ${tableName}:`, newCampaignError);
-        return null;
-      }
-      return newCampaign;
+  try {
+    const row = await tdb.campaign.findFirst({
+      where: eq(campaignTable.id, Number(campaignId)),
+    });
+    if (!row) {
+      return null;
     }
-    logger.error(`Error fetching ${tableName}:`, error);
+
+    const campaignAudience = await db
+      .select()
+      .from(campaignAudienceTable)
+      .where(eq(campaignAudienceTable.campaign_id, Number(campaignId)));
+
+    return { ...row, campaign_audience: campaignAudience };
+  } catch (error) {
+    logger.error("Error fetching campaign data:", error);
     return null;
   }
-  return data;
-};
+}
 
-export const fetchQueueCounts = async (
-  supabaseClient: SupabaseClient<Database>,
-  campaignId: string,
-) => {
-  const { error: fullCountError, count: fullCountCount } = await supabaseClient
-    .from("campaign_queue")
-    .select("*, contact!inner(*)", { count: "exact", head: true })
-    .eq("campaign_id", Number(campaignId))
-    .not("contact.phone", "is", null)
-    .neq("contact.phone", "")
-    .limit(1);
+export async function fetchCampaignDetails({
+  workspaceId,
+  campaignId,
+  tdb: tdbIn,
+}: {
+  workspaceId: string;
+  campaignId: string | number;
+  tdb?: TenantDb;
+}) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
 
-  const { error: queuedCountError, count: queuedCountCount } =
-    await supabaseClient
-      .from("campaign_queue")
-      .select("*, contact!inner(*)", { count: "exact", head: true })
-      .eq("campaign_id", Number(campaignId))
-      .eq("status", QUEUE_STATUS_QUEUED)
-      .not("contact.phone", "is", null)
-      .neq("contact.phone", "")
-      .limit(1);
+  try {
+    const row = await tdb.campaign.findFirst({
+      where: eq(campaignTable.id, Number(campaignId)),
+      columns: {
+        id: true,
+        script_id: true,
+        body_text: true,
+        message_media: true,
+        voicedrop_audio: true,
+        disposition_options: true,
+        live_questions: true,
+        workspace: true,
+        type: true,
+      },
+    });
 
-  if (fullCountError)
-    throw new Error(
-      `Error fetching full count: ${fullCountError?.message || "Unknown error fetching full count"}`,
-    );
-  if (queuedCountError)
-    throw new Error(
-      `Error fetching queued count: ${queuedCountError?.message || "Unknown error fetching queued count"}`,
-    );
+    if (!row) {
+      return null;
+    }
 
-  return {
-    fullCount: fullCountCount,
-    queuedCount: queuedCountCount,
-  };
-};
+    return {
+      campaign_id: row.id,
+      script_id: row.script_id,
+      body_text: row.body_text,
+      message_media: row.message_media,
+      voicedrop_audio: row.voicedrop_audio,
+      disposition_options: row.disposition_options,
+      questions: row.live_questions,
+      workspace: row.workspace,
+    };
+  } catch (error) {
+    logger.error("Error fetching campaign details:", error);
+    return null;
+  }
+}
 
-export const fetchCampaignAudience = async (
-  supabaseClient: SupabaseClient<Database>,
-  campaignId: string,
-  workspaceId: string,
-) => {
-  const scriptsPromise = supabaseClient
-    .from("script")
-    .select(`*`)
-    .eq("workspace", workspaceId);
-
-  const queuePromise = supabaseClient
-    .from("campaign_queue")
-    .select(`*, contact!inner(*)`, { count: "exact" })
-    .eq("campaign_id", Number(campaignId))
-    .not("contact.phone", "is", null)
-    .neq("contact.phone", "")
-    .limit(25);
-
-  const isQueuedCountPromise = supabaseClient
-    .from("campaign_queue")
-    .select(`id, contact_id, contact!inner(*)`, { count: "exact" })
-    .eq("campaign_id", Number(campaignId))
-    .eq("status", QUEUE_STATUS_QUEUED)
-    .not("contact.phone", "is", null)
-    .neq("contact.phone", "")
-    .limit(1);
-
-  const dequeuedCountPromise = supabaseClient
-    .from("campaign_queue")
-    .select(`id, contact_id, contact!inner(*)`, { count: "exact", head: true })
-    .eq("campaign_id", Number(campaignId))
-    .or(COMPLETED_QUEUE_COUNT_FILTER)
-    .not("contact.phone", "is", null)
-    .neq("contact.phone", "")
-    .limit(1);
-
-  const [queueResult, isQueuedCount, dequeuedCount, scripts] = await Promise.all([
-    queuePromise,
-    isQueuedCountPromise,
-    dequeuedCountPromise,
-    scriptsPromise,
+export async function fetchQueueCounts({
+  workspaceId: _workspaceId,
+  campaignId,
+}: {
+  workspaceId: string;
+  campaignId: string;
+}) {
+  const campaignIdNum = Number(campaignId);
+  const [fullCount, queuedCount, completedCount] = await Promise.all([
+    countDialableCampaignQueueRows(campaignIdNum),
+    countDialableQueuedCampaignQueueRows(campaignIdNum),
+    countDialableCompletedCampaignQueueRows(campaignIdNum),
   ]);
 
-  if (queueResult.error)
-    throw new Error(`Error fetching queue data: ${queueResult.error.message}`);
-  if (isQueuedCount.error)
-    throw new Error(
-      `Error fetching queued count: ${isQueuedCount.error.message}`,
-    );
-  if (dequeuedCount.error)
-    throw new Error(
-      `Error fetching dequeued count: ${dequeuedCount.error.message}`,
-    );
-  if (scripts.error)
-    throw new Error(`Error fetching scripts: ${scripts.error.message}`);
   return {
-    campaign_queue: queueResult.data,
-    queue_count: isQueuedCount.count,
-    dequeued_count: dequeuedCount.count,
-    total_count: queueResult.count,
-    scripts: scripts.data,
+    fullCount,
+    queuedCount,
+    completedCount,
   };
-};
+}
 
-export const fetchAdvancedCampaignDetails = async (
-  supabaseClient: SupabaseClient<Database>,
-  campaignId: string | number,
-  campaignType: "live_call" | "message" | "robocall",
-  workspaceId: string,
-) => {
-  let table: CampaignTableKey;
-  let extraSelect = "";
-  switch (campaignType) {
-    case "live_call":
-    case null:
-      table = "live_campaign";
-      extraSelect = ", script(*)";
-      break;
-    case "message":
-      table = "message_campaign";
-      break;
-    case "robocall":
-      table = "ivr_campaign";
-      extraSelect = ", script(*)";
-      break;
-    default:
-      throw new Error(`Invalid campaign type: ${campaignType}`);
+export async function fetchCampaignAudience({
+  workspaceId,
+  campaignId,
+  tdb: tdbIn,
+}: {
+  workspaceId: string;
+  campaignId: string;
+  tdb?: TenantDb;
+}) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  const campaignIdNum = Number(campaignId);
+
+  const [campaignQueue, queueCount, dequeuedCount, totalCount, scripts] = await Promise.all([
+    fetchDialableCampaignQueueWithContacts({ campaignId: campaignIdNum, limit: 25 }),
+    countDialableQueuedCampaignQueueRows(campaignIdNum),
+    countDialableCompletedCampaignQueueRows(campaignIdNum),
+    countDialableCampaignQueueRows(campaignIdNum),
+    tdb.script.findMany({}),
+  ]);
+
+  return {
+    campaign_queue: campaignQueue,
+    queue_count: queueCount,
+    dequeued_count: dequeuedCount,
+    total_count: totalCount,
+    scripts,
+  };
+}
+
+export async function fetchAdvancedCampaignDetails({
+  workspaceId,
+  campaignId,
+  campaignType,
+  tdb: tdbIn,
+}: {
+  workspaceId: string;
+  campaignId: string | number;
+  campaignType: "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr";
+  /** Storage signed URLs for message media */
+  tdb?: TenantDb;
+}) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+
+  let row;
+  try {
+    row = await tdb.campaign.findFirst({
+      where: eq(campaignTable.id, Number(campaignId)),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    throw new Error(`Error fetching campaign details: ${message}`);
   }
 
-  const typedClient = supabaseClient as SupabaseClient<any>;
-  const { data: rawData, error } = await typedClient
-    .from(table)
-    .select(`*${extraSelect}`)
-    .eq("campaign_id", campaignId)
-    .single();
-  const data = rawData as
-    | (Database["public"]["Tables"]["message_campaign"]["Row"] & {
-        mediaLinks?: string[];
-      })
-    | (Database["public"]["Tables"]["live_campaign"]["Row"] & { script?: Script | null })
-    | (Database["public"]["Tables"]["ivr_campaign"]["Row"] & { script?: Script | null })
-    | null;
+  if (!row) {
+    throw new Error("Error fetching campaign details: Campaign not found");
+  }
 
-  if (error) throw new Error(`Error fetching campaign details: ${error.message}`);
+  let script: Script | null = null;
+  if (row.script_id) {
+    try {
+      script = (await tdb.script.findFirst({
+        where: eq(scriptTable.id, row.script_id),
+      })) as Script | null;
+    } catch (scriptError) {
+      const message = scriptError instanceof Error ? scriptError.message : "Unknown error";
+      throw new Error(`Error fetching campaign details: ${message}`);
+    }
+  }
 
-  const messageData =
-    campaignType === "message"
-      ? (data as
-          | (Database["public"]["Tables"]["message_campaign"]["Row"] & {
-              mediaLinks?: string[];
-            })
-          | null)
-      : null;
+  const data = {
+    campaign_id: row.id,
+    script_id: row.script_id,
+    body_text: row.body_text,
+    message_media: row.message_media,
+    voicedrop_audio: row.voicedrop_audio,
+    disposition_options: row.disposition_options,
+    questions: row.live_questions,
+    workspace: row.workspace,
+    script,
+    mediaLinks: undefined as string[] | undefined,
+  };
 
-  if (messageData?.message_media?.length) {
-    messageData.mediaLinks = await getSignedUrls(
-      supabaseClient,
+  if (campaignType === "message" && Array.isArray(data.message_media) && data.message_media.length) {
+    data.mediaLinks = await getSignedUrls(
       workspaceId,
-      messageData.message_media,
+      data.message_media,
     );
   }
 
   return data;
-};
+}

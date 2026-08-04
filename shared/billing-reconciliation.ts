@@ -1,3 +1,25 @@
+// Inline bucket classifier to avoid cross-file import incompatibility between Node (extensionless) and Deno (.ts extension).
+// Keep in sync with `shared/billing-keys.ts` `bucketFromIdempotencyKey`.
+type LedgerBucket = "sms" | "voice" | "numbers" | "purchase" | "ai" | "other";
+
+function bucketFromIdempotencyKey(
+  idempotencyKey: string | null | undefined,
+): LedgerBucket {
+  const key = idempotencyKey?.trim() ?? "";
+  if (key.startsWith("sms:")) return "sms";
+  if (key.startsWith("call:")) return "voice";
+  if (key.startsWith("number_rent:") || key.startsWith("number_rent_purchase:")) return "numbers";
+  if (key.startsWith("stripe_evt:") || key.startsWith("stripe_session:")) return "purchase";
+  if (
+    key.startsWith("transcription:") ||
+    key.startsWith("transcription_batch:") ||
+    key.startsWith("coaching:")
+  ) {
+    return "ai";
+  }
+  return "other";
+}
+
 export type TwilioUsageRecord = {
   category: string;
   description: string;
@@ -35,6 +57,13 @@ export type BillingEntityAudit = {
   billableCalls: number;
   debitedCalls: number;
   callGap: number;
+  /**
+   * Started minutes across billable calls, on Twilio's own rounding
+   * (`ceil(seconds / 60)`, minimum 1). This is the only figure comparable to
+   * Twilio's `calls-outbound` usage; the ledger cannot supply it, because voice
+   * credits are 2–5 per minute depending on whether the call was IVR or staffed.
+   */
+  billedVoiceMinutes: number;
 };
 
 export type BillingReconciliationReport = {
@@ -87,30 +116,17 @@ function sumTwilioCostUsd(
 }
 
 export function categorizeLedgerRow(row: LedgerTransactionRow): {
-  bucket: "sms" | "voice" | "numbers" | "purchase" | "other";
+  bucket: LedgerBucket;
   credits: number;
 } {
   const key = row.idempotency_key?.trim() ?? "";
   const credits = Math.abs(row.amount);
 
   if (row.type === "CREDIT") {
-    if (key.startsWith("stripe_evt:") || key.startsWith("stripe_session:")) {
-      return { bucket: "purchase", credits };
-    }
     return { bucket: "purchase", credits };
   }
 
-  if (key.startsWith("sms:")) {
-    return { bucket: "sms", credits };
-  }
-  if (key.startsWith("call:")) {
-    return { bucket: "voice", credits };
-  }
-  if (key.startsWith("number_rent:") || key.startsWith("number_rent_purchase:")) {
-    return { bucket: "numbers", credits };
-  }
-
-  return { bucket: "other", credits };
+  return { bucket: bucketFromIdempotencyKey(key), credits };
 }
 
 export function filterLedgerRowsInPeriod(
@@ -131,6 +147,7 @@ export function summarizeLedger(rows: LedgerTransactionRow[]) {
     voice: { events: 0, credits: 0 },
     numbers: { events: 0, credits: 0 },
     purchase: { events: 0, credits: 0 },
+    ai: { events: 0, credits: 0 },
     other: { events: 0, credits: 0 },
   };
 
@@ -190,14 +207,21 @@ export function buildBillingReconciliationReport(args: {
         twilioUnitLabel: "segments",
         ledgerEvents: ledgerSummary.sms.events,
         ledgerCredits: ledgerSummary.sms.credits,
-        variance: smsTwilioUnits - ledgerSummary.sms.events,
+        // Segments against segments. SMS_SEGMENT_CREDITS is 1, so the credit
+        // total IS the segment count — whereas the row count is one per
+        // message, making every multi-segment SMS look like drift.
+        variance: smsTwilioUnits - ledgerSummary.sms.credits,
       },
       voice: {
         twilioUnits: voiceTwilioMinutes,
         twilioUnitLabel: "minutes",
         ledgerEvents: ledgerSummary.voice.events,
         ledgerCredits: ledgerSummary.voice.credits,
-        variance: voiceTwilioMinutes - ledgerSummary.voice.events,
+        // Minutes against minutes. Neither the row count (one per call, so a
+        // 10-minute call read as 9 minutes of drift) nor the credit total
+        // (2–5 credits per minute depending on IVR vs staffed) is comparable
+        // to Twilio's minutes.
+        variance: voiceTwilioMinutes - args.entityAudit.billedVoiceMinutes,
       },
       numbers: {
         twilioUnits: numbersTwilioUnits,
@@ -213,22 +237,56 @@ export function buildBillingReconciliationReport(args: {
       ledgerSummary.sms.credits +
       ledgerSummary.voice.credits +
       ledgerSummary.numbers.credits +
+      ledgerSummary.ai.credits +
       ledgerSummary.other.credits,
     ledgerCreditPurchases: ledgerSummary.purchase.credits,
     unrecognizedDebitEvents: ledgerSummary.other.events,
   };
 }
 
+/** Twilio-vs-ledger unit/event gaps above this count trigger material-variance alerts. */
+export const BILLING_RECONCILIATION_VARIANCE_THRESHOLD = 2;
+
+export function exceedsBillingVarianceThreshold(value: number): boolean {
+  return Math.abs(value) > BILLING_RECONCILIATION_VARIANCE_THRESHOLD;
+}
+
 export function hasMaterialBillingVariance(
   report: BillingReconciliationReport,
 ): boolean {
   return (
-    Math.abs(report.categories.sms.variance) > 2 ||
-    Math.abs(report.categories.voice.variance) > 2 ||
-    Math.abs(report.entityAudit.messageGap) > 2 ||
-    Math.abs(report.entityAudit.callGap) > 2 ||
+    exceedsBillingVarianceThreshold(report.categories.sms.variance) ||
+    exceedsBillingVarianceThreshold(report.categories.voice.variance) ||
+    exceedsBillingVarianceThreshold(report.entityAudit.messageGap) ||
+    exceedsBillingVarianceThreshold(report.entityAudit.callGap) ||
     report.unrecognizedDebitEvents > 0
   );
+}
+
+export type BillingReconciliationAlertDetails = {
+  period: BillingReconciliationPeriod;
+  smsVariance: number;
+  voiceVariance: number;
+  messageGap: number;
+  callGap: number;
+  unrecognizedDebitEvents: number;
+  twilioTotalCostUsd: number;
+  ledgerDebitCredits: number;
+};
+
+export function buildBillingReconciliationAlertDetails(
+  report: BillingReconciliationReport,
+): BillingReconciliationAlertDetails {
+  return {
+    period: report.period,
+    smsVariance: report.categories.sms.variance,
+    voiceVariance: report.categories.voice.variance,
+    messageGap: report.entityAudit.messageGap,
+    callGap: report.entityAudit.callGap,
+    unrecognizedDebitEvents: report.unrecognizedDebitEvents,
+    twilioTotalCostUsd: report.twilioTotalCostUsd,
+    ledgerDebitCredits: report.ledgerDebitCredits,
+  };
 }
 
 export type BillingReconciliationSnapshot = {

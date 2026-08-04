@@ -1,73 +1,88 @@
-import { requireWorkspaceAccess, safeParseJson } from "@/lib/database.server";
+import { data as routeData } from "react-router";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { safeParseJson } from "@/lib/request-utils.server";
 import { initiateIvrBodySchema } from "@/lib/schemas/api/common";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
+import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { rpcGetCampaignQueue } from "@/lib/db-rpc.server";
+import { createTenantDb } from "@/server/tenant-db";
 import { normalizePhoneNumber } from "@/lib/utils";
-import type { ActionFunctionArgs } from "react-router";
+import { isWithinRecipientCallingWindow } from "@/lib/recipient-calling-window";
+import { defineAction } from "@/lib/handler.server";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const parsed = initiateIvrBodySchema.safeParse(await safeParseJson(request));
-  if (!parsed.success) {
-    return { error: "Invalid initiate IVR payload" };
-  }
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  // Kicks off IVR dials by POSTing each queued contact to /api/ivr (which does
+  // the Twilio call + db writes); this handler itself only reads the queue.
+  sideEffects: ["db-read", "external"],
+  handler: async ({ request, auth }) => {
+    const user = auth.user;
 
-  const { campaign_id, user_id, workspace_id } = parsed.data;
-  const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-  const supabase = getAuthSupabaseClient(auth);
-  const user = auth.user;
-
-  await requireWorkspaceAccess({ supabaseClient: supabase,
-    user,
-    workspaceId: workspace_id,
-  });
-
-  const { data: campaign } = await supabase
-    .from("campaign")
-    .select("id")
-    .eq("id", campaign_id)
-    .eq("workspace", workspace_id)
-    .maybeSingle();
-
-  if (!campaign) {
-    return { error: "Campaign not found in workspace" };
-  }
-
-  const { data, error } = await supabase.rpc("get_campaign_queue", {
-    campaign_id_pro: campaign_id,
-  });
-  if (error) throw error;
-
-  logger.debug("Campaign queue data:", data);
-  for (let i = 0; i < (data?.length ?? 0); i++) {
-    const contact = data[i];
-    if (!contact) {
-      continue;
+    const parsed = initiateIvrBodySchema.safeParse(await safeParseJson(request));
+    if (!parsed.success) {
+      return { error: "Invalid initiate IVR payload" };
     }
-    const formData = new FormData();
-    formData.append("user_id", user_id.id);
-    formData.append("campaign_id", String(campaign_id));
-    formData.append("workspace_id", workspace_id);
-    formData.append("queue_id", String(contact.id));
-    formData.append("contact_id", String(contact.contact_id));
-    formData.append("caller_id", String(contact.caller_id));
-    formData.append("to_number", normalizePhoneNumber(contact.phone));
-    const res = await fetch(`${env.BASE_URL()}/api/ivr`, {
-      body: formData,
-      method: "POST",
-    })
-      .then((response) => response.json())
-      .catch((fetchError) => {
+
+    const { campaign_id, user_id, workspace_id } = parsed.data;
+
+    await requireWorkspaceAccess({
+      user,
+      workspaceId: workspace_id,
+    });
+
+    try {
+      await fetchCampaignByIdForWorkspace(workspace_id, campaign_id);
+    } catch {
+      return { error: "Campaign not found in workspace" };
+    }
+
+    const tdb = createTenantDb(workspace_id);
+
+    const data = await rpcGetCampaignQueue(tdb, campaign_id);
+
+    logger.debug("Campaign queue data:", data);
+    for (let i = 0; i < (data?.length ?? 0); i++) {
+      const contact = data[i];
+      if (!contact) {
+        continue;
+      }
+      // Recipient-local calling window: leave out-of-window contacts queued
+      // for a later run instead of posting a call that /api/ivr would refuse
+      // anyway (it re-checks as the choke point).
+      if (!isWithinRecipientCallingWindow(contact.phone)) {
+        continue;
+      }
+      const formData = new FormData();
+      formData.append("user_id", user_id.id);
+      formData.append("campaign_id", String(campaign_id));
+      formData.append("workspace_id", workspace_id);
+      formData.append("queue_id", String(contact.id));
+      formData.append("contact_id", String(contact.contact_id));
+      formData.append("caller_id", String(contact.caller_id));
+      formData.append("to_number", normalizePhoneNumber(contact.phone));
+      const response = await fetch(`${env.BASE_URL()}/api/ivr`, {
+        body: formData,
+        method: "POST",
+      }).catch((fetchError) => {
         logger.error("Error initiating IVR call:", fetchError);
         return null;
       });
-    if (res?.creditsError) {
-      return {
-        creditsError: true,
-      };
+      if (!response) {
+        continue;
+      }
+      const res = await response
+        .json()
+        .catch((parseError: unknown) => {
+          logger.error("Error parsing IVR response:", parseError);
+          return null;
+        });
+      if (response.status === 402 || res?.creditsError) {
+        return routeData({ creditsError: true }, { status: 402 });
+      }
     }
-  }
-  return data;
-};
+    return data;
+  },
+});

@@ -12,9 +12,54 @@ const mocks = vi.hoisted(() => ({
     ivrRuntimeHint: "unknown" as const,
     smsStatusCanonical: "edge" as const,
   })),
-  logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn(), warn: vi.fn()},
+  logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
   baseUrl: vi.fn(() => "https://base.example"),
 }));
+
+const adminDbMocks = vi.hoisted(() => ({
+  workspace: { id: "w1", name: "Workspace", twilio_data: {} as any },
+  updateCalls: [] as any[],
+  selectError: null as unknown | null,
+  updateError: null as unknown | null,
+}));
+
+const adminDb = vi.hoisted(() => ({
+  updateCalls: adminDbMocks.updateCalls,
+  select: () => ({
+    from: () => ({
+      where: () => ({
+        limit: async () => {
+          if (adminDbMocks.selectError) throw adminDbMocks.selectError;
+          return [adminDbMocks.workspace];
+        },
+      }),
+    }),
+  }),
+  update: () => ({
+    set: (set: any) => ({
+      where: async () => {
+        if (adminDbMocks.updateError) throw adminDbMocks.updateError;
+        adminDbMocks.updateCalls.push(set);
+        if (set.twilio_data != null) {
+          adminDbMocks.workspace.twilio_data =
+            typeof set.twilio_data === "string"
+              ? JSON.parse(set.twilio_data)
+              : set.twilio_data;
+        }
+      },
+    }),
+  }),
+  query: {
+    workspace: {
+      findFirst: async () => {
+        if (adminDbMocks.selectError) throw adminDbMocks.selectError;
+        return adminDbMocks.workspace;
+      },
+    },
+  },
+}));
+
+vi.mock("@/server/admin-db", () => ({ adminDb }));
 
 vi.mock("@/lib/twilio-webhook-audit.server", () => ({
   auditWorkspaceTwilioWebhooks: (...args: any[]) => mocks.auditWebhooks(...args),
@@ -65,7 +110,7 @@ function makeOnboarding(overrides: Record<string, unknown> = {}) {
   return {
     version: 1,
     status: "not_started",
-    currentStep: "business_profile",
+    currentStep: "business_identity",
     selectedChannels: ["a2p10dlc", "voice_compliance"],
     steps: [],
     businessProfile: {
@@ -174,33 +219,23 @@ function makeOnboarding(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeSupabase(
-  twilioData: unknown,
-  options?: { selectError?: unknown; updateError?: unknown },
-) {
-  const updateEq = vi.fn(async () => ({ error: options?.updateError ?? null }));
-  return {
-    from: vi.fn((table: string) => {
-      if (table !== "workspace") throw new Error(`Unexpected table: ${table}`);
-      return {
-        select: () => ({
-          eq: () => ({
-            single: vi.fn(async () => ({
-              data: { id: "w1", name: "Workspace", twilio_data: twilioData },
-              error: options?.selectError ?? null,
-            })),
-          }),
-        }),
-        update: () => ({ eq: updateEq }),
-      };
-    }),
-    _updateEq: updateEq,
-  };
+function setWorkspaceTwilioData(twilioData: unknown) {
+  adminDbMocks.workspace.twilio_data = twilioData;
+}
+
+function setWorkspaceCredentials(key = "AKtest", token = "secret") {
+  adminDbMocks.workspace.key = key;
+  adminDbMocks.workspace.token = token;
 }
 
 describe("twilio-bootstrap server", () => {
   beforeEach(() => {
     vi.resetModules();
+    adminDbMocks.workspace = { id: "w1", name: "Workspace", twilio_data: {} };
+    setWorkspaceCredentials();
+    adminDb.updateCalls.length = 0;
+    adminDbMocks.selectError = null;
+    adminDbMocks.updateError = null;
     mocks.createService.mockReset();
     mocks.updateService.mockReset();
     mocks.updateService.mockResolvedValue({});
@@ -228,15 +263,14 @@ describe("twilio-bootstrap server", () => {
       sid: "MG123",
       friendlyName: "Svc",
     });
-    const mod = await import("../app/lib/twilio-bootstrap.server");
-    const supabase = makeSupabase({
+    setWorkspaceTwilioData({
       sid: "AC123",
       authToken: "token",
       onboarding: makeOnboarding(),
     });
+    const mod = await import("../app/lib/twilio-bootstrap.server");
 
     const result = await mod.ensureWorkspaceTwilioBootstrap({
-      supabaseClient: supabase as any,
       workspaceId: "w1",
       actorUserId: "u1",
     });
@@ -245,13 +279,34 @@ describe("twilio-bootstrap server", () => {
     expect(result.outcome).toBe("success");
     expect(result.onboarding.messagingService.serviceSid).toBe("MG123");
     expect(result.onboarding.subaccountBootstrap.status).toBe("live");
+    // Bootstrap must not fast-forward the wizard: a fresh workspace stays on
+    // business_identity so the user starts at step 1.
+    expect(result.onboarding.currentStep).toBe("business_identity");
+    expect(adminDb.updateCalls.length).toBeGreaterThan(0);
+  });
+
+  test("ensureWorkspaceTwilioBootstrap advances only the legacy messaging_service step", async () => {
+    mocks.createService.mockResolvedValue({
+      sid: "MG123",
+      friendlyName: "Svc",
+    });
+    setWorkspaceTwilioData({
+      sid: "AC123",
+      authToken: "token",
+      onboarding: makeOnboarding({ currentStep: "messaging_service" }),
+    });
+    const mod = await import("../app/lib/twilio-bootstrap.server");
+
+    const result = await mod.ensureWorkspaceTwilioBootstrap({
+      workspaceId: "w1",
+      actorUserId: "u1",
+    });
+
     expect(result.onboarding.currentStep).toBe("first_number");
-    expect(supabase._updateEq).toHaveBeenCalled();
   });
 
   test("ensureWorkspaceTwilioBootstrap skips create when service already exists", async () => {
-    const mod = await import("../app/lib/twilio-bootstrap.server");
-    const supabase = makeSupabase({
+    setWorkspaceTwilioData({
       sid: "AC123",
       authToken: "token",
       onboarding: makeOnboarding({
@@ -263,29 +318,29 @@ describe("twilio-bootstrap server", () => {
         },
       }),
     });
+    const mod = await import("../app/lib/twilio-bootstrap.server");
 
     const result = await mod.ensureWorkspaceTwilioBootstrap({
-      supabaseClient: supabase as any,
       workspaceId: "w1",
       actorUserId: null,
     });
 
     expect(mocks.createService).not.toHaveBeenCalled();
     expect(result.onboarding.messagingService.serviceSid).toBe("MG_EXISTING");
-    expect(result.onboarding.currentStep).toBe("first_number");
+    // A user already on a later step must not be pulled back/forward by a re-run.
+    expect(result.onboarding.currentStep).toBe("provider_provisioning");
   });
 
   test("ensureWorkspaceTwilioBootstrap captures bootstrap failure details", async () => {
     mocks.createService.mockRejectedValueOnce(new Error("create failed"));
-    const mod = await import("../app/lib/twilio-bootstrap.server");
-    const supabase = makeSupabase({
+    setWorkspaceTwilioData({
       sid: "AC123",
       authToken: "token",
       onboarding: makeOnboarding(),
     });
+    const mod = await import("../app/lib/twilio-bootstrap.server");
 
     const result = await mod.ensureWorkspaceTwilioBootstrap({
-      supabaseClient: supabase as any,
       workspaceId: "w1",
       actorUserId: "u2",
     });
@@ -300,62 +355,63 @@ describe("twilio-bootstrap server", () => {
   test("ensureWorkspaceTwilioBootstrap throws on missing creds and query/update errors", async () => {
     const mod = await import("../app/lib/twilio-bootstrap.server");
 
+    setWorkspaceTwilioData({ onboarding: makeOnboarding() });
     await expect(
       mod.ensureWorkspaceTwilioBootstrap({
-        supabaseClient: makeSupabase({ onboarding: makeOnboarding() }) as any,
         workspaceId: "w1",
         actorUserId: null,
       }),
     ).rejects.toThrow("Workspace is missing Twilio account credentials");
 
+    adminDbMocks.selectError = new Error("select failed");
     await expect(
       mod.ensureWorkspaceTwilioBootstrap({
-        supabaseClient: makeSupabase(
-          {},
-          { selectError: new Error("select failed") },
-        ) as any,
         workspaceId: "w1",
         actorUserId: null,
       }),
     ).rejects.toThrow("select failed");
+    adminDbMocks.selectError = null;
 
+    setWorkspaceTwilioData({
+      sid: "AC123",
+      authToken: "token",
+      onboarding: makeOnboarding(),
+    });
+    adminDbMocks.updateError = new Error("update failed");
     await expect(
       mod.ensureWorkspaceTwilioBootstrap({
-        supabaseClient: makeSupabase(
-          { sid: "AC123", authToken: "token", onboarding: makeOnboarding() },
-          { updateError: new Error("update failed") },
-        ) as any,
         workspaceId: "w1",
         actorUserId: null,
       }),
     ).rejects.toThrow("update failed");
+    adminDbMocks.updateError = null;
   });
 
   test("syncWorkspaceTwilioBootstrapState updates drift based on service presence", async () => {
     const mod = await import("../app/lib/twilio-bootstrap.server");
 
+    setWorkspaceTwilioData({
+      sid: "AC123",
+      authToken: "token",
+      onboarding: makeOnboarding({
+        messagingService: {
+          ...makeOnboarding().messagingService,
+          serviceSid: "MG123",
+        },
+      }),
+    });
     const withService = await mod.syncWorkspaceTwilioBootstrapState({
-      supabaseClient: makeSupabase({
-        sid: "AC123",
-        authToken: "token",
-        onboarding: makeOnboarding({
-          messagingService: {
-            ...makeOnboarding().messagingService,
-            serviceSid: "MG123",
-          },
-        }),
-      }) as any,
       workspaceId: "w1",
     });
     expect(withService.subaccountBootstrap.status).toBe("live");
     expect(withService.subaccountBootstrap.driftMessages).toEqual([]);
 
+    setWorkspaceTwilioData({
+      sid: "AC123",
+      authToken: "token",
+      onboarding: makeOnboarding(),
+    });
     const withoutService = await mod.syncWorkspaceTwilioBootstrapState({
-      supabaseClient: makeSupabase({
-        sid: "AC123",
-        authToken: "token",
-        onboarding: makeOnboarding(),
-      }) as any,
       workspaceId: "w1",
     });
     expect(withoutService.subaccountBootstrap.driftMessages).toContain(
@@ -365,15 +421,14 @@ describe("twilio-bootstrap server", () => {
 
   test("ensureWorkspaceTwilioBootstrap keeps provisioning when service create has no sid", async () => {
     mocks.createService.mockResolvedValue({ sid: "   ", friendlyName: "   " });
-    const mod = await import("../app/lib/twilio-bootstrap.server");
-    const supabase = makeSupabase({
+    setWorkspaceTwilioData({
       sid: "AC123",
       authToken: "token",
       onboarding: makeOnboarding(),
     });
+    const mod = await import("../app/lib/twilio-bootstrap.server");
 
     const result = await mod.ensureWorkspaceTwilioBootstrap({
-      supabaseClient: supabase as any,
       workspaceId: "w1",
       actorUserId: "u1",
     });
@@ -390,15 +445,14 @@ describe("twilio-bootstrap server", () => {
 
   test("ensureWorkspaceTwilioBootstrap stores unknown error for non-Error throws", async () => {
     mocks.createService.mockRejectedValueOnce("boom");
-    const mod = await import("../app/lib/twilio-bootstrap.server");
-    const supabase = makeSupabase({
+    setWorkspaceTwilioData({
       sid: "AC123",
       authToken: "token",
       onboarding: makeOnboarding(),
     });
+    const mod = await import("../app/lib/twilio-bootstrap.server");
 
     const result = await mod.ensureWorkspaceTwilioBootstrap({
-      supabaseClient: supabase as any,
       workspaceId: "w1",
       actorUserId: null,
     });
@@ -410,24 +464,20 @@ describe("twilio-bootstrap server", () => {
 
   test("syncWorkspaceTwilioBootstrapState throws select errors", async () => {
     const mod = await import("../app/lib/twilio-bootstrap.server");
-
+    adminDbMocks.selectError = new Error("select failed");
     await expect(
       mod.syncWorkspaceTwilioBootstrapState({
-        supabaseClient: makeSupabase(
-          {},
-          { selectError: new Error("select failed") },
-        ) as any,
         workspaceId: "w1",
       }),
     ).rejects.toThrow("select failed");
+    adminDbMocks.selectError = null;
   });
 
   test("syncWorkspaceTwilioBootstrapState handles non-record twilio_data", async () => {
     const mod = await import("../app/lib/twilio-bootstrap.server");
-    const supabase = makeSupabase(null);
+    setWorkspaceTwilioData(null);
 
     const result = await mod.syncWorkspaceTwilioBootstrapState({
-      supabaseClient: supabase as any,
       workspaceId: "w1",
     });
 
@@ -435,6 +485,6 @@ describe("twilio-bootstrap server", () => {
     expect(result.subaccountBootstrap.driftMessages).toContain(
       "Messaging Service is missing from the expected bootstrap resources.",
     );
-    expect(supabase._updateEq).toHaveBeenCalled();
+    expect(adminDb.updateCalls.length).toBeGreaterThan(0);
   });
 });

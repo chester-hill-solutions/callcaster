@@ -1,224 +1,61 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource/zilla-slab/400.css";
+@import "@fontsource/zilla-slab/500.css";
+@import "@fontsource/zilla-slab/600.css";
+@import "@fontsource/zilla-slab/700.css";
+@import "@chester-hill-solutions/shad-cc/theme.css";
+
+@source "../vendor/chester-hill-solutions/shad-cc/src";
+@source "./**/*.{ts,tsx}";
+
+/* Preserve CallCaster legacy font utility class names */
+@theme inline {
+  --font-Tabac-Slab: var(--font-brand);
+  --font-Zilla-Slab: var(--font-heading);
+}
 
 @layer base {
-  @font-face {
-    font-family: "Tabac Slab";
-    font-weight: 400;
-    src: url("/fonts/Tabac%20Slab.otf") format("opentype");
-  }
-  @font-face {
-    font-family: "Tabac Slab";
-    font-weight: 900;
-    src: url("/fonts/Tabac%20Slab%20Black.otf") format("opentype");
-  }
-  @font-face {
-    font-family: "Tabac Slab";
-    font-style: italic;
-    font-weight: 900;
-    src: url("/fonts/Tabac%20Slab%20Black%20Italic.otf") format("opentype");
+  * {
+    @apply border-border outline-ring/50;
   }
 
-  @font-face {
-    font-family: "Tabac Big Slab";
-    font-weight: 900;
-    src: url("/fonts/Tabac%20Big%20Slab%20Black.otf") format("opentype");
+  body {
+    @apply bg-background text-foreground text-sm antialiased;
   }
 
-  @font-face {
-    font-family: "Josefin Sans";
-    src: url("/fonts/JosefinSans-VariableFont_wght.ttf") format("truetype");
+  html {
+    @apply font-sans;
   }
 
-  @font-face {
-    font-family: "Lilita One";
-    font-weight: 400;
-    src: url("/fonts/LilitaOne.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 100;
-    font-style: normal;
-    src: url("/fonts/Sarabun-Thin.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 100;
-    font-style: italic;
-    src: url("/fonts/Sarabun-ThinItalic.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 200;
-    font-style: normal;
-    src: url("/fonts/Sarabun-ExtraLight.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 200;
-    font-style: italic;
-    src: url("/fonts/Sarabun-ExtraLightItalic.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 300;
-    font-style: normal;
-    src: url("/fonts/Sarabun-Light.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 300;
-    font-style: italic;
-    src: url("/fonts/Sarabun-LightItalic.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 400;
-    font-style: normal;
-    src: url("/fonts/Sarabun-Regular.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 400;
-    font-style: italic;
-    src: url("/fonts/Sarabun-Italic.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 500;
-    font-style: normal;
-    src: url("/fonts/Sarabun-Medium.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 500;
-    font-style: italic;
-    src: url("/fonts/Sarabun-MediumItalic.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 600;
-    font-style: normal;
-    src: url("/fonts/Sarabun-SemiBold.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 600;
-    font-style: italic;
-    src: url("/fonts/Sarabun-SemiBoldItalic.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 700;
-    font-style: normal;
-    src: url("/fonts/Sarabun-Bold.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 700;
-    font-style: italic;
-    src: url("/fonts/Sarabun-BoldItalic.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 800;
-    font-style: normal;
-    src: url("/fonts/Sarabun-ExtraBold.ttf") format("truetype");
-  }
-
-  @font-face {
-    font-family: "Sarabun";
-    font-weight: 800;
-    font-style: italic;
-    src: url("/fonts/Sarabun-ExtraBoldItalic.ttf") format("truetype");
-  }
-
-  :root {
-    --brand-primary: 357 75% 45%;
-    --brand-secondary: 198 100% 87%;
-    --brand-tertiary: 354 83% 88%;
-
-    --brand-bronze: 30 61% 48%;
-    --brand-silver: 30 2% 62%;
-    --brand-gold: 45 100% 48%;
-
-    --background: 0 0% 100%;
-
-    --foreground: 240 10% 3.9%;
-    --card: 220 5% 90%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: var(--brand-primary);
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: var(--brand-secondary);
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 346.8 77.2% 49.8%;
-    --radius: 0.5rem;
-    --contrast-text: #333;
-  }
-
-  .dark,
-  :root[class~="dark"] {
-    --background: 220 5% 12%;
-    --foreground: 0 0% 95%;
-    --card: 44 1% 41%;
-    /* --card-foreground: 0 0% 95%; */
-    --popover: 0 0% 9%;
-    --popover-foreground: 0 0% 95%;
-    --primary: var(--brand-primary);
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: var(--brand-secondary);
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 12 6.5% 15.1%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 85.7% 97.3%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 346.8 77.2% 49.8%;
-    --contrast-text: #f1f1f1;
-
-    --brand-bronze: 30 61% 48% 50%;
-    --brand-silver: 30 2% 62% 50%;
-    --brand-gold: 45 100% 48% 50%;
+  code,
+  kbd,
+  .font-mono {
+    font-family: var(--font-mono);
   }
 }
 
-input:not([type="hidden"]),
-select,
-textarea {
-  border: 2px solid hsl(var(--border));
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+/* Baseline for raw form controls that don't use the ui/ primitives.
+   :where() keeps specificity at zero so Tailwind utilities always win. */
+:where(
+  input:not(
+      [type="hidden"],
+      [type="checkbox"],
+      [type="radio"],
+      [type="range"],
+      [type="file"]
+    ),
+  select,
+  textarea
+) {
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) * 0.75);
+  background-color: var(--background);
+  color: var(--foreground);
   padding: 4px 8px;
 }
 
-textarea::placeholder {
-  color: hsl(var(--muted-foreground));
+:where(textarea)::placeholder {
+  color: var(--muted-foreground);
 }

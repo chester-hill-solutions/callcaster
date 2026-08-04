@@ -77,6 +77,6 @@ Workspace Twilio ops portal → **Billing Reconciliation**:
 ## Local verification
 
 ```bash
-npm run typecheck && npm run typecheck:deno && npm run test -- test/billing-reconciliation.test.ts
+npm run typecheck && npm run test -- test/billing-reconciliation.test.ts
 node scripts/check-twilio-webhook-coverage.mjs
 ```

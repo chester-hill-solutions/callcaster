@@ -75,8 +75,7 @@ describe("app/routes/api+/docs/openapi/route.tsx", () => {
       openApiSpec: { openapi: "3.0.0", info: { title: "t" } },
     }));
     const mod = await import("../../app/routes/api+/docs/openapi.route");
-    const res = await asRouteResponse(
-      await mod.loader({ request: new Request("http://x", { method: "GET" }) } as never),
+    const res = await asRouteResponse(mod.loader({ request: new Request("http://x", { method: "GET" }) } as never),
     );
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({ openapi: "3.0.0" });

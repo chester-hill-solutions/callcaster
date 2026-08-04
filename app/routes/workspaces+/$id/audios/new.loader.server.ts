@@ -1,27 +1,21 @@
 import { data as routeData } from "react-router";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
+import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const { supabaseClient, headers } = await verifyAuth(request);
+export const loader = defineLoader({
+  auth: workspaceLoaderAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ auth: result }) => {
+    if (!result.ok) return result.response;
+    const { headers, workspaceId } = result.ctx;
 
-  const workspaceId = params.id;
-  if (workspaceId == null) {
-    return routeData(
-      { workspace: null, error: "Workspace does not exist" },
-      { headers },
-    );
-  }
+    const workspaceData = await getWorkspaceForClient(workspaceId);
+    if (!workspaceData) {
+      return routeData({ workspace: null, error: "Workspace not found" }, { headers, status: 404 });
+    }
 
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspaceId)
-    .single();
-  if (workspaceError) {
-    return routeData({ workspace: null, error: workspaceError }, { headers });
-  }
-
-  return routeData({ workspace: workspaceData, error: null }, { headers });
-}
+    return routeData({ workspace: workspaceData, error: null }, { headers });
+  },
+});

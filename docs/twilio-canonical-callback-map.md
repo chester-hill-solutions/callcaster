@@ -28,6 +28,9 @@
 | IVR status (Edge candidate) | Edge | `${SUPABASE_URL}/functions/v1/ivr-status` | Used by `ivr-flow` / `ivr-handler` |
 | IVR recording | Edge | `${SUPABASE_URL}/functions/v1/ivr-recording` | Edge path |
 | Handset inbound | Remix | `${BASE_URL}/api/inbound-handset` | |
+| Inbound ACD queue wait | Edge | `${SUPABASE_URL}/functions/v1/acd-router` | Twilio waitUrl + action; signature required (workspace subaccount token) |
+| Inbound ACD agent bridge | Edge | `${SUPABASE_URL}/functions/v1/acd-router/agent-bridge` | Agent leg TwiML; signature required (workspace subaccount token) |
+| Inbound ACD agent status | Edge | `${SUPABASE_URL}/functions/v1/acd-router/agent-status` | Agent leg statusCallback; signature required (workspace subaccount token) |
 | Verification inbound | Remix | `${BASE_URL}/api/inbound-verification` | Dev script only |
 
 ## Messaging Service inbound strategy

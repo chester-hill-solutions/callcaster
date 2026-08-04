@@ -1,14 +1,15 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { loadInboundIvrBlockContext } from "@/lib/inbound-ivr-db.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { requireTwilioSignatureForIvrResponse } from "@/lib/ivr-webhook-auth.server";
+import { findCallBySid } from "@/lib/telephony-db.server";
 import {
   appendInboundVoicemailTwiml,
   resolveInboundVoicemailAudio,
 } from "@/lib/inbound-voicemail-twiml.server";
 import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
+import { defineAction } from "@/lib/handler.server";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -18,26 +19,6 @@ interface Script {
     options?: Array<{ value: string; next?: string }>;
   }>;
 }
-
-const getWorkspaceNumberData = async (
-  supabase: SupabaseClient<Database>,
-  numberId: string,
-) => {
-  const { data: number } = await supabase
-    .from("workspace_number")
-    .select("id, inbound_script_id, inbound_audio, workspace")
-    .eq("id", Number(numberId))
-    .single();
-  if (!number?.inbound_script_id) throw new Error("Number has no inbound script");
-  const { data: script } = await supabase
-    .from("script")
-    .select("steps")
-    .eq("id", number.inbound_script_id)
-    .single();
-  const steps = script?.steps as Script | null | undefined;
-  if (!steps?.blocks || !steps?.pages) throw new Error("Invalid script structure");
-  return { number, script: steps, workspace: number.workspace };
-};
 
 const findNextBlock = (
   script: Script,
@@ -93,8 +74,7 @@ const renderTerminalTarget = async (
   target: string,
   numberId: string,
   workspace: string,
-  supabase: SupabaseClient<Database>,
-  baseUrl: string,
+    baseUrl: string,
 ) => {
   if (target === "hangup") {
     twiml.hangup();
@@ -116,7 +96,6 @@ const renderTerminalTarget = async (
 
   if (target.startsWith("voicemail:")) {
     const voicemail = await resolveInboundVoicemailAudio({
-      supabase,
       workspaceId: workspace,
       inboundAudio: null,
     });
@@ -144,56 +123,52 @@ const renderTerminalTarget = async (
   twiml.hangup();
 };
 
-export const action = async ({ request, params }: ActionFunctionArgs) => {
+export const action = defineAction({
+  auth: ({ request, params }) =>
+    requireTwilioSignatureForIvrResponse(request, [params.numberId, params.pageId, params.blockId]),
+  sideEffects: ["db-read", "external"],
+  handler: async ({ params, auth }) => {
   const baseUrl = env.BASE_URL();
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
   const twiml = new Twilio.twiml.VoiceResponse();
 
-  const pageId = params.pageId;
-  const blockId = params.blockId;
-  const numberId = params.numberId;
+  const pageId = params.pageId as string;
+  const blockId = params.blockId as string;
+  const numberId = params.numberId as string;
 
-  if (!numberId || !pageId || !blockId) {
-    return new Response("Missing required parameters", { status: 400 });
-  }
-
-  const formData = await request.formData();
-  const formParams = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const digitsValue = formParams.Digits;
-  const speechResultValue = formParams.SpeechResult;
-  const callSidValue = formParams.CallSid;
-
-  const userInput =
-    typeof digitsValue === "string"
-      ? digitsValue
-      : typeof speechResultValue === "string"
-        ? speechResultValue
-        : null;
-  const callSid = typeof callSidValue === "string" ? callSidValue : null;
-
-  if (!callSid) {
-    return new Response("Missing CallSid parameter", { status: 400 });
-  }
-
-  const validation = await validateTwilioWebhookForCallSid({
-    request,
-    supabase,
-    callSid,
-    params: formParams,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const { callSid, userInput } = auth;
 
   try {
-    const { number, script, workspace } = await getWorkspaceNumberData(supabase, numberId);
-    const currentBlock = script.blocks[blockId];
+    const call = await findCallBySid(callSid);
+    if (!call?.to) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
+    const context = await loadInboundIvrBlockContext(Number(numberId));
+    if (!context || call.to !== context.number.phoneNumber) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
+    const { script, number } = context;
+    const currentPage = script.pages[pageId];
+    const currentBlock = currentPage?.blocks.includes(blockId)
+      ? (script.blocks[blockId] as Script["blocks"][string] | undefined)
+      : undefined;
     if (!currentBlock) {
       throw new Error(`Block ${blockId} not found`);
     }
 
-    const nextStep = findNextStep(currentBlock, userInput, script, pageId);
-    await renderTerminalTarget(twiml, nextStep, numberId, workspace, supabase, baseUrl);
+    const nextStep = findNextStep(currentBlock, userInput, script as Script, pageId);
+    await renderTerminalTarget(
+      twiml,
+      nextStep,
+      numberId,
+      number.workspaceId,
+      baseUrl,
+    );
   } catch (e) {
     const errorMessage =
       e instanceof Error ? e.message : "An error occurred. Please try again later.";
@@ -205,4 +180,5 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "application/xml" },
   });
-};
+  },
+});

@@ -1,4 +1,4 @@
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 
 /**
  * Queue status semantics for campaign_queue.status.
@@ -21,6 +21,19 @@ export const QUEUE_STATUS_FILTERS = [
   "active",
   "completed",
 ] as const;
+
+/**
+ * Raw `campaign_queue.status` values that can be written back via the queue
+ * UI (re-queue or dequeue). Distinct from {@link QUEUE_STATUS_FILTERS}, which
+ * are derived display/filter states (assigned/active/completed are not writable
+ * status values).
+ */
+export const QUEUE_SETTABLE_STATUSES = [
+  QUEUE_STATUS_QUEUED,
+  QUEUE_STATUS_DEQUEUED,
+] as const;
+
+export type QueueSettableStatus = (typeof QUEUE_SETTABLE_STATUSES)[number];
 
 export type QueueStatusFilter = (typeof QUEUE_STATUS_FILTERS)[number];
 export type QueueDisplayState = QueueStatusFilter;
@@ -47,7 +60,7 @@ export const LEGACY_QUEUE_ASSIGNMENT_LIKE_PATTERN =
   "________-____-____-____-____________";
 
 /**
- * Supabase OR filter for rows that should count as "completed" in queue progress.
+ * Postgres OR filter for rows that should count as "completed" in queue progress.
  * `status` is not reliable on its own because Twilio/webhook updates can overwrite it,
  * while `dequeued_at` remains the durable marker that queue work is finished.
  */
@@ -118,11 +131,7 @@ export function isQueued(
   value: QueueStateLike | string | null | undefined,
 ): boolean {
   const queue = toQueueStateLike(value);
-  if (queue.queue_state) {
-    return queue.queue_state === QUEUE_STATUS_QUEUED && !queue.dequeued_at;
-  }
-
-  return queue.status === QUEUE_STATUS_QUEUED && !queue.dequeued_at;
+  return queue.queue_state === QUEUE_STATUS_QUEUED && !queue.dequeued_at;
 }
 
 /**
@@ -133,11 +142,7 @@ export function isDequeued(
   dequeuedAt?: string | null | undefined,
 ): boolean {
   const queue = toQueueStateLike(value, dequeuedAt);
-  return (
-    queue.queue_state === QUEUE_STATUS_DEQUEUED ||
-    queue.status === QUEUE_STATUS_DEQUEUED ||
-    Boolean(queue.dequeued_at)
-  );
+  return queue.queue_state === QUEUE_STATUS_DEQUEUED || Boolean(queue.dequeued_at);
 }
 
 /**
@@ -226,51 +231,15 @@ export function matchesQueueStatusFilter(
   return getQueueDisplayState(value) === queueStatus;
 }
 
-export function applyQueueStatusFilter(
-  query: any,
-  queueStatus: QueueStatusFilter,
-): any {
-  if (queueStatus === "queued") {
-    return query.eq("status", QUEUE_STATUS_QUEUED).is("dequeued_at", null);
-  }
-
-  if (queueStatus === "completed") {
-    return query.or(COMPLETED_QUEUE_COUNT_FILTER);
-  }
-
-  if (queueStatus === "assigned") {
-    return query
-      .like("status", LEGACY_QUEUE_ASSIGNMENT_LIKE_PATTERN)
-      .is("dequeued_at", null);
-  }
-
-  return query
-    .not(
-      "status",
-      "in",
-      `("${QUEUE_STATUS_QUEUED}","${QUEUE_STATUS_DEQUEUED}")`,
-    )
-    .not("status", "like", LEGACY_QUEUE_ASSIGNMENT_LIKE_PATTERN)
-    .is("dequeued_at", null);
-}
-
 export function buildQueuedQueueUpdate(options?: {
   includeNormalizedFields?: boolean;
 }): Database["public"]["Tables"]["campaign_queue"]["Update"] {
-  const baseUpdate: Database["public"]["Tables"]["campaign_queue"]["Update"] = {
-    status: QUEUE_STATUS_QUEUED,
+  void options;
+  return {
+    assigned_to_user_id: null,
     dequeued_at: null,
     dequeued_by: null,
     dequeued_reason: null,
-  };
-
-  if (!options?.includeNormalizedFields) {
-    return baseUpdate;
-  }
-
-  return {
-    ...baseUpdate,
-    assigned_to_user_id: null,
     provider_status: null,
     queue_state: QUEUE_STATUS_QUEUED,
   };
@@ -280,20 +249,12 @@ export function buildAssignedQueueUpdate(
   assignedToUserId: string,
   options?: { includeNormalizedFields?: boolean },
 ): Database["public"]["Tables"]["campaign_queue"]["Update"] {
-  const baseUpdate: Database["public"]["Tables"]["campaign_queue"]["Update"] = {
-    status: assignedToUserId,
+  void options;
+  return {
+    assigned_to_user_id: assignedToUserId,
     dequeued_at: null,
     dequeued_by: null,
     dequeued_reason: null,
-  };
-
-  if (!options?.includeNormalizedFields) {
-    return baseUpdate;
-  }
-
-  return {
-    ...baseUpdate,
-    assigned_to_user_id: assignedToUserId,
     provider_status: null,
     queue_state: QUEUE_LIFECYCLE_ASSIGNED,
   };
@@ -303,16 +264,8 @@ export function buildProviderStatusQueueUpdate(
   providerStatus: string,
   options?: { includeNormalizedFields?: boolean },
 ): Database["public"]["Tables"]["campaign_queue"]["Update"] {
-  const baseUpdate: Database["public"]["Tables"]["campaign_queue"]["Update"] = {
-    status: providerStatus,
-  };
-
-  if (!options?.includeNormalizedFields) {
-    return baseUpdate;
-  }
-
+  void options;
   return {
-    ...baseUpdate,
     provider_status: providerStatus,
     queue_state: QUEUE_LIFECYCLE_ASSIGNED,
   };
@@ -323,21 +276,18 @@ export function buildDequeuedQueueUpdate(
   dequeuedReason: string,
   options?: { includeNormalizedFields?: boolean },
 ): Database["public"]["Tables"]["campaign_queue"]["Update"] {
-  const baseUpdate: Database["public"]["Tables"]["campaign_queue"]["Update"] = {
-    status: QUEUE_STATUS_DEQUEUED,
+  void options;
+  return {
+    assigned_to_user_id: null,
     dequeued_at: new Date().toISOString(),
     dequeued_by: dequeuedBy,
     dequeued_reason: dequeuedReason,
-  };
-
-  if (!options?.includeNormalizedFields) {
-    return baseUpdate;
-  }
-
-  return {
-    ...baseUpdate,
-    assigned_to_user_id: null,
     provider_status: null,
     queue_state: QUEUE_STATUS_DEQUEUED,
   };
 }
+
+// NOTE: releaseAssignedQueueForUser lives in @/lib/campaign-queue-db.server —
+// import it from there. Re-exporting it here dragged the entire server db
+// graph into the client bundle (this file is imported by client components),
+// which crashed client-side navigation with "DATABASE_URL is required".

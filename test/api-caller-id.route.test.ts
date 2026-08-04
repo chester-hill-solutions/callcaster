@@ -27,19 +27,19 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("returns 500 on workspace query error / missing data / missing twilio_data", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
-      error: "Supabase query error: q",
+      error: "Postgres query error: q",
       status: 500,
     });
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
       error: "No workspace data found",
       status: 500,
     });
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
       error: "Workspace twilio_data not found",
@@ -53,21 +53,21 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
       friendlyName: "n",
     };
 
-    const r1 = await asRouteResponse(await mod.action({ request: makeReq(body) } as any));
+    const r1 = await asRouteResponse(mod.action({ request: makeReq(body) } as any));
     expect(r1.status).toBe(500);
-    await expect(r1.json()).resolves.toMatchObject({ error: "Supabase query error: q" });
+    await expect(r1.json()).resolves.toMatchObject({ error: "Postgres query error: q" });
 
-    const r2 = await asRouteResponse(await mod.action({ request: makeReq(body) } as any));
+    const r2 = await asRouteResponse(mod.action({ request: makeReq(body) } as any));
     expect(r2.status).toBe(500);
     await expect(r2.json()).resolves.toMatchObject({ error: "No workspace data found" });
 
-    const r3 = await asRouteResponse(await mod.action({ request: makeReq(body) } as any));
+    const r3 = await asRouteResponse(mod.action({ request: makeReq(body) } as any));
     expect(r3.status).toBe(500);
     await expect(r3.json()).resolves.toMatchObject({ error: "Workspace twilio_data not found" });
   });
 
   test("returns 500 on invalid phone number length", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
       error: "Invalid phone number length",
@@ -75,7 +75,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/caller-id");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         phoneNumber: "+123",
         workspace_id: "00000000-0000-4000-8000-000000000001",
@@ -89,7 +89,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("returns 500 when Twilio validation request rejects", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
       error: "twilio down",
@@ -97,7 +97,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/caller-id");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         phoneNumber: "5555550100",
         workspace_id: "00000000-0000-4000-8000-000000000001",
@@ -109,7 +109,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("returns 500 on workspace_number upsert error", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: false,
       error: "Error inserting workspace number: ins",
@@ -117,7 +117,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/caller-id");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         phoneNumber: "5555550100",
         workspace_id: "00000000-0000-4000-8000-000000000001",
@@ -131,7 +131,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
   });
 
   test("happy path returns validationRequest + numberRequest (covers + in middle normalization)", async () => {
-    queueJsonAuthSession({ supabaseClient: {}, user: { id: "u1" } });
+    queueJsonAuthSession({ user: { id: "u1" } });
     mocks.verifyWorkspaceCallerId.mockResolvedValueOnce({
       ok: true,
       validationRequest: { sid: "VR1" },
@@ -139,7 +139,7 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
     });
 
     const mod = await import("../app/routes/api+/caller-id");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({
         phoneNumber: "1+5555550100",
         workspace_id: "00000000-0000-4000-8000-000000000001",
@@ -152,7 +152,6 @@ describe("app/routes/api+/call/routeer-id.tsx", () => {
     expect(body.validationRequest).toMatchObject({ sid: "VR1" });
     expect(body.numberRequest).toEqual([{ id: 1 }]);
     expect(mocks.verifyWorkspaceCallerId).toHaveBeenCalledWith(
-      {},
       "u1",
       "00000000-0000-4000-8000-000000000001",
       "1+5555550100",

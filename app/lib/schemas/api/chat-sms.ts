@@ -10,6 +10,8 @@ export const chatSmsBodySchema = z.object({
   media: z.string().optional(),
   message_intent: z.string().optional(),
   messaging_service_sid: z.string().optional(),
+  /** "Send later" — ISO date string, 15min-35days from now, requires a Messaging Service sender. */
+  send_at: z.string().optional(),
 });
 
 export type ChatSmsBody = z.infer<typeof chatSmsBodySchema>;

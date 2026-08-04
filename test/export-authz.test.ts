@@ -1,9 +1,41 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+vi.hoisted(() => {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
+});
+
+import { asRouteResponse, withRouteUrl } from "./helpers/route-result";
 import { setDualAuthSession } from "./helpers/route-auth-mock";
 
-const requireWorkspaceAccess = vi.fn(async () => undefined);
+const requireWorkspaceAccess = vi.hoisted(() =>
+  vi.fn(async () => undefined),
+);
+
+vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
+  return {
+    ...actual,
+    findCampaignExportMeta: vi.fn(async () => null),
+  };
+});
+
+vi.mock("@/lib/audience-upload-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/audience-upload-db.server")>();
+  return {
+    ...actual,
+    findAudienceWorkspaceById: vi.fn(async () => "w1"),
+  };
+});
+
+vi.mock("@/lib/database/contact-audience.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/database/contact-audience.server")>();
+  return {
+    ...actual,
+    listAudienceContactsForExport: vi.fn(async () => []),
+    listAudienceContactsJson: vi.fn(async () => []),
+  };
+});
 
 vi.mock("@/lib/env.server", () => {
   const handler = {
@@ -12,18 +44,26 @@ vi.mock("@/lib/env.server", () => {
   return { env: new Proxy({}, handler) };
 });
 
-vi.mock("@/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/database.server")>(
-    "@/lib/database.server",
-  );
-  return {
-    ...actual,
-    requireWorkspaceAccess,
-  };
-});
+vi.mock("@/lib/object-storage.server", () => ({
+  downloadObject: vi.fn(async () => Buffer.from(JSON.stringify({ status: "processing" }))),
+}));
 
-function buildSupabaseClient() {
-  const supabaseClient: any = {
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    requireWorkspaceAccess(...args),
+}));
+
+vi.mock("@/lib/capability-guard.server", () => ({
+  requireDualAuthCapability: async () => ({ type: "ok" }),
+  requireDataPlaneCapability: async () => ({ type: "ok" }),
+  requireDataPlaneRouteCapability: async (
+    _context: unknown,
+    workspaceId: string,
+  ) => ({ workspaceId, auth: { workspaceId, userId: "u1" } }),
+}));
+
+function buildMockDb() {
+  const mockClient: any = {
     storage: {
       from: () => ({
         download: async () => ({
@@ -36,7 +76,7 @@ function buildSupabaseClient() {
     },
   };
 
-  supabaseClient.from = (table: string) => {
+  mockClient.from = (table: string) => {
     if (table === "audience") {
       return {
         select: () => ({
@@ -83,13 +123,11 @@ function buildSupabaseClient() {
     };
   };
 
-  return supabaseClient;
+  return null;
 }
 
-vi.mock("@/lib/supabase.server", () => ({
-  createSupabaseServerClient: () => ({
-    supabaseClient: {},
-    headers: new Headers(),
+vi.mock("@/lib/auth.server", () => ({
+  getSession: () => ({ headers: new Headers(),
   }),
 }));
 
@@ -97,8 +135,7 @@ describe("export endpoints authz", () => {
   beforeEach(() => {
     requireWorkspaceAccess.mockClear();
     setDualAuthSession({
-      supabaseClient: buildSupabaseClient(),
-      headers: new Headers(),
+            headers: new Headers(),
       user: { id: "u1" },
     });
   });
@@ -108,7 +145,7 @@ describe("export endpoints authz", () => {
     const request = new Request(
       "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
     );
-    const res = await asRouteResponse(await mod.loader({ request } as any));
+    const res = await asRouteResponse(mod.loader(withRouteUrl({ request } as any)));
     expect(res.status).toBe(200);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
     expect(requireWorkspaceAccess).toHaveBeenCalledWith(
@@ -121,7 +158,7 @@ describe("export endpoints authz", () => {
     const request = new Request(
       "http://localhost/api/audiences?returnType=csv&audienceId=123",
     );
-    const res = await asRouteResponse(await mod.loader({ request } as any));
+    const res = await asRouteResponse(mod.loader(withRouteUrl({ request } as any)));
     expect(res.status).toBe(200);
     expect(requireWorkspaceAccess).toHaveBeenCalled();
   });
@@ -135,7 +172,7 @@ describe("export endpoints authz", () => {
       method: "POST",
       body: fd,
     });
-    const res = await asRouteResponse(await mod.action({ request } as any));
+    const res = await asRouteResponse(mod.action(withRouteUrl({ request } as any)));
     expect(res.status).toBe(404);
     expect(requireWorkspaceAccess).toHaveBeenCalledTimes(1);
     expect(requireWorkspaceAccess).toHaveBeenCalledWith(

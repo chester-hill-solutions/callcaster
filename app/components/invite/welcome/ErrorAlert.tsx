@@ -12,8 +12,11 @@ export function ErrorAlert({ error }: ErrorAlertProps) {
   if (!error || error?.message === "Email link is invalid or has expired" ) return null;
   return (
     <Alert variant="destructive">
-      <AlertTitle>Error</AlertTitle>
-      <AlertDescription>{error.message}</AlertDescription>
+      <AlertTitle>Something went wrong</AlertTitle>
+      <AlertDescription>
+        We couldn&apos;t process your invitation. The link may have expired —
+        ask your workspace admin to send a new one.
+      </AlertDescription>
     </Alert>
   );
 }

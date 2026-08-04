@@ -1,111 +1,106 @@
 export { action } from "./new.action.server";
 
-import { data as routeData, ActionFunctionArgs, redirect, Form, useActionData, useOutletContext, useParams, useSubmit, useNavigation } from "react-router";
+import {
+  useActionData,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router";
 import { useState } from "react";
 import { MdArrowForward, MdCheck } from "react-icons/md";
-import { Card, CardContent, CardTitle } from "@/components/shared/CustomCard";
+import { Section } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { PageShell } from "@/components/ui/page-shell";
+import { Text } from "@/components/ui/typography";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AudienceUploader from "@/components/audience/AudienceUploader";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import { validatePeopleReturnPath } from "@/lib/people-return-path";
 
 export default function AudiencesNew() {
   const actionData = useActionData();
   const params = useParams();
   const workspaceId = params.id;
-  const submit = useSubmit();
-  const navigation = useNavigation();
-  const isSubmitting = navigation.state === "submitting";
-  
+  const navigate = useNavigate();
+
+  const [searchParams] = useSearchParams();
+  const initialStep = searchParams.get("step") === "upload" ? 2 : 1;
+  const initialName = searchParams.get("name") ?? "";
+  const campaignId = searchParams.get("campaignId") ?? undefined;
+  const returnTo = workspaceId
+    ? validatePeopleReturnPath(searchParams.get("returnTo"), workspaceId)
+    : null;
+
   // Multi-step form state
-  const [currentStep, setCurrentStep] = useState(1);
-  const [audienceName, setAudienceName] = useState("");
+  const [currentStep, setCurrentStep] = useState(initialStep);
+  const [audienceName, setAudienceName] = useState(initialName);
+  const [completedAudienceId, setCompletedAudienceId] = useState<string | null>(
+    null,
+  );
   
-  // Get the Supabase client from context
-  const { supabase } = useOutletContext<{ supabase: SupabaseClient<Database> }>();
-
-  const handleCreateAudience = (e: React.FormEvent) => {
+  // Single forward path (#1060): name the list, then upload. The audience row
+  // is created by the upload API once contacts are submitted, so an empty name
+  // can never reach the server (#1080).
+  const handleNameSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!audienceName) {
-      return;
-    }
-    
-    const formData = new FormData();
-    formData.append("formAction", "createAudience");
-    formData.append("audience-name", audienceName);
-    
-    submit(formData, { method: "POST" });
-  };
-
-  const goToNextStep = () => {
-    setCurrentStep(prev => prev + 1);
-  };
-
-  const goToPreviousStep = () => {
-    setCurrentStep(prev => prev - 1);
+    const trimmed = audienceName.trim();
+    if (!trimmed) return;
+    setAudienceName(trimmed);
+    setCurrentStep(2);
   };
 
   return (
-    <section
-      id="form"
-      className="mx-auto mt-8 flex h-fit w-fit flex-col items-center justify-center"
-    >
-      <Card bgColor="bg-brand-secondary dark:bg-zinc-900 w-[60vw]">
-        <CardTitle>Add an Audience</CardTitle>
-        {actionData?.error && (
-          <p className="text-center font-Zilla-Slab text-2xl font-bold text-red-500">
+    <section id="form">
+      <PageShell title="Add a Call list" maxWidth="narrow">
+        {actionData?.error ? (
+          <Text className="text-center text-destructive">
             Error: {actionData.error}
-          </p>
-        )}
-        <CardContent>
-          <Tabs value={`step-${currentStep}`} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger 
-                value="step-1" 
-                disabled={currentStep !== 1}
-                className={currentStep > 1 ? "text-green-800" : ""}
-              >
-                {currentStep > 1 && <MdCheck className="mr-1" />}
-                Name
-              </TabsTrigger>
-              <TabsTrigger 
-                value="step-2" 
-                disabled={currentStep !== 2}
-                className={currentStep > 2 ? "text-green-800" : ""}
-              >
-                {currentStep > 2 && <MdCheck className="mr-1" />}
-                Upload
-              </TabsTrigger>
-              <TabsTrigger 
-                value="step-3" 
-                disabled={currentStep !== 3}
-              >
-                Process
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="step-1" className="space-y-4">
-              <form onSubmit={handleCreateAudience} className="space-y-6">
-                <label
-                  htmlFor="audience-name"
-                  className="block text-sm font-medium text-gray-700 dark:text-gray-200"
-                >
-                  Audience Name
-                  <input
+          </Text>
+        ) : null}
+        <Tabs value={`step-${currentStep}`} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger 
+              value="step-1" 
+              disabled={currentStep !== 1}
+              className={currentStep > 1 ? "text-green-800" : ""}
+            >
+              {currentStep > 1 && <MdCheck className="mr-1" />}
+              Name
+            </TabsTrigger>
+            <TabsTrigger 
+              value="step-2" 
+              disabled={currentStep !== 2}
+              className={currentStep > 2 ? "text-green-800" : ""}
+            >
+              {currentStep > 2 && <MdCheck className="mr-1" />}
+              Upload
+            </TabsTrigger>
+            <TabsTrigger 
+              value="step-3" 
+              disabled={currentStep !== 3}
+            >
+              Process
+            </TabsTrigger>
+          </TabsList>
+
+          {currentStep === 1 ? (
+            <Section variant="flat" className="space-y-4">
+              <form onSubmit={handleNameSubmit} className="space-y-6">
+                <FormField htmlFor="audience-name" label="Call list name">
+                  <Input
                     type="text"
                     name="audience-name"
                     id="audience-name"
+                    aria-label="Call list name"
                     value={audienceName}
                     onChange={(e) => setAudienceName(e.target.value)}
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-brand-primary focus:outline-none focus:ring-brand-primary dark:border-gray-600 dark:bg-zinc-800 dark:text-white"
                     required
                   />
-                </label>
-                
-                <div className="flex items-center justify-between gap-4">
+                </FormField>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
                   <Button
                     type="button"
                     variant="outline"
@@ -113,66 +108,64 @@ export default function AudiencesNew() {
                   >
                     Cancel
                   </Button>
-                  
-                  <div className="flex items-center gap-4">
-                    <Button
-                      type="submit"
-                      disabled={!audienceName || isSubmitting}
-                      className="bg-brand-primary text-white hover:bg-brand-secondary"
-                    >
-                      Create Empty Audience
-                    </Button>
-                    
-                    <Button
-                      type="button"
-                      onClick={goToNextStep}
-                      disabled={!audienceName}
-                      className="bg-brand-primary text-white hover:bg-brand-secondary"
-                    >
-                      Next: Upload Contacts <MdArrowForward className="ml-2" />
-                    </Button>
-                  </div>
+                  <Button
+                    type="submit"
+                    data-testid="audience-next-upload"
+                    disabled={!audienceName.trim()}
+                    className="bg-brand-primary text-white hover:bg-brand-secondary"
+                  >
+                    Next: Upload Contacts <MdArrowForward className="ml-2" />
+                  </Button>
                 </div>
               </form>
-            </TabsContent>
-            
-            <TabsContent value="step-2" className="space-y-4">
-              <div className="text-center mb-4">
+            </Section>
+          ) : null}
+
+          {currentStep === 2 ? (
+            <Section variant="flat" className="space-y-4">
+              <div className="mb-4 text-center" data-testid="audience-upload-step">
                 <h3 className="text-lg font-medium">Upload Contacts</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Upload a CSV file with your contacts. You'll be able to map the columns in the next step.
-                </p>
               </div>
               
               <div className="space-y-6">
-                <AudienceUploader 
+                <AudienceUploader
                   audienceName={audienceName}
-                  supabase={supabase}
+                  campaignId={campaignId}
+                  returnTo={returnTo}
+                  onUploadComplete={(audienceId) => {
+                    setCompletedAudienceId(audienceId);
+                    setCurrentStep(3);
+                  }}
                 />
-                
-                <div className="flex items-center justify-between gap-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={goToPreviousStep}
-                  >
-                    Back
-                  </Button>
-                </div>
               </div>
-            </TabsContent>
-            
-            <TabsContent value="step-3" className="space-y-4">
-              <div className="text-center">
-                <h3 className="text-lg font-medium mb-2">Upload Complete</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Your audience has been created and contacts are being processed.
-                </p>
+            </Section>
+          ) : null}
+
+          {currentStep === 3 ? (
+            <Section variant="flat" className="space-y-4">
+              <div className="text-center space-y-4">
+                <h3 className="mb-2 text-lg font-medium">Upload Complete</h3>
+                <Text variant="muted">
+                  Your Call list is ready and contacts are being processed.
+                </Text>
+                <Button
+                  type="button"
+                  className="bg-brand-primary text-white hover:bg-brand-secondary"
+                  onClick={() => {
+                    if (!workspaceId || !completedAudienceId) return;
+                    navigate(
+                      returnTo ??
+                        `/workspaces/${workspaceId}/audiences/${completedAudienceId}`,
+                    );
+                  }}
+                >
+                  {returnTo ? "Continue setup" : "View Call list"}
+                </Button>
               </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+            </Section>
+          ) : null}
+        </Tabs>
+      </PageShell>
     </section>
   );
 }

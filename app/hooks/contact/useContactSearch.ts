@@ -1,13 +1,15 @@
-import { SupabaseClient } from "@supabase/supabase-js";
-import { MutableRefObject, useEffect, useState, useCallback } from "react";
+import { MutableRefObject, useEffect, useState, useCallback, useRef } from "react";
 import { useClickOutside } from "@/hooks/utils/useClickOutside";
+import {
+  fetchContactsByPhone,
+  fetchLatestMessageForPhone,
+} from "@/lib/chats/messaging-client";
 import { Contact } from "@/lib/types";
 import { formatMessageTimestamp } from "@/lib/utils";
-import { phoneRegex, normalizePhoneNumber, isValidPhoneNumber } from "@/lib/utils/phone";
+import { isValidPhoneNumber, normalizePhoneNumber } from "@/lib/phone";
 import { logger } from "@/lib/logger.client";
 
 interface UseContactSearchProps {
-  supabase: SupabaseClient;
   workspace_id: string;
   contact_number: string;
   potentialContacts: Contact[];
@@ -23,73 +25,8 @@ interface ExistingConversation {
 
 /**
  * Hook for searching and managing contacts by phone number
- * 
- * Provides contact search functionality with phone number validation, automatic search
- * on valid phone numbers, conversation history lookup, and dropdown menu management.
- * Handles click-outside detection for closing the contact dropdown.
- * 
- * @param props - Configuration object
- * @param props.supabase - Supabase client instance
- * @param props.workspace_id - Workspace ID for filtering contacts
- * @param props.contact_number - Initial contact phone number
- * @param props.potentialContacts - Initial list of potential contacts to display
- * @param props.dropdownRef - Ref to the dropdown element for click-outside detection
- * @param props.initialContact - Initially selected contact, if any
- * 
- * @returns Object containing:
- *   - selectedContact: Currently selected contact or null
- *   - isContactMenuOpen: Boolean indicating if contact dropdown is open
- *   - searchError: Error message string if search failed, null otherwise
- *   - contacts: Array of contacts matching the search
- *   - isValid: Boolean indicating if current phone number is valid
- *   - phoneNumber: Current phone number value
- *   - existingConversation: Latest conversation data if found, null otherwise
- *   - isSearching: Boolean indicating if search is in progress
- *   - setPhoneNumber: Function to manually set phone number
- *   - handleSearch: Function to handle phone number input changes
- *   - handleContactSelect: Function to handle contact selection from dropdown
- *   - toggleContactMenu: Function to toggle contact dropdown visibility
- *   - clearSelectedContact: Function to clear selected contact
- * 
- * @example
- * ```tsx
- * const dropdownRef = useRef<HTMLDivElement>(null);
- * 
- * const {
- *   selectedContact,
- *   contacts,
- *   isValid,
- *   phoneNumber,
- *   isSearching,
- *   handleSearch,
- *   handleContactSelect
- * } = useContactSearch({
- *   supabase,
- *   workspace_id: workspace.id,
- *   contact_number: '+1234567890',
- *   potentialContacts: [],
- *   dropdownRef,
- *   initialContact: null
- * });
- * 
- * // Use in input
- * <input
- *   value={phoneNumber}
- *   onChange={handleSearch}
- *   placeholder="Enter phone number"
- * />
- * 
- * // Display search results
- * {isSearching && <div>Searching...</div>}
- * {contacts.map(contact => (
- *   <div key={contact.id} onClick={() => handleContactSelect(contact)}>
- *     {contact.name}
- *   </div>
- * ))}
- * ```
  */
 export function useContactSearch({
-  supabase,
   workspace_id,
   contact_number,
   potentialContacts,
@@ -105,6 +42,7 @@ export function useContactSearch({
   const [contacts, setContacts] = useState<Contact[]>(potentialContacts || []);
   const [existingConversation, setExistingConversation] = useState<ExistingConversation | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const requestSequenceRef = useRef(0);
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -127,18 +65,19 @@ export function useContactSearch({
     setManualContact(null);
   }, []);
 
-  const searchContact = useCallback(async (phoneNumber: string) => {
+  const searchContact = useCallback(async (nextPhoneNumber: string, sequence: number) => {
+    // Ignore result if a newer search sequence has started
+    if (sequence !== requestSequenceRef.current) return;
+
     setIsSearching(true);
     setSearchError(null);
     try {
-      const { data, error } = await supabase.rpc("find_contact_by_phone", {
-        p_workspace_id: workspace_id,
-        p_phone_number: phoneNumber,
-      });
-      
-      if (error) throw error;
+      const data = await fetchContactsByPhone(workspace_id, nextPhoneNumber);
 
-      if (data && data.length > 0) {
+      // Check sequence again before updating state; abort if stale
+      if (sequence !== requestSequenceRef.current) return;
+
+      if (data.length > 0) {
         setContacts(data);
         setManualContact(null);
         setIsContactMenuOpen(true);
@@ -149,33 +88,39 @@ export function useContactSearch({
         setSearchError("No contact found. A new contact will be created.");
       }
     } catch (error) {
+      // Check sequence before updating error state
+      if (sequence !== requestSequenceRef.current) return;
+
       logger.error("Contact search error:", error);
       setContacts([]);
       setManualContact(null);
-      const errorMessage = error instanceof Error 
+      const errorMessage = error instanceof Error
         ? `Error searching for contact: ${error.message}`
         : "Unable to search for contact. Please try again.";
       setSearchError(errorMessage);
     } finally {
-      setIsSearching(false);
+      // Check sequence before clearing searching state
+      if (sequence === requestSequenceRef.current) {
+        setIsSearching(false);
+      }
     }
-  }, [supabase, workspace_id]);
+  }, [workspace_id]);
 
-  const searchConversation = useCallback(async (phoneNumber: string) => {
+  const searchConversation = useCallback(async (nextPhoneNumber: string, sequence: number) => {
+    // Ignore result if a newer search sequence has started
+    if (sequence !== requestSequenceRef.current) return;
+
     try {
-      const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
-      const { data: latestMessage, error: messageSearchError } = await supabase
-        .from("message")
-        .select("*")
-        .eq("workspace", workspace_id)
-        .or(`from.eq.${normalizedPhoneNumber},to.eq.${normalizedPhoneNumber}`)
-        .order("date_created", { ascending: false })
-        .limit(1)
-        .single();
+      const normalizedPhoneNumber = normalizePhoneNumber(nextPhoneNumber);
+      const latestMessage = await fetchLatestMessageForPhone(
+        workspace_id,
+        normalizedPhoneNumber,
+      );
 
-      if (messageSearchError) {
-        setExistingConversation(null);
-      } else if (latestMessage) {
+      // Check sequence again before updating state; abort if stale
+      if (sequence !== requestSequenceRef.current) return;
+
+      if (latestMessage?.body && latestMessage.date_created) {
         setExistingConversation({
           phoneNumber: normalizedPhoneNumber,
           latestMessage: latestMessage.body,
@@ -185,22 +130,47 @@ export function useContactSearch({
         setExistingConversation(null);
       }
     } catch (error) {
+      // Check sequence before updating error state
+      if (sequence !== requestSequenceRef.current) return;
+
       logger.error("Conversation search error:", error);
-      // Silently fail for conversation search - it's not critical
       setExistingConversation(null);
     }
-  }, [supabase, workspace_id]);
+  }, [workspace_id]);
 
+  /**
+   * @effect Debounced fetch of contact matches and latest conversation for the typed phone number.
+   *   Uses a request-sequence guard (requestSequenceRef) to ignore stale responses from
+   *   out-of-order network requests; a pending timer is canceled on unmount or input change.
+   * @effect-deps phoneNumber, isValid (only searches once the number is valid), searchContact, searchConversation
+   * @effect-side-effects fetch via debounce cleanup (fetchContactsByPhone + fetchLatestMessageForPhone)
+   * @effect-why-not-loader This is disguised data fetching driven by local input state rather than
+   *   route params — it calls imperative HTTP helpers directly instead of a loader/useFetcher. Could
+   *   be migrated to a debounced useFetcher().load() pair (workspace_id + phoneNumber as query params)
+   *   so React Router owns request de-duplication/cancellation instead of this hook doing it by hand.
+   */
   useEffect(() => {
-    if (isValid && phoneNumber) {
-      searchContact(phoneNumber);
-      searchConversation(phoneNumber);
-    } else {
+    if (!isValid || !phoneNumber) {
       setContacts([]);
       setManualContact(null);
       setSearchError(null);
       setExistingConversation(null);
+      return;
     }
+
+    // Increment sequence number for this search cycle
+    const currentSequence = ++requestSequenceRef.current;
+
+    // Debounce the search requests (~300ms)
+    const timeoutId = setTimeout(() => {
+      // Only execute if this sequence is still current (no newer search has fired)
+      if (currentSequence === requestSequenceRef.current) {
+        searchContact(phoneNumber, currentSequence);
+        searchConversation(phoneNumber, currentSequence);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
   }, [phoneNumber, isValid, searchContact, searchConversation]);
 
   useClickOutside(dropdownRef, () => setIsContactMenuOpen(false));

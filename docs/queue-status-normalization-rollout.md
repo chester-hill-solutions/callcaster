@@ -1,6 +1,6 @@
 ## Queue Status Normalization Rollout
 
-This repository now reads queue rows through compatibility helpers in `app/lib/queue-status.ts`, but the schema and RPC changes still need to land wherever `campaign_queue` and its queue RPCs are managed.
+This repository reads queue rows through compatibility helpers in `app/lib/queue-status.ts`. The normalized schema columns (`queue_state`, `assigned_to_user_id`, `provider_status`) and the dual-writing queue RPCs have landed in migration `20260521140000_queue_state_and_claim.sql`, which also backfills `queue_state` for existing rows. App writers and row helpers now prefer the normalized columns over legacy `status`.
 
 ### Target Columns
 

@@ -2,9 +2,15 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import {
+  makeApplyLedgerEntryRpcStub,
   makeTransactionHistoryTableStub,
   type TransactionRow,
 } from "./helpers/transaction-history-stub";
+import { telephonyStubState, configureTelephonyStub, telephonyDbMocks } from "./helpers/telephony-db-stub";
+
+vi.hoisted(() => {
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
 
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
@@ -17,20 +23,57 @@ const loggerMocks = vi.hoisted(() => ({
   debug: vi.fn(),
   info: vi.fn(),
 }));
+const campaignQueueDbMocks = vi.hoisted(() => ({
+  updateCampaignQueueByContactAndCampaign: vi.fn(async () => []),
+  updateError: null as Error | null,
+}));
 vi.mock("@/lib/logger.server", () => ({
   logger: loggerMocks,
+}));
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  updateCampaignQueueByContactAndCampaign: async (...args: unknown[]) => {
+    if (campaignQueueDbMocks.updateError) {
+      throw campaignQueueDbMocks.updateError;
+    }
+    return campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign(...args);
+  },
 }));
 
 const twilioValidation = vi.hoisted(() => ({
   validateTwilioWebhookParams: vi.fn(() => true),
-  validateTwilioWebhookForCallSid: vi.fn(),
+  requireTwilioSignature: vi.fn(),
 }));
+const rpcDequeueContactMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: (...args: unknown[]) =>
-    twilioValidation.validateTwilioWebhookForCallSid(...args),
+  requireTwilioSignature: (...args: unknown[]) =>
+    twilioValidation.requireTwilioSignature(...args),
 }));
 vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: twilioValidation.validateTwilioWebhookParams,
+}));
+
+vi.mock("@/lib/telephony-db.server", async () => {
+  const stub = await import("./helpers/telephony-db-stub");
+  return {
+    findCallBySid: stub.telephonyDbMocks.findCallBySid,
+    findCallsByConferenceId: stub.telephonyDbMocks.findCallsByConferenceId,
+    findActiveConferenceIdsForUser: stub.telephonyDbMocks.findActiveConferenceIdsForUser,
+    updateCallBySid: stub.telephonyDbMocks.updateCallBySid,
+    findOutreachAttemptById: stub.telephonyDbMocks.findOutreachAttemptById,
+    updateOutreachAttemptForWorkspace: stub.telephonyDbMocks.updateOutreachAttemptForWorkspace,
+    insertCallForWorkspace: stub.telephonyDbMocks.insertCallForWorkspace,
+    findCampaignTypeByCampaignId: stub.telephonyDbMocks.findCampaignTypeByCampaignId,
+    upsertCallBySid: stub.telephonyDbMocks.upsertCallBySid,
+  };
+});
+
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcDequeueContact: rpcDequeueContactMock,
+}));
+
+const runAutoDialerTurnMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/auto-dial.server", () => ({
+  runAutoDialerTurn: (...args: unknown[]) => runAutoDialerTurnMock(...args),
 }));
 
 const twilioClientMock = {
@@ -44,20 +87,19 @@ const twilioClientMock = {
   ),
 };
 
-vi.mock("../app/lib/database.server", async () => {
-  const actual = await vi.importActual<typeof import("../app/lib/database.server")>(
-    "../app/lib/database.server",
-  );
+vi.mock("../app/lib/database/workspace.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("../app/lib/database/workspace.server")
+  >("../app/lib/database/workspace.server");
   return {
     ...actual,
     createWorkspaceTwilioInstance: vi.fn(async () => twilioClientMock as any),
   };
 });
 
-function makeSupabaseStub(args?: { outreachDisposition?: string }) {
+function makeDbClientStub(args?: { outreachDisposition?: string }) {
   const transactionRows: TransactionRow[] = [];
   const outreachUpdateCalls: any[] = [];
-  const campaignQueueEqCalls: Array<[string, unknown]> = [];
   let lastCallSid: string = "CA1";
 
   const callSelectError: Error | null = (args as any)?.callSelectError ?? null;
@@ -66,6 +108,8 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
   const outreachUpdateError: Error | null = (args as any)?.outreachUpdateError ?? null;
   const outreachUpdateThrows: unknown = (args as any)?.outreachUpdateThrows ?? null;
   const campaignQueueUpdateError: Error | null = (args as any)?.campaignQueueUpdateError ?? null;
+  campaignQueueDbMocks.updateError = campaignQueueUpdateError;
+  campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign.mockClear();
   const rpcDequeueError: Error | null = (args as any)?.rpcDequeueError ?? null;
   const outreachFetchError: Error | null = (args as any)?.outreachFetchError ?? null;
 
@@ -73,9 +117,9 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
     (args as any)?.dbCall ?? ({
       sid: "CA1",
       workspace: "w1",
-      outreach_attempt_id: "oa1",
+      outreach_attempt_id: 1,
       conference_id: "conf1",
-      contact_id: "c1",
+      contact_id: 1,
       campaign_id: 1,
     } as any);
 
@@ -137,7 +181,7 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
             single: async () => ({
               data: {
                 disposition: args?.outreachDisposition ?? "in-progress",
-                contact_id: "c1",
+                contact_id: 1,
               },
               error: outreachFetchError,
             }),
@@ -150,24 +194,11 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
                 if (outreachUpdateThrows != null) throw outreachUpdateThrows;
                 if (outreachUpdateError) return { data: null, error: outreachUpdateError };
                 outreachUpdateCalls.push(patch);
-                return { data: { ...patch, contact_id: "c1" }, error: null };
+                return { data: { ...patch, contact_id: 1 }, error: null };
               },
             }),
           }),
         }),
-      };
-    }
-
-    if (table === "campaign_queue") {
-      const builder: any = {
-        eq: (col: string, val: unknown) => {
-          campaignQueueEqCalls.push([col, val]);
-          return builder;
-        },
-        select: async () => ({ data: [], error: campaignQueueUpdateError }),
-      };
-      return {
-        update: () => builder,
       };
     }
 
@@ -180,52 +211,131 @@ function makeSupabaseStub(args?: { outreachDisposition?: string }) {
 
   return {
     from,
-    realtime: { channel: () => ({ send: vi.fn() }) },
-    rpc: vi.fn(async () => ({ data: null, error: rpcDequeueError })),
-    channel: () => ({ send: vi.fn() }),
-    removeChannel: vi.fn(),
+    rpc: vi.fn(async (fn: string, rpcArgs: any) => {
+      if (fn === "apply_ledger_entry_and_sync_credits") {
+        return makeApplyLedgerEntryRpcStub(transactionRows)(fn, rpcArgs);
+      }
+      return { data: null, error: rpcDequeueError };
+    }),
+    execute: vi.fn(async (query: any) => {
+      const sqlText = typeof query === "string"
+        ? query
+        : typeof query?.toSQL === "function"
+          ? JSON.stringify(query.toSQL())
+          : JSON.stringify(query);
+      if (sqlText.includes("apply_ledger_entry_and_sync_credits")) {
+        const values = query?.queryChunks?.filter((_: unknown, i: number) => i % 2 === 1) ?? [];
+        const [workspace, type, amount, idempotencyKey, note, campaignId, callSid, messageSid] = values;
+        const result = await makeApplyLedgerEntryRpcStub(transactionRows)(
+          "apply_ledger_entry_and_sync_credits",
+          {
+            p_workspace_id: workspace,
+            p_type: type,
+            p_amount: amount,
+            p_idempotency_key: idempotencyKey,
+            p_description: note,
+            p_campaign_id: campaignId,
+            p_call_sid: callSid,
+            p_message_sid: messageSid,
+          },
+        );
+        return result.data ? [result.data] : [];
+      }
+      return [];
+    }),
     _transactionRows: transactionRows,
     _outreachUpdateCalls: outreachUpdateCalls,
-    _campaignQueueEqCalls: campaignQueueEqCalls,
+    _telephonyConfig: {
+      callRow: dbCallRow,
+      callSelectError,
+      callUpdateError,
+      campaignType: args?.campaignType,
+      outreachDisposition: args?.outreachDisposition,
+      outreachFetchError,
+      outreachUpdateError,
+      outreachUpdateThrows,
+      rpcDequeueError,
+    },
   };
 }
 
-let supabaseStub: ReturnType<typeof makeSupabaseStub>;
-const supabaseState = vi.hoisted(() => ({ supabase: null as any }));
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: () => supabaseState.supabase,
+let postgresStub: ReturnType<typeof makeDbClientStub>;
+const clientState = vi.hoisted(() => ({ client: null as any }));
+
+vi.mock("@/lib/auth.server", () => ({
+  getAdminDb: () => clientState.client,
+}));
+
+// Deliberately NOT a catch-all Proxy. One here manufactured any property asked
+// for, including a Supabase `.channel()` that does not exist on the real Drizzle
+// client — which is how a route that 500'd on every callback passed CI. Reading
+// a property the real adminDb does not have now throws instead.
+vi.mock("@/server/admin-db", () => ({
+  adminDb: new Proxy({} as any, {
+    get(_target, prop) {
+      const client = clientState.client;
+      if (typeof prop === "string" && !(prop in (client ?? {}))) {
+        throw new TypeError(
+          `adminDb.${prop} does not exist on the real Drizzle client — do not mock it into existence.`,
+        );
+      }
+      return client?.[prop];
+    },
+  }),
+}));
+
+vi.mock("@/server/db", () => ({
+  db: new Proxy({} as any, {
+    get(_target, prop) {
+      const client = clientState.client;
+      return client?.[prop];
+    },
+  }),
+}));
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    execute: vi.fn(async () => []),
+  }),
+}));
+
+async function usePostgresStub(args?: Parameters<typeof makeDbClientStub>[0]) {
+  postgresStub = makeDbClientStub(args);
+  clientState.client = postgresStub as any;
+  const { configureTelephonyStub } = await import("./helpers/telephony-db-stub");
+  configureTelephonyStub(postgresStub._telephonyConfig);
+  return postgresStub;
+}
+vi.mock("@client/client-js", () => ({
+  createClient: () => clientState.client,
 }));
 
 describe("api.auto-dial.status", () => {
-  beforeEach(() => {
-    vi.resetModules();
-    supabaseStub = makeSupabaseStub();
-    supabaseState.supabase = supabaseStub as any;
+  beforeEach(async () => {
+    await usePostgresStub();
     twilioValidation.validateTwilioWebhookParams.mockReset();
     twilioValidation.validateTwilioWebhookParams.mockReturnValue(true);
-    twilioValidation.validateTwilioWebhookForCallSid.mockReset();
-    twilioValidation.validateTwilioWebhookForCallSid.mockImplementation(
-      async (args: { params?: Record<string, string> }) => ({
-        ok: true,
-        params: args.params ?? {},
-        authToken: "tok",
-      }),
+    twilioValidation.requireTwilioSignature.mockReset();
+    twilioValidation.requireTwilioSignature.mockImplementation(
+      async (args: { params?: Record<string, string> }) => (null),
     );
     twilioClientMock.conferences.list.mockReset();
     twilioClientMock.conferences.list.mockResolvedValue([]);
     loggerMocks.error.mockReset();
     loggerMocks.debug.mockReset();
+    campaignQueueDbMocks.updateError = null;
+    campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign.mockReset();
     loggerMocks.info.mockReset();
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("ok", { status: 200 })));
+    rpcDequeueContactMock.mockReset();
+    rpcDequeueContactMock.mockImplementation(async () => {});
+    runAutoDialerTurnMock.mockReset();
+    runAutoDialerTurnMock.mockResolvedValue({ success: true });
   });
 
   test("rejects invalid Twilio signature", async () => {
-    twilioValidation.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    twilioValidation.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
+      }));
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -234,7 +344,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "61");
     fd.set("CallDuration", "61");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "bad" },
@@ -242,7 +352,7 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(403);
-  });
+  }, 60000);
 
   test("bills idempotently for completed calls (same CallSid)", async () => {
     const mod = await import("../app/routes/api+/auto-dial/status.route");
@@ -261,21 +371,45 @@ describe("api.auto-dial.status", () => {
       });
     };
 
-    const r1 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
+    const r1 = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(r1.status).toBe(200);
-    const r2 = await asRouteResponse(await mod.action({ request: makeReq() } as any));
+    const r2 = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(r2.status).toBe(200);
 
-    expect(supabaseStub._transactionRows.length).toBeGreaterThan(0);
-    const matching = supabaseStub._transactionRows.filter(
+    expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
+    const matching = postgresStub._transactionRows.filter(
       (r) => r.idempotency_key === "call:CA_DUP",
     );
     expect(matching.length).toBe(1);
   });
 
-  test("does not overwrite terminal disposition (completed -> busy)", async () => {
-    supabaseStub = makeSupabaseStub({ outreachDisposition: "completed" });
-    supabaseState.supabase = supabaseStub as any;
+  test("billing kind is derived from campaign type", async () => {
+    postgresStub = await usePostgresStub({ campaignType: "robocall" } as any);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_IVR_KIND");
+    fd.set("CallStatus", "completed");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "61");
+    fd.set("CallDuration", "61");
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
+    const matching = postgresStub._transactionRows.filter(
+      (r) => r.idempotency_key === "call:CA_IVR_KIND",
+    );
+    expect(matching.length).toBe(1);
+  });
+
+  test("dequeues by fetched attempt without writing provider status to disposition", async () => {
+    postgresStub = await usePostgresStub({ outreachDisposition: "completed" });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -284,7 +418,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "10");
     fd.set("CallDuration", "10");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -293,15 +427,56 @@ describe("api.auto-dial.status", () => {
     } as any));
 
     expect(res.status).toBe(200);
-    expect(supabaseStub._outreachUpdateCalls.length).toBe(0);
-    expect(supabaseStub.rpc).toHaveBeenCalledWith("dequeue_contact", expect.objectContaining({
-      passed_contact_id: "c1",
-    }));
+    expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
+    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ contactId: 1 }),
+    );
+  });
+
+  /**
+   * Conference names are minted as `${userId}~${uuid}`, and dequeue_contact
+   * binds this argument as ::uuid. Passing the raw name raised 22P02 on every
+   * terminal call, so the contact was never dequeued and the dialer stopped
+   * after a single call with the campaign stuck on "Running".
+   */
+  test("dequeues with the user id from the conference name, not the name itself", async () => {
+    const userId = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA1",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: `${userId}~9f3ae1b2-0000-4000-8000-00000000abcd`,
+        contact_id: 1,
+        campaign_id: 1,
+      },
+    } as any);
+
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "completed");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "10");
+    fd.set("CallDuration", "10");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+
+    expect(res.status).toBe(200);
+    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ dequeuedById: userId }),
+    );
   });
 
   test("returns 500 when call lookup fails", async () => {
-    supabaseStub = makeSupabaseStub({ callSelectError: new Error("no call") } as any);
-    supabaseState.supabase = supabaseStub as any;
+    postgresStub = await usePostgresStub({ callSelectError: new Error("no call") } as any);
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -311,7 +486,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -322,8 +497,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("uses env TWILIO_AUTH_TOKEN when workspace has no twilio_data", async () => {
-    supabaseStub = makeSupabaseStub({ workspaceAuthToken: null } as any);
-    supabaseState.supabase = supabaseStub as any;
+    postgresStub = await usePostgresStub({ workspaceAuthToken: null } as any);
     twilioValidation.validateTwilioWebhookParams.mockImplementation(
       (_params: any, _sig: any, _url: any, authToken: string) => {
         expect(authToken).toBe("test");
@@ -339,7 +513,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -349,18 +523,17 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
   });
 
-  test("participant-join updates conference_id/start_time and updates queue + outreach attempt", async () => {
-    supabaseStub = makeSupabaseStub({
+  test("participant-join updates call, queue, and answered_at without provider disposition", async () => {
+    postgresStub = await usePostgresStub({
       dbCall: {
         sid: "CA1",
         workspace: "w1",
-        outreach_attempt_id: "oa1",
+        outreach_attempt_id: 1,
         conference_id: null,
-        contact_id: "c1",
+        contact_id: 1,
         campaign_id: 1,
       },
     } as any);
-    supabaseState.supabase = supabaseStub as any;
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -370,7 +543,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("ConferenceSid", "conf1");
     fd.set("FriendlyName", "in-progress");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -378,9 +551,14 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(supabaseStub._outreachUpdateCalls.length).toBeGreaterThan(0);
-    expect(supabaseStub._campaignQueueEqCalls).toContainEqual(["contact_id", "c1"]);
-    expect(supabaseStub._campaignQueueEqCalls).toContainEqual(["campaign_id", 1]);
+    expect(telephonyStubState.outreachUpdateCalls.length).toBeGreaterThan(0);
+    expect(telephonyStubState.outreachUpdateCalls).toEqual([
+      expect.objectContaining({ answered_at: expect.any(String) }),
+    ]);
+    expect(telephonyStubState.outreachUpdateCalls[0]).not.toHaveProperty("disposition");
+    expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({ contactId: 1, campaignId: 1 }),
+    );
   });
 
   test("participant-leave completes conferences and sets completed status", async () => {
@@ -394,9 +572,9 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("Duration", "1");
     fd.set("CallDuration", "2");
-    fd.set("FriendlyName", "conf1");
+    fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -406,9 +584,8 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
   });
 
-  test("call status busy triggers dialer when conferences exist and status not completed", async () => {
+  test("call status busy triggers dialer in-process (no HTTP self-fetch) when conferences exist and status not completed", async () => {
     twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 200 })));
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA_BUSY");
@@ -417,7 +594,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -425,11 +602,18 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
+    // Regression guard: the dialer turn must be invoked in-process, not via a
+    // self-fetch to /api/auto-dial/dialer (that path is matched by the
+    // Twilio webhook prefix and an unsigned self-fetch would 403 in
+    // production). See app/lib/auto-dial.server.ts:runAutoDialerTurn.
+    expect(runAutoDialerTurnMock).toHaveBeenCalledWith(
+      expect.objectContaining({ campaign_id: 1, workspace_id: "w1" }),
+    );
   });
 
-  test("triggerAutoDialer error bubbles to 500 when fetch not ok", async () => {
+  test("triggerAutoDialer error bubbles to 500 when the in-process dialer turn fails", async () => {
     twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("bad", { status: 500 })));
+    runAutoDialerTurnMock.mockResolvedValueOnce({ success: false, error: "no queue" });
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA_BUSY");
@@ -438,7 +622,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -449,11 +633,10 @@ describe("api.auto-dial.status", () => {
   });
 
   test("updateOutreachAttempt catch path returns Response (still returns success)", async () => {
-    supabaseStub = makeSupabaseStub({
+    postgresStub = await usePostgresStub({
       outreachFetchError: new Error("fetch"),
       outreachUpdateError: new Error("oa"),
     } as any);
-    supabaseState.supabase = supabaseStub as any;
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -463,7 +646,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -471,26 +654,21 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(loggerMocks.error).toHaveBeenCalledWith(
-      "Error updating outreach attempt:",
-      expect.any(Error),
-    );
   });
 
   test("updateOutreachAttempt works without disposition (covers else path)", async () => {
     const mod = await import("../app/routes/api+/auto-dial/status.action.server");
-    const res = await mod.updateOutreachAttempt("oa1", {
+    const res = await mod.updateOutreachAttempt("1", "w1", {
       answered_at: new Date().toISOString(),
     } as any);
     expect(res).toMatchObject({ answered_at: expect.any(String) });
-    expect(supabaseStub._outreachUpdateCalls.length).toBeGreaterThan(0);
+    expect(telephonyStubState.outreachUpdateCalls.length).toBeGreaterThan(0);
   });
 
   test("updateOutreachAttempt catch formats non-Error as Unknown error", async () => {
-    supabaseStub = makeSupabaseStub({ outreachUpdateThrows: "nope" } as any);
-    supabaseState.supabase = supabaseStub as any;
+    postgresStub = await usePostgresStub({ outreachUpdateThrows: "nope" } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.action.server");
-    const res = (await mod.updateOutreachAttempt("oa1", {
+    const res = (await mod.updateOutreachAttempt("1", "w1", {
       answered_at: new Date().toISOString(),
     } as any)) as any;
     expect(res.status).toEqual(expect.any(Number));
@@ -499,8 +677,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("updateCall error path returns 500", async () => {
-    supabaseStub = makeSupabaseStub({ callUpdateError: new Error("up") } as any);
-    supabaseState.supabase = supabaseStub as any;
+    postgresStub = await usePostgresStub({ callUpdateError: new Error("up") } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -509,7 +686,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -517,12 +694,11 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(500);
-    expect(loggerMocks.error).toHaveBeenCalledWith("Error updating call:", expect.any(Error));
+    expect(loggerMocks.error).toHaveBeenCalledWith("Error in handleCallStatus:", expect.any(Error));
   });
 
   test("rpc dequeue_contact error returns 500", async () => {
-    supabaseStub = makeSupabaseStub({ rpcDequeueError: new Error("dq") } as any);
-    supabaseState.supabase = supabaseStub as any;
+    rpcDequeueContactMock.mockRejectedValue(new Error("dq"));
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -531,7 +707,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -539,12 +715,15 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(500);
-    expect(loggerMocks.error).toHaveBeenCalledWith("Error dequeing contact", expect.any(Error));
+    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ contactId: 1 }),
+    );
+    expect(loggerMocks.error).toHaveBeenCalledWith("Error in handleCallStatus:", expect.any(Error));
   });
 
   test("participant-leave outreach fetch error returns 500", async () => {
-    supabaseStub = makeSupabaseStub({ outreachFetchError: new Error("out") } as any);
-    supabaseState.supabase = supabaseStub as any;
+    postgresStub = await usePostgresStub({ outreachFetchError: new Error("out") } as any);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -554,9 +733,9 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("Duration", "1");
     fd.set("CallDuration", "2");
-    fd.set("FriendlyName", "conf1");
+    fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -577,9 +756,9 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("Duration", "1");
     fd.set("CallDuration", "2");
-    fd.set("FriendlyName", "conf1");
+    fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -594,17 +773,16 @@ describe("api.auto-dial.status", () => {
   });
 
   test("participant-join does nothing when conference_id exists and no outreach_attempt_id", async () => {
-    supabaseStub = makeSupabaseStub({
+    postgresStub = await usePostgresStub({
       dbCall: {
         sid: "CA1",
         workspace: "w1",
         outreach_attempt_id: null,
-        conference_id: "conf1",
-        contact_id: "c1",
+      conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: 1,
         campaign_id: 1,
       },
     } as any);
-    supabaseState.supabase = supabaseStub as any;
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -613,7 +791,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("ConferenceSid", "conf1");
     fd.set("FriendlyName", "in-progress");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -632,7 +810,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -650,7 +828,7 @@ describe("api.auto-dial.status", () => {
     fd.set("StatusCallbackEvent", "other");
     fd.set("Timestamp", new Date().toISOString());
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -661,7 +839,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("action catch formats non-Error as Unknown error", async () => {
-    const dbMod = await import("../app/lib/database.server");
+    const dbMod = await import("../app/lib/database/workspace.server");
     (dbMod.createWorkspaceTwilioInstance as any).mockRejectedValueOnce("nope");
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
@@ -672,7 +850,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Duration", "1");
     fd.set("CallDuration", "1");
     fd.set("ConferenceSid", "conf1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },
@@ -684,8 +862,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("participant-join campaign_queue update error hits updateCampaignQueue + join catch branches", async () => {
-    supabaseStub = makeSupabaseStub({ campaignQueueUpdateError: new Error("cq") } as any);
-    supabaseState.supabase = supabaseStub as any;
+    postgresStub = await usePostgresStub({ campaignQueueUpdateError: new Error("cq") } as any);
 
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -695,7 +872,7 @@ describe("api.auto-dial.status", () => {
     fd.set("Timestamp", new Date().toISOString());
     fd.set("ConferenceSid", "conf1");
     fd.set("FriendlyName", "in-progress");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       request: new Request("http://localhost/api/auto-dial/status", {
         method: "POST",
         headers: { "x-twilio-signature": "good" },

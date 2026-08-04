@@ -16,9 +16,9 @@ function makeHousehold(n: number) {
   return Array.from({ length: n }).map((_, i) => ({ contact: makeContact({ firstname: `H${i}` }) })) as any;
 }
 
-describe("app/components/call-list/records/participant/CallContact.tsx", () => {
+describe("app/components/call/CallContact.tsx", () => {
   test("ungrouped + no household renders address cell and default styles", async () => {
-    const QueueContact = (await import("@/components/call-list/records/participant/CallContact")).default;
+    const QueueContact = (await import("@/components/call/CallContact")).default;
     const { container } = render(
       <table>
         <tbody>
@@ -42,7 +42,7 @@ describe("app/components/call-list/records/participant/CallContact.tsx", () => {
   });
 
   test("grouped first-in-house can be selected/last and styles address cell", async () => {
-    const QueueContact = (await import("@/components/call-list/records/participant/CallContact")).default;
+    const QueueContact = (await import("@/components/call/CallContact")).default;
     const { container } = render(
       <table>
         <tbody>
@@ -62,19 +62,21 @@ describe("app/components/call-list/records/participant/CallContact.tsx", () => {
     const cells = Array.from(container.querySelectorAll("td"));
 
     expect(row.style.borderTop).toMatch(/^2px solid/i);
-    expect(row.style.background).toBe("rgb(241, 193, 193)");
+    expect(row.style.background).toBe(
+      "color-mix(in srgb, var(--primary) 12%, transparent)",
+    );
     expect(row.style.borderBottomLeftRadius).toBe("18px");
 
     expect(cells).toHaveLength(3);
     expect(cells[1].style.opacity).toBe("1");
     expect(cells[2].style.background).toContain("secondary");
-    expect(cells[2].style.color).toBe("rgb(51, 51, 51)");
+    expect(cells[2].style.color).toBe("var(--foreground)");
     expect(cells[2].style.borderBottomRightRadius).toBe("18px");
     expect(cells[2].getAttribute("rowspan")).toBe("2");
   });
 
   test("grouped not-first-in-house dims phone and omits address cell", async () => {
-    const QueueContact = (await import("@/components/call-list/records/participant/CallContact")).default;
+    const QueueContact = (await import("@/components/call/CallContact")).default;
     const { container } = render(
       <table>
         <tbody>

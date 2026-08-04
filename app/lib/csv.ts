@@ -38,11 +38,6 @@ export function sanitizeCsvInjection(value: string): string {
   return value;
 }
 
-/** @deprecated Prefer escapeCsvCell; kept for legacy imports from utils.ts */
-export function escapeCSV(field: unknown): string {
-  return escapeCsvCell(field as CsvCell);
-}
-
 export function escapeCsvCell(
   value: CsvCell,
   opts: Pick<CsvStringOptions, "protectFromInjection"> = {},
@@ -119,6 +114,40 @@ export function csvResponse(args: {
   // Avoid caching downloads that can contain sensitive data.
   headers.set("Cache-Control", "no-store");
   return new Response(args.csv, { status: 200, headers });
+}
+
+/**
+ * Sanitize an arbitrary string for use in a download filename.
+ *
+ * NFKD-normalizes (decomposes accents), collapses non-word characters to `_`,
+ * trims leading/trailing underscores, truncates to 80 chars, and falls back to
+ * `fallback` (default `"survey"`) when the result is empty.
+ */
+export function safeFilenamePart(
+  input: string,
+  fallback = "survey",
+): string {
+  return (
+    input
+      .normalize("NFKD")
+      .replace(/[^\w.-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 80) || fallback
+  );
+}
+
+/**
+ * Format an ISO/date string as a UTC date-only string (`YYYY-MM-DD`).
+ *
+ * Returns `"-"` when the value is missing or unparseable, matching the
+ * survey-responses CSV contract.
+ */
+export function formatDateUtc(value: string | null | undefined): string {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toISOString().slice(0, 10);
 }
 
 export type CSVParseResult = {

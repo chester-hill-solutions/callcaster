@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import type { Call } from "@twilio/voice-sdk";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/shared/CustomCard";
+import { PageShell } from "@/components/ui/page-shell";
+import { Text } from "@/components/ui/typography";
 import { HeldCallsList } from "@/components/calls/HeldCallsList";
 import { IncomingCallPanel } from "@/components/calls/IncomingCallPanel";
 import { OutboundDialer } from "@/components/calls/OutboundDialer";
@@ -22,6 +23,7 @@ type SoftphonePanelProps = {
   headerExtra?: ReactNode;
   waitingContent?: ReactNode;
   outboundDialDisabled?: boolean;
+  outboundDialDisabledReason?: string;
   connectionStatus?: string;
   onEndSession: () => void;
 };
@@ -36,6 +38,7 @@ export function SoftphonePanel({
   headerExtra,
   waitingContent,
   outboundDialDisabled = false,
+  outboundDialDisabledReason,
   connectionStatus,
   onEndSession,
 }: SoftphonePanelProps) {
@@ -43,20 +46,20 @@ export function SoftphonePanel({
   const activeCall = callHandling.activeCall;
 
   return (
-    <div className="container mx-auto max-w-lg p-6">
-      <Card className="p-6">
-        <h1 className="text-xl font-semibold">{title}</h1>
-        {connectionStatus !== undefined && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Status: {connectionStatus}
-          </p>
-        )}
-        {headerExtra}
+    <PageShell
+      title={title}
+      description={
+        connectionStatus !== undefined ? `Status: ${connectionStatus}` : undefined
+      }
+      maxWidth="narrow"
+    >
+      {headerExtra}
 
-        <div className="mt-4 rounded-lg bg-muted p-4">
-          <p className="text-sm font-medium text-muted-foreground">
+      <div className="space-y-4">
+        <div className="rounded-md bg-muted/50 px-3 py-2">
+          <Text variant="muted" className="text-sm font-medium">
             {handsetNumberLabel}
-          </p>
+          </Text>
           <p className="mt-1 font-mono text-lg">{handsetNumber}</p>
         </div>
 
@@ -65,6 +68,7 @@ export function SoftphonePanel({
             value={controller.outboundTo}
             error={controller.outboundError}
             disabled={outboundDialDisabled}
+            disabledReason={outboundDialDisabledReason}
             onChange={controller.setOutboundTo}
             onDial={controller.handleOutboundDial}
             onClearError={controller.clearOutboundError}
@@ -76,13 +80,10 @@ export function SoftphonePanel({
             incomingCall={incomingCall}
             callHandling={callHandling}
             onDecline={controller.handleDecline}
-            className="mt-6"
           />
         ) : (
           waitingContent ?? (
-            <p className="mt-6 text-center text-muted-foreground">
-              Waiting for calls...
-            </p>
+            <p className="text-center text-muted-foreground">Waiting for calls...</p>
           )
         )}
 
@@ -100,23 +101,21 @@ export function SoftphonePanel({
             selectedMicId={audio.selectedMicId}
             selectedSpeakerId={audio.selectedSpeakerId}
             micMuted={callHandling.isMicMuted}
-            speakerMuted={audio.speakerMuted}
             callOnHold={callHandling.isActiveCallOnLocalHold}
             onMicChange={audio.handleMicChange}
             onSpeakerChange={audio.handleSpeakerChange}
             onMuteMic={audio.handleMuteMic}
-            onMuteSpeaker={audio.handleMuteSpeaker}
             onHold={callHandling.holdActiveCall}
             onResume={() => callHandling.resumeActiveCall()}
             onHangUp={() => callHandling.hangUp()}
             onKeypadPress={controller.handleKeypadPress}
           />
         )}
+      </div>
 
-        <Button variant="ghost" className="mt-6 w-full" onClick={onEndSession}>
-          End session and leave
-        </Button>
-      </Card>
-    </div>
+      <Button variant="ghost" className="w-full" onClick={onEndSession}>
+        End session and leave
+      </Button>
+    </PageShell>
   );
 }

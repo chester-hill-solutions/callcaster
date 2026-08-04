@@ -1,8 +1,12 @@
 import { data as routeData } from "react-router";
-import { safeParseJson } from "@/lib/database.server";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
-import { createSupabaseServerClient } from "@/lib/supabase.server";
-import type { ActionFunctionArgs } from "react-router";
+import { safeParseJson } from "@/lib/request-utils.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
+import { getSession } from "@/lib/auth.server";
+import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
+import { createTenantDb } from "@/server/tenant-db";
+import { resolveContactWorkspaceId } from "@/lib/platform-telephony.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import { defineAction } from "@/lib/handler.server";
 
 interface OutreachAttemptRequest {
   campaign_id: number | string;
@@ -10,23 +14,38 @@ interface OutreachAttemptRequest {
   queue_id: number | string;
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-
-    const auth = await requireJsonAuth(request);
-    if (auth instanceof Response) return auth;
-    const { headers } = createSupabaseServerClient(request);
-    const supabase = getAuthSupabaseClient(auth);
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
+    const { headers } = await getSession(request);
     const user = auth.user;
     const { campaign_id, contact_id, queue_id }: OutreachAttemptRequest =
       await safeParseJson(request);
 
-    const { data, error } = await supabase.rpc("create_outreach_attempt", {
-      con_id: Number(contact_id),
-      cam_id: Number(campaign_id),
-      usr_id: user?.id ?? '',
-      wks_id: '',
-      queue_id: Number(queue_id)
-    });
-    if (error) return routeData({ error })
-    return routeData(data,{headers})
-}
+    const workspaceId = await resolveContactWorkspaceId(contact_id);
+    if (!workspaceId) {
+      return routeData({ error: "Contact not found" }, { headers });
+    }
+
+    // The workspace is derived from a caller-supplied contact_id, so resolving
+    // it proves nothing about the caller. No minRole: recording an outreach
+    // attempt is a `caller`'s core job on the dial screen.
+    await requireWorkspaceAccess({ user, workspaceId });
+
+    const tdb = createTenantDb(workspaceId);
+
+    try {
+      const data = await rpcCreateOutreachAttempt(tdb, {
+        contactId: Number(contact_id),
+        campaignId: Number(campaign_id),
+        userId: user?.id ?? "",
+        workspaceId,
+        queueId: Number(queue_id),
+      });
+      return routeData(data, { headers });
+    } catch (error) {
+      return routeData({ error }, { headers });
+    }
+  },
+});

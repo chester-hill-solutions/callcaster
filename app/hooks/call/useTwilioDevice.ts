@@ -3,6 +3,7 @@ import type { Call, Device } from "@twilio/voice-sdk";
 import { useCallDuration } from "./useCallDuration";
 import { useTwilioConnection } from "./useTwilioConnection";
 import { useCallHandling } from "./useCallHandling";
+import { logger } from "@/lib/logger.client";
 
 interface CallConnectParams {
   To: string;
@@ -38,13 +39,13 @@ export function useTwilioDevice(
   send: (action: { type: string }) => void,
 ): TwilioDeviceHook {
   if (!token) {
-    throw new Error("useTwilioDevice: token is required");
+    logger.error("useTwilioDevice: token is required");
   }
   if (!workspaceId) {
-    throw new Error("useTwilioDevice: workspaceId is required");
+    logger.error("useTwilioDevice: workspaceId is required");
   }
   if (typeof send !== "function") {
-    throw new Error("useTwilioDevice: send callback must be a function");
+    logger.error("useTwilioDevice: send callback must be a function");
   }
 
   const [deviceIsBusy, setIsBusy] = useState<boolean>(false);
@@ -69,6 +70,15 @@ export function useTwilioDevice(
   const callHandling = useCallHandling({
     device: connection.device,
     workspaceId,
+    autoAcceptIncoming: true,
+    onCallStateChange: (newCallState) => {
+      switch (newCallState) {
+        case "dialing": send({ type: "START_DIALING" }); break;
+        case "connected": send({ type: "CONNECT" }); break;
+        case "completed": send({ type: "HANG_UP" }); break;
+        case "failed": send({ type: "FAIL" }); break;
+      }
+    },
     onStatusChange: (newStatus) => {
       setStatus(newStatus);
     },
@@ -78,22 +88,46 @@ export function useTwilioDevice(
     onDeviceBusyChange: (isBusy) => {
       setIsBusy(isBusy);
     },
-    onConnect: () => {
-      send({ type: "CONNECT" });
-    },
   });
 
+  /**
+   * @effect Mirror the latest `callHandling.receiveIncoming` handler into a
+   * ref so the stable `onIncomingCall` callback passed to useTwilioConnection
+   * always invokes current call-handling logic.
+   * @effect-deps callHandling.receiveIncoming (only re-syncs the ref when the
+   * handler identity changes)
+   * @effect-side-effects none (plain ref assignment)
+   * @effect-why-not-loader Not data fetching; "latest ref" pattern to avoid
+   * re-registering Twilio device listeners on every render.
+   */
   useEffect(() => {
     receiveIncomingRef.current = callHandling.receiveIncoming;
   }, [callHandling.receiveIncoming]);
 
   const { callDuration, setCallDuration } = useCallDuration(callHandling.callState);
 
+  /**
+   * @effect Hang up the active call and disconnect the Twilio device when
+   * the component unmounts, so calls do not stay live and consume credits
+   * after the agent navigates away.
+   * @effect-deps callHandling.hangUp, callHandling.activeCall, callHandling.callState, connection.device
+   * @effect-side-effects hung up / disconnecting SDK calls + device
+   * @effect-why-not-loader Teardown of imperative SDK resources on unmount.
+   */
   useEffect(() => {
-    if (connection.error && connection.error !== error) {
-      setError(connection.error);
-    }
-  }, [connection.error, error]);
+    const hangUp = callHandling.hangUp;
+    const device = connection.device;
+    const hasActiveCall = Boolean(callHandling.activeCall);
+    const isActive = callHandling.callState === "connected" || callHandling.callState === "dialing";
+    return () => {
+      if (hasActiveCall || isActive) {
+        hangUp().catch(() => {
+          logger.debug("Call hung up during unmount cleanup");
+        });
+      }
+      device?.disconnectAll();
+    };
+  }, [callHandling.hangUp, callHandling.activeCall, callHandling.callState, connection.device]);
 
   return {
     device: connection.device,

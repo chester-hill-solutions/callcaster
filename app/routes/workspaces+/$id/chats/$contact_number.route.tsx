@@ -3,17 +3,15 @@ export { loader } from "./$contact_number.loader.server";
 import { useOutletContext } from "react-router";
 import { ChatThreadView } from "@/components/chats/ChatThreadView";
 import type { Workspace, WorkspaceNumber } from "@/lib/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 type ChatThreadOutletContext = {
-  supabase: SupabaseClient;
   workspace: NonNullable<Workspace>;
   workspaceNumbers: WorkspaceNumber[];
   registerChatActions?: (
     actions: {
       addOptimisticMessage?: (p: {
         body: string;
-        from: string;
+        from?: string;
         to: string;
         media?: string;
       }) => void;
@@ -23,13 +21,13 @@ type ChatThreadOutletContext = {
 };
 
 export default function ChatScreen() {
-  const { supabase, workspace, registerChatActions, contactOptOut } =
+  const { workspace, workspaceNumbers, registerChatActions, contactOptOut } =
     useOutletContext<ChatThreadOutletContext>();
 
   return (
     <ChatThreadView
-      supabase={supabase}
       workspace={workspace}
+      workspaceNumbers={workspaceNumbers}
       registerChatActions={registerChatActions}
       contactOptOut={contactOptOut}
     />

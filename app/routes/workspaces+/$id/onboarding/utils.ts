@@ -1,3 +1,3 @@
-import { isRecord } from "@/lib/parse-utils.server";
-export { isRecord };
+import { isObject } from "@/lib/type-safety-utils";
+export { isObject };
 export { hasVoiceCapability } from "@/lib/onboarding/voice-capabilities";

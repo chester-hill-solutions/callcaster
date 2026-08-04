@@ -1,7 +1,8 @@
 import { MdCached, MdCheckCircle, MdClose, MdError } from "react-icons/md";
-import { Form } from "react-router";
-import { useState, useCallback, useEffect } from "react";
+import { Form, Link } from "react-router";
+import { useState, useCallback } from "react";
 import { CheckCircleIcon, Edit } from "lucide-react";
+import { WorkspaceResourceEmptyState } from "@/components/workspace/WorkspaceResourceListShell";
 import { Button } from "@/components/ui/button";
 import { Heading } from "@/components/ui/typography";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { User, WorkspaceNumbers } from "@/lib/types";
+
+/** Minimal member shape this table consumes (User rows or workspace-user rows). */
+type MemberOption = Pick<NonNullable<User>, "id" | "username"> | null;
 import {
   INBOUND_RING_COUNT_OPTIONS,
   normalizeInboundRingCount,
@@ -25,6 +29,7 @@ export const NumbersTable = ({
   mediaNames = [],
   queues = [],
   scripts = [],
+  forwardingNumbers,
   onIncomingActivityChange,
   onIncomingVoiceMessageChange,
   onCallerIdChange,
@@ -34,12 +39,15 @@ export const NumbersTable = ({
   onInboundScriptChange,
   onNumberRemoval,
   isBusy,
+  title = "Existing Numbers",
+  hideEmptyState = false,
 }: {
   phoneNumbers: WorkspaceNumbers[];
-  users: User[];
-  mediaNames: { id: number; name: string }[];
+  users: MemberOption[];
+  mediaNames: { id: number | string; name: string }[];
   queues?: { id: number; name: string }[];
   scripts?: { id: number; name: string }[];
+  forwardingNumbers?: WorkspaceNumbers[];
   onIncomingActivityChange: (id: number, value: string) => void;
   onIncomingVoiceMessageChange: (id: number, value: string) => void;
   onCallerIdChange: (id: number, value: string) => void;
@@ -49,13 +57,18 @@ export const NumbersTable = ({
   onInboundScriptChange?: (numberId: number, scriptId: string) => void;
   onNumberRemoval: (id: number) => void;
   isBusy: boolean;
+  /** Reuse hook for embedding this table outside the numbers settings page (e.g. onboarding). */
+  title?: string;
+  /** Reuse hook: suppress the "No phone numbers yet" empty state when the caller already gates rendering on having numbers. */
+  hideEmptyState?: boolean;
 }) => {
   const [numbers, setNumbers] = useState(phoneNumbers);
 
-  useEffect(() => {
-
+  const [prevPhoneNumbers, setPrevPhoneNumbers] = useState(phoneNumbers);
+  if (prevPhoneNumbers !== phoneNumbers) {
+    setPrevPhoneNumbers(phoneNumbers);
     setNumbers(phoneNumbers);
-  }, [phoneNumbers]);
+  }
 
   const updateNumber = useCallback(
     (id: number, updates: Partial<WorkspaceNumbers>) => {
@@ -111,7 +124,7 @@ export const NumbersTable = ({
 
   const handleInboundQueueChange = useCallback(
     (numberId: number, queueId: string) => {
-      updateNumber(numberId, { inbound_queue_id: queueId ? Number(queueId) : null });
+      updateNumber(numberId, { inbound_queue_id: queueId ? Number(queueId) : undefined });
       onInboundQueueChange?.(numberId, queueId);
     },
     [updateNumber, onInboundQueueChange],
@@ -127,15 +140,28 @@ export const NumbersTable = ({
     [onNumberRemoval],
   );
 
-  const verifiedNumbers = numbers.filter(
-    (number) => number?.type === "caller_id",
-  );
+  const verifiedNumbers =
+    forwardingNumbers ??
+    numbers.filter((number) => number?.type === "caller_id");
 
   return (
       <>
-      <Heading className="text-center" branded>
-      Existing Numbers
+      <Heading as="h2" className="text-center" branded={false}>
+      {title}
     </Heading><div className="flex flex-col py-4">
+        {numbers.length === 0 ? (
+          hideEmptyState ? null : (
+            <WorkspaceResourceEmptyState
+              emptyMessage="No phone numbers yet"
+              emptyDescription="Rent a number or verify a caller ID to start calling."
+              addAction={
+                <Button asChild>
+                  <Link to="./purchase">Rent a Number</Link>
+                </Button>
+              }
+            />
+          )
+        ) : (
         <Table>
           <TableHeader>
             <TableRow>
@@ -173,6 +199,7 @@ export const NumbersTable = ({
             ))}
           </TableBody>
         </Table>
+        )}
       </div></>
   );
 };
@@ -195,9 +222,9 @@ const NumberRow = ({
   isBusy,
 }: {
   number: WorkspaceNumbers;
-  members: User[];
+  members: MemberOption[];
   verifiedNumbers: WorkspaceNumbers[];
-  mediaNames: { id: number; name: string }[];
+  mediaNames: { id: number | string; name: string }[];
   queues?: { id: number; name: string }[];
   scripts?: { id: number; name: string }[];
   handleIncomingActivityChange: (id: number, value: string) => void;
@@ -229,9 +256,10 @@ const NumberRow = ({
       <TableCell className="mt-2 py-2">
         <Button
         variant={"ghost"}
-          className="text-red-500 hover:text-red-700"
+          className="text-destructive hover:text-destructive/80"
           onClick={() => handleNumberRemoval(number.id)}
           disabled={isBusy}
+          aria-label={`Release ${number.phone_number ?? "this number"}`}
         >
           <MdClose />
         </Button>
@@ -269,6 +297,7 @@ const NumberRow = ({
                 variant={"ghost"}
                 className="rounded-full"
                 onClick={() => setIsEditingNumber(number.id)}
+                aria-label={`Edit caller ID for ${number.phone_number ?? "this number"}`}
               >
                 <Edit />
               </Button>
@@ -396,8 +425,8 @@ const StatusIndicator = ({ status }: { status: string }) => {
     case "failed":
       return (
         <div className="flex items-center gap-2">
-          <p className="text-xs uppercase text-red-600">{status}</p>
-          <MdError className="text-red-600" size={24} />
+          <p className="text-xs uppercase text-destructive">{status}</p>
+          <MdError className="text-destructive" size={24} />
         </div>
       );
     case "pending":
@@ -419,62 +448,82 @@ const IncomingActivitySelect = ({
   onChange,
 }: {
   number: WorkspaceNumbers;
-  members: User[];
+  members: MemberOption[];
   verifiedNumbers: WorkspaceNumbers[];
   onChange: (id: number, value: string) => void;
 }) => {
+  const forwardingDisabledReasonId = `forwarding-disabled-reason-${number?.id ?? "unknown"}`;
+  const forwardingUnavailable =
+    Boolean(number) && number?.type !== "caller_id" && verifiedNumbers.length === 0;
+
   return (
     number && (
-      <select
-        className="w-full rounded border p-2"
-        disabled={number.type === "caller_id"}
-        defaultValue={number.inbound_action || ""}
-        onChange={(e) => onChange(number.id, e.target.value)}
-      >
-        {number.type === "caller_id" ? (
-          <option>Outbound Only</option>
-        ) : (
-          <>
-            <option value="">Select how to handle incoming calls</option>
-            <option value="webhook_only">Webhook Only</option>
-            {members.map(
-              (member: User) =>
-                member && (
-                  <option key={member.id} value={member.username}>
-                    Email to Workspace Member{" "}
-                    {member.username && `- ${member.username}`}
+      <div className="space-y-1">
+        <select
+          className="w-full rounded border p-2"
+          disabled={number.type === "caller_id"}
+          defaultValue={number.inbound_action || ""}
+          onChange={(e) => onChange(number.id, e.target.value)}
+          aria-label={`Incoming call handling for ${number.phone_number ?? "number"}`}
+          aria-describedby={
+            forwardingUnavailable ? forwardingDisabledReasonId : undefined
+          }
+        >
+          {number.type === "caller_id" ? (
+            <option>Outbound Only</option>
+          ) : (
+            <>
+              <option value="">Select how to handle incoming calls</option>
+              <option value="webhook_only">Webhook Only</option>
+              {members.map(
+                (member: MemberOption) =>
+                  member && (
+                    <option key={member.id} value={member.username}>
+                      Email to Workspace Member{" "}
+                      {member.username && `- ${member.username}`}
+                    </option>
+                  ),
+              )}
+              {!verifiedNumbers.length && (
+                <option disabled>Forward to your verified number</option>
+              )}
+              {verifiedNumbers.length > 0 &&
+                verifiedNumbers.map((verifiedNumber) => (
+                  <option
+                    key={verifiedNumber?.id}
+                    value={`${verifiedNumber?.phone_number}`}
+                  >
+                    Forward to {verifiedNumber?.friendly_name}
                   </option>
-                ),
-            )}
-            {!verifiedNumbers.length && (
-              <option disabled>Forward to your verified number</option>
-            )}
-            {verifiedNumbers.length > 0 &&
-              verifiedNumbers.map((verifiedNumber) => (
-                <option
-                  key={verifiedNumber?.id}
-                  value={`${verifiedNumber?.phone_number}`}
-                >
-                  Forward to {verifiedNumber?.friendly_name}
-                </option>
-              ))}
-          </>
-        )}
-      </select>
+                ))}
+            </>
+          )}
+        </select>
+        {forwardingUnavailable ? (
+          <p
+            id={forwardingDisabledReasonId}
+            className="text-xs text-muted-foreground"
+            role="status"
+          >
+            Verify a caller ID before enabling call forwarding.
+          </p>
+        ) : null}
+      </div>
     )
   );
 };
 
-const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }: { number: WorkspaceNumbers, mediaNames: { id: number; name: string; }[], onChange: (id: number, value: string) => void }) => {
+const IncomingVoiceMessageSelect = ({ number, mediaNames, onChange }: { number: WorkspaceNumbers, mediaNames: { id: number | string; name: string; }[], onChange: (id: number, value: string) => void }) => {
   if (!number) return null;
   return (
     <select
       className="w-full rounded border p-2"
       defaultValue={number?.inbound_audio || ""}
       onChange={(e) => onChange(number?.id, e.target.value)}
+      aria-label={`Voicemail message for ${number?.phone_number ?? "number"}`}
     >
       <option value="">Select a voice message</option>
-      {mediaNames.filter(mediaName => !mediaName.name.startsWith('voicemail-+')).map((mediaName: { id: number, name: string }, index: number) => (
+      {mediaNames.filter(mediaName => !mediaName.name.startsWith('voicemail-+')).map((mediaName: { id: number | string; name: string }, index: number) => (
         <option key={index} value={mediaName.name}>
           {mediaName.name}
         </option>

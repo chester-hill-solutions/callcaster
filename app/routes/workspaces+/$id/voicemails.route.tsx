@@ -1,51 +1,64 @@
 export { loader } from "./voicemails.loader.server";
 
-import { LoaderFunctionArgs, redirect, useLoaderData, useOutletContext } from "react-router";
+import { Link, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
+import { Voicemail } from "lucide-react";
 import { mediaColumns } from "@/components/file-assets/columns";
-
+import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { DataTable } from "@/components/workspace/tables/DataTable";
+import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
+import { Button } from "@/components/ui/button";
 
-
-import { Workspace } from "@/lib/types";
-import type { FileObject } from "@supabase/storage-js";
+import { ContextType } from "@/lib/types";
 
 export default function WorkspaceVoicemailsPage() {
-  const { audioMedia, error} =
-    useLoaderData();
-  const {workspace } = useOutletContext<{workspace: Workspace}>();
+  const outlet = useOutlet();
+  const parentContext = useOutletContext<ContextType>();
+  const { audioMedia, error } = useLoaderData();
+
+  if (outlet) {
+    return <Outlet context={parentContext} />;
+  }
+
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-  const voicemails = audioMedia?.filter(
-    (media: FileObject) => media.name.includes("voicemail-+") || media.name.includes("voicemail-undefined"),
+  const voicemails = audioMedia;
+
+  const setUpAction = (
+    <Button asChild className="font-Zilla-Slab text-lg font-semibold">
+      <Link to="./setup">Set up voicemail</Link>
+    </Button>
   );
 
   return (
-    <main className="flex h-full flex-col gap-4 rounded-sm ">
-      <div className="flex flex-col sm:flex-row sm:justify-between">
-        <div className="flex">
-          <h1 className="mb-4 text-center font-Zilla-Slab text-2xl font-bold text-brand-primary dark:text-white">
-            {workspace != null
-              ? `${workspace?.name} Voicemails`
-              : "No Workspace"}
-          </h1>
-        </div>
-      </div>
-      {error && !isWorkspaceAudioEmpty && (
-        <h4 className="text-center font-Zilla-Slab text-4xl font-bold text-red-500">
-          {error}
-        </h4>
-      )}
-      {isWorkspaceAudioEmpty && (
-        <h4 className="py-16 text-center font-Zilla-Slab text-2xl font-bold text-black dark:text-white">
-          Add Your Own Audio to this Workspace!
-        </h4>
-      )}
-      {voicemails != null && (
-        <DataTable
-          className="rounded-md border-2 font-semibold text-gray-700 dark:border-white dark:text-white"
-          columns={mediaColumns}
-          data={voicemails}
-        />
-      )}
-    </main>
+    <>
+      <QueryParamBanner
+        param="configured"
+        variants={{
+          "1": {
+            title: "Voicemail is set up",
+            description:
+              "Callers will hear your greeting and can leave a message. Their messages will show up here.",
+          },
+        }}
+      />
+      <WorkspaceResourceListShell
+        title="Voicemails"
+        error={error}
+        isEmpty={isWorkspaceAudioEmpty}
+        emptyMessage="No voicemails yet"
+        emptyDescription="Messages callers leave will appear here. Set up a greeting so callers know they can leave one."
+        emptyIcon={<Voicemail className="h-7 w-7" aria-hidden="true" />}
+        addAction={setUpAction}
+      >
+        {voicemails != null && !isWorkspaceAudioEmpty ? (
+          <DataTable
+            className="font-semibold text-foreground"
+            columns={mediaColumns}
+            data={voicemails}
+          />
+        ) : null}
+      </WorkspaceResourceListShell>
+    </>
   );
 }
+
+export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";

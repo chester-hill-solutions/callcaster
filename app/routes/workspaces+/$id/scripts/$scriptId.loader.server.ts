@@ -1,14 +1,14 @@
+import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
-import { getUserRole, listMedia } from "@/lib/database.server";
+import { listMedia } from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { getScriptDetailApi } from "@/lib/platform-data.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
+import { defineLoader } from "@/lib/handler.server";
 import type { Script } from "@/lib/types";
-import type { Tables } from "@/lib/database.types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type ScriptIdLoaderData = {
-  workspace: Tables<"workspace">;
+  workspace: NonNullable<Awaited<ReturnType<typeof getWorkspaceForClient>>>;
   workspace_id: string;
   selected_id: string;
   script: Script | null;
@@ -16,40 +16,39 @@ export type ScriptIdLoaderData = {
   userRole: MemberRole;
 };
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { id: workspace_id, scriptId: selected_id } = params;
-  if (!workspace_id || !selected_id) {
-    throw redirect("/workspaces");
-  }
-  const { supabaseClient, user } = await verifyAuth(request);
-  if (!user) {
-    throw redirect("/signin");
-  }
-  const { data: workspaceData, error: workspaceError } = await supabaseClient
-    .from("workspace")
-    .select()
-    .eq("id", workspace_id as string)
-    .single();
-  if (workspaceError) throw workspaceError;
-  const userRole = await getUserRole({
-    supabaseClient: supabaseClient as SupabaseClient,
-    user,
-    workspaceId: workspace_id as string,
-  });
-  const { data: script } = await supabaseClient
-    .from("script")
-    .select()
-    .eq("workspace", workspace_id as string)
-    .eq("id", Number(selected_id) || 0)
-    .single();
+export const loader = defineLoader({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ params, auth }) => {
+    const { id: workspace_id, scriptId: selected_id } = params;
+    if (!workspace_id || !selected_id) {
+      throw redirect("/workspaces");
+    }
 
-  const mediaNames = await listMedia(supabaseClient, workspace_id as string);
-  return routeData({
-    workspace: workspaceData,
-    workspace_id,
-    selected_id,
-    script,
-    mediaNames,
-    userRole: (userRole?.role ?? MemberRole.Member) as MemberRole,
-  } satisfies ScriptIdLoaderData);
-};
+    const { userRole } = auth;
+
+    const workspaceData = await getWorkspaceForClient(workspace_id);
+    if (!workspaceData) {
+      throw redirect("/workspaces");
+    }
+    if (!userRole) {
+      throw redirect(`/workspaces/${workspace_id}`);
+    }
+
+    const scriptResult = await getScriptDetailApi(
+      selected_id,
+      workspace_id,
+    );
+    const script = scriptResult.ok ? (scriptResult.script as Script) : null;
+
+    const mediaNames = await listMedia(workspace_id);
+    return routeData({
+      workspace: workspaceData,
+      workspace_id,
+      selected_id,
+      script,
+      mediaNames,
+      userRole: userRole as MemberRole,
+    } satisfies ScriptIdLoaderData);
+  },
+});

@@ -1,11 +1,10 @@
-import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { data as routeData } from "react-router";
+import { defineLoader } from "@/lib/handler.server";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-
-  const { supabaseClient } = await verifyAuth(request);
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) return redirect("/remember");
-  return routeData({});
-}
+export const loader = defineLoader({
+  sideEffects: ["none"],
+  handler: ({ url }) => {
+    const token = url.searchParams.get("token") ?? null;
+    return routeData({ token });
+  },
+});

@@ -1,4 +1,5 @@
 import type { TwilioSmsSenderClass, TwilioTrafficClass } from "@/lib/types";
+import { stripPhoneNumber } from "@/lib/phone";
 
 const TOLL_FREE_NPA = new Set([
   "800",
@@ -11,7 +12,7 @@ const TOLL_FREE_NPA = new Set([
 ]);
 
 export function classifyPhoneNumberSenderType(phoneNumber: string): string {
-  const digits = phoneNumber.replace(/\D/g, "");
+  const digits = stripPhoneNumber(phoneNumber);
   if (digits.length > 0 && digits.length <= 6) {
     return "short_code";
   }
@@ -116,5 +117,3 @@ export function classifyTwilioPhoneInventory(
   };
 }
 
-/** @deprecated Use inferSmsSenderClassFromSenderTypes with Twilio inventory sender types. */
-export { inferSmsSenderClassFromSenderTypes as inferSmsSenderClassFromNumberTypes };

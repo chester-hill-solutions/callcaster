@@ -1,3 +1,4 @@
+import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import {
   Audience,
   Campaign,
@@ -16,14 +17,30 @@ import { data as routeData, redirect } from "react-router";
 import { normalizeCampaignData } from "@/lib/campaign-settings";
 import { normalizeSchedule } from "@/lib/workspace-members";
 import { deepEqual } from "@/lib/utils";
-import { fetchQueueCounts, getCampaignTableKey, parseActionRequest, updateCampaign } from "@/lib/database.server";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import { parseActionRequest } from "@/lib/request-utils.server";
+import {
+  findCampaignInWorkspace,
+  insertCampaignForWorkspace,
+  updateCampaignStatusInWorkspace,
+} from "@/lib/campaign-ivr.server";
+import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
+import {
+  splitMessageCampaign,
+  fetchCampaignDetails,
+  fetchQueueCounts,
+  updateCampaign,
+} from "@/lib/database/campaign.server";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
+import { getCampaignReadiness, getScheduleValidation } from "@/lib/campaign-readiness";
+import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { verifyAuth } from "@/lib/supabase.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
-import type { ActionFunctionArgs } from "react-router";
+import { defineAction } from "@/lib/handler.server";
+import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
+import { createTenantDb } from "@/server/tenant-db";
+import { MemberRole } from "@/lib/member-role";
+import { toUserMessage } from "@/lib/user-message";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
 
@@ -38,9 +55,8 @@ type CampaignDetails = (LiveCampaign | MessageCampaign | IVRCampaign) & {
 };
 
 async function updateCampaignStatus(
-  supabaseClient: SupabaseClient,
-  selected_id: string,
   workspaceId: string,
+  selected_id: string,
   status: string,
   is_active?: boolean,
 ) {
@@ -54,78 +70,57 @@ async function updateCampaignStatus(
   }
 
   logger.debug("Server update object:", update);
-  const { error } = await supabaseClient
-    .from("campaign")
-    .update({ ...update })
-    .eq("id", Number(selected_id))
-    .eq("workspace", workspaceId);
-
-  if (error) throw error;
+  await updateCampaignStatusInWorkspace(workspaceId, Number(selected_id), update);
   return { success: true };
 }
 
 async function handleCampaignDuplicate(
-  supabaseClient: SupabaseClient,
   selected_id: string,
   workspace_id: string,
   campaignData: string,
 ) {
   const parsedData = JSON.parse(campaignData);
 
-  const { data: campaign, error } = await supabaseClient
-    .from("campaign")
-    .insert({ ...parsedData, workspace: workspace_id })
-    .select("id")
-    .single();
+  // Don't trust the client's (possibly stale/edited) draft for the script
+  // reference — read the source campaign's real script_id off the DB so the
+  // duplicate always points at a script that actually exists in this
+  // workspace. Null it out if the source has none.
+  const sourceCampaign = await findCampaignInWorkspace(workspace_id, selected_id);
 
-  if (error || !campaign) throw error || new Error("Failed to create campaign");
+  const campaign = await insertCampaignForWorkspace(workspace_id, {
+    ...parsedData,
+    script_id: sourceCampaign?.script_id ?? null,
+    live_questions: parsedData.live_questions ?? parsedData.questions ?? null,
+  });
 
-  const { data: originalQueue } = await supabaseClient
-    .from("campaign_queue")
-    .select("contact_id")
-    .eq("campaign_id", selected_id);
+  const originalContactIds = await getCampaignQueueContactIds(Number(selected_id));
 
-  if (originalQueue?.length) {
-    const newQueueItems = originalQueue.map((item) => ({
-      campaign_id: campaign.id,
-      contact_id: item.contact_id,
-      workspace: workspace_id,
-    }));
-
-    const { error: queueError } = await supabaseClient
-      .from("campaign_queue")
-      .insert(newQueueItems);
-
-    if (queueError) throw queueError;
+  if (originalContactIds.length > 0) {
+    await enqueueContactsForCampaign(
+      campaign.id,
+      originalContactIds,
+      { requeue: false },
+    );
   }
-
-  await supabaseClient
-    .from(
-      parsedData.type === "live_call"
-        ? "live_campaign"
-        : parsedData.type === "message"
-          ? "message_campaign"
-          : "ivr_campaign",
-    )
-    .insert({
-      campaign_id: campaign.id,
-      workspace: workspace_id,
-      script_id: parsedData.script_id,
-      body_text: parsedData.body_text,
-      message_media: parsedData.message_media,
-      voicedrop_audio: parsedData.voicedrop_audio,
-    });
 
   return { success: true };
 }
 
-export async function action({ request, params }: ActionFunctionArgs) {
-
+export const action = defineAction({
+  auth: workspaceRouteAuth,
+  sideEffects: ["db-write"],
+  handler: async ({ request, params, auth }) => {
   const { id: workspace_id, selected_id } = params;
-  const { supabaseClient, user } = await verifyAuth(request);
+  const { user, userRole, headers } = auth;
 
-  if (!user) return redirect("/signin");
   if (!selected_id || !workspace_id) return redirect("/");
+
+  if (!hasMinRole(userRole, MemberRole.Admin)) {
+    return routeData(
+      { error: "You don't have permission to perform this action" },
+      { headers, status: 403 },
+    );
+  }
 
   const data = await parseActionRequest(request);
   const intent = String(data.intent ?? "");
@@ -145,19 +140,27 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
         const nextCampaignData = JSON.parse(campaignDataStr);
         const nextCampaignDetails = JSON.parse(campaignDetailsStr);
-        const previousCampaign = await supabaseClient
-          .from("campaign")
-          .select("type")
-          .eq("id", Number(selected_id))
-          .single();
+
+        const schedule = normalizeSchedule(nextCampaignData.schedule);
+        const scheduleValidation = getScheduleValidation(schedule);
+        if (scheduleValidation.hasInvalidIntervals) {
+          return routeData(
+            {
+              error:
+                "Each active calling day needs at least one valid time window (start and end must be different).",
+              actionType: "save" as const,
+            },
+            { status: 400 },
+          );
+        }
 
         const result = await updateCampaign({
-          supabase: supabaseClient,
           campaignData: {
             ...nextCampaignData,
             campaign_id: Number(selected_id),
             workspace: workspace_id,
-            schedule: normalizeSchedule(nextCampaignData.schedule),
+            schedule,
+            sms_send_window: normalizeSchedule(nextCampaignData.sms_send_window),
           },
           campaignDetails: {
             ...nextCampaignDetails,
@@ -165,22 +168,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
             workspace: workspace_id,
           },
         });
-
-        if (
-          previousCampaign.data?.type &&
-          previousCampaign.data.type !== nextCampaignData.type
-        ) {
-          const activeTable = getCampaignTableKey(nextCampaignData.type);
-          const tables = ["live_campaign", "message_campaign", "ivr_campaign"] as const;
-
-          await Promise.all(
-            tables
-              .filter((table) => table !== activeTable)
-              .map((table) =>
-                supabaseClient.from(table).delete().eq("campaign_id", Number(selected_id)),
-              ),
-          );
-        }
 
         return routeData({
           success: true,
@@ -192,7 +179,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         logger.error("Error saving campaign settings", error);
         return routeData(
           {
-            error: error instanceof Error ? error.message : "Campaign changes could not be saved",
+            error: toUserMessage(error, "Campaign changes could not be saved"),
             actionType: "save" as const,
           },
           { status: 400 },
@@ -204,15 +191,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
       try {
         const status = String(data.status ?? "") as CampaignStatus;
         const is_active = String(data.is_active ?? "");
-        const { data: campaignRecord, error: campaignError } = await supabaseClient
-          .from("campaign")
-          .select("*")
-          .eq("id", Number(selected_id))
-          .eq("workspace", workspace_id)
-          .single();
+        const campaignRecord = await findCampaignInWorkspace(workspace_id, selected_id);
 
-        if (campaignError || !campaignRecord) {
-          throw campaignError ?? new Error("Campaign could not be loaded");
+        if (!campaignRecord) {
+          throw new Error("Campaign could not be loaded");
         }
 
         if (status === "running" || status === "scheduled") {
@@ -232,23 +214,28 @@ export async function action({ request, params }: ActionFunctionArgs) {
             );
           }
 
-          const detailTable = getCampaignTableKey(
-            campaignRecord.type as Exclude<Campaign["type"], "email" | null>,
-          );
-          const { data: campaignDetails, error: detailError } = await supabaseClient
-            .from(detailTable)
-            .select("*")
-            .eq("campaign_id", Number(selected_id))
-            .eq("workspace", workspace_id)
-            .maybeSingle();
-
-          if (detailError) {
-            throw detailError;
-          }
-
-          const queueCounts = await fetchQueueCounts(supabaseClient, selected_id);
-          const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as CampaignDetails, {
+          const tdb = createTenantDb(workspace_id);
+          const [campaignDetails, queueCounts, phoneNumbersResult, scripts, audioList] =
+            await Promise.all([
+              fetchCampaignDetails({
+                workspaceId: workspace_id,
+                campaignId: selected_id,
+              }),
+              fetchQueueCounts({
+                workspaceId: workspace_id,
+                campaignId: selected_id,
+              }),
+              getWorkspacePhoneNumbers({ workspaceId: workspace_id }),
+              tdb.script.findMany({ columns: { id: true } }),
+              listWorkspaceAudiosApi(user.id, workspace_id),
+            ]);
+          const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as unknown as CampaignDetails, {
             queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
+            workspacePhoneNumbers: phoneNumbersResult.data ?? [],
+            workspaceScriptIds: scripts.map((script) => script.id),
+            workspaceAudioNames: audioList.ok
+              ? audioList.audios.map((audio) => audio.name)
+              : [],
           });
           const readinessError =
             status === "scheduled" ? readiness.scheduleDisabledReason : readiness.startDisabledReason;
@@ -262,9 +249,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
         }
 
         await updateCampaignStatus(
-          supabaseClient,
-          selected_id,
           workspace_id,
+          selected_id,
           status,
           is_active === "true" ? true : is_active === "false" ? false : undefined
         );
@@ -274,7 +260,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
         return routeData(
           {
             success: false,
-            error: error instanceof Error ? error.message : "Campaign status could not be updated",
+            error: toUserMessage(error, "Campaign status could not be updated"),
             actionType: "status" as const,
           },
           { status: 400 },
@@ -285,15 +271,53 @@ export async function action({ request, params }: ActionFunctionArgs) {
     case "duplicate": {
       try {
         const campaignData = data.campaignData != null ? String(data.campaignData) : "";
-        await handleCampaignDuplicate(supabaseClient, selected_id, workspace_id, campaignData);
+        await handleCampaignDuplicate(selected_id, workspace_id, campaignData);
         return routeData({ success: true, actionType: "duplicate" as const });
       } catch (error) {
         logger.error("Error duplicating campaign", error);
         return routeData(
           {
             success: false,
-            error: error instanceof Error ? error.message : "Campaign could not be duplicated",
+            error: toUserMessage(error, "Campaign could not be duplicated"),
             actionType: "duplicate" as const,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    case "split": {
+      try {
+        const segmentCount = Number(data.segmentCount ?? 0);
+        if (!Number.isFinite(segmentCount) || segmentCount < 2) {
+          return routeData(
+            {
+              success: false,
+              error: "Choose at least 2 segments to split into",
+              actionType: "split" as const,
+            },
+            { status: 400 },
+          );
+        }
+        const result = await splitMessageCampaign({
+          workspaceId: workspace_id,
+          sourceCampaignId: selected_id,
+          segmentCount,
+          userId: user.id,
+        });
+        return routeData({
+          success: true,
+          actionType: "split" as const,
+          segments: result.segments,
+          movedContactCount: result.movedContactCount,
+        });
+      } catch (error) {
+        logger.error("Error splitting campaign", error);
+        return routeData(
+          {
+            success: false,
+            error: toUserMessage(error, "Campaign could not be split"),
+            actionType: "split" as const,
           },
           { status: 400 },
         );
@@ -303,4 +327,5 @@ export async function action({ request, params }: ActionFunctionArgs) {
     default:
       return routeData({ success: false, error: "Invalid intent" }, { status: 400 });
   }
-}
+  },
+});

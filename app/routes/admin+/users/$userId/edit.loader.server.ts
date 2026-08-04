@@ -1,44 +1,27 @@
 import { data as routeData, redirect } from "react-router";
-import { verifyAuth } from "@/lib/supabase.server";
-import type { LoaderFunctionArgs } from "react-router";
+import { getAdminUser } from "@/lib/platform-admin.server";
+import { adminRouteAuth } from "@/lib/admin-route.server";
+import { defineLoader } from "@/lib/handler.server";
 
-export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-
-    const { supabaseClient, user } = await verifyAuth(request);
-
-    if (!user) {
-        throw redirect("/signin");
-    }
-
-    const { data: userData } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-    if (!userData || userData?.access_level !== 'sudo') {
-        throw redirect("/signin");
-    }
-
+export const loader = defineLoader({
+  auth: adminRouteAuth,
+  sideEffects: ["db-read"],
+  handler: async ({ auth, params }) => {
+    const { userData } = auth;
     const userId = params.userId;
-    
+
     if (!userId) {
-        throw redirect("/admin?tab=users");
+      throw redirect("/admin?tab=users");
     }
 
-    // Get the user to edit
-    const { data: targetUser } = await supabaseClient
-        .from("user")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-    if (!targetUser) {
-        throw redirect("/admin?tab=users");
+    const result = await getAdminUser(userId);
+    if (!result.ok) {
+      throw redirect("/admin?tab=users");
     }
 
-    return routeData({ 
-        currentUser: userData,
-        targetUser
+    return routeData({
+      currentUser: userData,
+      targetUser: result.user,
     });
-}
+  },
+});

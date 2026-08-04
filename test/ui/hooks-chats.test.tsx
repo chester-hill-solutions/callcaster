@@ -2,7 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   createMockFetcher,
-  createSupabaseRealtimeMock,
+  createWorkspaceRealtimeMock,
   installIntersectionObserverMock,
 } from "./hooks-test-helpers";
 
@@ -10,7 +10,40 @@ vi.mock("@/lib/logger.client", () => ({
   logger: { debug: vi.fn(), error: vi.fn(), warn: vi.fn(), info: vi.fn() },
 }));
 
-const imageFetcher = createMockFetcher({ state: "idle", data: { success: true, url: "https://img" } });
+const messagingMocks = vi.hoisted(() => ({
+  markConversationRead: vi.fn().mockResolvedValue(undefined),
+  fetchContactsByPhone: vi.fn(),
+  fetchLatestMessageForPhone: vi.fn(),
+  fetchConversationSummaries: vi.fn(),
+  fetchAudienceUploads: vi.fn(),
+  fetchCampaignQueueItemWithContact: vi.fn(),
+}));
+
+vi.mock("@/lib/chats/messaging-client", () => messagingMocks);
+
+vi.mock("@/hooks/utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/utils")>();
+  const { useEffect } = await import("react");
+  return {
+    ...actual,
+    useFetcherOnIdle: (
+      fetcher: { state: string; data?: unknown },
+      onIdle: (data: unknown) => void,
+    ) => {
+      useEffect(() => {
+        if (fetcher.state === "idle") {
+          onIdle(fetcher.data);
+        }
+        // onIdle omitted intentionally: this test double mirrors the real
+        // useFetcherOnIdle, which fires on the fetcher busy→idle edge, not on
+        // callback identity changes.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [fetcher.state, fetcher.data]);
+    },
+  };
+});
+
+const imageFetcher = createMockFetcher({ state: "idle", data: undefined });
 const olderFetcher = createMockFetcher({ state: "idle" });
 
 vi.mock("react-router", async () => {
@@ -45,13 +78,18 @@ describe("chats hooks", () => {
 
   test("useImageHandling uploads and removes images", async () => {
     const { useImageHandling } = await import("@/hooks/chats/useImageHandling");
-    const { result } = renderHook(() => useImageHandling("ws"));
+    const { result, rerender } = renderHook(() => useImageHandling("ws"));
 
     const file = new File(["x"], "a.png", { type: "image/png" });
     act(() => {
       result.current.handleImageSelect({
         target: { files: [file] },
       } as React.ChangeEvent<HTMLInputElement>);
+    });
+    act(() => {
+      imageFetcher.state = "idle";
+      imageFetcher.data = { success: true, url: "https://img" };
+      rerender();
     });
     expect(result.current.selectedImages).toContain("https://img");
 
@@ -60,13 +98,13 @@ describe("chats hooks", () => {
   });
 
   test("useChatThread registers actions and exposes messages", async () => {
-    const { supabase } = createSupabaseRealtimeMock();
+    const { client } = createWorkspaceRealtimeMock();
     const { useChatThread } = await import("@/hooks/chats/useChatThread");
     const registerChatActions = vi.fn();
 
     const { result } = renderHook(() =>
       useChatThread({
-        supabase: supabase as never,
+        client: client as never,
         workspace: { id: "ws" } as never,
         registerChatActions,
       }),

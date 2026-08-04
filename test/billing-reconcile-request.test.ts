@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   mapWithConcurrency,
   parseBillingReconcileBody,
-} from "../supabase/functions/_shared/billing-reconcile-request.ts";
+} from "../shared/billing-reconcile-request.ts";
 
 describe("parseBillingReconcileBody", () => {
   test("defaults when body is empty or invalid", () => {

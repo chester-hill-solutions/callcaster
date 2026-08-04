@@ -1,25 +1,33 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
+import { findCallWithCampaignScriptBySid } from "@/lib/telephony-db.server";
 
 const mocks = vi.hoisted(() => {
   return {
-    createClient: vi.fn(),
-    validateTwilioWebhookForCallSid: vi.fn(),
+    requireTwilioSignature: vi.fn(),
     env: {
-      SUPABASE_URL: () => "https://sb.example",
-      SUPABASE_SERVICE_KEY: () => "svc",
+      BETTER_AUTH_URL: () => "https://sb.example",
+      BETTER_AUTH_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "tok",
     },
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
 
-vi.mock("@supabase/supabase-js", () => ({ createClient: (...a: unknown[]) => mocks.createClient(...a) }));
 vi.mock("@/lib/twilio-webhook.server", () => ({
-  validateTwilioWebhookForCallSid: (...a: unknown[]) =>
-    mocks.validateTwilioWebhookForCallSid(...a),
+  requireTwilioSignature: (...a: unknown[]) =>
+    mocks.requireTwilioSignature(...a),
 }));
+
+vi.mock("@/lib/telephony-db.server", () => ({
+  findCallWithCampaignScriptBySid: vi.fn(),
+}));
+
+vi.mock("@/lib/campaign-ivr.server", () => ({
+  ivrScriptStepsFromCampaign: (campaign: any) => campaign?.script?.steps ?? null,
+}));
+
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -42,45 +50,18 @@ vi.mock("twilio", () => {
   return { default: { twiml: { VoiceResponse } } };
 });
 
-function makeSupabase(sequence: Array<{ data: unknown; error: unknown }>) {
-  let i = 0;
-  return {
-    from: (table: string) => {
-      if (table === "call") {
-        return {
-          select: () => ({
-            eq: () => ({
-              single: async () => {
-                const r = sequence[Math.min(i, sequence.length - 1)];
-                i += 1;
-                return r;
-              },
-            }),
-          }),
-        };
-      }
-      throw new Error("unexpected table");
-    },
-  };
-}
-
 describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
-    mocks.createClient.mockReset();
-    mocks.validateTwilioWebhookForCallSid.mockReset();
-    mocks.validateTwilioWebhookForCallSid.mockResolvedValue({
-      ok: true,
-      params: { CallSid: "CA1" },
-      authToken: "tok",
-    });
+    mocks.requireTwilioSignature.mockReset();
+    mocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.logger.error.mockReset();
+    vi.mocked(findCallWithCampaignScriptBySid).mockReset();
   });
 
   test("returns 400 when required params missing", async () => {
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: null, error: null }]));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       params: {},
       request: new Request("http://x", { method: "POST", body: new FormData() }),
     } as never));
@@ -88,18 +69,13 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
   });
 
   test("returns 403 on invalid signature", async () => {
-    mocks.validateTwilioWebhookForCallSid.mockResolvedValueOnce({
-      ok: false,
-      response: new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(new Response(JSON.stringify({ error: "Invalid Twilio signature" }), {
         status: 403,
-      }),
-    });
-    const callData = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } }] } };
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData, error: null }]));
+      }));
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
-    const res = await asRouteResponse(await mod.action({
+    const res = await asRouteResponse(mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
     } as never));
@@ -108,12 +84,12 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
   test("redirects to first block; says error when page invalid; catch path for invalid script and retry failure", async () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
-
-    // success
-    const callData = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } }] } };
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData, error: null }]));
     const fd = new FormData();
     fd.set("CallSid", "CA1");
+
+    // success
+    const callData = { workspace: "w1", campaign_id: 1, campaign: { script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } } };
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(callData as any);
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
@@ -121,8 +97,8 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     expect(await res.text()).toContain("redirect:/api/ivr/1/page_1/b1");
 
     // page missing blocks => say+hangup
-    const callData2 = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: { pages: { page_1: { blocks: [] } } } } }] } };
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData2, error: null }]));
+    const callData2 = { workspace: "w1", campaign_id: 1, campaign: { script: { steps: { pages: { page_1: { blocks: [] } } } } } };
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(callData2 as any);
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
@@ -130,8 +106,8 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     expect(await res.text()).toContain("There was an error in the IVR flow");
 
     // invalid script => catch
-    const callData3 = { workspace: "w1", campaign: { ivr_campaign: [{ script: { steps: null } }] } };
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: callData3, error: null }]));
+    const callData3 = { workspace: "w1", campaign_id: 1, campaign: { script: { steps: null } } };
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(callData3 as any);
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
@@ -140,7 +116,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
 
     // retry failure without waiting (fake timers)
     vi.useFakeTimers();
-    mocks.createClient.mockReturnValueOnce(makeSupabase([{ data: null, error: new Error("no") }]));
+    vi.mocked(findCallWithCampaignScriptBySid).mockRejectedValueOnce(new Error("no"));
     const p = mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
@@ -149,5 +125,28 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     res = await p;
     expect(await res.text()).toContain("An error occurred. Please try again later.");
     vi.useRealTimers();
+  });
+
+  test("returns hangup when campaign_id does not match URL or call is missing", async () => {
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+
+    // campaign_id mismatch
+    const callData = { workspace: "w1", campaign_id: 2, campaign: { script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } } };
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(callData as any);
+    let res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1" },
+      request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
+    } as never);
+    expect(await res.text()).toMatch(/hangup/i);
+
+    // call not found
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(null as any);
+    res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1" },
+      request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
+    } as never);
+    expect(await res.text()).toMatch(/hangup/i);
   });
 });

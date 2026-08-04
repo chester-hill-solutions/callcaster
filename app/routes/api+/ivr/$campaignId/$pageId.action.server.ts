@@ -1,11 +1,11 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { redirect } from "react-router";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { requireTwilioSignatureForIvrPage } from "@/lib/ivr-webhook-auth.server";
+import { findCallWithCampaignScriptBySid } from "@/lib/telephony-db.server";
+import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
-import type { ActionFunctionArgs } from "react-router";
-import type { Database } from "@/lib/database.types";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 200;
@@ -16,52 +16,44 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 type IvrScriptSteps = { pages: Record<string, { blocks: string[] }> };
 
 const getCallWithRetry = async (
-  supabase: SupabaseClient<Database>,
   callSid: string,
   retries = 0,
-) => {
-  const { data, error } = await supabase
-    .from("call")
-    .select("*, campaign(*, ivr_campaign(*, script(*)))")
-    .eq("sid", callSid)
-    .single();
+): Promise<ReturnType<typeof findCallWithCampaignScriptBySid> | null> => {
+  const data = await findCallWithCampaignScriptBySid(callSid);
 
-  if (error || !data) {
+  if (!data) {
     if (retries < MAX_RETRIES) {
       await sleep(RETRY_DELAY);
-      return getCallWithRetry(supabase, callSid, retries + 1);
+      return getCallWithRetry(callSid, retries + 1);
     }
-    throw new Error("Failed to retrieve call after multiple attempts");
+    return null;
   }
 
   return data;
 };
 
-export const action = async ({ params, request }: ActionFunctionArgs) => {
-  const supabase = createClient(env.SUPABASE_URL(), env.SUPABASE_SERVICE_KEY());
+export const action = defineAction({
+  auth: ({ request, params }) =>
+    requireTwilioSignatureForIvrPage(request, [params.campaignId, params.pageId]),
+  sideEffects: ["db-read"],
+  handler: async ({ params, auth }) => {
   const twiml = new Twilio.twiml.VoiceResponse();
   const { pageId, campaignId } = params as { pageId: string; campaignId: string };
-  const formData = await request.formData();
-  const paramsObj = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const callSid = paramsObj.CallSid ?? null;
-
-  if (!callSid || !campaignId || !pageId) {
-    return new Response("Missing required parameters", { status: 400 });
-  }
-
-  const validation = await validateTwilioWebhookForCallSid({
-    request,
-    supabase,
-    callSid,
-    params: paramsObj,
-  });
-  if (!validation.ok) {
-    return validation.response;
-  }
+  const { callSid } = auth;
 
   try {
-    const callData = await getCallWithRetry(supabase, callSid);
-    const script = callData.campaign?.ivr_campaign?.[0]?.script?.steps as
+    const callData = await getCallWithRetry(callSid);
+    if (!callData) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+    if (callData.campaign_id !== Number(campaignId)) {
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+    const script = ivrScriptStepsFromCampaign(callData.campaign) as
       | IvrScriptSteps
       | null
       | undefined;
@@ -85,4 +77,5 @@ export const action = async ({ params, request }: ActionFunctionArgs) => {
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "application/xml" },
   });
-};
+  },
+});

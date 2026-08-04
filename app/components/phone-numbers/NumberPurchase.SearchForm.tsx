@@ -55,14 +55,14 @@ export function NumberPurchaseSearchForm({
     <fetcher.Form
       action="/api/numbers"
       method="get"
-      className="space-y-4 rounded-lg border border-border p-4"
+      className="@container w-full min-w-[300px] space-y-4 rounded-lg border border-border p-4"
       onSubmit={onSubmit}
     >
       <input type="hidden" name="workspace_id" value={workspaceId} />
       <input type="hidden" name="searchMode" value={searchMode} />
       {filterVoice ? <input type="hidden" name="voice" value="true" /> : null}
       {filterSms ? <input type="hidden" name="sms" value="true" /> : null}
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 @min-[400px]:grid-cols-2">
         <FormField label="Search by" htmlFor="searchMode">
           <Select
             value={searchMode}

@@ -1,11 +1,12 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import { sql } from "drizzle-orm";
 import { logger } from "@/lib/logger.server";
 import {
   getBillingEventSource,
   getTransactionDisplayDescription,
   type TransactionType,
 } from "@/lib/transaction-history-display";
+import { emitTransactionHistoryInsertEvent } from "@/lib/workspace-events.server";
+import { db } from "@/server/db";
 
 export type { TransactionType } from "@/lib/transaction-history-display";
 export { getTransactionDisplayDescription } from "@/lib/transaction-history-display";
@@ -15,24 +16,57 @@ export {
   type BillingEventSource,
 } from "@/lib/transaction-history-display";
 
-import { isUniqueViolation } from "@/lib/parse-utils.server";
+type LedgerRpcRow = {
+  id: number;
+  inserted: boolean;
+  amount: number;
+  type: string;
+  idempotency_key: string;
+  workspace: string;
+};
 
-export { isUniqueViolation } from "@/lib/parse-utils.server";
-
-/**
- * DB-backed idempotent insert for transaction_history.
- *
- * Uses a deterministic idempotency key stored in the transaction_history table
- * and enforced by a unique DB index/constraint.
- */
-export async function insertTransactionHistoryIdempotent(args: {
-  supabase: SupabaseClient<Database>;
+type InsertArgs = {
   workspaceId: string;
   type: TransactionType;
   amount: number;
   note: string;
   idempotencyKey: string;
-}): Promise<{ inserted: boolean; existingId?: number }> {
+  campaignId?: number | null;
+  callSid?: string | null;
+  messageSid?: string | null;
+};
+
+async function applyLedgerEntryViaDrizzle(args: InsertArgs): Promise<LedgerRpcRow> {
+  const idempotencyKey = args.idempotencyKey.trim();
+  const result = await db.execute(sql`
+    select id, inserted, amount, type, idempotency_key, workspace
+    from apply_ledger_entry_and_sync_credits(
+      ${args.workspaceId}::uuid,
+      ${args.type},
+      ${args.amount},
+      ${idempotencyKey},
+      ${args.note},
+      ${args.campaignId ?? null},
+      ${args.callSid ?? null},
+      ${args.messageSid ?? null}
+    )
+  `);
+
+  const row = (result[0] ?? null) as LedgerRpcRow | null;
+  if (!row?.id) {
+    throw new Error(
+      `apply_ledger_entry_and_sync_credits returned no row for key ${idempotencyKey}`,
+    );
+  }
+  return row;
+}
+
+/**
+ * DB-backed idempotent insert for transaction_history + atomic credits sync.
+ */
+export async function insertTransactionHistoryIdempotent(
+  args: InsertArgs,
+): Promise<{ inserted: boolean; existingId?: number }> {
   const idempotencyKey = args.idempotencyKey.trim();
   if (!idempotencyKey) {
     throw new Error(
@@ -41,84 +75,44 @@ export async function insertTransactionHistoryIdempotent(args: {
   }
 
   try {
-    const { data, error } = await args.supabase
-      .from("transaction_history")
-      .insert({
-        workspace: args.workspaceId,
-        type: args.type,
-        amount: args.amount,
-        note: args.note,
-        idempotency_key: idempotencyKey,
-      })
-      .select("id")
-      .single();
-
-    if (!error) {
-      logger.info("billing.transaction", {
-        workspaceId: args.workspaceId,
-        type: args.type,
-        amount: args.amount,
-        idempotencyKey,
-        inserted: true,
-        source: getBillingEventSource({
-          type: args.type,
-          idempotencyKey,
-        }),
-      });
-      return { inserted: true, existingId: data?.id as number | undefined };
-    }
-
-    if (!isUniqueViolation(error)) {
-      logger.error("transaction_history insert failed", {
-        error,
-        workspaceId: args.workspaceId,
-        type: args.type,
-        idempotencyKey,
-      });
-      throw error;
-    }
-
-    const { data: existing, error: existingError } = await args.supabase
-      .from("transaction_history")
-      .select("id")
-      .eq("workspace", args.workspaceId)
-      .eq("type", args.type)
-      .eq("idempotency_key", idempotencyKey)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existingError) {
-      logger.error("transaction_history duplicate lookup failed", {
-        error: existingError,
-        workspaceId: args.workspaceId,
-        type: args.type,
-        idempotencyKey,
-      });
-      throw existingError;
-    }
-
-    if (!existing?.id) {
-      throw new Error(
-        `transaction_history duplicate insert detected but existing row not found for key ${idempotencyKey}`,
-      );
-    }
+    const row = await applyLedgerEntryViaDrizzle(args);
 
     logger.info("billing.transaction", {
       workspaceId: args.workspaceId,
       type: args.type,
       amount: args.amount,
       idempotencyKey,
-      inserted: false,
+      inserted: row.inserted,
       source: getBillingEventSource({
         type: args.type,
         idempotencyKey,
       }),
     });
-    return { inserted: false, existingId: existing.id };
+
+    // Post-write, non-fatal: ledger integrity outranks UI freshness. Emission
+    // failure must not convert a committed billing write into a reported error.
+    if (row.inserted) {
+      try {
+        await emitTransactionHistoryInsertEvent(args.workspaceId, {
+          id: row.id,
+          workspace: row.workspace,
+          type: row.type,
+          amount: row.amount,
+          idempotency_key: row.idempotency_key,
+        });
+      } catch (emitError) {
+        logger.error("transaction_history event emission failed", {
+          workspaceId: args.workspaceId,
+          ledgerId: row.id,
+          idempotencyKey,
+          error: emitError,
+        });
+      }
+    }
+
+    return { inserted: row.inserted, existingId: row.id };
   } catch (e) {
     logger.error("transaction_history idempotent insert error", e);
     throw e;
   }
 }
-

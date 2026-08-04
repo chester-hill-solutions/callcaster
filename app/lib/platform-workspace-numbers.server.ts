@@ -1,15 +1,15 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   createWorkspaceTwilioInstance,
   getUserRole,
+  getWorkspaceInfo,
   getWorkspacePhoneNumbers,
   getWorkspaceUsers,
   removeWorkspacePhoneNumber,
   requireWorkspaceAccess,
   updateCallerId,
   updateWorkspacePhoneNumber,
-} from "@/lib/database.server";
-import type { Database } from "@/lib/database.types";
+} from "@/lib/database/workspace.server";
+import type { Database } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { startWorkspaceCallerIdVerification } from "@/lib/caller-id-verification.server";
 import { logger } from "@/lib/logger.server";
@@ -29,24 +29,42 @@ import { attachPhoneNumberToMessagingService } from "@/lib/twilio-bootstrap.serv
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
 import { normalizeInboundRingCount } from "../../shared/inbound-rings";
+import { debitAmountFromCredits } from "@/lib/pricing";
+import { numberRentalPurchaseKey } from "@/lib/billing-keys";
+import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
+import { createTenantDb } from "@/server/tenant-db";
+import {
+  isNanpTollFreeNumber,
+  normalizeAddressRequirement,
+  resolveAddressForRequirement,
+  type AddressRequirement,
+  type CandidateAddress,
+} from "@/lib/number-address-requirements";
+import { deriveAndPersistWorkspaceThroughput } from "@/lib/database/workspace-twilio-config.server";
+import { syncWorkspaceTwilioSnapshot } from "@/lib/database/workspace-twilio-sync.server";
 import type { patchNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";
 import type { z } from "zod";
+import type { InboundRoutingPresetApplication } from "../../shared/inbound-routing-presets";
+import { applyRoutingPresetWithTenantDb } from "@/lib/routing-preset-write.server";
 
 type PatchNumberInput = z.infer<typeof patchNumberBodySchema>;
 
+// Default inbound ring count applied to newly rented numbers (Q59). Distinct
+// from `INBOUND_RING_COUNT_DEFAULT` in shared/inbound-rings.ts (which backs
+// `normalizeInboundRingCount`'s fallback for missing/invalid values) — this is
+// the deliberate first-purchase default, not a parsing fallback.
+const FIRST_NUMBER_DEFAULT_RING_COUNT = 3;
+
 async function requireNumbersManager(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
   const userRole = await getUserRole({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
@@ -63,18 +81,15 @@ async function requireNumbersManager(
 }
 
 export async function listWorkspaceNumbers(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
 ) {
   await requireWorkspaceAccess({
-    supabaseClient,
     user: { id: userId },
     workspaceId,
   });
 
   const { data, error } = await getWorkspacePhoneNumbers({
-    supabaseClient,
     workspaceId,
   });
 
@@ -87,24 +102,17 @@ export async function listWorkspaceNumbers(
 }
 
 export async function purchaseWorkspaceNumber(
-  userSupabase: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   phoneNumber: string,
 ) {
-  const access = await requireNumbersManager(userSupabase, userId, workspaceId);
+  const access = await requireNumbersManager(userId, workspaceId);
   if (!access.ok) {
     return access;
   }
 
-  const supabase = createClient<Database>(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
-  );
-
   try {
     const { data: users, error: usersError } = await getWorkspaceUsers({
-      supabaseClient: supabase,
       workspaceId,
     });
     if (usersError) throw usersError;
@@ -117,37 +125,67 @@ export async function purchaseWorkspaceNumber(
     }
 
     const owner = users.find((u) => u.user_workspace_role === "owner");
-    const { data: workspaceCredits, error: workspaceCreditsError } =
-      await supabase
-        .from("workspace")
-        .select("credits")
-        .eq("id", workspaceId)
-        .single();
-    if (workspaceCreditsError) throw workspaceCreditsError;
+    const workspaceCredits = (await getWorkspaceCredits(workspaceId)) ?? 0;
 
-    if (!hasCreditsForNumberRental(workspaceCredits.credits)) {
+    if (!hasCreditsForNumberRental(workspaceCredits)) {
       return {
         ok: false as const,
         error: "Insufficient credits for number rental",
-        status: 400,
+        status: 402,
         creditsError: true as const,
       };
     }
 
-    const twilio = await createWorkspaceTwilioInstance({ supabase, workspace_id: workspaceId });
+    const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId });
     const onboarding = await getWorkspaceMessagingOnboardingState({
-      supabaseClient: supabase,
       workspaceId,
     });
 
+    const address = onboarding.emergencyVoice.address;
+    const hasServiceAddress = Boolean(
+      address.street.trim() &&
+        address.city.trim() &&
+        address.region.trim() &&
+        address.postalCode.trim(),
+    );
+    if (!hasServiceAddress) {
+      return {
+        ok: false as const,
+        error:
+          "Add a service address before renting a phone number.",
+        status: 400,
+      };
+    }
+
+    const { data: workspaceInfo } = await getWorkspaceInfo({ workspaceId });
+    const workspaceName = workspaceInfo?.name ?? workspaceId;
+
+    // Attach a validated emergency (E911) address SID when we have one so the
+    // number is E911-provisioned at purchase time.
+    const validatedEmergencyAddressSid =
+      onboarding.emergencyVoice.address.status === "validated"
+        ? onboarding.emergencyVoice.address.addressSid ?? undefined
+        : undefined;
+
+    // TODO(Q43): auto-apply `addressRequirements` when the number's regulation
+    // requires a registered address. Deferred: the Twilio SDK's create options
+    // do not expose a clean typed field here, so we set the emergency address
+    // SID only and leave regulatory address-requirement handling to a follow-up.
     const number = await withTwilioRetry(
       () =>
         twilio.incomingPhoneNumbers.create({
           phoneNumber,
-          statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
+          friendlyName: `${workspaceName} / ${phoneNumber}`,
+          // SMS delivery status (caller-ID verification keeps /api/caller-id/status).
+          statusCallback: `${env.BASE_URL()}/api/sms/status`,
           statusCallbackMethod: "POST",
           voiceUrl: `${env.BASE_URL()}/api/inbound`,
+          voiceMethod: "POST",
           smsUrl: `${env.BASE_URL()}/api/inbound-sms`,
+          smsMethod: "POST",
+          ...(validatedEmergencyAddressSid
+            ? { emergencyAddressSid: validatedEmergencyAddressSid }
+            : {}),
         }),
       { workspaceId, operation: "incomingPhoneNumbers.create" },
     );
@@ -174,31 +212,37 @@ export async function purchaseWorkspaceNumber(
       Boolean(number.capabilities.voice) &&
       onboarding.emergencyVoice.address.status === "validated";
 
-    const { data: newNumber, error: newNumberError } = await supabase
-      .from("workspace_number")
-      .insert({
-        workspace: workspaceId,
-        friendly_name: number.friendlyName,
-        phone_number: number.phoneNumber,
-        capabilities: {
-          verification_status:
-            number.capabilities.mms &&
-            number.capabilities.sms &&
-            number.capabilities.voice
-              ? "success"
-              : "pending",
-          emergency_address_status: onboarding.emergencyVoice.address.status,
-          emergency_address_sid: onboarding.emergencyVoice.address.addressSid,
-          emergency_eligible: emergencyEligible,
-          emergency_compliance_status: onboarding.emergencyVoice.status,
-          ...number.capabilities,
-        },
-        inbound_action: owner?.username ?? null,
-        type: "rented",
-      })
-      .select()
-      .single();
-    if (newNumberError) throw newNumberError;
+    const tdb = createTenantDb(workspaceId);
+    const [newNumber] = await tdb.workspace_number.insert({
+      friendly_name: number.friendlyName,
+      phone_number: number.phoneNumber,
+      twilio_phone_number_sid: number.sid ?? null,
+      capabilities: {
+        verification_status:
+          number.capabilities.mms &&
+          number.capabilities.sms &&
+          number.capabilities.voice
+            ? "success"
+            : "pending",
+        emergency_address_status: onboarding.emergencyVoice.address.status,
+        emergency_address_sid: onboarding.emergencyVoice.address.addressSid,
+        emergency_eligible: emergencyEligible,
+        emergency_compliance_status: onboarding.emergencyVoice.status,
+        ...number.capabilities,
+      },
+      inbound_action: owner?.username ?? null,
+      type: "rented",
+      created_at: new Date().toISOString(),
+      // Q45/Q59: handset off, ring count 3 by default for a freshly rented
+      // number; owners can change both from the numbers table or the
+      // first-number onboarding step.
+      handset_enabled: false,
+      inbound_ring_count: FIRST_NUMBER_DEFAULT_RING_COUNT,
+    });
+
+    if (!newNumber) {
+      throw new Error("Failed to insert workspace number");
+    }
 
     const mergedOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
       messagingService: {
@@ -232,7 +276,6 @@ export async function purchaseWorkspaceNumber(
     });
 
     const { data: workspacePhoneNumbers } = await getWorkspacePhoneNumbers({
-      supabaseClient: supabase,
       workspaceId,
     });
     const nextOnboarding = applyOnboardingStepsWithWorkspaceNumbers(
@@ -240,19 +283,44 @@ export async function purchaseWorkspaceNumber(
       workspacePhoneNumbers ?? [newNumber],
     );
     await updateWorkspaceMessagingOnboardingState({
-      supabaseClient: supabase,
       workspaceId,
       updates: nextOnboarding,
       actorUserId: owner?.id ?? null,
     });
 
+    // Q39: re-derive smsSenderClass/smsTargetMps from the updated number
+    // inventory now that this purchase changed it. Best-effort — a failure
+    // here shouldn't fail the purchase itself.
+    try {
+      await deriveAndPersistWorkspaceThroughput({ workspaceId });
+    } catch (throughputError) {
+      logger.error(
+        "Failed to auto-derive workspace throughput after number purchase",
+        throughputError,
+      );
+    }
+
+    // Q60: kick off a Twilio portal snapshot sync once this workspace's first
+    // number lands, so the numbers/throughput inventory is fresh without
+    // waiting for the next scheduled/admin-triggered sync. Best-effort.
+    const isFirstWorkspaceNumber = (workspacePhoneNumbers ?? [newNumber]).length <= 1;
+    if (isFirstWorkspaceNumber) {
+      try {
+        await syncWorkspaceTwilioSnapshot({ workspaceId });
+      } catch (syncError) {
+        logger.error(
+          "Failed to sync Twilio portal snapshot after first number purchase",
+          syncError,
+        );
+      }
+    }
+
     await insertTransactionHistoryIdempotent({
-      supabase,
       workspaceId,
       type: "DEBIT",
-      amount: -NUMBER_RENTAL_MONTHLY_CREDITS,
+      amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
       note: "Rented number - " + number.friendlyName,
-      idempotencyKey: `number_rent_purchase:${workspaceId}:${number.sid}`,
+      idempotencyKey: numberRentalPurchaseKey(workspaceId, number.sid),
     });
 
     const partialSuccess =
@@ -278,13 +346,12 @@ export async function purchaseWorkspaceNumber(
 }
 
 export async function patchWorkspaceNumber(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   numberId: string,
   input: PatchNumberInput,
 ) {
-  const access = await requireNumbersManager(supabaseClient, userId, workspaceId);
+  const access = await requireNumbersManager(userId, workspaceId);
   if (!access.ok) {
     return access;
   }
@@ -313,7 +380,6 @@ export async function patchWorkspaceNumber(
   }
 
   const { data: number, error } = await updateWorkspacePhoneNumber({
-    supabaseClient,
     numberId,
     workspaceId,
     updates,
@@ -325,7 +391,6 @@ export async function patchWorkspaceNumber(
 
   if (input.friendly_name !== undefined && number) {
     const callerIdResult = await updateCallerId({
-      supabaseClient,
       workspaceId,
       number,
       friendly_name: input.friendly_name,
@@ -342,19 +407,50 @@ export async function patchWorkspaceNumber(
   return { ok: true as const, number };
 }
 
+/**
+ * Applies a canonical inbound routing preset in one tenant-scoped update.
+ * Building the complete patch before touching the database guarantees that
+ * validation failures cannot leave a partially-updated route.
+ */
+export async function applyWorkspaceNumberRoutingPreset(
+  userId: string,
+  workspaceId: string,
+  numberId: string,
+  application: InboundRoutingPresetApplication,
+) {
+  const access = await requireNumbersManager(userId, workspaceId);
+  if (!access.ok) {
+    return access;
+  }
+
+  try {
+    const tdb = createTenantDb(workspaceId);
+    return await applyRoutingPresetWithTenantDb(
+      tdb,
+      numberId,
+      application,
+    );
+  } catch (error) {
+    logger.error("applyWorkspaceNumberRoutingPreset error", error);
+    return {
+      ok: false as const,
+      error: "Failed to apply routing preset",
+      status: 500,
+    };
+  }
+}
+
 export async function deleteWorkspaceNumber(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   numberId: string,
 ) {
-  const access = await requireNumbersManager(supabaseClient, userId, workspaceId);
+  const access = await requireNumbersManager(userId, workspaceId);
   if (!access.ok) {
     return access;
   }
 
   const { error } = await removeWorkspacePhoneNumber({
-    supabaseClient,
     numberId: BigInt(numberId),
     workspaceId,
   });
@@ -369,13 +465,12 @@ export async function deleteWorkspaceNumber(
 }
 
 export async function verifyWorkspaceCallerId(
-  supabaseClient: SupabaseClient<Database>,
   userId: string,
   workspaceId: string,
   phoneNumber: string,
   friendlyName: string,
 ) {
-  const access = await requireNumbersManager(supabaseClient, userId, workspaceId);
+  const access = await requireNumbersManager(userId, workspaceId);
   if (!access.ok) {
     return access;
   }
@@ -383,7 +478,6 @@ export async function verifyWorkspaceCallerId(
   try {
     const { validationRequest, numberRequest } =
       await startWorkspaceCallerIdVerification({
-        supabaseClient,
         workspaceId,
         phoneNumber,
         friendlyName,

@@ -1,14 +1,17 @@
-import Twilio from "twilio";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/database.types";
+import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
 import {
-  buildOnboardingStepsForState,
+  evaluateWorkspaceReadiness,
   getWorkspaceMessagingOnboardingFromTwilioData,
   mergeWorkspaceMessagingOnboardingState,
+  type WorkspaceReadinessContext,
 } from "@/lib/messaging-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import {
+  loadWorkspaceTwilioData,
+  persistWorkspaceTwilioData,
+} from "@/lib/merge-workspace-twilio-data.server";
 import type {
   TwilioAccountData,
   WorkspaceMessagingOnboardingState,
@@ -16,31 +19,16 @@ import type {
 import { parseOptionalString } from "@/lib/parse-utils.server";
 
 async function loadWorkspaceTwilioContext(
-  supabaseClient: SupabaseClient<Database>,
   workspaceId: string,
 ) {
-  const { data: workspace, error } = await supabaseClient
-    .from("workspace")
-    .select("id, name, twilio_data")
-    .eq("id", workspaceId)
-    .single();
-
-  if (error) {
-    throw error;
-  }
-
-  const twilioData = (workspace?.twilio_data ?? null) as TwilioAccountData;
+  const twilioData = (await loadWorkspaceTwilioData(workspaceId,
+  )) as unknown as TwilioAccountData;
   const onboarding = getWorkspaceMessagingOnboardingFromTwilioData(twilioData);
 
-  const creds = readTwilioWorkspaceCredentials(workspace?.twilio_data);
-  if (!creds) {
-    throw new Error("Workspace is missing Twilio subaccount credentials");
-  }
-
-  const twilio = new Twilio.Twilio(creds.sid, creds.authToken);
+  const twilio = await createWorkspaceTwilioInstance({     workspace_id: workspaceId,
+  });
 
   return {
-    workspace,
     twilioData,
     onboarding,
     twilio,
@@ -48,74 +36,44 @@ async function loadWorkspaceTwilioContext(
 }
 
 async function persistOnboardingState({
-  supabaseClient,
   workspaceId,
   twilioData,
   onboarding,
 }: {
-  supabaseClient: SupabaseClient<Database>;
+  null?: never | null;
   workspaceId: string;
   twilioData: TwilioAccountData;
   onboarding: WorkspaceMessagingOnboardingState;
 }) {
-  const { error } = await supabaseClient
-    .from("workspace")
-    .update({
-      twilio_data: {
-        ...twilioData,
-        onboarding,
-      } as unknown as Database["public"]["Tables"]["workspace"]["Update"]["twilio_data"],
-    })
-    .eq("id", workspaceId);
-
-  if (error) {
-    throw error;
-  }
+  await persistWorkspaceTwilioData(workspaceId, {
+    ...(twilioData as Record<string, unknown>),
+    onboarding,
+  });
 }
 
 export function buildA2pBlockingIssues(onboarding: WorkspaceMessagingOnboardingState) {
-  const issues: string[] = [];
-
-  if (!onboarding.businessProfile.legalBusinessName) {
-    issues.push("Legal business name is required.");
-  }
-  if (!onboarding.businessProfile.websiteUrl) {
-    issues.push("Website URL is required.");
-  }
-  if (!onboarding.businessProfile.useCaseSummary) {
-    issues.push("Use case summary is required.");
-  }
-  if (onboarding.businessProfile.sampleMessages.length === 0) {
-    issues.push("At least one sample message is required.");
-  }
-  if (!onboarding.messagingService.serviceSid) {
-    issues.push("Messaging Service must be provisioned first.");
-  }
-  if (!onboarding.a2p10dlc.customerProfileBundleSid) {
-    issues.push(
-      "Customer Profile Bundle SID is required before A2P registration can be submitted.",
-    );
-  }
-  if (!onboarding.a2p10dlc.trustProductSid) {
-    issues.push(
-      "A2P Messaging Profile Bundle SID is required before A2P registration can be submitted.",
-    );
-  }
-
-  return issues;
+  const ctx: WorkspaceReadinessContext = {
+    onboarding,
+    workspaceNumbers: [],
+  };
+  const results = evaluateWorkspaceReadiness(ctx, {
+    forChannel: "a2p10dlc",
+    exclude: ["a2p_approved"],
+    messageOverrides: {
+      messaging_service_not_provisioned: "Messaging Service must be provisioned first.",
+    },
+  });
+  return results.map((result) => result.message);
 }
 
 export async function provisionWorkspaceA2P({
-  supabaseClient,
   workspaceId,
   actorUserId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
   actorUserId: string | null;
 }) {
   const bootstrap = await ensureWorkspaceTwilioBootstrap({
-    supabaseClient,
     workspaceId,
     actorUserId,
   });
@@ -125,16 +83,14 @@ export async function provisionWorkspaceA2P({
     );
   }
 
-  const { twilioData, onboarding, twilio } = await loadWorkspaceTwilioContext(
-    supabaseClient,
-    workspaceId,
+  const { twilioData, onboarding, twilio } = await loadWorkspaceTwilioContext(workspaceId,
   );
 
   const blockingIssues = buildA2pBlockingIssues(onboarding);
   if (blockingIssues.length > 0) {
     const blockedState = mergeWorkspaceMessagingOnboardingState(onboarding, {
       status: "collecting_business",
-      currentStep: "business_profile",
+      currentStep: "business_identity",
       reviewState: {
         ...onboarding.reviewState,
         blockingIssues,
@@ -147,9 +103,7 @@ export async function provisionWorkspaceA2P({
       },
       lastUpdatedBy: actorUserId,
     });
-    blockedState.steps = buildOnboardingStepsForState(blockedState);
     await persistOnboardingState({
-      supabaseClient,
       workspaceId,
       twilioData,
       onboarding: blockedState,
@@ -214,7 +168,6 @@ export async function provisionWorkspaceA2P({
         status: brandSid ? "in_review" : "submitting",
         lastSyncedAt: new Date().toISOString(),
       },
-      steps: buildOnboardingStepsForState(nextOnboarding),
     });
   } catch (a2pError) {
     logger.error("Error provisioning workspace A2P registration:", a2pError);
@@ -232,12 +185,10 @@ export async function provisionWorkspaceA2P({
           a2pError instanceof Error ? a2pError.message : "Unknown A2P error",
         lastUpdatedAt: new Date().toISOString(),
       },
-      steps: buildOnboardingStepsForState(nextOnboarding),
     });
   }
 
   await persistOnboardingState({
-    supabaseClient,
     workspaceId,
     twilioData,
     onboarding: nextOnboarding,
@@ -247,15 +198,11 @@ export async function provisionWorkspaceA2P({
 }
 
 export async function syncWorkspaceA2PStatus({
-  supabaseClient,
   workspaceId,
 }: {
-  supabaseClient: SupabaseClient<Database>;
   workspaceId: string;
 }) {
-  const { twilioData, onboarding } = await loadWorkspaceTwilioContext(
-    supabaseClient,
-    workspaceId,
+  const { twilioData, onboarding } = await loadWorkspaceTwilioContext(workspaceId,
   );
 
   const nextOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
@@ -264,10 +211,8 @@ export async function syncWorkspaceA2PStatus({
       lastSyncedAt: new Date().toISOString(),
     },
   });
-  nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
 
   await persistOnboardingState({
-    supabaseClient,
     workspaceId,
     twilioData,
     onboarding: nextOnboarding,

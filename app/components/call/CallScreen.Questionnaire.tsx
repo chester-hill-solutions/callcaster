@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
-import Result from "@/components/call-list/records/participant/Result";
+import Result from "@/components/campaign/settings/script/Result";
 import { Button } from "@/components/ui/button";
-import { Tables } from "@/lib/database.types";
+import {
+  callPanelHeaderPrimaryClass,
+  callPanelShellClass,
+} from "@/components/call/call-panel-classes";
+import type { Tables } from "@/lib/db-types";
 import { CampaignDetails, Block } from "@/lib/types";
 
 type Contact = Tables<"contact">;
@@ -22,7 +26,6 @@ interface Script {
   };
 }
 
-
 interface CallQuestionnaireProps {
   handleResponse: (response: {
     pageId: string;
@@ -36,6 +39,7 @@ interface CallQuestionnaireProps {
   disabled: boolean;
   isBusy: boolean;
 }
+
 const CallQuestionnaire = ({
   handleResponse,
   campaignDetails,
@@ -43,20 +47,29 @@ const CallQuestionnaire = ({
   nextRecipient: contact,
   handleQuickSave,
   disabled,
-  isBusy
+  isBusy,
 }: CallQuestionnaireProps) => {
   const scriptSteps = campaignDetails.script?.steps as Script["steps"] | undefined;
   const pageKeys = Object.keys(scriptSteps?.pages || {});
   const [currentPageId, setCurrentPageId] = useState<string | undefined>(
-    pageKeys[0] || undefined
+    pageKeys[0] || undefined,
   );
   const [localUpdate, setLocalUpdate] = useState(update || {});
 
+  /**
+   * @effect Resync the local edit buffer (localUpdate) whenever the parent's authoritative `update` object changes (e.g. new recipient, external answer sync).
+   * @effect-deps update — the parent-owned response state this component mirrors and edits locally before calling handleResponse.
+   * @effect-side-effects none (local setState only; no DOM/timer/subscription/fetch)
+   * @effect-why-not-loader `update` is live in-memory call-session state passed down as a prop, not request data — there's no route transition to hang a loader off.
+   */
   useEffect(() => {
     setLocalUpdate(update || {});
   }, [update]);
 
-  const handleBlockResponse = (blockId: string, value: string | boolean | string[]) => {
+  const handleBlockResponse = (
+    blockId: string,
+    value: string | boolean | string[],
+  ) => {
     const pageId = currentPageId!;
     const newUpdate = {
       ...localUpdate,
@@ -71,97 +84,75 @@ const CallQuestionnaire = ({
 
   const renderBlock = (blockId: string) => {
     const block = scriptSteps?.blocks?.[blockId];
-    
+
     if (!block) return null;
-    
+
     const pageId = currentPageId!;
     const pageUpdate = localUpdate[pageId] as Record<string, unknown> | undefined;
     const blockValue = pageUpdate?.[blockId];
-    
+
     return (
       <div key={`questions-${blockId}`}>
-      <Result
-        disabled={disabled}
-        action={(response) => handleBlockResponse(blockId, response.value)}
-        questions={block}
-        key={`questions-${blockId}`}
-        questionId={blockId}
-        initResult={(blockValue as string | boolean | string[] | null | undefined) || null}
-      />
+        <Result
+          disabled={disabled}
+          action={(response) => handleBlockResponse(blockId, response.value)}
+          questions={block}
+          key={`questions-${blockId}`}
+          questionId={blockId}
+          initResult={
+            (blockValue as string | boolean | string[] | null | undefined) || null
+          }
+        />
       </div>
     );
   };
 
-  return (
+  const contactLabel =
+    contact?.contact != null
+      ? ` - ${contact.contact.firstname} ${contact.contact.surname}`
+      : "";
 
-    <div
-      style={{
-        position: "relative",
-        minWidth: "30%",
-        flex: "1 1 auto",
-        border: "3px solid #BCEBFF",
-        borderRadius: "20px",
-        backgroundColor: "hsl(var(--card))",
-        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
-      }}
-      className="flex flex-col"
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderTopLeftRadius: "18px",
-          borderTopRightRadius: "18px",
-          padding: "16px",
-          marginBottom: "10px",
-        }}
-        className="bg-brand-primary font-Tabac-Slab text-xl text-white "
-      >
-        <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-          Script & Questionnaire{" "}
-          {contact &&
-            contact.contact &&
-            ` - ${contact.contact.firstname} ${contact.contact.surname}`}
-        </div>
+  return (
+    <div className={`${callPanelShellClass} min-w-0 flex-1`}>
+      <div className={callPanelHeaderPrimaryClass}>
+        Script & Questionnaire{contactLabel}
       </div>
-      <div className="p-4">
+      <div className="flex flex-col p-4">
         <div className="flex flex-col gap-4">
           {(scriptSteps?.pages?.[currentPageId || ""]?.blocks ?? []).map(renderBlock)}
         </div>
-        {scriptSteps?.pages && currentPageId && <div className="mt-4 flex justify-between">
-          <Button
-            onClick={() => {
-              const pageIds = Object.keys(scriptSteps.pages!);
-              const currentIndex = pageIds.indexOf(currentPageId);
-              setCurrentPageId(pageIds[currentIndex - 1]);
-            }}
-            disabled={
-              isBusy ||
-              currentPageId === pageKeys[0]
-            }
-          >
-            Previous Page
-          </Button>
-          <Button
-            onClick={() => {
-              const pageIds = Object.keys(scriptSteps.pages!);
-              const currentIndex = pageIds.indexOf(currentPageId);
-              setCurrentPageId(pageIds[currentIndex + 1]);
-            }}
-            disabled={
-              isBusy ||
-              currentPageId === pageKeys[pageKeys.length - 1]
-            }
-          >
-            Next Page
-          </Button>
-        </div>}
+        {scriptSteps?.pages && currentPageId ? (
+          <div className="mt-4 flex justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const pageIds = Object.keys(scriptSteps.pages!);
+                const currentIndex = pageIds.indexOf(currentPageId);
+                setCurrentPageId(pageIds[currentIndex - 1]);
+              }}
+              disabled={isBusy || currentPageId === pageKeys[0]}
+            >
+              Previous Page
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const pageIds = Object.keys(scriptSteps.pages!);
+                const currentIndex = pageIds.indexOf(currentPageId);
+                setCurrentPageId(pageIds[currentIndex + 1]);
+              }}
+              disabled={
+                isBusy || currentPageId === pageKeys[pageKeys.length - 1]
+              }
+            >
+              Next Page
+            </Button>
+          </div>
+        ) : null}
         <div className="flex justify-end p-2">
-          <Button
-            onClick={handleQuickSave}
-            disabled={isBusy}
-          >
+          <Button type="button" onClick={handleQuickSave} disabled={isBusy}>
             Save
           </Button>
         </div>

@@ -2,27 +2,28 @@ import ChatMessages from "@/components/sms-ui/ChatMessages";
 import { ChatOptOutBanner } from "@/components/chats/ChatOptOutBanner";
 import { useChatThread } from "@/hooks/chats/useChatThread";
 import type { Workspace, WorkspaceNumber } from "@/lib/types";
-import type { SupabaseClient } from "@supabase/supabase-js";
 
 type ChatThreadViewProps = {
-  supabase: SupabaseClient;
   workspace: NonNullable<Workspace>;
+  workspaceNumbers?: WorkspaceNumber[];
   registerChatActions?: (
     actions: {
       addOptimisticMessage?: (p: {
         body: string;
-        from: string;
+        from?: string;
         to: string;
         media?: string;
+        sid?: string;
       }) => void;
+      markOptimisticMessageFailed?: (sid: string) => void;
     } | null,
   ) => void;
   contactOptOut?: boolean;
 };
 
 export function ChatThreadView({
-  supabase,
-  workspace,
+    workspace,
+  workspaceNumbers,
   registerChatActions,
   contactOptOut,
 }: ChatThreadViewProps) {
@@ -36,8 +37,7 @@ export function ChatThreadView({
     loadingOlder,
     optedOut,
   } = useChatThread({
-    supabase,
-    workspace,
+        workspace,
     registerChatActions,
     contactOptOut,
   });
@@ -49,11 +49,17 @@ export function ChatThreadView({
         messages={
           messages as React.ComponentProps<typeof ChatMessages>["messages"]
         }
+        workspaceNumbers={
+          workspaceNumbers as React.ComponentProps<
+            typeof ChatMessages
+          >["workspaceNumbers"]
+        }
         messagesEndRef={messagesEndRef}
         scrollContainerRef={scrollContainerRef}
         loadMoreSentinelRef={loadMoreSentinelRef}
         hasMoreOlder={hasMoreOlder}
         loadingOlder={loadingOlder}
+        workspaceId={workspace.id}
       />
     </div>
   );

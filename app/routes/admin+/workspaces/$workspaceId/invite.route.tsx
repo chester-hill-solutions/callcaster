@@ -1,16 +1,16 @@
 export { loader } from "./invite.loader.server";
 export { action } from "./invite.action.server";
 
-import { data as routeData, ActionFunctionArgs, LoaderFunctionArgs, Form, useActionData, useLoaderData } from "react-router";
+import { ActionFunctionArgs, LoaderFunctionArgs, Form, useActionData, useLoaderData } from "react-router";
 import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/shared/CustomCard";
+import { BrandedCard as Card } from "@/components/shared/BrandedCard";
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
 import { compareMembersByRole } from "@/lib/workspace-members";
 import { capitalize } from "@/lib/utils";
-import type { Database, Tables } from "@/lib/database.types";
+import type { Database, Tables } from "@/lib/db-types";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 

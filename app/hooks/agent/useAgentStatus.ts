@@ -1,19 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { SupabaseClient } from "@supabase/supabase-js";
-import { Database, Tables } from "@/lib/database.types";
+import type { Database, Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
 
 type AgentState = Database["public"]["Enums"]["agent_state"];
 
 interface UseAgentStatusOptions {
-  supabase: SupabaseClient<Database>;
   workspaceId: string;
   userId: string;
 }
 
 interface UseAgentStatusReturn {
   agentStatus: Tables<"agent_status"> | null;
-  setStatus: (to: AgentState, reason?: string) => Promise<void>;
+  setStatus: (to: AgentState, reason?: string) => Promise<boolean>;
   refreshStatus: () => Promise<void>;
   loading: boolean;
   error: string | null;
@@ -21,8 +19,7 @@ interface UseAgentStatusReturn {
 }
 
 export function useAgentStatus({
-  supabase,
-  workspaceId,
+    workspaceId,
   userId,
 }: UseAgentStatusOptions): UseAgentStatusReturn {
   const [agentStatus, setAgentStatus] = useState<Tables<"agent_status"> | null>(null);
@@ -30,7 +27,6 @@ export function useAgentStatus({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const channelRef = useRef<ReturnType<SupabaseClient<Database>["channel"]> | null>(null);
   const currentStatusRef = useRef<string>("offline");
 
   const refreshStatus = useCallback(async () => {
@@ -57,7 +53,7 @@ export function useAgentStatus({
   }, [workspaceId]);
 
   const setStatus = useCallback(
-    async (to: AgentState, reason?: string) => {
+    async (to: AgentState, reason?: string): Promise<boolean> => {
       try {
         const res = await fetch("/api/agent-status", {
           method: "POST",
@@ -67,44 +63,36 @@ export function useAgentStatus({
         if (!res.ok) {
           const body = await res.json();
           setError(body.error ?? "Failed to update status");
-          return;
+          return false;
         }
         const result = await res.json();
         setAgentStatus(result.status);
         currentStatusRef.current = result.status?.status ?? "offline";
+        setError(null);
+        return true;
       } catch (e) {
         logger.error("Failed to update agent status:", e);
         setError("Failed to update agent status");
+        return false;
       }
     },
     [workspaceId],
   );
 
+  /**
+   * @effect Load the agent's current status on mount and send a heartbeat POST every 30s while mounted.
+   * @effect-deps workspaceId, userId (guards + re-arms the heartbeat when either changes), refreshStatus
+   * @effect-side-effects timer (setInterval heartbeat) + fetch (initial refreshStatus() and each heartbeat POST); interval cleared on unmount/dep change
+   * @effect-why-not-loader The recurring heartbeat is live client-only polling a loader can't express;
+   *   the initial refreshStatus() call rides along on the same effect for simplicity rather than
+   *   being a separate loader round-trip.
+   */
   useEffect(() => {
     if (!workspaceId || !userId) return;
     refreshStatus();
 
-    const channel = supabase.channel(`agent-status:${workspaceId}`);
-    channelRef.current = channel;
-
-    channel
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "agent_status",
-          filter: `workspace_id=eq.${workspaceId}`,
-        },
-        (payload) => {
-          const row = payload.new as Tables<"agent_status"> | null;
-          if (row?.user_id === userId) {
-            setAgentStatus(row);
-            currentStatusRef.current = row.status;
-          }
-        },
-      )
-      .subscribe();
+    // TODO: Re-implement realtime agent_status updates via SSE
+    // (useWorkspaceEventSubscription or EventSource to /api/workspaces/{workspaceId}/events)
 
     heartbeatRef.current = setInterval(async () => {
       try {
@@ -113,7 +101,7 @@ export function useAgentStatus({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             workspace_id: workspaceId,
-            status: currentStatusRef.current,
+            intent: "heartbeat",
           }),
         });
       } catch {
@@ -122,16 +110,12 @@ export function useAgentStatus({
     }, 30_000);
 
     return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
       }
     };
-  }, [workspaceId, userId, supabase, refreshStatus]);
+  }, [workspaceId, userId, refreshStatus]);
 
   return {
     agentStatus,

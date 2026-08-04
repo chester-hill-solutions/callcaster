@@ -1,69 +1,85 @@
-import { createClient } from "@supabase/supabase-js";
-import { createWorkspaceTwilioInstance } from "@/lib/database.server";
+import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
-import { env } from "@/lib/env.server";
-import { validateTwilioWebhookForCallSid } from "@/lib/twilio-webhook.server";
+import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import { markContactLineType } from "@/lib/twilio-lookup.server";
+import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import {
+  findCallBySid,
+  updateCallBySid,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
+import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
-export const action = async ({ request }: ActionFunctionArgs) => {
-  const supabase = createClient(
-    env.SUPABASE_URL(),
-    env.SUPABASE_SERVICE_KEY(),
-  );
-  const formData = await request.formData();
-  const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-  const callSidValue = formData.get("CallSid");
-  const answeredByValue = formData.get("AnsweredBy");
-  const callStatusValue = formData.get("CallStatus");
+type DialStatusAuth = {
+  callSid: string | null;
+  answeredBy: string | null;
+  callStatus: string | null;
+};
 
-  if (!callSidValue || typeof callSidValue !== "string") {
-    return routeData({ success: false, error: "CallSid is required and must be a string" });
-  }
+export const action = defineAction({
+  auth: async ({ request }: ActionFunctionArgs): Promise<DialStatusAuth | Response> => {
+    // Clone before reading — Bun yields empty params on re-read after consume.
+    const formData = await request.clone().formData();
+    const params = Object.fromEntries(formData.entries()) as Record<string, string>;
+    const callSidValue = params.CallSid;
+    const answeredByValue = params.AnsweredBy;
+    const callStatusValue = params.CallStatus;
 
-  const callSid = callSidValue;
-  const answeredBy = typeof answeredByValue === "string" ? answeredByValue : null;
-  const callStatus = typeof callStatusValue === "string" ? callStatusValue : null;
+    const callSid = typeof callSidValue === "string" && callSidValue ? callSidValue : null;
+    const answeredBy = typeof answeredByValue === "string" ? answeredByValue : null;
+    const callStatus = typeof callStatusValue === "string" ? callStatusValue : null;
 
-  try {
-    const validation = await validateTwilioWebhookForCallSid({
-      request,
-      supabase,
-      callSid,
-      params,
-    });
-    if (!validation.ok) {
-      return validation.response;
+    if (callSid) {
+      const forbidden = await requireTwilioSignature(request, { callSid, params });
+      if (forbidden) return forbidden;
     }
 
-    const { data: dbCall, error: callError } = await supabase
-      .from("call")
-      .select("campaign_id, outreach_attempt_id, workspace")
-      .eq("sid", callSid)
-      .single();
-    if (callError) throw callError;
-    if (!dbCall) {
+    return { callSid, answeredBy, callStatus };
+  },
+  sideEffects: ["twilio", "db-write"],
+  handler: async ({ auth }) => {
+    const { callSid, answeredBy, callStatus } = auth;
+
+    if (!callSid) {
+      return routeData({ success: false, error: "CallSid is required and must be a string" });
+    }
+
+  try {
+    const dbCall = await findCallBySid(callSid);
+    if (!dbCall?.workspace) {
       return routeData({ success: false, error: "Call not found" });
     }
 
-    const twilio = await createWorkspaceTwilioInstance({ supabase: supabase,
-      workspace_id: dbCall.workspace,
-    });
-    const { data: campaign, error: campaignError } = await supabase
-      .from("campaign")
-      .select("voicemail_file")
-      .eq("id", dbCall.campaign_id)
-      .single();
-    if (campaignError) throw campaignError;
-    if (!campaign) {
-      return routeData({ success: false, error: "Campaign not found" });
+    // Free line-type signal: AMD identifying a fax machine means this number
+    // can never receive SMS — stamp it so the send gates skip it.
+    if (answeredBy === "fax" && dbCall.contact_id) {
+      await markContactLineType({
+        workspaceId: dbCall.workspace,
+        contactId: dbCall.contact_id,
+        lineType: "fax",
+      });
     }
 
-    const { data: voicemailData, error: voicemailError } = campaign.voicemail_file
-      ? await supabase.storage
-          .from(`workspaceAudio`)
-          .createSignedUrl(`${dbCall.workspace}/${campaign.voicemail_file}`, 3600)
-      : { data: null, error: null };
-    if (voicemailError) throw voicemailError;
+    const twilio = await createWorkspaceTwilioInstance({
+      workspace_id: dbCall.workspace,
+    });
+    const campaign = await fetchCampaignByIdForWorkspace(
+      dbCall.workspace,
+      dbCall.campaign_id ?? 0,
+    );
+
+    let voicemailData: { signedUrl: string } | null = null;
+    if (campaign.voicemail_file) {
+      const signedUrl = await createSignedObjectUrl(
+        "workspaceAudio",
+        `${dbCall.workspace}/${campaign.voicemail_file}`,
+        3600,
+      );
+      voicemailData = { signedUrl };
+    }
 
     const call = twilio.calls(callSid);
 
@@ -75,50 +91,56 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     ) {
       try {
         if (voicemailData && voicemailData.signedUrl) {
-          const { error: outreachError } = await supabase
-            .from("outreach_attempt")
-            .update({ disposition: "voicemail" })
-            .eq("id", dbCall.outreach_attempt_id)
-            .select();
-          if (outreachError) throw outreachError;
+          if (dbCall.outreach_attempt_id) {
+            const outreachResult = await updateOutreachAttemptForWorkspace(dbCall.workspace, dbCall.outreach_attempt_id, {
+              disposition: "voicemail",
+            });
+            if (outreachResult instanceof Response) {
+              throw new Error(await outreachResult.text());
+            }
+          }
           await call.update({
-            twiml: `<Response><Pause length="5"/><Play>${voicemailData.signedUrl}</Play></Response>`,
-          });
-          return routeData({ success: true });
-        } else {
-          const { error: outreachError } = await supabase
-            .from("outreach_attempt")
-            .update({ disposition: "no-answer" })
-            .eq("id", dbCall.outreach_attempt_id)
-            .select();
-          if (outreachError) throw outreachError;
-          await call.update({
-            twiml: `<Response><Hangup/></Response>`,
+            twiml: pausePlayTwiml(voicemailData.signedUrl, 5),
           });
           return routeData({ success: true });
         }
+
+        if (dbCall.outreach_attempt_id) {
+          const outreachResult = await updateOutreachAttemptForWorkspace(dbCall.workspace, dbCall.outreach_attempt_id, {
+            disposition: "no-answer",
+          });
+          if (outreachResult instanceof Response) {
+            throw new Error(await outreachResult.text());
+          }
+        }
+        await call.update({
+          twiml: hangupTwiml(),
+        });
+        return routeData({ success: true });
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "Failed to handle voicemail";
         return routeData({ success: false, error: errorMessage });
       }
-    } else {
-      const { data: callData, error: callUpsertError } = await supabase
-        .from("call")
-        .upsert({ sid: callSid, answered_by: answeredBy }, { onConflict: "sid" })
-        .select();
-      if (callUpsertError) throw callUpsertError;
-      const { data: attempt, error: attemptError } = await supabase
-        .from("outreach_attempt")
-        .update({ answered_at: new Date() })
-        .eq("id", dbCall.outreach_attempt_id)
-        .select();
-      if (attemptError) throw attemptError;
-      return routeData({ success: true, data: callData, attempt });
     }
+
+    await updateCallBySid(dbCall.workspace, callSid, { answered_by: answeredBy });
+    if (dbCall.outreach_attempt_id) {
+      const attempt = await updateOutreachAttemptForWorkspace(
+        dbCall.workspace,
+        dbCall.outreach_attempt_id,
+        { answered_at: new Date().toISOString() },
+      );
+      if (attempt instanceof Response) {
+        throw new Error(await attempt.text());
+      }
+      return routeData({ success: true, attempt });
+    }
+    return routeData({ success: true });
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "An unexpected error occurred";
     return routeData({ success: false, error: errorMessage });
   }
-};
+  },
+});

@@ -1,19 +1,23 @@
-import { createWorkspaceTwilioInstance, parseActionRequest, requireWorkspaceAccess } from "@/lib/database.server";
+import {
+  createWorkspaceTwilioInstance,
+  requireWorkspaceAccess,
+} from "@/lib/database/workspace.server";
+import { parseActionRequest } from "@/lib/request-utils.server";
+import { findCallBySid, updateOutreachDispositionByContactId } from "@/lib/telephony-db.server";
 import { data as routeData } from "react-router";
-import { isAssignedToUser } from "@/lib/queue-status";
 import { logger } from "@/lib/logger.server";
-import { getAuthSupabaseClient, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
+import { rpcDequeueContact } from "@/lib/db-rpc.server";
+import { createTenantDb } from "@/server/tenant-db";
+import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { defineAction } from "@/lib/handler.server";
 
-
-export const action = async ({ request }: { request: Request }) => {
-
-    const auth = await requireJsonAuth(request);
-  if (auth instanceof Response) return auth;
-  const supabase = getAuthSupabaseClient(auth);
-  const user = auth.user;
+export const action = defineAction({
+  auth: ({ request }) => requireJsonAuth(request),
+  sideEffects: ["db-write", "twilio"],
+  handler: async ({ request, auth }) => {
+    const user = auth.user;
     const data = await parseActionRequest(request);
-    const conferenceId =
-        typeof data.conference_id === "string" ? data.conference_id : null;
     const workspaceId =
         typeof data.workspaceId === "string" ? data.workspaceId : null;
     const callSid = typeof data.callSid === "string" ? data.callSid : null;
@@ -21,68 +25,43 @@ export const action = async ({ request }: { request: Request }) => {
         return routeData({ success: false, message: "Invalid hangup payload" }, { status: 400 });
     }
     try {
-        await requireWorkspaceAccess({ supabaseClient: supabase, user, workspaceId });
+        await requireWorkspaceAccess({ user, workspaceId });
 
-        let resolvedConferenceId = conferenceId;
-        if (!resolvedConferenceId) {
-            const { data: callRecord, error: callError } = await supabase
-                .from("call")
-                .select("conference_id")
-                .eq("sid", callSid)
-                .eq("workspace", workspaceId)
-                .maybeSingle();
-            if (callError) throw callError;
-            resolvedConferenceId = callRecord?.conference_id ?? null;
+        const call = await findCallBySid(callSid);
+        if (!call || call.workspace !== workspaceId) {
+            return routeData({ success: false, message: "Call not found" }, { status: 404 });
         }
 
-        const realtime = resolvedConferenceId
-            ? supabase.realtime.channel(resolvedConferenceId)
-            : null;
-        const twilio = await createWorkspaceTwilioInstance({ supabase: supabase, workspace_id: workspaceId});
+        const tdb = createTenantDb(workspaceId);
+        const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspaceId});
         try {
-            await twilio.calls(callSid).update({ twiml: `<Response><Hangup/></Response>` });
+            await twilio.calls(callSid).update({ twiml: hangupTwiml() });
         } catch (twilioErr: unknown) {
             const code = (twilioErr as { code?: number })?.code;
             if (code === 21220) {
-                // Call already ended (e.g. caller hung up); continue to broadcast + optional dequeue
+                // Call already ended (e.g. caller hung up); continue to optional dequeue
             } else {
                 throw twilioErr;
             }
         }
-        realtime?.send({
-            type: "broadcast", event: "message", payload: {
-                contact_id: null,
-                status: 'idle'
-            }
-        });
-        const { data: queueRows, error: queueError } = await supabase
-            .from("campaign_queue")
-            .select("*, campaign(group_household_queue)")
-            .is("dequeued_at", null);
-        if (queueError) throw queueError;
-        const queue = queueRows?.find((row) => isAssignedToUser(row, user.id));
-        if (queue) {
-            const { error } = await supabase.rpc('dequeue_contact', {
-                passed_contact_id: queue.contact_id,
-                group_on_household: queue.campaign.group_household_queue,
-                dequeued_by_id: user.id,
-                dequeued_reason_text: "Call completed"
+        if (call.contact_id) {
+            await rpcDequeueContact(tdb, {
+                contactId: call.contact_id,
+                groupOnHousehold: true,
+                dequeuedById: user.id,
+                dequeuedReasonText: "Call completed",
             });
-            if (error) throw error;
-            const { error: outreachError } = await supabase
-                .from("outreach_attempt")
-                .update({ disposition: "completed" })
-                .eq("contact_id", queue.contact_id)
-                .eq("workspace", workspaceId);
-            if (outreachError) throw outreachError;
-        }
-        if (realtime) {
-            supabase.removeChannel(realtime);
+            await updateOutreachDispositionByContactId(
+                workspaceId,
+                call.contact_id,
+                "completed",
+            );
         }
         return routeData({ success: true });
-   
+
     } catch (error) {
         logger.error('Error hanging up call:', error);
         return routeData({ success: false, message: 'An error occurred while hanging up the call' }, { status: 500 });
     }
-}
+  },
+});

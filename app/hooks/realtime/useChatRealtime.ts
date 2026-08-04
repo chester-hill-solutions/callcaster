@@ -1,8 +1,16 @@
-import { SupabaseClient, RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { Message } from "@/lib/types";
-import type { Database, Tables } from "@/lib/database.types";
-import { useSupabaseRealtimeSubscription } from "./useSupabaseRealtime";
+import type { Database, Tables } from "@/lib/db-types";
+import {
+  compareByRecentActivity,
+  isInboundMessageDirection,
+} from "@/lib/chat-conversation-sort";
+import {
+  fetchConversationSummaries,
+  markConversationRead,
+} from "@/lib/chats/messaging-client";
+import { useWorkspaceEventSubscription } from "./useWorkspaceEventSubscription";
+import { type RealtimeChangePayload } from "@/lib/workspace-events.shared";
 import { logger } from "@/lib/logger.client";
 
 type ConversationSummary = NonNullable<Database["public"]["Functions"]["get_conversation_summary"]["Returns"][number]>;
@@ -37,7 +45,7 @@ export function phoneNumbersMatch(phone1: string | null, phone2: string | null):
 /**
  * Hook for managing real-time chat messages
  * 
- * Subscribes to Supabase realtime changes for messages in a workspace, automatically
+ * Subscribes to Postgres realtime changes for messages in a workspace, automatically
  * updating the messages list when new messages are inserted. Filters messages by
  * workspace and optionally by contact number. Prevents duplicate messages using
  * message SID tracking.
@@ -49,7 +57,7 @@ export function phoneNumbersMatch(phone1: string | null, phone2: string | null):
  * - Failed message filtering
  * 
  * @param params - Configuration object
- * @param params.supabase - Supabase client instance
+ * @param params.client - Postgres client instance
  * @param params.initial - Initial list of messages
  * @param params.workspace - Workspace ID to filter messages
  * @param params.contact_number - Optional contact phone number to filter messages
@@ -61,20 +69,17 @@ export function phoneNumbersMatch(phone1: string | null, phone2: string | null):
  * @example
  * ```tsx
  * const { messages } = useChatRealTime({
- *   supabase,
- *   initial: initialMessages,
+ *    *   initial: initialMessages,
  *   workspace: workspaceId,
  *   contact_number: contactPhone,
  * });
  * ```
  */
 export const useChatRealTime = ({
-  supabase,
-  initial,
+    initial,
   workspace,
   contact_number,
 }: {
-  supabase: SupabaseClient<Database>;
   initial: Message[];
   workspace: string;
   contact_number?: string;
@@ -84,19 +89,30 @@ export const useChatRealTime = ({
   const messageIdsRef = useRef(new Set(initial.map(msg => msg?.sid)));
   const contactNumberRef = useRef(contact_number);
 
-  // Update refs when props change
+  /**
+   * @effect Reset local message state and the SID-dedupe set whenever the caller supplies a new initial message list (e.g. switching conversations).
+   * @effect-deps initial (loader-provided message list; a new reference means the conversation/context changed)
+   * @effect-side-effects none — synchronizes initialRef/messageIdsRef and calls setMessages
+   * @effect-why-not-loader `initial` already comes from a loader; this effect only re-derives local realtime bookkeeping (the dedupe set) each time that loader data changes, which isn't itself a fetch.
+   */
   useEffect(() => {
     initialRef.current = initial;
     messageIdsRef.current = new Set(initial.map(msg => msg?.sid));
     setMessages(initial);
   }, [initial]);
 
+  /**
+   * @effect Keep a ref to the active contact_number filter so the realtime message handler always reads the current value.
+   * @effect-deps contact_number (filter prop, changes when the user switches contacts)
+   * @effect-side-effects none — updates contactNumberRef only
+   * @effect-why-not-loader Local ref bookkeeping to avoid a stale closure inside handleMessageChange; not data fetching.
+   */
   useEffect(() => {
     contactNumberRef.current = contact_number;
   }, [contact_number]);
 
-  const handleMessageChange = useCallback((payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-    const typedPayload = payload as RealtimePostgresChangesPayload<Tables<"message">>;
+  const handleMessageChange = useCallback((payload: RealtimeChangePayload<Record<string, unknown>>) => {
+    const typedPayload = payload as RealtimeChangePayload<Tables<"message">>;
     const newRow = typedPayload.new as Tables<"message"> | null;
     if (!newRow?.workspace || newRow.workspace !== workspace) return;
 
@@ -107,19 +123,20 @@ export const useChatRealTime = ({
     if (!isForContact) return;
 
     if (typedPayload.eventType === "INSERT") {
-      if (newRow.status === "failed") return;
       setMessages((curr) => {
         const newMessage = newRow as Message;
         if (!newMessage?.sid || messageIdsRef.current.has(newMessage.sid)) {
           return curr;
         }
         messageIdsRef.current.add(newMessage.sid);
-        // Replace pending message with same body/from/to if present
+        // Messaging Service optimistic messages have no fabricated From value,
+        // so reconcile those by body/to while retaining From matching for
+        // phone-number sends.
         const withoutMatchingPending = curr.filter((m) => {
           if (!m?.sid?.startsWith?.("pending-")) return true;
           return !(
             m.body === newMessage.body &&
-            phoneNumbersMatch(m.from, newMessage.from) &&
+            (!m.from || phoneNumbersMatch(m.from, newMessage.from)) &&
             phoneNumbersMatch(m.to, newMessage.to)
           );
         });
@@ -135,12 +152,18 @@ export const useChatRealTime = ({
   }, [workspace]);
 
   const addOptimisticMessage = useCallback(
-    (params: { body: string; from: string; to: string; media?: string }) => {
+    (params: {
+      body: string;
+      from?: string;
+      to: string;
+      media?: string;
+      sid?: string;
+    }) => {
       const mediaArr = params.media ? JSON.parse(params.media || "[]") : [];
       const pending = {
-        sid: `pending-${Date.now()}`,
+        sid: params.sid ?? `pending-${Date.now()}`,
         body: params.body,
-        from: params.from,
+        from: params.from ?? null,
         to: params.to,
         workspace,
         direction: "outbound",
@@ -155,20 +178,27 @@ export const useChatRealTime = ({
     [workspace]
   );
 
-  useSupabaseRealtimeSubscription({
-    supabase,
+  /** Flip a still-pending optimistic message (by sid) to "failed" so it renders as undelivered. */
+  const markOptimisticMessageFailed = useCallback((sid: string) => {
+    setMessages((curr) =>
+      curr.map((m) => (m?.sid === sid ? ({ ...m, status: "failed" } as Message) : m)),
+    );
+  }, []);
+
+  useWorkspaceEventSubscription({
+    workspaceId: workspace,
     table: "message",
     filter: `workspace=eq.${workspace}`,
-    onChange: handleMessageChange as (p: RealtimePostgresChangesPayload<Record<string, unknown>>) => void
+    onChange: handleMessageChange as (p: RealtimeChangePayload<Record<string, unknown>>) => void
   });
 
-  return { messages, setMessages, addOptimisticMessage };
+  return { messages, setMessages, addOptimisticMessage, markOptimisticMessageFailed };
 };
 
 /**
  * Hook for managing real-time conversation summaries
  * 
- * Subscribes to Supabase realtime changes for messages and automatically updates
+ * Subscribes to Postgres realtime changes for messages and automatically updates
  * conversation summaries including unread counts, message counts, and last update times.
  * Handles debounced fetching of conversation summaries to prevent excessive API calls.
  * Tracks active conversation to mark messages as read.
@@ -182,7 +212,7 @@ export const useChatRealTime = ({
  * - Automatic sorting by most recent conversation
  * 
  * @param params - Configuration object
- * @param params.supabase - Supabase client instance
+ * @param params.client - Postgres client instance
  * @param params.initial - Initial list of conversation summaries
  * @param params.workspace - Workspace ID to filter messages
  * @param params.activeContactNumber - Optional active contact phone number (marks as read)
@@ -195,8 +225,7 @@ export const useChatRealTime = ({
  * @example
  * ```tsx
  * const { conversations, fetchConversationSummary } = useConversationSummaryRealTime({
- *   supabase,
- *   initial: initialConversations,
+ *    *   initial: initialConversations,
  *   workspace: workspaceId,
  *   activeContactNumber: currentContact?.phone,
  * });
@@ -206,12 +235,10 @@ export const useChatRealTime = ({
  * ```
  */
 export const useConversationSummaryRealTime = ({
-  supabase,
-  initial,
+    initial,
   workspace,
   activeContactNumber,
 }: {
-  supabase: SupabaseClient<Database>;
   initial: ConversationSummary[];
   workspace: string;
   activeContactNumber?: string; // Add this to track the active conversation
@@ -224,7 +251,12 @@ export const useConversationSummaryRealTime = ({
   const lastUpdateTimeRef = useRef<number>(Date.now());
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Update active contact ref when it changes
+  /**
+   * @effect Keep a ref to the active contact number so the realtime message handler always reads the currently-open conversation without a stale closure.
+   * @effect-deps activeContactNumber (which conversation is open; changes as the user navigates between chats)
+   * @effect-side-effects none — updates activeContactRef only
+   * @effect-why-not-loader Local ref bookkeeping to avoid stale closures in handleMessageChange; not data fetching.
+   */
   useEffect(() => {
     activeContactRef.current = activeContactNumber;
   }, [activeContactNumber]);
@@ -243,89 +275,90 @@ export const useConversationSummaryRealTime = ({
     lastUpdateTimeRef.current = now;
     
     try {
-      const { data, error } = await supabase.rpc("get_conversation_summary", {
-        p_workspace: workspace,
+      const data = await fetchConversationSummaries(workspace);
+      const filteredData = data.filter((item): item is ConversationSummary => item !== null);
+
+      const processedData = filteredData.map(conv => {
+        if (activeContactRef.current &&
+            phoneNumbersMatch(conv.contact_phone, activeContactRef.current)) {
+          return {
+            ...conv,
+            unread_count: 0,
+          };
+        }
+        return conv;
       });
-      if (error) {
-        logger.error("Error fetching conversation summary:", error);
-        // Don't throw, just return early to prevent breaking the UI
-        // The error is logged for debugging purposes
-        return;
-      }
-      if (data) {
-        const filteredData = data.filter((item): item is ConversationSummary => item !== null);
-        
-        // Process the data to update unread counts
-        const processedData = filteredData.map(conv => {
-          // If this is the active conversation, we can assume messages are being read
-          if (activeContactRef.current && 
-              phoneNumbersMatch(conv.contact_phone, activeContactRef.current)) {
-            return {
-              ...conv,
-              unread_count: 0 // Mark as read for the active conversation
-            };
-          }
-          return conv;
-        });
-        
-        // Sort conversations by most recent first
-        processedData.sort((a, b) => {
-          return new Date(b.conversation_last_update).getTime() - 
-                 new Date(a.conversation_last_update).getTime();
-        });
-        
-        setConversations(processedData);
-        
-        // Update the phone numbers set for future comparisons
-        phoneNumbersRef.current = new Set(processedData.map(conv => conv.contact_phone));
-      }
+
+      processedData.sort(compareByRecentActivity);
+      setConversations(processedData);
+      phoneNumbersRef.current = new Set(processedData.map(conv => conv.contact_phone));
+    } catch (error) {
+      logger.error("Error fetching conversation summary:", error);
     } finally {
       isFetchingRef.current = false;
     }
-  }, [supabase, workspace]);
+  }, [workspace]);
 
-  // Update conversations when initial data changes
+  /**
+   * @effect Resync `conversations` from the caller-supplied `initial` list when the loader gives us a materially different set (new/removed contacts or a changed count).
+   * @effect-deps initial (loader data — always reacted to via reference change); conversations.length (used only as a coarse "did the set size change" check, intentionally NOT the full `conversations` object — see tradeoff below)
+   * @effect-side-effects none — recomputes and calls setConversations when the phone-number set or length diverges from `initial`
+   * @effect-why-not-loader `initial` is already loader data; this effect exists purely to reconcile it against realtime-mutated local state, which a loader can't do on its own.
+   *
+   * Known tradeoff (assessed, not changed): depending on the full `conversations` object instead of `conversations.length`
+   * would make this effect re-fire on every realtime-driven `setConversations` call (unread bumps, new conversations from
+   * handleMessageChange), and it would then be free to overwrite those local-only changes with stale `initial` data whenever
+   * the phone-number-set/length heuristic happened not to catch the difference — a strictly worse regression (losing live
+   * updates) than the one it fixes. Because a live realtime subscription + a 60s poll fallback (see
+   * `fetchConversationSummary` effect below) already keep `conversations` fresh, the bounded miss here (an `initial` change
+   * that alters existing-conversation content, e.g. message_count/timestamps, without changing the phone-number set or
+   * count) self-heals within one poll cycle. Kept as `[initial, conversations.length]` with a justified
+   * eslint-disable rather than widening the dependency.
+   */
   useEffect(() => {
     const newPhoneNumbers = new Set(initial.map(conv => conv.contact_phone));
     // Only update if phone numbers changed or length changed
     if (!setsAreEqual(phoneNumbersRef.current, newPhoneNumbers) || initial.length !== conversations.length) {
       phoneNumbersRef.current = newPhoneNumbers;
       initialRef.current = initial;
-      
+
       // Sort by most recent first
-      const sortedConversations = [...initial].sort((a, b) => {
-        return new Date(b.conversation_last_update).getTime() - 
-               new Date(a.conversation_last_update).getTime();
-      });
-      
+      const sortedConversations = [...initial].sort(compareByRecentActivity);
+
       setConversations(sortedConversations);
     }
-  }, [initial, conversations.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initial, conversations.length]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally excludes full `conversations` object; see @effect-why-not-loader tradeoff note above
 
   // Handle new messages and message status changes
-  const handleMessageChange = useCallback((payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
-    const typedPayload = payload as RealtimePostgresChangesPayload<Tables<"message">>;
-    if (typedPayload.eventType === 'INSERT' && typedPayload.new?.workspace === workspace) {
+  const handleMessageChange = useCallback((payload: RealtimeChangePayload<Record<string, unknown>>) => {
+    const typedPayload = payload as RealtimeChangePayload<Tables<"message">>;
+    const newRow = typedPayload.new;
+    if (!newRow || newRow.workspace !== workspace) return;
+    if (typedPayload.eventType !== 'INSERT' && typedPayload.eventType !== 'UPDATE') {
+      return;
+    }
+
+    if (typedPayload.eventType === 'INSERT') {
       // For new messages, we need to update unread counts
-      if (typedPayload.new.status === "received") {
+      if (newRow.status === "received") {
         // Check if this is for the active contact
-        const isForActiveContact = activeContactRef.current && 
-          (phoneNumbersMatch(typedPayload.new.from, activeContactRef.current) || 
-           phoneNumbersMatch(typedPayload.new.to, activeContactRef.current));
-        
+        const isForActiveContact = activeContactRef.current &&
+          (phoneNumbersMatch(newRow.from, activeContactRef.current) ||
+           phoneNumbersMatch(newRow.to, activeContactRef.current));
+
         // If it's not for the active contact, we need to increment unread count
         if (!isForActiveContact) {
           // Find the conversation for this contact
           setConversations(prevConversations => {
             // Determine the contact phone number (the one that's not a workspace number)
             const contactPhone =
-              (typedPayload.new.direction === 'inbound' ? typedPayload.new.from : typedPayload.new.to) ?? "";
-            
+              (newRow.direction === 'inbound' ? newRow.from : newRow.to) ?? "";
+
             // Check if we already have a conversation for this contact
-            const existingConversationIndex = prevConversations.findIndex(conv => 
+            const existingConversationIndex = prevConversations.findIndex(conv =>
               phoneNumbersMatch(conv.contact_phone, contactPhone)
             );
-            
+
             if (existingConversationIndex >= 0) {
               // Update existing conversation
               const updatedConversations = [...prevConversations];
@@ -336,7 +369,7 @@ export const useConversationSummaryRealTime = ({
               updatedConversations[existingConversationIndex] = {
                 ...existingConversation,
                 unread_count: existingConversation.unread_count + 1,
-                conversation_last_update: typedPayload.new.date_created || new Date().toISOString(),
+                conversation_last_update: newRow.date_created || new Date().toISOString(),
                 message_count: existingConversation.message_count + 1
               };
               return updatedConversations;
@@ -345,47 +378,46 @@ export const useConversationSummaryRealTime = ({
               const newConversation: ConversationSummary = {
                 contact_phone: contactPhone,
                 user_phone:
-                  (typedPayload.new.direction === 'inbound'
-                    ? typedPayload.new.to
-                    : typedPayload.new.from) ?? "",
-                conversation_start: typedPayload.new.date_created || new Date().toISOString(),
-                conversation_last_update: typedPayload.new.date_created || new Date().toISOString(),
+                  (newRow.direction === 'inbound'
+                    ? newRow.to
+                    : newRow.from) ?? "",
+                conversation_start: newRow.date_created || new Date().toISOString(),
+                conversation_last_update: newRow.date_created || new Date().toISOString(),
                 message_count: 1,
                 unread_count: 1,
                 contact_firstname: '',  // We don't have this info yet
                 contact_surname: ''     // We don't have this info yet
               };
-              
+
               // Add the new conversation and sort by most recent
-              const updatedConversations = [...prevConversations, newConversation].sort((a, b) => {
-                return new Date(b.conversation_last_update).getTime() - 
-                       new Date(a.conversation_last_update).getTime();
-              });
-              
+              const updatedConversations = [...prevConversations, newConversation].sort(
+                compareByRecentActivity,
+              );
+
               return updatedConversations;
             }
           });
         }
       }
-      
+
       // For status changes, refresh the conversation summary
-      if (typedPayload.new.status === "delivered" || typedPayload.new.status === "read") {
+      if (newRow.status === "delivered" || newRow.status === "read") {
         // For delivered/read status, we need to update unread counts
         setConversations(prevConversations => {
           // Early return if no conversations match
-          const hasMatchingConversation = prevConversations.some(conv => 
-            phoneNumbersMatch(conv.contact_phone, typedPayload.new.from) || 
-            phoneNumbersMatch(conv.contact_phone, typedPayload.new.to)
+          const hasMatchingConversation = prevConversations.some(conv =>
+            phoneNumbersMatch(conv.contact_phone, newRow.from) ||
+            phoneNumbersMatch(conv.contact_phone, newRow.to)
           );
-          
+
           if (!hasMatchingConversation) {
             return prevConversations;
           }
-          
+
           return prevConversations.map(conv => {
             // Check if this message is from/to this conversation's contact
-            if (phoneNumbersMatch(conv.contact_phone, typedPayload.new.from) || 
-                phoneNumbersMatch(conv.contact_phone, typedPayload.new.to)) {
+            if (phoneNumbersMatch(conv.contact_phone, newRow.from) ||
+                phoneNumbersMatch(conv.contact_phone, newRow.to)) {
               // Decrement unread count (but not below 0)
               return {
                 ...conv,
@@ -396,15 +428,15 @@ export const useConversationSummaryRealTime = ({
           });
         });
       }
-      
+
       // Store the last time we received a message change
       lastUpdateTimeRef.current = Date.now();
-      
+
       // Clear any existing timeout to prevent multiple calls
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      
+
       // Use a longer delay to allow multiple messages to be processed together
       // and prevent excessive refreshes
       timeoutRef.current = setTimeout(() => {
@@ -418,18 +450,23 @@ export const useConversationSummaryRealTime = ({
   }, [workspace, fetchConversationSummary]);
 
   // Subscribe to message changes
-  useSupabaseRealtimeSubscription({
-    supabase,
+  useWorkspaceEventSubscription({
+    workspaceId: workspace,
     table: "message",
     filter: `workspace=eq.${workspace}`,
     onChange: handleMessageChange,
   });
 
-  // Periodically refresh conversations to ensure they're up to date
+  /**
+   * @effect Fetch conversation summaries immediately on mount, then poll every 60s as a fallback in case realtime events are missed/coalesced.
+   * @effect-deps fetchConversationSummary (useCallback memoized on [workspace] — resubscribes the timer if the workspace changes)
+   * @effect-side-effects timer (setInterval, 60s) + fetch (fetchConversationSummary network call); interval cleared and any pending debounce timeout cleared on cleanup
+   * @effect-why-not-loader The interval itself needs a live component-lifetime timer, which loaders/fetchers can't express; only the underlying network call is "fetching," and it exists here as a polling fallback alongside the realtime subscription and debounced on-event fetch (handleMessageChange), not as the primary data source. The immediate on-mount call is somewhat redundant with the loader-seeded `initial` prop but is left as-is (low cost, keeps summaries fresh if `initial` was stale by the time this hook mounts).
+   */
   useEffect(() => {
     // Initial fetch
     fetchConversationSummary(true);
-    
+
     // Set up periodic refresh (every 60 seconds)
     const intervalId = setInterval(() => {
       fetchConversationSummary(true);
@@ -446,26 +483,14 @@ export const useConversationSummaryRealTime = ({
   // Mark all messages as read for the active contact
   const markConversationAsRead = useCallback(async (contactPhone: string) => {
     if (!contactPhone) return;
-    
+
     try {
-      // Update all received messages for this contact to delivered
-      const { error } = await supabase
-        .from("message")
-        .update({ status: "delivered" })
-        .eq("workspace", workspace)
-        .eq("status", "received")
-        .or(`from.eq.${contactPhone},to.eq.${contactPhone}`);
-      
-      if (error) {
-        logger.error("Error marking conversation as read:", error);
-      } else {
-        // Force refresh conversation summary to update unread counts
-        fetchConversationSummary(true);
-      }
+      await markConversationRead(workspace, contactPhone);
+      fetchConversationSummary(true);
     } catch (err) {
       logger.error("Error in markConversationAsRead:", err);
     }
-  }, [supabase, workspace, fetchConversationSummary]);
+  }, [workspace, fetchConversationSummary]);
 
   return { 
     conversations, 

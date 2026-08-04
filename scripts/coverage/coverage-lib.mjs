@@ -14,10 +14,7 @@ export const lcovInputs = [
     name: "vitest-ui",
     path: path.join(coverageDir, "vitest-ui", "lcov.info"),
   },
-  {
-    name: "deno",
-    path: path.join(coverageDir, "deno", "lcov.info"),
-  },
+  // "deno" input removed with the client edge functions (see typecheck:deno).
 ];
 
 /** @param {string} sf */
@@ -212,7 +209,7 @@ export function listSourceFiles() {
   /** @type {string[]} */
   const roots = [
     path.join(repoRoot, "app"),
-    path.join(repoRoot, "supabase", "functions"),
+    path.join(repoRoot, "client", "functions"),
   ];
 
   /** @type {string[]} */
@@ -227,7 +224,7 @@ export function listSourceFiles() {
     if (parts.includes(".deno")) return true;
     if (rel.startsWith("build")) return true;
     if (rel.startsWith(path.join("public", "build"))) return true;
-    if (rel.startsWith(path.join("supabase", "functions", "__tests__")))
+    if (rel.startsWith(path.join("client", "functions", "__tests__")))
       return true;
     return false;
   };
@@ -243,14 +240,14 @@ export function listSourceFiles() {
     if (rel === path.join("app", "env.ts")) return true;
     if (
       rel ===
-      path.join("supabase", "functions", "number-rental-billing", "index.ts")
+      path.join("client", "functions", "number-rental-billing", "index.ts")
     )
       return true;
     if (rel === path.join("app", "lib", "queue-filter-search.server.ts"))
       return true;
     if (rel === path.join("app", "lib", "chats", "types.ts")) return true;
     if (rel.endsWith("database.types.ts")) return true;
-    if (rel.endsWith("supabase.types.ts")) return true;
+    if (rel.endsWith("adminDb.types.ts")) return true;
     if (rel.endsWith("twilio.types.ts")) return true;
     if (rel.startsWith(path.join("app", "lib", "api-generated"))) return true;
     if (rel.startsWith(path.join("archive", "deprecated", "twilio-serverless")))

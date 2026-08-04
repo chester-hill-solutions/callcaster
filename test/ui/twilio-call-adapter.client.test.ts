@@ -3,7 +3,6 @@ import {
   getCallFrom,
   getCallSid,
   logTwilioAdapterResult,
-  replaceCallInputStream,
   sendCallDigits,
   setCallMuted,
 } from "@/lib/twilio/twilio-call-adapter.client";
@@ -16,13 +15,11 @@ vi.mock("@/lib/logger.client", () => ({
 function makeCall(overrides: {
   parameters?: Record<string, string>;
   mute?: (muted: boolean) => void;
-  setInputStream?: (stream: MediaStream) => Promise<void>;
   sendDigits?: (key: string) => void;
 } = {}) {
   return {
     parameters: overrides.parameters,
     mute: overrides.mute,
-    _setInputTracksFromStream: overrides.setInputStream,
     sendDigits: overrides.sendDigits ?? vi.fn(),
   } as unknown as import("@twilio/voice-sdk").Call;
 }
@@ -46,25 +43,6 @@ describe("twilio-call-adapter", () => {
 
     expect(setCallMuted(makeCall(), true)).toEqual({ status: "unsupported" });
     expect(mute).toHaveBeenCalledTimes(1);
-  });
-
-  test("replaceCallInputStream returns explicit adapter results", async () => {
-    const setInputStream = vi.fn().mockResolvedValue(undefined);
-    const stream = {} as MediaStream;
-
-    expect(await replaceCallInputStream(null, stream)).toEqual({
-      status: "invalid_call",
-    });
-
-    expect(
-      await replaceCallInputStream(makeCall({ setInputStream }), stream),
-    ).toEqual({ status: "ok" });
-    expect(setInputStream).toHaveBeenCalledWith(stream);
-
-    expect(await replaceCallInputStream(makeCall(), stream)).toEqual({
-      status: "unsupported",
-    });
-    expect(setInputStream).toHaveBeenCalledTimes(1);
   });
 
   test("sendCallDigits returns explicit adapter results", () => {

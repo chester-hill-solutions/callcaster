@@ -244,9 +244,9 @@ function DateCalendar({
       };
     }
     return genMonths(locale);
-  }, []);
+  }, [props.locale]);
 
-  const YEARS = React.useMemo(() => genYears(yearRange), []);
+  const YEARS = React.useMemo(() => genYears(yearRange), [yearRange]);
 
   return (
     <DayPicker
@@ -324,7 +324,10 @@ const TimePeriodSelect = React.forwardRef<HTMLButtonElement, PeriodSelectorProps
 
     return (
       <div className="flex h-10 items-center">
-        <Select defaultValue={period} onValueChange={(value: Period) => handleValueChange(value)}>
+        <Select
+          defaultValue={period}
+          onValueChange={(value) => handleValueChange(value as Period)}
+        >
           <SelectTrigger
             ref={ref}
             className="w-[65px] focus:bg-accent focus:text-accent-foreground"
@@ -569,6 +572,8 @@ type DateTimePickerProps = {
   /** showing `AM/PM` or not. */
   hourCycle?: 12 | 24;
   placeholder?: string;
+  /** Show the calendar icon on the trigger button. Defaults to true. */
+  showIcon?: boolean;
   /**
    * The year range will be: `This year + yearRange` and `this year - yearRange`.
    * Default is 50.
@@ -604,6 +609,7 @@ const DateTimePicker = React.forwardRef<Partial<DateTimePickerRef>, DateTimePick
       displayFormat,
       granularity = 'second',
       placeholder = 'Pick a date',
+      showIcon = true,
       ...props
     },
     ref,
@@ -663,19 +669,21 @@ const DateTimePicker = React.forwardRef<Partial<DateTimePickerRef>, DateTimePick
           <Button
             variant="outline"
             className={cn(
-              'flex flex-grow min-w-48 justify-start text-left font-normal text-xs',
+              'flex w-full min-w-0 justify-start text-left font-normal text-xs',
               !value && 'text-muted-foreground',
             )}
             ref={buttonRef}
           >
-            <CalendarIcon className="mr-1 h-4 w-4" />
-            {value ? (
-              format(value, hourCycle === 24 ? initHourFormat.hour24 : initHourFormat.hour12, {
-                locale: loc,
-              })
-            ) : (
-              <span>{placeholder}</span>
-            )}
+            {showIcon ? <CalendarIcon className="mr-1 h-4 w-4 shrink-0" /> : null}
+            <span className="truncate">
+              {value ? (
+                format(value, hourCycle === 24 ? initHourFormat.hour24 : initHourFormat.hour12, {
+                  locale: loc,
+                })
+              ) : (
+                placeholder
+              )}
+            </span>
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0">
@@ -683,7 +691,7 @@ const DateTimePicker = React.forwardRef<Partial<DateTimePickerRef>, DateTimePick
             mode="single"
             selected={value}
             month={month}
-            onSelect={(d) => handleSelect(d)}
+            onSelect={(d: Date | undefined) => handleSelect(d)}
             onMonthChange={handleSelect}
             yearRange={yearRange}
             locale={locale}

@@ -46,6 +46,7 @@ export const updateMeBodySchema = z.object({
   last_name: z.string().min(1).optional(),
   email: z.string().email().optional(),
   password: z.string().min(8).optional(),
+  current_password: z.string().min(1).optional(),
 });
 
 export const createWorkspaceBodySchema = z.object({
@@ -64,6 +65,8 @@ const workspaceOnboardingChannelSchema = z.enum([
   "a2p10dlc",
   "rcs",
   "voice_compliance",
+  "toll_free_bulk_sms",
+  "local_number",
 ]);
 
 const workspaceOnboardingStatusSchema = z.enum([

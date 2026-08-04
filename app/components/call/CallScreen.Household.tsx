@@ -1,5 +1,7 @@
 import { CheckCircleIcon } from "lucide-react";
-import { Tables } from "@/lib/database.types";
+import { callPanelShellClass } from "@/components/call/call-panel-classes";
+import { cn } from "@/lib/utils";
+import type { Tables } from "@/lib/db-types";
 
 type ContactRow = Tables<"contact">;
 type QueueItemRow = Tables<"campaign_queue"> & { contact: ContactRow };
@@ -22,75 +24,67 @@ export const Household = ({
   questionContact,
   isBusy,
 }: HouseholdProps) => {
-  const isSelected = house?.find(
+  const selectedId = house?.find(
     (queueItem) => queueItem?.contact?.id === questionContact?.contact?.id,
-  );
+  )?.contact?.id;
+
   return (
-    <div
-      style={{
-        border: "3px solid #BCEBFF",
-        borderRadius: "20px",
-        //backgroundColor: "hsl(var(--card))",
-        minHeight: "300px",
-        alignItems: "stretch",
-        flexDirection: "column",
-        display: "flex",
-        boxShadow: "3px 5px 0  rgba(50,50,50,.6)",
-      }}
+    <section
+      className={cn(callPanelShellClass, "p-3")}
+      aria-labelledby="household-members-label"
     >
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderTopLeftRadius: "18px",
-          borderTopRightRadius: "18px",
-          padding: "16px",
-          background: "hsl(var(--brand-secondary))",
-          width: "100%",
-          textAlign: "center",
-        }}
-        className="font-Tabac-Slab text-xl dark:text-slate-800"
+        id="household-members-label"
+        className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
       >
-        <div style={{ display: "flex", flex: "1", justifyContent: "center" }}>
-          Household Members
-        </div>
+        Household Members
       </div>
-      {house?.filter(Boolean).map((queueItem: QueueItemRow) => (
-        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
-        <div
-          key={queueItem.contact.id}
-          className={`m-1 flex justify-center rounded-2xl p-2  ${isSelected?.contact?.id === queueItem.contact?.id ? "border-2 border-primary bg-gray-100" : "bg-secondary"} hover:shadow-inner-lg transition-all hover:bg-gray-100 hover:opacity-85`}
-          onClick={() =>
-            !isBusy && switchQuestionContact({ contact: queueItem })
-          }
-        >
-          <div className="flex flex-auto items-center justify-between font-Zilla-Slab text-lg font-semibold dark:text-slate-800">
-            <div>
-              {queueItem.contact.firstname} {queueItem.contact.surname}
-            </div>
-            <div>
-              {(() => {
-                const attempt = attemptList.find(
-                  (a: Attempt) =>
-                    a.contact_id === queueItem.contact.id,
-                );
-                if (
-                  attempt?.result &&
-                  typeof attempt.result === "object" &&
-                  !Array.isArray(attempt.result)
-                ) {
-                  const resultObject = attempt.result as Record<string, unknown>;
-                  if ("status" in resultObject && resultObject["status"]) {
-                    return <CheckCircleIcon size={"16px"} />;
+      <div className="flex flex-wrap gap-2">
+        {house?.filter(Boolean).map((queueItem: QueueItemRow) => {
+          const isActive = selectedId === queueItem.contact.id;
+          return (
+            <button
+              key={queueItem.contact.id}
+              type="button"
+              disabled={isBusy}
+              className={cn(
+                "inline-flex items-center gap-2 rounded-full border px-3 py-2 text-left font-Zilla-Slab text-sm font-semibold transition-colors",
+                isActive
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-secondary hover:bg-muted/70",
+              )}
+              onClick={() => switchQuestionContact({ contact: queueItem })}
+            >
+              <span>
+                {queueItem.contact.firstname} {queueItem.contact.surname}
+              </span>
+              <span>
+                {(() => {
+                  const attempt = attemptList.find(
+                    (a: Attempt) => a.contact_id === queueItem.contact.id,
+                  );
+                  if (
+                    attempt?.result &&
+                    typeof attempt.result === "object" &&
+                    !Array.isArray(attempt.result)
+                  ) {
+                    const resultObject = attempt.result as Record<
+                      string,
+                      unknown
+                    >;
+                    if ("status" in resultObject && resultObject["status"]) {
+                      return (
+                        <CheckCircleIcon className="h-4 w-4 text-primary" />
+                      );
+                    }
                   }
-                }
-                return null;
-              })()}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
+                  return null;
+                })()}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 };

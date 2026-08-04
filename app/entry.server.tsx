@@ -1,131 +1,135 @@
 /**
- * By default, Remix will handle generating the HTTP Response for you.
- * You are free to delete this file if you'd like to, but if you ever want it revealed again, you can run `npx remix reveal` ✨
- * For more information, see https://remix.run/file-conventions/entry.server
+ * React Router streaming SSR entry.
+ *
+ * Uses renderToReadableStream (web streams): Bun resolves `react-dom/server`
+ * to `server.bun.js`, which — as of React 19 — no longer exports the
+ * node-streams renderToPipeableStream. The web-streams renderer works under
+ * both Bun (production server) and Node (vite dev).
  */
 
 import { ServerRouter } from "react-router";
 import type { AppLoadContext, EntryContext } from "react-router";
-import { PassThrough } from "node:stream";
-
-import { createReadableStreamFromReadable } from "@react-router/node";
 
 import { isbot } from "isbot";
-import { renderToPipeableStream } from "react-dom/server";
+import { renderToReadableStream } from "react-dom/server";
 import { logger } from "@/lib/logger.server";
+import { captureException } from "@/lib/sentry.server";
+import { recordServerError } from "@/lib/error-rate.server";
 
-const ABORT_DELAY = 5_000;
+/**
+ * How long React Router's turbo-stream encoder waits for a deferred loader
+ * promise before rejecting it with "Server Timeout".
+ *
+ * React Router reads this export off the server build (`encodeViaTurboStream`
+ * in server-runtime/single-fetch) for BOTH document requests and single-fetch
+ * `.data` requests. 4950 is RR's own internal fallback, so stating it here is
+ * a no-op for timing — it exists to make the ABORT_DELAY relationship below
+ * explicit and reviewable rather than an accident of an undocumented default.
+ */
+export const streamTimeout = 4_950;
 
-export default function handleRequest(
+/**
+ * When to abort Suspense boundaries still pending, so the HTML stream always
+ * closes.
+ *
+ * MUST stay above `streamTimeout`. turbo-stream rejects a stalled deferred at
+ * `streamTimeout` and flushes an error chunk as an inline StreamTransfer
+ * script; that rejection is the ONLY thing that can settle the client's
+ * deferred promise and let <Await errorElement> render. If React aborts first,
+ * the document is truncated before that script is emitted, the client promise
+ * never settles, and the boundary suspends forever (React #419 + a permanent
+ * "Loading results..."). The gap is the flush window for that error chunk.
+ */
+export const ABORT_DELAY = streamTimeout + 1_050;
+
+export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
   responseHeaders: Headers,
   reactRouterContext: EntryContext,
-  loadContext: AppLoadContext
+  _loadContext: AppLoadContext,
 ) {
-  return isbot(request.headers.get("user-agent") || "")
-    ? handleBotRequest(
-        request,
-        responseStatusCode,
-        responseHeaders,
-        reactRouterContext
-      )
-    : handleBrowserRequest(
-        request,
-        responseStatusCode,
-        responseHeaders,
-        reactRouterContext,
-      );
-}
+  let shellRendered = false;
+  const controller = new AbortController();
+  // Abort any Suspense boundaries still pending after the delay so responses
+  // always complete (parity with the old renderToPipeableStream abort timer).
+  const abortTimer = setTimeout(() => controller.abort(), ABORT_DELAY);
 
-function handleBotRequest(
-  request: Request,
-  responseStatusCode: number,
-  responseHeaders: Headers,
-  reactRouterContext: EntryContext
-) {
-  return new Promise((resolve, reject) => {
-    let shellRendered = false;
-    const { pipe, abort } = renderToPipeableStream(
+  try {
+    const body = await renderToReadableStream(
       <ServerRouter context={reactRouterContext} url={request.url} />,
       {
-        onAllReady() {
-          shellRendered = true;
-          const body = new PassThrough();
-          const stream = createReadableStreamFromReadable(body);
-
-          responseHeaders.set("Content-Type", "text/html");
-
-          resolve(
-            new Response(stream, {
-              headers: responseHeaders,
-              status: responseStatusCode,
-            })
-          );
-
-          pipe(body);
-        },
-        onShellError(error: unknown) {
-          reject(error);
-        },
+        signal: controller.signal,
         onError(error: unknown) {
+          // An intentional abort (slow Suspense past ABORT_DELAY) is not a
+          // render failure — the shell already streamed, so keep the 2xx and
+          // let the flushed content stand. Only real errors become a 500.
+          if (controller.signal.aborted) return;
           responseStatusCode = 500;
-          // Log streaming rendering errors from inside the shell.  Don't log
-          // errors encountered during initial shell rendering since they'll
-          // reject and get logged in handleDocumentRequest.
+          // Shell errors reject the render promise and are logged by
+          // handleDocumentRequest; only log post-shell streaming errors here.
           if (shellRendered) {
             logger.error("Streaming render error:", error);
           }
         },
-      }
+      },
+    );
+    shellRendered = true;
+
+    // Clear the abort timer only once the stream is fully DONE — never when the
+    // shell resolves. `renderToReadableStream` resolves as soon as the shell is
+    // ready, while Suspense boundaries may still be pending; clearing at that
+    // point cancels the abort and lets a never-settling boundary hold the
+    // response open forever (the deferred promise on the client is fed only by
+    // the inline StreamTransfer scripts, so it never settles and <Await>
+    // suspends indefinitely rather than reaching its errorElement).
+    void body.allReady.then(
+      () => clearTimeout(abortTimer),
+      () => clearTimeout(abortTimer),
     );
 
-    setTimeout(abort, ABORT_DELAY);
-  });
+    // Bots get the fully rendered document (parity with onAllReady).
+    if (isbot(request.headers.get("user-agent") || "")) {
+      await body.allReady;
+    }
+
+    responseHeaders.set("Content-Type", "text/html");
+    return new Response(body, {
+      headers: responseHeaders,
+      status: responseStatusCode,
+    });
+  } catch (error) {
+    // The shell itself failed, so nothing will ever settle `allReady`.
+    clearTimeout(abortTimer);
+    throw error;
+  }
 }
 
-function handleBrowserRequest(
-  request: Request,
-  responseStatusCode: number,
-  responseHeaders: Headers,
-  reactRouterContext: EntryContext
-) {
-  return new Promise((resolve, reject) => {
-    let shellRendered = false;
-    const { pipe, abort } = renderToPipeableStream(
-      <ServerRouter context={reactRouterContext} url={request.url} />,
-      {
-        onShellReady() {
-          shellRendered = true;
-          const body = new PassThrough();
-          const stream = createReadableStreamFromReadable(body);
+/**
+ * React Router's hook for unhandled loader/action/render errors.
+ *
+ * This was never exported, so RR used its own default and every such error was
+ * structurally invisible — no log line, no counter, nothing to alert on.
+ *
+ * Note this does NOT fire for errors that `withGuards` (app/lib/handler.server)
+ * already catches and converts into a `data(...)` response; those are counted
+ * at the other chokepoint, `createErrorResponse`.
+ */
+export function handleError(
+  error: unknown,
+  { request }: { request: Request },
+): void {
+  // A client that navigated away is not an application failure.
+  if (request.signal.aborted) {
+    return;
+  }
 
-          responseHeaders.set("Content-Type", "text/html");
-
-          resolve(
-            new Response(stream, {
-              headers: responseHeaders,
-              status: responseStatusCode,
-            })
-          );
-
-          pipe(body);
-        },
-        onShellError(error: unknown) {
-          reject(error);
-        },
-        onError(error: unknown) {
-          responseStatusCode = 500;
-          // Log streaming rendering errors from inside the shell.  Don't log
-          // errors encountered during initial shell rendering since they'll
-          // reject and get logged in handleDocumentRequest.
-          if (shellRendered) {
-            logger.error("Streaming render error:", error);
-          }
-        },
-      }
-    );
-
-    setTimeout(abort, ABORT_DELAY);
+  const url = new URL(request.url);
+  logger.error("router.unhandled_error", {
+    method: request.method,
+    path: url.pathname,
+    ...(error instanceof Error ? { err: error } : { thrown: String(error) }),
   });
+  captureException(error, { method: request.method, path: url.pathname });
+  recordServerError();
 }

@@ -1,7 +1,8 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Database, Tables } from "@/lib/database.types";
+import type { Database, Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
+import { safeOutboundFetch } from "@/lib/safe-outbound-url.server";
+import { getWorkspaceWebhookRow } from "@/lib/workspace-members-db.server";
 
 type WebhookWithEvents = Tables<"webhook"> & {
   events?: Array<{ category: string; type: string }>;
@@ -12,31 +13,18 @@ export async function sendWorkspaceWebhookNotification({
   eventType,
   workspaceId,
   payload,
-  supabaseClient,
   optional = false,
 }: {
   eventCategory: string;
   eventType: "INSERT" | "UPDATE";
   workspaceId: string;
   payload: Record<string, unknown>;
-  supabaseClient: SupabaseClient<Database>;
+  null?: never;
   /** When true, missing/disabled webhooks are treated as a no-op success. */
   optional?: boolean;
 }): Promise<{ success: boolean; error?: string | null }> {
   try {
-    const { data: webhook, error: webhookError } = await supabaseClient
-      .from("webhook")
-      .select("*")
-      .eq("workspace", workspaceId)
-      .single();
-
-    if (webhookError) {
-      logger.error(`No webhook configured for workspace ${workspaceId}`);
-      return {
-        success: false,
-        error: webhookError.message,
-      };
-    }
+    const webhook = await getWorkspaceWebhookRow(workspaceId);
 
     if (!webhook) {
       if (optional) {
@@ -73,7 +61,7 @@ export async function sendWorkspaceWebhookNotification({
         ? (webhook.custom_headers as Record<string, string>)
         : {};
 
-    const result = await fetch(webhook.destination_url, {
+    const result = await safeOutboundFetch(webhook.destination_url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -86,6 +74,7 @@ export async function sendWorkspaceWebhookNotification({
         timestamp: new Date().toISOString(),
         payload,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
 
     if (!result.ok) {
