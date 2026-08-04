@@ -28,8 +28,33 @@ import {
 import type { Call } from "@twilio/voice-sdk";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
 import type { ActiveCall, CampaignDetails, QueueItem } from "@/lib/types";
+import type { ReactNode } from "react";
 import type { Tables } from "@/lib/db-types";
 import { normalizeDispositionOptions } from "@/lib/outreach-disposition";
+
+function ErrorBanner({
+  title,
+  text,
+  children,
+  testId,
+}: {
+  title: string;
+  text?: string;
+  children?: ReactNode;
+  testId?: string;
+}) {
+  return (
+    <div
+      className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center"
+      data-testid={testId}
+      role="alert"
+    >
+      <p className="font-Zilla-Slab text-xl font-semibold">{title}</p>
+      {text ? <p className="mt-2 text-sm">{text}</p> : null}
+      {children}
+    </div>
+  );
+}
 
 export function CallScreenLayout({
   isBusy,
@@ -46,6 +71,7 @@ export function CallScreenLayout({
   device,
   currentState,
   creditsError,
+  deviceError,
   callControls,
   queueControls,
   formState,
@@ -140,19 +166,17 @@ export function CallScreenLayout({
   return (
     <div className="w-full space-y-6">
       {Number(credits) <= 0 ? (
-        <div
-          className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center"
-          data-testid="credits-error-banner"
-          role="alert"
-        >
-          <p className="font-Zilla-Slab text-xl font-semibold">
-            {hasAccess ? "Credit balance depleted" : "Campaign credits required"}
-          </p>
-          <p className="mt-2 text-sm">
-            {hasAccess
+        <ErrorBanner
+          testId="credits-error-banner"
+          title={
+            hasAccess ? "Credit balance depleted" : "Campaign credits required"
+          }
+          text={
+            hasAccess
               ? "Add credits to continue this campaign."
-              : "Contact a workspace administrator to continue this campaign."}
-          </p>
+              : "Contact a workspace administrator to continue this campaign."
+          }
+        >
           {hasAccess ? (
             <Button asChild className="mt-3">
               <NavLink to="../../../billing" relative="path">
@@ -160,7 +184,19 @@ export function CallScreenLayout({
               </NavLink>
             </Button>
           ) : null}
-        </div>
+        </ErrorBanner>
+      ) : null}
+      {creditsError && Number(credits) > 0 ? (
+        <ErrorBanner
+          title="Credit check failed"
+          text="The system was unable to verify credits. Check your balance or try again."
+        />
+      ) : null}
+      {deviceError ? (
+        <ErrorBanner
+          title="Phone connection error"
+          text={deviceError.message}
+        />
       ) : null}
       <TopChrome
         campaign={campaign}

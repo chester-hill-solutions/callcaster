@@ -17,6 +17,7 @@ import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.se
 import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
+import { emitPostgresChangeEvent } from "@/lib/workspace-events.server";
 
 export {
   voiceBillingKindFromCampaignType,
@@ -262,6 +263,16 @@ export async function processCallStatusWebhook(
   const call = await upsertCallBySid(update as Partial<Tables<"call">> & { sid: string });
   if (!call) {
     throw new Error(`Failed to upsert call ${updateData.sid}`);
+  }
+
+  if (call.workspace) {
+    emitPostgresChangeEvent(call.workspace, {
+      eventType: "UPDATE",
+      table: "call",
+      schema: "public",
+      new: call as unknown as Record<string, unknown>,
+      old: null,
+    });
   }
 
   const billingResult = options.skipBilling

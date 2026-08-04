@@ -63,7 +63,7 @@ export function usePredictiveCallSync({
           send({ type: "HANG_UP" });
           break;
         default:
-          send({ type: "NEXT" });
+          break;
       }
     }
     if (!predictiveState.contact_id && predictiveState.status === "dialing") {

@@ -72,6 +72,13 @@ export function useCallScreen() {
     onChange: () => revalidator.revalidate(),
   });
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      revalidator.revalidate();
+    }, 50 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [revalidator]);
+
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(initialNextRecipient);
   const [update, setUpdate] = useState<Record<string, unknown> | null>(null);
   const groupByHousehold = campaign?.group_household_queue || false;
@@ -101,6 +108,7 @@ export function useCallScreen() {
     callDuration,
     setCallDuration,
     deviceIsBusy,
+    error: deviceError,
   } = useTwilioDevice(
     token,
     phoneVerification.selectedDevice,
@@ -238,6 +246,7 @@ export function useCallScreen() {
     deviceIsBusy,
     incomingCall,
     deviceStatus,
+    callState,
     begin,
     startCall,
     nextRecipient,
@@ -378,6 +387,7 @@ export function useCallScreen() {
     recentAttempt,
     availableCredits,
     creditState,
+    deviceError,
   };
 
   const queueControls = {
@@ -440,6 +450,7 @@ export function useCallScreen() {
     device,
     currentState,
     creditsError,
+    deviceError,
     callControls,
     queueControls,
     formState,

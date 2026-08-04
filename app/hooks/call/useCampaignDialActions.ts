@@ -24,6 +24,7 @@ type UseCampaignDialActionsOptions = {
   deviceIsBusy: boolean;
   incomingCall: Call | null;
   deviceStatus: string;
+  callState: string;
   begin: () => void;
   startCall: (args: StartCallArgs) => void;
   nextRecipient: QueueItem | null;
@@ -39,6 +40,7 @@ export function useCampaignDialActions({
   deviceIsBusy,
   incomingCall,
   deviceStatus,
+  callState,
   begin,
   startCall,
   nextRecipient,
@@ -58,6 +60,8 @@ export function useCampaignDialActions({
       begin();
     } else if (campaign.dial_type === "call") {
       if (!nextRecipient?.contact) return;
+      if (deviceIsBusy || incomingCall) return;
+      if (callState === "dialing" || callState === "connected") return;
 
       send({ type: "START_DIALING" });
       startCall({
@@ -75,6 +79,7 @@ export function useCampaignDialActions({
     deviceIsBusy,
     incomingCall,
     deviceStatus,
+    callState,
     begin,
     startCall,
     nextRecipient,
