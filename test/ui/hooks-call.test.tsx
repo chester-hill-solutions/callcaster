@@ -350,4 +350,54 @@ describe("call hooks", () => {
     act(() => result.current.setIsBusy(true));
     expect(result.current.deviceIsBusy).toBe(true);
   });
+
+  test("autoAcceptIncoming accepts client-ringed outbound legs and never surfaces the incoming box", async () => {
+    const { useCallHandling } = await import("@/hooks/call/useCallHandling");
+
+    const { result } = renderHook(() =>
+      useCallHandling({
+        device: mockTwilioDevice as any,
+        workspaceId: "ws",
+        autoAcceptIncoming: true,
+      }),
+    );
+
+    const incoming = createMockTwilioCall({
+      parameters: { CallSid: "CA-auto", To: "client:u" },
+    });
+    act(() => result.current.receiveIncoming(incoming));
+    expect(incoming.accept).toHaveBeenCalledTimes(1);
+    expect(result.current.activeCall).toBe(incoming);
+    expect(result.current.incomingCall).toBeNull();
+    expect(result.current.callState).toBe("connected");
+
+    const nonClient = createMockTwilioCall({
+      parameters: { CallSid: "CA-sip", To: "sip:x" },
+    });
+    act(() => result.current.receiveIncoming(nonClient));
+    expect(nonClient.accept).not.toHaveBeenCalled();
+    expect(result.current.incomingCall).toBe(nonClient);
+  });
+
+  test("useTwilioDevice auto-answers client-ringed outbound legs (no incoming box)", async () => {
+    const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
+    const send = vi.fn();
+
+    const { result } = renderHook(() =>
+      useTwilioDevice("tok", "computer", "ws", send),
+    );
+
+    await act(async () => {
+      await mockTwilioDevice.register();
+    });
+
+    const incoming = createMockTwilioCall({
+      parameters: { CallSid: "CA-dial", To: "client:u" },
+    });
+    act(() => mockTwilioDevice.emit("incoming", incoming));
+    expect(incoming.accept).toHaveBeenCalledTimes(1);
+    expect(result.current.activeCall).toBe(incoming);
+    expect(result.current.incomingCall).toBeNull();
+    expect(send).toHaveBeenCalledWith({ type: "CONNECT" });
+  });
 });
