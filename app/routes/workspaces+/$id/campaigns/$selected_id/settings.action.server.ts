@@ -31,7 +31,7 @@ import {
   updateCampaign,
 } from "@/lib/database/campaign.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import { getCampaignReadiness, getScheduleValidation } from "@/lib/campaign-readiness";
 import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -140,12 +140,26 @@ export const action = defineAction({
 
         const nextCampaignData = JSON.parse(campaignDataStr);
         const nextCampaignDetails = JSON.parse(campaignDetailsStr);
+
+        const schedule = normalizeSchedule(nextCampaignData.schedule);
+        const scheduleValidation = getScheduleValidation(schedule);
+        if (scheduleValidation.hasInvalidIntervals) {
+          return routeData(
+            {
+              error:
+                "Each active calling day needs at least one valid time window (start and end must be different).",
+              actionType: "save" as const,
+            },
+            { status: 400 },
+          );
+        }
+
         const result = await updateCampaign({
           campaignData: {
             ...nextCampaignData,
             campaign_id: Number(selected_id),
             workspace: workspace_id,
-            schedule: normalizeSchedule(nextCampaignData.schedule),
+            schedule,
             sms_send_window: normalizeSchedule(nextCampaignData.sms_send_window),
           },
           campaignDetails: {

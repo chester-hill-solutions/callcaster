@@ -165,7 +165,7 @@ function parseSchedule(schedule: Campaign["schedule"]): NormalizedSchedule | nul
   return Object.fromEntries(normalizedEntries);
 }
 
-function getScheduleValidation(schedule: Campaign["schedule"]) {
+export function getScheduleValidation(schedule: Campaign["schedule"]) {
   const parsedSchedule = parseSchedule(schedule);
 
   if (!parsedSchedule) {

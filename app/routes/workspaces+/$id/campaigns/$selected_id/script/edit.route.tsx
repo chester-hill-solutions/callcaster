@@ -59,8 +59,16 @@ export default function ScriptEditor() {
   const handleSaveUpdate = async (saveScriptAsCopy: boolean) => {
     setIsSaving(true);
     try {
+      const campaignPayload =
+        pageData.type === "message"
+          ? {
+              ...pageData,
+              body_text: pageData.campaignDetails.body_text ?? "",
+              message_media: pageData.campaignDetails.message_media ?? [],
+            }
+          : pageData;
       const formData = new FormData();
-      formData.append("campaignData", JSON.stringify(pageData));
+      formData.append("campaignData", JSON.stringify(campaignPayload));
       formData.append(
         "campaignDetails",
         JSON.stringify(pageData.campaignDetails),

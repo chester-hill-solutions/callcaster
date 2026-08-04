@@ -194,7 +194,7 @@ export async function persistCampaignScriptWithTenantDb(args: {
     excludeCampaignId: args.campaignId,
     tdb: args.tdb,
   });
-  const shouldCopy = args.saveAsCopy || usage.totalCount > 0;
+  const shouldCopy = args.saveAsCopy;
 
   if (shouldCopy) {
     const name =
