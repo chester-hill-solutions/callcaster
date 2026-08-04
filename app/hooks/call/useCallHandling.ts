@@ -507,13 +507,25 @@ export function useCallHandling({
     applyAgentLegMute(currentActive, isMicMutedRef.current);
   }, []);
 
+  const onStatusChangeRef = useRef(onStatusChange);
+  const onErrorRef = useRef(onError);
+  const onDeviceBusyChangeRef = useRef(onDeviceBusyChange);
+  const updateCallStateRef = useRef(updateCallState);
+  const updateActiveCallRef = useRef(updateActiveCall);
+
+  onStatusChangeRef.current = onStatusChange;
+  onErrorRef.current = onError;
+  onDeviceBusyChangeRef.current = onDeviceBusyChange;
+  updateCallStateRef.current = updateCallState;
+  updateActiveCallRef.current = updateActiveCall;
+
   /**
    * @effect Attach Twilio Call SDK event listeners (accept/audio/disconnect/
    * error) to the current active call and drive local call-state and
    * held-call transitions when it accepts, ends, or errors.
-   * @effect-deps activeCall, updateCallState, updateActiveCall, onStatusChange,
-   * onError, onDeviceBusyChange (re-subscribes whenever the active call
-   * instance changes; the callbacks are invoked from the listeners)
+   * @effect-deps activeCall (re-subscribes only when the active call instance
+   * changes; callback identities are read via refs so unstable callers cannot
+   * cause spurious detach/reattach cycles)
    * @effect-side-effects subscription (Twilio Call event listeners), cleaned
    * up whenever activeCall changes or on unmount.
    * @effect-why-not-loader Subscribes to imperative SDK call-object events;
@@ -523,7 +535,7 @@ export function useCallHandling({
     if (!activeCall) return;
 
     const handleAccept = () => {
-      updateCallState("connected");
+      updateCallStateRef.current("connected");
     };
 
     const handleAudio = (e: unknown) => {
@@ -541,22 +553,22 @@ export function useCallHandling({
         isMicMutedRef.current = false;
         isOnLocalHoldRef.current = false;
         applyAgentLegMute(next, false);
-        updateActiveCall(next);
-        onStatusChange?.("connected");
-        updateCallState("connected");
+        updateActiveCallRef.current(next);
+        onStatusChangeRef.current?.("connected");
+        updateCallStateRef.current("connected");
       } else {
-        updateActiveCall(null);
-        onStatusChange?.("Registered");
-        updateCallState("completed");
-        onDeviceBusyChange?.(false);
+        updateActiveCallRef.current(null);
+        onStatusChangeRef.current?.("Registered");
+        updateCallStateRef.current("completed");
+        onDeviceBusyChangeRef.current?.(false);
       }
     };
 
     const handleError = (err: unknown) => {
       const error = err instanceof Error ? err : new Error("Call error");
-      onDeviceBusyChange?.(false);
-      onError?.(error);
-      updateCallState("failed");
+      onDeviceBusyChangeRef.current?.(false);
+      onErrorRef.current?.(error);
+      updateCallStateRef.current("failed");
       logger.error("Call error:", error);
     };
 
@@ -568,14 +580,7 @@ export function useCallHandling({
     ];
 
     return () => cleanups.forEach((fn) => fn());
-  }, [
-    activeCall,
-    updateCallState,
-    updateActiveCall,
-    onStatusChange,
-    onError,
-    onDeviceBusyChange,
-  ]);
+  }, [activeCall]);
 
   /**
    * @effect Attach a disconnect listener to each currently held call so a held
