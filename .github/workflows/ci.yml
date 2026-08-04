@@ -57,6 +57,12 @@ jobs:
       # in workspace write authorization, or a loader leaking twilio_data /
       # stripe_id to the client, could merge unnoticed.
       - run: npm run check:route-authz
+      # Companion to the above: route-authz asks whether a workspaces+ WRITE
+      # enforces a ROLE. This asks whether ANY tenant-data route proves
+      # MEMBERSHIP — the question the api+ surface was never asked, and where
+      # three cross-tenant IDORs lived. Follows imports into the specific
+      # service functions a route calls, because this codebase checks there.
+      - run: npm run check:route-membership
       - run: npm run check:workspace-projection
       - run: npm run check:effects
       - run: npm run check:type-safety
