@@ -22,6 +22,10 @@ const handsetState = vi.hoisted(() => ({
   handsetNumber: null as string | null,
 }));
 
+const workspaceMocks = vi.hoisted(() => ({
+  workspace: { feature_flags: {} } as { feature_flags: Record<string, unknown> },
+}));
+
 const telephonyDbMocks = vi.hoisted(() => ({
   insertCallForWorkspace: vi.fn(async () => ({})),
 }));
@@ -48,6 +52,19 @@ vi.mock("@/lib/database/workspace.server", async () => {
         : null,
       error: null,
     })),
+  };
+});
+
+// The route reads the workspace to decide whether to attach a live
+// transcription <Stream> to the TwiML. Unmocked this reaches a real database
+// and every handset call 500s.
+vi.mock("@/lib/workspace-members-db.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/workspace-members-db.server")
+  >("@/lib/workspace-members-db.server");
+  return {
+    ...actual,
+    getWorkspaceById: vi.fn(async () => workspaceMocks.workspace),
   };
 });
 

@@ -213,6 +213,16 @@ export const INTERNAL_API_SURFACE_1: readonly ApiSurfaceEntry[] = [
     ],
   }),
   seed({
+    path: "/api/coaching-ack",
+    routeModule: "app/routes/api+/coaching-ack.tsx",
+    authClass: "session",
+    ownerArea: "telephony",
+    exposure: "sessionOnly",
+    docsGuide: GUIDE.telephony,
+    workspaceScoped: true,
+    operations: [{ method: "POST", handler: "action", bodyType: "json" }],
+  }),
+  seed({
     path: "/api/campaigns/create-with-script",
     routeModule: "app/routes/api+/campaigns/create-with-script.route.tsx",
     authClass: "apiKeyOrSession",

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { logger } from "@/lib/logger.client";
 import {
+  ACCESS_REVOKED_EVENT,
   matchesPostgresChangeFilter,
   parseWorkspaceEventData,
   type PostgresChangePayload,
@@ -74,13 +75,24 @@ export const useWorkspaceEventSubscription = ({
       }
     };
 
+    // The server sends this when the user's workspace access is revoked while
+    // the stream is open. Close explicitly: EventSource reconnects on its own
+    // after a server-side close, and every retry would be rejected by the
+    // middleware, so without this the tab retries forever.
+    const handleAccessRevoked = () => {
+      logger.warn("Workspace access revoked; closing SSE subscription");
+      eventSource.close();
+    };
+
     eventSource.addEventListener("workspace_event", handleWorkspaceEvent);
+    eventSource.addEventListener(ACCESS_REVOKED_EVENT, handleAccessRevoked);
     eventSource.onerror = () => {
       logger.debug("Workspace SSE connection interrupted; EventSource will retry");
     };
 
     return () => {
       eventSource.removeEventListener("workspace_event", handleWorkspaceEvent);
+      eventSource.removeEventListener(ACCESS_REVOKED_EVENT, handleAccessRevoked);
       eventSource.close();
     };
   }, [workspaceId, tablesForSubscription, filter]);

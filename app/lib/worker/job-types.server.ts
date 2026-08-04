@@ -15,3 +15,4 @@ export type WebhookSideEffectJobType =
 export const CAMPAIGN_EXPORT_JOB_TYPE = "campaign_export";
 export const CAMPAIGN_DISPATCH_JOB_TYPE = "campaign_dispatch";
 export const WEBHOOK_DELIVERY_JOB_TYPE = "webhook_delivery";
+export const ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE = "elevenlabs_batch_transcribe";

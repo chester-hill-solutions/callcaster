@@ -9,6 +9,7 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
+import { parseActionRequest } from "@/lib/request-utils.server";
 import { normalizeInboundRingCount } from "../../../../../shared/inbound-rings";
 import { defineAction } from "@/lib/handler.server";
 import type { InboundRoutingPresetApplication } from "../../../../../shared/inbound-routing-presets";
@@ -22,10 +23,7 @@ export const action = defineAction({
   handler: async ({ request, params, auth }) => {
     const { user, userRole } = auth;
 
-    const data = Object.fromEntries(await request.formData()) as Record<
-      string,
-      FormDataEntryValue
-    >;
+    const data = await parseActionRequest(request);
     const formName = data.formName;
     const workspace_id = params.id;
     if (!workspace_id) return { error: "Workspace ID is required" };

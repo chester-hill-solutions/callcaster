@@ -682,8 +682,9 @@ describe("app/lib/database/campaign.server.ts", () => {
 
     queueSearchMocks.countDialableCampaignQueueRows.mockResolvedValueOnce(10);
     queueSearchMocks.countDialableQueuedCampaignQueueRows.mockResolvedValueOnce(3);
+    queueSearchMocks.countDialableCompletedCampaignQueueRows.mockResolvedValueOnce(7);
     const ok = await mod.fetchQueueCounts({ workspaceId: "w1", campaignId: "1" });
-    expect(ok).toEqual({ fullCount: 10, queuedCount: 3 });
+    expect(ok).toEqual({ fullCount: 10, queuedCount: 3, completedCount: 7 });
   });
 
   test("fetchCampaignAudience returns data and throws for any query error", async () => {

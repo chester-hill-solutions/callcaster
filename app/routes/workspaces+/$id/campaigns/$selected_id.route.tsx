@@ -65,7 +65,15 @@ export default function CampaignScreen() {
   const safeQueueCounts = {
     fullCount: queueCounts.fullCount ?? 0,
     queuedCount: queueCounts.queuedCount ?? 0,
+    completedCount: queueCounts.completedCount ?? 0,
   };
+  const campaignQueueProgress =
+    safeQueueCounts.fullCount > 0
+      ? {
+          completedCount: safeQueueCounts.completedCount,
+          totalCount: safeQueueCounts.fullCount,
+        }
+      : null;
   const campaignDetails = initialCampaignDetails;
 
   const railItems = useMemo(() => {
@@ -125,6 +133,7 @@ export default function CampaignScreen() {
           title={campaignData?.title || ""}
           status={(campaignData?.status as CampaignStatus) || "pending"}
           isDesktop={false}
+          queueProgress={campaignQueueProgress}
         />
         <div className="border-b border-border/70 pb-4">
           <CampaignHeader

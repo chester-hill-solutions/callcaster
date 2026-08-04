@@ -332,14 +332,16 @@ export async function fetchQueueCounts({
   campaignId: string;
 }) {
   const campaignIdNum = Number(campaignId);
-  const [fullCount, queuedCount] = await Promise.all([
+  const [fullCount, queuedCount, completedCount] = await Promise.all([
     countDialableCampaignQueueRows(campaignIdNum),
     countDialableQueuedCampaignQueueRows(campaignIdNum),
+    countDialableCompletedCampaignQueueRows(campaignIdNum),
   ]);
 
   return {
     fullCount,
     queuedCount,
+    completedCount,
   };
 }
 

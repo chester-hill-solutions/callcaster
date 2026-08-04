@@ -8,6 +8,7 @@ import { Household } from "@/components/call/CallScreen.Household";
 import { CampaignHeader, TopChrome } from "@/components/call/CallScreen.Header";
 import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
+import { CallScreenLiveCoachingPanels } from "@/components/call/CallScreen.LiveCoachingPanels";
 import { OperatorColumn } from "@/components/call/CallScreen.OperatorColumn";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +52,9 @@ export function CallScreenLayout({
   dialogControls,
   audioControls,
   phoneVerification,
+  featureFlags,
+  callSid,
+  initialCoaching,
 }: CallScreenLayoutProps) {
   const {
     hangUp,
@@ -428,6 +432,12 @@ export function CallScreenLayout({
             disabled={!questionContact}
           />
         }
+      />
+      <CallScreenLiveCoachingPanels
+        workspaceId={workspaceId}
+        callSid={callSid}
+        featureFlags={featureFlags}
+        initialCoaching={initialCoaching}
       />
       <CampaignDialogs
         isDialogOpen={isDialogOpen}

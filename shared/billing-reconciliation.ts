@@ -1,13 +1,22 @@
 // Inline bucket classifier to avoid cross-file import incompatibility between Node (extensionless) and Deno (.ts extension).
 // Keep in sync with `shared/billing-keys.ts` `bucketFromIdempotencyKey`.
+type LedgerBucket = "sms" | "voice" | "numbers" | "purchase" | "ai" | "other";
+
 function bucketFromIdempotencyKey(
   idempotencyKey: string | null | undefined,
-): "sms" | "voice" | "numbers" | "purchase" | "other" {
+): LedgerBucket {
   const key = idempotencyKey?.trim() ?? "";
   if (key.startsWith("sms:")) return "sms";
   if (key.startsWith("call:")) return "voice";
   if (key.startsWith("number_rent:") || key.startsWith("number_rent_purchase:")) return "numbers";
   if (key.startsWith("stripe_evt:") || key.startsWith("stripe_session:")) return "purchase";
+  if (
+    key.startsWith("transcription:") ||
+    key.startsWith("transcription_batch:") ||
+    key.startsWith("coaching:")
+  ) {
+    return "ai";
+  }
   return "other";
 }
 
@@ -107,7 +116,7 @@ function sumTwilioCostUsd(
 }
 
 export function categorizeLedgerRow(row: LedgerTransactionRow): {
-  bucket: "sms" | "voice" | "numbers" | "purchase" | "other";
+  bucket: LedgerBucket;
   credits: number;
 } {
   const key = row.idempotency_key?.trim() ?? "";
@@ -138,6 +147,7 @@ export function summarizeLedger(rows: LedgerTransactionRow[]) {
     voice: { events: 0, credits: 0 },
     numbers: { events: 0, credits: 0 },
     purchase: { events: 0, credits: 0 },
+    ai: { events: 0, credits: 0 },
     other: { events: 0, credits: 0 },
   };
 
@@ -227,6 +237,7 @@ export function buildBillingReconciliationReport(args: {
       ledgerSummary.sms.credits +
       ledgerSummary.voice.credits +
       ledgerSummary.numbers.credits +
+      ledgerSummary.ai.credits +
       ledgerSummary.other.credits,
     ledgerCreditPurchases: ledgerSummary.purchase.credits,
     unrecognizedDebitEvents: ledgerSummary.other.events,

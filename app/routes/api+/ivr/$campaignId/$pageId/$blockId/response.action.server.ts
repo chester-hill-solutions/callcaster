@@ -9,7 +9,14 @@ import { logger } from "@/lib/logger.server";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { requireTwilioSignatureForIvrResponse } from "@/lib/ivr-webhook-auth.server";
 import { defineAction } from "@/lib/handler.server";
+import {
+  extractTypedOutreachFields,
+  syncContactSupportLevelCache,
+} from "@/lib/outreach-typed-fields.server";
+import { createTenantDb } from "@/server/tenant-db";
 import Twilio from "twilio";
+
+import type { Json } from "@/lib/db-types";
 const getOutreach = async (workspaceId: string, outreachId: number) => {
   const row = await findOutreachAttemptById(workspaceId, outreachId);
   if (!row) throw new Error("Outreach attempt not found");
@@ -176,13 +183,20 @@ export const action = defineAction({
     if (!call.outreach_attempt_id) {
       throw new Error("Missing outreach attempt for IVR response");
     }
+    const typedFields = extractTypedOutreachFields(newResult as Json);
+    const tdb = createTenantDb(call.workspace);
     const outreachUpdate = await updateOutreachAttemptForWorkspace(
       call.workspace,
       call.outreach_attempt_id,
-      { result: newResult },
+      { result: newResult, ...typedFields },
+      { tdb },
     );
     if (outreachUpdate instanceof Response) {
       throw new Error(await outreachUpdate.text());
+    }
+
+    if (call.contact_id != null && typedFields.support_level != null) {
+      await syncContactSupportLevelCache(tdb, call.contact_id, typedFields.support_level);
     }
 
     const nextStep = findNextStep(currentBlock, userInput, script, pageId);

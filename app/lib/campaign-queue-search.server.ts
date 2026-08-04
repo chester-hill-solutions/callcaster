@@ -337,6 +337,58 @@ export async function countDialableCompletedCampaignQueueRows(
   return countCampaignQueueRows(campaignId, buildCompletedCampaignQueueWhere(campaignId));
 }
 
+export type CampaignQueueProgressCounts = {
+  completedCount: number;
+  totalCount: number;
+};
+
+export async function fetchWorkspaceCampaignQueueProgressMap(
+  workspaceId: string,
+): Promise<Map<number, CampaignQueueProgressCounts>> {
+  const dialableContact = exists(
+    db
+      .select({ one: sql`1` })
+      .from(contactTable)
+      .where(
+        and(
+          eq(contactTable.id, campaignQueueTable.contact_id),
+          isNotNull(contactTable.phone),
+          ne(contactTable.phone, ""),
+        ),
+      ),
+  );
+
+  const rows = await db
+    .select({
+      campaignId: campaignQueueTable.campaign_id,
+      totalCount: count(),
+      completedCount: sql<number>`
+        count(*) filter (
+          where ${campaignQueueTable.queue_state} = ${QUEUE_STATUS_DEQUEUED}
+            or ${campaignQueueTable.dequeued_at} is not null
+        )::int
+      `.mapWith(Number),
+    })
+    .from(campaignQueueTable)
+    .where(
+      and(
+        eq(campaignQueueTable.workspace, workspaceId),
+        dialableContact,
+      ),
+    )
+    .groupBy(campaignQueueTable.campaign_id);
+
+  return new Map(
+    rows.map((row) => [
+      row.campaignId,
+      {
+        completedCount: row.completedCount ?? 0,
+        totalCount: row.totalCount ?? 0,
+      },
+    ]),
+  );
+}
+
 export async function fetchDialableCampaignQueueWithContacts(args: {
   campaignId: number;
   limit: number;

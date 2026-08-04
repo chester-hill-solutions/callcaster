@@ -1,10 +1,12 @@
 import { env } from "@/lib/env.server";
 import { getHandsetNumberForWorkspace } from "@/lib/database/workspace.server";
 import { findActiveHandsetSession } from "@/lib/handset/handset-session.server";
+import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
 import { isPhoneNumber, normalizePhoneNumber } from "@/lib/utils";
 import { logger } from "@/lib/logger.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { insertCallForWorkspace } from "@/lib/telephony-db.server";
+import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { defineAction } from "@/lib/handler.server";
 import Twilio from "twilio";
 import type { ActionFunctionArgs } from "react-router";
@@ -81,6 +83,19 @@ export const action = defineAction({
         is_last: false,
       });
     }
+
+    const workspace = await getWorkspaceById(workspaceId);
+    appendLiveTranscriptionStreamTwiml({
+      twiml,
+      featureFlags: workspace?.feature_flags as Record<string, unknown> | undefined,
+      params: {
+        workspaceId,
+        userId: session.user_id,
+        direction: "outbound",
+        callSid: callSid || null,
+        streamName: callSid ? `call-${callSid}` : undefined,
+      },
+    });
 
     const dial = twiml.dial({
       callerId,

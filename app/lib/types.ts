@@ -1,5 +1,6 @@
 import type { Database, Tables } from "@/lib/db-types";
 import type { AccountInstance } from "twilio/lib/rest/api/v2010/account";
+import type { CallCoachingHydration } from "@/hooks/call/useCallCoaching";
 import type { WorkspaceOnboardingGoal } from "@/lib/workspace-onboarding-goals";
 export {
   WORKSPACE_ONBOARDING_GOAL_VALUES,
@@ -658,6 +659,10 @@ export type LoaderData = {
   isActive: boolean;
   hasAccess: boolean;
   verifiedNumbers: string[];
+  featureFlags: Record<string, unknown>;
+  /** Transcript/coaching state for a call already in flight; null when the
+   * workspace has no live-media flags or there is nothing to hydrate. */
+  initialCoaching: CallCoachingHydration | null;
 };
 
 export interface CallAreaProps {

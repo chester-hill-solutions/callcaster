@@ -27,6 +27,10 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useUnreadConversationsCount } from "@/hooks/chats/useUnreadConversationsCount";
+import {
+  CampaignQueueProgress,
+  type CampaignQueueProgressCounts,
+} from "@/components/campaign/CampaignQueueProgress";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { workspaceSidebarHeightClass } from "./workspace-panel-classes";
 
@@ -56,6 +60,7 @@ type CampaignNavSubItem = {
   name: string;
   path: string;
   status?: string | null;
+  campaignId?: string | number;
 };
 
 const NAV_GROUPS: NavGroup[] = [
@@ -146,6 +151,7 @@ interface WorkspaceNavProps {
     title?: string | null;
     status?: string | null;
   }>;
+  campaignQueueProgress?: Record<string, CampaignQueueProgressCounts>;
   userRole: MemberRole;
   className?: string;
 }
@@ -153,6 +159,7 @@ interface WorkspaceNavProps {
 const WorkspaceNav = ({
   workspace,
   campaigns,
+  campaignQueueProgress = {},
   userRole,
   className = "",
 }: WorkspaceNavProps) => {
@@ -271,6 +278,7 @@ const WorkspaceNav = ({
                               `Campaign ${String(campaign.id)}`,
                             path: `campaigns/${campaign.id}`,
                             status: campaign.status,
+                            campaignId: campaign.id,
                           })),
                         ]
                       : visibleStaticSubItems;
@@ -307,6 +315,10 @@ const WorkspaceNav = ({
                             const subItemTo = subItem.path
                               ? `${baseUrl}/${subItem.path}`
                               : baseUrl;
+                            const progress =
+                              subItem.campaignId != null
+                                ? campaignQueueProgress[String(subItem.campaignId)]
+                                : undefined;
                             return (
                               <NavLink
                                 key={subItem.path || subItem.name}
@@ -316,13 +328,24 @@ const WorkspaceNav = ({
                                 <span className="min-w-0 truncate">
                                   {subItem.name}
                                 </span>
-                                {subItem.status ? (
-                                  <span
-                                    className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${campaignStatusClass(
-                                      subItem.status,
-                                    )}`}
-                                  >
-                                    {formatCampaignStatus(subItem.status)}
+                                {progress?.totalCount || subItem.status ? (
+                                  <span className="flex shrink-0 items-center gap-1.5">
+                                    {progress?.totalCount ? (
+                                      <CampaignQueueProgress
+                                        completedCount={progress.completedCount}
+                                        totalCount={progress.totalCount}
+                                        className="text-[10px] font-semibold uppercase tracking-wide"
+                                      />
+                                    ) : null}
+                                    {subItem.status ? (
+                                      <span
+                                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${campaignStatusClass(
+                                          subItem.status,
+                                        )}`}
+                                      >
+                                        {formatCampaignStatus(subItem.status)}
+                                      </span>
+                                    ) : null}
                                   </span>
                                 ) : null}
                               </NavLink>

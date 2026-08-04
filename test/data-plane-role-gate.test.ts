@@ -33,7 +33,7 @@ vi.mock("@/lib/database/workspace.server", () => ({
 
 vi.mock("@/server/tenant-db", () => ({ createTenantDb: vi.fn(() => ({})) }));
 
-// getContactWorkspaceId / getCampaignWorkspaceId both resolve to "w1".
+// resolveResourceWorkspaceId for contact/campaign both resolve to "w1".
 vi.mock("@/server/db", () => ({
   db: {
     select: () => ({
@@ -46,7 +46,7 @@ vi.mock("@/server/db", () => ({
   },
 }));
 
-// Keep the REAL authForContact / authForCampaign (the gate under test); stub the
+// Keep the REAL authForResource (the gate under test); stub the
 // downstream mutation handlers so we can assert whether they were reached.
 vi.mock("@/lib/platform-data.server", async (importOriginal) => {
   const actual =
@@ -81,20 +81,21 @@ function allowAccess() {
   mocks.getUserRole.mockResolvedValue({ role: "member" });
 }
 
-describe("data-plane mutation role gate (authForContact / authForCampaign)", () => {
+describe("data-plane mutation role gate (authForResource)", () => {
   beforeEach(() => {
     for (const fn of Object.values(mocks)) {
       (fn as { mockReset?: () => void }).mockReset?.();
     }
   });
 
-  test("authForContact('member') returns 403 for a below-member caller", async () => {
+  test("authForResource('contact', 'member') returns 403 for a below-member caller", async () => {
     asSessionUser("u-caller");
     forbidBelowMember();
-    const { authForContact } = await import("@/lib/platform-data.server");
+    const { authForResource } = await import("@/lib/platform-data.server");
 
-    const result = await authForContact(
+    const result = await authForResource(
       new Request("http://x/api/contacts/5", { method: "DELETE" }),
+      "contact",
       "5",
       "member",
     );
@@ -107,13 +108,14 @@ describe("data-plane mutation role gate (authForContact / authForCampaign)", () 
     );
   });
 
-  test("authForContact('member') resolves context for a member", async () => {
+  test("authForResource('contact', 'member') resolves context for a member", async () => {
     asSessionUser("u-member");
     allowAccess();
-    const { authForContact } = await import("@/lib/platform-data.server");
+    const { authForResource } = await import("@/lib/platform-data.server");
 
-    const result = await authForContact(
+    const result = await authForResource(
       new Request("http://x/api/contacts/5", { method: "DELETE" }),
+      "contact",
       "5",
       "member",
     );
@@ -122,13 +124,14 @@ describe("data-plane mutation role gate (authForContact / authForCampaign)", () 
     expect(result).toEqual({ userId: "u-member", workspaceId: "w1" });
   });
 
-  test("authForContact read path (no minRole) stays open to callers", async () => {
+  test("authForResource('contact') read path (no minRole) stays open to callers", async () => {
     asSessionUser("u-caller");
     allowAccess();
-    const { authForContact } = await import("@/lib/platform-data.server");
+    const { authForResource } = await import("@/lib/platform-data.server");
 
-    const result = await authForContact(
+    const result = await authForResource(
       new Request("http://x/api/contacts/5"),
+      "contact",
       "5",
     );
 
@@ -139,13 +142,14 @@ describe("data-plane mutation role gate (authForContact / authForCampaign)", () 
     );
   });
 
-  test("authForCampaign('member') returns 403 for a below-member caller", async () => {
+  test("authForResource('campaign', 'member') returns 403 for a below-member caller", async () => {
     asSessionUser("u-caller");
     forbidBelowMember();
-    const { authForCampaign } = await import("@/lib/platform-data.server");
+    const { authForResource } = await import("@/lib/platform-data.server");
 
-    const result = await authForCampaign(
+    const result = await authForResource(
       new Request("http://x/api/campaigns/9", { method: "POST" }),
+      "campaign",
       "9",
       "member",
     );
@@ -154,13 +158,14 @@ describe("data-plane mutation role gate (authForContact / authForCampaign)", () 
     expect((result as Response).status).toBe(403);
   });
 
-  test("authForCampaign('member') resolves context for a member", async () => {
+  test("authForResource('campaign', 'member') resolves context for a member", async () => {
     asSessionUser("u-member");
     allowAccess();
-    const { authForCampaign } = await import("@/lib/platform-data.server");
+    const { authForResource } = await import("@/lib/platform-data.server");
 
-    const result = await authForCampaign(
+    const result = await authForResource(
       new Request("http://x/api/campaigns/9", { method: "POST" }),
+      "campaign",
       "9",
       "member",
     );
@@ -173,10 +178,11 @@ describe("data-plane mutation role gate (authForContact / authForCampaign)", () 
       authType: "api_key",
       workspaceId: "w1",
     });
-    const { authForContact } = await import("@/lib/platform-data.server");
+    const { authForResource } = await import("@/lib/platform-data.server");
 
-    const result = await authForContact(
+    const result = await authForResource(
       new Request("http://x/api/contacts/5", { method: "DELETE" }),
+      "contact",
       "5",
       "member",
     );

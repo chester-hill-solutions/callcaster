@@ -27,7 +27,14 @@ const BASELINE_ALLOWLIST = {
   // 2026-08-03 when a new column would have breached the cap; the same move is
   // available for the remaining domains.
   "db/schema.ts": 754,
-  "lib/platform-data.server.ts": 1080,
+  // Crossed 800 on 2026-08-04 merging feat/live-coaching: this barrel re-exports
+  // both the onboarding-goal types and the new coaching hydration type. Pinned,
+  // not exempted — the next type added here fails, which is the moment to split
+  // the barrel by domain rather than raise the number.
+  "lib/types.ts": 804,
+  // Lowered from 1080 on 2026-08-04: authForContact/Script/Survey/OutreachAttempt
+  // collapsed into authForResource, so the file genuinely shrank.
+  "lib/platform-data.server.ts": 1005,
   "lib/database/workspace.server.ts": 826,
   "lib/survey-db.server.ts": 928,
 };

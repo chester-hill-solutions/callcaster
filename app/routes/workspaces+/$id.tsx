@@ -17,6 +17,7 @@ import { workspacePanelHeightLgClass } from "@/components/workspace/workspace-pa
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
+import type { CampaignQueueProgressCounts } from "@/components/campaign/CampaignQueueProgress";
 import WorkspaceToday from "@/components/workspace/WorkspaceToday";
 import { ComplianceStatusPanel } from "@/components/workspace/ComplianceStatusPanel";
 import {
@@ -36,6 +37,7 @@ type LoaderData = {
   today?: WorkspaceTodaySelection;
   complianceOnboarding?: WorkspaceMessagingOnboardingState;
   a2pBlockingIssues?: string[];
+  campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
 };
 
 type OnboardingStripData = Pick<
@@ -75,6 +77,7 @@ function WorkspaceResolvedView({
   showSidebar,
   complianceOnboarding,
   a2pBlockingIssues,
+  campaignQueueProgress,
 }: {
   resolvedData: WorkspaceInfoWithDetails;
   userRole: string | null | undefined;
@@ -85,6 +88,7 @@ function WorkspaceResolvedView({
   showSidebar: boolean;
   complianceOnboarding?: WorkspaceMessagingOnboardingState;
   a2pBlockingIssues?: string[];
+  campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
 }) {
   const normalizedWorkspace = resolvedData.workspace as unknown as {
     id: string;
@@ -118,7 +122,7 @@ function WorkspaceResolvedView({
   // and low-credit banners stay in sync without a duplicate credit subscription.
   useWorkspaceEventSubscription({
     workspaceId: workspace.id,
-    table: ["campaign", "transaction_history"],
+    table: ["campaign", "campaign_queue", "transaction_history"],
     onChange: () => revalidator.revalidate(),
   });
 
@@ -135,6 +139,7 @@ function WorkspaceResolvedView({
         <WorkspaceNav
           workspace={workspace}
           campaigns={campaigns as Campaign[]}
+          campaignQueueProgress={campaignQueueProgress}
           userRole={
             (userRole as MemberRole | null | undefined) ?? MemberRole.Member
           }
@@ -226,6 +231,7 @@ export default function Workspace() {
     today,
     complianceOnboarding,
     a2pBlockingIssues,
+    campaignQueueProgress,
   } =
     useLoaderData<LoaderData>();
   const outlet = useOutlet();
@@ -261,6 +267,7 @@ export default function Workspace() {
           showSidebar={showSidebar}
           complianceOnboarding={complianceOnboarding}
           a2pBlockingIssues={a2pBlockingIssues}
+          campaignQueueProgress={campaignQueueProgress}
         />
       </div>
     </>

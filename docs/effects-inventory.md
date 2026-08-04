@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**107** documented / **107** total effects (0 grandfathered, ratcheting to 0).
+**109** documented / **109** total effects (0 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -33,6 +33,8 @@
 | `app/hooks/call/useCallAudioControls.ts` | Enumerate audio devices on mount and subscribe to OS | refreshDevices (stable callback) | subscription (mediaDevices "devicechange" listener) | Browser hardware enumeration is a client-only API. |
 | `app/hooks/call/useCallAudioControls.ts` | Apply the selected microphone and speaker device IDs to the | device, microphone, output | dom (Twilio Device audio input/output routing) | Live Twilio audio routing follows user device picks. |
 | `app/hooks/call/useCallAudioControls.ts` | Auto-request microphone access whenever there's no live stream | stream, permissionError, requestMicrophoneAccess (re-runs | dom (navigator.mediaDevices.getUserMedia browser | Browser media-permission/hardware access is a |
+| `app/hooks/call/useCallCoaching.ts` | Track the active call sid in a ref for the SSE listener, and reset transcript/coaching state when the screen switches to a different call (re-seeding from hydration if the new call has any). | callSid (the active call; a change means the previous call's transcript, cues, metrics and session must not leak into the new one) | none — updates callSidRef/seededSidRef and resets local state only | Reacts to an in-page call switch rather than a navigation; the initial values come from the loader via `hydration`, and this only handles subsequent changes. |
+| `app/hooks/call/useCallCoaching.ts` | Open an SSE connection to the workspace events endpoint and apply this call's transcript segments, coaching metrics, cues and final session to local state. | workspaceId (which workspace's event stream to open); callSid (which call's events to keep — others are discarded); subscribe (capability gate; false means no connection is opened at all) | subscription — opens an EventSource (SSE) connection on mount/dep-change; removes listeners and closes the connection on cleanup, or on a terminal access_revoked frame | Live server-pushed transcript/coaching events cannot be modeled as request/response; the connection stays open for the call's duration. Initial state is loader-provided via `hydration`. |
 | `app/hooks/call/useCallDuration.ts` | Tick the call-duration counter once per second while connected. | callState (starts the timer on 'connected', resets otherwise) | timer (setInterval) + functional setState; cleared on unmount/state change | Wall-clock elapsed time is live client state, not server request data. |
 | `app/hooks/call/useCallHandling.ts` | Mirror `heldCalls` state into a ref so callbacks/other effects | heldCalls (re-syncs the ref whenever the held-calls list changes) | none (plain ref assignment) | Not data fetching; "latest ref" pattern for use in |
 | `app/hooks/call/useCallHandling.ts` | Mirror `activeCall` state into a ref for the same reason as | activeCall (re-syncs the ref whenever the active call changes) | none (plain ref assignment) | Not data fetching; "latest ref" pattern. |

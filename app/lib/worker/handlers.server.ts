@@ -5,6 +5,7 @@ import {
   RECORDING_SIDE_EFFECTS_JOB_TYPE,
   SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
   WEBHOOK_DELIVERY_JOB_TYPE,
+  ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
 } from "@/lib/worker/job-types.server";
 import type { JobHandlers } from "@/lib/worker/poll-jobs.server";
 import {
@@ -29,6 +30,7 @@ import {
   WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE,
   workspaceTwilioComplianceHandler,
 } from "./handlers/campaign.server";
+import { elevenlabsBatchTranscribeHandler } from "./handlers/elevenlabs-batch-transcribe.server";
 
 export { enqueueWorkspaceComplianceJob };
 
@@ -46,4 +48,5 @@ export const jobHandlers: JobHandlers = {
   [CAMPAIGN_EXPORT_JOB_TYPE]: campaignExportHandler,
   [CAMPAIGN_DISPATCH_JOB_TYPE]: campaignDispatchHandler,
   [WEBHOOK_DELIVERY_JOB_TYPE]: webhookDeliveryHandler,
+  [ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE]: elevenlabsBatchTranscribeHandler,
 };

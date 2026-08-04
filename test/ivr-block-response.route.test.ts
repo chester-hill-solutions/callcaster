@@ -39,6 +39,15 @@ const ivrTestState = vi.hoisted(() => ({
   campaignError: null as Error | null,
   outreachResult: {} as unknown,
   outreachError: null as Error | null,
+  contactUpdate: vi.fn(),
+}));
+
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    contact: {
+      update: (...args: unknown[]) => ivrTestState.contactUpdate(...args),
+    },
+  }),
 }));
 
 vi.mock("@/lib/campaign-ivr.server", () => ({
@@ -147,6 +156,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     ivrTestState.campaignError = null;
     ivrTestState.outreachResult = {};
     ivrTestState.outreachError = null;
+    ivrTestState.contactUpdate.mockReset();
     configureTelephonyStub();
     mocks.createClient.mockReset();
     mocks.requireTwilioSignature.mockReset();
@@ -385,6 +395,44 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
     expect(await res.text()).toContain("An error occurred. Please try again later.");
+  });
+
+  test("writes typed outreach columns and syncs contact.support_level cache", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: {
+        b1: { id: "b1", title: "Support Level", options: [{ value: "2", next: "hangup" }] },
+      },
+    };
+    const campaignData = { script: { steps: script } };
+    mocks.createClient.mockReturnValueOnce(
+      makeDbClient({
+        call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 9, contact_id: 42 },
+        campaignData,
+        outreachResult: {},
+      }),
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1", Digits: "2" }),
+    } as any);
+    expect(await res.text()).toContain("hangup");
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      9,
+      expect.objectContaining({
+        support_level: 2,
+        result: expect.objectContaining({
+          page_1: expect.objectContaining({ "Support Level": "2" }),
+        }),
+      }),
+      expect.objectContaining({ tdb: expect.anything() }),
+    );
+    expect(ivrTestState.contactUpdate).toHaveBeenCalledWith({
+      set: { support_level: 2 },
+      where: expect.anything(),
+    });
   });
 
   test("returns hangup when campaign_id mismatches URL or call is missing", async () => {

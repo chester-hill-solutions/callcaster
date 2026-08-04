@@ -193,6 +193,35 @@ describe("app/routes/api+/questions/route.tsx", () => {
     await expect(mod.action({ request: makeRequest(defaultBody) } as any)).rejects.toThrow("final bad");
   });
 
+  test("writes typed outreach columns and syncs contact.support_level cache", async () => {
+    tenantDbMocks.findFirst.mockResolvedValueOnce(null);
+    mocks.rpcCreateOutreachAttempt.mockResolvedValueOnce(7);
+    mocks.safeParseJson.mockResolvedValueOnce({
+      ...defaultBody,
+      update: {
+        support_level: 2,
+        volunteer_interest: "yes",
+        lawn_sign: true,
+      },
+    });
+    const mod = await import("../app/routes/api+/questions");
+    const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
+    expect(res.status).toBe(200);
+    expect(tenantDbMocks.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        set: expect.objectContaining({
+          support_level: 2,
+          volunteer_interest: "yes",
+          lawn_sign: true,
+        }),
+      }),
+    );
+    expect(tenantDbMocks.contactUpdate).toHaveBeenCalledWith({
+      set: { support_level: 2 },
+      where: expect.anything(),
+    });
+  });
+
   test("returns 500 when outreach attempt id is null after creation", async () => {
     tenantDbMocks.findFirst.mockResolvedValueOnce(null);
     mocks.rpcCreateOutreachAttempt.mockResolvedValueOnce(null);

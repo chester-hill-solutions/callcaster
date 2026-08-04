@@ -1,10 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { ServerWebSocket } from "bun";
-import { verifyMediaStreamToken, type MediaStreamTokenPayload } from "@/lib/media-stream-token.server";
+import {
+  verifyMediaStreamToken,
+  type MediaStreamTokenPayload,
+} from "@/lib/media-stream-token.server";
 import {
   captureException,
   initializeSentry,
 } from "@/lib/sentry.server";
+import { handleTwilioStreamMessage } from "./twilio-handler";
+import { isTwilioStreamMessage, type MediaStreamSocketData } from "./types";
 import {
   parseMediaStreamMaxPerWorkspace,
   WorkspaceStreamCapTracker,
@@ -16,7 +21,6 @@ const maxPerWorkspace = parseMediaStreamMaxPerWorkspace();
 const workspaceCaps = new WorkspaceStreamCapTracker(maxPerWorkspace);
 
 // Map of sessionId -> connected clients in that session.
-type MediaStreamSocketData = MediaStreamTokenPayload & { requestId: string };
 const sessions = new Map<string, Set<ServerWebSocket<MediaStreamSocketData>>>();
 
 function log(level: "info" | "error", message: string, meta?: Record<string, unknown>) {
@@ -145,8 +149,28 @@ const server = Bun.serve<MediaStreamSocketData>({
       const clients = sessions.get(sessionId);
       if (!clients) return;
 
-      // Passthrough/echo: forward every packet to the other clients in the session.
-      // TODO: Deepgram Nova-3 streaming integration for live transcription.
+      // Bun hands binary frames over as a Buffer (an ArrayBufferView), which
+      // TextDecoder accepts directly as a BufferSource — no cast needed.
+      const text = typeof message === "string" ? message : new TextDecoder().decode(message);
+
+      try {
+        const parsed: unknown = JSON.parse(text);
+        if (isTwilioStreamMessage(parsed)) {
+          void handleTwilioStreamMessage(ws, parsed).catch((error) => {
+            log("error", "Twilio stream handler failed", {
+              sessionId,
+              requestId: ws.data.requestId,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            captureException(error, { sessionId, requestId: ws.data.requestId });
+          });
+          return;
+        }
+      } catch {
+        // Not JSON — fall through to agent passthrough.
+      }
+
+      // Passthrough: forward non-Twilio packets to other clients in the session.
       for (const client of clients) {
         if (client !== ws) {
           client.send(message);
@@ -155,6 +179,22 @@ const server = Bun.serve<MediaStreamSocketData>({
     },
     close(ws, code, reason) {
       const { sessionId, userId, workspaceId, requestId } = ws.data;
+
+      if (ws.data.twilio?.phase === "streaming") {
+        void handleTwilioStreamMessage(ws, {
+          event: "stop",
+          code,
+          reason: reason ? Buffer.from(reason).toString("utf-8") : undefined,
+        }).catch((error) => {
+          log("error", "Twilio stream stop handler failed", {
+            sessionId,
+            requestId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          captureException(error, { sessionId, requestId });
+        });
+      }
+
       workspaceCaps.release(workspaceId);
       log("info", "Client disconnected", {
         sessionId,

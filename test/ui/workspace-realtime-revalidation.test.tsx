@@ -85,7 +85,7 @@ describe("workspace campaign and credit realtime revalidation", () => {
     mocks.subscriptionOptions = null;
   });
 
-  test("subscribes to campaign and transaction_history and revalidates once per matching event", () => {
+  test("subscribes to campaign, campaign_queue and transaction_history and revalidates once per matching event", () => {
     render(<Workspace />);
 
     expect(
@@ -93,7 +93,7 @@ describe("workspace campaign and credit realtime revalidation", () => {
     ).toBeInTheDocument();
     expect(mocks.subscriptionOptions).toMatchObject({
       workspaceId: "ws-1",
-      table: ["campaign", "transaction_history"],
+      table: ["campaign", "campaign_queue", "transaction_history"],
     });
 
     act(() => mocks.subscriptionOptions?.onChange());

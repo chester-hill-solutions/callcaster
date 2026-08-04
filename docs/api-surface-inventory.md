@@ -29,6 +29,7 @@ Interactive specs:
 | `/api/campaign_audience` | POST, DELETE | User API | sessionOnly | yes | `routes/api+/campaign_audience.tsx` | `docs/api-data-management.md` |  |
 | `/api/campaign_queue` | POST, DELETE | User API | sessionOnly | yes | `routes/api+/campaign_queue.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/campaigns` | POST, PATCH, DELETE | User API | sessionOnly | yes | `routes/api+/campaigns.tsx` | `docs/api-data-management.md` |  |
+| `/api/coaching-ack` | POST | User API | sessionOnly | yes | `routes/api+/coaching-ack.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/campaigns/create-with-script` | POST | Integrator API | publicSdk | yes | `routes/api+/campaigns/create-with-script.route.tsx` | `docs/api-create-campaign-with-script.md` |  |
 | `/api/chat_sms` | POST | Integrator API | publicSdk | yes | `routes/api+/chat_sms.tsx` | `docs/api-send-sms.md` |  |
 | `/api/connect-campaign-conference/:workspaceId/:campaignId` | GET | Provider Webhook | providerOnly | no | `routes/api+/connect-campaign-conference/$workspaceId/$campaignId.route.tsx` | `docs/api-webhooks.md` | Twilio voice URL after connect-phone-device; returns TwiML. |
@@ -155,5 +156,5 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/audiences/:audienceId/uploads` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audiences/$audienceId/uploads.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/workspaces/:workspaceId/events` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/events.route.tsx` | `docs/api-live-operations.md` | SSE stream for workspace events (activity log). |
 
-Total entries: **144**
+Total entries: **145**
 

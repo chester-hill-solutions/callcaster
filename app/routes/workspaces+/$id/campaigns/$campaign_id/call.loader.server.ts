@@ -14,6 +14,8 @@ import {
 import { redirect } from "react-router";
 import { MemberRole } from "@/lib/member-role";
 import { defineLoader } from "@/lib/handler.server";
+import { getCallCoachingHydration } from "@/lib/call-coaching-hydration.server";
+import { liveMediaCapabilities } from "@/lib/live-media-capabilities";
 
 export const loader = defineLoader({
   auth: workspaceRouteAuth,
@@ -58,6 +60,22 @@ export const loader = defineLoader({
     const initialRecentAttempt = getInitialRecentAttempt(attempts || [], nextRecipient);
     const hasAccess = [MemberRole.Owner, MemberRole.Admin].includes(userRole as MemberRole);
     const isActive = campaign ? checkSchedule(campaign) : false;
+    // `useCallScreen` derives its live callSid as
+    // `getCallSid(activeCall) ?? recentCall?.sid`, and on a reload there is no
+    // activeCall yet — so the recent call is exactly the sid whose transcript
+    // the panels are about to ask for. Hydrating any other call would be waste.
+    //
+    // Gated on the same capabilities as the panels: when neither the transcript
+    // nor the coaching UI renders, the hook opens no EventSource and nothing
+    // consumes a seed, so the four hydration queries would be pure waste on
+    // every call-screen load for every workspace without the flags.
+    const { showTranscript, showCoaching } = liveMediaCapabilities(
+      workspaceData.feature_flags as Record<string, unknown> | undefined,
+    );
+    const initialCoaching =
+      showTranscript || showCoaching
+        ? await getCallCoachingHydration(workspaceId, initialRecentCall?.sid)
+        : null;
 
     return {
       campaign,
@@ -79,6 +97,8 @@ export const loader = defineLoader({
       isActive,
       hasAccess,
       verifiedNumbers,
+      featureFlags: workspaceData.feature_flags,
+      initialCoaching,
     };
   },
 });

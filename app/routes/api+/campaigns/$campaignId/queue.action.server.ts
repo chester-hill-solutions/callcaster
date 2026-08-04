@@ -7,7 +7,7 @@ import {
   mapCampaignQueueItemForUi,
 } from "@/lib/campaign-queue-search.server";
 import {
-  authForCampaign,
+  authForResource,
   getCampaignQueueApi,
   patchCampaignQueueApi,
 } from "@/lib/platform-data.server";
@@ -21,7 +21,7 @@ export const loader = defineLoader({
       return jsonError("campaignId is required", 400);
     }
 
-    const auth = await authForCampaign(request, campaignId);
+    const auth = await authForResource(request, "campaign", campaignId);
     if (auth instanceof Response) return auth;
 
     const capability = await requireDataPlaneCapability(auth, "campaigns.read");
@@ -82,7 +82,7 @@ export const action = defineAction({
     }
 
     // Destructive mutation: require at least `member`, blocking the `caller` role.
-    const auth = await authForCampaign(request, campaignId, "member");
+    const auth = await authForResource(request, "campaign", campaignId, "member");
     if (auth instanceof Response) return auth;
 
     const capability = await requireDataPlaneCapability(auth, "campaigns.write");

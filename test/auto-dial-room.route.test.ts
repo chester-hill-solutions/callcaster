@@ -105,6 +105,19 @@ vi.mock("@/twilio.server", () => ({
   validateTwilioWebhookParams: vi.fn(() => true),
 }));
 
+// addToConference reads the workspace to decide whether to attach a live
+// transcription <Stream>. Unmocked it reaches a real database and throws
+// before the dialer turn runs.
+vi.mock("@/lib/workspace-members-db.server", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/workspace-members-db.server")
+  >("@/lib/workspace-members-db.server");
+  return {
+    ...actual,
+    getWorkspaceById: vi.fn(async () => ({ feature_flags: {} })),
+  };
+});
+
 vi.mock("@/lib/twilio-twiml.server", () => ({
   hangupTwiml: () => '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>',
   pausePlayTwiml: (url: string, seconds = 5) =>

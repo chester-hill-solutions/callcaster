@@ -7,7 +7,13 @@
  * (`categorizeLedgerRow`) classify rows through a single `bucketFromIdempotencyKey`.
  */
 
-export type BillingBucket = "sms" | "voice" | "numbers" | "purchase" | "other";
+export type BillingBucket =
+  | "sms"
+  | "voice"
+  | "numbers"
+  | "purchase"
+  | "ai"
+  | "other";
 
 const SMS_PREFIX = "sms:";
 const CALL_PREFIX = "call:";
@@ -16,6 +22,9 @@ const NUMBER_RENT_PURCHASE_PREFIX = "number_rent_purchase:";
 const STRIPE_EVT_PREFIX = "stripe_evt:";
 const STRIPE_SESSION_PREFIX = "stripe_session:";
 const WELCOME_CREDITS_PREFIX = "welcome-credits:";
+const TRANSCRIPTION_PREFIX = "transcription:";
+const TRANSCRIPTION_BATCH_PREFIX = "transcription_batch:";
+const COACHING_PREFIX = "coaching:";
 
 export function smsKey(sid: string): string {
   return `${SMS_PREFIX}${sid}`;
@@ -64,6 +73,31 @@ export function welcomeCreditsKey(workspaceId: string): string {
 }
 
 /**
+ * Realtime (live) speech-to-text for one call. Keyed on CallSid alone: one
+ * media stream per call, billed once from the STT clock on stream stop.
+ */
+export function liveTranscriptionKey(callSid: string): string {
+  return `${TRANSCRIPTION_PREFIX}${callSid}`;
+}
+
+/**
+ * Post-call batch transcription of the recording. Distinct namespace from
+ * {@link liveTranscriptionKey} — a call may be both live- and batch-transcribed,
+ * and the two are separate vendor charges.
+ */
+export function batchTranscriptionKey(callSid: string): string {
+  return `${TRANSCRIPTION_BATCH_PREFIX}${callSid}`;
+}
+
+/**
+ * One LLM-generated coaching cue. Keyed by the persisted `coaching_event` row id
+ * so each cue is charged exactly once; rule-based cues are not billed.
+ */
+export function coachingCueKey(callSid: string, eventId: string): string {
+  return `${COACHING_PREFIX}${callSid}:${eventId}`;
+}
+
+/**
  * Classify a ledger row into a billing bucket from its idempotency key prefix.
  * Consumed by both `getBillingEventSource` (app display) and
  * `categorizeLedgerRow` (shared reconciliation) so the two mappers no longer
@@ -80,6 +114,16 @@ export function bucketFromIdempotencyKey(
   }
   if (key.startsWith(STRIPE_EVT_PREFIX) || key.startsWith(STRIPE_SESSION_PREFIX)) {
     return "purchase";
+  }
+  // AI vendor pass-through (ElevenLabs STT, Cohere cues). Deliberately NOT
+  // "voice": the voice bucket is reconciled unit-for-unit against Twilio
+  // call minutes, and these charges have no Twilio usage record behind them.
+  if (
+    key.startsWith(TRANSCRIPTION_PREFIX) ||
+    key.startsWith(TRANSCRIPTION_BATCH_PREFIX) ||
+    key.startsWith(COACHING_PREFIX)
+  ) {
+    return "ai";
   }
   return "other";
 }

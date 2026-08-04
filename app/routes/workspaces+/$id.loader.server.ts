@@ -10,6 +10,7 @@ import {
   getWorkspaceInfoWithDetails,
   getWorkspacePhoneNumbers,
 } from "@/lib/database/workspace.server";
+import { fetchWorkspaceCampaignQueueProgressMap } from "@/lib/campaign-queue-search.server";
 import { getWorkspaceUnreadConversationCount } from "@/lib/database/workspace-conversations.server";
 import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
 import { workspaceContext } from "@/lib/route-context.server";
@@ -35,6 +36,7 @@ type LoaderData = {
     ReturnType<typeof getWorkspaceMessagingOnboardingState>
   >;
   a2pBlockingIssues?: string[];
+  campaignQueueProgress: Record<string, { completedCount: number; totalCount: number }>;
 };
 
 export const loader = defineLoader({
@@ -61,6 +63,7 @@ export const loader = defineLoader({
         unreadCount,
         audienceCount,
         scriptCount,
+        campaignQueueProgressMap,
       ] = await Promise.all([
         getWorkspaceMessagingOnboardingState({ workspaceId }),
         getWorkspacePhoneNumbers({ workspaceId }),
@@ -73,6 +76,7 @@ export const loader = defineLoader({
         isExactWorkspaceRoot
           ? tdb.script.count()
           : Promise.resolve(0),
+        fetchWorkspaceCampaignQueueProgressMap(workspaceId),
       ]);
       const workspaceNumbers = (phoneNumbersResult.data ?? []).map((number) => ({
         type: number?.type ?? null,
@@ -147,6 +151,12 @@ export const loader = defineLoader({
               a2pBlockingIssues: buildA2pBlockingIssues(onboarding),
             }
           : {}),
+        campaignQueueProgress: Object.fromEntries(
+          [...campaignQueueProgressMap.entries()].map(([campaignId, counts]) => [
+            String(campaignId),
+            counts,
+          ]),
+        ),
       } satisfies LoaderData, { headers });
     } catch (error) {
       if (

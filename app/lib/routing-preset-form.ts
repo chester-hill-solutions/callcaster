@@ -4,10 +4,7 @@ import type {
 } from "../../shared/inbound-routing-presets";
 import { INBOUND_ROUTING_PRESET_IDS } from "../../shared/inbound-routing-presets";
 
-function parsePositiveId(
-  value: FormDataEntryValue | undefined,
-  choice: string,
-): number {
+function parsePositiveId(value: unknown, choice: string): number {
   const id = Number(value);
   if (!Number.isInteger(id) || id <= 0) {
     throw new Error(`Choose ${choice}`);
@@ -15,8 +12,11 @@ function parsePositiveId(
   return id;
 }
 
+// Accepts `Record<string, unknown>` because callers now feed it
+// `parseActionRequest` output (JSON bodies as well as form posts). Every read
+// below coerces with String()/Number(), so a wider input type is safe.
 export function parseRoutingPresetApplication(
-  data: Record<string, FormDataEntryValue>,
+  data: Record<string, unknown>,
 ): InboundRoutingPresetApplication {
   const presetId = String(data.presetId ?? "") as InboundRoutingPresetId;
   if (!INBOUND_ROUTING_PRESET_IDS.includes(presetId) || presetId === "custom") {

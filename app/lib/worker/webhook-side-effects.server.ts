@@ -33,6 +33,10 @@ import {
   resolveCallOutreachContext,
   twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
+import { persistCallRecordingToStorage } from "@/lib/call-recording-storage.server";
+import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE } from "@/lib/worker/job-types.server";
+import { isBatchTranscriptionEnabled } from "@/lib/worker/handlers/elevenlabs-batch-transcribe.server";
 
 export async function runCallStatusSideEffects(args: {
   callSid: string;
@@ -218,6 +222,7 @@ export async function runRecordingSideEffects(args: {
 
   const recordingSid = args.twilioParams.RecordingSid?.trim();
   const recordingDuration = args.twilioParams.RecordingDuration?.trim();
+  const accountSid = args.twilioParams.AccountSid?.trim();
 
   const enrichment: Record<string, string> = {};
   if (recordingSid) {
@@ -227,6 +232,51 @@ export async function runRecordingSideEffects(args: {
     enrichment.recording_duration = recordingDuration;
   }
 
+  if (recordingSid && accountSid) {
+    const persistResult = await persistCallRecordingToStorage({
+      workspaceId: callRow.workspace,
+      callSid: args.callSid,
+      accountSid,
+      recordingSid,
+      existingAudioUrl: callRow.audio_url,
+    });
+
+    if (persistResult.ok && !persistResult.skipped) {
+      enrichment.audio_url = persistResult.audioUrl;
+      // Batch transcription is default-off pending an undecided product policy
+      // (see `batchTranscription` in @/lib/coaching-schemas). Suppress the
+      // enqueue entirely rather than queueing work nothing will bill for.
+      if (await isBatchTranscriptionEnabled(callRow.workspace)) {
+        try {
+          await enqueueJob({
+            type: ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
+            workspaceId: callRow.workspace,
+            params: { callSid: args.callSid },
+            dedupe: { kind: "idempotency", key: `elevenlabs_batch:${args.callSid}` },
+          });
+        } catch (error) {
+          logger.warn("elevenlabs_batch_transcribe.enqueue_failed", {
+            callSid: args.callSid,
+            workspaceId: callRow.workspace,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    } else if (!persistResult.ok) {
+      logger.warn("call_recording.persist_skipped", {
+        callSid: args.callSid,
+        workspaceId: callRow.workspace,
+        reason: persistResult.reason,
+        error: persistResult.error,
+      });
+    }
+  } else if (recordingSid && !accountSid) {
+    logger.warn("call_recording.missing_account_sid", {
+      callSid: args.callSid,
+      workspaceId: callRow.workspace,
+    });
+  }
+
   if (Object.keys(enrichment).length > 0) {
     await updateCallBySid(callRow.workspace, args.callSid, enrichment);
   }
@@ -234,6 +284,7 @@ export async function runRecordingSideEffects(args: {
   logger.debug("Recording side effects completed", {
     callSid: args.callSid,
     workspaceId: callRow.workspace,
+    audioUrlPersisted: Boolean(enrichment.audio_url),
   });
 
   return { ok: true };

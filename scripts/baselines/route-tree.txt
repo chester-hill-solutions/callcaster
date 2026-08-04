@@ -59,6 +59,7 @@ api/campaign_audience
 api/campaign_queue
 api/campaigns
 api/chat_sms
+api/coaching-ack
 api/connect-campaign-conference/:workspaceId/:campaignId
 api/connect-phone-device
 api/contact-audience

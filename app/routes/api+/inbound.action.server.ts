@@ -18,8 +18,9 @@ import {
   upsertInboundCallRecord,
   workspaceWebhookHasInboundCallInsert,
 } from "@/lib/inbound-call-db.server";
-import { findActiveHandsetSessionClientIdentity } from "@/lib/handset/handset-session.server";
-import { getWorkspaceWebhookRow } from "@/lib/workspace-members-db.server";
+import { findActiveHandsetSession, findActiveHandsetSessionClientIdentity } from "@/lib/handset/handset-session.server";
+import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
+import { getWorkspaceById, getWorkspaceWebhookRow } from "@/lib/workspace-members-db.server";
 import Twilio from "twilio";
 import { inboundRingCountToDialTimeoutSeconds } from "../../../shared/inbound-rings";
 import { defineAction } from "@/lib/handler.server";
@@ -258,6 +259,19 @@ async function handleInboundAction(
       });
       const baseUrl = env.BASE_URL();
       const handsetTwiml = new Twilio.twiml.VoiceResponse();
+      const session = await findActiveHandsetSession({ workspaceId, clientIdentity });
+      const workspace = await getWorkspaceById(workspaceId);
+      appendLiveTranscriptionStreamTwiml({
+        twiml: handsetTwiml,
+        featureFlags: workspace?.feature_flags as Record<string, unknown> | undefined,
+        params: {
+          workspaceId,
+          userId: session?.user_id ?? "",
+          direction: "inbound",
+          callSid: data.CallSid,
+          streamName: `inbound-${data.CallSid}`,
+        },
+      });
       const dial = handsetTwiml.dial({
         timeout: dialTimeout,
         action: `${baseUrl}/api/inbound-handset-dial-end`,

@@ -1,4 +1,4 @@
-import { authForOutreachAttempt } from "@/lib/platform-data.server";
+import { authForResource } from "@/lib/platform-data.server";
 import { data as routeData } from "react-router";
 import { getSession } from "@/lib/auth.server";
 import { defineAction } from "@/lib/handler.server";
@@ -17,7 +17,7 @@ export const action = defineAction({
     if (!params.id) return badRequest("id is required");
     const outreachAttemptId = Number(params.id);
     if (!Number.isFinite(outreachAttemptId)) return badRequest("id must be a number");
-    return authForOutreachAttempt(request, outreachAttemptId);
+    return authForResource(request, "outreach_attempt", outreachAttemptId);
   },
   sideEffects: ["db-write"],
   handler: async ({ request, params, auth }) => {
