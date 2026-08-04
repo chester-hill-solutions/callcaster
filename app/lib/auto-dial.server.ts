@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import {
   rpcCreateOutreachAttempt,
   rpcDequeueContact,
+  rpcResetStaleCampaignQueueClaims,
   rpcTryCompleteCampaignIfDrained,
 } from "@/lib/db-rpc.server";
 import { claimNextQueueContact, requeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
@@ -190,6 +191,23 @@ export async function runAutoDialerTurn(
 
   const twilioClient = await createWorkspaceTwilioInstance({ workspace_id });
   const tdb = createTenantDb(workspace_id);
+
+  // Sweep before claiming. A claim is only released by the turn that made it,
+  // so a turn that dies between claiming and dialling strands the row as
+  // `assigned` forever — and once that claim goes stale
+  // campaign_queue_has_pending_work stops counting it, so the campaign reports
+  // itself drained with contacts still undialled. Sweeping here repairs it at
+  // exactly the moment it matters, with no scheduler involved — the same
+  // shape claimAgentForQueue uses for inbound offers.
+  // Best-effort: a failed sweep must not stop this turn from dialling.
+  try {
+    const reclaimed = await rpcResetStaleCampaignQueueClaims(tdb, campaign_id);
+    if (reclaimed > 0) {
+      logger.info("auto_dial.stale_claims_reset", { campaignId: campaign_id, reclaimed });
+    }
+  } catch (error) {
+    logger.error("reset_stale_campaign_queue_claims RPC error", error);
+  }
 
   try {
     // Claim the next contact that is inside the recipient-local calling

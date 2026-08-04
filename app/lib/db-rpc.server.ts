@@ -93,6 +93,29 @@ export async function rpcAutoDialQueue(
  * released back to `queued` (out of the recipient calling window, say) still
  * counts as pending and will not be mistaken for a drained queue.
  */
+/**
+ * Return stale `assigned` rows to `queued` for one campaign, and fail contacts
+ * past max_attempts. Returns how many claims were reset.
+ *
+ * A claim is only undone by the dial path that made it, so a turn that dies
+ * between claiming and dialling strands the row. Nothing in the live code
+ * called this: its only caller was the dead Supabase-shaped campaign-dispatch
+ * module, so stranded rows were never recovered — and because
+ * campaign_queue_has_pending_work stops counting an assigned row once its
+ * claim goes stale, the campaign then reported itself drained with contacts
+ * still undialled.
+ */
+export async function rpcResetStaleCampaignQueueClaims(
+  executor: RpcExecutor,
+  campaignId: number,
+): Promise<number> {
+  const rows = await queryRows<{ reset_count: number }>(
+    executor,
+    sql`select reset_stale_campaign_queue_claims(${campaignId}, NULL) as reset_count`,
+  );
+  return Number(rows[0]?.reset_count ?? 0);
+}
+
 export async function rpcTryCompleteCampaignIfDrained(
   executor: RpcExecutor,
   campaignId: number,
