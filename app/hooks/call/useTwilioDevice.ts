@@ -3,6 +3,7 @@ import type { Call, Device } from "@twilio/voice-sdk";
 import { useCallDuration } from "./useCallDuration";
 import { useTwilioConnection } from "./useTwilioConnection";
 import { useCallHandling } from "./useCallHandling";
+import { logger } from "@/lib/logger.client";
 
 interface CallConnectParams {
   To: string;
@@ -38,13 +39,13 @@ export function useTwilioDevice(
   send: (action: { type: string }) => void,
 ): TwilioDeviceHook {
   if (!token) {
-    throw new Error("useTwilioDevice: token is required");
+    logger.error("useTwilioDevice: token is required");
   }
   if (!workspaceId) {
-    throw new Error("useTwilioDevice: workspaceId is required");
+    logger.error("useTwilioDevice: workspaceId is required");
   }
   if (typeof send !== "function") {
-    throw new Error("useTwilioDevice: send callback must be a function");
+    logger.error("useTwilioDevice: send callback must be a function");
   }
 
   const [deviceIsBusy, setIsBusy] = useState<boolean>(false);
@@ -69,6 +70,14 @@ export function useTwilioDevice(
   const callHandling = useCallHandling({
     device: connection.device,
     workspaceId,
+    onCallStateChange: (newCallState) => {
+      switch (newCallState) {
+        case "dialing": send({ type: "START_DIALING" }); break;
+        case "connected": send({ type: "CONNECT" }); break;
+        case "completed": send({ type: "HANG_UP" }); break;
+        case "failed": send({ type: "FAIL" }); break;
+      }
+    },
     onStatusChange: (newStatus) => {
       setStatus(newStatus);
     },
@@ -100,25 +109,27 @@ export function useTwilioDevice(
   const { callDuration, setCallDuration } = useCallDuration(callHandling.callState);
 
   /**
-   * CANDIDATE-REMOVE: @effect Mirror useTwilioConnection's `connection.error`
-   * into this hook's own local `error` state.
-   * @effect-deps connection.error, error (re-runs when the underlying
-   * connection error changes or local error is updated, guarded against
-   * redundant sets)
-   * @effect-side-effects none (setState mirroring only)
-   * @effect-why-not-loader N/A — not a fetch, but likely redundant: the
-   * `onError` callback passed to useTwilioConnection below already calls
-   * `setError` synchronously on every connection error, so this effect
-   * duplicates that sync via a second mechanism (derived-state-copied-into-
-   * state anti-pattern). Worth checking whether it's dead code or covers a
-   * real gap (e.g. an error set internally by useTwilioConnection without
-   * going through onError) before removing.
+   * @effect Hang up the active call and disconnect the Twilio device when
+   * the component unmounts, so calls do not stay live and consume credits
+   * after the agent navigates away.
+   * @effect-deps callHandling.hangUp, callHandling.activeCall, callHandling.callState, connection.device
+   * @effect-side-effects hung up / disconnecting SDK calls + device
+   * @effect-why-not-loader Teardown of imperative SDK resources on unmount.
    */
   useEffect(() => {
-    if (connection.error && connection.error !== error) {
-      setError(connection.error);
-    }
-  }, [connection.error, error]);
+    const hangUp = callHandling.hangUp;
+    const device = connection.device;
+    const hasActiveCall = Boolean(callHandling.activeCall);
+    const isActive = callHandling.callState === "connected" || callHandling.callState === "dialing";
+    return () => {
+      if (hasActiveCall || isActive) {
+        hangUp().catch(() => {
+          logger.debug("Call hung up during unmount cleanup");
+        });
+      }
+      device?.disconnectAll();
+    };
+  }, [callHandling.hangUp, callHandling.activeCall, callHandling.callState, connection.device]);
 
   return {
     device: connection.device,

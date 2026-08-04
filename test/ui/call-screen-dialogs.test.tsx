@@ -57,7 +57,7 @@ function baseProps(overrides: Partial<any> = {}) {
     setErrorDialog: vi.fn(),
     isReportDialogOpen: false,
     setReportDialog: vi.fn(),
-    campaign: { title: "Camp", dial_type: "call", voicemail_file: false },
+    campaign: { title: "Camp", dial_type: "call", voicemail_file: false, status: "running" },
     currentState: { x: 1 },
     fetchMore: vi.fn(),
     householdMap: {},

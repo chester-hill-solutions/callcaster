@@ -24,6 +24,7 @@ type UseCampaignDialActionsOptions = {
   deviceIsBusy: boolean;
   incomingCall: Call | null;
   deviceStatus: string;
+  callState: string;
   begin: () => void;
   startCall: (args: StartCallArgs) => void;
   nextRecipient: QueueItem | null;
@@ -31,6 +32,7 @@ type UseCampaignDialActionsOptions = {
   workspaceId: string;
   recentAttempt: OutreachAttempt | null;
   selectedDevice: string;
+  send: (action: { type: string }) => void;
 };
 
 export function useCampaignDialActions({
@@ -38,6 +40,7 @@ export function useCampaignDialActions({
   deviceIsBusy,
   incomingCall,
   deviceStatus,
+  callState,
   begin,
   startCall,
   nextRecipient,
@@ -45,6 +48,7 @@ export function useCampaignDialActions({
   workspaceId,
   recentAttempt,
   selectedDevice,
+  send,
 }: UseCampaignDialActionsOptions) {
   return useCallback(() => {
     if (!campaign) return;
@@ -56,7 +60,10 @@ export function useCampaignDialActions({
       begin();
     } else if (campaign.dial_type === "call") {
       if (!nextRecipient?.contact) return;
+      if (deviceIsBusy || incomingCall) return;
+      if (callState === "dialing" || callState === "connected") return;
 
+      send({ type: "START_DIALING" });
       startCall({
         contact: nextRecipient.contact,
         campaign,
@@ -72,6 +79,7 @@ export function useCampaignDialActions({
     deviceIsBusy,
     incomingCall,
     deviceStatus,
+    callState,
     begin,
     startCall,
     nextRecipient,
@@ -79,6 +87,7 @@ export function useCampaignDialActions({
     workspaceId,
     recentAttempt,
     selectedDevice,
+    send,
   ]);
 }
 

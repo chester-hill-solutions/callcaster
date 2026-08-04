@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Call } from "@twilio/voice-sdk";
 import {
   normalizeProviderStatus,
@@ -6,6 +6,7 @@ import {
   type CallStatusEnum,
 } from "@/lib/call-status";
 import { useCallStatusPolling } from "@/hooks/call/useCallStatusPolling";
+import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
 import type {
   ActiveCall,
   Campaign,
@@ -51,6 +52,13 @@ export function useCampaignCallFlow({
     !!workspaceId &&
     (state === "dialing" || state === "connected");
 
+  function dispatchCallStatus(normalized: CallStatusEnum) {
+    const action = getStateMachineAction(normalized);
+    if (action === "CONNECT") send({ type: "CONNECT" });
+    else if (action === "HANG_UP") send({ type: "HANG_UP" });
+    else if (action === "FAIL") send({ type: "FAIL" });
+  }
+
   useCallStatusPolling({
     callSid,
     workspaceId,
@@ -60,13 +68,50 @@ export function useCampaignCallFlow({
       const normalized = normalizeProviderStatus(status);
       if (normalized) {
         setProviderState({ callSid, status: normalized });
-        const action = getStateMachineAction(normalized);
-        if (action === "CONNECT") send({ type: "CONNECT" });
-        else if (action === "HANG_UP") send({ type: "HANG_UP" });
-        else if (action === "FAIL") send({ type: "FAIL" });
+        dispatchCallStatus(normalized);
       }
     },
   });
+
+  const callSidRef = useRef(callSid);
+  callSidRef.current = callSid;
+
+  // Opens a second EventSource to the same workspace events endpoint that
+  // useWorkspaceRealtime already connects to. Eliminating this would require
+  // restructuring useCallScreen's hook call order (useWorkspaceRealtime runs
+  // before useCampaignCallFlow, creating a circular dependency on callbacks).
+  // The overhead is negligible — SSE connections are lightweight — and the
+  // 5-second polling fallback remains as a safety net for both paths.
+  useWorkspaceEventSubscription({
+    workspaceId,
+    table: "call",
+    filter: `workspace=eq.${workspaceId}`,
+    onChange: (payload) => {
+      const callRow = payload.new as { sid?: string; status?: string } | null;
+      if (!callRow?.sid || !callRow?.status) return;
+      if (callRow.sid !== callSidRef.current) return;
+
+      const normalized = normalizeProviderStatus(callRow.status);
+      if (!normalized) return;
+
+      setProviderState({ callSid: callRow.sid, status: normalized });
+      dispatchCallStatus(normalized);
+    },
+  });
+
+  /**
+   * @effect Reset provider call state back to idle when the active call SID
+   * clears (call ended, navigated away, or component unmount).
+   * @effect-deps callSid (only fires when the tracked SID changes to null)
+   * @effect-side-effects none (plain setState)
+   * @effect-why-not-loader Call lifecycle state is ephemeral client state,
+   * not request/response data.
+   */
+  useEffect(() => {
+    if (!callSid) {
+      setProviderState({ callSid: null, status: null });
+    }
+  }, [callSid]);
 
   const getDisplayState = useCallback(
     (
@@ -105,7 +150,7 @@ export function useCampaignCallFlow({
     predictiveState.status === "dialing"
       ? "dialing"
       : predictiveState.status === "connected"
-        ? "connected"
+        ? state === "dialing" ? "dialing" : "connected"
         : predictiveState.status === "completed"
           ? "completed"
           : predictiveState.status === "idle"

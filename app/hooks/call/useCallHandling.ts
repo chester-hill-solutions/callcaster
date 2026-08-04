@@ -101,6 +101,7 @@ export function useCallHandling({
   const isMicMutedRef = useRef(false);
   const isOnLocalHoldRef = useRef(false);
   const incomingListenerCleanupsRef = useRef<Map<Call, () => void>>(new Map());
+  const callGenerationRef = useRef(0);
 
   /**
    * @effect Mirror `heldCalls` state into a ref so callbacks/other effects
@@ -358,13 +359,18 @@ export function useCallHandling({
         return;
       }
 
+      callGenerationRef.current += 1;
+      const myGeneration = callGenerationRef.current;
+
       const connection = device.connect({ params });
       connection
         .then((call: Call) => {
+          if (callGenerationRef.current !== myGeneration) return;
           updateActiveCall(call);
           updateCallState("dialing");
         })
         .catch((err: unknown) => {
+          if (callGenerationRef.current !== myGeneration) return;
           logger.error("Error making call:", err);
           onError?.(err instanceof Error ? err : new Error("Failed to make call"));
         });
@@ -374,6 +380,7 @@ export function useCallHandling({
 
   const hangUp = useCallback(
     async (call?: Call) => {
+      callGenerationRef.current += 1;
       const target = call ?? activeCallRef.current;
       if (!target) {
         logger.error("No call to hang up");
@@ -553,7 +560,6 @@ export function useCallHandling({
       const error = err instanceof Error ? err : new Error("Call error");
       onDeviceBusyChange?.(false);
       onError?.(error);
-      onStatusChange?.("error");
       updateCallState("failed");
       logger.error("Call error:", error);
     };

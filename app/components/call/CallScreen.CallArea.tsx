@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import type { Tables } from "@/lib/db-types";
 import { QueueItem } from "@/lib/types";
 import { formatTime, cn } from "@/lib/utils";
@@ -142,6 +143,35 @@ export function CallControls({
   voiceDrop,
   callState,
 }: CallControlsProps) {
+  const [confirmingHangUp, setConfirmingHangUp] = useState(false);
+  const confirmTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * @effect Clean up the hang-up confirmation timer on unmount to prevent
+   * a stale timeout callback from firing after the component is gone.
+   * @effect-deps [] — fire-once cleanup, no external state to track
+   * @effect-side-effects timer (clearTimeout on unmount)
+   * @effect-why-not-loader Component lifecycle cleanup, not data fetching.
+   */
+  useEffect(() => () => {
+    if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+  }, []);
+
+  const handleHangUpClick = () => {
+    if (confirmingHangUp) {
+      if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+      setConfirmingHangUp(false);
+      hangUp();
+    } else {
+      setConfirmingHangUp(true);
+      confirmTimerRef.current = setTimeout(() => {
+        setConfirmingHangUp(false);
+      }, 3000);
+    }
+  };
+
+  const hangUpDisabled = callState !== "connected" && callState !== "dialing";
+
   return (
     <div className="flex flex-col gap-3 px-4 py-3">
       {!conference && predictive && callState === "idle" ? (
@@ -155,12 +185,12 @@ export function CallControls({
       ) : null}
       <div className="flex flex-1 gap-2">
         <Button
-          onClick={hangUp}
-          variant="destructive"
+          onClick={handleHangUpClick}
+          variant={confirmingHangUp ? "destructive" : "destructive"}
           className="flex-1 rounded-full"
-          disabled={callState !== "connected" && callState !== "dialing"}
+          disabled={hangUpDisabled}
         >
-          Hang Up
+          {confirmingHangUp ? "Click again to hang up" : "Hang Up"}
         </Button>
         {voiceDrop ? (
           <Button

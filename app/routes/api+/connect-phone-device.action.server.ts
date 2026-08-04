@@ -86,6 +86,12 @@ export const action = defineAction({
                 return routeData({ error: "Campaign not found" }, { status: 404, headers });
             }
             if (!checkSchedule(campaign)) {
+                if (campaign.status === "draft" || campaign.status === "pending") {
+                    return routeData({ error: "Campaign is not live yet. Start it from the Launch page." }, { status: 400, headers });
+                }
+                if (campaign.status === "paused") {
+                    return routeData({ error: "Campaign is paused." }, { status: 400, headers });
+                }
                 return routeData({ error: "Campaign is not currently active" }, { status: 400, headers });
             }
         }

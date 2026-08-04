@@ -91,12 +91,14 @@ describe("useCampaignDialActions", () => {
   test("manual dial starts call for next recipient", () => {
     const begin = vi.fn();
     const startCall = vi.fn();
+    const send = vi.fn();
     const { result } = renderHook(() =>
       useCampaignDialActions({
         campaign: baseCampaign,
         deviceIsBusy: false,
         incomingCall: null,
         deviceStatus: "Registered",
+        callState: "idle",
         begin,
         startCall,
         nextRecipient,
@@ -104,6 +106,7 @@ describe("useCampaignDialActions", () => {
         workspaceId: "ws",
         recentAttempt: null,
         selectedDevice: "computer",
+        send,
       }),
     );
 

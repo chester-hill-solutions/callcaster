@@ -248,6 +248,7 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Hang Up" }));
+    fireEvent.click(screen.getByRole("button", { name: "Click again to hang up" }));
     fireEvent.click(screen.getByRole("button", { name: "Audio Drop" }));
     expect(hangUp).toHaveBeenCalledTimes(1);
     expect(handleVoiceDrop).toHaveBeenCalledTimes(1);

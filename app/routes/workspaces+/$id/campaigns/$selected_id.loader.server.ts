@@ -78,7 +78,11 @@ export const loader = defineLoader({
       : campaignRow?.status === "scheduled"
         ? "Campaign scheduled."
         : !campaignRow?.is_active
-          ? "It is currently outside of the campaign's calling hours"
+          ? campaignRow?.status === "draft" || campaignRow?.status === "pending"
+            ? "Campaign is not live yet. Start it from the Launch page."
+            : campaignRow?.status === "paused"
+              ? "Campaign is paused."
+              : "It is currently outside of the campaign's calling hours"
           : null;
     const scheduleDisabled = readiness.scheduleDisabledReason;
 

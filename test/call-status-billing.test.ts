@@ -46,6 +46,7 @@ vi.mock("@/lib/telephony-db.server", () => ({
 
 vi.mock("@/lib/workspace-events.server", () => ({
   emitPredictiveBroadcast: vi.fn(async () => ({})),
+  emitPostgresChangeEvent: vi.fn(async () => null),
 }));
 
 const enqueueJobMock = vi.hoisted(() => vi.fn(async () => ({ enqueued: true, jobId: 1 })));

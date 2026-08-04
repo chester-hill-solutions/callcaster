@@ -72,6 +72,22 @@ export function useCallScreen() {
     onChange: () => revalidator.revalidate(),
   });
 
+  /**
+   * @effect Periodically revalidate the call-screen loader data every 50
+   * minutes so stale workspace/campaign info is refreshed during long sessions.
+   * @effect-deps revalidator (re-subscribes when the revalidator instance changes)
+   * @effect-side-effects timer (setInterval) + fetch (revalidator.revalidate);
+   * cleared on unmount or revalidator change
+   * @effect-why-not-loader Polling for client-side freshness; a loader
+   * cannot self-schedule periodic re-fetches.
+   */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      revalidator.revalidate();
+    }, 50 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [revalidator]);
+
   const [questionContact, setQuestionContact] = useState<QueueItem | null>(initialNextRecipient);
   const [update, setUpdate] = useState<Record<string, unknown> | null>(null);
   const groupByHousehold = campaign?.group_household_queue || false;
@@ -101,6 +117,7 @@ export function useCallScreen() {
     callDuration,
     setCallDuration,
     deviceIsBusy,
+    error: deviceError,
   } = useTwilioDevice(
     token,
     phoneVerification.selectedDevice,
@@ -238,6 +255,7 @@ export function useCallScreen() {
     deviceIsBusy,
     incomingCall,
     deviceStatus,
+    callState,
     begin,
     startCall,
     nextRecipient,
@@ -245,6 +263,7 @@ export function useCallScreen() {
     workspaceId,
     recentAttempt,
     selectedDevice: phoneVerification.selectedDevice,
+    send: send as unknown as (action: { type: string }) => void,
   });
 
   const handleDequeueNext = useCampaignDequeueActions({
@@ -377,6 +396,7 @@ export function useCallScreen() {
     recentAttempt,
     availableCredits,
     creditState,
+    deviceError,
   };
 
   const queueControls = {
@@ -439,6 +459,7 @@ export function useCallScreen() {
     device,
     currentState,
     creditsError,
+    deviceError,
     callControls,
     queueControls,
     formState,

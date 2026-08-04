@@ -22,6 +22,7 @@ interface CampaignDialogsProps {
     title: string;
     dial_type: string;
     voicemail_file: boolean;
+    status: string | null;
   };
   currentState: Record<string, unknown>;
   fetchMore: (params: Record<string, unknown>) => void;
@@ -74,11 +75,19 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
         <DialogContent className="flex w-full max-w-[450px] flex-col items-center bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
-              This campaign is currently inactive.
+              {campaign.status === "draft" || campaign.status === "pending"
+                ? "This campaign is not live yet."
+                : campaign.status === "paused"
+                  ? "This campaign is paused."
+                  : "This campaign is currently inactive."}
             </DialogTitle>
             <div className="my-4 w-full">
               <p className="mb-2">
-                It is currently outside of the designated calling window for this campaign. Please check with your team for calling times.
+                {campaign.status === "draft" || campaign.status === "pending"
+                  ? "Go to the Launch page and click \"Start calling\" to activate this campaign."
+                  : campaign.status === "paused"
+                    ? "Resume the campaign from the Launch page to start calling."
+                    : "It is currently outside of the designated calling window for this campaign. Please check with your team for calling times."}
               </p>
             </div>
           </DialogHeader>

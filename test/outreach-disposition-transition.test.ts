@@ -40,6 +40,7 @@ vi.mock("@/lib/transaction-history.server", () => ({
 
 vi.mock("@/lib/workspace-events.server", () => ({
   emitPredictiveBroadcast: vi.fn(async () => ({})),
+  emitPostgresChangeEvent: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
