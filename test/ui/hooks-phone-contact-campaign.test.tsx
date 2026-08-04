@@ -81,6 +81,12 @@ describe("phone, contact, campaign hooks", () => {
         target: { value: "+1 (555) 123-4567" },
       } as React.ChangeEvent<HTMLInputElement>);
     });
+    // The search is debounced, so wait for the first one to actually fire
+    // before typing again — otherwise the second keystroke cancels the first
+    // and only one request is ever issued, which is the debounce working.
+    await waitFor(() =>
+      expect(contactSearchMocks.fetchContactsByPhone).toHaveBeenCalledTimes(1),
+    );
     await waitFor(() => expect(result.current.isSearching).toBe(false));
     expect(result.current.isValid).toBe(true);
 

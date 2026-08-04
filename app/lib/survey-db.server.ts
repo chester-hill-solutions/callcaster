@@ -14,26 +14,11 @@ import {
   user as userTable,
 } from "@/db/schema";
 import { db, type Database } from "@/server/db";
+import { formatSurveyAnswer } from "@/lib/survey-format";
+
+export { formatSurveyAnswer };
 import { createTenantDb } from "@/server/tenant-db";
 
-/**
- * Format survey answer for display, handling checkbox arrays
- */
-export function formatSurveyAnswer(answer: {
-  answer_value: string;
-  survey_question?: { question_type: string } | null;
-} | undefined): string {
-  if (!answer) return "-";
-  if (answer.survey_question?.question_type === "checkbox") {
-    try {
-      const values = JSON.parse(answer.answer_value) as unknown;
-      return Array.isArray(values) ? values.join(", ") : answer.answer_value;
-    } catch {
-      return answer.answer_value;
-    }
-  }
-  return answer.answer_value;
-}
 
 type SurveyRow = typeof surveyTable.$inferSelect;
 type SurveyResponseRow = typeof surveyResponseTable.$inferSelect;

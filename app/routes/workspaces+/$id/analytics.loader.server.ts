@@ -4,6 +4,7 @@ import { loadWorkspaceAnalytics } from "@/lib/workspace-analytics.server";
 import { logger } from "@/lib/logger.server";
 import { listWorkspaceMembersEnriched } from "@/lib/workspace-members-db.server";
 import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
+import { listWorkspaceCampaignOptions } from "@/lib/database/campaign.server";
 import { defaultAnalyticsRange } from "../../../../shared/workspace-analytics";
 import { campaign as campaignTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
@@ -64,10 +65,7 @@ export const loader = defineLoader({
     const tdb = createTenantDb(workspaceId);
     const [workspace, campaigns] = await Promise.all([
       getWorkspaceForClient(workspaceId),
-      tdb.campaign.findMany({
-        columns: { id: true, title: true, status: true },
-        orderBy: [desc(campaignTable.created_at)],
-      }),
+      listWorkspaceCampaignOptions(tdb),
     ]);
 
     if (!workspace) {

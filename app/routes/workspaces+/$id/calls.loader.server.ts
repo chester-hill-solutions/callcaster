@@ -1,5 +1,6 @@
 import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { loadCallLogPage } from "@/lib/call-log.server";
+import { listWorkspaceCampaignOptions } from "@/lib/database/campaign.server";
 import { logger } from "@/lib/logger.server";
 import { data as routeData } from "react-router";
 import { defineLoader } from "@/lib/handler.server";
@@ -62,10 +63,7 @@ export const loader = defineLoader({
         .where(eq(workspaceTable.id, workspaceId))
         .limit(1)
         .then((rows) => rows[0] ?? null),
-      tdb.campaign.findMany({
-        columns: { id: true, title: true, status: true },
-        orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
-      }),
+      listWorkspaceCampaignOptions(tdb),
     ]);
 
     const workspace = workspaceRow;

@@ -22,7 +22,19 @@ export default function WorkspaceTwilio() {
     return (
         <div className="grid grid-cols-1 gap-6">
             <Suspense fallback={<LoadingCard title="Twilio Ops Portal" description="Loading Twilio account, strategy, and messaging insights..." />}>
-                <Await resolve={twilioData}>
+                <Await
+                    resolve={twilioData}
+                    errorElement={
+                        <div className="grid grid-cols-1 gap-6">
+                            <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+                                <h3 className="font-semibold text-red-900">Failed to load Twilio data</h3>
+                                <p className="mt-1 text-sm text-red-800">
+                                    There was an error loading Twilio account information. Please refresh the page and try again.
+                                </p>
+                            </div>
+                        </div>
+                    }
+                >
                     {(data: TwilioPageData) => <PortalContent data={data} />}
                 </Await>
             </Suspense>

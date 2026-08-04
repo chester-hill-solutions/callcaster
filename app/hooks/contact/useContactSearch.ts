@@ -1,4 +1,4 @@
-import { MutableRefObject, useEffect, useState, useCallback } from "react";
+import { MutableRefObject, useEffect, useState, useCallback, useRef } from "react";
 import { useClickOutside } from "@/hooks/utils/useClickOutside";
 import {
   fetchContactsByPhone,
@@ -42,6 +42,7 @@ export function useContactSearch({
   const [contacts, setContacts] = useState<Contact[]>(potentialContacts || []);
   const [existingConversation, setExistingConversation] = useState<ExistingConversation | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const requestSequenceRef = useRef(0);
 
   const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -64,11 +65,17 @@ export function useContactSearch({
     setManualContact(null);
   }, []);
 
-  const searchContact = useCallback(async (nextPhoneNumber: string) => {
+  const searchContact = useCallback(async (nextPhoneNumber: string, sequence: number) => {
+    // Ignore result if a newer search sequence has started
+    if (sequence !== requestSequenceRef.current) return;
+
     setIsSearching(true);
     setSearchError(null);
     try {
       const data = await fetchContactsByPhone(workspace_id, nextPhoneNumber);
+
+      // Check sequence again before updating state; abort if stale
+      if (sequence !== requestSequenceRef.current) return;
 
       if (data.length > 0) {
         setContacts(data);
@@ -81,6 +88,9 @@ export function useContactSearch({
         setSearchError("No contact found. A new contact will be created.");
       }
     } catch (error) {
+      // Check sequence before updating error state
+      if (sequence !== requestSequenceRef.current) return;
+
       logger.error("Contact search error:", error);
       setContacts([]);
       setManualContact(null);
@@ -89,17 +99,26 @@ export function useContactSearch({
         : "Unable to search for contact. Please try again.";
       setSearchError(errorMessage);
     } finally {
-      setIsSearching(false);
+      // Check sequence before clearing searching state
+      if (sequence === requestSequenceRef.current) {
+        setIsSearching(false);
+      }
     }
   }, [workspace_id]);
 
-  const searchConversation = useCallback(async (nextPhoneNumber: string) => {
+  const searchConversation = useCallback(async (nextPhoneNumber: string, sequence: number) => {
+    // Ignore result if a newer search sequence has started
+    if (sequence !== requestSequenceRef.current) return;
+
     try {
       const normalizedPhoneNumber = normalizePhoneNumber(nextPhoneNumber);
       const latestMessage = await fetchLatestMessageForPhone(
         workspace_id,
         normalizedPhoneNumber,
       );
+
+      // Check sequence again before updating state; abort if stale
+      if (sequence !== requestSequenceRef.current) return;
 
       if (latestMessage?.body && latestMessage.date_created) {
         setExistingConversation({
@@ -111,30 +130,47 @@ export function useContactSearch({
         setExistingConversation(null);
       }
     } catch (error) {
+      // Check sequence before updating error state
+      if (sequence !== requestSequenceRef.current) return;
+
       logger.error("Conversation search error:", error);
       setExistingConversation(null);
     }
   }, [workspace_id]);
 
   /**
-   * @effect CANDIDATE-REMOVE Fetch contact matches and the latest conversation for the typed phone number.
+   * @effect Debounced fetch of contact matches and latest conversation for the typed phone number.
+   *   Uses a request-sequence guard (requestSequenceRef) to ignore stale responses from
+   *   out-of-order network requests; a pending timer is canceled on unmount or input change.
    * @effect-deps phoneNumber, isValid (only searches once the number is valid), searchContact, searchConversation
-   * @effect-side-effects fetch (fetchContactsByPhone + fetchLatestMessageForPhone via lib/chats/messaging-client)
+   * @effect-side-effects fetch via debounce cleanup (fetchContactsByPhone + fetchLatestMessageForPhone)
    * @effect-why-not-loader This is disguised data fetching driven by local input state rather than
    *   route params — it calls imperative HTTP helpers directly instead of a loader/useFetcher. Could
    *   be migrated to a debounced useFetcher().load() pair (workspace_id + phoneNumber as query params)
    *   so React Router owns request de-duplication/cancellation instead of this hook doing it by hand.
    */
   useEffect(() => {
-    if (isValid && phoneNumber) {
-      searchContact(phoneNumber);
-      searchConversation(phoneNumber);
-    } else {
+    if (!isValid || !phoneNumber) {
       setContacts([]);
       setManualContact(null);
       setSearchError(null);
       setExistingConversation(null);
+      return;
     }
+
+    // Increment sequence number for this search cycle
+    const currentSequence = ++requestSequenceRef.current;
+
+    // Debounce the search requests (~300ms)
+    const timeoutId = setTimeout(() => {
+      // Only execute if this sequence is still current (no newer search has fired)
+      if (currentSequence === requestSequenceRef.current) {
+        searchContact(phoneNumber, currentSequence);
+        searchConversation(phoneNumber, currentSequence);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
   }, [phoneNumber, isValid, searchContact, searchConversation]);
 
   useClickOutside(dropdownRef, () => setIsContactMenuOpen(false));

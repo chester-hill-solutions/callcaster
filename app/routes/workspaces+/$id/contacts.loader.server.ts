@@ -3,6 +3,7 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { listWorkspaceContactsApi } from "@/lib/platform-data.server";
 import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
+import { listWorkspaceCampaignOptions } from "@/lib/database/campaign.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { defineLoader } from "@/lib/handler.server";
 
@@ -92,10 +93,7 @@ export const loader = defineLoader({
       contactsResult,
     ] = await Promise.all([
       getWorkspaceForClient(workspaceId),
-      tdb.campaign.findMany({
-        columns: { id: true, title: true, status: true },
-        orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
-      }),
+      listWorkspaceCampaignOptions(tdb),
       listWorkspaceContactsApi(workspaceId, url.searchParams),
     ]);
 

@@ -3,7 +3,7 @@ export { loader } from "./responses.loader.server";
 import { type LoaderFunctionArgs, useLoaderData, useFetcher, Link } from "react-router";
 
 import type { User, Survey, SurveyResponse, ResponseAnswer, Contact } from "@/lib/types";
-import { formatSurveyAnswer } from "@/lib/survey-db.server";
+import { formatSurveyAnswer } from "@/lib/survey-format";
 import { Button } from "@/components/ui/button";
 import { Heading, Text } from "@/components/ui/typography";
 import { Section, SectionHeader } from "@/components/shared/Section";

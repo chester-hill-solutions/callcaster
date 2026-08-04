@@ -196,6 +196,19 @@ export async function getWorkspaceCampaigns({
   }
 }
 
+/**
+ * Fetch campaign dropdown options (id, title, status) for a workspace,
+ * ordered by creation date descending, limited to 200 results.
+ * These are dropdown options, not a paginated list.
+ */
+export async function listWorkspaceCampaignOptions(tdb: TenantDb) {
+  return tdb.campaign.findMany({
+    columns: { id: true, title: true, status: true },
+    orderBy: (campaign, { desc: descFn }) => [descFn(campaign.created_at)],
+    limit: 200,
+  });
+}
+
 export async function updateCampaign({
   campaignData,
   campaignDetails,
