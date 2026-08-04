@@ -100,6 +100,7 @@ const steps = [
   "client/migrations/20260731160000_workspace_number_rental_lifecycle.sql",
   "client/migrations/20260803120000_fix_queue_rpcs_on_queue_state.sql",
   "client/migrations/20260803130000_claim_next_queue_contact_attempt_count.sql",
+  "client/migrations/20260803140000_workspace_number_rental_warned_cycle.sql",
 ];
 
 /**
@@ -146,6 +147,27 @@ if (unwired.length > 0) {
       unwired.map((file) => `  ${file}`).join("\n") +
       "\n\nAppend each to `steps` (in filename order), or to `coveredByBaseline` if\n" +
       "the drizzle/ baseline already contains its effect. Update the compose\n" +
+      "bootstrap (scripts/e2e/bootstrap-compose-db.mjs) in the same commit.",
+  );
+  process.exit(1);
+}
+
+// Drift guard for drizzle/ files: all must be wired into `steps`.
+const allDrizzleFiles = readdirSync(path.join(rootDir, "drizzle"))
+  .filter((file) => file.endsWith(".sql"))
+  .sort();
+const drizzleWired = new Set(
+  steps
+    .filter((step) => step.startsWith("drizzle/"))
+    .map((step) => path.basename(step)),
+);
+const unwiredDrizzle = allDrizzleFiles.filter((file) => !drizzleWired.has(file));
+if (unwiredDrizzle.length > 0) {
+  console.error(
+    "[bootstrap-fresh-db] drizzle/*.sql files exist but are wired into neither\n" +
+      "`steps` in this file:\n" +
+      unwiredDrizzle.map((file) => `  drizzle/${file}`).join("\n") +
+      "\n\nAppend each to `steps` (in filename order). Update the compose\n" +
       "bootstrap (scripts/e2e/bootstrap-compose-db.mjs) in the same commit.",
   );
   process.exit(1);

@@ -31,6 +31,25 @@ export {
   call_transcript,
 } from "./schema-transcription";
 
+// Re-exported so `@/db/schema` stays the single import site; also imported
+// because the relations block below wires these to campaign/contact.
+import {
+  survey,
+  survey_page,
+  survey_question,
+  question_option,
+  survey_response,
+  response_answer,
+} from "./schema-survey";
+export {
+  survey,
+  survey_page,
+  survey_question,
+  question_option,
+  survey_response,
+  response_answer,
+};
+
 export const agent_state = pgEnum("agent_state", ["offline","available","busy","wrap_up","away"]);
 export const answered_by = pgEnum("answered_by", ["human","machine","unknown"]);
 export const call_status = pgEnum("call_status", ["queued","ringing","in-progress","canceled","completed","failed","busy","no-answer","initiated"]);
@@ -187,6 +206,8 @@ export const workspace_number = pgTable("workspace_number", {
   inbound_ring_count: integer().notNull(),
   inbound_script_id: serial(),
   phone_number: text(),
+  /** Unpaid cycle count at which the customer was last warned; null = never. */
+  rental_warned_cycle: integer(),
   /** Unpaid-rental suspension: blocks outbound use, inbound still works. */
   suspended_at: timestamp({ withTimezone: true, mode: "string" }),
   twilio_phone_number_sid: text(),
@@ -585,74 +606,6 @@ export const transaction_history = pgTable("transaction_history", {
   campaign_id: bigint({ mode: "number" }),
   call_sid: text(),
   message_sid: text(),
-});
-
-// ─── Survey ──────────────────────────────────────
-
-export const survey = pgTable("survey", {
-  id: serial().notNull().primaryKey(),
-  survey_id: uuid().notNull(),
-  title: text().notNull(),
-  workspace: uuid().notNull(),
-  is_active: boolean().notNull(),
-  created_at: text().notNull(),
-  updated_at: text().notNull(),
-});
-
-export const survey_page = pgTable("survey_page", {
-  id: serial().notNull().primaryKey(),
-  survey_id: serial().notNull(),
-  page_id: uuid().notNull(),
-  title: text().notNull(),
-  page_order: integer().notNull(),
-  created_at: text().notNull(),
-  updated_at: text().notNull(),
-});
-
-export const survey_question = pgTable("survey_question", {
-  id: serial().notNull().primaryKey(),
-  page_id: serial().notNull(),
-  question_id: uuid().notNull(),
-  question_text: text().notNull(),
-  question_type: text().notNull(),
-  is_required: boolean().notNull(),
-  question_order: integer().notNull(),
-  created_at: text().notNull(),
-  updated_at: text().notNull(),
-});
-
-export const question_option = pgTable("question_option", {
-  id: serial().notNull().primaryKey(),
-  question_id: serial().notNull(),
-  option_value: text().notNull(),
-  option_label: text().notNull(),
-  option_order: integer().notNull(),
-  created_at: text().notNull(),
-});
-
-export const survey_response = pgTable(
-  "survey_response",
-  {
-    id: serial().notNull().primaryKey(),
-    survey_id: serial().notNull(),
-    result_id: text().notNull(),
-    contact_id: serial(),
-    started_at: text().notNull(),
-    completed_at: text(),
-    last_page_completed: text(),
-    created_at: text().notNull(),
-    updated_at: text().notNull(),
-  },
-  (table) => [uniqueIndex("survey_response_survey_result_unique").on(table.survey_id, table.result_id)],
-);
-
-export const response_answer = pgTable("response_answer", {
-  id: serial().notNull().primaryKey(),
-  response_id: serial().notNull(),
-  question_id: serial().notNull(),
-  answer_value: text().notNull(),
-  answered_at: text().notNull(),
-  created_at: text().notNull(),
 });
 
 // ─── Auth/Verification ──────────────────────────────────────

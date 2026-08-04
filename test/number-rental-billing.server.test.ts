@@ -399,7 +399,14 @@ describe("runNumberRentalBilling", () => {
     });
 
     expect(result).toMatchObject({ suspended: 0 });
-    expect(tdbMocks.workspace_number.update).not.toHaveBeenCalled();
+    // Specifically no SUSPENSION write. `update` is no longer a proxy for
+    // "nothing happened" — the warn rung writes a rental_warned_cycle marker,
+    // which is what stops it emailing daily.
+    expect(tdbMocks.workspace_number.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: expect.objectContaining({ suspended_at: expect.anything() }),
+      }),
+    );
   });
 
   test("does not alert when every rental is paid", async () => {
@@ -534,6 +541,53 @@ describe("runNumberRentalBilling", () => {
     // And the customer is not told they lost a number they still own.
     expect(resendMocks.send).not.toHaveBeenCalledWith(
       expect.objectContaining({ subject: expect.stringContaining("has been released") }),
+    );
+  });
+
+  /**
+   * The sweep runs daily and the warn rung fires whenever the unpaid count is
+   * exactly 1, so without a marker a workspace was emailed "Payment needed"
+   * every day for up to a month. The suspend rung was already idempotent; this
+   * one was not.
+   */
+  test("warns once per unpaid-cycle count, not once per daily sweep", async () => {
+    tdbMocks.workspace_number.update.mockResolvedValue([{ id: 1 }]);
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-05-01", rental_warned_cycle: 1 }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+    resendMocks.send.mockClear();
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-06-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ warned: 0 });
+    expect(resendMocks.send).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Stores the cycle COUNT rather than a boolean so a customer who pays some
+   * and falls behind again is warned afresh — a boolean would suppress that
+   * second, legitimate warning forever.
+   */
+  test("warns again when the unpaid count changes", async () => {
+    tdbMocks.workspace_number.update.mockResolvedValue([{ id: 1 }]);
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-05-01", rental_warned_cycle: 3 }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+    resendMocks.send.mockClear();
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-06-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ warned: 1 });
+    expect(tdbMocks.workspace_number.update).toHaveBeenCalledWith(
+      expect.objectContaining({ set: { rental_warned_cycle: 1 } }),
     );
   });
 

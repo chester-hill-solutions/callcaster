@@ -23,8 +23,10 @@ const BASELINE_ALLOWLIST = {
   // the unpaid-rental ladder. Pinned rather than exempted so the ratchet still
   // applies: the next column addition fails here, which is the right moment to
   // split this file by domain (workspace / campaign / telephony / survey)
-  // instead of raising the number again.
-  "db/schema.ts": 801,
+  // instead of raising the number again. Survey moved to db/schema-survey.ts on
+  // 2026-08-03 when a new column would have breached the cap; the same move is
+  // available for the remaining domains.
+  "db/schema.ts": 754,
   "lib/platform-data.server.ts": 1080,
   "lib/database/workspace.server.ts": 826,
   "lib/survey-db.server.ts": 928,

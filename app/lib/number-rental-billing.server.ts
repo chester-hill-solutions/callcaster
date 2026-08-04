@@ -176,7 +176,13 @@ async function sendNumberRentalReminderEmail(args: {
  */
 async function applyRentalLifecycleAction(args: {
   action: RentalLifecycleAction;
-  number: { id: number; workspace: string; twilio_phone_number_sid: string | null; suspended_at?: unknown };
+  number: {
+    id: number;
+    workspace: string;
+    twilio_phone_number_sid: string | null;
+    suspended_at?: unknown;
+    rental_warned_cycle?: unknown;
+  };
   phoneNumberLabel: string;
   unpaidCycles: number;
   tdb: ReturnType<typeof createTenantDb>;
@@ -194,6 +200,23 @@ async function applyRentalLifecycleAction(args: {
   const recipients = await listWorkspaceOwnerAdminEmails(number.workspace).catch(() => []);
 
   if (action === "warn") {
+    // Idempotent, the way the suspend rung already was. The sweep runs daily
+    // and this rung fires whenever the unpaid count is exactly 1, so without a
+    // marker a workspace received "Payment needed for …" every day for up to a
+    // month, until a second cycle escalated it. Worse after suspensions became
+    // clearable: a suspended customer who partially pays drops back to one
+    // unpaid cycle and would get daily warn mail while still suspended.
+    //
+    // The marker stores the CYCLE COUNT, not a boolean: if the customer pays
+    // some and falls behind again, the count differs from the stored one and a
+    // fresh warning is correct. A boolean would suppress that second,
+    // legitimate warning forever.
+    if (Number(number.rental_warned_cycle) === unpaidCycles) return "none";
+
+    await tdb.workspace_number.update({
+      set: { rental_warned_cycle: unpaidCycles },
+      where: eq(workspaceNumberTable.id, number.id),
+    });
     await notifyOps({
       event: "billing.rental_unpaid_warned",
       severity: "warn",

@@ -7,7 +7,7 @@ The media-stream Bun service is a **third Railway process** in the CallCaster de
 | Process | Entry point | Role |
 |---|---|---|
 | Web | `server/bun.ts` (or Node entry) | HTTP, React Router, Twilio webhooks |
-| Worker | `scripts/worker.ts` | Background jobs |
+| Worker | `worker/index.ts` | Background jobs |
 | Media-stream | `services/media-stream/index.ts` | WebSocket bridge |
 
 All three share the same repo and Docker image; only the **start command** differs. Deploy media-stream as its own Railway service so CPU/memory spikes on concurrent audio streams do not affect web request latency or webhook handling.
