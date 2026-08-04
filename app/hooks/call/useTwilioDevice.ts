@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
 import { useCallDuration } from "./useCallDuration";
 import { useTwilioConnection } from "./useTwilioConnection";
@@ -53,41 +53,43 @@ export function useTwilioDevice(
   const [error, setError] = useState<Error | null>(null);
   const receiveIncomingRef = useRef<(call: Call) => void>(() => {});
 
+  const onStatusChange = useCallback((newStatus: string) => {
+    setStatus(newStatus);
+  }, []);
+
+  const onDeviceError = useCallback((err: Error) => {
+    setError(err);
+  }, []);
+
+  const onDeviceBusy = useCallback((isBusy: boolean) => {
+    setIsBusy(isBusy);
+  }, []);
+
+  const onCallState = useCallback((newCallState: string) => {
+    switch (newCallState) {
+      case "dialing": send({ type: "START_DIALING" }); break;
+      case "connected": send({ type: "CONNECT" }); break;
+      case "completed": send({ type: "HANG_UP" }); break;
+      case "failed": send({ type: "FAIL" }); break;
+    }
+  }, [send]);
+
   const connection = useTwilioConnection({
     token,
     onIncomingCall: (call) => receiveIncomingRef.current(call),
-    onStatusChange: (newStatus) => {
-      setStatus(newStatus);
-    },
-    onError: (err) => {
-      setError(err);
-    },
-    onDeviceBusyChange: (isBusy) => {
-      setIsBusy(isBusy);
-    },
+    onStatusChange,
+    onError: onDeviceError,
+    onDeviceBusyChange: onDeviceBusy,
   });
 
   const callHandling = useCallHandling({
     device: connection.device,
     workspaceId,
     autoAcceptIncoming: true,
-    onCallStateChange: (newCallState) => {
-      switch (newCallState) {
-        case "dialing": send({ type: "START_DIALING" }); break;
-        case "connected": send({ type: "CONNECT" }); break;
-        case "completed": send({ type: "HANG_UP" }); break;
-        case "failed": send({ type: "FAIL" }); break;
-      }
-    },
-    onStatusChange: (newStatus) => {
-      setStatus(newStatus);
-    },
-    onError: (err) => {
-      setError(err);
-    },
-    onDeviceBusyChange: (isBusy) => {
-      setIsBusy(isBusy);
-    },
+    onCallStateChange: onCallState,
+    onStatusChange,
+    onError: onDeviceError,
+    onDeviceBusyChange: onDeviceBusy,
   });
 
   /**
@@ -106,28 +108,39 @@ export function useTwilioDevice(
 
   const { callDuration, setCallDuration } = useCallDuration(callHandling.callState);
 
+  const activeCallRef = useRef(callHandling.activeCall);
+  const hangUpRef = useRef(callHandling.hangUp);
+  const callStateRef = useRef(callHandling.callState);
+  const deviceRef = useRef(connection.device);
+
+  activeCallRef.current = callHandling.activeCall;
+  hangUpRef.current = callHandling.hangUp;
+  callStateRef.current = callHandling.callState;
+  deviceRef.current = connection.device;
+
   /**
    * @effect Hang up the active call and disconnect the Twilio device when
    * the component unmounts, so calls do not stay live and consume credits
    * after the agent navigates away.
-   * @effect-deps callHandling.hangUp, callHandling.activeCall, callHandling.callState, connection.device
+   * @effect-deps [] — mount-once cleanup-only; reads latest values via refs
+   * kept fresh on every render so the unmount teardown always acts on the
+   * current call/device regardless of stale closures.
    * @effect-side-effects hung up / disconnecting SDK calls + device
    * @effect-why-not-loader Teardown of imperative SDK resources on unmount.
    */
   useEffect(() => {
-    const hangUp = callHandling.hangUp;
-    const device = connection.device;
-    const hasActiveCall = Boolean(callHandling.activeCall);
-    const isActive = callHandling.callState === "connected" || callHandling.callState === "dialing";
     return () => {
+      const hasActiveCall = Boolean(activeCallRef.current);
+      const isActive =
+        callStateRef.current === "connected" || callStateRef.current === "dialing";
       if (hasActiveCall || isActive) {
-        hangUp().catch(() => {
+        hangUpRef.current?.().catch(() => {
           logger.debug("Call hung up during unmount cleanup");
         });
       }
-      device?.disconnectAll();
+      deviceRef.current?.disconnectAll();
     };
-  }, [callHandling.hangUp, callHandling.activeCall, callHandling.callState, connection.device]);
+  }, []);
 
   return {
     device: connection.device,
