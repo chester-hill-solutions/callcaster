@@ -243,7 +243,8 @@ export async function upsertCallBySid(
 ): Promise<CallRow | null> {
   const existingWorkspace = values.workspace ?? null;
   if (existingWorkspace) {
-    return updateCallBySid(existingWorkspace, values.sid, values as Partial<CallRow>);
+    const updated = await updateCallBySid(existingWorkspace, values.sid, values as Partial<CallRow>);
+    if (updated) return updated;
   }
 
   const [row] = await db
