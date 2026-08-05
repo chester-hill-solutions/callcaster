@@ -87,26 +87,37 @@ const useDebouncedSave = ({
     const previousDispositionRef = useRef<string | null>(disposition);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+    // A save is meaningful when the agent has answered something or chosen a
+    // real outcome. "idle" is the between-calls sentinel derived from a null
+    // recentAttempt — submitting it after "Save and Next" wrote phantom
+    // attempts against the NEXT contact with empty answers.
+    const hasAnswers = update != null && Object.keys(update).length > 0;
+    const hasRealDisposition = Boolean(disposition && disposition !== "idle");
+    const isMeaningful = hasAnswers || hasRealDisposition;
+
     const saveData = useCallback(() => {
+        if (!(update != null && Object.keys(update).length > 0) &&
+            !(disposition && disposition !== "idle")) {
+            return;
+        }
         if (nextRecipient?.contact?.id) {
-            const formData = new FormData();
-            formData.append("update", JSON.stringify(update));
-            if (recentAttempt?.id != null) {
-                formData.append("callId", recentAttempt.id.toString());
-            }
-            formData.append("selected_workspace_id", workspaceId);
-            formData.append("contact_id", nextRecipient.contact.id.toString());
-            formData.append("queue_id", nextRecipient.id.toString());
-            if (campaign?.id != null) {
-                formData.append("campaign_id", campaign.id.toString());
-            }
-            formData.append("workspace", workspaceId);
-            formData.append("disposition", disposition || '');
+            // JSON on purpose: the route parses JSON natively, and FormData's
+            // urlencoded serialization was 400ing at the JSON-only parser.
+            const payload: Record<string, unknown> = {
+                update: update ?? {},
+                callId: recentAttempt?.id ?? null,
+                contact_id: Number(nextRecipient.contact.id),
+                campaign_id: campaign?.id != null ? Number(campaign.id) : null,
+                queue_id: Number(nextRecipient.id),
+                workspace: workspaceId,
+                disposition: disposition || "",
+            };
             fetcher.submit(
-                formData,
+                payload as Parameters<typeof fetcher.submit>[0],
                 {
                     method: "PATCH",
                     action: `/api/questions`,
+                    encType: "application/json",
                 }
             );
         } else {
@@ -125,7 +136,7 @@ const useDebouncedSave = ({
      *   (fetcher.submit) triggered by user input, not something a loader can express.
      */
     useEffect(() => {
-        const shouldUpdate = nextRecipient &&
+        const shouldUpdate = nextRecipient && isMeaningful &&
             (!deepEqual(update, previousUpdateRef.current) ||
              !deepEqual(disposition, previousDispositionRef.current));
     
@@ -147,7 +158,7 @@ const useDebouncedSave = ({
                 timeoutRef.current = null;
             }
         };
-    }, [update, disposition, nextRecipient, saveData]);
+    }, [update, disposition, nextRecipient, saveData, isMeaningful]);
   
     /**
      * @effect CANDIDATE-REMOVE Toast success/failure once the save fetcher settles.

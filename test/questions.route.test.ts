@@ -32,6 +32,9 @@ vi.mock("@/lib/database/workspace.server", () => ({
 }));
 vi.mock("@/lib/request-utils.server", () => ({
   safeParseJson: (...args: any[]) => mocks.safeParseJson(...args),
+  // The route parses via parseActionRequest (JSON or form); tests stub the
+  // parsed body through the same mock either way.
+  parseActionRequest: (...args: any[]) => mocks.safeParseJson(...args),
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...args: any[]) => mocks.rpcCreateOutreachAttempt(...args),
@@ -138,9 +141,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
 
   test("updates existing outreach when recentOutreach exists (update undefined branch)", async () => {
     tenantDbMocks.findFirst.mockResolvedValueOnce({ id: 1 });
-    tenantDbMocks.update
-      .mockResolvedValueOnce([{ id: 1 }])
-      .mockResolvedValueOnce([{ id: 1, disposition: "completed" }]);
+    tenantDbMocks.update.mockResolvedValueOnce([{ id: 1, disposition: "completed" }]);
     mocks.safeParseJson.mockResolvedValueOnce({
       update: undefined,
       contact_id: 1,
@@ -153,6 +154,49 @@ describe("app/routes/api+/questions/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: makeRequest({}) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ id: 1, disposition: "completed" });
+    expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+  });
+
+  test("targets the attempt by callId when provided instead of the 10-minute window", async () => {
+    tenantDbMocks.findFirst.mockResolvedValueOnce({ id: 42 });
+    tenantDbMocks.update.mockResolvedValueOnce([{ id: 42, disposition: "completed" }]);
+    mocks.safeParseJson.mockResolvedValueOnce({
+      update: { a: 1 },
+      callId: 42,
+      contact_id: 1,
+      campaign_id: 2,
+      workspace: "w1",
+      disposition: "completed",
+      queue_id: 3,
+    });
+    const mod = await import("../app/routes/api+/questions");
+    const res = await asRouteResponse(mod.action({ request: makeRequest({}) } as any));
+    expect(res.status).toBe(200);
+    // Exactly one lookup (by id) — no fallback window query, no create.
+    expect(tenantDbMocks.findFirst).toHaveBeenCalledTimes(1);
+    expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toEqual({ id: 42, disposition: "completed" });
+  });
+
+  test("the 'idle' sentinel and empty dispositions never reach the update", async () => {
+    for (const sentinel of ["idle", ""]) {
+      tenantDbMocks.findFirst.mockResolvedValueOnce({ id: 1, disposition: "voicemail" });
+      tenantDbMocks.update.mockResolvedValueOnce([{ id: 1, disposition: "voicemail" }]);
+      mocks.safeParseJson.mockResolvedValueOnce({
+        update: { a: 1 },
+        contact_id: 1,
+        campaign_id: 2,
+        workspace: "w1",
+        disposition: sentinel,
+        queue_id: 3,
+      });
+      const mod = await import("../app/routes/api+/questions");
+      const res = await asRouteResponse(mod.action({ request: makeRequest({}) } as any));
+      expect(res.status).toBe(200);
+      const updateArg = tenantDbMocks.update.mock.calls.at(-1)?.[0];
+      expect(updateArg.set).not.toHaveProperty("disposition");
+      expect(updateArg.set).toHaveProperty("result", { a: 1 });
+    }
   });
 
   test.skip("returns 500 when updating recent outreach attempt errors", async () => {
@@ -164,13 +208,15 @@ describe("app/routes/api+/questions/route.tsx", () => {
     await expect(mod.action({ request: makeRequest(defaultBody) } as any)).rejects.toThrow("update bad");
   });
 
-  test("covers null id fallback when recent update returns empty data", async () => {
-    tenantDbMocks.findFirst.mockResolvedValueOnce({ id: 1 });
-    tenantDbMocks.update
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([{ id: null, disposition: "completed" }]);
+  test("a stale callId scoped to another contact falls back to the window lookup", async () => {
+    // callId lookup (scoped by contact+campaign) misses; window lookup hits.
+    tenantDbMocks.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 9 });
+    tenantDbMocks.update.mockResolvedValueOnce([{ id: 9, disposition: "completed" }]);
     mocks.safeParseJson.mockResolvedValueOnce({
-      update: undefined,
+      update: { a: 1 },
+      callId: 999,
       contact_id: 1,
       campaign_id: 2,
       workspace: "w1",
@@ -180,7 +226,8 @@ describe("app/routes/api+/questions/route.tsx", () => {
     const mod = await import("../app/routes/api+/questions");
     const res = await asRouteResponse(mod.action({ request: makeRequest({}) } as any));
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ id: null, disposition: "completed" });
+    expect(tenantDbMocks.findFirst).toHaveBeenCalledTimes(2);
+    await expect(res.json()).resolves.toEqual({ id: 9, disposition: "completed" });
   });
 
   test.skip("returns 500 when final outreach update errors", async () => {
