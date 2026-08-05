@@ -185,6 +185,7 @@ export function useCallScreen() {
     activeCall,
     recentAttemptDisposition: recentAttempt?.disposition,
     predictiveState,
+    isPredictive: campaign?.dial_type === "predictive",
     send: send as unknown as (action: { type: string }) => void,
   });
 

@@ -31,6 +31,7 @@ describe("useCampaignCallFlow", () => {
           activeCall: null,
           recentAttemptDisposition: disposition,
           predictiveState: { status: "unknown", contact_id: null },
+          isPredictive: false,
           send,
         });
         return { disposition, ...flow };

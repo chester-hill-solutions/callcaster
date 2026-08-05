@@ -29,6 +29,7 @@ type UseCampaignCallFlowOptions = {
   activeCall: Call | null;
   recentAttemptDisposition: string | null | undefined;
   predictiveState: PredictiveState;
+  isPredictive: boolean;
   send: CallStateMachineSend;
 };
 
@@ -39,6 +40,7 @@ export function useCampaignCallFlow({
   activeCall,
   recentAttemptDisposition,
   predictiveState,
+  isPredictive,
   send,
 }: UseCampaignCallFlowOptions) {
   const [providerState, setProviderState] = useState<{
@@ -122,15 +124,16 @@ export function useCampaignCallFlow({
       if (callStateValue === "failed" || statusValue === "failed" || statusValue === "busy") {
         return "failed";
       }
+      if (callStateValue === "connected" || statusValue === "in-progress") {
+        return "connected";
+      }
       if (
         statusValue === "initiated" ||
         statusValue === "queued" ||
-        statusValue === "ringing" ||
-        (activeCallValue && statusValue !== "in-progress")
+        statusValue === "ringing"
       ) {
         return "dialing";
       }
-      if (statusValue === "in-progress") return "connected";
       if (statusValue === "no-answer") return "no-answer";
       if (statusValue === "voicemail") return "voicemail";
       if (
@@ -140,14 +143,25 @@ export function useCampaignCallFlow({
       ) {
         return "completed";
       }
-      if (!activeCallValue && !statusValue) return "idle";
+      // No provider status yet: the local FSM covers the gap, since the device
+      // hook dispatches START_DIALING/CONNECT the moment the softphone leg
+      // moves while provider status arrives later via SSE/polling. Without
+      // this the screen sits on "Pending" until the first webhook lands.
+      if (callStateValue === "dialing" || (activeCallValue && !statusValue)) {
+        return "dialing";
+      }
       return "idle";
     },
     [],
   );
 
-  const displayState =
-    predictiveState.status === "dialing"
+  // Predictive campaigns are driven by dialer-room broadcasts; everything else
+  // (power dial) must ignore predictiveState — it initializes to "idle" and
+  // never updates outside predictive mode, so letting it lead pins the screen
+  // on "Pending" forever.
+  const predictiveDisplay = !isPredictive
+    ? null
+    : predictiveState.status === "dialing"
       ? "dialing"
       : predictiveState.status === "connected"
         ? state === "dialing" ? "dialing" : "connected"
@@ -155,11 +169,19 @@ export function useCampaignCallFlow({
           ? "completed"
           : predictiveState.status === "idle"
             ? "idle"
-            : getDisplayState(
-                state,
-                providerStatus ?? recentAttemptDisposition ?? undefined,
-                activeCall as unknown as ActiveCall,
-              );
+            : null;
+
+  // The last attempt's disposition is only a fallback for showing the outcome
+  // of a finished call; while a new call is in flight it is stale data from
+  // the previous one and must not override the live dialing/connected display.
+  const callInFlight = state === "dialing" || state === "connected";
+  const displayStatus =
+    providerStatus ??
+    (callInFlight ? undefined : recentAttemptDisposition ?? undefined);
+
+  const displayState =
+    predictiveDisplay ??
+    getDisplayState(state, displayStatus, activeCall as unknown as ActiveCall);
 
   const displayColor =
     displayState === "failed"
