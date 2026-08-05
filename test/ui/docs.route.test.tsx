@@ -15,6 +15,12 @@ vi.mock("@scalar/api-reference-react/style.css?url", () => ({
   default: "/mock-scalar.css",
 }));
 
+// Hoisted to module scope regardless of where it's written; vitest warns on
+// (and will eventually reject) vi.mock calls nested inside test bodies.
+vi.mock("@/lib/openapi", () => ({
+  openApiSpec: { openapi: "3.0.0", info: { title: "t" } },
+}));
+
 describe("app/routes/docs.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -71,9 +77,6 @@ describe("app/routes/api+/docs/openapi/route.tsx", () => {
   });
 
   test("openapi route still serves spec", async () => {
-    vi.mock("@/lib/openapi", () => ({
-      openApiSpec: { openapi: "3.0.0", info: { title: "t" } },
-    }));
     const mod = await import("../../app/routes/api+/docs/openapi.route");
     const res = await asRouteResponse(mod.loader({ request: new Request("http://x", { method: "GET" }) } as never),
     );
