@@ -446,14 +446,8 @@ describe("worker poll-jobs lifecycle", () => {
       heartbeatIntervalMs: 60_000,
     });
 
-    // Let a few iterations run (no jobs queued, so each iteration is a
-    // quick no-op poll + sleep).
-    await new Promise((resolve) => setTimeout(resolve, 40));
-    controller.abort();
-    await loopPromise;
-
-    const resetCalls = (db.execute as ReturnType<typeof vi.fn>).mock.calls.filter(
-      ([query]) => {
+    const countResetCalls = () =>
+      (db.execute as ReturnType<typeof vi.fn>).mock.calls.filter(([query]) => {
         const chunks = (query as any).queryChunks as Array<{
           constructor: { name: string };
           value: unknown;
@@ -468,11 +462,18 @@ describe("worker poll-jobs lifecycle", () => {
           str.includes("WHERE status = 'running'") &&
           str.includes("claimed_until < now()")
         );
-      },
-    );
+      }).length;
 
-    // One reset before the loop starts, plus at least one per iteration.
-    expect(resetCalls.length).toBeGreaterThan(1);
+    // Wait until at least one loop iteration has reset stale claims (beyond
+    // the boot-time reset) instead of sleeping a fixed 40ms — a loaded CI
+    // worker can starve the loop past any fixed budget.
+    await vi.waitFor(
+      // One reset before the loop starts, plus at least one per iteration.
+      () => expect(countResetCalls()).toBeGreaterThan(1),
+      { timeout: 5000, interval: 10 },
+    );
+    controller.abort();
+    await loopPromise;
   });
   /**
    * A job that kills the worker process never reaches failJob, so it is never

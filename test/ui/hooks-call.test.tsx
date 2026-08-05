@@ -31,6 +31,10 @@ describe("call hooks", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    // Restore real timers here rather than at the end of each fake-timer
+    // test body: a mid-test assertion failure would otherwise skip the
+    // restore and leak fake timers into every later test in the file.
+    vi.useRealTimers();
   });
 
   test("useCallState state machine and timer", async () => {
@@ -49,7 +53,6 @@ describe("call hooks", () => {
     act(() => result.current.send({ type: "FAIL" }));
     act(() => result.current.send({ type: "START_DIALING" }));
     act(() => result.current.send({ type: "NEXT" }));
-    vi.useRealTimers();
   });
 
   test("useCallDuration tracks connected state", async () => {
@@ -65,7 +68,6 @@ describe("call hooks", () => {
     expect(result.current.callDuration).toBeGreaterThan(0);
     rerender({ state: "idle" });
     expect(result.current.callDuration).toBe(0);
-    vi.useRealTimers();
   });
 
   test("useCallStatusPolling polls when enabled", async () => {
@@ -82,10 +84,13 @@ describe("call hooks", () => {
       }),
     );
 
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 150));
-    });
-    expect(onStatus).toHaveBeenCalledWith("in-progress");
+    // Poll-until rather than a fixed sleep: a 150ms wait on a 100ms interval
+    // left a 50ms scheduling margin, which is exactly the kind of budget a
+    // loaded fork-pool CI worker blows through.
+    await vi.waitFor(
+      () => expect(onStatus).toHaveBeenCalledWith("in-progress"),
+      { timeout: 2000 },
+    );
   });
 
   test("useStartConferenceAndDial begin paths", async () => {
