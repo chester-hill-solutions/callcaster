@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**112** documented / **112** total effects (0 grandfathered, ratcheting to 0).
+**113** documented / **113** total effects (0 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -60,7 +60,8 @@
 | `app/hooks/call/useSoftphoneAudioDevices.ts` | When a call becomes active (or the selected mic/speaker changes | activeCall, device, selectedMicId, selectedSpeakerId (reacts | dom (imperative Device.audio.setInputDevice / | Imperative SDK/audio-hardware binding tied to an |
 | `app/hooks/call/useSoftphoneController.ts` | Mirror the latest `callHandling.receiveIncoming` handler into a ref | callHandling.receiveIncoming (only re-syncs the ref when the | none (plain ref assignment) | Not data fetching; this is the "latest ref" pattern |
 | `app/hooks/call/useSoftphoneController.ts` | On unmount (e.g. navigating away from the softphone), hang up any | [] — intentionally mount-once, cleanup-only; reads activeCall/ | fetch (hangUp() calls the Twilio hangup API) + dom/sdk | Imperative SDK teardown tied to component unmount, |
-| `app/hooks/call/useTwilioConnection.ts` | Create and register a Twilio Voice SDK `Device` for the given auth | token, deviceOptions (a new/changed token or device options | subscription (Twilio Device event listeners) + network | Establishes and tears down a stateful, imperative |
+| `app/hooks/call/useTwilioConnection.ts` | Ensure a Twilio Voice SDK `Device` exists and carries the current | token, deviceOptions (a token change is applied via | subscription (Twilio Device event listeners) + network | Establishes a stateful, imperative WebRTC device |
+| `app/hooks/call/useTwilioConnection.ts` | Tear the Device down on unmount only: detach listeners and | [] — mount-once, cleanup-only; reads live values via refs. | subscription cleanup + network (device.destroy()). | Imperative SDK teardown tied to component unmount. |
 | `app/hooks/call/useTwilioDevice.ts` | Mirror the latest `callHandling.receiveIncoming` handler into a | callHandling.receiveIncoming (only re-syncs the ref when the | none (plain ref assignment) | Not data fetching; "latest ref" pattern to avoid |
 | `app/hooks/call/useTwilioDevice.ts` | Hang up the active call and disconnect the Twilio device when | [] — mount-once cleanup-only; reads latest values via refs | hung up / disconnecting SDK calls + device | Teardown of imperative SDK resources on unmount. |
 | `app/hooks/chats/useChatThread.ts` | CANDIDATE-REMOVE: mirror the loader's initialHasMore into local hasMoreOlder state every time the thread's loader data changes (e.g. switching contact_number). | initialHasMore (loader value for the freshly-loaded thread) | none (setState only) | This copies loader data into state after a render — the "reset state when a prop changes" pattern the effects guide recommends avoiding (e.g. via a `key` remount or reading useLoaderData directly). It's an effect today because hasMoreOlder is also mutated later by the older-messages fetcher merge, and this route doesn't remount per contact_number. |

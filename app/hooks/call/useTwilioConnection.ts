@@ -38,8 +38,12 @@ export function useTwilioConnection({
   onDeviceBusyChange,
 }: UseTwilioConnectionOptions): UseTwilioConnectionReturn {
   const deviceRef = useRef<Device | null>(null);
+  const [device, setDevice] = useState<Device | null>(null);
   const [status, setStatus] = useState<string>("disconnected");
   const [error, setError] = useState<Error | null>(null);
+  const tokenRef = useRef(token);
+  const listenerCleanupsRef = useRef<Array<() => void>>([]);
+  const unmountedRef = useRef(false);
 
   const onIncomingCallRef = useRef(onIncomingCall);
   const onStatusChangeRef = useRef(onStatusChange);
@@ -53,21 +57,25 @@ export function useTwilioConnection({
   onDeviceBusyChangeRef.current = onDeviceBusyChange;
 
   /**
-   * @effect Create and register a Twilio Voice SDK `Device` for the given auth
-   * token, lazily loading the SDK, and wire all device-level lifecycle events
-   * (registered/unregistered/connecting/connected/disconnected/cancel/error/
-   * incoming) to the latest caller-supplied callbacks.
-   * @effect-deps token, deviceOptions (a new/changed token or device options
-   * means a new Device must be created and registered; callback props are read
-   * via refs so they don't need to be deps and don't retrigger setup)
+   * @effect Ensure a Twilio Voice SDK `Device` exists and carries the current
+   * auth token. The Device is created ONCE for the component's lifetime;
+   * subsequent token changes are applied in place via `device.updateToken()`.
+   * Rebuilding on every new token string tore the phone down mid-call, because
+   * the call-screen loader re-mints the JWT on every revalidation (every
+   * fetcher submit: script auto-save, dial, audiodrop, queue ops).
+   * @effect-deps token, deviceOptions (a token change is applied via
+   * updateToken on the existing device, or triggers first-time creation;
+   * callback props are read via refs so they don't retrigger setup)
    * @effect-side-effects subscription (Twilio Device event listeners) + network
-   * (lazy SDK import, device.register()/unregister()); all listeners detached
-   * and the device unregistered in the cleanup function.
-   * @effect-why-not-loader Establishes and tears down a stateful, imperative
-   * WebRTC device registration with the Twilio SDK that must persist for the
-   * component's lifetime; it isn't a request/response data fetch.
+   * (lazy SDK import, device.register()/updateToken()); teardown lives in the
+   * separate unmount-only effect below, NOT in this effect's cleanup — pairing
+   * teardown with this effect is exactly what caused the rebuild storm.
+   * @effect-why-not-loader Establishes a stateful, imperative WebRTC device
+   * registration with the Twilio SDK that must persist for the component's
+   * lifetime; it isn't a request/response data fetch.
    */
   useEffect(() => {
+    tokenRef.current = token;
     if (!token) {
       logger.error("No token provided");
       setError(new Error("No token provided"));
@@ -77,18 +85,25 @@ export function useTwilioConnection({
 
     if (typeof window === "undefined") return;
 
-    let cancelled = false;
-    let device: Device | null = null;
-    let listenerCleanups: Array<() => void> = [];
+    const existing = deviceRef.current;
+    if (existing) {
+      try {
+        existing.updateToken(token);
+      } catch (err) {
+        logger.error("Failed to update Twilio device token:", err);
+      }
+      return;
+    }
 
     const setupDevice = async () => {
       // Load the Twilio Voice SDK lazily so it isn't bundled into routes
       // that merely render call UI but never actually connect a call.
       const { Device: TwilioDevice } = await import("@twilio/voice-sdk");
-      if (cancelled) return;
+      if (unmountedRef.current || deviceRef.current) return;
 
-      device = new TwilioDevice(token, deviceOptions ?? undefined);
+      const device = new TwilioDevice(tokenRef.current, deviceOptions ?? undefined);
       deviceRef.current = device;
+      setDevice(device);
 
       const handleRegistered = () => {
         setStatus("Registered");
@@ -139,7 +154,7 @@ export function useTwilioConnection({
         onIncomingCallRef.current?.(call as Call);
       };
 
-      listenerCleanups = [
+      listenerCleanupsRef.current = [
         attachTwilioListener(device, "registered", handleRegistered),
         attachTwilioListener(device, "unregistered", handleUnregistered),
         attachTwilioListener(device, "connecting", handleConnecting),
@@ -168,7 +183,7 @@ export function useTwilioConnection({
     };
 
     setupDevice().catch((err: unknown) => {
-      if (cancelled) return;
+      if (unmountedRef.current) return;
       const error =
         err instanceof Error ? err : new Error("Failed to load Twilio Voice SDK");
       logger.error("Failed to load Twilio Voice SDK:", error);
@@ -177,21 +192,37 @@ export function useTwilioConnection({
       onErrorRef.current?.(error);
       onCallStateChangeRef.current?.("failed");
     });
-
-    return () => {
-      cancelled = true;
-      if (device && device.state === "registered") {
-        device.unregister().catch((err: Error) =>
-          logger.error("Error unregistering device:", err),
-        );
-      }
-      listenerCleanups.forEach((cleanup) => cleanup());
-      deviceRef.current = null;
-    };
   }, [token, deviceOptions]);
 
+  /**
+   * @effect Tear the Device down on unmount only: detach listeners and
+   * `destroy()` it. destroy() (not just unregister()) closes the signalling
+   * socket — the old unregister-only teardown leaked one socket per rebuild
+   * over a shift.
+   * @effect-deps [] — mount-once, cleanup-only; reads live values via refs.
+   * @effect-side-effects subscription cleanup + network (device.destroy()).
+   * @effect-why-not-loader Imperative SDK teardown tied to component unmount.
+   */
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      listenerCleanupsRef.current.forEach((cleanup) => cleanup());
+      listenerCleanupsRef.current = [];
+      const device = deviceRef.current;
+      deviceRef.current = null;
+      if (device) {
+        try {
+          device.destroy();
+        } catch (err) {
+          logger.error("Error destroying Twilio device:", err);
+        }
+      }
+    };
+  }, []);
+
   return {
-    device: deviceRef.current,
+    device,
     status,
     error,
     isRegistered: status === "Registered" || status === "Connected",
