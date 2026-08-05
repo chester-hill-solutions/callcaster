@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { logger } from "@/lib/logger.client";
+import { toDialerStatus } from "@/lib/call-status";
 import { parseWorkspaceEventData } from "@/lib/workspace-events.shared";
 
 const PRESENCE_UPDATE_INTERVAL = 5 * 60 * 1000;
@@ -106,7 +107,13 @@ const useCallRoom = ({
       try {
         const record = parseWorkspaceEventData(message.data);
         if (record.event_type === "predictive_broadcast") {
-          setPredictiveState(record.payload as unknown as PredictiveState);
+          const payload = record.payload as unknown as PredictiveState;
+          // Broadcasts carry raw Twilio statuses (see runCallStatusSideEffects);
+          // translate them to the dialer vocabulary the consumers switch on.
+          setPredictiveState({
+            contact_id: payload.contact_id ?? null,
+            status: toDialerStatus(String(payload.status ?? "")),
+          });
           return;
         }
         if (record.event_type === "presence_sync") {

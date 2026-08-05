@@ -5,6 +5,7 @@ import {
   isActiveStatus,
   isTerminalStatus,
   normalizeProviderStatus,
+  toDialerStatus,
 } from "../app/lib/call-status";
 
 describe("call-status", () => {
@@ -40,6 +41,27 @@ describe("call-status", () => {
     expect(isActiveStatus("initiated")).toBe(true);
     expect(isActiveStatus("in-progress")).toBe(true);
     expect(isActiveStatus("completed")).toBe(false);
+  });
+
+  test("toDialerStatus maps raw provider statuses to the dialer vocabulary", () => {
+    expect(toDialerStatus("initiated")).toBe("dialing");
+    expect(toDialerStatus("queued")).toBe("dialing");
+    expect(toDialerStatus("ringing")).toBe("dialing");
+    expect(toDialerStatus("in-progress")).toBe("connected");
+    expect(toDialerStatus("IN-PROGRESS")).toBe("connected");
+    expect(toDialerStatus("completed")).toBe("completed");
+    expect(toDialerStatus("canceled")).toBe("completed");
+    expect(toDialerStatus("busy")).toBe("failed");
+    expect(toDialerStatus("failed")).toBe("failed");
+    expect(toDialerStatus("no-answer")).toBe("no-answer");
+  });
+
+  test("toDialerStatus passes dialer vocabulary and unknown values through", () => {
+    expect(toDialerStatus("idle")).toBe("idle");
+    expect(toDialerStatus("dialing")).toBe("dialing");
+    expect(toDialerStatus("connected")).toBe("connected");
+    expect(toDialerStatus("")).toBe("");
+    expect(toDialerStatus("voicemail")).toBe("voicemail");
   });
 });
 

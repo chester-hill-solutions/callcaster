@@ -167,9 +167,13 @@ export function useCampaignCallFlow({
         ? state === "dialing" ? "dialing" : "connected"
         : predictiveState.status === "completed"
           ? "completed"
-          : predictiveState.status === "idle"
-            ? "idle"
-            : null;
+          : predictiveState.status === "failed"
+            ? "failed"
+            : predictiveState.status === "no-answer"
+              ? "no-answer"
+              : predictiveState.status === "idle"
+                ? "idle"
+                : null;
 
   // The last attempt's disposition is only a fallback for showing the outcome
   // of a finished call; while a new call is in flight it is stale data from

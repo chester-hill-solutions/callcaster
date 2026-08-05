@@ -119,6 +119,18 @@ describe("useCampaignCallFlow displayState", () => {
       expect(result.current.displayState).toBe("dialing");
     });
 
+    test.each([
+      ["completed", "completed"],
+      ["failed", "failed"],
+      ["no-answer", "no-answer"],
+    ])("dialer outcome %s shows %s", (status, expected) => {
+      const { result } = renderFlow({
+        isPredictive: true,
+        predictiveState: { contact_id: 7, status },
+      });
+      expect(result.current.displayState).toBe(expected);
+    });
+
     test("raw provider broadcast statuses fall through to the FSM/provider path", () => {
       const { result } = renderFlow({
         isPredictive: true,
