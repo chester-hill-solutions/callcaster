@@ -247,6 +247,16 @@ const handleParticipantJoin = async (
       if (!dbCall.campaign_id) {
         throw new Error("Missing campaign_id for participant join");
       }
+      // Replayed join callbacks must not restamp answered_at — it feeds
+      // answer-time metrics, and each redelivery was overwriting it with
+      // the replay's clock instead of the actual answer moment.
+      const existingAttempt = await findOutreachAttemptById(
+        workspaceId,
+        dbCall.outreach_attempt_id,
+      );
+      if (existingAttempt && (existingAttempt as { answered_at?: string | null }).answered_at) {
+        return;
+      }
       const outreachStatus = resolveOutreachUpdate(
         await updateOutreachAttempt(
           `${dbCall.outreach_attempt_id}`,
@@ -331,6 +341,22 @@ export const action = defineAction({
       case "busy":
       case "no-answer":
       case "completed":
+        // Replay guard: the first successful delivery writes this status onto
+        // the call row (inside processCallStatusWebhook). A Twilio retry or
+        // duplicate delivery of the SAME terminal status must ack, not
+        // re-process — without this, every replay re-dequeued the contact and
+        // triggerAutoDialer placed a NEW outbound call, and a handler error
+        // (500 → Twilio retries forever) turned that into a dial loop.
+        if (
+          typeof dbCall.status === "string" &&
+          dbCall.status.toLowerCase() === callStatusValue.toLowerCase()
+        ) {
+          logger.info("auto-dial status: terminal status already applied; acking replay", {
+            callSid: callSidValue,
+            status: callStatusValue,
+          });
+          return routeData({ success: true, replay: true });
+        }
         await handleCallStatus(
           parsedBody,
           dbCall,

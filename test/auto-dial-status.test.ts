@@ -266,6 +266,7 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
       callUpdateError,
       campaignType: args?.campaignType,
       outreachDisposition: args?.outreachDisposition,
+      outreachAnsweredAt: (args as any)?.outreachAnsweredAt,
       outreachFetchError,
       outreachUpdateError,
       outreachUpdateThrows,
@@ -816,6 +817,106 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
+  });
+
+  test("replayed terminal status acks without re-dequeuing or re-dialing", async () => {
+    twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA_REPLAY",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: 1,
+        campaign_id: 1,
+        // First delivery already wrote the terminal status onto the row.
+        status: "busy",
+      },
+    } as any);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_REPLAY");
+    fd.set("CallStatus", "busy");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "1");
+    fd.set("CallDuration", "1");
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ success: true, replay: true });
+    // The dangerous side effects must not run again: no re-dequeue, no new
+    // outbound call, no billing.
+    expect(rpcDequeueContactMock).not.toHaveBeenCalled();
+    expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
+    expect(postgresStub._transactionRows.length).toBe(0);
+  });
+
+  test("a different terminal status for the same call still processes", async () => {
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA_PROGRESS",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: 1,
+        campaign_id: 1,
+        status: "ringing",
+      },
+    } as any);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_PROGRESS");
+    fd.set("CallStatus", "completed");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "10");
+    fd.set("CallDuration", "10");
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(rpcDequeueContactMock).toHaveBeenCalled();
+  });
+
+  test("replayed participant-join does not restamp answered_at", async () => {
+    postgresStub = await usePostgresStub({
+      outreachAnsweredAt: "2026-08-05T00:00:00.000Z",
+      dbCall: {
+        sid: "CA1",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: 1,
+        campaign_id: 1,
+      },
+    } as any);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "ringing");
+    fd.set("StatusCallbackEvent", "participant-join");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("ConferenceSid", "conf1");
+    fd.set("FriendlyName", "in-progress");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
   });
 
   // Predictive contact calls send status callbacks only to this route (see

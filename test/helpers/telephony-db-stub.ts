@@ -12,6 +12,7 @@ export type TelephonyStubConfig = {
   }>;
   campaignType?: string | null;
   outreachDisposition?: string;
+  outreachAnsweredAt?: string | null;
   outreachFetchError?: Error | null;
   outreachUpdateError?: Error | null;
   outreachUpdateThrows?: unknown;
@@ -96,6 +97,9 @@ function applyTelephonyMockImplementations() {
     return {
       disposition: cfg.outreachDisposition ?? "in-progress",
       contact_id: 1,
+      ...(cfg.outreachAnsweredAt !== undefined
+        ? { answered_at: cfg.outreachAnsweredAt }
+        : {}),
     };
   });
 
