@@ -6,6 +6,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ContactForm } from "@/components/contact/ContactForm";
+import { useSubmit } from "react-router";
 import { useState } from "react";
 import { Contact } from "@/lib/types";
 
@@ -58,8 +59,12 @@ const ChatAddContactDialog = ({
       [e.target.name]: e.target.value,
     }));
   };
+  const submit = useSubmit();
   const handleSaveContact = (e: React.FormEvent) => {
     e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
+    const formData = new FormData(form);
+    submit(formData, { method: "POST", action: "/api/contacts", navigate: false });
     setDialog(false);
   };
   return (
