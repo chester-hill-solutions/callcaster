@@ -1,5 +1,5 @@
 import { data as routeData } from "react-router";
-import { updateContact } from "@/lib/database/contact.server";
+import { findContactsByPhone, updateContact } from "@/lib/database/contact.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
 import { createTenantDb } from "@/server/tenant-db";
@@ -72,6 +72,17 @@ export const action = defineAction({
     const tdb = createTenantDb(workspace_id);
 
     if (selected_id === "new") {
+      let duplicateWarning: string | undefined;
+      if (normalizedPhone) {
+        const existing = await findContactsByPhone(workspace_id, normalizedPhone, tdb);
+        if (existing.length > 0) {
+          const names = existing.map(
+            (c) => [c.firstname, c.surname].filter(Boolean).join(" ") || `id: ${c.id}`,
+          );
+          duplicateWarning = `A contact with phone ${normalizedPhone} already exists: ${names.join(", ")}`;
+        }
+      }
+
       const { workspace: _workspace, id: _id, ...insertValues } = contactData;
       const [newContact] = await tdb.contact.insert(insertValues);
 
@@ -79,7 +90,11 @@ export const action = defineAction({
         throw new Error("Failed to create contact");
       }
 
-      return routeData({ success: true, contact: newContact });
+      return routeData({
+        success: true,
+        contact: newContact,
+        ...(duplicateWarning ? { warning: duplicateWarning } : {}),
+      });
     }
 
     const contactId = Number(selected_id);
