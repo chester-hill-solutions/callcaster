@@ -76,6 +76,21 @@ vi.mock("@/lib/auto-dial.server", () => ({
   runAutoDialerTurn: (...args: unknown[]) => runAutoDialerTurnMock(...args),
 }));
 
+const emitPredictiveBroadcastMock = vi.hoisted(() => vi.fn(async () => null));
+// Several modules in this route's graph (twilio-call-status, campaign-queue-db,
+// transaction-history, …) also import from workspace-events.server, so keep
+// every other export intact and stub only what this suite asserts on.
+vi.mock("@/lib/workspace-events.server", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/lib/workspace-events.server")
+  >();
+  return {
+    ...actual,
+    emitPredictiveBroadcast: (...args: unknown[]) =>
+      emitPredictiveBroadcastMock(...(args as [unknown, unknown])),
+  };
+});
+
 const twilioClientMock = {
   conferences: Object.assign(
     (sid: string) => ({
@@ -330,6 +345,8 @@ describe("api.auto-dial.status", () => {
     rpcDequeueContactMock.mockImplementation(async () => {});
     runAutoDialerTurnMock.mockReset();
     runAutoDialerTurnMock.mockResolvedValue({ success: true });
+    emitPredictiveBroadcastMock.mockReset();
+    emitPredictiveBroadcastMock.mockResolvedValue(null);
   });
 
   test("rejects invalid Twilio signature", async () => {
@@ -799,6 +816,82 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
+  });
+
+  // Predictive contact calls send status callbacks only to this route (see
+  // statusCallback in app/lib/auto-dial.server.ts), so it must emit the
+  // predictive_broadcast events the agent call screen subscribes to — the
+  // generic /api/call-status side-effects job never runs for these calls.
+  test("emits predictive_broadcast for contact-leg progress statuses", async () => {
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "ringing");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(emitPredictiveBroadcastMock).toHaveBeenCalledWith("w1", {
+      contact_id: 1,
+      status: "ringing",
+    });
+  });
+
+  test("emits predictive_broadcast for terminal statuses before dequeue handling", async () => {
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "completed");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "1");
+    fd.set("CallDuration", "1");
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(emitPredictiveBroadcastMock).toHaveBeenCalledWith("w1", {
+      contact_id: 1,
+      status: "completed",
+    });
+  });
+
+  test("does not emit predictive_broadcast for calls without a contact (agent leg)", async () => {
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA_AGENT",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: null,
+        campaign_id: 1,
+      },
+    } as any);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_AGENT");
+    fd.set("CallStatus", "in-progress");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(emitPredictiveBroadcastMock).not.toHaveBeenCalled();
   });
 
   test("CallStatus failed is handled", async () => {

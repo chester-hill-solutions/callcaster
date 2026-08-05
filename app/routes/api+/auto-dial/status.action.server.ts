@@ -23,6 +23,7 @@ import {
 } from "@/lib/telephony-db.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { defineAction } from "@/lib/handler.server";
+import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
 
 type TwilioClient = Twilio.Twilio;
 
@@ -312,6 +313,19 @@ export const action = defineAction({
     });
     const callStatusValue =
       typeof underCase.call_status === "string" ? underCase.call_status : "";
+
+    // Predictive contact calls send their status callbacks HERE, not to
+    // /api/call-status — so this route is the only place that can push
+    // dialer-room state (predictive_broadcast) to waiting agents. Emit for
+    // contact legs on every status update, before the heavier handling below,
+    // so agents see dialing/connected/outcome even if that handling errors.
+    // Best-effort by design: emitPredictiveBroadcast never throws.
+    if (dbCall.contact_id && callStatusValue) {
+      await emitPredictiveBroadcast(requireValue(dbCall.workspace, "workspace"), {
+        contact_id: dbCall.contact_id,
+        status: callStatusValue.toLowerCase(),
+      });
+    }
     switch (callStatusValue) {
       case "failed":
       case "busy":
