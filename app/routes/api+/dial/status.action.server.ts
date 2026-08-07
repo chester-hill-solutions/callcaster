@@ -32,10 +32,14 @@ export const action = defineAction({
     const answeredBy = typeof answeredByValue === "string" ? answeredByValue : null;
     const callStatus = typeof callStatusValue === "string" ? callStatusValue : null;
 
-    if (callSid) {
-      const forbidden = await requireTwilioSignature(request, { callSid, params });
-      if (forbidden) return forbidden;
-    }
+    // Validate the Twilio signature unconditionally (fail closed). Previously
+    // this ran only when CallSid was present, so a request without CallSid
+    // skipped the webhook auth boundary entirely.
+    const forbidden = await requireTwilioSignature(request, {
+      callSid: callSid ?? undefined,
+      params,
+    });
+    if (forbidden) return forbidden;
 
     return { callSid, answeredBy, callStatus };
   },

@@ -250,6 +250,16 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     await expect(res.json()).resolves.toMatchObject({ success: false });
   });
 
+  test("validates the Twilio signature even when CallSid is absent (fail closed)", async () => {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(
+      new Response("forbidden", { status: 403 }),
+    );
+    const mod = await import("../app/routes/api+/dial/status.route");
+    const res = await asRouteResponse(mod.action({ request: makeReq({}) } as any));
+    expect(res.status).toBe(403);
+    expect(mocks.requireTwilioSignature).toHaveBeenCalled();
+  });
+
   test("callStatus missing covers null branch; callError/campaignError/voicemailError bubble to outer catch (Error message)", async () => {
     const { client, twilio } = makeDbClient();
     client._set.callError(new Error("call"));
