@@ -141,8 +141,6 @@ describe("app/routes/api+/call/route.tsx", () => {
         callerId: "+15551234567",
         record: "record-from-answer",
         recordingStatusCallback: "https://base.example/api/recording",
-        transcribe: true,
-        transcribeCallback: "https://base.example/api/transcribe",
       }),
     );
     expect(twilioMocks.dialNumber).toHaveBeenCalledWith("+15555550100");

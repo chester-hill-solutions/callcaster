@@ -102,8 +102,6 @@ export const action = defineAction({
       record: "record-from-answer",
       recordingStatusCallback: `${baseUrl}/api/recording`,
       recordingStatusCallbackEvent: ["completed"],
-      transcribe: true,
-      transcribeCallback: `${baseUrl}/api/transcribe`,
     } as Record<string, unknown>);
     dial.number(
       {
@@ -126,8 +124,6 @@ export const action = defineAction({
       record: "record-from-answer",
       recordingStatusCallback: `${baseUrl}/api/recording`,
       recordingStatusCallbackEvent: ["completed"],
-      transcribe: true,
-      transcribeCallback: `${baseUrl}/api/transcribe`,
     } as Record<string, unknown>);
     dial.number(toNumber);
   } else {
