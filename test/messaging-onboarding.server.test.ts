@@ -268,7 +268,7 @@ describe("messaging onboarding helpers", () => {
       "bad" as any,
     );
 
-    expect(fromNull.currentStep).toBe("business_identity");
+    expect(fromNull.currentStep).toBe("path_selection");
     expect(fromPrimitive.selectedChannels).toEqual([]);
   });
 
@@ -345,7 +345,7 @@ describe("messaging onboarding helpers", () => {
     const loaded = await getWorkspaceMessagingOnboardingState({
       workspaceId: "w1",
     });
-    expect(loaded.currentStep).toBe("business_identity");
+    expect(loaded.currentStep).toBe("path_selection");
 
     const updated = await updateWorkspaceMessagingOnboardingState({
       workspaceId: "w1",
