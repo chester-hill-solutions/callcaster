@@ -76,9 +76,13 @@ export async function listAudienceContactsForExport(
 }
 
 export async function listAudienceContactsJson(
+  workspaceId: string,
   audienceId?: number,
 ): Promise<AudienceContactExportRow[]> {
-  const filters: SQL[] = [];
+  // Always scope to the workspace. Without this, an omitted audienceId left the
+  // WHERE empty and dumped every tenant's audience-linked contacts (PII) to any
+  // authenticated caller with access to a single workspace.
+  const filters: SQL[] = [eq(contactTable.workspace, workspaceId)];
   if (audienceId != null) {
     filters.push(eq(contactAudienceTable.audience_id, audienceId));
   }
@@ -90,7 +94,7 @@ export async function listAudienceContactsJson(
     })
     .from(contactAudienceTable)
     .innerJoin(contactTable, eq(contactAudienceTable.contact_id, contactTable.id))
-    .where(filters.length > 0 ? and(...filters) : undefined);
+    .where(and(...filters));
 
   return rows.map(({ link, contact }) => ({
     ...link,
