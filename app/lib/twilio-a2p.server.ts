@@ -10,7 +10,7 @@ import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import {
   loadWorkspaceTwilioData,
-  persistWorkspaceTwilioData,
+  mergeWorkspaceTwilioData,
 } from "@/lib/merge-workspace-twilio-data.server";
 import type {
   TwilioAccountData,
@@ -37,18 +37,18 @@ async function loadWorkspaceTwilioContext(
 
 async function persistOnboardingState({
   workspaceId,
-  twilioData,
   onboarding,
 }: {
   null?: never | null;
   workspaceId: string;
-  twilioData: TwilioAccountData;
   onboarding: WorkspaceMessagingOnboardingState;
 }) {
-  await persistWorkspaceTwilioData(workspaceId, {
-    ...(twilioData as Record<string, unknown>),
+  // Atomic merge over the fresh locked row so a concurrent writer's top-level
+  // keys (brandSid/campaignSid/…) are preserved rather than clobbered.
+  await mergeWorkspaceTwilioData(workspaceId, (current) => ({
+    ...current,
     onboarding,
-  });
+  }));
 }
 
 export function buildA2pBlockingIssues(onboarding: WorkspaceMessagingOnboardingState) {
@@ -83,7 +83,7 @@ export async function provisionWorkspaceA2P({
     );
   }
 
-  const { twilioData, onboarding, twilio } = await loadWorkspaceTwilioContext(workspaceId,
+  const { onboarding, twilio } = await loadWorkspaceTwilioContext(workspaceId,
   );
 
   const blockingIssues = buildA2pBlockingIssues(onboarding);
@@ -105,7 +105,6 @@ export async function provisionWorkspaceA2P({
     });
     await persistOnboardingState({
       workspaceId,
-      twilioData,
       onboarding: blockedState,
     });
     return blockedState;
@@ -190,7 +189,6 @@ export async function provisionWorkspaceA2P({
 
   await persistOnboardingState({
     workspaceId,
-    twilioData,
     onboarding: nextOnboarding,
   });
 
@@ -202,7 +200,7 @@ export async function syncWorkspaceA2PStatus({
 }: {
   workspaceId: string;
 }) {
-  const { twilioData, onboarding } = await loadWorkspaceTwilioContext(workspaceId,
+  const { onboarding } = await loadWorkspaceTwilioContext(workspaceId,
   );
 
   const nextOnboarding = mergeWorkspaceMessagingOnboardingState(onboarding, {
@@ -214,7 +212,6 @@ export async function syncWorkspaceA2PStatus({
 
   await persistOnboardingState({
     workspaceId,
-    twilioData,
     onboarding: nextOnboarding,
   });
 
