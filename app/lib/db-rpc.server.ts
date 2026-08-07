@@ -191,6 +191,7 @@ export async function rpcDequeueContact(
   executor: RpcExecutor,
   args: {
     contactId: number;
+    workspaceId: string;
     groupOnHousehold: boolean;
     dequeuedById?: string | null;
     dequeuedReasonText?: string | null;
@@ -201,13 +202,23 @@ export async function rpcDequeueContact(
     const [sourceContact] = await db
       .select({ household_id: contactTable.household_id })
       .from(contactTable)
-      .where(eq(contactTable.id, args.contactId))
+      .where(
+        and(
+          eq(contactTable.id, args.contactId),
+          eq(contactTable.workspace, args.workspaceId),
+        ),
+      )
       .limit(1);
     if (sourceContact?.household_id != null) {
       const householdContacts = await db
         .select({ id: contactTable.id })
         .from(contactTable)
-        .where(eq(contactTable.household_id, sourceContact.household_id));
+        .where(
+          and(
+            eq(contactTable.household_id, sourceContact.household_id),
+            eq(contactTable.workspace, args.workspaceId),
+          ),
+        );
       for (const row of householdContacts) {
         contactIds.add(row.id);
       }
@@ -220,6 +231,7 @@ export async function rpcDequeueContact(
     .where(
       and(
         inArray(campaignQueueTable.contact_id, [...contactIds]),
+        eq(campaignQueueTable.workspace, args.workspaceId),
         isNull(campaignQueueTable.dequeued_at),
         or(
           isNull(campaignQueueTable.queue_state),
@@ -233,6 +245,7 @@ export async function rpcDequeueContact(
     sql`select dequeue_contact(
       ${args.contactId}::bigint,
       ${args.groupOnHousehold},
+      ${args.workspaceId}::uuid,
       ${args.dequeuedById ?? null}::uuid,
       ${args.dequeuedReasonText ?? null}
     )`,

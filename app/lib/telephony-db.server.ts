@@ -301,12 +301,18 @@ export async function findCampaignTypeByCampaignId(
 }
 
 export async function findCallSidByParentCallSid(
+  workspaceId: string,
   parentCallSid: string,
 ): Promise<string | null> {
   const rows = await db
     .select({ sid: callTable.sid })
     .from(callTable)
-    .where(eq(callTable.parent_call_sid, parentCallSid))
+    .where(
+      and(
+        eq(callTable.parent_call_sid, parentCallSid),
+        eq(callTable.workspace, workspaceId),
+      ),
+    )
     .limit(1);
   return rows[0]?.sid ?? null;
 }

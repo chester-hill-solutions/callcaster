@@ -2,7 +2,10 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
-import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import {
+    requireTwilioSignature,
+    twilioWebhookForbiddenHangup,
+} from "@/lib/twilio-webhook.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { defineAction } from "@/lib/handler.server";
 import Twilio from 'twilio';
@@ -23,7 +26,12 @@ export const action = defineAction({
     auth: async ({ request }) => {
         const formData = await request.clone().formData();
         const callSid = String(formData.get("CallSid") ?? "");
-        const forbidden = await requireTwilioSignature(request, callSid ? { callSid } : {});
+        // Twilio always supplies CallSid when fetching a call's TwiML action
+        // URL. Omitting the option here (rather than requiring it) would
+        // silently downgrade validation to the main-account token instead of
+        // this call's workspace token — fail closed instead.
+        if (!callSid) return twilioWebhookForbiddenHangup();
+        const forbidden = await requireTwilioSignature(request, { callSid });
         return forbidden ?? null;
     },
     sideEffects: ["twilio"],

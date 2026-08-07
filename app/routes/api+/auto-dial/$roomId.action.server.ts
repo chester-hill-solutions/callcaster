@@ -69,6 +69,7 @@ const dequeueContact = async (
         const tdb = createTenantDb(workspace);
         return await rpcDequeueContact(tdb, {
             contactId: Number(contactId),
+            workspaceId: workspace,
             groupOnHousehold,
             dequeuedById: userId,
             dequeuedReasonText: "Auto-dial completed",
