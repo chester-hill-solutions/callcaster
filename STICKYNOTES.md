@@ -30,4 +30,5 @@ short — one or two lines. Prune entries that are confirmed stale/fixed.
 - [2026-08-06] The repo's top recurring bug class is a hand-maintained list (allowlist, route table, migration manifest, etc.) drifting from reality — when something 'should work' but doesn't, find the list before suspecting app logic.
 - [2026-08-06] Test/demo data must use bland, neutral professional names — never cute or joke names.
 - [2026-08-06] master is GitHub's designated default branch, not dev — a PR's 'Closes #NNNN' only auto-fires on merge to the actual default branch, so merging a PR into dev leaves the linked issue open even though the fix landed. Comment noting the merge instead of assuming auto-close.
+- [2026-08-07] The Railway CLI (railway command) is pre-authenticated locally even when the Railway MCP server itself requires interactive OAuth — use 'railway logs <deploymentId> --service <id> --environment <id> --build/--deployment' to pull real deploy/build logs when a PR's Railway check goes red, instead of guessing from memory. Redeploy/mutating commands are still classifier-blocked without explicit user authorization.
 
