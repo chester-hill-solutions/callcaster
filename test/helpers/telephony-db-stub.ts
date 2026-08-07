@@ -62,6 +62,7 @@ export const telephonyDbMocks = {
   insertCallForWorkspace: vi.fn(),
   findCampaignTypeByCampaignId: vi.fn(),
   upsertCallBySid: vi.fn(),
+  claimTerminalCallStatus: vi.fn(),
 };
 
 function applyTelephonyMockImplementations() {
@@ -88,6 +89,19 @@ function applyTelephonyMockImplementations() {
       telephonyStubState.callUpdateCalls.push({ workspaceId, sid, patch });
       if (cfg.callUpdateError) throw cfg.callUpdateError;
       return { ...defaultCallRow, ...(cfg.callRow ?? {}), sid, ...patch };
+    },
+  );
+
+  // Mirror the real compare-and-set: the claim wins unless the row is already at
+  // this terminal status (a replay / concurrent duplicate loses).
+  telephonyDbMocks.claimTerminalCallStatus.mockImplementation(
+    async (_workspaceId: string, _sid: string, terminalStatus: string) => {
+      const cfg = readConfig();
+      const current = (cfg.callRow as { status?: unknown } | null | undefined)?.status;
+      return (
+        typeof current !== "string" ||
+        current.toLowerCase() !== terminalStatus.toLowerCase()
+      );
     },
   );
 

@@ -64,6 +64,7 @@ vi.mock("@/lib/telephony-db.server", async () => {
     insertCallForWorkspace: stub.telephonyDbMocks.insertCallForWorkspace,
     findCampaignTypeByCampaignId: stub.telephonyDbMocks.findCampaignTypeByCampaignId,
     upsertCallBySid: stub.telephonyDbMocks.upsertCallBySid,
+    claimTerminalCallStatus: stub.telephonyDbMocks.claimTerminalCallStatus,
   };
 });
 

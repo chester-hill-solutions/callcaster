@@ -15,6 +15,7 @@ import { OutreachAttempt } from "@/lib/types";
 import { Tables } from "@/lib/db-types";
 import type Twilio from "twilio";
 import {
+  claimTerminalCallStatus,
   findCallBySid,
   findCampaignTypeByCampaignId,
   findOutreachAttemptById,
@@ -342,21 +343,25 @@ export const action = defineAction({
       case "busy":
       case "no-answer":
       case "completed":
-        // Replay guard: the first successful delivery writes this status onto
-        // the call row (inside processCallStatusWebhook). A Twilio retry or
-        // duplicate delivery of the SAME terminal status must ack, not
-        // re-process — without this, every replay re-dequeued the contact and
-        // triggerAutoDialer placed a NEW outbound call, and a handler error
-        // (500 → Twilio retries forever) turned that into a dial loop.
-        if (
-          typeof dbCall.status === "string" &&
-          dbCall.status.toLowerCase() === callStatusValue.toLowerCase()
-        ) {
-          logger.info("auto-dial status: terminal status already applied; acking replay", {
-            callSid: callSidValue,
-            status: callStatusValue,
-          });
-          return routeData({ success: true, replay: true });
+        // Replay guard, done atomically: claim the terminal-status transition
+        // with a compare-and-set UPDATE. Only the delivery that actually moves
+        // the row to this status proceeds; a Twilio retry or a CONCURRENT
+        // duplicate of the SAME terminal status loses the claim and acks. The
+        // old check-then-act (compare a pre-read snapshot) let two overlapping
+        // deliveries both pass and each re-dequeue + place a NEW outbound call.
+        {
+          const claimed = await claimTerminalCallStatus(
+            requireValue(dbCall.workspace, "workspace"),
+            callSidValue,
+            callStatusValue,
+          );
+          if (!claimed) {
+            logger.info("auto-dial status: terminal status already applied; acking replay", {
+              callSid: callSidValue,
+              status: callStatusValue,
+            });
+            return routeData({ success: true, replay: true });
+          }
         }
         await handleCallStatus(
           parsedBody,

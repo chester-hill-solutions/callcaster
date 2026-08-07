@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import {
   call as callTable,
   campaign as campaignTable,
@@ -120,6 +120,34 @@ export async function findActiveConferenceIdsForUser(
       AND c.status = ANY(ARRAY['initiated', 'queued', 'ringing', 'in-progress'])
   `);
   return (rows as unknown as { conference_id: string }[]).map((row) => row.conference_id);
+}
+
+/**
+ * Atomically claim a terminal-status transition for a call.
+ *
+ * Returns true only for the delivery that actually moves the row TO
+ * `terminalStatus` (from a different or null status); a concurrent/duplicate
+ * delivery of the same terminal status sees 0 rows and returns false. This is a
+ * compare-and-set — the UPDATE's row lock serializes concurrent callbacks — so
+ * it replaces a check-then-act guard that let two overlapping Twilio retries
+ * both re-dequeue the contact and place a second outbound call.
+ */
+export async function claimTerminalCallStatus(
+  workspaceId: string,
+  sid: string,
+  terminalStatus: string,
+  options?: { tdb?: TenantDb },
+): Promise<boolean> {
+  const tdb = options?.tdb ?? createTenantDb(workspaceId);
+  const normalized = terminalStatus.toLowerCase();
+  const rows = await tdb.call.update({
+    set: { status: normalized } as unknown as Partial<CallRow>,
+    where: and(
+      eq(callTable.sid, sid),
+      or(isNull(callTable.status), sql`LOWER(${callTable.status}) <> ${normalized}`),
+    ),
+  });
+  return rows.length > 0;
 }
 
 export async function updateCallBySid(
