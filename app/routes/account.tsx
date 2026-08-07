@@ -9,6 +9,7 @@ import {
 } from "react-router";
 import type { MetaFunction } from "react-router";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { PageShell } from "@/components/ui/page-shell";
 import { Text } from "@/components/ui/typography";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 type LoaderData = {
@@ -56,6 +58,16 @@ export default function Account() {
   const twoFactorEnabled = mfaData?.enabled ?? profile.twoFactorEnabled;
   const showingMfaVerification = mfaData?.step === "verify";
 
+  const copyMfaSetupUri = async () => {
+    if (!mfaData?.totpURI) return;
+    try {
+      await navigator.clipboard.writeText(mfaData.totpURI);
+      toast.success("MFA setup code copied to clipboard");
+    } catch {
+      toast.error("Could not copy the MFA setup code");
+    }
+  };
+
   useEffect(() => {
     if (actionData?.success) {
       setEditingProfile(false);
@@ -83,6 +95,7 @@ export default function Account() {
           <SectionHeader
             title="Personal information"
             description="This information identifies you across your workspaces."
+            className="mb-3 pb-3"
             actions={
               editingProfile ? (
                 <div className="flex gap-2">
@@ -108,6 +121,12 @@ export default function Account() {
               )
             }
           />
+          {actionData?.error ? (
+            <Alert variant="destructive" role="alert" className="mb-4">
+              <AlertTitle>Could not update your profile</AlertTitle>
+              <AlertDescription>{actionData.error}</AlertDescription>
+            </Alert>
+          ) : null}
           <Form ref={profileFormRef} id="profile-form" method="POST" className="space-y-5">
             <div className="grid gap-5 sm:grid-cols-2">
               <FormField htmlFor="first_name" label="First name" required>
@@ -153,6 +172,7 @@ export default function Account() {
           <SectionHeader
             title="MFA"
             description="Protect your account with multi-factor authentication."
+            className="mb-3 pb-3"
             actions={
               editingMfa ? (
                 <div className="flex gap-2">
@@ -187,7 +207,12 @@ export default function Account() {
           <Text className="text-sm text-muted-foreground">
             Status: {twoFactorEnabled ? "Enabled" : "Not enabled"}
           </Text>
-          {mfaData?.error ? <Text className="text-destructive">{mfaData.error}</Text> : null}
+          {mfaData?.error ? (
+            <Alert variant="destructive" role="alert">
+              <AlertTitle>Could not update MFA</AlertTitle>
+              <AlertDescription>{mfaData.error}</AlertDescription>
+            </Alert>
+          ) : null}
           {mfaData?.success ? <Text className="text-green-600">{mfaData.success}</Text> : null}
 
           {editingMfa && !twoFactorEnabled && !showingMfaVerification ? (
@@ -212,9 +237,24 @@ export default function Account() {
 
           {editingMfa && showingMfaVerification ? (
             <div className="space-y-4">
-              {mfaData?.totpURI ? (
-                <Text className="break-all text-xs">{mfaData.totpURI}</Text>
-              ) : null}
+              <Alert className="border-warning/50 bg-warning/10">
+                <AlertTitle>Connect your authenticator app</AlertTitle>
+                <AlertDescription>
+                  Copy this setup code into Google Authenticator, Microsoft Authenticator,
+                  1Password, or another TOTP authenticator app. Then enter the six-digit
+                  code it generates below.
+                  {mfaData?.totpURI ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <code className="min-w-0 flex-1 break-all rounded bg-muted px-2 py-1 text-xs">
+                        {mfaData.totpURI}
+                      </code>
+                      <Button type="button" size="sm" onClick={() => void copyMfaSetupUri()}>
+                        Copy setup code
+                      </Button>
+                    </div>
+                  ) : null}
+                </AlertDescription>
+              </Alert>
               {mfaData?.backupCodes?.length ? (
                 <Text className="text-sm">
                   Backup codes: {mfaData.backupCodes.join(", ")}
