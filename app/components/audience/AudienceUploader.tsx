@@ -102,10 +102,7 @@ export default function AudienceUploader({
     }
   };
 
-  const displayFileToUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
+  const processSelectedFile = async (file: File | undefined) => {
     if (!file) return;
 
     const data = await file.text();
@@ -143,6 +140,12 @@ export default function AudienceUploader({
     });
     setWizard("map");
     onStageChange?.("map");
+  };
+
+  const displayFileToUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    await processSelectedFile(e.target.files?.[0]);
   };
 
   const updateHeaderMapping = (
@@ -263,6 +266,7 @@ export default function AudienceUploader({
               <AudienceUploadFileStep
                 ref={fileInputRef}
                 onFileChange={displayFileToUpload}
+                onFileDrop={(file) => void processSelectedFile(file)}
               />
             );
           case "map":

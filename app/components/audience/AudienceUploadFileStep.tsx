@@ -3,16 +3,23 @@ import { MdUploadFile } from "react-icons/md";
 
 export type AudienceUploadFileStepProps = {
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onFileDrop: (file: File) => void;
 };
 
 export const AudienceUploadFileStep = forwardRef<
   HTMLInputElement,
   AudienceUploadFileStepProps
->(function AudienceUploadFileStep({ onFileChange }, ref) {
+>(function AudienceUploadFileStep({ onFileChange, onFileDrop }, ref) {
   return (
     <label
       htmlFor="contacts"
       className="flex min-h-[8rem] cursor-pointer flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border bg-muted/30 px-6 py-8 text-center transition-colors hover:border-border hover:bg-muted/50"
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        const file = event.dataTransfer.files[0];
+        if (file) onFileDrop(file);
+      }}
     >
       <span className="inline-flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <MdUploadFile className="size-5" aria-hidden />

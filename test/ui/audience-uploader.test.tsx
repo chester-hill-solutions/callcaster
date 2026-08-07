@@ -178,6 +178,22 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.getByText("1. Select file")).toBeInTheDocument();
   });
 
+  test("accepts a CSV dropped onto the file picker", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    render(<AudienceUploader audienceName="A1" />);
+    const file = new File(["Phone\n123"], "contacts.csv", { type: "text/csv" });
+    (file as any).text = async () => "Phone\n123";
+    const dropZone = screen.getByText("Drop or choose a CSV file").closest("label");
+
+    expect(dropZone).not.toBeNull();
+    fireEvent.drop(dropZone!, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Map CSV Headers")).toBeInTheDocument();
+    });
+  });
+
   test("hides step strip when embedded (onUploadComplete)", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
