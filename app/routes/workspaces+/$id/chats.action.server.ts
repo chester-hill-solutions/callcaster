@@ -7,13 +7,15 @@ import { linkContactToConversation } from "@/lib/database/chat-contact-link.serv
 import { getEffectiveWorkspaceTwilioPortalConfigForWorkspace } from "@/lib/database/workspace.server";
 import { parseChatSenderSelection } from "@/lib/sms-campaign-send-mode";
 import { eq } from "drizzle-orm";
-import {
-  contact as contactTable,
-  workspace_number as workspaceNumberTable,
-} from "@/db/schema";
+import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
-import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
+import {
+  isOptedOutRecipient,
+  isSmsIncapableRecipient,
+} from "@/lib/chat-sms-guards.server";
+import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { hasInsufficientCreditsForOutbound } from "../../../../shared/credit-floor";
 import type { BaseUser, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { defineAction } from "@/lib/handler.server";
 import { toUserMessage } from "@/lib/user-message";
@@ -96,6 +98,17 @@ export const action = defineAction({
     return routeData({ error: "Workspace is required" }, { status: 400 });
   }
 
+  // Fail-closed credit gate (mirrors api+/chat_sms). Without this the UI
+  // composer bypasses the credit floor the API enforces, letting a depleted
+  // workspace rack up unmetered Twilio spend.
+  const creditsBalance = await getWorkspaceCreditsBalance(workspaceId);
+  if (hasInsufficientCreditsForOutbound(creditsBalance)) {
+    return routeData(
+      { error: "Insufficient credits", creditsError: true },
+      { status: 402 },
+    );
+  }
+
   let contact_number: string;
   try {
     contact_number = normalizePhoneNumber(
@@ -176,43 +189,27 @@ export const action = defineAction({
     }
   }
 
-  const contactId = data.contact_id as string;
-  if (workspaceId && contactId) {
-    try {
-      const tdb = createTenantDb(workspaceId);
-      const contact = await tdb.contact.findFirst({
-        where: eq(contactTable.id, Number(contactId)),
-      });
-      if (contact?.opt_out) {
-        return routeData(
-          {
-            error: "This contact has opted out of messages.",
-            optedOut: true,
-          },
-          { status: 403 },
-        );
-      }
+  // Resolve the recipient by explicit contact_id, else by an unambiguous phone
+  // match (shared with api+/chat_sms). Previously these gates ran only when a
+  // contact_id was present, so the "new number" composer could text an
+  // opted-out contact or a landline that was not linked by id.
+  const contactId =
+    typeof data.contact_id === "string" && data.contact_id.length > 0
+      ? data.contact_id
+      : undefined;
 
-      if (contact) {
-        const lineType = await getOrLookupLineType({
-          workspaceId,
-          contactId: Number(contactId),
-          phone: contact_number,
-          tdb,
-        });
-        if (isSmsIncapableLineType(lineType)) {
-          return routeData(
-            {
-              error: "This number is a landline and can't receive SMS.",
-              landline: true,
-            },
-            { status: 400 },
-          );
-        }
-      }
-    } catch (error) {
-      logger.error("Error checking contact opt-out status:", error);
-    }
+  if (await isOptedOutRecipient(workspaceId, contact_number, contactId)) {
+    return routeData(
+      { error: "This contact has opted out of messages.", optedOut: true },
+      { status: 403 },
+    );
+  }
+
+  if (await isSmsIncapableRecipient(workspaceId, contact_number, contactId)) {
+    return routeData(
+      { error: "This number is a landline and can't receive SMS.", landline: true },
+      { status: 400 },
+    );
   }
 
   const sendAt = typeof data["send_at"] === "string" ? data["send_at"] : undefined;

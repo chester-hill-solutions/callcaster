@@ -45,6 +45,14 @@ vi.mock("@/lib/twilio-lookup.server", () => ({
   isSmsIncapableLineType: () => false,
 }));
 
+vi.mock("@/lib/inbound-sms-context.server", () => ({
+  findMatchingContactIds: vi.fn(async () => [] as number[]),
+}));
+
+vi.mock("@/lib/workspace-credits.server", () => ({
+  getWorkspaceCreditsBalance: vi.fn(async () => 100),
+}));
+
 describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
   beforeEach(() => {
     vi.resetModules();

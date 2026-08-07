@@ -144,7 +144,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
 
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error checking contact opt-out status for chat_sms:",
+      "Error checking contact opt-out status:",
       expect.any(Error),
     );
     expect(mocks.sendMessage).toHaveBeenCalled();
@@ -207,7 +207,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
 
     expect(res.status).toBe(201);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error checking contact line type for chat_sms:",
+      "Error checking contact line type:",
       expect.any(Error),
     );
     expect(mocks.sendMessage).toHaveBeenCalled();
