@@ -95,6 +95,37 @@ function assertNoRoleEscalation(
   return { ok: true };
 }
 
+/**
+ * An actor may only manage (demote or remove) a member whose current rank is
+ * at or below the actor's own. Without this, `requireMemberManager` alone lets
+ * a `member` remove or demote an `admin`: the escalation guards only inspect
+ * the *assigned* role, never the target's *existing* rank. Actor-at-or-above
+ * (rather than strictly-above) preserves peer management and self-service while
+ * closing the escalation.
+ */
+async function requireActorOutranksTarget(
+  actorRole: string,
+  workspaceId: string,
+  targetUserId: string,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const targetMembership = await findWorkspaceMembership(workspaceId, targetUserId);
+  if (!targetMembership) {
+    return { ok: false, error: "Member not found", status: 404 };
+  }
+
+  const actorRank = WORKSPACE_ROLE_RANK[actorRole] ?? 0;
+  const targetRank = WORKSPACE_ROLE_RANK[targetMembership.role] ?? 0;
+  if (actorRank < targetRank) {
+    return {
+      ok: false,
+      error: "You cannot manage a member who outranks you.",
+      status: 403,
+    };
+  }
+
+  return { ok: true };
+}
+
 async function getWorkspaceOwners(workspaceId: string) {
   const members = await listWorkspaceMembersEnriched(workspaceId);
   return members.filter((member) => member.role === MemberRole.Owner);
@@ -269,7 +300,10 @@ export async function inviteWorkspaceMemberAsApiKey(
   email: string,
   role: "owner" | "admin" | "member" | "caller",
 ) {
-  return inviteWorkspaceMemberWithActorRole("admin", workspaceId, email, role);
+  // Actor rank `member`, not `admin`: a `members.invite` key must not be able to
+  // mint an `admin`/`owner` invite. assertNoRoleEscalation blocks anything above
+  // `member`, matching this function's member/caller-only policy.
+  return inviteWorkspaceMemberWithActorRole("member", workspaceId, email, role);
 }
 
 export async function updateWorkspaceMemberRole(
@@ -280,6 +314,11 @@ export async function updateWorkspaceMemberRole(
 ) {
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
+
+  // The actor must at least match the target's current rank, or a `member`
+  // could demote an `admin`.
+  const rankCheck = await requireActorOutranksTarget(access.actorRole, workspaceId, targetUserId);
+  if (!rankCheck.ok) return rankCheck;
 
   // Owner-role transitions keep their specific owner-only gate first.
   const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId, role);
@@ -323,6 +362,11 @@ export async function removeWorkspaceMember(
 ) {
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
+
+  // The actor must at least match the target's current rank, or a `member`
+  // could remove an `admin`.
+  const rankCheck = await requireActorOutranksTarget(access.actorRole, workspaceId, targetUserId);
+  if (!rankCheck.ok) return rankCheck;
 
   const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId);
   if (!ownerCheck.ok) return ownerCheck;
