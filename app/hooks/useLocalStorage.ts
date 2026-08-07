@@ -104,7 +104,32 @@ export function useLocalStorageMulti<T extends Record<string, any>>(
   removeAll: () => void;
   clearErrors: () => void;
 } {
-  const [values, setValues] = useState<Partial<T>>({});
+  // Read every key from localStorage ONCE in a lazy initializer (like the
+  // single-key useLocalStorage above), not in a mount effect keyed on the
+  // `keys`/`options` identities — with inline args those change every render,
+  // which re-ran the effect and setValues on every render (a re-render loop
+  // that hammered localStorage).
+  const [values, setValues] = useState<Partial<T>>(() => {
+    const initialValues: Partial<T> = {};
+    keys.forEach((key) => {
+      try {
+        const item = window.localStorage.getItem(String(key));
+        if (item !== null) {
+          initialValues[key] = options.deserializer
+            ? options.deserializer(item)
+            : JSON.parse(item);
+        }
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        logger.error(`Error reading localStorage key "${String(key)}":`, err);
+        options.onError?.(err);
+      }
+    });
+    return initialValues;
+    // Intentionally mount-only: keys/options are read once, matching the
+    // single-key hook. eslint-disable is not needed — lazy initializers have no
+    // dependency array.
+  });
   const [errors, setErrors] = useState<Record<string, Error>>({});
 
   const setValue = useCallback(
@@ -179,36 +204,8 @@ export function useLocalStorageMulti<T extends Record<string, any>>(
     setErrors({});
   }, []);
 
-  /**
-   * @effect CANDIDATE-REMOVE Populate `values` by reading each key from localStorage on mount.
-   * @effect-deps keys, options (re-reads if the tracked key list or serializer options change)
-   * @effect-side-effects none — synchronous localStorage.getItem reads only; setValues at the end
-   * @effect-why-not-loader This is derived initial state, not data fetching: the single-key
-   *   useLocalStorage above already does this via a lazy useState(() => ...) initializer with no
-   *   effect. useLocalStorageMulti could do the same (compute initialValues in a lazy initializer)
-   *   instead of reading on mount via useEffect, avoiding an extra render with empty `values`.
-   */
-  // Initialize values from localStorage
-  useEffect(() => {
-    const initialValues: Partial<T> = {};
-    
-    keys.forEach(key => {
-      try {
-        const item = window.localStorage.getItem(String(key));
-        if (item !== null) {
-          const value = options.deserializer ? options.deserializer(item) : JSON.parse(item);
-          initialValues[key] = value;
-        }
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        logger.error(`Error reading localStorage key "${String(key)}":`, err);
-        setErrors(prev => ({ ...prev, [String(key)]: err }));
-        options.onError?.(err);
-      }
-    });
-
-    setValues(initialValues);
-  }, [keys, options]);
+  // Initial values are read once in the lazy useState initializer above — no
+  // mount effect (which re-ran every render with inline keys/options).
 
   return {
     values,
