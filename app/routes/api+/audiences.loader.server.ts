@@ -178,7 +178,7 @@ export const loader = defineLoader({
         requireWorkspaceAccess: d.requireWorkspaceAccess,
       });
 
-      const data = await listAudienceContactsJson(parsedAudienceId);
+      const data = await listAudienceContactsJson(resolvedWorkspaceId, parsedAudienceId);
       return routeData({ data }, { headers });
     } catch (error) {
       if (error instanceof Response) {

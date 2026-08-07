@@ -472,8 +472,14 @@ export async function fetchCampaignQueuePage(args: {
   filters: QueueSearchFilters;
   offset: number;
   limit: number;
+  workspaceId?: string;
 }): Promise<{ items: CampaignQueueApiItem[]; totalCount: number }> {
-  const where = buildCampaignQueueSearchWhere(args.campaignId, args.filters);
+  const where = buildCampaignQueueSearchWhere(
+    args.campaignId,
+    args.filters,
+    "",
+    args.workspaceId,
+  );
 
   const [totalCount, queueRows] = await Promise.all([
     countCampaignQueueRows(args.campaignId, where),

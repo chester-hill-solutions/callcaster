@@ -160,13 +160,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     );
   });
 
-  test("add_contacts routes direct contacts through enqueue helper", async () => {
-    const dbClient = {
-      from: vi.fn(() => {
-        throw new Error("unexpected from()");
-      }),
-    };
-
+  test("add_contacts enqueues only contacts owned by the workspace", async () => {
     mocks.verifyAuth.mockResolvedValueOnce({
       user: { id: "u1" },
     });
@@ -174,6 +168,8 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
       intent: "add_contacts",
       contacts: [{ id: 21 }, { id: 22 }],
     });
+    // Workspace ownership lookup: both ids belong to the workspace.
+    dbMocks.selectChain.mockResolvedValueOnce([{ id: 21 }, { id: 22 }]);
 
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
@@ -190,6 +186,30 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
       [21, 22],
       { requeue: false },
     );
+  });
+
+  test("add_contacts rejects contact ids not owned by the workspace (cross-tenant)", async () => {
+    mocks.verifyAuth.mockResolvedValueOnce({
+      user: { id: "u1" },
+    });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "add_contacts",
+      // 22 belongs to another tenant; the ownership query returns only 21.
+      contacts: [{ id: 21 }, { id: 22 }],
+    });
+    dbMocks.selectChain.mockResolvedValueOnce([{ id: 21 }]);
+
+    const mod = await import(
+      "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
+    );
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+      request: new Request("http://x", { method: "POST" }),
+      params: { selected_id: "77" },
+    } as any)));
+
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ success: false });
+    expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
   });
 
   // A technical error must not reach the user verbatim; toUserMessage swaps it

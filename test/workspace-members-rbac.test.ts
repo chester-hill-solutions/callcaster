@@ -165,6 +165,19 @@ describe("workspace member RBAC", () => {
       expect(result).toEqual({ ok: true, member: { id: "u2" } });
     });
 
+    test("blocks a member from demoting an admin (target outranks actor)", async () => {
+      accessMocks.getUserRole.mockResolvedValue({ role: "member" });
+      // Target u2 is an admin; actor u1 is only a member.
+      membersDbMocks.findWorkspaceMembership.mockImplementation(async (_ws, userId) => ({
+        user_id: userId,
+        role: userId === "u2" ? "admin" : "member",
+      }));
+      const mod = await import("../app/lib/platform-members.server");
+      const result = await mod.updateWorkspaceMemberRole("u1", "w1", "u2", "caller");
+      expect(result).toMatchObject({ ok: false, status: 403 });
+      expect(membersDbMocks.updateWorkspaceMemberRole).not.toHaveBeenCalled();
+    });
+
     test("blocks promoting to admin when target has not enrolled in 2FA", async () => {
       accessMocks.getUserRole.mockResolvedValue({ role: "owner" });
       twoFactorMocks.isTwoFactorEnabled.mockResolvedValueOnce(false);
@@ -209,7 +222,11 @@ describe("workspace member RBAC", () => {
 
     test("rejects non-owners from removing an owner", async () => {
       accessMocks.getUserRole.mockResolvedValue({ role: "admin" });
-      membersDbMocks.findWorkspaceMembership.mockResolvedValue({ user_id: "u2", role: "owner" });
+      // Actor u1 is an admin, target u2 is an owner: the owner-change gate fires.
+      membersDbMocks.findWorkspaceMembership.mockImplementation(async (_ws, userId) => ({
+        user_id: userId,
+        role: userId === "u2" ? "owner" : "admin",
+      }));
       const mod = await import("../app/lib/platform-members.server");
       const result = await mod.removeWorkspaceMember("u1", "w1", "u2");
       expect(result).toMatchObject({ ok: false, status: 403, error: expect.stringContaining("owner") });
@@ -224,6 +241,29 @@ describe("workspace member RBAC", () => {
       const mod = await import("../app/lib/platform-members.server");
       const result = await mod.removeWorkspaceMember("u1", "w1", "u2");
       expect(result).toMatchObject({ ok: false, status: 403, error: expect.stringContaining("sole owner") });
+    });
+
+    test("blocks a member from removing an admin (target outranks actor)", async () => {
+      accessMocks.getUserRole.mockResolvedValue({ role: "member" });
+      // Target u2 is an admin (not an owner, so the owner gate passes).
+      membersDbMocks.findWorkspaceMembership.mockImplementation(async (_ws, userId) => ({
+        user_id: userId,
+        role: userId === "u2" ? "admin" : "member",
+      }));
+      const mod = await import("../app/lib/platform-members.server");
+      const result = await mod.removeWorkspaceMember("u1", "w1", "u2");
+      expect(result).toMatchObject({ ok: false, status: 403 });
+      expect(membersDbMocks.removeWorkspaceMember).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("platform-members inviteWorkspaceMemberAsApiKey", () => {
+    test("blocks an API key from inviting an admin (member/caller-only policy)", async () => {
+      const mod = await import("../app/lib/platform-members.server");
+      const result = await mod.inviteWorkspaceMemberAsApiKey("w1", "new@example.com", "admin");
+      expect(result).toMatchObject({ ok: false, status: 403 });
+      // Blocked at the escalation guard, before any user lookup / invite send.
+      expect(accessMocks.getWorkspaceUsers).not.toHaveBeenCalled();
     });
   });
 

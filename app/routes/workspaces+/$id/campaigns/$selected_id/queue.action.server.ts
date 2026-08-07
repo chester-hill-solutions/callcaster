@@ -1,6 +1,6 @@
 import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import {
   deleteAllCampaignQueueForCampaign,
   deleteCampaignQueueByIds,
@@ -12,7 +12,7 @@ import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
 import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
-import { contact_audience as contactAudienceTable } from "@/db/schema";
+import { contact as contactTable, contact_audience as contactAudienceTable } from "@/db/schema";
 // contact_audience is a join table without a workspace column; tdb cannot scope it.
 // eslint-disable-next-line no-restricted-imports
 import { db } from "@/server/db";
@@ -134,11 +134,39 @@ export const action = defineAction({
             ? JSON.parse(data.contacts)
             : data.contacts
         ) as Contact[];
-        await enqueueContactsForCampaign(
-          campaignIdNum,
-          contacts.map((contact) => contact.id),
-          { requeue: false },
-        );
+
+        const requestedIds = [
+          ...new Set(
+            contacts
+              .map((contact) => Number(contact.id))
+              .filter((id): id is number => Number.isFinite(id)),
+          ),
+        ];
+
+        // Only enqueue contacts that belong to this workspace. The submitted ids
+        // come straight from the request body; without this check a member could
+        // POST another tenant's contact ids and have their dialer call them.
+        const ownedRows = requestedIds.length
+          ? await db
+              .select({ id: contactTable.id })
+              .from(contactTable)
+              .where(
+                and(
+                  inArray(contactTable.id, requestedIds),
+                  eq(contactTable.workspace, workspaceId),
+                ),
+              )
+          : [];
+        const ownedIds = ownedRows.map((row) => row.id);
+
+        if (ownedIds.length !== requestedIds.length) {
+          return routeData(
+            { success: false, error: "One or more contacts were not found in this workspace" },
+            { status: 403 },
+          );
+        }
+
+        await enqueueContactsForCampaign(campaignIdNum, ownedIds, { requeue: false });
 
         return routeData({ success: true });
       } catch (error) {
