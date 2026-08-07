@@ -69,7 +69,8 @@ describe("app/components/call/CallScreen.Questionnaire.tsx", () => {
     fireEvent.click(screen.getByText("answer-b1"));
     expect(handleResponse).toHaveBeenCalledWith({ pageId: "p1", blockId: "b1", value: "v" });
 
-    // update prop change -> useEffect syncs localUpdate and initResult updates
+    // update prop change with the same contact does NOT overwrite local state
+    // (parent remounts per-contact via key prop; local edits are preserved)
     rerender(
       <CallQuestionnaire
         handleResponse={handleResponse}
@@ -81,7 +82,7 @@ describe("app/components/call/CallScreen.Questionnaire.tsx", () => {
         isBusy={false}
       />,
     );
-    expect(screen.getByTestId("init-b1").textContent).toBe("changed");
+    expect(screen.getByTestId("init-b1").textContent).toBe("v");
   });
 
   test("clicking answer with empty update uses fallback {} and updates initResult", async () => {
