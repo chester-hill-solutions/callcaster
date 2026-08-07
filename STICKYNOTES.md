@@ -29,4 +29,5 @@ short — one or two lines. Prune entries that are confirmed stale/fixed.
 - [2026-08-06] Repo is public — never put live infra state, secrets, or credentials in committed docs or PR bodies.
 - [2026-08-06] The repo's top recurring bug class is a hand-maintained list (allowlist, route table, migration manifest, etc.) drifting from reality — when something 'should work' but doesn't, find the list before suspecting app logic.
 - [2026-08-06] Test/demo data must use bland, neutral professional names — never cute or joke names.
+- [2026-08-06] master is GitHub's designated default branch, not dev — a PR's 'Closes #NNNN' only auto-fires on merge to the actual default branch, so merging a PR into dev leaves the linked issue open even though the fix landed. Comment noting the merge instead of assuming auto-close.
 
