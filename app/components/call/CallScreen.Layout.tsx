@@ -105,6 +105,7 @@ export function CallScreenLayout({
     recentAttempt,
     availableCredits,
     creditState,
+    reconnectDevice,
   } = callControls;
 
   const {
@@ -194,9 +195,14 @@ export function CallScreenLayout({
       ) : null}
       {deviceError ? (
         <ErrorBanner
+          testId="device-error-banner"
           title="Phone connection error"
           text={deviceError.message}
-        />
+        >
+          <Button className="mt-3" onClick={reconnectDevice}>
+            Reconnect phone
+          </Button>
+        </ErrorBanner>
       ) : null}
       <TopChrome
         campaign={campaign}

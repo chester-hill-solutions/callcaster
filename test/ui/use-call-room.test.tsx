@@ -142,4 +142,95 @@ describe("useCallRoom", () => {
       status: "dialing",
     });
   });
+
+  // Regression: onerror alone used to just set status: "error" with no
+  // reconnect. The browser's own auto-retry covers a transient blip
+  // (readyState stays CONNECTING and it retries on its own), but some
+  // failures fail the connection straight to CLOSED, after which the
+  // browser never retries — leaving the 5-minute presence heartbeat
+  // (gated on status === "online") stopped forever.
+  describe("reconnect on readyState CLOSED", () => {
+    function makeMockEventSourceClass() {
+      const instances: Array<{
+        readyState: number;
+        onopen: ((event: Event) => void) | null;
+        onerror: ((event: Event) => void) | null;
+        close: ReturnType<typeof vi.fn>;
+      }> = [];
+
+      class MockEventSource {
+        static readonly CONNECTING = 0;
+        static readonly OPEN = 1;
+        static readonly CLOSED = 2;
+        readyState = MockEventSource.CONNECTING;
+        onopen: ((event: Event) => void) | null = null;
+        onerror: ((event: Event) => void) | null = null;
+        addEventListener = vi.fn();
+        removeEventListener = vi.fn();
+        close = vi.fn();
+
+        constructor() {
+          instances.push(this);
+        }
+      }
+
+      return { MockEventSource, instances };
+    }
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    test("does not reconnect when readyState is not CLOSED (browser handles its own retry)", async () => {
+      const { MockEventSource, instances } = makeMockEventSourceClass();
+      vi.stubGlobal("EventSource", MockEventSource);
+      vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true })));
+      vi.useFakeTimers();
+
+      const { default: useCallRoom } = await import("@/hooks/call/useCallRoom");
+      const { result } = renderHook(() =>
+        useCallRoom({ workspace: "w1", campaign: 42, userId: "u1" }),
+      );
+
+      const first = instances[0];
+      first.readyState = MockEventSource.CONNECTING;
+      act(() => first.onerror?.(new Event("error")));
+
+      expect(result.current.status).toBe("error");
+      act(() => vi.advanceTimersByTime(10_000));
+      expect(instances.length).toBe(1);
+    });
+
+    test("reconnects with a new EventSource when readyState reaches CLOSED", async () => {
+      const { MockEventSource, instances } = makeMockEventSourceClass();
+      vi.stubGlobal("EventSource", MockEventSource);
+      vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true })));
+      vi.useFakeTimers();
+
+      const { default: useCallRoom } = await import("@/hooks/call/useCallRoom");
+      const { result } = renderHook(() =>
+        useCallRoom({ workspace: "w1", campaign: 42, userId: "u1" }),
+      );
+
+      const first = instances[0];
+      first.readyState = MockEventSource.CLOSED;
+      act(() => first.onerror?.(new Event("error")));
+
+      expect(result.current.status).toBe("error");
+      expect(instances.length).toBe(1);
+
+      act(() => vi.advanceTimersByTime(5_000));
+
+      expect(instances.length).toBe(2);
+      expect(first.removeEventListener).toHaveBeenCalledWith(
+        "workspace_event",
+        expect.any(Function),
+      );
+
+      // The new connection recovering clears the error status.
+      const second = instances[1];
+      act(() => second.onopen?.(new Event("open")));
+      expect(result.current.status).toBe("online");
+    });
+  });
 });

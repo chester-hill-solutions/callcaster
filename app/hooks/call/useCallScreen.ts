@@ -119,6 +119,7 @@ export function useCallScreen() {
     setCallDuration,
     deviceIsBusy,
     error: deviceError,
+    reconnect: reconnectDevice,
   } = useTwilioDevice(
     token,
     phoneVerification.selectedDevice,
@@ -406,6 +407,7 @@ export function useCallScreen() {
     availableCredits,
     creditState,
     deviceError,
+    reconnectDevice,
   };
 
   const queueControls = {
