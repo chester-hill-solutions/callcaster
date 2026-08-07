@@ -4,6 +4,8 @@ import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
   getUserById: vi.fn(),
+  isTwoFactorEnabled: vi.fn(),
+  userHasPrivilegedWorkspaceRole: vi.fn(),
   updateMeProfile: vi.fn(),
   verifyAuth: vi.fn(),
 }));
@@ -20,6 +22,11 @@ vi.mock("@/lib/workspace-members-db.server", () => ({
   getUserById: mocks.getUserById,
 }));
 
+vi.mock("@/lib/two-factor.server", () => ({
+  isTwoFactorEnabled: mocks.isTwoFactorEnabled,
+  userHasPrivilegedWorkspaceRole: mocks.userHasPrivilegedWorkspaceRole,
+}));
+
 describe("account route", () => {
   beforeEach(() => {
     mocks.verifyAuth.mockReset();
@@ -34,6 +41,8 @@ describe("account route", () => {
       last_name: "Last",
       username: "person@example.com",
     });
+    mocks.isTwoFactorEnabled.mockResolvedValue(false);
+    mocks.userHasPrivilegedWorkspaceRole.mockResolvedValue(false);
     mocks.updateMeProfile.mockReset();
   });
 
@@ -51,6 +60,9 @@ describe("account route", () => {
       firstName: "First",
       lastName: "Last",
       email: "person@example.com",
+      twoFactorEnabled: false,
+      privileged: false,
+      enrollRequired: false,
     });
   });
 

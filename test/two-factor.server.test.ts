@@ -135,7 +135,7 @@ describe("requireTwoFactorEnrollmentForPrivilegedUser (sudo path)", () => {
     delete process.env.RAILWAY_ENVIRONMENT_NAME;
   });
 
-  test("sudo (isPrivileged) not enrolled is redirected to /account/security", async () => {
+  test("sudo (isPrivileged) not enrolled is redirected to account MFA", async () => {
     let thrown: unknown;
     try {
       await requireTwoFactorEnrollmentForPrivilegedUser({
@@ -149,7 +149,7 @@ describe("requireTwoFactorEnrollmentForPrivilegedUser (sudo path)", () => {
     expect(thrown).toBeInstanceOf(Response);
     expect((thrown as Response).status).toBe(302);
     expect((thrown as Response).headers.get("location")).toContain(
-      "/account/security?enroll=1",
+      "/account?enroll=1",
     );
   });
 

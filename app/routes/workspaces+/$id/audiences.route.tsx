@@ -24,7 +24,7 @@ export default function WorkspaceAudiencesPage() {
 
   if (outlet) {
     return (
-      <PeopleHubLayout>
+      <PeopleHubLayout title="Call lists">
         <Outlet context={parentContext} />
       </PeopleHubLayout>
     );
@@ -33,9 +33,10 @@ export default function WorkspaceAudiencesPage() {
   const title = "Call lists";
 
   return (
-    <PeopleHubLayout>
+    <PeopleHubLayout title="Call lists">
       <WorkspaceResourceListShell
         title={title}
+        hideTitle
         error={error}
         isEmpty={isWorkspaceAudienceEmpty}
         emptyMessage="Add a Call list to this workspace"

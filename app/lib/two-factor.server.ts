@@ -227,7 +227,7 @@ export async function requireTwoFactorEnrollmentForPrivilegedUser(args: {
   }
 
   const next = args.nextPath ?? pathname;
-  throw redirect(`/account/security?enroll=1&next=${encodeURIComponent(next)}`);
+  throw redirect(`/account?enroll=1&next=${encodeURIComponent(next)}`);
 }
 
 export function isTwoFactorRedirectResponse(

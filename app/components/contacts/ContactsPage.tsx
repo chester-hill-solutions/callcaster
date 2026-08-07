@@ -8,7 +8,6 @@ import { WorkspaceResourceEmptyState } from "@/components/workspace/WorkspaceRes
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Heading } from "@/components/ui/typography";
 import type { ContactsLoaderData } from "@/lib/contacts-loader.types";
 import { formatDateToLocale } from "@/lib/utils";
 
@@ -86,9 +85,6 @@ export default function ContactsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-        <Heading as="h1" level={2} branded={false}>
-          Contacts
-        </Heading>
         <div className="flex flex-wrap items-center gap-4">
           <Button
             asChild

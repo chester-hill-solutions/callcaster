@@ -1,31 +1,44 @@
 export { action, loader } from "./account.loader.server";
 
-import { ShieldCheck } from "lucide-react";
 import {
   Form,
-  Link,
   useActionData,
+  useFetcher,
   useLoaderData,
   useNavigation,
 } from "react-router";
 import type { MetaFunction } from "react-router";
+import { useEffect, useRef, useState } from "react";
 
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { PageShell } from "@/components/ui/page-shell";
+import { Text } from "@/components/ui/typography";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 type LoaderData = {
   firstName: string;
   lastName: string;
   email: string;
+  twoFactorEnabled: boolean;
+  privileged: boolean;
+  enrollRequired: boolean;
 };
 
 type ActionData = {
   error?: string;
   success?: boolean;
+};
+
+type MfaActionData = {
+  error?: string;
+  success?: string;
+  step?: "verify";
+  totpURI?: string | null;
+  backupCodes?: string[];
+  enabled?: boolean;
 };
 
 export const meta: MetaFunction = () => [{ title: "Account — CallCaster" }];
@@ -34,7 +47,26 @@ export default function Account() {
   const profile = useLoaderData<LoaderData>();
   const actionData = useActionData<ActionData>();
   const navigation = useNavigation();
+  const mfaFetcher = useFetcher<MfaActionData>();
+  const profileFormRef = useRef<HTMLFormElement>(null);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [editingMfa, setEditingMfa] = useState(profile.enrollRequired);
   const isSaving = navigation.state === "submitting";
+  const mfaData = mfaFetcher.data;
+  const twoFactorEnabled = mfaData?.enabled ?? profile.twoFactorEnabled;
+  const showingMfaVerification = mfaData?.step === "verify";
+
+  useEffect(() => {
+    if (actionData?.success) {
+      setEditingProfile(false);
+    }
+  }, [actionData?.success]);
+
+  useEffect(() => {
+    if (mfaData?.enabled) {
+      setEditingMfa(false);
+    }
+  }, [mfaData?.enabled]);
 
   useActionFeedback(actionData, {
     successMessage: "Profile updated.",
@@ -49,10 +81,34 @@ export default function Account() {
       >
         <Section>
           <SectionHeader
-            title="Profile"
+            title="Personal information"
             description="This information identifies you across your workspaces."
+            actions={
+              editingProfile ? (
+                <div className="flex gap-2">
+                  <Button type="submit" form="profile-form" disabled={isSaving}>
+                    {isSaving ? "Saving…" : "Save"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      profileFormRef.current?.reset();
+                      setEditingProfile(false);
+                    }}
+                    disabled={isSaving}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button type="button" variant="outline" onClick={() => setEditingProfile(true)}>
+                  Edit
+                </Button>
+              )
+            }
           />
-          <Form method="POST" className="space-y-5">
+          <Form ref={profileFormRef} id="profile-form" method="POST" className="space-y-5">
             <div className="grid gap-5 sm:grid-cols-2">
               <FormField htmlFor="first_name" label="First name" required>
                 <Input
@@ -61,6 +117,7 @@ export default function Account() {
                   defaultValue={profile.firstName}
                   autoComplete="given-name"
                   maxLength={100}
+                  disabled={!editingProfile}
                   required
                 />
               </FormField>
@@ -71,6 +128,7 @@ export default function Account() {
                   defaultValue={profile.lastName}
                   autoComplete="family-name"
                   maxLength={100}
+                  disabled={!editingProfile}
                   required
                 />
               </FormField>
@@ -88,25 +146,103 @@ export default function Account() {
                 aria-readonly="true"
               />
             </FormField>
-            <div className="flex justify-end">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving ? "Saving…" : "Save profile"}
-              </Button>
-            </div>
           </Form>
         </Section>
 
         <Section>
           <SectionHeader
-            title="Security"
-            description="Protect your account with two-factor authentication."
+            title="MFA"
+            description="Protect your account with multi-factor authentication."
+            actions={
+              editingMfa ? (
+                <div className="flex gap-2">
+                  <Button
+                    type="submit"
+                    form="mfa-form"
+                    disabled={mfaFetcher.state !== "idle"}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setEditingMfa(false)}
+                    disabled={mfaFetcher.state !== "idle"}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button type="button" variant="outline" onClick={() => setEditingMfa(true)}>
+                  Edit
+                </Button>
+              )
+            }
           />
-          <Button asChild variant="outline">
-            <Link to="/account/security">
-              <ShieldCheck className="mr-2 h-4 w-4" />
-              Manage account security
-            </Link>
-          </Button>
+          {profile.enrollRequired && profile.privileged && !twoFactorEnabled ? (
+            <Text className="text-sm text-destructive">
+              MFA enrollment is required before you can access your workspace.
+            </Text>
+          ) : null}
+          <Text className="text-sm text-muted-foreground">
+            Status: {twoFactorEnabled ? "Enabled" : "Not enabled"}
+          </Text>
+          {mfaData?.error ? <Text className="text-destructive">{mfaData.error}</Text> : null}
+          {mfaData?.success ? <Text className="text-green-600">{mfaData.success}</Text> : null}
+
+          {editingMfa && !twoFactorEnabled && !showingMfaVerification ? (
+            <mfaFetcher.Form
+              id="mfa-form"
+              method="POST"
+              action="/account/security"
+              className="space-y-4"
+            >
+              <input type="hidden" name="intent" value="enable" />
+              <FormField htmlFor="mfa-password" label="Current password" required>
+                <Input
+                  id="mfa-password"
+                  name="password"
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                />
+              </FormField>
+            </mfaFetcher.Form>
+          ) : null}
+
+          {editingMfa && showingMfaVerification ? (
+            <div className="space-y-4">
+              {mfaData?.totpURI ? (
+                <Text className="break-all text-xs">{mfaData.totpURI}</Text>
+              ) : null}
+              {mfaData?.backupCodes?.length ? (
+                <Text className="text-sm">
+                  Backup codes: {mfaData.backupCodes.join(", ")}
+                </Text>
+              ) : null}
+              <mfaFetcher.Form
+                id="mfa-form"
+                method="POST"
+                action="/account/security"
+                className="space-y-4"
+              >
+                <input type="hidden" name="intent" value="verify" />
+                <FormField htmlFor="mfa-code" label="Verification code" required>
+                  <Input
+                    id="mfa-code"
+                    name="code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                  />
+                </FormField>
+              </mfaFetcher.Form>
+            </div>
+          ) : null}
+
+          {!editingMfa && !twoFactorEnabled ? (
+            <Text className="text-sm text-muted-foreground">MFA is not enabled.</Text>
+          ) : null}
         </Section>
       </PageShell>
     </main>

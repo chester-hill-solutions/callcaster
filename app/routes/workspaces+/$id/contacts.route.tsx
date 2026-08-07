@@ -12,14 +12,14 @@ export default function WorkspaceContactsPage() {
 
   if (outlet) {
     return (
-      <PeopleHubLayout>
+      <PeopleHubLayout title="Contacts">
         <Outlet />
       </PeopleHubLayout>
     );
   }
 
   return (
-    <PeopleHubLayout>
+    <PeopleHubLayout title="Contacts">
       <ContactsPage />
     </PeopleHubLayout>
   );
