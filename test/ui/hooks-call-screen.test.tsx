@@ -123,7 +123,7 @@ describe("useCallScreen", () => {
     );
 
     Object.assign(fetcher, { submit: vi.fn(), state: "idle", data: undefined });
-    Object.assign(queueFetcher, { submit: vi.fn(), state: "idle" });
+    Object.assign(queueFetcher, { submit: vi.fn(), state: "idle", data: undefined });
     Object.assign(verifyFetcher, {
       load: vi.fn(),
       data: {

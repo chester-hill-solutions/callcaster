@@ -31,6 +31,10 @@ const autoDialState = vi.hoisted(() => ({
   saveCallError: null as Error | null,
 }));
 
+const dbRpcState = vi.hoisted(() => ({
+  claimQueueEntryForDial: vi.fn(async () => "claimed" as string),
+}));
+
 vi.mock("../app/lib/client.server", () => ({
   getSession: (...args: any[]) => mocks.getSession(...args),
   verifyAuth: (...args: any[]) => mocks.verifyAuth(...args),
@@ -75,6 +79,9 @@ vi.mock("@/lib/auto-dial.server", () => ({
     }
   }),
 }));
+vi.mock("@/lib/db-rpc.server", () => ({
+  rpcClaimQueueEntryForDial: (...args: any[]) => dbRpcState.claimQueueEntryForDial(...args),
+}));
 
 vi.mock("twilio", () => {
   class VoiceResponse {
@@ -103,6 +110,8 @@ describe("app/routes/api+/dial/tsx.route", () => {
     autoDialState.createOutreachAttempt.mockReset();
     autoDialState.createOutreachAttempt.mockResolvedValue(77);
     autoDialState.saveCallError = null;
+    dbRpcState.claimQueueEntryForDial.mockReset();
+    dbRpcState.claimQueueEntryForDial.mockResolvedValue("claimed");
     creditsState.credits = 10;
     creditsState.throwError = null;
     tenantDbState.callerIdRecord = { type: "rented", phone_number: "+1555" };
@@ -209,6 +218,61 @@ describe("app/routes/api+/dial/tsx.route", () => {
       "w1",
       "u1",
     );
+  });
+
+  test("claims the queue row with workspace/campaign/queue/session-user before dialing", async () => {
+    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      to_number: "+15555550100",
+      user_id: "someone-else",
+      campaign_id: "1",
+      contact_id: "2",
+      workspace_id: "w1",
+      queue_id: "3",
+      caller_id: "+1555",
+    });
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: { create: async () => ({ sid: "CA1", from: "+1555" }) } });
+
+    const mod = await import("../app/routes/api+/dial");
+    await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
+
+    expect(dbRpcState.claimQueueEntryForDial).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        queueId: 3,
+        campaignId: 1,
+        workspaceId: "w1",
+        userId: "u1",
+      }),
+    );
+  });
+
+  test.each([
+    ["claimed_by_other", "This contact is being dialed by another agent."],
+    ["active_call", "This contact already has a call in progress."],
+    ["not_queued", "This contact is no longer queued."],
+    ["unavailable", "This contact is not available to dial."],
+  ])("refuses to dial and returns 409 when the claim result is %s", async (claim, message) => {
+    dbRpcState.claimQueueEntryForDial.mockResolvedValueOnce(claim);
+    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      to_number: "+15555550100",
+      user_id: "u1",
+      campaign_id: "1",
+      contact_id: "2",
+      workspace_id: "w1",
+      queue_id: "3",
+      caller_id: "+1555",
+    });
+    queueJsonAuthSession({ user: { id: "u1" } });
+
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: message, claim });
+    expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
   });
 
   test("rejects an unverified selected device before calling Twilio", async () => {

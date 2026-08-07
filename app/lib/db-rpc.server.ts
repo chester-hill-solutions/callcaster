@@ -153,6 +153,40 @@ export async function rpcCreateOutreachAttempt(
   return id;
 }
 
+export type DialClaimResult =
+  | "claimed"
+  | "unavailable"
+  | "claimed_by_other"
+  | "not_queued"
+  | "active_call";
+
+/**
+ * Atomically claim a specific queue row before dialing it (manual dial path).
+ * Anything but "claimed" means the dial must not proceed — see
+ * client/migrations/20260805120000_atomic_manual_dial_claims.sql for the
+ * exact semantics of each refusal code.
+ */
+export async function rpcClaimQueueEntryForDial(
+  executor: RpcExecutor,
+  args: {
+    queueId: number;
+    campaignId: number;
+    workspaceId: string;
+    userId: string;
+  },
+): Promise<DialClaimResult> {
+  const result = await queryScalar<string>(
+    executor,
+    sql`select claim_queue_entry_for_dial(
+      ${args.queueId}::bigint,
+      ${args.campaignId}::bigint,
+      ${args.workspaceId}::uuid,
+      ${args.userId}::uuid
+    ) as result`,
+  );
+  return (result ?? "unavailable") as DialClaimResult;
+}
+
 export async function rpcDequeueContact(
   executor: RpcExecutor,
   args: {
