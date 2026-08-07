@@ -51,12 +51,6 @@ export function AudienceUploadMapStep({
 }: AudienceUploadMapStepProps) {
   return (
     <div className="space-y-4">
-      <AudienceUploadFileSummary
-        fileName={fileName}
-        rowCount={rowCount}
-        columnCount={headers.length}
-      />
-
       <Alert>
         <AlertDescription>{PHONE_SKIP_HINT}</AlertDescription>
       </Alert>
@@ -68,7 +62,14 @@ export function AudienceUploadMapStep({
       ) : null}
 
       <div className="rounded-md border bg-muted/40 p-4">
-        <h3 className="mb-4 font-medium text-foreground">Map CSV Headers</h3>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-medium text-foreground">Map CSV Headers</h3>
+          <AudienceUploadFileSummary
+            fileName={fileName}
+            rowCount={rowCount}
+            columnCount={headers.length}
+          />
+        </div>
 
         <Table className="w-full">
           <TableHeader>

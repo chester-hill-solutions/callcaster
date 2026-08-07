@@ -29,8 +29,9 @@ export function AudienceUploadReviewStep({
         fileName={fileName}
         rowCount={rowCount}
         columnCount={columnCount}
-        hint={PHONE_SKIP_HINT}
       />
+
+      <div className="text-xs text-muted-foreground">{PHONE_SKIP_HINT}</div>
 
       {showSplitNameOption ? (
         <label className="flex items-center gap-2 text-xs text-foreground">
