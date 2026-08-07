@@ -292,7 +292,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("Script steps not found");
+    expect(await res.text()).toContain("Sorry, we ran into a problem.");
   });
 
   test("covers findNextBlock variants and handleNextStep final else redirect", async () => {
@@ -348,13 +348,13 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
   test("covers helper error branches, invalid script structure, missing block, and non-Error catch message", async () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
 
-    // campaignError in getCampaignData
+    // campaignError in getCampaignData — internal message not spoken to caller
     mocks.createClient.mockReturnValueOnce(makeDbClient({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignError: new Error("camp") }));
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("say:camp");
+    expect(await res.text()).toContain("Sorry, we ran into a problem.");
 
     // outreachError in getOutreach
     const script = { pages: { page_1: { blocks: ["b1"] } }, blocks: { b1: { id: "b1" } } };
@@ -364,7 +364,8 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("say:out");
+    // Internal error text is not read to the caller — a generic message is.
+    expect(await res.text()).toContain("Sorry, we ran into a problem.");
 
     // invalid script structure
     mocks.createClient.mockReturnValueOnce(makeDbClient({ call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 1 }, campaignData: { script: { steps: { pages: null, blocks: null } } } }));
@@ -372,7 +373,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("Invalid script structure");
+    expect(await res.text()).toContain("Sorry, we ran into a problem.");
 
     // block not found
     const script2 = { pages: { page_1: { blocks: ["b1"] } }, blocks: {} };
@@ -381,7 +382,10 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("Block b1 not found");
+    const blockNotFoundText = await res.text();
+    expect(blockNotFoundText).toContain("Sorry, we ran into a problem.");
+    // The internal "Block b1 not found" detail must not be spoken to the caller.
+    expect(blockNotFoundText).not.toContain("Block b1 not found");
 
     // non-Error thrown inside try => default message branch
     telephonyDbMocks.findCallBySid.mockImplementationOnce(async () => {
@@ -394,7 +398,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
-    expect(await res.text()).toContain("An error occurred. Please try again later.");
+    expect(await res.text()).toContain("Sorry, we ran into a problem.");
   });
 
   test("writes typed outreach columns and syncs contact.support_level cache", async () => {

@@ -202,10 +202,10 @@ export const action = defineAction({
     const nextStep = findNextStep(currentBlock, userInput, script, pageId);
     handleNextStep(twiml, nextStep, campaignId, pageId, baseUrl);
   } catch (e) {
-    const errorMessage =
-      e instanceof Error ? e.message : "An error occurred. Please try again later.";
+    // Never read raw internal error text aloud to the caller — log it and speak
+    // a fixed generic message instead.
     logger.error("IVR Error:", e);
-    twiml.say(errorMessage);
+    twiml.say("Sorry, we ran into a problem. Please try again later. Goodbye.");
     twiml.hangup();
   }
 
