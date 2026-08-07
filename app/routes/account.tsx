@@ -95,7 +95,7 @@ export default function Account() {
           <SectionHeader
             title="Personal information"
             description="This information identifies you across your workspaces."
-            className="mb-3 pb-3"
+            className="mb-3 border-b-0 pb-0"
             actions={
               editingProfile ? (
                 <div className="flex gap-2">
@@ -172,7 +172,7 @@ export default function Account() {
           <SectionHeader
             title="MFA"
             description="Protect your account with multi-factor authentication."
-            className="mb-3 pb-3"
+            className="mb-3 border-b-0 pb-0"
             actions={
               editingMfa ? (
                 <div className="flex gap-2">
