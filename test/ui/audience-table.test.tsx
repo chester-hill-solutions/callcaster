@@ -297,6 +297,36 @@ describe("app/components/audience/AudienceTable.tsx", () => {
     expect(screen.queryByText("Remove Selected (2)")).toBeNull();
   });
 
+  test("select-all after searching selects only the filtered rows, not hidden ones", async () => {
+    const { AudienceTable } = await import("@/components/audience/AudienceTable");
+    render(
+      <AudienceTable
+        contacts={[
+          { contact: makeContact(1, { firstname: "Ada", surname: "Lovelace" }) },
+          { contact: makeContact(2, { firstname: "Bob", surname: "Smith" }) },
+          { contact: makeContact(3, { firstname: "Bob", surname: "Jones" }) },
+        ]}
+        workspace_id="w1"
+        selected_id="a1"
+        name="Audience A"
+        onNameChange={() => {}}
+        pagination={{ currentPage: 1, pageSize: 10, totalCount: 3 }}
+        sorting={{ sortKey: "id", sortDirection: "asc" }}
+      />,
+    );
+
+    // Narrow the visible list to the two "Bob" rows.
+    fireEvent.change(screen.getByPlaceholderText("Search contacts..."), {
+      target: { value: "bob" },
+    });
+
+    // Header select-all must select only the 2 visible rows, not all 3 loaded.
+    const checkboxes = screen.getAllByLabelText("checkbox");
+    fireEvent.click(checkboxes[0]);
+    expect(screen.getByRole("button", { name: "Remove Selected (2)" })).toBeInTheDocument();
+    expect(screen.queryByText("Remove Selected (3)")).toBeNull();
+  });
+
   test("row checkbox toggles selectedContacts and select-all can be unchecked", async () => {
     const { AudienceTable } = await import("@/components/audience/AudienceTable");
     render(

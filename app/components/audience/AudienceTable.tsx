@@ -202,7 +202,9 @@ export function AudienceTable({
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedContacts(contacts.map(contact => contact.id.toString()));
+      // Only the rows actually shown (after the active search filter), so
+      // "select all → Remove Selected" never removes contacts the user can't see.
+      setSelectedContacts(filteredContacts.map(contact => contact.id.toString()));
     } else {
       setSelectedContacts([]);
     }
@@ -309,7 +311,10 @@ export function AudienceTable({
             <TableRow>
               <TableHead className="w-[50px]">
                 <Checkbox
-                  checked={selectedContacts.length === contacts.length && contacts.length > 0}
+                  checked={
+                    selectedContacts.length === filteredContacts.length &&
+                    filteredContacts.length > 0
+                  }
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
