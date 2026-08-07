@@ -6,7 +6,7 @@ This project defines its Railway infrastructure in code.
 .railway/railway.ts
 ```
 
-Use this file to describe the Railway project you want: services, databases, buckets, custom domains, replicas, groups, and environment variables.
+Use this file to describe the Railway project you want: services, databases, buckets, replicas, groups, and environment variables. The root file selects a complete resource graph from `.railway/environments/` based on the target Railway environment.
 
 ## Common commands
 
@@ -43,3 +43,15 @@ railway config apply
 - Use `replicas` for scaling; advanced placement can still specify region names.
 - Use `group("Name", [resources])` to keep large projects organized on the Railway canvas.
 - Secrets imported from Railway are rendered as `preserve()` so existing values are retained without writing secret values to source. Use `railway config pull --omit-preserved-variables` for a smaller import.
+- Custom domains are managed separately with `railway domain`; the current CLI planner rejects custom-domain registration in IaC even though the SDK reference documents `domains`.
+- The GitHub Actions workflow applies only after pushes to `dev` or `master`; pull requests run plan-only checks.
+
+## GitHub Actions setup
+
+Create GitHub Environments named `dev` and `production`. In each environment configure:
+
+- Secret `RAILWAY_TOKEN`: a Railway project token for CallCaster.
+- Variable `RAILWAY_PROJECT_ID`: `32b36c6c-5f3d-463b-8c7f-bbcd70351e8f`.
+- Variable `RAILWAY_ENVIRONMENT_ID`: the matching Railway environment ID.
+
+Protect the `production` GitHub Environment with required reviewers. The workflow plans pull requests and applies only pushes to the matching branch.
