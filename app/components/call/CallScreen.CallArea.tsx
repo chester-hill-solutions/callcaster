@@ -51,6 +51,7 @@ export interface CallAreaProps {
   isMicrophoneMuted?: boolean;
   onToggleMute?: () => void;
   onLoadQueue?: () => void;
+  onResetCall?: () => void;
 }
 
 function statusBarClass(displayState: string): string {
@@ -134,6 +135,7 @@ type CallControlsProps = Pick<
   | "isMicrophoneMuted"
   | "onToggleMute"
   | "onLoadQueue"
+  | "onResetCall"
 >;
 
 /**
@@ -155,6 +157,7 @@ export function CallControls({
   isMicrophoneMuted,
   onToggleMute,
   onLoadQueue,
+  onResetCall,
 }: CallControlsProps) {
   const [confirmingHangUp, setConfirmingHangUp] = useState(false);
   const confirmTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -226,6 +229,16 @@ export function CallControls({
             </Button>
           ) : null}
         </div>
+        {onResetCall ? (
+          <button
+            type="button"
+            onClick={onResetCall}
+            className="text-xs text-muted-foreground underline hover:text-foreground"
+            data-testid="call-screen-reset-call"
+          >
+            Reset call
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -351,6 +364,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
   isMicrophoneMuted,
   onToggleMute,
   onLoadQueue,
+  onResetCall,
 }: CallAreaProps) => {
   return (
     <div className={cn(callPanelShellClass, "min-h-0 justify-between")}>
@@ -369,6 +383,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
         isMicrophoneMuted={isMicrophoneMuted}
         onToggleMute={onToggleMute}
         onLoadQueue={onLoadQueue}
+        onResetCall={onResetCall}
       />
       <DispositionBar
         isBusy={isBusy}

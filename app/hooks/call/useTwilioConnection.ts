@@ -61,6 +61,8 @@ export function useTwilioConnection({
   const listenerCleanupsRef = useRef<Array<() => void>>([]);
   const unmountedRef = useRef(false);
   const isReconnectingRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onTokenWillExpireRef = useRef(onTokenWillExpire);
   onTokenWillExpireRef.current = onTokenWillExpire;
   // Bumping this forces the setup effect to run again with deviceRef already
@@ -115,6 +117,7 @@ export function useTwilioConnection({
     if (existing) {
       try {
         existing.updateToken(token);
+        setError(null);
       } catch (err) {
         logger.error("Failed to update Twilio device token:", err);
       }
@@ -139,11 +142,12 @@ export function useTwilioConnection({
 
       const handleRegistered = () => {
         isReconnectingRef.current = false;
+        if (retryTimerRef.current) {
+          clearTimeout(retryTimerRef.current);
+          retryTimerRef.current = null;
+        }
+        retryCountRef.current = 0;
         setStatus("Registered");
-        // Registering successfully means any prior error no longer applies —
-        // error was set-only before this, so a single transient failure left
-        // a stale "Phone connection error" banner up for the rest of the
-        // shift even after the device recovered.
         setError(null);
         onStatusChangeRef.current?.("Registered");
         onDeviceBusyChangeRef.current?.(false);
@@ -161,6 +165,7 @@ export function useTwilioConnection({
 
       const handleConnected = () => {
         setStatus("Connected");
+        setError(null);
         onStatusChangeRef.current?.("Connected");
         onCallStateChangeRef.current?.("connected");
       };
@@ -176,6 +181,19 @@ export function useTwilioConnection({
         setStatus("Cancelled");
         onStatusChangeRef.current?.("Cancelled");
         onDeviceBusyChangeRef.current?.(false);
+      };
+
+      const scheduleRetry = (reason: string) => {
+        if (unmountedRef.current) return;
+        const retries = retryCountRef.current;
+        const BASE_DELAY_MS = 2000;
+        const MAX_DELAY_MS = 60000;
+        const delay = Math.min(BASE_DELAY_MS * 2 ** retries, MAX_DELAY_MS);
+        logger.info(`Scheduling device reconnect (${reason}) in ${delay}ms`, { retry: retries + 1 });
+        retryCountRef.current = retries + 1;
+        retryTimerRef.current = setTimeout(() => {
+          if (!unmountedRef.current) reconnectRef.current();
+        }, delay);
       };
 
       const handleError = (err: unknown) => {
@@ -201,6 +219,7 @@ export function useTwilioConnection({
         setError(error);
         onErrorRef.current?.(error);
         onCallStateChangeRef.current?.("failed");
+        scheduleRetry("device error");
       };
 
       const handleIncoming = (call: unknown) => {
@@ -225,12 +244,6 @@ export function useTwilioConnection({
       ];
 
       device.register().catch((err: unknown) => {
-        // Twilio's Voice SDK can reject register() with `undefined` (not an
-        // Error) for signaling-level auth failures — the real error is
-        // delivered separately via the device "error" event. The
-        // `(err: Error)` annotation this replaced was a lie: at runtime
-        // `err` could be undefined, and passing it straight through crashed
-        // downstream `err.message` accesses (see useSoftphoneController.ts).
         const error =
           err instanceof Error ? err : new Error("Twilio device registration failed");
         logger.error("Failed to register device:", error);
@@ -238,6 +251,7 @@ export function useTwilioConnection({
         setStatus("RegistrationFailed");
         onErrorRef.current?.(error);
         onCallStateChangeRef.current?.("failed");
+        scheduleRetry("registration failed");
       });
     };
 
@@ -255,6 +269,10 @@ export function useTwilioConnection({
 
   const reconnect = useCallback(() => {
     isReconnectingRef.current = true;
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     const stale = deviceRef.current;
     deviceRef.current = null;
     listenerCleanupsRef.current.forEach((cleanup) => cleanup());
@@ -287,6 +305,10 @@ export function useTwilioConnection({
     unmountedRef.current = false;
     return () => {
       unmountedRef.current = true;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
       listenerCleanupsRef.current.forEach((cleanup) => cleanup());
       listenerCleanupsRef.current = [];
       const device = deviceRef.current;

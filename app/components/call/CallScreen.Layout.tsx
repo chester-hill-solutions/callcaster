@@ -103,6 +103,7 @@ export function CallScreenLayout({
     availableCredits,
     creditState,
     reconnectDevice,
+    resetCall,
   } = callControls;
 
   const {
@@ -391,6 +392,7 @@ export function CallScreenLayout({
             isMicrophoneMuted={isMicrophoneMuted}
             onToggleMute={handleMuteMicrophone}
             onLoadQueue={() => fetchMore({ householdMap })}
+            onResetCall={resetCall}
           />
         }
         household={

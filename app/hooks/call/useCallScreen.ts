@@ -404,6 +404,13 @@ export function useCallScreen() {
       availableCredits > 0 && availableCredits < queue.length ? "WARNING" :
         "BAD";
 
+  const resetCall = useCallback(() => {
+    hangUp();
+    send({ type: "HANG_UP" });
+    send({ type: "NEXT" });
+    reconnectDevice();
+  }, [hangUp, send, reconnectDevice]);
+
   const callControls = {
     hangUp,
     answer,
@@ -429,6 +436,7 @@ export function useCallScreen() {
     creditState,
     deviceError,
     reconnectDevice,
+    resetCall,
   };
 
   const queueControls = {

@@ -71,6 +71,10 @@ export function useTwilioDevice(
     setError(err);
   }, []);
 
+  const onCallError = useCallback((err: Error) => {
+    logger.error("Call handling error:", err);
+  }, []);
+
   const onDeviceBusy = useCallback((isBusy: boolean) => {
     setIsBusy(isBusy);
   }, []);
@@ -98,7 +102,7 @@ export function useTwilioDevice(
     autoAcceptIncoming: true,
     onCallStateChange: onCallState,
     onStatusChange,
-    onError: onDeviceError,
+    onError: onCallError,
     onDeviceBusyChange: onDeviceBusy,
   });
 
