@@ -246,7 +246,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.getByText("Alice")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByText(/contacts ready to upload/)).toBeInTheDocument();
+    expect(screen.getByText(/2 rows 3 columns/)).toBeInTheDocument();
     const split = screen.getByLabelText(
       "Split full name into first name and last name",
     ) as HTMLInputElement;
