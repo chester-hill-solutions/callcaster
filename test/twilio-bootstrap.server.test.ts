@@ -23,41 +23,43 @@ const adminDbMocks = vi.hoisted(() => ({
   updateError: null as unknown | null,
 }));
 
-const adminDb = vi.hoisted(() => ({
-  updateCalls: adminDbMocks.updateCalls,
-  select: () => ({
-    from: () => ({
-      where: () => ({
-        limit: async () => {
-          if (adminDbMocks.selectError) throw adminDbMocks.selectError;
-          return [adminDbMocks.workspace];
+const adminDb = vi.hoisted(() => {
+  const readRows = async () => {
+    if (adminDbMocks.selectError) throw adminDbMocks.selectError;
+    return [adminDbMocks.workspace];
+  };
+  // `.where()` is followed by `.limit()` (plain load) or `.for("update").limit()`
+  // (the atomic merge transaction) — support both chains.
+  const afterWhere: any = { limit: readRows, for: () => ({ limit: readRows }) };
+  const client: any = {
+    updateCalls: adminDbMocks.updateCalls,
+    select: () => ({ from: () => ({ where: () => afterWhere }) }),
+    update: () => ({
+      set: (set: any) => ({
+        where: async () => {
+          if (adminDbMocks.updateError) throw adminDbMocks.updateError;
+          adminDbMocks.updateCalls.push(set);
+          if (set.twilio_data != null) {
+            adminDbMocks.workspace.twilio_data =
+              typeof set.twilio_data === "string"
+                ? JSON.parse(set.twilio_data)
+                : set.twilio_data;
+          }
         },
       }),
     }),
-  }),
-  update: () => ({
-    set: (set: any) => ({
-      where: async () => {
-        if (adminDbMocks.updateError) throw adminDbMocks.updateError;
-        adminDbMocks.updateCalls.push(set);
-        if (set.twilio_data != null) {
-          adminDbMocks.workspace.twilio_data =
-            typeof set.twilio_data === "string"
-              ? JSON.parse(set.twilio_data)
-              : set.twilio_data;
-        }
-      },
-    }),
-  }),
-  query: {
-    workspace: {
-      findFirst: async () => {
-        if (adminDbMocks.selectError) throw adminDbMocks.selectError;
-        return adminDbMocks.workspace;
+    query: {
+      workspace: {
+        findFirst: async () => {
+          if (adminDbMocks.selectError) throw adminDbMocks.selectError;
+          return adminDbMocks.workspace;
+        },
       },
     },
-  },
-}));
+    transaction: async (fn: (tx: any) => Promise<unknown>) => fn(client),
+  };
+  return client;
+});
 
 vi.mock("@/server/admin-db", () => ({ adminDb }));
 
