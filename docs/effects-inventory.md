@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**113** documented / **113** total effects (0 grandfathered, ratcheting to 0).
+**114** documented / **114** total effects (0 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -52,6 +52,7 @@
 | `app/hooks/call/useCallScreen.ts` | Let the physical/OS keyboard send DTMF digits during an active | [] — intentionally mount-once; the handler always calls | dom (window "keypress" event listener), removed on | DOM event subscription, not request/response data. |
 | `app/hooks/call/useCallState.ts` | Tick the call FSM's duration counter (dispatch TICK) once per | state, send (starts/stops the interval based on FSM state; | timer (setInterval), cleared on state change/unmount | Wall-clock elapsed time is live client timer state, |
 | `app/hooks/call/useCampaignCallFlow.ts` | Reset provider call state back to idle when the active call SID | callSid (only fires when the tracked SID changes to null) | none (plain setState) | Call lifecycle state is ephemeral client state, |
+| `app/hooks/call/useDialFailureRecovery.ts` | Dispatch FAIL to the call FSM when a settled dial fetcher | fetcherState, fetcherData, send, showError (fires once per | none directly (FSM dispatch + toast) | Reacts to a mutation result to fix client FSM |
 | `app/hooks/call/useNextRecipientSync.ts` | When the queue-provided next recipient advances, sync the | nextRecipient, send, setCallDuration, setQuestionContact | none (dispatches to state setters/reducer passed in; | nextRecipient is already realtime/loader-sourced |
 | `app/hooks/call/usePhoneVerification.ts` | Reset handset selection to computer when the previously chosen | selectedDevice, verifiedNumbers | setSelectedDevice, setPhoneConnectionStatus, | Device selection is live client state reconciled |
 | `app/hooks/call/usePhoneVerification.ts` | Surface call-in verification results from the verify fetcher: | verifyFetcher.data | toast + setVerificationPhoneNumber, setIsAddingNumber | Reacts to fetcher submission outcomes after the user |
