@@ -13,6 +13,7 @@ type UsePredictiveCallSyncOptions = {
   send: (action: { type: string }) => void;
   setNextRecipient: (recipient: QueueItem | null) => void;
   setUpdate: (update: Record<string, unknown> | null) => void;
+  conference: string | null;
 };
 
 /**
@@ -25,6 +26,7 @@ export function usePredictiveCallSync({
   send,
   setNextRecipient,
   setUpdate,
+  conference,
 }: UsePredictiveCallSyncOptions) {
   /**
    * @effect Bridge predictive-dialer room state (pushed via the workspace SSE
@@ -52,7 +54,7 @@ export function usePredictiveCallSync({
 
       switch (predictiveState.status) {
         case "dialing":
-          send({ type: "START_DIALING" });
+          if (conference) send({ type: "START_DIALING" });
           break;
         case "connected":
           send({ type: "CONNECT" });
@@ -82,5 +84,6 @@ export function usePredictiveCallSync({
     setNextRecipient,
     nextRecipient?.contact_id,
     setUpdate,
+    conference,
   ]);
 }

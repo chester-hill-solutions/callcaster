@@ -377,6 +377,7 @@ export function useCallScreen() {
     send: send as unknown as (action: { type: string }) => void,
     setNextRecipient,
     setUpdate,
+    conference,
   });
 
   const handleDeviceSelect = useCallback(

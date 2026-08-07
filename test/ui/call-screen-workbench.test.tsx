@@ -21,7 +21,7 @@ describe("CallScreen.Workbench", () => {
     );
   });
 
-  test("hides the queue rail below the lg breakpoint (queue sheet covers mobile)", () => {
+  test("hides the queue rail below the xl breakpoint (queue sheet covers mobile)", () => {
     render(
       <CallWorkbench
         call={<div>Contact and controls</div>}
@@ -32,7 +32,7 @@ describe("CallScreen.Workbench", () => {
 
     const queueRail = screen.getByText("Queue rail").parentElement;
     expect(queueRail?.className).toContain("hidden");
-    expect(queueRail?.className).toContain("lg:block");
+    expect(queueRail?.className).toContain("xl:block");
   });
 
   test("omits the incoming and queue slots when not provided", () => {

@@ -13,6 +13,7 @@ function baseProps(overrides: Partial<HookProps> = {}): HookProps {
     send: vi.fn(),
     setNextRecipient: vi.fn(),
     setUpdate: vi.fn(),
+    conference: "test-conf",
     ...overrides,
   };
 }
@@ -52,6 +53,18 @@ describe("usePredictiveCallSync", () => {
         send,
       }),
     );
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  test("dialing status with no conference dispatches nothing", () => {
+    const send = vi.fn();
+    renderHook((props: HookProps) => usePredictiveCallSync(props), {
+      initialProps: baseProps({
+        predictiveState: { contact_id: 7, status: "dialing" },
+        conference: null,
+        send,
+      }),
+    });
     expect(send).not.toHaveBeenCalled();
   });
 

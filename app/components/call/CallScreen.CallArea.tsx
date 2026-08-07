@@ -184,8 +184,9 @@ export function CallControls({
   };
 
   const inCall = callState === "connected" || callState === "dialing";
+  const showInCall = inCall && (!predictive || !!conference);
 
-  if (inCall) {
+  if (showInCall) {
     return (
       <div className="flex flex-col gap-3 px-4 py-3">
         <div className="flex flex-1 gap-2">

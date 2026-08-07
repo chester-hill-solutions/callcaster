@@ -197,6 +197,17 @@ export async function runAutoDialerTurn(
   const twilioClient = await createWorkspaceTwilioInstance({ workspace_id });
   const tdb = createTenantDb(workspace_id);
 
+  if (conferenceId && conferenceId.includes("~")) {
+    const activeConfs = await twilioClient.conferences.list({
+      friendlyName: conferenceId,
+      status: "in-progress",
+      limit: 1,
+    });
+    if (!activeConfs.length) {
+      return { success: true, message: "Conference ended, stopping auto-dial" };
+    }
+  }
+
   // Sweep before claiming. A claim is only released by the turn that made it,
   // so a turn that dies between claiming and dialling strands the row as
   // `assigned` forever — and once that claim goes stale
