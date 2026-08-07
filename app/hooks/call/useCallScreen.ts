@@ -210,7 +210,7 @@ export function useCallScreen() {
   useDialFailureRecovery({
     fetcherState: fetcher.state,
     fetcherData: fetcher.data,
-    send: send as unknown as (action: { type: string }) => void,
+    send,
     showError: (message) => toast.error(message),
   });
 

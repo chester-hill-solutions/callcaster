@@ -3,7 +3,12 @@ import { useEffect } from "react";
 type UseDialFailureRecoveryOptions = {
   fetcherState: string;
   fetcherData: { error?: string; creditsError?: boolean } | undefined;
-  send: (action: { type: string }) => void;
+  // Narrowed to just the action this hook ever dispatches (rather than the
+  // wider `{ type: string }` + `as unknown as` cast other call-screen hooks
+  // use) — useCallState's send is `(action: CallAction) => void`, and a
+  // function typed to accept the whole CallAction union is assignable here
+  // without a cast under parameter contravariance.
+  send: (action: { type: "FAIL" }) => void;
   showError: (message: string) => void;
 };
 
