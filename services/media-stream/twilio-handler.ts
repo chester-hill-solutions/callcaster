@@ -145,6 +145,27 @@ export async function handleTwilioStreamMessage(
         await handleCommittedTranscript(ws, state, event);
       });
 
+      // The message handler runs fire-and-forget, so a stop/close can be
+      // processed while we were awaiting the config load and the STT open. If it
+      // was, the stop handler already ran and saw no state.stt — so this stream
+      // is orphaned. Close it here (never assigning it to state) instead of
+      // leaking the upstream ElevenLabs connection. No billing: the stream
+      // opened after the call ended, so no audio was transcribed.
+      // `phaseAfterOpen` widens the type: TS narrows state.phase to "streaming"
+      // from the assignment above and can't see the concurrent stop mutation.
+      const phaseAfterOpen: string = state.phase;
+      if (phaseAfterOpen === "stopped") {
+        if (stt) {
+          stt.close();
+          log("info", "twilio stream stopped during STT open; closed orphaned stream", {
+            workspaceId: ws.data.workspaceId,
+            callSid: state.callSid,
+            streamSid: state.streamSid,
+          });
+        }
+        return;
+      }
+
       state.stt = stt;
       // The STT clock — not the coaching clock — is what live transcription is
       // billed on. Only set once the stream is actually open.
