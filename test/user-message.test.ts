@@ -36,6 +36,14 @@ describe("app/lib/user-message.ts", () => {
         FALLBACK,
       );
       expect(toUserMessage(new Error("Supabase client error"), FALLBACK)).toBe(FALLBACK);
+      // Connection/pool failures that otherwise read as plain English.
+      expect(toUserMessage(new Error("Connection terminated unexpectedly"), FALLBACK)).toBe(
+        FALLBACK,
+      );
+      expect(toUserMessage(new Error("Connection reset by peer"), FALLBACK)).toBe(FALLBACK);
+      expect(toUserMessage(new Error("Timeout exceeded when trying to connect"), FALLBACK)).toBe(
+        FALLBACK,
+      );
     });
 
     test("returns fallback for lowercase, empty, or overlong messages", () => {

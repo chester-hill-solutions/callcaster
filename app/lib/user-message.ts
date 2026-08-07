@@ -25,6 +25,17 @@ const TECHNICAL_MARKERS = [
   "null",
   "{",
   "\n    at ", // stack frame
+  // Connection/pool/socket failures read as capitalized plain English and
+  // otherwise slip through (e.g. "Connection terminated unexpectedly").
+  "connection terminated",
+  "connection reset",
+  "connection closed",
+  "terminated unexpectedly",
+  "socket hang up",
+  "epipe",
+  "the pool",
+  "timeout exceeded",
+  "query read timeout",
 ];
 
 function isLikelyUserFacing(message: string): boolean {
