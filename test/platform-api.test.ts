@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from "vitest";
+import { describe, expect, test, beforeEach, vi } from "vitest";
 import {
   registerBodySchema,
   tokenBodySchema,
@@ -13,7 +13,6 @@ import {
   storeIdempotentResponse,
   withIdempotency,
 } from "../app/lib/platform-idempotency.server";
-import { vi } from "vitest";
 import { resetRateLimitsForTests } from "../app/lib/platform-rate-limit.server";
 import { openApiSpec } from "../app/lib/openapi";
 
