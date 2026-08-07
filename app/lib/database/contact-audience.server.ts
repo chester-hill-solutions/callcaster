@@ -36,6 +36,34 @@ export type AudienceContactExportRow = Record<string, unknown> & {
   other_data?: unknown;
 };
 
+/**
+ * Shared query for the audience-contact export rows. Every caller MUST pass a
+ * workspace-scoping filter (an unscoped call leaks cross-tenant PII).
+ */
+async function queryAudienceContactRows(
+  filters: SQL[],
+  order?: { column: ReturnType<typeof audienceContactSortColumn>; direction: "asc" | "desc" },
+): Promise<AudienceContactExportRow[]> {
+  const base = db
+    .select({
+      link: contactAudienceTable,
+      contact: contactTable,
+    })
+    .from(contactAudienceTable)
+    .innerJoin(contactTable, eq(contactAudienceTable.contact_id, contactTable.id))
+    .where(and(...filters));
+
+  const rows = order
+    ? await base.orderBy(order.direction === "asc" ? asc(order.column) : desc(order.column))
+    : await base;
+
+  return rows.map(({ link, contact }) => ({
+    ...link,
+    ...contact,
+    contact,
+  }));
+}
+
 export async function listAudienceContactsForExport(
   workspaceId: string,
   audienceId: number,
@@ -47,7 +75,6 @@ export async function listAudienceContactsForExport(
 ): Promise<AudienceContactExportRow[]> {
   const sortKey = options?.sortKey ?? "id";
   const sortDirection = options?.sortDirection ?? "asc";
-  const sortColumn = audienceContactSortColumn(sortKey);
   const searchWhere = options?.q ? buildContactSearchWhere(options.q) : undefined;
 
   const filters: SQL[] = [
@@ -58,21 +85,10 @@ export async function listAudienceContactsForExport(
     filters.push(searchWhere);
   }
 
-  const rows = await db
-    .select({
-      link: contactAudienceTable,
-      contact: contactTable,
-    })
-    .from(contactAudienceTable)
-    .innerJoin(contactTable, eq(contactAudienceTable.contact_id, contactTable.id))
-    .where(and(...filters))
-    .orderBy(sortDirection === "asc" ? asc(sortColumn) : desc(sortColumn));
-
-  return rows.map(({ link, contact }) => ({
-    ...link,
-    ...contact,
-    contact,
-  }));
+  return queryAudienceContactRows(filters, {
+    column: audienceContactSortColumn(sortKey),
+    direction: sortDirection,
+  });
 }
 
 export async function listAudienceContactsJson(
@@ -87,20 +103,7 @@ export async function listAudienceContactsJson(
     filters.push(eq(contactAudienceTable.audience_id, audienceId));
   }
 
-  const rows = await db
-    .select({
-      link: contactAudienceTable,
-      contact: contactTable,
-    })
-    .from(contactAudienceTable)
-    .innerJoin(contactTable, eq(contactAudienceTable.contact_id, contactTable.id))
-    .where(and(...filters));
-
-  return rows.map(({ link, contact }) => ({
-    ...link,
-    ...contact,
-    contact,
-  }));
+  return queryAudienceContactRows(filters);
 }
 
 async function resolveAudienceWorkspaceId(audienceId: number): Promise<string> {
