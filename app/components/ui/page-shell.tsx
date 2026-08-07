@@ -13,6 +13,7 @@ const maxWidthClasses: Record<PageShellMaxWidth, string> = {
 
 type PageShellProps = {
   title: string;
+  titleAs?: "h1" | "h2";
   description?: string;
   /** Right-aligned slot for page-level actions (buttons, links). */
   actions?: ReactNode;
@@ -32,6 +33,7 @@ type PageShellProps = {
  */
 export function PageShell({
   title,
+  titleAs = "h1",
   description,
   actions,
   maxWidth = "full",
@@ -42,7 +44,7 @@ export function PageShell({
     <div className={cn("flex flex-col gap-6", maxWidthClasses[maxWidth], className)}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1 text-center sm:text-left">
-          <Heading as="h1" level={2} branded={false}>
+          <Heading as={titleAs} level={2} branded={false}>
             {title}
           </Heading>
           {description ? <Text variant="muted">{description}</Text> : null}

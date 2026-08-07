@@ -53,7 +53,7 @@ export default function AudiencesNew() {
 
   return (
     <section id="form">
-      <PageShell title="Add a Call list" maxWidth="narrow">
+      <PageShell title="Add a Call list" titleAs="h2" maxWidth="narrow">
         {actionData?.error ? (
           <Text className="text-center text-destructive">
             Error: {actionData.error}
