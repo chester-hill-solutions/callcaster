@@ -253,6 +253,9 @@ export function useCallScreen() {
     campaign,
     workspaceId,
     disposition,
+    // Autosave fires every 2s while the agent types mid-call; success toasts
+    // would spam over the call UI. Errors still surface.
+    silent: true,
     toast: toast as unknown as {
       success: (message: React.ReactNode, data?: unknown) => string | number;
       error: (message: React.ReactNode, data?: unknown) => string | number;
@@ -340,6 +343,16 @@ export function useCallScreen() {
    */
   useEffect(() => {
     const handleKeypress = (e: KeyboardEvent) => {
+      // Typing digits into a questionnaire field must not fire DTMF tones
+      // into the live call.
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest("input, textarea, select") !== null)
+      ) {
+        return;
+      }
       if (KEYPAD_KEYS.includes(e.key)) {
         handleDTMFRef.current(e.key);
       }

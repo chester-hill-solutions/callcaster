@@ -108,6 +108,44 @@ describe("utils hooks", () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
+  test("useDebouncedSave silent option suppresses success toast but keeps error toast", async () => {
+    const fetcher = createMockFetcher({ state: "idle" });
+    mockUseFetcher.mockReturnValue(fetcher);
+
+    const useDebouncedSave = (await import("@/hooks/utils/useDebouncedSave")).default;
+    const toast = {
+      success: vi.fn(),
+      error: vi.fn(),
+      warning: vi.fn(),
+    };
+
+    const base = {
+      update: { q1: "a" },
+      recentAttempt: { id: 9 } as any,
+      nextRecipient: { id: 2, contact: { id: 10 } } as any,
+      campaign: { id: 3 } as any,
+      workspaceId: "ws1",
+      disposition: "answered",
+      toast,
+      silent: true,
+    };
+
+    const { rerender } = renderHook(
+      (props) => useDebouncedSave(props),
+      { initialProps: base },
+    );
+
+    Object.assign(fetcher, { data: { id: 1 } });
+    rerender({ ...base, update: { q1: "b" } });
+    await act(async () => Promise.resolve());
+    expect(toast.success).not.toHaveBeenCalled();
+
+    Object.assign(fetcher, { data: { error: "nope" } });
+    rerender({ ...base, update: { q1: "c" } });
+    await act(async () => Promise.resolve());
+    expect(toast.error).toHaveBeenCalled();
+  });
+
   test("useOptimisticMutation and useOptimisticCollection rollback on error", async () => {
     const {
       useOptimisticMutation,

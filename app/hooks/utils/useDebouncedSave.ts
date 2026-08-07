@@ -18,6 +18,8 @@ interface UseDebouncedSaveParams {
     workspaceId: string;
     disposition: string | null;
     toast: ToastType;
+    /** Suppress the "Saved successfully" success toast (errors still toast). */
+    silent?: boolean;
 }
 
 interface UseDebouncedSaveReturn {
@@ -80,7 +82,8 @@ const useDebouncedSave = ({
     campaign,
     workspaceId,
     disposition,
-    toast
+    toast,
+    silent = false
 }: UseDebouncedSaveParams): UseDebouncedSaveReturn => {
     const fetcher = useFetcher<FetcherData>();
     const previousUpdateRef = useRef<Record<string, unknown> | null>(update);
@@ -172,13 +175,13 @@ const useDebouncedSave = ({
     useEffect(() => {
         if (fetcher.state === 'idle' && fetcher.data) {
             if (fetcher.data.id) {
-                toast.success("Saved successfully");
+                if (!silent) toast.success("Saved successfully");
             } else {
                 logger.error("Save failed:", fetcher.data.error);
                 toast.error(`Save failed: ${fetcher.data.error || 'Unknown error'}`);
             }
         }
-    }, [fetcher.state, fetcher.data, toast]);
+    }, [fetcher.state, fetcher.data, toast, silent]);
   
     return { saveData, isSaving: fetcher.state === 'submitting' };
 };
