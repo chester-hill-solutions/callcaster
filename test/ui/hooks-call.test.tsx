@@ -37,22 +37,29 @@ describe("call hooks", () => {
     vi.useRealTimers();
   });
 
-  test("useCallState state machine and timer", async () => {
-    vi.useFakeTimers();
+  test("useCallState enforces state machine transitions", async () => {
     const { useCallState } = await import("@/hooks/call/useCallState");
     const { result } = renderHook(() => useCallState());
 
+    expect(result.current.state).toBe("idle");
+    // Invalid from idle — stays idle.
     act(() => result.current.send({ type: "CONNECT" }));
+    expect(result.current.state).toBe("idle");
+
     act(() => result.current.send({ type: "START_DIALING" }));
+    expect(result.current.state).toBe("dialing");
     act(() => result.current.send({ type: "CONNECT" }));
-    act(() => result.current.send({ type: "SET_DISPOSITION", disposition: "yes" }));
-    act(() => vi.advanceTimersByTime(1000));
-    expect(result.current.context.callDuration).toBeGreaterThan(0);
+    expect(result.current.state).toBe("connected");
     act(() => result.current.send({ type: "HANG_UP" }));
+    expect(result.current.state).toBe("completed");
     act(() => result.current.send({ type: "NEXT" }));
-    act(() => result.current.send({ type: "FAIL" }));
+    expect(result.current.state).toBe("idle");
+
     act(() => result.current.send({ type: "START_DIALING" }));
+    act(() => result.current.send({ type: "FAIL" }));
+    expect(result.current.state).toBe("failed");
     act(() => result.current.send({ type: "NEXT" }));
+    expect(result.current.state).toBe("idle");
   });
 
   test("useCallDuration tracks connected state", async () => {

@@ -102,7 +102,7 @@ export function useCallScreen() {
     verifiedNumbers,
   });
 
-  const { state, context, send } = useCallState();
+  const { state, send } = useCallState();
   const navigate = useNavigate();
   const {
     device,
