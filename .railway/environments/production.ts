@@ -26,7 +26,7 @@ const appVariables = [
 
 export function productionResources() {
   const app = service("callcaster", {
-    source: source("master"),
+    source: source("prod"),
     build: { buildEnvironment: "V2", builder: "NIXPACKS" },
     replicas: { "us-east4-eqdc4a": 1 },
     env: preservedVariables(appVariables),
