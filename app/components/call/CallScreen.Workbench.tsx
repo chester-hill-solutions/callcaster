@@ -15,8 +15,9 @@ interface CallWorkbenchProps {
  *
  * Desktop (lg+): three columns — queue rail (left), script/questionnaire
  * (center, main reading surface), action column (right: call panel with
- * status, contact, controls, and disposition). The action column and queue
- * rail stay sticky below the top chrome while long scripts scroll.
+ * status, contact, controls, disposition, and household-member switcher).
+ * The action column and queue rail stay sticky below the top chrome while
+ * long scripts scroll.
  *
  * Mobile: single stacked column in task order — incoming, call panel
  * (with disposition), household, script. The queue rail is hidden below lg;
@@ -42,9 +43,9 @@ export function CallWorkbench({
       {incoming ? <div className="lg:col-span-3">{incoming}</div> : null}
       <div className="order-1 flex min-w-0 flex-col gap-4 lg:sticky lg:top-20 lg:order-3">
         {call}
+        {household}
       </div>
       <div className="order-2 flex min-w-0 flex-col gap-4 lg:order-2">
-        {household}
         {script}
       </div>
       {queue ? (

@@ -124,7 +124,7 @@ Reserve **slab typography and bold brand color** for chrome and moments of actio
 ### Call screen panels
 
 - Use shared classes from [`call-panel-classes.ts`](app/components/call/call-panel-classes.ts) for queue, script, household, and call area panels — consistent border, radius, and header bars.
-- The call screen uses the three-column [`CallWorkbench`](app/components/call/CallScreen.Workbench.tsx) layout: queue rail (left, lg+ only — the header queue sheet covers mobile), script/questionnaire (center), and a sticky action column (right: call panel with state-driven primary action + disposition). On mobile it collapses to a single column in task order: call panel → household → script.
+- The call screen uses the three-column [`CallWorkbench`](app/components/call/CallScreen.Workbench.tsx) layout: queue rail (left, lg+ only — the header queue sheet covers mobile), script/questionnaire (center), and a sticky action column (right: call panel with state-driven primary action + disposition, then the household-member switcher). On mobile it collapses to a single column in task order: call panel → household → script.
 
 ### Quality bar (PR checklist)
 
