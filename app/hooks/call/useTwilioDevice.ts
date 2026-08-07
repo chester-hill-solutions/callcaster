@@ -27,6 +27,8 @@ interface TwilioDeviceHook {
   setCallDuration: React.Dispatch<React.SetStateAction<number>>;
   setIsBusy: React.Dispatch<React.SetStateAction<boolean>>;
   deviceIsBusy: boolean;
+  /** Manually recover from a terminal Device error — see useTwilioConnection. */
+  reconnect: () => void;
 }
 
 /**
@@ -55,6 +57,13 @@ export function useTwilioDevice(
 
   const onStatusChange = useCallback((newStatus: string) => {
     setStatus(newStatus);
+    // "Registered" is the connection's own signal that it's healthy —
+    // clear any stale error from a prior failure. This state was set-only
+    // otherwise: a single transient failure left the "Phone connection
+    // error" banner up for the rest of the shift even after recovery.
+    if (newStatus === "Registered") {
+      setError(null);
+    }
   }, []);
 
   const onDeviceError = useCallback((err: Error) => {
@@ -159,5 +168,6 @@ export function useTwilioDevice(
     setCallDuration,
     setIsBusy,
     deviceIsBusy,
+    reconnect: connection.reconnect,
   };
 }

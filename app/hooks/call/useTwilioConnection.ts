@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
 import { logger } from "@/lib/logger.client";
 import { attachTwilioListener } from "@/lib/twilio/call-listener-utils.client";
@@ -23,6 +23,14 @@ interface UseTwilioConnectionReturn {
   status: string;
   error: Error | null;
   isRegistered: boolean;
+  /**
+   * Tear down the current Device (if any) and create a fresh one from
+   * scratch. Terminal states (Error/RegistrationFailed/Unregistered) never
+   * self-heal — nothing retries registration — so without this, the only
+   * recovery is a full page reload. Safe to call at any time; a healthy
+   * Device is simply replaced.
+   */
+  reconnect: () => void;
 }
 
 /**
@@ -44,6 +52,10 @@ export function useTwilioConnection({
   const tokenRef = useRef(token);
   const listenerCleanupsRef = useRef<Array<() => void>>([]);
   const unmountedRef = useRef(false);
+  // Bumping this forces the setup effect to run again with deviceRef already
+  // cleared, taking the "create a new device" branch instead of the
+  // "update the existing device's token" branch.
+  const [reconnectNonce, setReconnectNonce] = useState(0);
 
   const onIncomingCallRef = useRef(onIncomingCall);
   const onStatusChangeRef = useRef(onStatusChange);
@@ -65,7 +77,10 @@ export function useTwilioConnection({
    * fetcher submit: script auto-save, dial, audiodrop, queue ops).
    * @effect-deps token, deviceOptions (a token change is applied via
    * updateToken on the existing device, or triggers first-time creation;
-   * callback props are read via refs so they don't retrigger setup)
+   * callback props are read via refs so they don't retrigger setup),
+   * reconnectNonce (bumped by the returned `reconnect()` — the manual
+   * recovery path for terminal Error/RegistrationFailed/Unregistered states,
+   * which nothing retries automatically)
    * @effect-side-effects subscription (Twilio Device event listeners) + network
    * (lazy SDK import, device.register()/updateToken()); teardown lives in the
    * separate unmount-only effect below, NOT in this effect's cleanup — pairing
@@ -107,6 +122,11 @@ export function useTwilioConnection({
 
       const handleRegistered = () => {
         setStatus("Registered");
+        // Registering successfully means any prior error no longer applies —
+        // error was set-only before this, so a single transient failure left
+        // a stale "Phone connection error" banner up for the rest of the
+        // shift even after the device recovered.
+        setError(null);
         onStatusChangeRef.current?.("Registered");
         onDeviceBusyChangeRef.current?.(false);
       };
@@ -192,7 +212,25 @@ export function useTwilioConnection({
       onErrorRef.current?.(error);
       onCallStateChangeRef.current?.("failed");
     });
-  }, [token, deviceOptions]);
+  }, [token, deviceOptions, reconnectNonce]);
+
+  const reconnect = useCallback(() => {
+    const stale = deviceRef.current;
+    deviceRef.current = null;
+    listenerCleanupsRef.current.forEach((cleanup) => cleanup());
+    listenerCleanupsRef.current = [];
+    setDevice(null);
+    setError(null);
+    setStatus("disconnected");
+    if (stale) {
+      try {
+        stale.destroy();
+      } catch (err) {
+        logger.error("Error destroying Twilio device during reconnect:", err);
+      }
+    }
+    setReconnectNonce((n) => n + 1);
+  }, []);
 
   /**
    * @effect Tear the Device down on unmount only: detach listeners and
@@ -226,5 +264,6 @@ export function useTwilioConnection({
     status,
     error,
     isRegistered: status === "Registered" || status === "Connected",
+    reconnect,
   };
 }

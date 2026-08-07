@@ -356,6 +356,30 @@ describe("call hooks", () => {
     expect(result.current.deviceIsBusy).toBe(true);
   });
 
+  // Regression: useTwilioDevice keeps its own `error` state (set via the
+  // onError callback from useTwilioConnection) separate from the
+  // connection's internal error — clearing one without the other still left
+  // the call screen's banner (which reads useTwilioDevice's error) stuck.
+  test("useTwilioDevice clears its own error state on the next successful registration, and exposes reconnect", async () => {
+    const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
+    const send = vi.fn();
+
+    const { result } = renderHook(() =>
+      useTwilioDevice("tok", "computer", "ws", send),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => mockTwilioDevice.emit("error", new Error("device down")));
+    expect(result.current.error?.message).toBe("device down");
+
+    act(() => mockTwilioDevice.emit("registered"));
+    expect(result.current.error).toBeNull();
+
+    expect(typeof result.current.reconnect).toBe("function");
+  });
+
   test("autoAcceptIncoming accepts client-ringed outbound legs and never surfaces the incoming box", async () => {
     const { useCallHandling } = await import("@/hooks/call/useCallHandling");
 

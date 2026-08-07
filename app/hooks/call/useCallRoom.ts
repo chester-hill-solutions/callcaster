@@ -81,13 +81,17 @@ const useCallRoom = ({
   /**
    * @effect Open a workspace SSE connection for this call room: track presence
    * online/offline, relay predictive-dialer broadcasts and presence_sync events
-   * into local state, and send a periodic presence heartbeat while online.
+   * into local state, send a periodic presence heartbeat while online, and
+   * manually reopen the connection if it reaches readyState CLOSED (the
+   * browser's own auto-retry only covers CONNECTING; some failures fail the
+   * connection straight to CLOSED with no further native retry).
    * @effect-deps campaign, updatePresence, userId, workspace (all identify which
    * workspace/campaign room to connect to and are needed to (re)open the stream
    * and to report presence for the right agent/campaign)
    * @effect-side-effects subscription (EventSource + "workspace_event" listener) +
-   * timer (setInterval heartbeat, PRESENCE_UPDATE_INTERVAL) + fetch (updatePresence
-   * POSTs on open/heartbeat/unmount); all torn down in the cleanup function.
+   * timer (setInterval heartbeat, PRESENCE_UPDATE_INTERVAL; setTimeout manual
+   * reconnect on CLOSED) + fetch (updatePresence POSTs on open/heartbeat/unmount);
+   * all torn down in the cleanup function.
    * @effect-why-not-loader Requires a persistent live connection (SSE) and a
    * recurring heartbeat for the lifetime of the mounted call room; this is a
    * subscription to a push stream, not a one-shot request/response.
@@ -95,13 +99,10 @@ const useCallRoom = ({
   useEffect(() => {
     if (!userId || !workspace) return;
 
+    let cancelled = false;
+    let eventSource: EventSource;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     const url = `/api/workspaces/${encodeURIComponent(workspace)}/events`;
-    const eventSource = new EventSource(url);
-
-    eventSource.onopen = () => {
-      setStatus("online");
-      void updatePresence("online");
-    };
 
     const onWorkspaceEvent = (message: MessageEvent<string>) => {
       try {
@@ -125,10 +126,34 @@ const useCallRoom = ({
       }
     };
 
-    eventSource.addEventListener("workspace_event", onWorkspaceEvent);
-    eventSource.onerror = () => {
-      setStatus("error");
+    const connect = () => {
+      if (cancelled) return;
+      eventSource = new EventSource(url);
+
+      eventSource.onopen = () => {
+        setStatus("online");
+        void updatePresence("online");
+      };
+
+      eventSource.addEventListener("workspace_event", onWorkspaceEvent);
+
+      eventSource.onerror = () => {
+        setStatus("error");
+        // The browser auto-retries an SSE connection on its own as long as
+        // readyState stays CONNECTING. Some failures (e.g. certain HTTP
+        // error responses) instead "fail the connection" straight to CLOSED,
+        // and the browser never retries again — without reconnecting
+        // ourselves here, the 5-minute presence heartbeat (gated on
+        // status === "online") stops forever and the agent silently drops
+        // off supervisor views while their own screen looks unaffected.
+        if (eventSource.readyState === EventSource.CLOSED && !cancelled) {
+          eventSource.removeEventListener("workspace_event", onWorkspaceEvent);
+          reconnectTimer = setTimeout(connect, 5000);
+        }
+      };
     };
+
+    connect();
 
     presenceIntervalRef.current = setInterval(() => {
       if (statusRef.current === "online") {
@@ -137,6 +162,10 @@ const useCallRoom = ({
     }, PRESENCE_UPDATE_INTERVAL);
 
     return () => {
+      cancelled = true;
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
       if (presenceIntervalRef.current) {
         clearInterval(presenceIntervalRef.current);
       }
