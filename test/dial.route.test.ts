@@ -76,7 +76,9 @@ vi.mock("@/lib/auto-dial.server", () => ({
   saveCallToDatabase: vi.fn(async () => {
     if (autoDialState.saveCallError) {
       mocks.logger.error("Error saving the call to the database:", autoDialState.saveCallError);
+      return false;
     }
+    return true;
   }),
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
@@ -218,6 +220,34 @@ describe("app/routes/api+/dial/tsx.route", () => {
       "w1",
       "u1",
     );
+  });
+
+  test("hangs up the placed call when saving it to the database fails (no untracked live call)", async () => {
+    autoDialState.saveCallError = new Error("db down");
+    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      to_number: "+15555550100",
+      user_id: "u1",
+      campaign_id: "1",
+      contact_id: "2",
+      workspace_id: "w1",
+      queue_id: "3",
+      outreach_id: "oa1",
+      caller_id: "+1555",
+      selected_device: "computer",
+    });
+    queueJsonAuthSession({ user: { id: "u1" } });
+    const update = vi.fn(async () => ({}));
+    // Twilio's `calls` is both callable (calls(sid)) and has `.create`.
+    const calls: any = vi.fn(() => ({ update }));
+    calls.create = vi.fn(async () => ({ sid: "CA1", from: "+1555" }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls });
+
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
+    expect((res as Response).headers.get("Content-Type")).toBe("text/xml");
+    expect(calls).toHaveBeenCalledWith("CA1");
+    expect(update).toHaveBeenCalledWith({ status: "completed" });
   });
 
   test("claims the queue row with workspace/campaign/queue/session-user before dialing", async () => {

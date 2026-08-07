@@ -132,6 +132,20 @@ export const action = defineAction({
     const to = normalizePhoneNumber(to_number)
     const twilio = await createWorkspaceTwilioInstance({ workspace_id });
     const twiml = new Twilio.twiml.VoiceResponse();
+    // Track the placed SID outside the try: if the call is created but we then
+    // fail to persist its row, the active_call redial guard can't see it and a
+    // retry would double-dial the same contact. Hang it up in that case — a
+    // killed call the agent retries is far safer than a duplicate live call to a
+    // real person plus a duplicate completion charge.
+    let placedCallSid: string | null = null;
+    const hangUpUntrackedCall = async (reason: string) => {
+        if (!placedCallSid) return;
+        try {
+            await twilio.calls(placedCallSid).update({ status: "completed" });
+        } catch (hangupError) {
+            logger.error(`Failed to hang up untracked call (${reason}):`, hangupError);
+        }
+    };
     try {
         const call = await withTwilioRetry(
           () =>
@@ -145,6 +159,7 @@ export const action = defineAction({
             }),
           { workspaceId: workspace_id, operation: "calls.create" },
         );
+        placedCallSid = call.sid ?? null;
         let outreach_attempt_id;
         const campaignId = parseInt(campaign_id, 10);
         const contactId = parseInt(contact_id, 10);
@@ -164,7 +179,7 @@ export const action = defineAction({
             outreach_attempt_id = Number(outreach_id)
         }
 
-        await saveCallToDatabase(workspace_id, {
+        const callSaved = await saveCallToDatabase(workspace_id, {
             sid: call.sid,
             date_updated: call.dateUpdated?.toISOString() ?? new Date().toISOString(),
             parent_call_sid: call.parentCallSid ?? null,
@@ -191,8 +206,17 @@ export const action = defineAction({
             outreach_attempt_id: Number.isFinite(outreach_attempt_id) ? outreach_attempt_id : undefined,
             queue_id: queueId,
         });
+
+        // saveCallToDatabase swallows its own DB errors (returns false) so a
+        // status callback can't be blocked by a transient write failure; here on
+        // the dial path a failed write means the redial guard is blind, so hang up.
+        if (!callSaved) {
+            logger.error('Call placed but its row was not persisted; hanging up to avoid an untracked live call.');
+            await hangUpUntrackedCall('save failed');
+        }
     } catch (error) {
         logger.error('Error placing call:', error);
+        await hangUpUntrackedCall('error placing call');
         twiml.say('There was an error placing your call. Please try again later.');
     }
 

@@ -100,7 +100,7 @@ export async function saveCallToDatabase(
 ) {
   if (!callData.sid) {
     logger.error("Cannot save call without sid");
-    return;
+    return false;
   }
 
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
@@ -120,15 +120,20 @@ export async function saveCallToDatabase(
         row as Parameters<typeof updateCallBySid>[2],
         { tdb },
       );
-      return;
+      return true;
     }
     await tdb.call.insert({
       ...row,
       date_created: new Date().toISOString(),
       is_last: false,
     });
+    return true;
   } catch (error) {
+    // Swallowed so a late status callback can't be blocked by a transient write
+    // failure. Callers that need to know whether the row landed (e.g. the dial
+    // path's redial guard) must check the returned boolean.
     logger.error("Error saving the call to the database:", error);
+    return false;
   }
 }
 
