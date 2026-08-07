@@ -315,14 +315,14 @@ export async function updateWorkspaceMemberRole(
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
-  // The actor must at least match the target's current rank, or a `member`
-  // could demote an `admin`.
-  const rankCheck = await requireActorOutranksTarget(access.actorRole, workspaceId, targetUserId);
-  if (!rankCheck.ok) return rankCheck;
-
   // Owner-role transitions keep their specific owner-only gate first.
   const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId, role);
   if (!ownerCheck.ok) return ownerCheck;
+
+  // The actor must at least match the target's current rank, or a `member`
+  // could demote an `admin` (the owner gate above only covers owner targets).
+  const rankCheck = await requireActorOutranksTarget(access.actorRole, workspaceId, targetUserId);
+  if (!rankCheck.ok) return rankCheck;
 
   // No privilege escalation: an actor cannot grant a role above their own.
   // This is what stops a `member` (who may manage members) from promoting
@@ -363,13 +363,13 @@ export async function removeWorkspaceMember(
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
-  // The actor must at least match the target's current rank, or a `member`
-  // could remove an `admin`.
-  const rankCheck = await requireActorOutranksTarget(access.actorRole, workspaceId, targetUserId);
-  if (!rankCheck.ok) return rankCheck;
-
   const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId);
   if (!ownerCheck.ok) return ownerCheck;
+
+  // The actor must at least match the target's current rank, or a `member`
+  // could remove an `admin` (the owner gate above only covers owner targets).
+  const rankCheck = await requireActorOutranksTarget(access.actorRole, workspaceId, targetUserId);
+  if (!rankCheck.ok) return rankCheck;
 
   const soleOwnerCheck = await requireSoleOwnerProtection(workspaceId, targetUserId);
   if (!soleOwnerCheck.ok) return soleOwnerCheck;
