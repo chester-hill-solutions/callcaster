@@ -301,6 +301,7 @@ export async function runAutoDialerTurn(
             });
             await rpcDequeueContact(tdb, {
               contactId: contactRecord.contact_id,
+              workspaceId: workspace_id,
               groupOnHousehold: false,
               dequeuedById: user_id,
               dequeuedReasonText:
@@ -318,6 +319,7 @@ export async function runAutoDialerTurn(
 
       await rpcDequeueContact(tdb, {
         contactId: contactRecord.contact_id,
+        workspaceId: workspace_id,
         groupOnHousehold: true,
         dequeuedById: user_id,
         dequeuedReasonText: "Predictive Dialer called contact",

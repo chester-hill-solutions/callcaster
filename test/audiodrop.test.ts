@@ -59,6 +59,11 @@ describe("api.audiodrop action", () => {
       deps: { verifyAuth: vi.fn(async () => ({ user: { id: "u1" }, headers: new Headers() })), createWorkspaceTwilioInstance },
     } as any));
     expect(res).toMatchObject({ success: false, error: { call: expect.any(Error) } });
+    // Regression: findCallSidByParentCallSid used to be a global,
+    // untenanted lookup by callId alone — any workspace could resolve
+    // another workspace's child call SID. It must now be scoped by the
+    // workspace the caller passed access-control checks for.
+    expect(telephonyMocks.findCallSidByParentCallSid).toHaveBeenCalledWith("w1", "c1");
   });
 
   test("returns failure when campaign lookup errors", async () => {

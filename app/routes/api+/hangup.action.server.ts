@@ -47,6 +47,7 @@ export const action = defineAction({
         if (call.contact_id) {
             await rpcDequeueContact(tdb, {
                 contactId: call.contact_id,
+                workspaceId,
                 groupOnHousehold: true,
                 dequeuedById: user.id,
                 dequeuedReasonText: "Call completed",

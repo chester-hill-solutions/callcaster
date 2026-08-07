@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: (...args: unknown[]) => mocks.requireTwilioSignature(...args),
+  twilioWebhookForbiddenHangup: () =>
+    new Response("<Response><Say>hangup</Say></Response>", {
+      status: 403,
+      headers: { "Content-Type": "text/xml" },
+    }),
 }));
 vi.mock("@/lib/acd/acd-router.server", () => ({
   handleAcdRouterRequest: (...args: unknown[]) => mocks.handleAcdRouterRequest(...args),
@@ -50,6 +55,24 @@ describe("app/routes/api+/acd-router", () => {
       }),
     );
     mocks.logger.error.mockReset();
+  });
+
+  // Regression: this route used to build the signature-check option as
+  // `callSid ? { callSid } : {}` — omitting CallSid silently downgraded
+  // validation to the main-account token instead of failing. A genuine
+  // Twilio callback to this URL always carries CallSid.
+  test("rejects with 403 hangup when CallSid is missing, without calling requireTwilioSignature", async () => {
+    const mod = await import("../app/routes/api+/acd-router.route");
+    const res = await asRouteResponse(
+      mod.action({
+        request: new Request("http://localhost/api/acd-router", {
+          method: "POST",
+          body: new FormData(),
+        }),
+      } as never),
+    );
+    expect(res.status).toBe(403);
+    expect(mocks.requireTwilioSignature).not.toHaveBeenCalled();
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {

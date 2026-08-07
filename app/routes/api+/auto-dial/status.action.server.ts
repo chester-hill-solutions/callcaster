@@ -158,6 +158,7 @@ const handleCallStatus = async (
     const tdb = createTenantDb(workspace);
     await rpcDequeueContact(tdb, {
       contactId: outreachStatus.contact_id,
+      workspaceId: workspace,
       groupOnHousehold: true,
       // A conference name is `${userId}~${uuid}`, and this argument is bound
       // as ::uuid — passing the raw name raised 22P02 on every terminal call,

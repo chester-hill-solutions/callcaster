@@ -40,6 +40,7 @@ export const action = defineAction({
 
       await rpcDequeueContact(tdb, {
         contactId: Number(contact_id),
+        workspaceId,
         groupOnHousehold: household,
         dequeuedById: auth.user.id,
         dequeuedReasonText: "Manually dequeued by user",
