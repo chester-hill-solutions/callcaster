@@ -463,7 +463,9 @@ export async function runNumberRentalBilling(args: {
       // negative and keep the number active for free. Check funds explicitly
       // and route an unaffordable new charge to the unpaid/grace path instead.
       const balance = await getWorkspaceCreditsBalance(number.workspace);
-      if (balance != null && balance < NUMBER_RENTAL_MONTHLY_CREDITS) {
+      // Treat an unknown balance (null → workspace row missing / replication
+      // gap) as unaffordable rather than debiting it negative.
+      if (balance == null || balance < NUMBER_RENTAL_MONTHLY_CREDITS) {
         unpaid++;
         logger.info("Number rental left unpaid: insufficient credits", {
           numberId: number.id,
