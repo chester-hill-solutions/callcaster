@@ -5,7 +5,7 @@ import { normalizeWorkspaceMessagingOnboardingState } from "@/lib/messaging-onbo
 import { mergeWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding/merge.server";
 import {
   loadWorkspaceTwilioData,
-  persistWorkspaceTwilioData,
+  mergeWorkspaceTwilioData,
 } from "@/lib/merge-workspace-twilio-data.server";
 
 export function getWorkspaceMessagingOnboardingFromTwilioData(
@@ -36,22 +36,24 @@ export async function updateWorkspaceMessagingOnboardingState({workspaceId,
   updates: Partial<WorkspaceMessagingOnboardingState>;
   actorUserId: string | null;
 }) {
-  const currentTwilioData = await loadWorkspaceTwilioData(workspaceId);
-  const currentState = getWorkspaceMessagingOnboardingFromTwilioData(
-    currentTwilioData as TwilioAccountData,
-  );
-  const nextState = mergeWorkspaceMessagingOnboardingState(currentState, {
-    ...updates,
-    lastUpdatedAt: new Date().toISOString(),
-    lastUpdatedBy: actorUserId,
+  // Re-derive the current onboarding state from the FRESH row inside the atomic
+  // merge, so a concurrent write (e.g. the compliance job persisting a brandSid)
+  // is not clobbered by a stale-cache read-modify-write.
+  let nextState: WorkspaceMessagingOnboardingState | undefined;
+  await mergeWorkspaceTwilioData(workspaceId, (current) => {
+    const currentState = getWorkspaceMessagingOnboardingFromTwilioData(
+      current as TwilioAccountData,
+    );
+    nextState = mergeWorkspaceMessagingOnboardingState(currentState, {
+      ...updates,
+      lastUpdatedAt: new Date().toISOString(),
+      lastUpdatedBy: actorUserId,
+    });
+    return {
+      ...current,
+      onboarding: nextState,
+    };
   });
 
-  const nextTwilioData = {
-    ...currentTwilioData,
-    onboarding: nextState,
-  };
-
-  await persistWorkspaceTwilioData(workspaceId, nextTwilioData);
-
-  return nextState;
+  return nextState!;
 }
