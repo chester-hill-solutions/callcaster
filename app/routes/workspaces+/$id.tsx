@@ -237,10 +237,9 @@ export default function Workspace() {
   const outlet = useOutlet();
   const context = useOutletContext<ContextType>();
   const onboardingStrip = findOnboardingStripData(useMatches());
-  // Sidebar stays visible after short intake. Hide only while the intake
-  // route is active or the root loader would still bounce into intake.
-  const showSidebar =
-    !onboardingStrip && !onboardingReadiness.shouldRedirectToOnboarding;
+  // Keep the workspace sidebar available on all workspace screens; onboarding
+  // itself is the only focused layout that should hide it.
+  const showSidebar = !onboardingStrip;
 
   return (
     <>
