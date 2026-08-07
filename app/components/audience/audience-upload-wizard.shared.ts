@@ -1,7 +1,7 @@
 export const AUDIENCE_UPLOAD_WIZARD_STEPS = [
-  { id: "file", label: "1. File" },
+  { id: "file", label: "1. Select file" },
   { id: "map", label: "2. Map columns" },
-  { id: "review", label: "3. Review" },
+  { id: "review", label: "3. Upload" },
 ] as const;
 
 export type AudienceUploadWizardStepId =

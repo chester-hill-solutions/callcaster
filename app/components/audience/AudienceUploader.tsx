@@ -34,6 +34,7 @@ type AudienceUploaderProps = {
   campaignId?: string;
   returnTo?: string | null;
   onUploadComplete?: (audienceId: string) => void;
+  onStageChange?: (stage: "file" | "map" | "upload") => void;
 };
 
 export default function AudienceUploader({
@@ -42,6 +43,7 @@ export default function AudienceUploader({
   campaignId,
   returnTo,
   onUploadComplete,
+  onStageChange,
 }: AudienceUploaderProps) {
   const params = useParams();
   const workspaceId = params["id"];
@@ -93,6 +95,7 @@ export default function AudienceUploader({
   const resetFileState = () => {
     setDraft(null);
     setWizard("file");
+    onStageChange?.("file");
     resetProgress();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -139,6 +142,7 @@ export default function AudienceUploader({
       splitNameColumn: nameColumnHeader ?? null,
     });
     setWizard("map");
+    onStageChange?.("map");
   };
 
   const updateHeaderMapping = (
@@ -166,6 +170,7 @@ export default function AudienceUploader({
     if (!draft || !workspaceId) return;
 
     startSubmitting(draft.rowCount);
+    onStageChange?.("upload");
 
     try {
       const formData = new FormData();
@@ -275,6 +280,7 @@ export default function AudienceUploader({
                 onContinue={() => {
                   if (hasBlockingMappingIssue) return;
                   setWizard("review");
+                  onStageChange?.("upload");
                 }}
                 onChooseAnotherFile={resetFileState}
               />
@@ -328,9 +334,6 @@ export default function AudienceUploader({
               />
             );
           case "completed":
-            if (embedded) {
-              return null;
-            }
             return (
               <AudienceUploadProgressPanel
                 status="completed"
