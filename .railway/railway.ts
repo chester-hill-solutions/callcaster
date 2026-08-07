@@ -10,6 +10,7 @@ export default defineRailway(() => {
     source: callcaster,
     healthcheck: "/readyz",
     healthcheckTimeout: 30,
+    domains: ["dev.callcaster.ca"],
     replicas: { "us-east4-eqdc4a": 1 },
     networking: { privateNetworkEndpoint: "callcaster-review" },
     env: {
