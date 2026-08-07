@@ -389,7 +389,7 @@ describe("realtime hooks", () => {
       emitWorkspaceEvent({
         table: "transaction_history",
         eventType: "INSERT",
-        new: { amount: 5, workspace: "ws" },
+        new: { id: 1, amount: 5, workspace: "ws" },
         old: null,
       });
     });
@@ -397,7 +397,7 @@ describe("realtime hooks", () => {
 
     act(() => result.current.setDisposition("answered"));
     expect(result.current.disposition).toBe("answered");
-    expect(result.current.availableCredits).toBeGreaterThan(10);
+    expect(result.current.availableCredits).toBe(15);
   });
 
   test("useWorkspaceRealtime downgrades SSE onerror to logger.debug (reconnects are normal, not errors)", async () => {

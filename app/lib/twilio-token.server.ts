@@ -22,7 +22,7 @@ export async function generateToken({
     twilioAccountSid,
     twilioApiKey,
     twilioApiSecret,
-    { identity },
+    { identity, ttl: 28800 },
   );
   token.addGrant(voiceGrant);
   return token.toJwt();

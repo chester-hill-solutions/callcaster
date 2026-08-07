@@ -8,7 +8,8 @@ export interface UseCallStatusPollingOptions {
   workspaceId: string;
   enabled: boolean;
   intervalMs?: number;
-  onStatus?: (status: string) => void;
+  agentLegSid?: string | null;
+  onStatus?: (status: string, resolvedSid?: string) => void;
 }
 
 const DEFAULT_INTERVAL_MS = 5000;
@@ -24,6 +25,7 @@ export function useCallStatusPolling({
   workspaceId,
   enabled,
   intervalMs = DEFAULT_INTERVAL_MS,
+  agentLegSid,
   onStatus,
 }: UseCallStatusPollingOptions): void {
   const inFlightRef = useRef(false);
@@ -32,17 +34,17 @@ export function useCallStatusPolling({
     if (!callSid || !workspaceId || inFlightRef.current) return;
 
     inFlightRef.current = true;
-    const params = new URLSearchParams({ callSid, workspaceId });
+    const params = new URLSearchParams({ callSid, workspaceId, agentLegSid: agentLegSid ?? "" });
     fetch(`/api/call-status-poll?${params}`)
       .then((res) => {
         if (!res.ok) return res.json().then((data) => Promise.reject(data));
         return res.json();
       })
-      .then((data: { status?: string }) => {
+      .then((data: { status?: string; callSid?: string }) => {
         if (typeof data?.status === "string") {
           const normalized = normalizeProviderStatus(data.status);
           if (normalized) {
-            onStatus?.(normalized);
+            onStatus?.(normalized, data.callSid);
           }
         }
       })
@@ -52,7 +54,7 @@ export function useCallStatusPolling({
       .finally(() => {
         inFlightRef.current = false;
       });
-  }, [callSid, workspaceId, onStatus]);
+  }, [callSid, workspaceId, agentLegSid, onStatus]);
 
   const delay =
     enabled && callSid && workspaceId ? intervalMs : null;

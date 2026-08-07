@@ -129,6 +129,7 @@ confirm-payment
 contacts
 conversations
 create-with-script
+credits
 dead-letters
 docs
 edit

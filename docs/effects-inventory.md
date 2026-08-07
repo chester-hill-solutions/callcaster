@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**114** documented / **114** total effects (0 grandfathered, ratcheting to 0).
+**113** documented / **113** total effects (0 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -50,8 +50,8 @@
 | `app/hooks/call/useCallRoom.ts` | Open a workspace SSE connection for this call room: track presence | campaign, updatePresence, userId, workspace (all identify which | subscription (EventSource + "workspace_event" listener) + | Requires a persistent live connection (SSE) and a |
 | `app/hooks/call/useCallScreen.ts` | Periodically revalidate the call-screen loader data every 50 | revalidator (re-subscribes when the revalidator instance changes) | timer (setInterval) + fetch (revalidator.revalidate); | Polling for client-side freshness; a loader |
 | `app/hooks/call/useCallScreen.ts` | Let the physical/OS keyboard send DTMF digits during an active | [] — intentionally mount-once; the handler always calls | dom (window "keypress" event listener), removed on | DOM event subscription, not request/response data. |
-| `app/hooks/call/useCallState.ts` | Tick the call FSM's duration counter (dispatch TICK) once per | state, send (starts/stops the interval based on FSM state; | timer (setInterval), cleared on state change/unmount | Wall-clock elapsed time is live client timer state, |
-| `app/hooks/call/useCampaignCallFlow.ts` | Reset provider call state back to idle when the active call SID | callSid (only fires when the tracked SID changes to null) | none (plain setState) | Call lifecycle state is ephemeral client state, |
+| `app/hooks/call/useCampaignCallFlow.ts` | Start a new dial generation when agentLegSid changes (new call | agentLegSid (changes when a new REST call is created for the | none — plain setState calls | Dial lifecycle management is ephemeral client state |
+| `app/hooks/call/useCampaignCallFlow.ts` | Clear the terminal outcome latch when the FSM enters dialing | state (the FSM's call lifecycle state) | none — plain setState | FSM state transitions are client-side; server |
 | `app/hooks/call/useDialFailureRecovery.ts` | Dispatch FAIL to the call FSM when a settled dial fetcher | fetcherState, fetcherData, send, showError (fires once per | none directly (FSM dispatch + toast) | Reacts to a mutation result to fix client FSM |
 | `app/hooks/call/useNextRecipientSync.ts` | When the queue-provided next recipient advances, sync the | nextRecipient, send, setCallDuration, setQuestionContact | none (dispatches to state setters/reducer passed in; | nextRecipient is already realtime/loader-sourced |
 | `app/hooks/call/usePhoneVerification.ts` | Reset handset selection to computer when the previously chosen | selectedDevice, verifiedNumbers | setSelectedDevice, setPhoneConnectionStatus, | Device selection is live client state reconciled |
@@ -103,7 +103,6 @@
 | `app/hooks/useIntersectionObserver.ts` | Trigger the caller's onLoadMore callback once the sentinel scrolls into view. | entry?.isIntersecting, hasMore, loading (guards against firing while a page is already loading or none remain) | none — delegates to caller-supplied onLoadMore (typically a fetcher.load/submit) | Reacts to a DOM intersection event, not route data; the load itself belongs to the caller. |
 | `app/hooks/useIntersectionObserver.ts` | Lazily load the target image's src once its placeholder scrolls into view. | entry?.isIntersecting, src, currentSrc (avoids reloading an already-loaded src) | dom (constructs an Image() element to preload; fires onLoad/onError callbacks) | Preloading a browser Image element is a DOM/asset concern, not route data. |
 | `app/hooks/useLocalStorage.ts` | Keep state in sync with this localStorage key when it changes in another tab/window. | key, deserializer, onError (re-subscribes and re-parses using the current key/deserializer) | subscription (window 'storage' event listener; removed on cleanup) | Cross-tab localStorage sync is client-only browser state, not server/route data. |
-| `app/hooks/useLocalStorage.ts` | CANDIDATE-REMOVE Populate `values` by reading each key from localStorage on mount. | keys, options (re-reads if the tracked key list or serializer options change) | none — synchronous localStorage.getItem reads only; setValues at the end | This is derived initial state, not data fetching: the single-key |
 | `app/hooks/utils/useActionFeedback.ts` | Show a toast (warning/error/success) and fire onSuccess/onError once per new actionData. | actionData (identity-guarded via lastHandledRef so re-renders with the same data | none directly (this hook doesn't fetch) — calls toast.warning/error/success | actionData already arrived via the caller's own action/fetcher result; |
 | `app/hooks/utils/useClickOutside.ts` | Call onClose when a mousedown occurs outside the given element's ref. | onClose, ref (re-subscribes if either identity changes, keeping the handler current) | dom (document 'mousedown' listener; removed on cleanup) | Not data fetching — this is a DOM event subscription for detecting outside clicks. |
 | `app/hooks/utils/useDebouncedSave.ts` | Debounce saveData() by 2s after `update`/`disposition` change, skipping no-op edits. | update, disposition, nextRecipient (only schedules a save when a recipient exists | timer (setTimeout; cleared on re-schedule/unmount) — saveData() itself | Debounced auto-save on local edits needs a client timer; it's a mutation |

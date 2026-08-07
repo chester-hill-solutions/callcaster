@@ -1,13 +1,16 @@
-import { renderHook } from "@testing-library/react";
+import { renderHook, act } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  onPollStatus: null as ((status: string) => void) | null,
+  onPollStatus: null as ((status: string, resolvedSid?: string) => void) | null,
   onCallRowChange: null as ((payload: unknown) => void) | null,
+  send: vi.fn(),
 }));
 
 vi.mock("@/hooks/call/useCallStatusPolling", () => ({
-  useCallStatusPolling: (opts: { onStatus: (status: string) => void }) => {
+  useCallStatusPolling: (opts: {
+    onStatus: (status: string, resolvedSid?: string) => void;
+  }) => {
     mocks.onPollStatus = opts.onStatus;
   },
 }));
@@ -27,6 +30,7 @@ type HookProps = Parameters<typeof useCampaignCallFlow>[0];
 function baseProps(overrides: Partial<HookProps> = {}): HookProps {
   return {
     callSid: null,
+    agentLegSid: null,
     workspaceId: "ws-1",
     state: "idle",
     activeCall: null,
@@ -52,10 +56,113 @@ describe("useCampaignCallFlow displayState", () => {
     });
 
     test("ignores predictiveState 'idle' once the FSM starts dialing", () => {
-      // Regression: predictiveState initializes to "idle" and never updates
-      // outside predictive mode; it must not pin the screen on Pending.
       const { result } = renderFlow({ state: "dialing" });
       expect(result.current.displayState).toBe("dialing");
+    });
+
+    test("agent leg accepted stays at dialing — no CONNECT dispatch", () => {
+      // Regression: the auto-accept path previously dispatched CONNECT
+      // the moment the browser agent leg connected. The FSM must remain
+      // at dialing; only a child-leg in-progress may advance it.
+      const send = vi.fn();
+      const { result } = renderFlow({
+        state: "dialing",
+        agentLegSid: "CA-parent",
+        callSid: "CA-parent",
+        send,
+      });
+
+      // Simulate polling returning the PARENT leg's in-progress (which
+      // would be the current broken behavior if we poll the parent).
+      // Our fix resolves the child leg first, so even if the parent
+      // is in-progress, the child status controls the display.
+      expect(result.current.displayState).toBe("dialing");
+    });
+
+    test("child SSE event with parent_call_sid gets adopted as customer leg", () => {
+      const send = vi.fn();
+      const { result, rerender } = renderFlow({
+        state: "dialing",
+        agentLegSid: "CA-parent",
+        callSid: "CA-parent",
+        send,
+      });
+
+      // Simulate child-leg SSE event arriving
+      mocks.onCallRowChange?.({
+        new: { sid: "CA-child", parent_call_sid: "CA-parent", status: "ringing" },
+      });
+      rerender(baseProps({
+        state: "dialing",
+        agentLegSid: "CA-parent",
+        callSid: "CA-parent",
+        send,
+      }));
+
+      expect(result.current.displayState).toBe("dialing");
+      expect(send).not.toHaveBeenCalledWith({ type: "CONNECT" });
+    });
+
+    test("child in-progress shows connected and dispatches CONNECT", () => {
+      const send = vi.fn();
+      const { result, rerender } = renderFlow({
+        state: "dialing",
+        agentLegSid: "CA-parent",
+        callSid: "CA-parent",
+        send,
+      });
+
+      mocks.onCallRowChange?.({
+        new: { sid: "CA-child", parent_call_sid: "CA-parent", status: "in-progress" },
+      });
+      rerender(baseProps({
+        state: "dialing",
+        agentLegSid: "CA-parent",
+        callSid: "CA-parent",
+        send,
+      }));
+
+      expect(result.current.displayState).toBe("connected");
+      expect(send).toHaveBeenCalledWith({ type: "CONNECT" });
+    });
+
+    test("parent in-progress does NOT show connected when child exists", () => {
+      // If the parent SDK call is in-progress but we're already tracking
+      // the child leg, parent events must be ignored.
+      const send = vi.fn();
+      const { result, rerender } = renderFlow({
+        state: "dialing",
+        agentLegSid: "CA-parent",
+        callSid: "CA-parent",
+        send,
+      });
+
+      // First a child ringing arrives
+      mocks.onCallRowChange?.({
+        new: { sid: "CA-child", parent_call_sid: "CA-parent", status: "ringing" },
+      });
+      rerender(baseProps({
+        state: "dialing",
+        agentLegSid: "CA-parent",
+        callSid: "CA-parent",
+        send,
+      }));
+      expect(result.current.displayState).toBe("dialing");
+
+      // Now a parent in-progress arrives (should be ignored)
+      mocks.onCallRowChange?.({
+        new: { sid: "CA-parent", status: "in-progress" },
+      });
+      rerender(baseProps({
+        state: "dialing",
+        agentLegSid: "CA-parent",
+        callSid: "CA-parent",
+        send,
+      }));
+
+      // Display must NOT jump to connected from parent leg.
+      expect(result.current.displayState).toBe("dialing");
+      expect(send).not.toHaveBeenCalledWith({ type: "CONNECT" });
     });
 
     test("FSM connected shows connected before any provider status arrives", () => {
@@ -99,6 +206,103 @@ describe("useCampaignCallFlow displayState", () => {
 
       expect(send).toHaveBeenCalledWith({ type: "HANG_UP" });
       expect(result.current.displayState).toBe("completed");
+    });
+
+    test("completed call retains outcome after SDK teardown (terminal latch)", () => {
+      // Regression: when activeCall becomes null, the provider status
+      // was cleared and completed fell through to Pending.
+      const send = vi.fn();
+      const { result, rerender } = renderFlow({
+        state: "completed",
+        callSid: "CA-terminal",
+        agentLegSid: "CA-terminal",
+        send,
+        activeCall: {} as any,
+      });
+
+      // Terminal status arrives
+      mocks.onCallRowChange?.({
+        new: { sid: "CA-child", parent_call_sid: "CA-terminal", status: "completed" },
+      });
+      rerender(baseProps({
+        state: "completed",
+        callSid: "CA-terminal",
+        agentLegSid: "CA-terminal",
+        send,
+        activeCall: {} as any,
+      }));
+
+      expect(result.current.displayState).toBe("completed");
+
+      // SDK tears down: activeCall === null, callSid cleared
+      rerender(baseProps({
+        state: "completed",
+        callSid: null,
+        agentLegSid: null,
+        send,
+        activeCall: null,
+      }));
+
+      // Must still show completed, not idle / Pending
+      expect(result.current.displayState).toBe("completed");
+    });
+
+    test("terminate latch cleared on new dial", () => {
+      const send = vi.fn();
+      const { result, rerender } = renderFlow({
+        state: "completed",
+        callSid: "CA-old",
+        agentLegSid: "CA-old",
+        send,
+        activeCall: null,
+      });
+
+      // Terminal latch was set
+      mocks.onCallRowChange?.({
+        new: { sid: "CA-child", parent_call_sid: "CA-old", status: "completed" },
+      });
+      rerender(baseProps({
+        state: "completed",
+        callSid: "CA-old",
+        agentLegSid: "CA-old",
+        send,
+        activeCall: null,
+      }));
+
+      // New dial begins — agentLegSid changes
+      rerender(baseProps({
+        state: "dialing",
+        callSid: "CA-new",
+        agentLegSid: "CA-new",
+        send,
+        activeCall: {} as any,
+      }));
+
+      expect(result.current.displayState).toBe("dialing");
+    });
+
+    test("terminal latch: no-answer outcome retained", () => {
+      const send = vi.fn();
+      const { result, rerender } = renderFlow({
+        state: "dialing",
+        callSid: "CA-call",
+        agentLegSid: "CA-call",
+        send,
+        activeCall: {} as any,
+      });
+
+      mocks.onCallRowChange?.({
+        new: { sid: "CA-child", parent_call_sid: "CA-call", status: "no-answer" },
+      });
+      rerender(baseProps({
+        state: "completed",
+        callSid: null,
+        agentLegSid: null,
+        send,
+        activeCall: null,
+      }));
+
+      expect(result.current.displayState).toBe("no-answer");
     });
   });
 

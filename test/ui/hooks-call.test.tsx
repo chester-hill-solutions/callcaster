@@ -95,7 +95,7 @@ describe("call hooks", () => {
     // left a 50ms scheduling margin, which is exactly the kind of budget a
     // loaded fork-pool CI worker blows through.
     await vi.waitFor(
-      () => expect(onStatus).toHaveBeenCalledWith("in-progress"),
+      () => expect(onStatus).toHaveBeenCalledWith("in-progress", undefined),
       { timeout: 2000 },
     );
   });
@@ -434,6 +434,9 @@ describe("call hooks", () => {
     expect(incoming.accept).toHaveBeenCalledTimes(1);
     expect(result.current.activeCall).toBe(incoming);
     expect(result.current.incomingCall).toBeNull();
-    expect(send).toHaveBeenCalledWith({ type: "CONNECT" });
+    // Campaign outbound auto-accept no longer dispatches CONNECT — the
+    // customer-leg in-progress callback is the only signal that advances
+    // the FSM from dialing to connected.
+    expect(send).not.toHaveBeenCalledWith({ type: "CONNECT" });
   });
 });

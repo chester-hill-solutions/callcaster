@@ -162,6 +162,18 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
   }),
   platformSeed({
+    path: "/api/workspaces/:workspaceId/credits",
+    routeModule:
+      "app/routes/api+/workspaces+/$workspaceId/credits.route.tsx",
+    authClass: "workspaceAdmin",
+    ownerArea: "billing",
+    exposure: "sessionOnly",
+    docsGuide: GUIDE.platform,
+    workspaceScoped: true,
+    operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
+    notes: "Read current workspace credit balance.",
+  }),
+  platformSeed({
     path: "/api/workspaces/:workspaceId/billing/checkout-session",
     routeModule:
       "app/routes/api+/workspaces+/$workspaceId/billing/checkout-session.route.tsx",

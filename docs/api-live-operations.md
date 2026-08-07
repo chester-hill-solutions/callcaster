@@ -33,6 +33,14 @@ Existing flat routes (see [Telephony control](./api-telephony-control.md)):
 - `GET /api/call-status-poll`, `/api/token`
 - `GET/POST /api/agent-status`
 
+## Credits
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/api/workspaces/:workspaceId/credits` | Current credit balance for the workspace |
+
+`GET /api/workspaces/:workspaceId/credits` — Returns the workspace's current credit balance. Auth is session or bearer. Response: `{ credits: number }`. Not exposed in the integrator OpenAPI surface.
+
 ## See also
 
 - [Telephony control](./api-telephony-control.md)

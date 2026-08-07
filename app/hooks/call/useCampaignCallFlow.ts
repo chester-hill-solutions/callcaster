@@ -14,6 +14,7 @@ import type {
   OutreachAttempt,
   QueueItem,
 } from "@/lib/types";
+import { logger } from "@/lib/logger.client";
 
 type CallStateMachineSend = (action: { type: string }) => void;
 
@@ -23,7 +24,11 @@ type PredictiveState = {
 };
 
 type UseCampaignCallFlowOptions = {
+  /** SID of the SDK active call (parent/agent leg) or the most recent call */
   callSid: string | null;
+  /** SID of the parent REST-created call (the agent/browser leg) — the
+   * child customer leg's events carry this as `parent_call_sid`. */
+  agentLegSid: string | null;
   workspaceId: string;
   state: string;
   activeCall: Call | null;
@@ -33,8 +38,18 @@ type UseCampaignCallFlowOptions = {
   send: CallStateMachineSend;
 };
 
+type TerminalOutcome =
+  | "completed"
+  | "canceled"
+  | "failed"
+  | "busy"
+  | "no-answer"
+  | "voicemail"
+  | null;
+
 export function useCampaignCallFlow({
   callSid,
+  agentLegSid,
   workspaceId,
   state,
   activeCall,
@@ -47,10 +62,22 @@ export function useCampaignCallFlow({
     callSid: string | null;
     status: CallStatusEnum | null;
   }>({ callSid: null, status: null });
+
+  const [customerLegSid, setCustomerLegSid] = useState<string | null>(null);
+  const [terminalOutcome, setTerminalOutcome] = useState<TerminalOutcome>(null);
+  const [pollingTargetSid, setPollingTargetSid] = useState<string | null>(null);
+
+  const agentLegSidRef = useRef(agentLegSid);
+  agentLegSidRef.current = agentLegSid;
+  const dialGenerationRef = useRef(0);
+
   const providerStatus =
-    providerState.callSid === callSid ? providerState.status : null;
+    providerState.callSid === callSid ||
+    (customerLegSid != null && providerState.callSid === customerLegSid)
+      ? providerState.status
+      : null;
   const pollingEnabled =
-    !!callSid &&
+    !!pollingTargetSid &&
     !!workspaceId &&
     (state === "dialing" || state === "connected");
 
@@ -61,16 +88,42 @@ export function useCampaignCallFlow({
     else if (action === "FAIL") send({ type: "FAIL" });
   }
 
+  /** Track a customer-leg status update from any source (SSE or polling). */
+  function acceptCustomerStatus(sid: string, normalized: CallStatusEnum) {
+    setCustomerLegSid(sid);
+    setPollingTargetSid(sid);
+    setProviderState({ callSid: sid, status: normalized });
+    dispatchCallStatus(normalized);
+    if (isTerminalForOutcome(normalized)) {
+      setTerminalOutcome(normalizedToOutcome(normalized));
+    }
+  }
+
+  function normalizedToOutcome(normalized: CallStatusEnum): TerminalOutcome {
+    if (normalized === "completed" || normalized === "canceled") return normalized;
+    if (normalized === "no-answer") return "no-answer";
+    if (normalized === "busy" || normalized === "failed") return normalized;
+    return null;
+  }
+
+  function isTerminalForOutcome(normalized: CallStatusEnum): boolean {
+    return ["completed", "canceled", "failed", "busy", "no-answer"].includes(normalized);
+  }
+
+  // Polling: use the customer leg SID if known, otherwise fall back to
+  // the parent/SDK SID (the server will resolve the child for us).
   useCallStatusPolling({
-    callSid,
+    callSid: pollingTargetSid ?? callSid,
     workspaceId,
     enabled: pollingEnabled,
     intervalMs: 5000,
-    onStatus: (status) => {
+    agentLegSid,
+    onStatus: (status, resolvedSid) => {
       const normalized = normalizeProviderStatus(status);
-      if (normalized) {
-        setProviderState({ callSid, status: normalized });
-        dispatchCallStatus(normalized);
+      if (!normalized) return;
+      const sid = resolvedSid ?? pollingTargetSid ?? callSid;
+      if (sid) {
+        acceptCustomerStatus(sid, normalized);
       }
     },
   });
@@ -78,42 +131,74 @@ export function useCampaignCallFlow({
   const callSidRef = useRef(callSid);
   callSidRef.current = callSid;
 
-  // Opens a second EventSource to the same workspace events endpoint that
-  // useWorkspaceRealtime already connects to. Eliminating this would require
-  // restructuring useCallScreen's hook call order (useWorkspaceRealtime runs
-  // before useCampaignCallFlow, creating a circular dependency on callbacks).
-  // The overhead is negligible — SSE connections are lightweight — and the
-  // 5-second polling fallback remains as a safety net for both paths.
+  // SSE events: accept direct matches OR child events keyed on parent_call_sid
   useWorkspaceEventSubscription({
     workspaceId,
     table: "call",
     filter: `workspace=eq.${workspaceId}`,
     onChange: (payload) => {
-      const callRow = payload.new as { sid?: string; status?: string } | null;
+      const callRow = payload.new as {
+        sid?: string;
+        parent_call_sid?: string;
+        status?: string;
+      } | null;
       if (!callRow?.sid || !callRow?.status) return;
-      if (callRow.sid !== callSidRef.current) return;
+
+      // If we already have a customer leg SID, only accept events for that leg.
+      if (customerLegSid != null) {
+        if (callRow.sid !== customerLegSid) return;
+      } else {
+        // Accept if the SID matches the SDK call SID (before child is known).
+        const matchesDirect = callRow.sid === callSidRef.current;
+
+        // Accept if this is a child event for our tracked parent leg.
+        const matchesParent =
+          agentLegSidRef.current != null &&
+          callRow.parent_call_sid === agentLegSidRef.current;
+
+        if (!matchesDirect && !matchesParent) return;
+      }
 
       const normalized = normalizeProviderStatus(callRow.status);
       if (!normalized) return;
 
-      setProviderState({ callSid: callRow.sid, status: normalized });
-      dispatchCallStatus(normalized);
+      acceptCustomerStatus(callRow.sid, normalized);
     },
   });
 
   /**
-   * @effect Reset provider call state back to idle when the active call SID
-   * clears (call ended, navigated away, or component unmount).
-   * @effect-deps callSid (only fires when the tracked SID changes to null)
-   * @effect-side-effects none (plain setState)
-   * @effect-why-not-loader Call lifecycle state is ephemeral client state,
-   * not request/response data.
+   * @effect Start a new dial generation when agentLegSid changes (new call
+   * placed). Resets customer leg tracking and terminal latch so the new call
+   * starts from a clean state.
+   * @effect-deps agentLegSid (changes when a new REST call is created for the
+   * agent leg)
+   * @effect-side-effects none — plain setState calls
+   * @effect-why-not-loader Dial lifecycle management is ephemeral client state
+   * derived from the SDK's active call identity.
    */
   useEffect(() => {
-    if (!callSid) {
-      setProviderState({ callSid: null, status: null });
+    if (agentLegSid) {
+      dialGenerationRef.current += 1;
+      setCustomerLegSid(null);
+      setPollingTargetSid(null);
+      setTerminalOutcome(null);
     }
-  }, [callSid]);
+  }, [agentLegSid]);
+
+  /**
+   * @effect Clear the terminal outcome latch when the FSM enters dialing
+   * (via START_DIALING), so the previous call's outcome does not persist into
+   * the new call's initial state.
+   * @effect-deps state (the FSM's call lifecycle state)
+   * @effect-side-effects none — plain setState
+   * @effect-why-not-loader FSM state transitions are client-side; server
+   * loaders have no concept of a terminal outcome latch.
+   */
+  useEffect(() => {
+    if (state === "dialing") {
+      setTerminalOutcome(null);
+    }
+  }, [state]);
 
   const getDisplayState = useCallback(
     (
@@ -139,12 +224,12 @@ export function useCampaignCallFlow({
       if (
         statusValue === "completed" ||
         statusValue === "canceled" ||
-        (callStateValue === "completed" && statusValue)
+        callStateValue === "completed"
       ) {
         return "completed";
       }
       // No provider status yet: the local FSM covers the gap, since the device
-      // hook dispatches START_DIALING/CONNECT the moment the softphone leg
+      // hook dispatches START_DIALING the moment the softphone leg
       // moves while provider status arrives later via SSE/polling. Without
       // this the screen sits on "Pending" until the first webhook lands.
       if (callStateValue === "dialing" || (activeCallValue && !statusValue)) {
@@ -180,10 +265,22 @@ export function useCampaignCallFlow({
   // the previous one and must not override the live dialing/connected display.
   const callInFlight = state === "dialing" || state === "connected";
   const displayStatus =
+    terminalOutcome ??
     providerStatus ??
     (callInFlight ? undefined : recentAttemptDisposition ?? undefined);
 
+  // Map terminal outcome to display string
+  const outcomeDisplay =
+    terminalOutcome === "completed" || terminalOutcome === "canceled"
+      ? "completed"
+      : terminalOutcome === "no-answer"
+        ? "no-answer"
+        : terminalOutcome === "voicemail"
+          ? "voicemail"
+          : null;
+
   const displayState =
+    outcomeDisplay ??
     predictiveDisplay ??
     getDisplayState(state, displayStatus, activeCall as unknown as ActiveCall);
 
@@ -211,4 +308,3 @@ export type StartCallArgs = {
   recentAttempt: OutreachAttempt | null;
   selectedDevice: string | null;
 };
-

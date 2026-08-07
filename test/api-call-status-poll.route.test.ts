@@ -181,7 +181,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ status: undefined, error: "Unsupported status" });
+    await expect(res.json()).resolves.toEqual({ status: undefined, callSid: "CA", error: "Unsupported status" });
   }, 30000);
 
   test("no DB update when status unchanged", async () => {
@@ -203,7 +203,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ status: "completed" });
+    await expect(res.json()).resolves.toEqual({ status: "completed", callSid: "CA" });
     expect(telephonyDbMocks.updateCallBySid).not.toHaveBeenCalled();
   }, 30000);
 
@@ -252,7 +252,7 @@ describe("app/routes/api+/call/route-status-poll.tsx", () => {
       request: new Request("http://localhost/api/call-status-poll?callSid=CA&workspaceId=w1"),
     } as any)));
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ status: "completed" });
+    await expect(res.json()).resolves.toEqual({ status: "completed", callSid: "CA" });
     expect(telephonyDbMocks.updateCallBySid).toHaveBeenCalled();
     expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   }, 30000);

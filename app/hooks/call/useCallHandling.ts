@@ -53,7 +53,7 @@ interface UseCallHandlingReturn {
   resumeActiveCall: () => void;
   /** Toggle operator mic mute without entering hold. */
   setMicMuted: (muted: boolean) => void;
-  receiveIncoming: (call: Call) => void;
+  receiveIncoming: (call: Call, suppressConnectedState?: boolean) => void;
   clearIncomingCall: () => void;
   /** Test-only: direct session mutation. */
   setActiveCall: (call: Call | null) => void;
@@ -284,7 +284,7 @@ export function useCallHandling({
   );
 
   const receiveIncoming = useCallback(
-    (call: Call) => {
+    (call: Call, suppressConnectedState?: boolean) => {
       updateIncomingCall(call);
 
       if (
@@ -293,8 +293,10 @@ export function useCallHandling({
         call.parameters.To.includes("client")
       ) {
         call.accept();
-        onStatusChange?.("connected");
-        updateCallState("connected");
+        if (!suppressConnectedState) {
+          onStatusChange?.("connected");
+          updateCallState("connected");
+        }
         updateActiveCall(call);
         updateIncomingCall(null);
         return;

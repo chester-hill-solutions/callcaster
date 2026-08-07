@@ -16,6 +16,13 @@ interface UseTwilioConnectionOptions {
   onError?: (error: Error) => void;
   onCallStateChange?: (callState: string) => void;
   onDeviceBusyChange?: (isBusy: boolean) => void;
+  /**
+   * Called when the Twilio SDK signals that the current access token is about
+   * to expire. The caller should fetch a fresh token (e.g. via route
+   * revalidation) so the existing `updateToken()` flow picks it up before the
+   * signaling WebSocket is closed.
+   */
+  onTokenWillExpire?: () => void;
 }
 
 interface UseTwilioConnectionReturn {
@@ -44,6 +51,7 @@ export function useTwilioConnection({
   onError,
   onCallStateChange,
   onDeviceBusyChange,
+  onTokenWillExpire,
 }: UseTwilioConnectionOptions): UseTwilioConnectionReturn {
   const deviceRef = useRef<Device | null>(null);
   const [device, setDevice] = useState<Device | null>(null);
@@ -52,6 +60,9 @@ export function useTwilioConnection({
   const tokenRef = useRef(token);
   const listenerCleanupsRef = useRef<Array<() => void>>([]);
   const unmountedRef = useRef(false);
+  const isReconnectingRef = useRef(false);
+  const onTokenWillExpireRef = useRef(onTokenWillExpire);
+  onTokenWillExpireRef.current = onTokenWillExpire;
   // Bumping this forces the setup effect to run again with deviceRef already
   // cleared, taking the "create a new device" branch instead of the
   // "update the existing device's token" branch.
@@ -116,11 +127,18 @@ export function useTwilioConnection({
       const { Device: TwilioDevice } = await import("@twilio/voice-sdk");
       if (unmountedRef.current || deviceRef.current) return;
 
-      const device = new TwilioDevice(tokenRef.current, deviceOptions ?? undefined);
+      // Emit tokenWillExpire 5 minutes before the token's TTL elapses, giving
+      // the caller plenty of time to fetch a fresh token via onTokenWillExpire.
+      const mergedOptions: DeviceOptions = {
+        ...deviceOptions,
+        tokenRefreshMs: 300000,
+      };
+      const device = new TwilioDevice(tokenRef.current, mergedOptions);
       deviceRef.current = device;
       setDevice(device);
 
       const handleRegistered = () => {
+        isReconnectingRef.current = false;
         setStatus("Registered");
         // Registering successfully means any prior error no longer applies —
         // error was set-only before this, so a single transient failure left
@@ -162,6 +180,21 @@ export function useTwilioConnection({
 
       const handleError = (err: unknown) => {
         const error = err instanceof Error ? err : new Error("Twilio device error");
+        const code = (err as { code?: number })?.code;
+
+        // TransportError (code 31009) means the signaling WebSocket is closed
+        // and no messages can be sent. This happens when the transport was
+        // never opened, was disconnected (e.g. token expiry, network blip), or
+        // the heartbeat timed out. Auto-recover by recreating the Device from
+        // scratch instead of leaving it stuck in Error state until the user
+        // manually clicks "Reconnect phone".
+        if (code === 31009 && !isReconnectingRef.current) {
+          isReconnectingRef.current = true;
+          logger.info("TransportError (31009) detected, auto-reconnecting device");
+          reconnectRef.current();
+          return;
+        }
+
         logger.error("Twilio Device Error:", error);
         onDeviceBusyChangeRef.current?.(false);
         setStatus("Error");
@@ -174,6 +207,11 @@ export function useTwilioConnection({
         onIncomingCallRef.current?.(call as Call);
       };
 
+      const handleTokenWillExpire = () => {
+        logger.info("Twilio token about to expire, requesting refresh");
+        onTokenWillExpireRef.current?.();
+      };
+
       listenerCleanupsRef.current = [
         attachTwilioListener(device, "registered", handleRegistered),
         attachTwilioListener(device, "unregistered", handleUnregistered),
@@ -183,6 +221,7 @@ export function useTwilioConnection({
         attachTwilioListener(device, "cancel", handleCancel),
         attachTwilioListener(device, "error", handleError),
         attachTwilioListener(device, "incoming", handleIncoming),
+        attachTwilioListener(device, "tokenWillExpire", handleTokenWillExpire),
       ];
 
       device.register().catch((err: unknown) => {
@@ -215,6 +254,7 @@ export function useTwilioConnection({
   }, [token, deviceOptions, reconnectNonce]);
 
   const reconnect = useCallback(() => {
+    isReconnectingRef.current = true;
     const stale = deviceRef.current;
     deviceRef.current = null;
     listenerCleanupsRef.current.forEach((cleanup) => cleanup());
@@ -231,6 +271,8 @@ export function useTwilioConnection({
     }
     setReconnectNonce((n) => n + 1);
   }, []);
+  const reconnectRef = useRef(reconnect);
+  reconnectRef.current = reconnect;
 
   /**
    * @effect Tear the Device down on unmount only: detach listeners and

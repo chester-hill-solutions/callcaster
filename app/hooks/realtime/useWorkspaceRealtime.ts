@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useCreditBalance } from "@/hooks/billing/useCreditBalance";
 import { useQueue } from "@/hooks/queue/useQueue";
 import { useAttempts } from "@/hooks/queue/useAttempts";
 import { useCalls } from "@/hooks/queue/useCalls";
@@ -80,12 +81,10 @@ export const useWorkspaceRealtime = ({
   const { phoneNumbers, setPhoneNumbers, updateWorkspaceNumbers } =
     usePhoneNumbers(init.phoneNumbers || [], workspace);
 
-  const [availableCredits, setAvailableCredits] = useState(init.credits || 0);
-  const updateCredits = useCallback((payload: PostgresChangePayload) => {
-    if (payload.eventType === "INSERT" && payload.new?.amount) {
-      setAvailableCredits((prev: number) => prev + Number(payload.new!.amount));
-    }
-  }, []);
+  const {
+    credits: availableCredits,
+    applyLedgerEntry: updateCredits,
+  } = useCreditBalance(init.credits || 0);
 
   const callsListRef = useRef(callsList);
   const queueRef = useRef(queue);

@@ -66,6 +66,9 @@ export function useCallScreen() {
     initialCoaching,
   } = useLoaderData<LoaderData>();
   const revalidator = useRevalidator();
+  const handleTokenWillExpire = useCallback(() => {
+    revalidator.revalidate();
+  }, [revalidator]);
   useWorkspaceEventSubscription({
     workspaceId,
     table: "campaign",
@@ -125,6 +128,7 @@ export function useCallScreen() {
     phoneVerification.selectedDevice,
     workspaceId,
     send as unknown as (action: { type: string }) => void,
+    handleTokenWillExpire,
   );
 
   const audioControls = useCallAudioControls({
@@ -180,8 +184,11 @@ export function useCallScreen() {
 
   const callSid = getCallSid(activeCall) ?? recentCall?.sid ?? null;
 
+  const agentLegSid = getCallSid(activeCall) ?? null;
+
   const { displayState, displayColor } = useCampaignCallFlow({
     callSid,
+    agentLegSid,
     workspaceId,
     state,
     activeCall,
@@ -206,7 +213,7 @@ export function useCallScreen() {
   const creditsError =
     fetcher.data?.creditsError ||
     conferenceCreditsError ||
-    (credits ?? 0) <= 0;
+    availableCredits <= 0;
 
   useDialFailureRecovery({
     fetcherState: fetcher.state,
@@ -462,7 +469,7 @@ export function useCallScreen() {
     completed,
     workspaceId,
     campaignDetails,
-    credits,
+    credits: availableCredits,
     isActive,
     hasAccess,
     verifiedNumbers,

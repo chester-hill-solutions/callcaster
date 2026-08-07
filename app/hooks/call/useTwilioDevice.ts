@@ -39,6 +39,7 @@ export function useTwilioDevice(
   selectedDevice: string,
   workspaceId: string,
   send: (action: { type: string }) => void,
+  onTokenWillExpire?: () => void,
 ): TwilioDeviceHook {
   if (!token) {
     logger.error("useTwilioDevice: token is required");
@@ -53,7 +54,7 @@ export function useTwilioDevice(
   const [deviceIsBusy, setIsBusy] = useState<boolean>(false);
   const [status, setStatus] = useState<string>("disconnected");
   const [error, setError] = useState<Error | null>(null);
-  const receiveIncomingRef = useRef<(call: Call) => void>(() => {});
+  const receiveIncomingRef = useRef<(call: Call, suppressConnectedState?: boolean) => void>(() => {});
 
   const onStatusChange = useCallback((newStatus: string) => {
     setStatus(newStatus);
@@ -77,7 +78,6 @@ export function useTwilioDevice(
   const onCallState = useCallback((newCallState: string) => {
     switch (newCallState) {
       case "dialing": send({ type: "START_DIALING" }); break;
-      case "connected": send({ type: "CONNECT" }); break;
       case "completed": send({ type: "HANG_UP" }); break;
       case "failed": send({ type: "FAIL" }); break;
     }
@@ -89,6 +89,7 @@ export function useTwilioDevice(
     onStatusChange,
     onError: onDeviceError,
     onDeviceBusyChange: onDeviceBusy,
+    onTokenWillExpire,
   });
 
   const callHandling = useCallHandling({
@@ -112,7 +113,8 @@ export function useTwilioDevice(
    * re-registering Twilio device listeners on every render.
    */
   useEffect(() => {
-    receiveIncomingRef.current = callHandling.receiveIncoming;
+    receiveIncomingRef.current = (call: Call) => callHandling.receiveIncoming(call, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callHandling.receiveIncoming]);
 
   const { callDuration, setCallDuration } = useCallDuration(callHandling.callState);
