@@ -161,6 +161,22 @@ export function CallScreenLayout({
     label: option,
   }));
 
+  // One queue list instance shared by the mobile sheet and the desktop rail.
+  const queueList = (
+    <QueueList
+      isBusy={isBusy}
+      householdMap={householdMap}
+      groupByHousehold={groupByHousehold}
+      queue={campaign.dial_type === "call" ? queue : predictiveQueue}
+      handleNextNumber={handleNextNumber}
+      nextRecipient={nextRecipient}
+      handleQueueButton={() => fetchMore({ householdMap })}
+      predictive={campaign.dial_type === "predictive"}
+      count={count}
+      completed={completed}
+    />
+  );
+
   return (
     <div className="w-full space-y-6">
       {Number(credits) <= 0 ? (
@@ -236,18 +252,7 @@ export function CallScreenLayout({
                 Review recipients, skip contacts, or load the next queue.
               </SheetDescription>
             </SheetHeader>
-            <QueueList
-              isBusy={isBusy}
-              householdMap={householdMap}
-              groupByHousehold={groupByHousehold}
-              queue={campaign.dial_type === "call" ? queue : predictiveQueue}
-              handleNextNumber={handleNextNumber}
-              nextRecipient={nextRecipient}
-              handleQueueButton={() => fetchMore({ householdMap })}
-              predictive={campaign.dial_type === "predictive"}
-              count={count}
-              completed={completed}
-            />
+            {queueList}
           </SheetContent>
         </Sheet>
         <Sheet>
@@ -466,20 +471,7 @@ export function CallScreenLayout({
             disabled={!questionContact}
           />
         }
-        queue={
-          <QueueList
-            isBusy={isBusy}
-            householdMap={householdMap}
-            groupByHousehold={groupByHousehold}
-            queue={campaign.dial_type === "call" ? queue : predictiveQueue}
-            handleNextNumber={handleNextNumber}
-            nextRecipient={nextRecipient}
-            handleQueueButton={() => fetchMore({ householdMap })}
-            predictive={campaign.dial_type === "predictive"}
-            count={count}
-            completed={completed}
-          />
-        }
+        queue={queueList}
       />
       <CallScreenLiveCoachingPanels
         workspaceId={workspaceId}
