@@ -716,8 +716,11 @@ export function checkSchedule(campaignData: Campaign) {
   if (!dayKey) {
     return false;
   }
+  // Partial/legacy schedules (e.g. an API-created campaign whose schedule JSON
+  // omits some weekdays, or a day with no intervals array) must read as "outside
+  // the calling window", not throw a 500 on the auto-dial/call-screen hot path.
   const todaySchedule = scheduleObject[dayKey];
-  if (!todaySchedule.active) {
+  if (!todaySchedule?.active || !Array.isArray(todaySchedule.intervals)) {
     return false;
   }
 

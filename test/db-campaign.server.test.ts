@@ -906,4 +906,30 @@ describe("app/lib/database/campaign.server.ts", () => {
       } as any),
     ).toBe(true);
   });
+
+  test("checkSchedule returns false (never throws) for partial/legacy schedules", async () => {
+    const mod = await import("../app/lib/database/campaign.server");
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2020-01-06T10:30:00.000Z")); // Monday
+
+    const base = {
+      start_date: "2020-01-01T00:00:00.000Z",
+      end_date: "2020-02-01T00:00:00.000Z",
+    };
+
+    // Weekday-only schedule evaluated on a day it omits (monday missing).
+    expect(
+      mod.checkSchedule({
+        ...base,
+        schedule: { tuesday: { active: true, intervals: [{ start: "10:00", end: "11:00" }] } },
+      } as any),
+    ).toBe(false);
+
+    // Today present but active with no intervals array.
+    expect(
+      mod.checkSchedule({ ...base, schedule: { monday: { active: true } } } as any),
+    ).toBe(false);
+
+    vi.useRealTimers();
+  });
 });
