@@ -3,7 +3,9 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
-import { findCallBySid, updateOutreachDispositionByContactId } from "@/lib/telephony-db.server";
+import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
+import { campaign as campaignTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
@@ -45,17 +47,35 @@ export const action = defineAction({
             }
         }
         if (call.contact_id) {
+            // Household fan-out follows the campaign's setting; it was
+            // hardcoded true, dequeuing whole households on campaigns that
+            // never asked for household grouping.
+            const campaign = call.campaign_id
+                ? await tdb.campaign.findFirst({
+                      where: eq(campaignTable.id, call.campaign_id),
+                      columns: { group_household_queue: true },
+                  })
+                : null;
             await rpcDequeueContact(tdb, {
                 contactId: call.contact_id,
-                groupOnHousehold: true,
+                groupOnHousehold: campaign?.group_household_queue ?? false,
                 dequeuedById: user.id,
                 dequeuedReasonText: "Call completed",
             });
-            await updateOutreachDispositionByContactId(
-                workspaceId,
-                call.contact_id,
-                "completed",
-            );
+            // Scope the disposition to THIS call's attempt. The old
+            // updateOutreachDispositionByContactId rewrote every attempt for
+            // the contact across all campaigns to "completed", destroying
+            // do_not_call/voicemail history. The workspace-scoped update also
+            // applies the terminal-transition guard, so a real disposition
+            // already on the attempt is never downgraded.
+            if (call.outreach_attempt_id) {
+                await updateOutreachAttemptForWorkspace(
+                    workspaceId,
+                    call.outreach_attempt_id,
+                    { disposition: "completed" },
+                    { tdb },
+                );
+            }
         }
         return routeData({ success: true });
 

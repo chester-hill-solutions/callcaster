@@ -29,6 +29,7 @@ import {
 } from "@/hooks/call/useCampaignDialActions";
 import { usePredictiveCallSync } from "@/hooks/call/usePredictiveCallSync";
 import { useNextRecipientSync } from "@/hooks/call/useNextRecipientSync";
+import { useDialFailureRecovery } from "@/hooks/call/useDialFailureRecovery";
 import { getCallSid } from "@/lib/twilio/twilio-call-params";
 import { KEYPAD_KEYS } from "@/lib/dtmf";
 import type {
@@ -199,12 +200,19 @@ export function useCallScreen() {
     },
   );
 
-  const fetcher = useFetcher<{ creditsError?: boolean }>();
+  const fetcher = useFetcher<{ creditsError?: boolean; error?: string }>();
   const submit = fetcher.submit;
   const creditsError =
     fetcher.data?.creditsError ||
     conferenceCreditsError ||
     (credits ?? 0) <= 0;
+
+  useDialFailureRecovery({
+    fetcherState: fetcher.state,
+    fetcherData: fetcher.data,
+    send: send as unknown as (action: { type: string }) => void,
+    showError: (message) => toast.error(message),
+  });
 
   const { startCall } = handleCall({ submit });
   const { handleConferenceEnd } = handleConference({

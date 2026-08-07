@@ -5,6 +5,7 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
+import { rpcClaimQueueEntryForDial } from "@/lib/db-rpc.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
 import { createTenantDb } from "@/server/tenant-db";
@@ -76,7 +77,36 @@ export const action = defineAction({
     if (hasInsufficientCreditsForOutbound(credits)) {
         return routeData({ creditsError: true }, { status: 402 });
     }
+    // NOTE: this credit gate is check-then-act — N concurrent dials can all
+    // read the same pre-debit balance (the debit lands at call completion).
+    // Overdraw is bounded by concurrency × per-call cost; an atomic pre-dial
+    // hold via apply_ledger_entry_and_sync_credits is the follow-up if that
+    // bound ever matters.
     const tdb = createTenantDb(workspace_id);
+
+    // Atomically claim the queue row before placing a real call. This is the
+    // server-side guard the client's callState check cannot provide: without
+    // it a double-click, a second tab, or two agents holding the same
+    // unclaimed row each dialed a real person. Refusals are 409s the call
+    // screen surfaces as a failed dial rather than a stuck "Dialing…".
+    const claim = await rpcClaimQueueEntryForDial(tdb, {
+        queueId: Number(queue_id),
+        campaignId: Number(campaign_id),
+        workspaceId: workspace_id,
+        userId: user.id,
+    });
+    if (claim !== "claimed") {
+        const messages: Record<string, string> = {
+            claimed_by_other: "This contact is being dialed by another agent.",
+            active_call: "This contact already has a call in progress.",
+            not_queued: "This contact is no longer queued.",
+            unavailable: "This contact is not available to dial.",
+        };
+        return routeData(
+            { error: messages[claim] ?? messages.unavailable, claim },
+            { status: 409 },
+        );
+    }
     const [callerIdRecord, onboarding] = await Promise.all([
         tdb.workspace_number.findFirst({
             where: eq(workspaceNumberTable.phone_number, caller_id),
