@@ -37,8 +37,17 @@ pnpm-debug.log*
 
 # Local tooling
 .cursor/
-.agents/
-.opencode/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/.gitkeep
+.opencode/*
+!.opencode/tools/
+!.opencode/agents/
+.opencode/tools/*
+!.opencode/tools/.gitkeep
+.opencode/agents/*
+!.opencode/agents/.gitkeep
 skills-lock.json
 
 # Secrets — never commit
