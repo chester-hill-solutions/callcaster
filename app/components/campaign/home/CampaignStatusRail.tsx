@@ -20,6 +20,8 @@ function statusHint(item: CampaignRailItem): string | null {
         return "Ready";
       case "running":
         return "Running";
+      case "waiting":
+        return "Waiting";
       case "paused":
         return "Paused";
       case "scheduled":
@@ -70,6 +72,7 @@ function TabStatusMark({ item }: { item: CampaignRailItem }) {
     item.health === "ready" ||
     item.launchLifecycle === "ready" ||
     item.launchLifecycle === "running" ||
+    item.launchLifecycle === "waiting" ||
     item.resultsStatus === "has_results" ||
     item.callStatus === "available"
   ) {

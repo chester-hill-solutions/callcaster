@@ -201,7 +201,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
                                         <TableCell>
                                             <Badge
                                                 variant={
-                                                    campaign.status === "running"
+                                                    campaign.status === "running" || campaign.status === "waiting"
                                                         ? "secondary"
                                                         : campaign.status === "paused"
                                                           ? "outline"

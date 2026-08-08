@@ -428,7 +428,7 @@ export async function transitionCampaignStatusApi(
 
   const { status, is_active } = body;
 
-  if (status === "running" || status === "scheduled") {
+  if (status === "running" || status === "waiting" || status === "scheduled") {
     if (
       !campaignRecord.type ||
       !["live_call", "message", "robocall", "simple_ivr", "complex_ivr"].includes(
@@ -466,7 +466,7 @@ export async function transitionCampaignStatusApi(
   };
   if (is_active !== undefined) {
     update.is_active = is_active;
-  } else if (status === "running") {
+  } else if (status === "running" || status === "waiting") {
     update.is_active = true;
   } else if (status === "paused") {
     update.is_active = false;

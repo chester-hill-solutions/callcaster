@@ -33,6 +33,7 @@ type CampaignStatus =
   | "pending"
   | "scheduled"
   | "running"
+  | "waiting"
   | "complete"
   | "paused"
   | "draft"
@@ -303,7 +304,7 @@ export function useCampaignSettingsController() {
       is_active?: boolean;
     } = { intent: "status", status };
 
-    if (status === "running") formData.is_active = true;
+    if (status === "running" || status === "waiting") formData.is_active = true;
     if (status === "paused") formData.is_active = false;
 
     fetcher.submit(formData, { method: "post" });

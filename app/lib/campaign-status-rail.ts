@@ -24,6 +24,7 @@ export type CampaignRailLaunchLifecycle =
   | "draft"
   | "ready"
   | "running"
+  | "waiting"
   | "paused"
   | "scheduled"
   | "complete"
@@ -137,6 +138,8 @@ function launchLifecycleFromStatus(
   switch (status) {
     case "running":
       return "running";
+    case "waiting":
+      return "waiting";
     case "paused":
       return "paused";
     case "scheduled":
@@ -160,6 +163,8 @@ function launchLifecycleLabel(lifecycle: CampaignRailLaunchLifecycle): string {
       return "Ready";
     case "running":
       return "Running";
+    case "waiting":
+      return "Waiting";
     case "paused":
       return "Paused";
     case "scheduled":
@@ -182,7 +187,7 @@ function resultsStatus(opts: {
   if (opts.hasResults) {
     return "has_results";
   }
-  if (opts.campaignStatus === "running") {
+  if (opts.campaignStatus === "running" || opts.campaignStatus === "waiting") {
     return "live";
   }
   return "idle";

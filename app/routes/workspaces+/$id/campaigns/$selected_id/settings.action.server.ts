@@ -42,7 +42,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { MemberRole } from "@/lib/member-role";
 import { toUserMessage } from "@/lib/user-message";
 
-type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived";
+type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived" | "waiting";
 
 type CampaignWithAudiences = Campaign & {
   audiences?: Audience[];
@@ -65,7 +65,7 @@ async function updateCampaignStatus(
   if (is_active !== undefined) {
     update.is_active = is_active;
   } else {
-    if (status === "running") update.is_active = true;
+    if (status === "running" || status === "waiting") update.is_active = true;
     if (status === "paused") update.is_active = false;
   }
 
@@ -197,7 +197,7 @@ export const action = defineAction({
           throw new Error("Campaign could not be loaded");
         }
 
-        if (status === "running" || status === "scheduled") {
+        if (status === "running" || status === "waiting" || status === "scheduled") {
           if (
             !campaignRecord.type ||
             !["live_call", "message", "robocall", "simple_ivr", "complex_ivr"].includes(

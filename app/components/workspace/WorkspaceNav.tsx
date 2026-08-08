@@ -197,6 +197,7 @@ const WorkspaceNav = ({
     switch (status) {
       case "active":
       case "running":
+      case "waiting":
       case "in_progress":
         return "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300";
       case "scheduled":

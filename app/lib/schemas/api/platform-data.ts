@@ -8,6 +8,7 @@ export const campaignStatusSchema = z.enum([
   "paused",
   "draft",
   "archived",
+  "waiting",
 ]);
 
 export const campaignStatusBodySchema = z.object({

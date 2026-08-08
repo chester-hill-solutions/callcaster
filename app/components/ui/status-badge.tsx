@@ -49,6 +49,7 @@ export const statusToVariant: Record<string, StatusVariant> = {
   // Waiting / needs attention
   pending: "warning",
   paused: "warning",
+  waiting: "warning",
   busy: "warning",
   "no-answer": "warning",
   no_answer: "warning",
