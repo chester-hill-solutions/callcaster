@@ -57,13 +57,13 @@ describe("app/routes/workspaces+/$id/contacts.route.tsx", () => {
     await renderContactsRoute(`/workspaces/${workspaceId}/contacts/new`);
 
     expect(await screen.findByText("contact-child-route")).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Contacts" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Contacts" })).toBeTruthy();
   });
 
   test("renders the child route for an existing contact id", async () => {
     await renderContactsRoute(`/workspaces/${workspaceId}/contacts/42`);
 
     expect(await screen.findByText("contact-child-route")).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Contacts" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Contacts" })).toBeTruthy();
   });
 });

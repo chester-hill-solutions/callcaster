@@ -130,7 +130,11 @@ export default function AudiencesNew() {
           ) : null}
 
           {currentStep >= 2 ? (
-            <Section variant="flat" className="space-y-4">
+            <Section
+              variant="flat"
+              className="space-y-4"
+              data-testid="audience-upload-step"
+            >
               <div className="space-y-6">
                 <AudienceUploader
                   audienceName={audienceName}
