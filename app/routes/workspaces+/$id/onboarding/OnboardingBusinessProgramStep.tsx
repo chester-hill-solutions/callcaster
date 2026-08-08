@@ -28,7 +28,7 @@ export function OnboardingBusinessProgramStep({
         title="SMS program details"
         description="Carriers review these when approving bulk texting. Keep them short and specific to how people opt in."
       />
-      <Form id={formId} method="post" className="max-w-xl space-y-6">
+      <Form id={formId} method="post" noValidate className="max-w-xl space-y-6">
         <input type="hidden" name="_action" value="save_business_profile" />
         <input type="hidden" name="wizardStep" value="business_program" />
         <div className="grid gap-4">
