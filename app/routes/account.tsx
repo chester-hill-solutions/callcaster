@@ -68,12 +68,24 @@ export default function Account() {
     }
   };
 
+  /**
+   * @effect Exit profile edit mode after the profile action succeeds.
+   * @effect-deps actionData?.success (the route action result changes after a successful save)
+   * @effect-side-effects none (local setState only)
+   * @effect-why-not-loader This is client-only edit-mode UI state tied to the action response.
+   */
   useEffect(() => {
     if (actionData?.success) {
       setEditingProfile(false);
     }
   }, [actionData?.success]);
 
+  /**
+   * @effect Exit MFA edit mode after MFA enrollment succeeds.
+   * @effect-deps mfaData?.enabled (the fetcher result changes after verification)
+   * @effect-side-effects none (local setState only)
+   * @effect-why-not-loader This is client-only edit-mode UI state tied to the fetcher response.
+   */
   useEffect(() => {
     if (mfaData?.enabled) {
       setEditingMfa(false);
