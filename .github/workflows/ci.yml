@@ -3,7 +3,19 @@ name: CI
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      # Agent metadata does not affect the application or CI runtime.
+      - AGENTS.md
+      - .agents/**
+      - .opencode/**
+      - .gitignore
   pull_request:
+    paths-ignore:
+      # Keep workflow, dependency, and runtime configuration changes in CI.
+      - AGENTS.md
+      - .agents/**
+      - .opencode/**
+      - .gitignore
 
 # packages:read lets GITHUB_TOKEN fetch @chester-hill-solutions/* from GitHub
 # Packages when the workflow token is permitted. Prefer repository secret
