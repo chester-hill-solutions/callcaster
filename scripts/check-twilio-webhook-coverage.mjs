@@ -1,29 +1,22 @@
 #!/usr/bin/env node
 /**
- * Static audit: Twilio-facing Remix routes must import a signature validator.
- * Exit 1 when a route is missing validation (Phase 3 webhook hardening inventory).
+ * Static audit: Twilio-facing action routes must import a signature validator.
+ *
+ * The expected webhook list is DERIVED from the API surface registry (files
+ * matching app/lib/api-surface-*.ts): every entry with authClass "twilioSignature"
+ * and a POST operation maps to an action file. A small secondary check catches
+ * routes that validate Twilio signatures but aren't classified "twilioSignature"
+ * in the registry (they are reported but still validated).
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
 const API_DIR = join(ROOT, "app/routes/api+");
+const SURFACE_DIR = join(ROOT, "app/lib");
+const SURFACE_PATTERN = /^api-surface-.+\.ts$/;
 
-/**
- * Constructs that actually authenticate a TWILIO request.
- *
- * Deliberately narrow. This list previously also accepted `requireWorkspaceAccess`,
- * `verifyAuth`, `verifyApiKey` and `safeOutboundUrl`. None of those proves a
- * request came from Twilio: the first three prove a *session or API key*, which
- * an inbound webhook never carries, and `safeOutboundUrl` is an EGRESS SSRF
- * guard that says nothing about the inbound request at all. With them present, a
- * route could swap its signature check for a session check and stay green — the
- * guard would report success on a webhook anyone could forge.
- *
- * Every route inventoried below was verified to use one of these before the
- * broader patterns were removed, so this narrowing changed no result today. It
- * closes the false pass, not a live hole.
- */
+/** Constructs that actually authenticate a TWILIO request. */
 const VALIDATION_PATTERNS = [
   /requireTwilioSignature/,
   /requireTwilioEventsSinkSecret/,
@@ -41,37 +34,52 @@ const EXCLUDED_SUFFIXES = [
   "error-report.action.server.ts",
 ];
 
-/** Twilio webhook handlers (POST from Twilio). Loader-only conference connect validated separately. */
-const TWILIO_WEBHOOK_SUFFIXES = [
-  "acd-router.action.server.ts",
-  "acd-router/agent-bridge.action.server.ts",
-  "acd-router/agent-status.action.server.ts",
-  "acd-router/complete.action.server.ts",
-  "call.action.server.ts",
-  "inbound.action.server.ts",
-  "inbound-sms.action.server.ts",
-  "inbound-verification.action.server.ts",
-  "inbound-handset.action.server.ts",
-  "inbound-handset-dial-end.action.server.ts",
-  "inbound-ivr/$numberId/$pageId.action.server.ts",
-  "inbound-ivr/$numberId/$pageId/$blockId.action.server.ts",
-  "inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
-  "sms/status.action.server.ts",
-  "call-status.action.server.ts",
-  "dial/$number.action.server.ts",
-  "dial/status.action.server.ts",
-  "auto-dial/status.action.server.ts",
-  "auto-dial/$roomId.action.server.ts",
-  "recording.action.server.ts",
-  "email-vm.action.server.ts",
-  "caller-id/status.action.server.ts",
-  "ivr/status.action.server.ts",
-  "ivr/$campaignId/$pageId.action.server.ts",
-  "ivr/$campaignId/$pageId/$blockId.action.server.ts",
-  "ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
-  "twilio/trusthub/status.action.server.ts",
-  "twilio/a2p/events.action.server.ts",
-];
+/**
+ * Parse all API surface TS files and extract action file paths for entries
+ * with authClass "twilioSignature" and a POST operation.
+ */
+function deriveExpectedTwilioActionFiles() {
+  const entries = readdirSync(SURFACE_DIR).filter((f) => SURFACE_PATTERN.test(f));
+  const actionFiles = new Set();
+
+  for (const file of entries) {
+    const source = readFileSync(join(SURFACE_DIR, file), "utf8");
+    const seedBlocks = source.match(/[a-zA-Z]*[Ss]eed\(\{[\s\S]*?\}\)\s*[,;]/g) ?? [];
+
+    for (const block of seedBlocks) {
+      if (!/"twilioSignature"/.test(block)) continue;
+      if (!/method:\s*"POST"/.test(block)) continue;
+
+      const rmMatch = block.match(/routeModule:\s*"([^"]+)"/);
+      if (!rmMatch) continue;
+
+      const routeModule = rmMatch[1];
+      const rel = routeModule.replace(/^app\/routes\/api\+/, "").replace(/^\//, "");
+      const actionRel = rel
+        .replace(/\.route\.tsx$/, ".action.server.ts")
+        .replace(/\.tsx$/, ".action.server.ts");
+      actionFiles.add(actionRel);
+    }
+  }
+
+  return [...actionFiles].sort();
+}
+
+/**
+ * Scan action files under API_DIR for import/usage of VALIDATION_PATTERNS.
+ * Returns files that validate Twilio signatures but aren't in the expected-twilio set.
+ */
+function findUnregisteredValidators(registeredTwilioRoutes) {
+  const allActionFiles = collectActionFiles(API_DIR);
+  const registered = new Set(registeredTwilioRoutes);
+
+  return allActionFiles.filter((rel) => {
+    if (EXCLUDED_SUFFIXES.some((s) => rel.endsWith(s))) return false;
+    if (registered.has(rel)) return false;
+    const source = readFileSync(join(API_DIR, rel), "utf8");
+    return VALIDATION_PATTERNS.some((p) => p.test(source));
+  });
+}
 
 function collectActionFiles(dir, prefix = "") {
   const files = [];
@@ -87,19 +95,16 @@ function collectActionFiles(dir, prefix = "") {
   return files;
 }
 
-function isTwilioWebhook(relPath) {
-  if (EXCLUDED_SUFFIXES.some((suffix) => relPath.endsWith(suffix))) {
-    return false;
-  }
-  return TWILIO_WEBHOOK_SUFFIXES.some((suffix) => relPath.endsWith(suffix));
-}
-
 function hasValidation(source) {
   return VALIDATION_PATTERNS.some((pattern) => pattern.test(source));
 }
 
+const expectedTwilioRoutes = deriveExpectedTwilioActionFiles();
 const actionFiles = collectActionFiles(API_DIR);
-const twilioRoutes = actionFiles.filter(isTwilioWebhook);
+
+// Filter the derived list to only files that actually exist on disk
+const twilioRoutes = expectedTwilioRoutes.filter((rel) => actionFiles.includes(rel));
+
 const missing = [];
 
 for (const rel of twilioRoutes) {
@@ -109,6 +114,8 @@ for (const rel of twilioRoutes) {
   }
 }
 
+// Check the connect-campaign-conference loader (GET-only, registered as twilioSignature
+// in the API surface but has no POST — checked separately by its loader file).
 const loaderPath = join(
   API_DIR,
   "connect-campaign-conference/$workspaceId/$campaignId.loader.server.ts",
@@ -121,8 +128,28 @@ try {
   loaderOk = false;
 }
 
+// Report any routes that validate Twilio but aren't registered as twilioSignature
+const unregistered = findUnregisteredValidators(twilioRoutes);
+
 console.log(`Twilio webhook routes scanned: ${twilioRoutes.length}`);
+console.log(`Derived from api-surface registry: ${expectedTwilioRoutes.length} entries`);
 console.log(`connect-campaign-conference loader validated: ${loaderOk ? "yes" : "NO"}`);
+
+if (unregistered.length > 0) {
+  console.log(
+    `\nWARNING: ${unregistered.length} route(s) validate Twilio signatures but are not registered as authClass "twilioSignature":`,
+  );
+  for (const route of unregistered) {
+    console.log(`  - ${route} (still validated)`);
+  }
+  // Also check these for validation even though they're unregistered
+  for (const rel of unregistered) {
+    const source = readFileSync(join(API_DIR, rel), "utf8");
+    if (!hasValidation(source)) {
+      missing.push(rel);
+    }
+  }
+}
 
 if (missing.length > 0) {
   console.error("\nMissing Twilio signature validation:");

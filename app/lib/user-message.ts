@@ -2,47 +2,26 @@
  * Convert an unknown thrown value into a safe, user-facing message.
  *
  * Intent: our own code throws intentional, human-readable errors
- * ("Campaign name is required"). Infrastructure errors (Supabase/Postgres,
+ * ("Campaign name is required"). Infrastructure errors (Postgres,
  * fetch failures, type errors) leak internals and confuse users. This helper
  * passes through the former and replaces the latter with a caller-supplied
  * fallback. Use `getErrorDetail` to log the raw message server-side.
+ *
+ * The implementation uses an allowlist-first approach:
+ * 1. The message must look like intentional product copy (sentence-like).
+ * 2. A compact deny list catches known infra patterns that happen to look
+ *    like English (e.g. "Connection terminated unexpectedly").
+ * 3. Default is fallback — only intentional copy and known border cases pass.
  */
 
-/** Substrings that mark a message as technical/internal, never user-facing. */
-const TECHNICAL_MARKERS = [
-  "supabase",
-  "fetch failed",
-  "typeerror",
-  "referenceerror",
-  "syntaxerror",
-  "pgrst",
-  "duplicate key",
-  "violates",
-  "econn",
-  "etimedout",
-  "enotfound",
-  "undefined",
-  "null",
-  "{",
-  "\n    at ", // stack frame
-  // Connection/pool/socket failures read as capitalized plain English and
-  // otherwise slip through (e.g. "Connection terminated unexpectedly").
-  "connection terminated",
-  "connection reset",
-  "connection closed",
-  "terminated unexpectedly",
-  "socket hang up",
-  "epipe",
-  "the pool",
-  "timeout exceeded",
-  "query read timeout",
-];
+const ALLOW_SENTENCE_RE = /^[A-Z][A-Za-z0-9 '(),./:;!?-]{0,138}[.!]?$/;
+
+const INFRA_DENY = /econn|pgrst|duplicate key|typeerror|referenceerror|syntaxerror|fetch failed|supabase|connection (terminated|reset|closed)|timeout exceeded|query read timeout|terminated unexpectedly|socket hang|epipe|the pool/i;
 
 function isLikelyUserFacing(message: string): boolean {
   if (!message || message.length >= 140) return false;
-  if (!/^[A-Z]/.test(message)) return false;
-  const lower = message.toLowerCase();
-  return !TECHNICAL_MARKERS.some((marker) => lower.includes(marker));
+  if (!ALLOW_SENTENCE_RE.test(message)) return false;
+  return !INFRA_DENY.test(message);
 }
 
 /**

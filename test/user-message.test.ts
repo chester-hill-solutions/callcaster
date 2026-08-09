@@ -58,6 +58,28 @@ describe("app/lib/user-message.ts", () => {
       expect(toUserMessage(undefined, FALLBACK)).toBe(FALLBACK);
       expect(toUserMessage(42, FALLBACK)).toBe(FALLBACK);
     });
+
+    test("allowlist rejects messages with curly braces, newlines, or control chars", () => {
+      expect(toUserMessage(new Error("Has {brace}"), FALLBACK)).toBe(FALLBACK);
+      expect(toUserMessage(new Error("Has\nnewline"), FALLBACK)).toBe(FALLBACK);
+    });
+
+    test("allowlist rejects lowercase-start or all-lowercase messages", () => {
+      expect(toUserMessage(new Error("something broke unexpectedly"), FALLBACK)).toBe(FALLBACK);
+    });
+
+    test("passes through messages with common product punctuation", () => {
+      expect(toUserMessage("Campaign name is required.", FALLBACK)).toBe("Campaign name is required.");
+      expect(toUserMessage("Could not load this audio file. The link may have expired.", FALLBACK)).toBe(
+        "Could not load this audio file. The link may have expired.",
+      );
+    });
+
+    test("rejects partial matches of infra patterns that look like English", () => {
+      expect(toUserMessage(new Error("Connection reset by peer"), FALLBACK)).toBe(FALLBACK);
+      expect(toUserMessage(new Error("econn something"), FALLBACK)).toBe(FALLBACK);
+      expect(toUserMessage(new Error("Disconnected"), FALLBACK)).toBe("Disconnected");
+    });
   });
 
   describe("getErrorDetail", () => {
