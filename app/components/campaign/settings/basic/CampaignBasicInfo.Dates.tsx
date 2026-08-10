@@ -10,6 +10,10 @@ import {
   ScheduleDay,
   ScheduleInterval,
 } from "@/lib/types";
+import {
+  wallClockToUtcHm,
+  utcToWallClockHm,
+} from "@/lib/schedule-timezone";
 
 // Schedule type matching the WeeklyScheduleTable component
 type DayName = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
@@ -158,51 +162,48 @@ export default function SelectDates({
     setCurrentSchedule(parseSchedule(scheduleSource as Campaign["schedule"]));
   }
 
-  const utcToLocal = (utcTime: string) => {
-    if (!utcTime) return "";
-    const [hours, minutes] = utcTime.split(":");
-    const date = new Date();
-    date.setUTCHours(Number(hours));
-    date.setUTCMinutes(Number(minutes));
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  };
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const localToUTC = (localTime: string) => {
-    if (!localTime) return "";
-    const [hours, minutes] = localTime.split(":");
-    const date = new Date();
-    date.setHours(Number(hours));
-    date.setMinutes(Number(minutes));
-    return date.toUTCString().slice(17, 22);
-  };
+  const utcToLocal = (utcTime: string) =>
+    utcToWallClockHm(utcTime, timeZone);
+
+  const localToUTC = (localTime: string) =>
+    wallClockToUtcHm(localTime, timeZone);
+
+  function intervalsWithoutTies(intervals: ScheduleInterval[]): ScheduleInterval[] {
+    return intervals.filter((iv) => iv.start !== iv.end);
+  }
 
   const commitSchedule = (next: Record<DayName, ScheduleDay>) => {
     const cleaned = cleanScheduleForPersist(next);
+    // Strip any interval where start === end (no-op range that would always
+    // make checkSchedule return false).
+    for (const day of DAYS_OF_WEEK) {
+      cleaned[day].intervals = intervalsWithoutTies(cleaned[day].intervals);
+    }
     setCurrentSchedule(cleaned);
     handleInputChange(copy.field, JSON.stringify(cleaned));
   };
 
   const applyScheduleToAll = (schedule: { start: string; end: string }) => {
+    const iv = schedule.start !== schedule.end ? [schedule] : [];
     const newSchedule: Record<DayName, ScheduleDay> = { ...currentSchedule };
     DAYS_OF_WEEK.forEach((day) => {
       newSchedule[day] = {
-        active: true,
-        intervals: [schedule],
+        active: iv.length > 0,
+        intervals: iv,
       };
     });
     commitSchedule(newSchedule);
   };
 
   const applyScheduleToWeekdays = (schedule: { start: string; end: string }) => {
+    const iv = schedule.start !== schedule.end ? [schedule] : [];
     const newSchedule: Record<DayName, ScheduleDay> = { ...currentSchedule };
     WEEKDAYS.forEach((day) => {
       newSchedule[day] = {
-        active: true,
-        intervals: [schedule],
+        active: iv.length > 0,
+        intervals: iv,
       };
     });
     commitSchedule(newSchedule);
