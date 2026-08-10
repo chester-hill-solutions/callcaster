@@ -31,7 +31,7 @@ vi.mock("@/components/ui/dialog", () => ({
     if (!open) return null;
     return <div data-testid="dialog">{children}</div>;
   },
-  DialogContent: ({ children }: any) => <div>{children}</div>,
+  DialogContent: ({ children, className }: any) => <div className={className}>{children}</div>,
   DialogFooter: ({ children }: any) => <div>{children}</div>,
   DialogHeader: ({ children }: any) => <div>{children}</div>,
   DialogTitle: ({ children }: any) => <div>{children}</div>,
@@ -74,6 +74,7 @@ describe("app/components/call/CallScreen.Dialogs.tsx", () => {
     render(<CampaignDialogs {...baseProps({ isActive: false })} />);
 
     expect(screen.getByText("This campaign is currently inactive.")).toBeInTheDocument();
+    expect(screen.getByText("This campaign is currently inactive.").closest("div[class*='grid-cols-1']")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "OK" }));
     expect(mocks.navigate).toHaveBeenCalledWith(-1);
   });
@@ -178,4 +179,3 @@ describe("app/components/call/CallScreen.Dialogs.tsx", () => {
   // dialog actually mount). The banner — including its Purchase Credits billing
   // link — is covered by e2e specs DIAL-08 and RBAC-18.
 });
-
