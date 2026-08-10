@@ -403,7 +403,15 @@ export async function updateMeProfile(
       returnHeaders: true,
     });
     const payload = (result?.response ?? result) as any;
-    const user = payload?.user;
+    const user =
+      payload?.user ??
+      (payload?.status === true
+        ? {
+            id: userId,
+            email: body.email ?? currentProfile?.username ?? null,
+            name: updateBody.name ?? currentProfile?.first_name ?? null,
+          }
+        : null);
     if (!user) {
       return { ok: false, error: "Update failed", status: 400 };
     }

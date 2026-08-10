@@ -177,5 +177,24 @@ describe("platform-auth.server.ts", () => {
       });
       expect(mocks.changePassword).not.toHaveBeenCalled();
     });
+
+    test("accepts Better Auth status-only update response", async () => {
+      mocks.updateUser.mockResolvedValueOnce({ response: { status: true } });
+      const mod = await import("../app/lib/platform-auth.server");
+
+      const result = await mod.updateMeProfile(
+        new Request("http://localhost/api/me", { headers: new Headers() }),
+        "u1",
+        { first_name: "Updated", last_name: "Name" } as any,
+      );
+
+      expect(result.ok).toBe(true);
+      expect(mocks.updateOwnUserProfile).toHaveBeenCalledWith({
+        userId: "u1",
+        first_name: "Updated",
+        last_name: "Name",
+        username: "a@b.com",
+      });
+    });
   });
 });

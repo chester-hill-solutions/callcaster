@@ -6,6 +6,7 @@ import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.serve
 import { defineAction, defineLoader } from "@/lib/handler.server";
 import { updateMeProfile } from "@/lib/platform-auth.server";
 import { getUserById } from "@/lib/workspace-members-db.server";
+import { isTwoFactorEnabled, userHasPrivilegedWorkspaceRole } from "@/lib/two-factor.server";
 
 const accountProfileSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required").max(100),
@@ -15,14 +16,22 @@ const accountProfileSchema = z.object({
 export const loader = defineLoader({
   auth: ({ request }) => verifyAuth(request, "/account"),
   sideEffects: ["db-read"],
-  handler: async ({ auth }) => {
+  handler: async ({ auth, request }) => {
     const profile = await getUserById(auth.user.id);
+    const url = new URL(request.url);
+    const [twoFactorEnabled, privileged] = await Promise.all([
+      isTwoFactorEnabled(auth.user.id),
+      userHasPrivilegedWorkspaceRole(auth.user.id),
+    ]);
 
     return routeData(
       {
         firstName: profile?.first_name ?? "",
         lastName: profile?.last_name ?? "",
         email: auth.user.email ?? profile?.username ?? "",
+        twoFactorEnabled,
+        privileged,
+        enrollRequired: url.searchParams.get("enroll") === "1",
       },
       { headers: auth.headers },
     );

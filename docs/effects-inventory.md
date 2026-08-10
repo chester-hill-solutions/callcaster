@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**113** documented / **113** total effects (0 grandfathered, ratcheting to 0).
+**116** documented / **116** total effects (0 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -117,6 +117,8 @@
 | `app/hooks/utils/useUnsavedChangesGuard.ts` | Ask the user to confirm in-app navigation via window.confirm when the blocker trips, then proceed/reset. | blocker (React Router's useBlocker result; re-runs whenever its state/proceed/reset change) | dom (window.confirm — a blocking UI prompt) + navigation (blocker.proceed()/reset()) | Not data fetching — reacts to React Router's blocker state to show an |
 | `app/hooks/utils/useUnsavedChangesGuard.ts` | Warn on tab close/refresh via beforeunload while there are unsaved changes. | isChanged (only subscribes while there's something to lose) | dom (window 'beforeunload' listener; removed on cleanup/when isChanged flips) | Not data fetching — beforeunload is a browser-native tab-close guard that |
 | `app/hooks/workspace/useApiKeys.ts` | CANDIDATE-REMOVE Fetches from the API keys resource route (external system) on mount | workspaceId, hasAccess, initialKeys.length. `listFetcher` is intentionally omitted | fetch (listFetcher.load against /api/workspace-api-keys) | Fallback fetch for data the route loader is expected to provide — if the |
+| `app/routes/account.tsx` | Exit profile edit mode after the profile action succeeds. | actionData?.success (the route action result changes after a successful save) | none (local setState only) | This is client-only edit-mode UI state tied to the action response. |
+| `app/routes/account.tsx` | Exit MFA edit mode after MFA enrollment succeeds. | mfaData?.enabled (the fetcher result changes after verification) | none (local setState only) | This is client-only edit-mode UI state tied to the fetcher response. |
 | `app/routes/docs.tsx` | Dynamically import and imperatively mount the Scalar API-reference widget into containerRef for the active spec. | config.url — remounts the widget against the newly selected spec (public vs. complete) when it changes. | dom (imperative third-party widget mount) + dynamic import; instance destroyed on cleanup/re-run. | Scalar's `createApiReference` is an imperative DOM-mounting API from a lazily-loaded client bundle, not data a loader could hand to a component tree. |
 | `app/routes/workspaces+/$id/campaigns/$selected_id/settings.route.tsx` | Redirect legacy #campaign-launch hash deep-links to the dedicated launch route. | location.hash, location.search, navigate | navigate (client redirect) | Hash fragments are not available to loaders; this preserves old bookmarks. |
 | `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx` | Open the verification-code dialog when the route action returns a validationRequest | validationRequest from useActionData via the parent route | setState for dialog open + retained request payload | Action data arrives after the mutation; opening a modal is client-only. |

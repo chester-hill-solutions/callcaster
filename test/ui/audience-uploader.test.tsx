@@ -175,7 +175,23 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(
       screen.getByText("Drop or choose a CSV file"),
     ).toBeInTheDocument();
-    expect(screen.getByText("1. File")).toBeInTheDocument();
+    expect(screen.getByText("1. Select file")).toBeInTheDocument();
+  });
+
+  test("accepts a CSV dropped onto the file picker", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    render(<AudienceUploader audienceName="A1" />);
+    const file = new File(["Phone\n123"], "contacts.csv", { type: "text/csv" });
+    (file as any).text = async () => "Phone\n123";
+    const dropZone = screen.getByText("Drop or choose a CSV file").closest("label");
+
+    expect(dropZone).not.toBeNull();
+    fireEvent.drop(dropZone!, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Map CSV Headers")).toBeInTheDocument();
+    });
   });
 
   test("hides step strip when embedded (onUploadComplete)", async () => {
@@ -246,7 +262,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     expect(screen.getByText("Alice")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
-    expect(screen.getByText(/contacts ready to upload/)).toBeInTheDocument();
+    expect(screen.getByText(/2 rows 3 columns/)).toBeInTheDocument();
     const split = screen.getByLabelText(
       "Split full name into first name and last name",
     ) as HTMLInputElement;
@@ -381,8 +397,8 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       expect(mocks.onUploadComplete).toHaveBeenCalledWith("5");
     });
 
-    expect(screen.queryByText("Completed!")).toBeNull();
-    expect(screen.queryByText("Redirecting to audience page...")).toBeNull();
+    expect(screen.getByText("Completed!")).toBeInTheDocument();
+    expect(screen.getByText("Redirecting to audience page...")).toBeInTheDocument();
   }, 15000);
 
   test("polling completion without onUploadComplete shows chrome and redirects after 2s", async () => {
@@ -571,7 +587,7 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
       });
     });
 
-    expect(screen.queryByText("Completed!")).toBeNull();
+    expect(screen.getByText("Completed!")).toBeInTheDocument();
     expect(mocks.onUploadComplete).toHaveBeenCalledWith("123");
   });
 
