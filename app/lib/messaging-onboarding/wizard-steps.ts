@@ -31,9 +31,9 @@ export function isWizardOnboardingStepId(value: string): value is WizardOnboardi
 export function resolvePersistedWizardStep(
   currentStep: string | null | undefined,
 ): WizardOnboardingStepId {
-  if (!currentStep) return "business_identity";
+  if (!currentStep) return "path_selection";
   if (isWizardOnboardingStepId(currentStep)) return currentStep;
   const redirected = LEGACY_WIZARD_STEP_REDIRECTS[currentStep];
   if (redirected) return redirected;
-  return "business_identity";
+  return "path_selection";
 }

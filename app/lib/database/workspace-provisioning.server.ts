@@ -153,7 +153,7 @@ export async function createNewWorkspace({
           status: "provisioning",
         },
         status: "provisioning",
-        currentStep: "business_identity",
+        currentStep: "path_selection",
         lastUpdatedBy: user_id,
       },
     );

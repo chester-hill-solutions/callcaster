@@ -230,7 +230,7 @@ describe("save_business_profile validation", () => {
 
   test("maps legacy business_profile persisted step to business_identity", () => {
     expect(resolvePersistedWizardStep("business_profile")).toBe("business_identity");
-    expect(resolvePersistedWizardStep(null)).toBe("business_identity");
+    expect(resolvePersistedWizardStep(null)).toBe("path_selection");
   });
 
   test("rejects an empty identity submit instead of advancing", async () => {
