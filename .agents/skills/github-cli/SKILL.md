@@ -29,6 +29,13 @@ The manual's command surface is: `agent-task`, `alias`, `api`, `attestation`, `a
 
 Use `gh auth refresh -s <scope>` only when the operation requires an additional scope. Project mutations commonly require `project`; do not expose tokens in commands, logs, or issue bodies.
 
+## Issue Development Branches
+
+- Read an issue before creating its branch: `gh issue view <number> --repo chester-hill-solutions/callcaster --json number,title,body,labels,assignees,milestone,state,url`. Check `gh issue develop --help` before relying on its flags.
+- Create a remote branch linked to an issue from `dev`: `gh issue develop <number> --repo chester-hill-solutions/callcaster --base dev --name feature/<number>-<kebab-description>`. Use `feature/` for implementation work; reserve `chore/<kebab-description>` for repository maintenance that is not the issue's product work.
+- Use a separate worktree for the linked branch. Fetch an explicit remote-tracking ref, then create the local tracking branch: `git fetch origin <branch>:refs/remotes/origin/<branch>` followed by `git worktree add --track -b <branch> ../<worktree-name> origin/<branch>`. Name the worktree after the branch without slashes, for example `../feature-1157-build-ai-test-audiences`.
+- For an unlinked chore branch, create the worktree from `dev`: `git worktree add -b chore/<kebab-description> ../chore-<kebab-description> dev`. After verification, commit, push with `git push -u origin <branch>`, and create the review with `gh pr create --repo chester-hill-solutions/callcaster --base dev --head <branch>`.
+
 ## Verification
 
 After a mutation, query the target object and report its URL plus the fields that changed. Do not treat successful command exit status as sufficient proof of remote state.
