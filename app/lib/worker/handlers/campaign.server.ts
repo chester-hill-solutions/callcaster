@@ -7,6 +7,10 @@ import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.serve
 import { scheduleNextDispatch } from "@/lib/worker/campaign-dispatch";
 import { runWorkspaceTwilioComplianceJob } from "@/lib/twilio-compliance-job.server";
 import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { sendSingleCampaignSms } from "@/lib/campaign-sms-send.server";
+import { getCampaignQueueById } from "@/lib/database/campaign.server";
+import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
+import type { Campaign, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 import {
@@ -146,29 +150,83 @@ export async function campaignExportHandler(job: ClaimedJobRow): Promise<unknown
 export async function campaignDispatchHandler(job: ClaimedJobRow): Promise<unknown> {
   const params = (job.params ?? {}) as Record<string, unknown>;
   const campaignId = requireNumberParam(params, "campaignId");
-  const queueNextUrl = requireStringParam(params, "queueNextUrl");
-  const owner = requireStringParam(params, "owner") ?? null;
-  const headers = requireRecordParam(params, "headers") ?? {
-    "Content-Type": "application/json",
-  };
-  const delayMs = requireNumberParam(params, "delayMs");
+  const workspaceId = job.workspace_id ?? requireStringParam(params, "workspaceId");
 
-  if (!campaignId || !queueNextUrl) {
+  if (!campaignId || !workspaceId) {
     throw new Error(
-      "campaign_dispatch: missing campaignId or queueNextUrl — enqueue only from a wired dispatch route",
+      "campaign_dispatch: missing campaignId or workspaceId",
     );
   }
 
-  await scheduleNextDispatch({
-    fetchImpl: fetch,
-    queueNextUrl,
-    headers,
-    campaignId,
-    owner,
-    delayMs,
-  });
+  // Load campaign and queued contacts.
+  const [campaignRecord, audience] = await Promise.all([
+    findCampaignInWorkspace(workspaceId, String(campaignId)),
+    getCampaignQueueById({ campaign_id: String(campaignId), onlyQueued: true }),
+  ]);
 
-  return { ok: true, campaignId };
+  if (!campaignRecord) {
+    throw new Error(`campaign_dispatch: campaign ${campaignId} not found`);
+  }
+
+  // Verify campaign is still active.
+  if (campaignRecord.status !== "running" && campaignRecord.status !== "scheduled") {
+    logger.info("campaign_dispatch.skipped", { campaignId, status: campaignRecord.status });
+    return { ok: true, campaignId, skipped: true };
+  }
+
+  // Check expired dates.
+  const now = new Date();
+  if (campaignRecord.end_date && new Date(campaignRecord.end_date) < now) {
+    logger.info("campaign_dispatch.expired", { campaignId });
+    return { ok: true, campaignId, expired: true };
+  }
+
+  const queueMembers = audience ?? [];
+  if (queueMembers.length === 0) {
+    logger.info("campaign_dispatch.empty_queue", { campaignId });
+    return { ok: true, campaignId, empty: true };
+  }
+
+  // Process a batch of queued contacts.
+  const BATCH_SIZE = 10;
+  const batch = queueMembers.slice(0, BATCH_SIZE);
+  const results = [];
+
+  for (const member of batch) {
+    const normalizedPhone = member.contact?.phone ?? "";
+    try {
+      const campaignBody = (campaignRecord as Campaign).body_text;
+      const result = await sendSingleCampaignSms({
+        body: campaignBody ?? "",
+        media: [],
+        to: normalizedPhone,
+        from: campaignRecord.caller_id ?? "",
+        campaign_id: String(campaignId),
+        workspace: workspaceId,
+        contact_id: member.contact_id,
+        queue_id: member.id,
+        user_id: job.user_id ?? "system",
+        portalConfig: {} as WorkspaceTwilioOpsConfig,
+        messagingServiceSidFromRequest: null,
+      });
+      results.push({ contact_id: member.contact_id, success: true });
+    } catch (err) {
+      logger.error("campaign_dispatch.send_failed", { campaignId, contactId: member.contact_id, error: err instanceof Error ? err.message : String(err) });
+      results.push({ contact_id: member.contact_id, success: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  // Re-enqueue for remaining work if queue still has members.
+  if (queueMembers.length > BATCH_SIZE) {
+    await enqueueJob({
+      type: "campaign_dispatch",
+      workspaceId,
+      params: { campaignId, workspaceId },
+      dedupe: { kind: "live", workspaceId },
+    });
+  }
+
+  return { ok: true, campaignId, sent: results.length, results };
 }
 
 export async function webhookDeliveryHandler(job: ClaimedJobRow): Promise<unknown> {

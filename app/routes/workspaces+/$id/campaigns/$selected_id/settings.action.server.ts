@@ -32,6 +32,7 @@ import {
 } from "@/lib/database/campaign.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { getCampaignReadiness, getScheduleValidation } from "@/lib/campaign-readiness";
+import { launchCampaign } from "@/lib/campaign-execution.server";
 import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -229,6 +230,28 @@ export const action = defineAction({
               tdb.script.findMany({ columns: { id: true } }),
               listWorkspaceAudiosApi(user.id, workspace_id),
             ]);
+
+          // For message campaigns, use launchCampaign which enqueues dispatch.
+          if (campaignRecord.type === "message" && (status === "running" || status === "scheduled")) {
+            const mode = status === "running" ? "now" : "scheduled";
+            const result = await launchCampaign({
+              workspaceId: workspace_id,
+              campaignId: selected_id,
+              campaign: campaignRecord as Campaign,
+              campaignDetails: campaignDetails as unknown as CampaignDetails,
+              mode,
+              queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
+            });
+            if (!result.ok) {
+              return routeData(
+                { success: false, error: result.error, actionType: "status" as const },
+                { status: 400 },
+              );
+            }
+            return routeData({ success: true, actionType: "status" as const, status });
+          }
+
+          // For voice campaigns, use readiness check + status update.
           const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as unknown as CampaignDetails, {
             queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
             workspacePhoneNumbers: phoneNumbersResult.data ?? [],
@@ -248,12 +271,15 @@ export const action = defineAction({
           }
         }
 
-        await updateCampaignStatus(
-          workspace_id,
-          selected_id,
-          status,
-          is_active === "true" ? true : is_active === "false" ? false : undefined
-        );
+        // Non-message campaigns or pause/archive/complete go through simple status update.
+        if (campaignRecord?.type !== "message" || (status !== "running" && status !== "scheduled")) {
+          await updateCampaignStatus(
+            workspace_id,
+            selected_id,
+            status,
+            is_active === "true" ? true : is_active === "false" ? false : undefined
+          );
+        }
         return routeData({ success: true, actionType: "status" as const, status });
       } catch (error) {
         logger.error("Error updating campaign status", error);

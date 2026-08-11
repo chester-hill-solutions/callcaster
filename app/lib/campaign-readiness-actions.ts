@@ -122,6 +122,16 @@ export const CAMPAIGN_READINESS_ACTIONS = {
     template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
     label: "Add message content",
   },
+  campaign_ended: {
+    type: "route",
+    template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignQueue,
+    label: "Update campaign dates",
+  },
+  send_window_required: {
+    type: "route",
+    template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignQueue,
+    label: "Set send hours",
+  },
 } as const satisfies Record<
   CampaignReadinessCode,
   CampaignReadinessCorrectiveAction
