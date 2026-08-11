@@ -1,14 +1,12 @@
 import { enqueueJob, type EnqueueJobResult } from "@/lib/worker/enqueue-job.server";
 import { getCampaignReadiness, type CampaignReadinessIssue } from "@/lib/campaign-readiness";
 import { updateCampaignStatusInWorkspace } from "@/lib/campaign-ivr.server";
-import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
-import { getCampaignQueueById } from "@/lib/database/campaign.server";
-import { logger } from "@/lib/logger.server";
+import { CAMPAIGN_DISPATCH_JOB_TYPE } from "@/lib/worker/job-types.server";
 import type { Campaign, LiveCampaign, MessageCampaign, IVRCampaign } from "@/lib/types";
 
 type CampaignDetails = LiveCampaign | MessageCampaign | IVRCampaign | null | undefined;
 
-export const CAMPAIGN_DISPATCH_JOB_TYPE = "campaign_dispatch";
+export { CAMPAIGN_DISPATCH_JOB_TYPE };
 
 /**
  * Evaluate whether a campaign is expired (end_date < now).
@@ -44,10 +42,16 @@ export async function launchCampaign(args: {
   campaign: Campaign;
   campaignDetails: CampaignDetails;
   mode: "now" | "scheduled";
+  /** Authenticated launching actor; attributed on worker dispatch side effects. */
+  userId: string;
   now?: Date;
   queueCount?: number;
 }): Promise<LaunchCampaignResult> {
-  const { workspaceId, campaignId, campaign, campaignDetails, mode, queueCount } = args;
+  const { workspaceId, campaignId, campaign, campaignDetails, mode, userId, queueCount } = args;
+
+  if (!userId) {
+    return { ok: false, error: "A launching user is required to start this campaign." };
+  }
 
   // Validate configuration readiness.
   const readiness = getCampaignReadiness(
@@ -82,12 +86,14 @@ export async function launchCampaign(args: {
     const job = await enqueueJob({
       type: CAMPAIGN_DISPATCH_JOB_TYPE,
       workspaceId,
+      userId,
       params: {
         workspaceId,
         campaignId: Number(campaignId),
+        userId,
         mode: status,
       },
-      dedupe: { kind: "live", workspaceId },
+      dedupe: { kind: "live", workspaceId, campaignId: Number(campaignId) },
       runAt: mode === "scheduled" ? campaign.start_date : undefined,
     });
     return { ok: true, status, job };

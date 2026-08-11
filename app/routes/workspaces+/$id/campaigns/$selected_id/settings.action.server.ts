@@ -240,6 +240,7 @@ export const action = defineAction({
               campaign: campaignRecord as Campaign,
               campaignDetails: campaignDetails as unknown as CampaignDetails,
               mode,
+              userId: user.id,
               queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
             });
             if (!result.ok) {

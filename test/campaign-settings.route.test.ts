@@ -221,8 +221,11 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, actionType: "status", status: "running" });
-    // For message campaigns, launchCampaign is called instead of updateCampaignStatus.
-    expect(mocks.launchCampaign).toHaveBeenCalled();
+    // For message campaigns, launchCampaign is called instead of updateCampaignStatus,
+    // attributed to the authenticated launching user.
+    expect(mocks.launchCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-1" }),
+    );
   });
 
   test("blocks activation when the configured script is not in the workspace", async () => {
