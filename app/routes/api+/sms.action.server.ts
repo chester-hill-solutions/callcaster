@@ -1,32 +1,20 @@
 import {
   messageCampaignRequiresCallerId,
-  resolveTwilioSmsMessagingServiceSid,
 } from "@/lib/sms-send-resolve";
-import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";
 import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
-import { countCampaignMessagesToPhone } from "@/lib/message-db.server";
 import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
-import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
 import { getCampaignQueueById } from "@/lib/database/campaign.server";
 import {
-  createWorkspaceTwilioInstance,
   getWorkspaceTwilioPortalConfig,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { requireDualAuthCapability } from "@/lib/capability-guard.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { campaignSmsDispatchBodySchema } from "@/lib/schemas/api/sms";
-import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
-import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
-import { withTwilioRetry } from "@/lib/twilio-client.server";
-import {
-  persistMessageRecord,
-  twilioMessageToPersistFields,
-} from "@/lib/sms-send.server";
+import type { TwilioMessageIntent } from "@/lib/types";
 import {
   claimBatchSizeForRate,
   configuredDispatcherSmsMps,
@@ -34,167 +22,18 @@ import {
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { isWithinSendWindow, parseSendWindow } from "@/lib/campaign-send-window";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
-import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
-import { createTenantDb } from "@/server/tenant-db";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
 import { defineAction } from "@/lib/handler.server";
-
-const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
-const OPTED_OUT_SMS_DEQUEUED_REASON = "Contact opted out";
-const LANDLINE_SMS_DEQUEUED_REASON = "Landline — cannot receive SMS";
-
-interface SendMessageParams {
-  body: string;
-  to: string;
-  from: string;
-  media: string[];
-  campaign_id: string;
-  workspace: string;
-  contact_id: string | number;
-  queue_id: number | string;
-  user_id: string;
-  portalConfig: WorkspaceTwilioOpsConfig;
-  messageIntent?: TwilioMessageIntent | null;
-  messagingServiceSidFromRequest: string | null;
-  campaignSmsRow?: {
-    end_time: string;
-    sms_send_mode?: string | null;
-    sms_messaging_service_sid?: string | null;
-    caller_id?: string | null;
-  };
-}
-
-async function hasDuplicateCampaignSms(args: {
-  workspaceId: string;
-  campaignId: string;
-  to: string;
-}): Promise<boolean> {
-  const count = await countCampaignMessagesToPhone(
-    args.workspaceId,
-    args.campaignId,
-    args.to,
-  );
-  return count > 0;
-}
-
-const sendMessage = async ({
-  body,
-  to,
-  from,
-  media,
-    campaign_id,
-  workspace,
-  contact_id,
-  queue_id,
-  user_id,
-  portalConfig,
-  messageIntent,
-  messagingServiceSidFromRequest,
-  campaignSmsRow,
-}: SendMessageParams) => {
-
-  await assertWorkspaceCanSendSms({workspaceId: workspace });
-
-  const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspace,
-  });
-
-  const processedBody = body;
-
-  const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
-    explicitRequestSid: messagingServiceSidFromRequest,
-    campaignSmsSendMode: campaignSmsRow?.sms_send_mode,
-    campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
-    portalConfig,
-  });
-
-  const [message, outreachAttempt] = await Promise.all([
-    withTwilioRetry(
-      () =>
-        twilio.messages.create(
-          buildTwilioOutboundSmsCreateParams({
-            body: processedBody,
-            to,
-            from,
-            media,
-            statusCallback: `${env.BASE_URL()}/api/sms/status`,
-            portalConfig,
-            messageIntent,
-            explicitMessagingServiceSid: resolvedMessagingServiceSid,
-            campaignSmsSendMode: campaignSmsRow?.sms_send_mode,
-            campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
-          }),
-        ),
-      { workspaceId: workspace, operation: "messages.create.campaign" },
-    ).catch((e) => ({ error: e })),
-    createOutreachAttempt({
-      contact_id,
-      campaign_id,
-      queue_id,
-      workspace,
-      user_id,
-    })
-  ]);
-
-  if ('error' in message) {
-    throw message.error;
-  }
-
-  const messageFields = twilioMessageToPersistFields(
-    { ...message, sid: message.sid || `failed-${to}-${Date.now()}` },
-    { workspace, campaign_id, contact_id },
-  );
-
-  const outreachUpdate = await updateOutreachAttemptForWorkspace(
-    workspace,
-    outreachAttempt,
-    { disposition: "completed" },
-  );
-  if (outreachUpdate instanceof Response) {
-    throw new Error(await outreachUpdate.text());
-  }
-
-  await Promise.all([
-    persistMessageRecord(workspace, messageFields),
-    dequeueCampaignQueueById({
-      queueId: Number(queue_id),
-      userId: user_id,
-      reason: "SMS message sent",
-    }),
-  ]);
-
-  return { message };
-};
-
-const createOutreachAttempt = async ({
-  contact_id,
-  campaign_id,
-  queue_id,
-  workspace,
-  user_id,
-}: {
-  contact_id: string | number;
-  campaign_id: string | number;
-  queue_id: string | number;
-  workspace: string;
-  user_id: string;
-}) => {
-  const tdb = createTenantDb(workspace);
-  try {
-    return await rpcCreateOutreachAttempt(tdb, {
-      contactId: Number(contact_id),
-      campaignId: Number(campaign_id),
-      userId: user_id,
-      workspaceId: workspace,
-      queueId: Number(queue_id),
-    });
-  } catch (outreachError) {
-    logger.error("Error creating outreach attempt:", outreachError);
-    throw outreachError;
-  }
-};
+import {
+  sendSingleCampaignSms,
+  hasDuplicateCampaignSms,
+  OPTED_OUT_SMS_DEQUEUED_REASON,
+  LANDLINE_SMS_DEQUEUED_REASON,
+  DUPLICATE_SMS_DEQUEUED_REASON,
+} from "@/lib/campaign-sms-send.server";
 
 export const action = defineAction({
   auth: async ({ request }: { request: Request }) => {
@@ -442,7 +281,7 @@ export const action = defineAction({
             processedBody = processTemplateTags(campaign.body_text, member.contact);
           }
           
-          return sendMessage({
+          return sendSingleCampaignSms({
             body: processedBody,
             media: media.filter(Boolean) as string[],
             to: normalizedPhone,

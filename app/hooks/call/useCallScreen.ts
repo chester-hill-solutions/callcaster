@@ -114,7 +114,7 @@ export function useCallScreen() {
     incomingCall,
     isMicMuted,
     setMicMuted,
-    hangUp,
+    hangUp: sdkHangUp,
     answer,
     holdAndAnswer,
     callState,
@@ -130,6 +130,18 @@ export function useCallScreen() {
     send as unknown as (action: { type: string }) => void,
     handleTokenWillExpire,
   );
+
+  // Wrap hangUp to drive lifecycle immediately before SDK teardown.
+  // This ensures the display transitions to ending/ended synchronously,
+  // even if the /api/hangup call or SDK disconnect is delayed.
+  const hangUp = useCallback(async () => {
+    send({ type: "HANG_UP" });
+    try {
+      await sdkHangUp();
+    } catch {
+      // SDK hangup failure is non-fatal; lifecycle already transitioned.
+    }
+  }, [sdkHangUp, send]);
 
   const audioControls = useCallAudioControls({
     device,
@@ -405,8 +417,8 @@ export function useCallScreen() {
         "BAD";
 
   const resetCall = useCallback(() => {
-    hangUp();
-    send({ type: "HANG_UP" });
+    // hangUp wrapper already sends HANG_UP to the lifecycle.
+    hangUp().catch(() => {});
     send({ type: "NEXT" });
     reconnectDevice();
   }, [hangUp, send, reconnectDevice]);

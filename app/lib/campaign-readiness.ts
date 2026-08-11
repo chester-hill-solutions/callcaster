@@ -22,7 +22,9 @@ export type CampaignReadinessCode =
   | "dates_required"
   | "dates_invalid"
   | "start_after_end"
+  | "campaign_ended"
   | "calling_hours_required"
+  | "send_window_required"
   | "invalid_intervals"
   | "queue_empty"
   | "bulk_sender_misaligned"
@@ -60,6 +62,8 @@ type CampaignReadinessOptions = {
   } | null>;
   workspaceScriptIds?: Array<number | string>;
   workspaceAudioNames?: string[];
+  /** Override "now" for deterministic date validation. Used by campaign-execution. */
+  now?: Date;
 };
 
 type NormalizedSchedule = Record<string, ScheduleDay>;
@@ -68,7 +72,9 @@ const SCHEDULE_READINESS_CODES = new Set<CampaignReadinessCode>([
   "dates_required",
   "dates_invalid",
   "start_after_end",
+  "campaign_ended",
   "calling_hours_required",
+  "send_window_required",
   "invalid_intervals",
 ]);
 
@@ -417,18 +423,47 @@ export function getCampaignReadiness(
     commonIssues.push(dateIssue);
   }
 
-  const scheduleValidation = getScheduleValidation(campaignData.schedule);
-  if (!scheduleValidation.hasCallingHours) {
-    commonIssues.push(issue("calling_hours_required", "Calling hours are required"));
-  }
-
-  if (scheduleValidation.hasInvalidIntervals) {
-    commonIssues.push(
-      issue(
-        "invalid_intervals",
-        "Each active calling day needs at least one valid time window",
-      ),
-    );
+  if (campaignData.type === "message") {
+    // Message campaigns prefer sms_send_window (nullable jsonb).
+    // null = unrestricted (send anytime) — no issue.
+    // Cast needed: sms_send_window is in Drizzle schema but not in generated db-types.
+    const smsSendWindow = (campaignData as Record<string, unknown>).sms_send_window;
+    if (smsSendWindow != null) {
+      const windowValidation = getScheduleValidation(smsSendWindow as Campaign["schedule"]);
+      if (!windowValidation.hasCallingHours) {
+        commonIssues.push(
+          issue("send_window_required", "Set an SMS send window or clear the current schedule for unrestricted sending"),
+        );
+      }
+      if (windowValidation.hasInvalidIntervals) {
+        commonIssues.push(
+          issue("invalid_intervals", "Each active send day needs at least one valid time window"),
+        );
+      }
+    } else if (campaignData.schedule != null) {
+      // Backward compat: check legacy schedule field for existing campaigns.
+      const scheduleValidation = getScheduleValidation(campaignData.schedule);
+      if (!scheduleValidation.hasCallingHours) {
+        commonIssues.push(issue("send_window_required", "Calling hours are required"));
+      }
+      if (scheduleValidation.hasInvalidIntervals) {
+        commonIssues.push(issue("invalid_intervals", "Each active calling day needs at least one valid time window"));
+      }
+    }
+  } else {
+    // Voice campaigns use scheme (calling hours).
+    const scheduleValidation = getScheduleValidation(campaignData.schedule);
+    if (!scheduleValidation.hasCallingHours) {
+      commonIssues.push(issue("calling_hours_required", "Calling hours are required"));
+    }
+    if (scheduleValidation.hasInvalidIntervals) {
+      commonIssues.push(
+        issue(
+          "invalid_intervals",
+          "Each active calling day needs at least one valid time window",
+        ),
+      );
+    }
   }
 
   if (typeof options.queueCount === "number" && options.queueCount <= 0) {

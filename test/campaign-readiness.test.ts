@@ -301,7 +301,8 @@ describe("app/lib/campaign-readiness.ts", () => {
     );
 
     expect(readiness.startIssues).toContain("Start and end dates are required");
-    expect(readiness.startIssues).toContain("Calling hours are required");
+    // Message campaigns with no schedule are unrestricted (send anytime).
+    expect(readiness.startIssues).not.toContain("Calling hours are required");
     expect(readiness.startIssues).not.toContain(
       "Start and end dates must be valid",
     );
