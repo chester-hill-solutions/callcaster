@@ -164,6 +164,58 @@ describe("webhook side-effect handlers", () => {
       "w1",
       expect.objectContaining({ contact_id: 123 }),
     );
+    // #1218: a provider-terminal status stamps the disposition so the call
+    // shows up in campaign results even when the browser never hit /api/hangup.
+    expect(mocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      10,
+      expect.objectContaining({ disposition: "completed", ended_at: expect.any(String) }),
+    );
+  });
+
+  test.each([
+    ["no-answer", "no-answer"],
+    ["busy", "busy"],
+    ["failed", "failed"],
+  ])("runCallStatusSideEffects stamps %s as disposition", async (status, disposition) => {
+    const { runCallStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+    await runCallStatusSideEffects({
+      callSid: "CA1",
+      twilioParams: { CallSid: "CA1", CallStatus: status },
+    });
+    expect(mocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      10,
+      expect.objectContaining({ disposition }),
+    );
+  });
+
+  test("runCallStatusSideEffects never downgrades a terminal disposition (AMD voicemail)", async () => {
+    mocks.findOutreachAttemptWithCampaignType.mockResolvedValue({
+      disposition: "voicemail",
+      contact_id: 123,
+      workspace: "w1",
+    });
+    const { runCallStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+    await runCallStatusSideEffects({
+      callSid: "CA1",
+      twilioParams: { CallSid: "CA1", CallStatus: "completed" },
+    });
+    expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
+  });
+
+  test("runCallStatusSideEffects ignores non-terminal statuses", async () => {
+    const { runCallStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+    await runCallStatusSideEffects({
+      callSid: "CA1",
+      twilioParams: { CallSid: "CA1", CallStatus: "in-progress" },
+    });
     expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 

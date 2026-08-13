@@ -38,6 +38,15 @@ import { enqueueJob } from "@/lib/worker/enqueue-job.server";
 import { ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE } from "@/lib/worker/job-types.server";
 import { isBatchTranscriptionEnabled } from "@/lib/worker/handlers/elevenlabs-batch-transcribe.server";
 
+/** Terminal Twilio call statuses and the outreach disposition they imply. */
+const CALL_STATUS_TO_DISPOSITION: Record<string, string> = {
+  completed: "completed",
+  busy: "busy",
+  "no-answer": "no-answer",
+  failed: "failed",
+  canceled: "canceled",
+};
+
 export async function runCallStatusSideEffects(args: {
   callSid: string;
   twilioParams: Record<string, string>;
@@ -63,6 +72,27 @@ export async function runCallStatusSideEffects(args: {
       contact_id: currentAttempt.contact_id,
       status: String(underCaseData.call_status ?? ""),
     });
+
+    // Provider-terminal statuses stamp a disposition so every call yields a
+    // results row even when the browser never reaches /api/hangup (callee
+    // hangs up, tab closes) and the agent picks nothing (#1218). The
+    // transition guard keeps AMD "voicemail" and other terminal values from
+    // being downgraded, and an explicit agent choice via /api/questions
+    // bypasses this guard entirely, so it always wins.
+    const terminalDisposition =
+      CALL_STATUS_TO_DISPOSITION[String(underCaseData.call_status ?? "").toLowerCase()];
+    if (
+      terminalDisposition &&
+      shouldUpdateOutreachDisposition({
+        currentDisposition: currentAttempt.disposition,
+        nextDisposition: terminalDisposition,
+      })
+    ) {
+      await updateOutreachAttemptForWorkspace(billingWorkspace, outreachAttemptId!, {
+        disposition: terminalDisposition,
+        ended_at: new Date().toISOString(),
+      });
+    }
   }
 
   return { ok: true };
