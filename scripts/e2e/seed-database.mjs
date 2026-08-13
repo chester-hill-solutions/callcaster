@@ -243,6 +243,11 @@ async function seed() {
       disposition_options: ["answered", "no_answer", "busy"],
       live_questions: {},
     }),
+    campaignBase(CAMPAIGNS.launchReady, readyId, "E2E Launch Ready", "live_call", {
+      script_id: SCRIPT_IDS.live,
+      disposition_options: ["answered", "no_answer", "busy"],
+      live_questions: {},
+    }),
     campaignBase(CAMPAIGNS.livePredictive, readyId, "E2E Predictive Live", "live_call", {
       status: "running",
       dial_type: "predictive",
@@ -378,6 +383,37 @@ async function seed() {
     ON CONFLICT (campaign_id, audience_id) DO UPDATE SET
       campaign_id = EXCLUDED.campaign_id,
       audience_id = EXCLUDED.audience_id
+  `;
+
+  await sql`
+    INSERT INTO campaign_audience (campaign_id, audience_id)
+    VALUES (${CAMPAIGNS.launchReady}, ${AUDIENCE_ID})
+    ON CONFLICT (campaign_id, audience_id) DO UPDATE SET
+      campaign_id = EXCLUDED.campaign_id,
+      audience_id = EXCLUDED.audience_id
+  `;
+
+  await sql`
+    INSERT INTO campaign_queue (
+      id, campaign_id, contact_id, queue_order, queue_state,
+      attempts, attempt_count, created_at, workspace
+    )
+    VALUES (
+      980020,
+      ${CAMPAIGNS.launchReady},
+      ${contacts[0].id},
+      1,
+      'queued',
+      0,
+      0,
+      ${new Date().toISOString()},
+      ${readyId}
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      campaign_id = EXCLUDED.campaign_id,
+      contact_id = EXCLUDED.contact_id,
+      queue_order = EXCLUDED.queue_order,
+      queue_state = EXCLUDED.queue_state
   `;
 
   await sql`

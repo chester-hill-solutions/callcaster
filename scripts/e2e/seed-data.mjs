@@ -26,6 +26,7 @@ export const CAMPAIGNS = {
   message: 910003,
   robocall: 910004,
   archived: 910005,
+  launchReady: 910006,
 };
 
 export const AUDIENCE_ID = 920001;
