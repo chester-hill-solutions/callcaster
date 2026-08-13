@@ -360,10 +360,7 @@ export const CampaignLaunch = ({
           <input
             type="hidden"
             name="campaignData"
-            value={JSON.stringify({
-              ...campaignData,
-              is_active: campaignData?.is_active,
-            })}
+            value={JSON.stringify(campaignData)}
           />
           <input
             type="hidden"

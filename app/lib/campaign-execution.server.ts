@@ -75,10 +75,7 @@ export async function launchCampaign(args: {
 
   // Change status.
   const status = mode === "now" ? "running" : "scheduled";
-  await updateCampaignStatusInWorkspace(workspaceId, Number(campaignId), {
-    status,
-    is_active: status === "running",
-  });
+  await updateCampaignStatusInWorkspace(workspaceId, Number(campaignId), { status });
 
   // For message campaigns, enqueue dispatch work.
   // Voice campaigns will be dispatched by the dialer.

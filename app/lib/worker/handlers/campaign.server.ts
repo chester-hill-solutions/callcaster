@@ -215,7 +215,6 @@ export async function campaignDispatchHandler(job: ClaimedJobRow): Promise<unkno
   if (campaignRecord.status === "scheduled") {
     await updateCampaignStatusInWorkspace(workspaceId, campaignId, {
       status: "running",
-      is_active: true,
     });
   } else if (campaignRecord.status !== "running") {
     logger.info("campaign_dispatch.skipped", {

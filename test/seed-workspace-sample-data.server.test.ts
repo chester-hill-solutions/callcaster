@@ -50,7 +50,6 @@ describe("app/lib/seed/seed-workspace-sample-data.server.ts", () => {
       dial_ratio: 1,
       next_queue_order: 0,
       group_household_queue: false,
-      is_active: false,
       script_id: 42,
     });
     // Campaign insert must happen after the script insert resolves, since it

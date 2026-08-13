@@ -298,16 +298,7 @@ export function useCampaignSettingsController() {
   };
 
   const handleStatusChange = (status: CampaignStatus) => {
-    const formData: {
-      intent: string;
-      status: CampaignStatus;
-      is_active?: boolean;
-    } = { intent: "status", status };
-
-    if (status === "running" || status === "waiting") formData.is_active = true;
-    if (status === "paused") formData.is_active = false;
-
-    fetcher.submit(formData, { method: "post" });
+    fetcher.submit({ intent: "status", status }, { method: "post" });
   };
 
   const handleConfirmStatus = (status: "play" | "archive" | "none") => {

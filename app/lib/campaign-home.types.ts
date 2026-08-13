@@ -31,6 +31,5 @@ export type CampaignState = {
   message_media: string[] | null;
   voicedrop_audio: string | null;
   schedule: Schedule | null;
-  is_active: boolean;
   details: LiveCampaign | MessageCampaign | IVRCampaign;
 };

@@ -279,7 +279,6 @@ export async function handleNewCampaign({formData,
       dial_ratio: 1,
       next_queue_order: 0,
       group_household_queue: false,
-      is_active: false,
       ...(smsSendMode ? { sms_send_mode: smsSendMode } : {}),
       ...(smsMessagingServiceSid
         ? { sms_messaging_service_sid: smsMessagingServiceSid }

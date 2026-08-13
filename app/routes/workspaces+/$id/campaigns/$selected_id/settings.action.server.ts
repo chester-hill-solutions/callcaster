@@ -59,19 +59,8 @@ async function updateCampaignStatus(
   workspaceId: string,
   selected_id: string,
   status: string,
-  is_active?: boolean,
 ) {
-  const update: { status: string; is_active?: boolean } = { status };
-
-  if (is_active !== undefined) {
-    update.is_active = is_active;
-  } else {
-    if (status === "running" || status === "waiting") update.is_active = true;
-    if (status === "paused") update.is_active = false;
-  }
-
-  logger.debug("Server update object:", update);
-  await updateCampaignStatusInWorkspace(workspaceId, Number(selected_id), update);
+  await updateCampaignStatusInWorkspace(workspaceId, Number(selected_id), { status });
   return { success: true };
 }
 
@@ -191,7 +180,6 @@ export const action = defineAction({
     case "status": {
       try {
         const status = String(data.status ?? "") as CampaignStatus;
-        const is_active = String(data.is_active ?? "");
         const campaignRecord = await findCampaignInWorkspace(workspace_id, selected_id);
 
         if (!campaignRecord) {
@@ -274,12 +262,7 @@ export const action = defineAction({
 
         // Non-message campaigns or pause/archive/complete go through simple status update.
         if (campaignRecord?.type !== "message" || (status !== "running" && status !== "scheduled")) {
-          await updateCampaignStatus(
-            workspace_id,
-            selected_id,
-            status,
-            is_active === "true" ? true : is_active === "false" ? false : undefined
-          );
+          await updateCampaignStatus(workspace_id, selected_id, status);
         }
         return routeData({ success: true, actionType: "status" as const, status });
       } catch (error) {
