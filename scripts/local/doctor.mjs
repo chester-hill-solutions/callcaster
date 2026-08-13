@@ -253,8 +253,9 @@ try {
   }
 
   // ── Campaigns ────────────────────────────────────────────────────────
+  const isActiveStatus = (status) => status === "running" || status === "waiting";
   const campaigns = await sql`
-    select c.id, c.title, c.type, c.status, c.is_active, c.caller_id,
+    select c.id, c.title, c.type, c.status, c.caller_id,
            (select count(*)::int from campaign_queue q where q.campaign_id = c.id) as queued
     from campaign c where c.workspace = ${workspaceId}
     order by c.created_at desc limit 10
@@ -264,13 +265,13 @@ try {
     title: c.title,
     type: c.type,
     status: c.status,
-    active: c.is_active,
+    active: isActiveStatus(c.status),
     queueRows: c.queued,
   }));
-  for (const c of campaigns.filter((c) => c.is_active && c.queued === 0)) {
+  for (const c of campaigns.filter((c) => isActiveStatus(c.status) && c.queued === 0)) {
     warn(`Campaign "${c.title}" (#${c.id}) is active but its queue is empty — it will not dial.`);
   }
-  for (const c of campaigns.filter((c) => c.is_active && !c.caller_id)) {
+  for (const c of campaigns.filter((c) => isActiveStatus(c.status) && !c.caller_id)) {
     problem(`Campaign "${c.title}" (#${c.id}) is active with no caller_id — dials will fail.`);
   }
 
@@ -344,7 +345,7 @@ try {
     for (const c of campaigns) {
       console.log(
         `    #${c.id} ${c.title} — ${c.type ?? "?"} ${c.status ?? "?"}` +
-          `${c.is_active ? " active" : ""} ${c.queued} queue row(s)`,
+          `${isActiveStatus(c.status) ? " active" : ""} ${c.queued} queue row(s)`,
       );
     }
     console.log("");

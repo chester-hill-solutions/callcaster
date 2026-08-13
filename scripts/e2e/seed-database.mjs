@@ -41,7 +41,6 @@ function campaignBase(id, workspaceId, title, type, extra = {}) {
     type,
     workspace: workspaceId,
     status: extra.status ?? "draft",
-    is_active: extra.is_active ?? false,
     caller_id: "+15555501001",
     start_date: start,
     end_date: end,
@@ -239,13 +238,13 @@ async function seed() {
 
   const campaigns = [
     campaignBase(CAMPAIGNS.liveCall, readyId, "E2E Live Call", "live_call", {
-      is_active: true,
+      status: "running",
       script_id: SCRIPT_IDS.live,
       disposition_options: ["answered", "no_answer", "busy"],
       live_questions: {},
     }),
     campaignBase(CAMPAIGNS.livePredictive, readyId, "E2E Predictive Live", "live_call", {
-      is_active: true,
+      status: "running",
       dial_type: "predictive",
       script_id: SCRIPT_IDS.live,
       disposition_options: ["answered", "no_answer", "busy"],
@@ -270,7 +269,7 @@ async function seed() {
   for (const row of campaigns) {
     await sql`
       INSERT INTO campaign (
-        id, title, type, workspace, status, is_active, caller_id, start_date, end_date,
+        id, title, type, workspace, status, caller_id, start_date, end_date,
         schedule, dial_type, dial_ratio, group_household_queue, next_queue_order,
         sms_send_mode, script_id, disposition_options, live_questions, body_text, message_media
       )
@@ -280,7 +279,6 @@ async function seed() {
         ${row.type},
         ${row.workspace},
         ${row.status},
-        ${row.is_active},
         ${row.caller_id},
         ${row.start_date},
         ${row.end_date},
@@ -301,7 +299,6 @@ async function seed() {
         type = EXCLUDED.type,
         workspace = EXCLUDED.workspace,
         status = EXCLUDED.status,
-        is_active = EXCLUDED.is_active,
         caller_id = EXCLUDED.caller_id,
         start_date = EXCLUDED.start_date,
         end_date = EXCLUDED.end_date,
