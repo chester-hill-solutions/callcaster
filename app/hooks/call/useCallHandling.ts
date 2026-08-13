@@ -292,6 +292,26 @@ export function useCallHandling({
         typeof call.parameters.To === "string" &&
         call.parameters.To.includes("client")
       ) {
+        // Teardown listeners only — the full listener set fires "connected"
+        // on accept, which campaign outbound suppresses (agent-leg accept is
+        // not the customer answering). Without a disconnect handler here, a
+        // callee-initiated hangup left activeCall stale and the FSM stuck,
+        // so no disposition was ever written (#1218).
+        clearIncomingListeners(call);
+        const cleanups = [
+          attachCallListener(call, "disconnect", () => {
+            updateActiveCall(null);
+            onStatusChange?.("Registered");
+            updateCallState("completed");
+          }),
+          attachCallListener(call, "cancel", () => {
+            updateIncomingCall(null);
+          }),
+        ];
+        incomingListenerCleanupsRef.current.set(call, () => {
+          cleanups.forEach((fn) => fn());
+        });
+
         call.accept();
         if (!suppressConnectedState) {
           onStatusChange?.("connected");
@@ -311,6 +331,7 @@ export function useCallHandling({
       updateCallState,
       onStatusChange,
       setupIncomingCallListeners,
+      clearIncomingListeners,
     ],
   );
 

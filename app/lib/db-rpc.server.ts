@@ -26,6 +26,26 @@ async function queryScalar<T>(
   return value ?? null;
 }
 
+/**
+ * Scalar RPC result coerced to a finite number. Postgres `bigint` (int8)
+ * comes back from the driver as a string — postgres.js only auto-parses
+ * int2/int4/oid/float — so a `RETURNS bigint` function silently fails
+ * `typeof === "number"` / `Number.isFinite` checks downstream (#1218).
+ */
+async function queryScalarNumber(
+  executor: RpcExecutor,
+  query: SQL,
+  label: string,
+): Promise<number | null> {
+  const raw = await queryScalar<number | string>(executor, query);
+  if (raw == null) return null;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    throw new Error(`${label} returned a non-numeric value: ${String(raw)}`);
+  }
+  return value;
+}
+
 async function execVoid(executor: RpcExecutor, query: SQL): Promise<void> {
   await executor.execute(query);
 }
@@ -137,7 +157,7 @@ export async function rpcCreateOutreachAttempt(
     queueId: number;
   },
 ): Promise<number> {
-  const id = await queryScalar<number>(
+  const id = await queryScalarNumber(
     executor,
     sql`select create_outreach_attempt(
       ${args.contactId}::bigint,
@@ -146,6 +166,7 @@ export async function rpcCreateOutreachAttempt(
       ${args.workspaceId}::uuid,
       ${args.queueId}::bigint
     ) as id`,
+    "create_outreach_attempt",
   );
   if (id == null) {
     throw new Error("create_outreach_attempt returned no id");
@@ -425,14 +446,15 @@ export async function rpcReserveCampaignQueueOrderRange(
   executor: RpcExecutor,
   args: { campaignId: number; count: number },
 ): Promise<number> {
-  const startOrder = await queryScalar<number>(
+  const startOrder = await queryScalarNumber(
     executor,
     sql`select reserve_campaign_queue_order_range(
       ${args.campaignId},
       ${args.count}
     ) as start_order`,
+    "reserve_campaign_queue_order_range",
   );
-  if (typeof startOrder !== "number" || !Number.isFinite(startOrder)) {
+  if (startOrder == null) {
     throw new Error(
       `Invalid start queue order returned for campaign ${args.campaignId}`,
     );

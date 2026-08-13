@@ -178,13 +178,33 @@ export function useCampaignCallFlow({
     if (previousFsmRef.current === fsmState) return;
     previousFsmRef.current = fsmState;
 
+    // A new dial always resets the lifecycle — the reducer starts a fresh
+    // generation even from terminal phases (#1220). Drop the previous call's
+    // provider tracking too, so a stale leg's late events can't repaint the
+    // old outcome over the new dial.
+    if (fsmState === "dialing") {
+      setCustomerLegSid(null);
+      setPollingTargetSid(null);
+      setProviderStatus(null);
+      dispatch({ type: "START_DIALING" });
+      return;
+    }
+
+    // FSM returning to idle (the NEXT action after a finished call) clears
+    // the lifecycle too — the reducer ignores RESET mid-call, so this only
+    // wipes terminal outcomes, never a live dial.
+    if (fsmState === "idle") {
+      setCustomerLegSid(null);
+      setPollingTargetSid(null);
+      setProviderStatus(null);
+      dispatch({ type: "RESET" });
+      return;
+    }
+
     const currentPhase = lifecycleRef.current.phase;
     if (TERMINAL_PHASES.has(currentPhase)) return;
 
     switch (fsmState) {
-      case "dialing":
-        dispatch({ type: "START_DIALING" });
-        break;
       case "connected":
         dispatch({ type: "CONNECT" });
         break;

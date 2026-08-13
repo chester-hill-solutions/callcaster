@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 type UseDialFailureRecoveryOptions = {
   fetcherState: string;
@@ -24,10 +24,16 @@ export function useDialFailureRecovery({
   send,
   showError,
 }: UseDialFailureRecoveryOptions) {
+  // One reaction per settled response: fetcher.data keeps its identity until
+  // the next submission settles, while `send`/`showError` are recreated every
+  // render — without this latch a single 409 re-toasted once per render for
+  // as long as its data stayed current (#1221).
+  const handledDataRef = useRef<unknown>(null);
+
   /**
    * @effect Dispatch FAIL to the call FSM when a settled dial fetcher
    * carries an error or creditsError, and toast the error message if one was
-   * given.
+   * given — once per settled response (latched on fetcher data identity).
    * @effect-deps fetcherState, fetcherData, send, showError (fires once per
    * settled fetcher response carrying a rejection)
    * @effect-side-effects none directly (FSM dispatch + toast)
@@ -36,6 +42,8 @@ export function useDialFailureRecovery({
    */
   useEffect(() => {
     if (fetcherState !== "idle" || !fetcherData) return;
+    if (handledDataRef.current === fetcherData) return;
+    handledDataRef.current = fetcherData;
     const { error, creditsError } = fetcherData;
     if (error || creditsError) {
       send({ type: "FAIL" });

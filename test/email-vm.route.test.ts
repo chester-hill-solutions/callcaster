@@ -443,4 +443,92 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     expect(res.status).toBe(500);
   });
 
+  // Regression #1224: the presign TTL was 100 days; SigV4 caps presigned
+  // URLs at 7 days and the signer throws client-side, so the upload landed
+  // (voicemail visible in the app) but the email never sent — and the retry
+  // guard swallowed every Twilio retry as "Already processed".
+  test("signs the recording link within the SigV4 7-day cap", async () => {
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
+    } as any);
+    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+
+    const mod = await import("../app/routes/api+/email-vm");
+    await asRouteResponse(mod.action({
+      request: makeReq({ RecordingUrl: "https://tw/rec", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
+      params: {},
+    } as any));
+
+    const expiry = objectStorageMocks.createSignedObjectUrl.mock.calls[0]?.[2];
+    expect(expiry).toBeLessThanOrEqual(7 * 24 * 60 * 60);
+  });
+
+  test("marks the call processed only after the email is sent", async () => {
+    const order: string[] = [];
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
+    } as any);
+    mocks.sendEmail.mockImplementationOnce(async () => {
+      order.push("email");
+      return { id: "em1" };
+    });
+    telephonyDbMocks.updateCallRecordingUrlBySid.mockImplementation(async () => {
+      order.push("persist");
+      return { sid: "CA1", from: "+15550001111", to: "+15550002222" };
+    });
+
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ RecordingUrl: "https://tw/rec", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
+      params: {},
+    } as any));
+
+    expect(res.status).toBe(200);
+    expect(order).toEqual(["email", "persist"]);
+  });
+
+  test("a failed presign leaves the call unprocessed so Twilio's retry can heal it", async () => {
+    setupEmailVmMocks({ signedUrlError: new Error("expiration date less than one week") });
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
+    } as any);
+
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ RecordingUrl: "https://tw/rec", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
+      params: {},
+    } as any));
+
+    expect(res.status).toBe(500);
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+    expect(telephonyDbMocks.updateCallRecordingUrlBySid).not.toHaveBeenCalled();
+  });
+
+  test("a resend API error is a retryable failure, not a silent success", async () => {
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
+    } as any);
+    mocks.sendEmail.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Domain not verified" },
+    });
+
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ RecordingUrl: "https://tw/rec", CallSid: "CA1", AccountSid: "AC1", RecordingSid: "RE1" }),
+      params: {},
+    } as any));
+
+    expect(res.status).toBe(500);
+    expect(telephonyDbMocks.updateCallRecordingUrlBySid).not.toHaveBeenCalled();
+  });
+
 });
