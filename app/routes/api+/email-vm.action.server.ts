@@ -85,10 +85,10 @@ export const action = defineAction({
 
       // Idempotency guard: Twilio retries the recordingStatusCallback on
       // timeout, and the retry carries the exact same RecordingUrl/RecordingSid
-      // as the original. If this call's recording URL was already persisted
-      // (by a prior run of this same handler, below), the voicemail has
-      // already been fetched, stored, and emailed — ack success without
-      // reprocessing so we don't send a duplicate email.
+      // as the original. recording_url is persisted only AFTER the email is
+      // sent (below), so its presence means the voicemail was fully
+      // processed — ack success without sending a duplicate email. A run
+      // that failed mid-flight left it unset, so the retry reprocesses.
       if (callRow.recording_url && callRow.recording_url === recordingUrl) {
         logger.debug("Voicemail webhook retry detected; skipping duplicate processing", {
           callSid,
@@ -111,12 +111,7 @@ export const action = defineAction({
         throw new Error("Workspace twilio data not found");
       }
 
-      const call = await updateCallRecordingUrlBySid(callSid, recordingUrl);
-
-      if (!call) {
-        throw new Error("Error updating call: not found");
-      }
-
+      const call = callRow;
       const action = number.inbound_action;
       const now = new Date();
 
@@ -157,9 +152,18 @@ export const action = defineAction({
         throw new Error(`Error uploading to storage: ${error instanceof Error ? error.message : String(error)}`);
       }
 
+      // SigV4 presigned URLs are capped at 7 days — the signer itself
+      // rejects anything longer, which is what silently killed every
+      // voicemail email after the S3 migration (#1224). The email also
+      // links to the voicemails page, which mints fresh URLs on demand.
+      const SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
       let signedUrl: string;
       try {
-        signedUrl = await createSignedObjectUrl("workspaceAudio", fileName, 8640000);
+        signedUrl = await createSignedObjectUrl(
+          "workspaceAudio",
+          fileName,
+          SIGNED_URL_TTL_SECONDS,
+        );
       } catch (error) {
         throw new Error(`Error creating signed URL: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -191,6 +195,21 @@ export const action = defineAction({
         View in workspace: ${env.BASE_URL()}/workspaces/${number.workspace.id}/voicemails
       `,
       });
+
+      // resend returns { data, error } and never throws on API errors — an
+      // unverified from-domain or bad recipient was previously reported as
+      // "email sent". Throwing keeps the callback retryable.
+      if (result.error) {
+        throw new Error(`Email send failed: ${result.error.message}`);
+      }
+
+      // Mark fully processed only now: persisting recording_url earlier made
+      // the retry guard above swallow every retry after a mid-flight failure
+      // as "Already processed" while no email had ever gone out.
+      const updatedCall = await updateCallRecordingUrlBySid(callSid, recordingUrl);
+      if (!updatedCall) {
+        throw new Error("Error updating call: not found");
+      }
 
       const voicemailWebhook = number.workspace.webhook.filter((webhook) =>
         Array.isArray(webhook.events) && (webhook.events as string[]).includes("voicemail"),
