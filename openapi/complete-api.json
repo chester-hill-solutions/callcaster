@@ -11742,7 +11742,9 @@
             "description": "Campaign status (e.g. draft, active)."
           },
           "is_active": {
-            "type": "boolean"
+            "type": "boolean",
+            "deprecated": true,
+            "description": "Deprecated: derived from status (running/waiting). Ignored on writes."
           },
           "start_date": {
             "type": "string",

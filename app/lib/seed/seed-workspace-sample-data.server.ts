@@ -36,7 +36,6 @@ export async function seedWorkspaceSampleData(
     dial_ratio: 1,
     next_queue_order: 0,
     group_household_queue: false,
-    is_active: false,
     script_id: script.id,
   });
   if (!campaign) {

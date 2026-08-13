@@ -25,6 +25,7 @@ export const createWithScriptBodySchema = z
     audience_ids: z.array(z.number().int().positive()).optional(),
     status: z.string().optional(),
     enqueue_audience_contacts: z.boolean().optional(),
+    // Deprecated: accepted for compatibility, ignored — derived from status (#1216).
     is_active: z.boolean().optional(),
     start_date: z.string().nullable().optional(),
     end_date: z.string().nullable().optional(),

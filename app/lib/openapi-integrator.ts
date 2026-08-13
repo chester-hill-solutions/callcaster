@@ -103,7 +103,12 @@ const schemas = {
         default: "draft",
         description: "Campaign status (e.g. draft, active).",
       },
-      is_active: { type: "boolean" as const },
+      is_active: {
+        type: "boolean" as const,
+        deprecated: true,
+        description:
+          "Deprecated: derived from status (running/waiting). Ignored on writes.",
+      },
       start_date: { type: "string" as const, nullable: true, format: "date-time" },
       end_date: { type: "string" as const, nullable: true, format: "date-time" },
       schedule: { type: "object" as const, additionalProperties: true },

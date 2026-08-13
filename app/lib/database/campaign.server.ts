@@ -170,7 +170,7 @@ function stripCampaignMetaFields(rest: Record<string, unknown>): Record<string, 
     message_media: undefined,
     voicedrop_audio: undefined,
     live_questions: undefined,
-    is_active: Boolean(rest.is_active),
+    is_active: undefined,
   });
 }
 
@@ -465,7 +465,6 @@ export async function splitMessageCampaign({
         workspace: workspaceId,
         title,
         status: "draft",
-        is_active: false,
       } as unknown as CampaignData,
       tdb,
     });

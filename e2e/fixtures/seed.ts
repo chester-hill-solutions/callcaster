@@ -32,6 +32,7 @@ export const E2E_CAMPAIGNS = {
   message: { id: 910003, title: "E2E Message Campaign" },
   robocall: { id: 910004, title: "E2E Robocall" },
   archived: { id: 910005, title: "E2E Archived Campaign" },
+  launchReady: { id: 910006, title: "E2E Launch Ready" },
 } as const;
 
 export const E2E_AUDIENCE = { id: 920001, name: "E2E Audience" };

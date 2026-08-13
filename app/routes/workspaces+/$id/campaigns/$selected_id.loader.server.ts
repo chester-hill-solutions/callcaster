@@ -1,4 +1,5 @@
 import { getWorkspaceRouteContext } from "@/lib/workspace-route.server";
+import { isCampaignActive } from "@/lib/campaign-status";
 import {
   IVRCampaign,
   LiveCampaign,
@@ -77,7 +78,7 @@ export const loader = defineLoader({
       ? readiness.startDisabledReason
       : campaignRow?.status === "scheduled"
         ? "Campaign scheduled."
-        : !campaignRow?.is_active
+        : !isCampaignActive(campaignRow?.status)
           ? campaignRow?.status === "draft" || campaignRow?.status === "pending"
             ? "Campaign is not live yet. Start it from the Launch page."
             : campaignRow?.status === "paused"

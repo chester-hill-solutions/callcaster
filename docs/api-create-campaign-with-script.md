@@ -45,7 +45,7 @@ Provide **exactly one** of `script` or `script_id` in the request body, not both
 | `audience_ids` | number[] | No | Audience IDs to attach. Must belong to the workspace. |
 | `enqueue_audience_contacts` | boolean | No | If `true` (default), contacts from attached audiences are enqueued for the campaign. If `false`, only the campaign–audience link is created. |
 | `status` | string | No | Campaign status (e.g. `draft`, `active`). Default: `draft`. |
-| `is_active` | boolean | No | Whether the campaign is active. |
+| `is_active` | boolean | No | Deprecated. Accepted for compatibility but ignored — activity is derived from `status` (`running`/`waiting`). |
 | `start_date` | string \| null | No | Campaign start date. |
 | `end_date` | string \| null | No | Campaign end date. |
 | `schedule` | object | No | Campaign schedule payload. |

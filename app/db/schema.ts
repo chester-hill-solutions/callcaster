@@ -227,7 +227,6 @@ export const campaign = pgTable("campaign", {
   end_date: text(),
   group_household_queue: boolean().notNull(),
   id: serial().notNull().primaryKey(),
-  is_active: boolean().notNull(),
   live_questions: jsonb(),
   message_media: text().array(),
   next_queue_order: integer().notNull(),

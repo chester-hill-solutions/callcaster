@@ -61,6 +61,10 @@ export type CreateCampaignWithScriptRequest = {
      * Campaign status (e.g. draft, active).
      */
     status?: string;
+    /**
+     * Deprecated: derived from status (running/waiting). Ignored on writes.
+     * @deprecated
+     */
     is_active?: boolean;
     start_date?: string | null;
     end_date?: string | null;
