@@ -300,13 +300,8 @@ export async function listWorkspaceCampaignsApi(
     logger.error("listWorkspaceCampaignsApi", error);
     return { ok: false as const, error: error.message, status: 500 };
   }
-  return {
-    ok: true as const,
-    campaigns: (data ?? []).map((row) => ({
-      ...row,
-      is_active: isCampaignActive(row.status),
-    })),
-  };
+  const campaigns = (data ?? []).map((row) => ({ ...row, is_active: isCampaignActive(row.status) }));
+  return { ok: true as const, campaigns };
 }
 
 export async function getCampaignDetailApi(
@@ -468,9 +463,7 @@ export async function transitionCampaignStatusApi(
     }
   }
 
-  // `is_active` in the request body is accepted for compatibility but
-  // ignored: activity is derived from status (#1216).
-  void is_active;
+  void is_active; // accepted for compatibility, ignored — derived from status (#1216)
   const update: Database["public"]["Tables"]["campaign"]["Update"] = {
     status: status as Database["public"]["Enums"]["campaign_status"],
   };
