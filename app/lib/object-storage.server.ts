@@ -173,7 +173,14 @@ export async function uploadObject(
         Key: key,
         Body: payload,
         ContentType: options.contentType,
-        CacheControl: options.cacheControl,
+        // Supabase Storage took bare seconds ("60") and expanded them to
+        // max-age; S3 stores the header verbatim, so a bare number is an
+        // invalid directive that caches nothing (#1228). Normalize here so
+        // no call site can regress.
+        CacheControl:
+          options.cacheControl && /^\d+$/.test(options.cacheControl)
+            ? `max-age=${options.cacheControl}`
+            : options.cacheControl,
         // `upsert` predates the S3 migration (it was a Supabase storage flag)
         // and was silently dropped here, so callers asking not to overwrite
         // were overwriting anyway. For audio that is not just a lost file: a

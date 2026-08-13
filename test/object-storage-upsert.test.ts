@@ -128,4 +128,28 @@ describe("uploadObject upsert handling", () => {
       mod.uploadObject("workspaceAudio", "w1/intro.mp3", Buffer.from("a")),
     ).rejects.not.toBeInstanceOf(mod.ObjectExistsError);
   });
+
+  // #1228: Supabase Storage's cacheControl took bare seconds; S3 stores the
+  // header verbatim, so "60" was an invalid Cache-Control that cached nothing.
+  test("normalizes bare-seconds cacheControl to max-age", async () => {
+    mockS3();
+    send.mockResolvedValue({});
+    const mod = await import("../app/lib/object-storage.server");
+    await mod.uploadObject("workspaceAudio", "w1/a.mp3", Buffer.from("a"), {
+      cacheControl: "60",
+    });
+    const input = (send.mock.calls[0][0] as { input: { CacheControl?: string } }).input;
+    expect(input.CacheControl).toBe("max-age=60");
+  });
+
+  test("passes through an already-valid Cache-Control directive", async () => {
+    mockS3();
+    send.mockResolvedValue({});
+    const mod = await import("../app/lib/object-storage.server");
+    await mod.uploadObject("workspaceAudio", "w1/b.mp3", Buffer.from("a"), {
+      cacheControl: "max-age=3600, public",
+    });
+    const input = (send.mock.calls[0][0] as { input: { CacheControl?: string } }).input;
+    expect(input.CacheControl).toBe("max-age=3600, public");
+  });
 });
