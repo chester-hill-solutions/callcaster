@@ -63,6 +63,7 @@ const steps = [
   "client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql",
   "client/migrations/20260807130000_manual_dial_claim_attempt_count.sql",
   "client/migrations/20260813120000_drop_campaign_is_active.sql",
+  "client/migrations/20260814000000_drop_supabase_era_orphans.sql",
 ];
 
 /**
