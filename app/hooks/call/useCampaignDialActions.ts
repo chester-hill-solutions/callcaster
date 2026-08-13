@@ -133,7 +133,9 @@ export function useCampaignDequeueActions({
       dequeue({ contact: nextRecipient });
       fetchMore({ householdMap });
       handleNextNumber(campaign?.group_household_queue || false);
-      send({ type: "HANG_UP" });
+      // NEXT resets a finished call to idle; HANG_UP here parked the FSM in
+      // "completed" even from idle, which the next dial then flashed (#1220).
+      send({ type: "NEXT" });
       setRecentAttempt(null);
       setUpdate({});
       setCallDuration(0);

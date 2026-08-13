@@ -68,4 +68,63 @@ describe("useCampaignCallFlow", () => {
     act(() => polling.onStatus?.("completed"));
     expect(send).toHaveBeenCalledWith({ type: "HANG_UP" });
   });
+
+  function renderFlow(initialState: string) {
+    const send = vi.fn();
+    const view = renderHook(
+      ({ state }: { state: string }) =>
+        useCampaignCallFlow({
+          callSid: "CA1",
+          agentLegSid: null,
+          workspaceId: "w1",
+          state,
+          activeCall: null,
+          recentAttemptDisposition: null,
+          predictiveState: { status: "unknown", contact_id: null },
+          isPredictive: false,
+          send,
+        }),
+      { initialProps: { state: initialState } },
+    );
+    return { ...view, send };
+  }
+
+  // Regression #1220: the previous call's terminal outcome flashed (or, with
+  // no browser leg SID, stuck) at the top of the screen when a new dial began.
+  test("a new dial immediately clears the previous call's terminal display", () => {
+    const { result, rerender } = renderFlow("dialing");
+
+    act(() => polling.onStatus?.("completed"));
+    rerender({ state: "completed" });
+    expect(result.current.displayState).toBe("completed");
+
+    // New dial: FSM goes dialing before any new leg SID exists (phone-as-
+    // device never gets one). The old outcome must not survive the gap.
+    rerender({ state: "dialing" });
+    expect(result.current.displayState).toBe("dialing");
+  });
+
+  test("a stale provider status does not repaint after a new dial starts", () => {
+    const { result, rerender } = renderFlow("dialing");
+
+    act(() => polling.onStatus?.("failed"));
+    rerender({ state: "failed" });
+    expect(result.current.displayState).toBe("failed");
+
+    rerender({ state: "dialing" });
+    expect(result.current.displayState).toBe("dialing");
+  });
+
+  test("advancing to the next contact resets a finished call to idle", () => {
+    const { result, rerender } = renderFlow("dialing");
+
+    act(() => polling.onStatus?.("completed"));
+    rerender({ state: "completed" });
+    expect(result.current.displayState).toBe("completed");
+
+    // The Next action sends NEXT to the FSM (completed -> idle); the bridge
+    // must clear the lifecycle rather than keep showing the old outcome.
+    rerender({ state: "idle" });
+    expect(result.current.displayState).toBe("idle");
+  });
 });
