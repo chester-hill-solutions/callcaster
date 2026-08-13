@@ -46,6 +46,27 @@ async function queryScalarNumber(
   return value;
 }
 
+/**
+ * Coerce named columns of raw-SQL rows to finite numbers. Same driver quirk
+ * as queryScalarNumber: bigint/numeric arrive as strings from postgres.js,
+ * and downstream `typeof === "number"` checks silently drop them
+ * (#1225/#1226/#1227). Non-finite values become null rather than NaN.
+ */
+function coerceRowNumbers<T extends Record<string, unknown>>(
+  rows: T[],
+  keys: ReadonlyArray<string>,
+): T[] {
+  return rows.map((row) => {
+    const patched: Record<string, unknown> = { ...row };
+    for (const key of keys) {
+      if (patched[key] == null) continue;
+      const value = Number(patched[key]);
+      patched[key] = Number.isFinite(value) ? value : null;
+    }
+    return patched as T;
+  });
+}
+
 async function execVoid(executor: RpcExecutor, query: SQL): Promise<void> {
   await executor.execute(query);
 }
@@ -310,10 +331,11 @@ export async function rpcGetCampaignStats(
   executor: RpcExecutor,
   campaignId: number | string,
 ): Promise<CampaignStatRow[]> {
-  return queryRows<CampaignStatRow>(
+  const rows = await queryRows<CampaignStatRow>(
     executor,
     sql`select * from get_campaign_stats(${Number(campaignId)})`,
   );
+  return coerceRowNumbers(rows, ["count", "expected_total"]);
 }
 
 export async function rpcResetCampaign(
@@ -384,10 +406,11 @@ export async function rpcFindContactByPhone(
   workspaceId: string,
   phoneNumber: string,
 ): Promise<Record<string, unknown>[]> {
-  return queryRows(
+  const rows = await queryRows(
     db,
     sql`select * from find_contact_by_phone(${phoneNumber}, ${workspaceId}::uuid)`,
   );
+  return coerceRowNumbers(rows, ["id"]);
 }
 
 export async function rpcFindContactsByPhones(
@@ -395,13 +418,14 @@ export async function rpcFindContactsByPhones(
   phoneNumbers: string[],
 ): Promise<Record<string, unknown>[]> {
   if (phoneNumbers.length === 0) return [];
-  return queryRows(
+  const rows = await queryRows(
     db,
     sql`select * from find_contacts_by_phones(${workspaceId}::uuid, array[${sql.join(
       phoneNumbers.map((phone) => sql`${phone}`),
       sql`, `,
     )}]::text[])`,
   );
+  return coerceRowNumbers(rows, ["id"]);
 }
 
 export async function rpcGetAudiencesByCampaign(
@@ -412,7 +436,7 @@ export async function rpcGetAudiencesByCampaign(
       db,
       sql`select * from get_audiences_by_campaign(${campaignId})`,
     );
-    return { data, error: null };
+    return { data: coerceRowNumbers(data, ["id"]), error: null };
   } catch (error) {
     return {
       data: null,
