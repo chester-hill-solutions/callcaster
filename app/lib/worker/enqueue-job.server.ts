@@ -9,6 +9,12 @@ export type EnqueueDedupe =
   | {
       kind: "live";
       workspaceId?: string | null;
+      /**
+       * Narrow the live-dedupe scope to one campaign (matched against
+       * `params.campaignId`). Without this, two campaigns in the same
+       * workspace share one dedupe slot and the second gets no job.
+       */
+      campaignId?: number;
       /** Ignore the currently-running job when scheduling its successor. */
       excludeJobId?: number;
     }
@@ -178,10 +184,14 @@ async function enqueueWithLiveDedupe(args: {
   workspaceId?: string | null;
   userId?: string | null;
   runAt?: Date | string | null;
+  campaignId?: number;
   excludeJobId?: number;
 }): Promise<EnqueueJobResult> {
   const workspaceId = args.workspaceId ?? null;
-  const lockKey = `${args.type}:${workspaceId ?? "global"}`;
+  const campaignId = args.campaignId ?? null;
+  const lockKey = `${args.type}:${workspaceId ?? "global"}${
+    campaignId != null ? `:${campaignId}` : ""
+  }`;
 
   return db.transaction(async (tx) => {
     // Serialize check + insert for this type/workspace pair. Unlike a unique
@@ -197,6 +207,8 @@ async function enqueueWithLiveDedupe(args: {
       WHERE type = ${args.type}
         AND status IN ('queued', 'running')
         AND workspace_id IS NOT DISTINCT FROM ${workspaceId}
+        AND (${campaignId}::integer IS NULL
+          OR (params->>'campaignId')::integer = ${campaignId})
         AND (${args.excludeJobId ?? null}::integer IS NULL
           OR id <> ${args.excludeJobId ?? null})
       ORDER BY created_at ASC
@@ -266,6 +278,7 @@ export async function enqueueJob(
         workspaceId: dedupe.workspaceId ?? args.workspaceId,
         userId: args.userId,
         runAt: args.runAt,
+        campaignId: dedupe.campaignId,
         excludeJobId: dedupe.excludeJobId,
       });
     case "none":

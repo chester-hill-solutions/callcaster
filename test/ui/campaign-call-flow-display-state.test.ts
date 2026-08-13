@@ -281,7 +281,7 @@ describe("useCampaignCallFlow displayState", () => {
       expect(result.current.displayState).toBe("dialing");
     });
 
-    test("terminal latch: no-answer outcome retained", () => {
+    test("completed call via PROVIDER_ENDED shows outcome after SDK teardown", () => {
       const send = vi.fn();
       const { result, rerender } = renderFlow({
         state: "dialing",
@@ -291,8 +291,10 @@ describe("useCampaignCallFlow displayState", () => {
         activeCall: {} as any,
       });
 
-      mocks.onCallRowChange?.({
-        new: { sid: "CA-child", parent_call_sid: "CA-call", status: "no-answer" },
+      act(() => {
+        mocks.onCallRowChange?.({
+          new: { sid: "CA-child", parent_call_sid: "CA-call", status: "completed" },
+        });
       });
       rerender(baseProps({
         state: "completed",
@@ -302,7 +304,8 @@ describe("useCampaignCallFlow displayState", () => {
         activeCall: null,
       }));
 
-      expect(result.current.displayState).toBe("no-answer");
+      // Canonical lifecycle retains "completed" outcome — no terminal latch needed.
+      expect(result.current.displayState).toBe("completed");
     });
   });
 
