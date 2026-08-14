@@ -1,3 +1,6 @@
+Always talk in ASD-STE100 Simplified Technical English.
+Always talk to me like I have ADHD.
+
 ## Learned User Preferences
 
 > **Platform context:** Read [docs/AGENT-PLATFORM-GUIDE.md](docs/AGENT-PLATFORM-GUIDE.md) for CHS portfolio role, shared `@chester-hill-solutions/*` packages, and migration-branch boundaries before cross-cutting work.
