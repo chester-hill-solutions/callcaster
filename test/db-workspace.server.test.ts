@@ -393,7 +393,7 @@ describe("app/lib/database/workspace.server.ts", () => {
     });
     expect(
       transactionHistoryMocks.insertTransactionHistoryIdempotent,
-    ).toHaveBeenCalledWith({
+    ).toHaveBeenCalledWith(expect.anything(), {
       workspaceId: "w_new",
       type: "CREDIT",
       amount: mod.NEW_WORKSPACE_WELCOME_CREDITS,

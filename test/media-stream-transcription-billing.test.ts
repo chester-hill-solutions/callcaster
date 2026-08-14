@@ -101,7 +101,7 @@ function capabilities(overrides: Partial<Record<string, boolean>> = {}) {
 
 function transcriptionDebits() {
   return ledgerMocks.insertTransactionHistoryIdempotent.mock.calls
-    .map((call) => call[0] as { idempotencyKey: string; amount: number; note: string })
+    .map((call) => call[1] as { idempotencyKey: string; amount: number; note: string })
     .filter((args) => args.idempotencyKey === liveTranscriptionKey("CA123"));
 }
 

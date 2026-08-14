@@ -89,6 +89,7 @@ describe("app/routes/api+/stripe-webhook/route.tsx", () => {
     expect(response.status).toBe(200);
     expect(transactionHistoryMock.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
     expect(transactionHistoryMock.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         workspaceId: "w1",
         amount: 10,

@@ -230,6 +230,7 @@ describe("webhook side-effect handlers", () => {
     });
 
     expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         workspaceId: "w1",
         type: "DEBIT",

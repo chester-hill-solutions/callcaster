@@ -58,7 +58,7 @@ vi.mock("@/lib/worker/enqueue-job.server", () => ({
 const transactionRowsState = vi.hoisted(() => ({ rows: [] as TransactionRow[] }));
 
 vi.mock("@/lib/transaction-history.server", () => ({
-  insertTransactionHistoryIdempotent: vi.fn(async (args: any) => {
+  insertTransactionHistoryIdempotent: vi.fn(async (_exec: unknown, args: any) => {
     const existing = transactionRowsState.rows.find(
       (r) =>
         r.workspace === args.workspaceId &&
