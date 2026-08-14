@@ -5,7 +5,6 @@ import { checkSchedule } from "@/lib/database/campaign.server";
 import { updateCampaignStatusInWorkspace } from "@/lib/campaign-ivr.server";
 import { ACTIVE_CAMPAIGN_STATUSES } from "@/lib/campaign-status";
 import { logger } from "@/lib/logger.server";
-import type { Campaign } from "@/lib/types";
 
 export type CampaignScheduleSyncResult = {
   scanned: number;
@@ -53,9 +52,7 @@ export async function runCampaignScheduleSync(): Promise<CampaignScheduleSyncRes
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) continue;
     if (now < start || now > end) continue;
 
-    const target = checkSchedule(row as unknown as Campaign)
-      ? "running"
-      : "waiting";
+    const target = checkSchedule(row) ? "running" : "waiting";
     if (row.status === target) continue;
 
     try {
