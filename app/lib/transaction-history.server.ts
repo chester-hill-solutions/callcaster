@@ -1,12 +1,12 @@
 import { sql } from "drizzle-orm";
 import { logger } from "@/lib/logger.server";
+import type { RpcExecutor } from "@/lib/db-rpc.server";
 import {
   getBillingEventSource,
   getTransactionDisplayDescription,
   type TransactionType,
 } from "@/lib/transaction-history-display";
 import { emitTransactionHistoryInsertEvent } from "@/lib/workspace-events.server";
-import { db } from "@/server/db";
 
 export type { TransactionType } from "@/lib/transaction-history-display";
 export { getTransactionDisplayDescription } from "@/lib/transaction-history-display";
@@ -36,9 +36,12 @@ type InsertArgs = {
   messageSid?: string | null;
 };
 
-async function applyLedgerEntryViaDrizzle(args: InsertArgs): Promise<LedgerRpcRow> {
+async function applyLedgerEntryViaDrizzle(
+  exec: RpcExecutor,
+  args: InsertArgs,
+): Promise<LedgerRpcRow> {
   const idempotencyKey = args.idempotencyKey.trim();
-  const result = await db.execute(sql`
+  const result = await exec.execute(sql`
     select id, inserted, amount, type, idempotency_key, workspace
     from apply_ledger_entry_and_sync_credits(
       ${args.workspaceId}::uuid,
@@ -65,6 +68,7 @@ async function applyLedgerEntryViaDrizzle(args: InsertArgs): Promise<LedgerRpcRo
  * DB-backed idempotent insert for transaction_history + atomic credits sync.
  */
 export async function insertTransactionHistoryIdempotent(
+  exec: RpcExecutor,
   args: InsertArgs,
 ): Promise<{ inserted: boolean; existingId?: number }> {
   const idempotencyKey = args.idempotencyKey.trim();
@@ -75,7 +79,7 @@ export async function insertTransactionHistoryIdempotent(
   }
 
   try {
-    const row = await applyLedgerEntryViaDrizzle(args);
+    const row = await applyLedgerEntryViaDrizzle(exec, args);
 
     logger.info("billing.transaction", {
       workspaceId: args.workspaceId,
