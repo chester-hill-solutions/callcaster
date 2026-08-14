@@ -5,6 +5,7 @@ import { runCronWorkspaceFanout } from "@/lib/cron-workspace-fanout.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { runLowCreditNotify } from "@/lib/low-credit-notify.server";
+import { runCampaignScheduleSync } from "@/lib/campaign-schedule-sync.server";
 import { pruneExpiredIdempotencyRecords } from "@/lib/platform-idempotency.server";
 import { pruneCompletedJobs, pruneWorkspaceEvents } from "@/lib/worker/job-retention.server";
 import {
@@ -21,6 +22,10 @@ const TWILIO_OPEN_SYNC_RESCHEDULE_MS = 5 * 60 * 1000;
 const BILLING_RECONCILE_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
 const NUMBER_RENTAL_BILLING_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
 const TWILIO_WEBHOOK_AUDIT_RESCHEDULE_MS = 6 * 60 * 60 * 1000;
+// Minute cadence: the status flip should land within a minute of a calling
+// window opening or closing, and the sweep is a single indexed read when no
+// campaign needs a transition.
+const CAMPAIGN_SCHEDULE_SYNC_RESCHEDULE_MS = 60 * 1000;
 
 export const TWILIO_WEBHOOK_AUDIT_JOB_TYPE = "twilio_webhook_audit";
 
@@ -213,6 +218,21 @@ export async function lowCreditNotifyHandler(job: ClaimedJobRow): Promise<unknow
 
       return result;
     },
+  );
+}
+
+/**
+ * Keep voice campaign statuses truthful around calling hours (#1168):
+ * running ↔ waiting per checkSchedule. Self-re-enqueuing every minute.
+ */
+export async function campaignScheduleSyncHandler(job: ClaimedJobRow): Promise<unknown> {
+  return withReschedule(
+    {
+      type: "campaign_schedule_sync",
+      delayMs: CAMPAIGN_SCHEDULE_SYNC_RESCHEDULE_MS,
+      completedJobId: job.id,
+    },
+    () => runCampaignScheduleSync(),
   );
 }
 

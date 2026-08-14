@@ -10,6 +10,7 @@ import {
 import type { JobHandlers } from "@/lib/worker/poll-jobs.server";
 import {
   billingReconcileHandler,
+  campaignScheduleSyncHandler,
   lowCreditNotifyHandler,
   numberRentalBillingHandler,
   twilioOpenSyncHandler,
@@ -38,6 +39,7 @@ export const jobHandlers: JobHandlers = {
   twilio_open_sync: twilioOpenSyncHandler,
   [WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE]: workspaceTwilioComplianceHandler,
   billing_reconcile: billingReconcileHandler,
+  campaign_schedule_sync: campaignScheduleSyncHandler,
   number_rental_billing: numberRentalBillingHandler,
   audience_upload: audienceUploadHandler,
   low_credit_notify: lowCreditNotifyHandler,
