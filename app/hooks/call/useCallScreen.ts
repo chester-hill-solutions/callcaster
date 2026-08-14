@@ -30,6 +30,7 @@ import {
 import { usePredictiveCallSync } from "@/hooks/call/usePredictiveCallSync";
 import { useNextRecipientSync } from "@/hooks/call/useNextRecipientSync";
 import { useDialFailureRecovery } from "@/hooks/call/useDialFailureRecovery";
+import { useCreditReconciliation } from "@/hooks/billing/useCreditReconciliation";
 import { getCallSid } from "@/lib/twilio/twilio-call-params";
 import { KEYPAD_KEYS } from "@/lib/dtmf";
 import type {
@@ -174,6 +175,7 @@ export function useCallScreen() {
     householdMap,
     nextRecipient,
     setNextRecipient,
+    reconcileCredits,
   } = useWorkspaceRealtime({
     user: user as unknown as AppUser,
     init: {
@@ -208,6 +210,19 @@ export function useCallScreen() {
     predictiveState,
     isPredictive: campaign?.dial_type === "predictive",
     send: send as unknown as (action: { type: string }) => void,
+  });
+
+  // A missed ledger SSE event would leave the credit display stale after a
+  // billable call — converge on the server balance within 30s (#1234).
+  useCreditReconciliation({
+    workspaceId,
+    isTerminal:
+      displayState === "completed" ||
+      displayState === "failed" ||
+      displayState === "no-answer" ||
+      displayState === "voicemail",
+    credits: availableCredits,
+    reconcile: reconcileCredits,
   });
 
   const { begin, conference, setConference, creditsError: conferenceCreditsError } = useStartConferenceAndDial(

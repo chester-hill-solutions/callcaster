@@ -84,6 +84,7 @@ export const useWorkspaceRealtime = ({
   const {
     credits: availableCredits,
     applyLedgerEntry: updateCredits,
+    reconcileFromServer: reconcileCredits,
   } = useCreditBalance(init.credits || 0);
 
   const callsListRef = useRef(callsList);
@@ -328,5 +329,6 @@ export const useWorkspaceRealtime = ({
     householdMap,
     setPhoneNumbers,
     availableCredits,
+    reconcileCredits,
   };
 };
