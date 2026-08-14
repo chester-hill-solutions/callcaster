@@ -14,12 +14,14 @@ type ScriptPageProps = {
   pageData: PageData;
   onPageDataChange: (data: PageData) => void;
   mediaNames: string[];
+  readOnly?: boolean;
 };
 
 export default function CampaignSettingsScript({
   pageData,
   onPageDataChange,
   mediaNames,
+  readOnly = false,
 }: ScriptPageProps) {
   const script = pageData.campaignDetails.script;
   const document = useMemo(() => scriptToDocument(script), [script]);
@@ -42,6 +44,7 @@ export default function CampaignSettingsScript({
       document={document}
       onChange={handleChange}
       mediaNames={mediaNames}
+      readOnly={readOnly}
     />
   );
 }
