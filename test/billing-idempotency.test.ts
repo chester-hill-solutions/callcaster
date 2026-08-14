@@ -81,7 +81,7 @@ describe("billing idempotency", () => {
     const rows: TransactionRow[] = [];
     resetTransactionRows(rows);
 
-    const res = await insertTransactionHistoryIdempotent({
+    const res = await insertTransactionHistoryIdempotent(db, {
       workspaceId: "w1",
       type: "DEBIT",
       amount: -2,
@@ -99,14 +99,14 @@ describe("billing idempotency", () => {
     const rows: TransactionRow[] = [];
     resetTransactionRows(rows);
 
-    await insertTransactionHistoryIdempotent({
+    await insertTransactionHistoryIdempotent(db, {
       workspaceId: "w1",
       type: "DEBIT",
       amount: -1,
       note: "SMS abc delivered",
       idempotencyKey: "sms:abc",
     });
-    const res = await insertTransactionHistoryIdempotent({
+    const res = await insertTransactionHistoryIdempotent(db, {
       workspaceId: "w1",
       type: "DEBIT",
       amount: -1,
@@ -123,7 +123,7 @@ describe("billing idempotency", () => {
     resetTransactionRows(rows);
 
     await expect(
-      insertTransactionHistoryIdempotent({
+      insertTransactionHistoryIdempotent(db, {
         workspaceId: "w1",
         type: "DEBIT",
         amount: -1,
@@ -139,7 +139,7 @@ describe("billing idempotency", () => {
     transactionRowsState.shouldThrow = "rpc failed";
 
     await expect(
-      insertTransactionHistoryIdempotent({
+      insertTransactionHistoryIdempotent(db, {
         workspaceId: "w1",
         type: "DEBIT",
         amount: -1,
