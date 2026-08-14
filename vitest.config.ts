@@ -10,6 +10,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["test/**/*.test.ts"],
+    // Real-Postgres tier; runs under vitest.integration-db.config.ts only.
+    exclude: ["**/node_modules/**", "test/integration-db/**"],
   },
 });
 
