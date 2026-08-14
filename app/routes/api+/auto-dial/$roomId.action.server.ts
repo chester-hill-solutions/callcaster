@@ -15,12 +15,12 @@ import {
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
-import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
+import { createVoiceResponse, hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { defineAction } from "@/lib/handler.server";
-import Twilio from "twilio";
+import type Twilio from "twilio";
 
 const getAdmin = () => null /* removed service client */;
 
@@ -128,7 +128,7 @@ const handleMachineAnswer = async (
     signedUrl: string,
     outreachStatus: OutreachStatusItem[]
 ) => {
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
     const firstOutreachStatus = outreachStatus[0];
     if (!firstOutreachStatus) {
         await call.update({ twiml: hangupTwiml() });
@@ -159,7 +159,7 @@ const handleMachineAnswer = async (
 };
 
 const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: string) => {
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
     const conferenceName = dbCall.conference_id?.toString() ?? '';
 
     if (dbCall.outreach_attempt_id && !called.startsWith('client')) {
@@ -188,7 +188,7 @@ const handleDeviceCheck = async (dbCall: NonNullable<Partial<Call>>) => {
 };
 
 async function addToConference(conferenceId: string, campaignId: string, workspaceId: string, userId: string) {
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
     const workspace = await getWorkspaceById(workspaceId);
     appendLiveTranscriptionStreamTwiml({
         twiml,

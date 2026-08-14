@@ -6,18 +6,18 @@ import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { logger } from "@/lib/logger.server";
 import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
-import VoiceResponse from "twilio/lib/twiml/VoiceResponse.js";
+import { createVoiceResponse, sayHangupTwiml } from "@/lib/twilio-twiml.server";
 
 /** Fallback TwiML returned when the handler throws unexpectedly, so Twilio
  * hears a graceful message instead of an HTML error page. */
 function connectCampaignConferenceUnavailableTwiml(): Response {
-  const twiml = new VoiceResponse();
-  twiml.say("We're unable to take your call right now. Please try again later.");
-  twiml.hangup();
-  return new Response(twiml.toString(), {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
-  });
+  return new Response(
+    sayHangupTwiml("We're unable to take your call right now. Please try again later."),
+    {
+      status: 200,
+      headers: { "Content-Type": "text/xml" },
+    },
+  );
 }
 
 export const loader = defineLoader({
@@ -43,7 +43,7 @@ export const loader = defineLoader({
         return twilioWebhookForbidden("Campaign not found");
       }
 
-      const twiml = new VoiceResponse();
+      const twiml = createVoiceResponse();
 
       twiml.say("Welcome to the campaign. You will be connected to calls through your phone.");
       twiml.pause({ length: 1 });

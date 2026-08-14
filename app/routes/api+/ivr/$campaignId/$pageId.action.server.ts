@@ -1,11 +1,10 @@
 import { ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { createVoiceResponse, hangupTwiml } from "@/lib/twilio-twiml.server";
 import { requireTwilioSignatureForIvrPage } from "@/lib/ivr-webhook-auth.server";
 import { findCallWithCampaignScriptBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
-import Twilio from "twilio";
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 200;
@@ -37,7 +36,7 @@ export const action = defineAction({
     requireTwilioSignatureForIvrPage(request, [params.campaignId, params.pageId]),
   sideEffects: ["db-read"],
   handler: async ({ params, auth }) => {
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = createVoiceResponse();
   const { pageId, campaignId } = params as { pageId: string; campaignId: string };
   const { callSid } = auth;
 

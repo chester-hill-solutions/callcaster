@@ -7,7 +7,7 @@ import {
 import { findWorkspaceNumberInboundFallbackByPhone } from "@/lib/inbound-call-db.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { defineAction } from "@/lib/handler.server";
-import Twilio from "twilio";
+import { createVoiceResponse } from "@/lib/twilio-twiml.server";
 
 type DialEndAuth = { called: string; dialCallStatus: string };
 
@@ -31,7 +31,7 @@ export const action = defineAction({
   handler: async ({ auth }) => {
     const { called, dialCallStatus } = auth;
 
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
 
     if (dialCallStatus === "no-answer" || dialCallStatus === "busy" || dialCallStatus === "failed") {
       const number = await findWorkspaceNumberInboundFallbackByPhone(called);
