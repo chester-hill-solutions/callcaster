@@ -43,7 +43,10 @@ describe("ensureSelfSchedulingJobsSeeded", () => {
 
     const result = await ensureSelfSchedulingJobsSeeded();
 
-    expect(result.seeded).toEqual(["low_credit_notify"]);
+    // Position-based, not identity-based: whichever type is first in the
+    // (now registry-derived, #1239 A1) SELF_SCHEDULING_JOB_TYPES order gets
+    // the one seed the mock allows through.
+    expect(result.seeded).toEqual([SELF_SCHEDULING_JOB_TYPES[0]]);
   });
 
   test("a failed seed does not abort the remaining types", async () => {
@@ -57,6 +60,8 @@ describe("ensureSelfSchedulingJobsSeeded", () => {
     expect(enqueueJobMock).toHaveBeenCalledTimes(
       SELF_SCHEDULING_JOB_TYPES.length,
     );
-    expect(result.seeded).toEqual(["twilio_webhook_audit"]);
+    // First type's seed rejects (and must not abort the loop), second
+    // type's seed succeeds.
+    expect(result.seeded).toEqual([SELF_SCHEDULING_JOB_TYPES[1]]);
   });
 });
