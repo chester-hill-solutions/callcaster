@@ -43,32 +43,6 @@ vi.mock("@/lib/object-storage.server", () => ({
   createSignedObjectUrl: vi.fn().mockResolvedValue("https://signed"),
 }));
 
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    private parts: string[] = [];
-    play(u: string) {
-      this.parts.push(`play:${u}`);
-    }
-    say(t: string) {
-      this.parts.push(`say:${t}`);
-    }
-    gather(opts: any) {
-      this.parts.push(`gather:${opts?.action}`);
-      return {};
-    }
-    redirect(u: string) {
-      this.parts.push(`redirect:${u}`);
-    }
-    hangup() {
-      this.parts.push("hangup");
-    }
-    toString() {
-      return `<Response>${this.parts.join("|")}</Response>`;
-    }
-  }
-  return { default: { twiml: { VoiceResponse } } };
-});
-
 function makeDbClient(opts?: {
   campaignData?: any;
   campaignError?: any;
@@ -174,9 +148,13 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       request: ivrBlockRequest(),
     } as any));
     const xml = await res.text();
-    expect(xml).toContain("play:https://signed");
-    expect(xml).toContain("gather:https://base.example/api/ivr/1/page_1/b1/response");
-    expect(xml).toContain("redirect:https://base.example/api/ivr/1/page_1/b1/response");
+    expect(xml).toContain("<Play>https://signed</Play>");
+    expect(xml).toContain(
+      '<Gather action="https://base.example/api/ivr/1/page_1/b1/response" input="dtmf speech" speechTimeout="auto" speechModel="phone_call" timeout="5"/>',
+    );
+    expect(xml).toContain(
+      "<Redirect>https://base.example/api/ivr/1/page_1/b1/response</Redirect>",
+    );
   });
 
   test("no options redirects to next block/page or hangs up; missing block says error", async () => {
@@ -195,14 +173,14 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
       request: ivrBlockRequest(),
     } as any);
-    expect(await res.text()).toContain("redirect:https://base.example/api/ivr/1/page_1/b2");
+    expect(await res.text()).toContain("<Redirect>https://base.example/api/ivr/1/page_1/b2</Redirect>");
 
     campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
     res = await mod.action({
       params: { campaignId: "1", pageId: "page_1", blockId: "b2" },
       request: ivrBlockRequest(),
     } as any);
-    expect(await res.text()).toContain("redirect:https://base.example/api/ivr/1/page_2/b3");
+    expect(await res.text()).toContain("<Redirect>https://base.example/api/ivr/1/page_2/b3</Redirect>");
 
     campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({ workspace: "w1", script: { steps: script } } as any);
     res = await mod.action({

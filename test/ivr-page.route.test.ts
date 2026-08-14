@@ -31,25 +31,6 @@ vi.mock("@/lib/campaign-ivr.server", () => ({
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    private parts: string[] = [];
-    redirect(u: string) {
-      this.parts.push(`redirect:${u}`);
-    }
-    say(t: string) {
-      this.parts.push(`say:${t}`);
-    }
-    hangup() {
-      this.parts.push("hangup");
-    }
-    toString() {
-      return `<Response>${this.parts.join("|")}</Response>`;
-    }
-  }
-  return { default: { twiml: { VoiceResponse } } };
-});
-
 describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -94,7 +75,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
     } as never);
-    expect(await res.text()).toContain("redirect:/api/ivr/1/page_1/b1");
+    expect(await res.text()).toContain("<Redirect>/api/ivr/1/page_1/b1</Redirect>");
 
     // page missing blocks => say+hangup
     const callData2 = { workspace: "w1", campaign_id: 1, campaign: { script: { steps: { pages: { page_1: { blocks: [] } } } } } };

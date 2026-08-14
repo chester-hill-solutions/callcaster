@@ -33,32 +33,6 @@ vi.mock("@/lib/auth.server", () => ({
   getAdminDb: () => mocks.null /* removed service client */,
 }));
 
-vi.mock("twilio/lib/twiml/VoiceResponse.js", () => {
-  class VoiceResponse {
-    private parts: string[] = [];
-    say(t: string) {
-      this.parts.push(`say:${t}`);
-    }
-    pause(opts: { length?: number }) {
-      this.parts.push(`pause:${opts?.length}`);
-    }
-    dial() {
-      return {
-        conference: (_opts: unknown, name: string) => {
-          this.parts.push(`conf:${name}`);
-        },
-      };
-    }
-    hangup() {
-      this.parts.push("hangup");
-    }
-    toString() {
-      return `<Response>${this.parts.join("|")}</Response>`;
-    }
-  }
-  return { default: VoiceResponse };
-});
-
 describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/route.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -84,7 +58,8 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
     );
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const body = await res.text();
-    expect(body).toContain("conf:campaign-w1-1");
+    expect(body).toContain("<Dial>");
+    expect(body).toContain(">campaign-w1-1</Conference>");
   });
 
   test("rejects unauthenticated Twilio requests", async () => {
@@ -122,8 +97,10 @@ describe("app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId/r
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const body = await res.text();
-    expect(body).toContain("say:");
-    expect(body).toContain("hangup");
+    expect(body).toContain(
+      "<Say>We're unable to take your call right now. Please try again later.</Say>",
+    );
+    expect(body).toContain("<Hangup/>");
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Unhandled error in api.connect-campaign-conference",
       expect.objectContaining({ error: "db down" }),

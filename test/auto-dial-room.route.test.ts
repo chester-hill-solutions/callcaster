@@ -118,12 +118,6 @@ vi.mock("@/lib/workspace-members-db.server", async () => {
   };
 });
 
-vi.mock("@/lib/twilio-twiml.server", () => ({
-  hangupTwiml: () => '<?xml version="1.0" encoding="UTF-8"?><Response><Hangup/></Response>',
-  pausePlayTwiml: (url: string, seconds = 5) =>
-    `<?xml version="1.0" encoding="UTF-8"?><Response><Pause length="${seconds}"/><Play>${url}</Play></Response>`,
-}));
-
 const roomDbMocks = vi.hoisted(() => ({
   dequeueCampaignQueueByContact: vi.fn(async () => [{ ok: 1 }]),
   getUserVerifiedAudioNumbers: vi.fn(async () => ["+1666"] as string[] | null),
@@ -149,28 +143,6 @@ vi.mock("@/lib/telephony-db.server", async () => {
     findOutreachAttemptById: stub.telephonyDbMocks.findOutreachAttemptById,
     updateOutreachAttemptForWorkspace: stub.telephonyDbMocks.updateOutreachAttemptForWorkspace,
     insertCallForWorkspace: stub.telephonyDbMocks.insertCallForWorkspace,
-  };
-});
-
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    private _dialed: any[] = [];
-    dial() {
-      return {
-        conference: (_opts: any, name: string) => {
-          this._dialed.push(name);
-        },
-      };
-    }
-    toString() {
-      return "<Response/>";
-    }
-  }
-
-  return {
-    default: {
-      twiml: { VoiceResponse },
-    },
   };
 });
 

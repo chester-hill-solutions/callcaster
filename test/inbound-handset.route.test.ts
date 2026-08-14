@@ -31,29 +31,6 @@ vi.mock("@/lib/handset/handset-session.server", () => ({
     handsetSessionMocks.findActiveHandsetSessionClientIdentity(...args),
 }));
 
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    private parts: string[] = [];
-    say(text: string) {
-      this.parts.push(`say:${text}`);
-    }
-    hangup() {
-      this.parts.push("hangup");
-    }
-    dial() {
-      return {
-        client: (identity: string) => {
-          this.parts.push(`client:${identity}`);
-        },
-      };
-    }
-    toString() {
-      return `<Response>${this.parts.join("|")}</Response>`;
-    }
-  }
-  return { default: { twiml: { VoiceResponse } } };
-});
-
 function makeRequest(called = "+15551234567") {
   const fd = new FormData();
   fd.set("Called", called);
@@ -116,7 +93,7 @@ describe("app/routes/api+/inbound-handset", () => {
     const res = await asRouteResponse(mod.action({ request: makeRequest() } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();
-    expect(text).toContain("client:agent-1");
+    expect(text).toContain("<Dial><Client>agent-1</Client></Dial>");
   });
 
   test("returns fallback TwiML (not an HTML error page) when an unexpected error is thrown", async () => {
@@ -126,8 +103,10 @@ describe("app/routes/api+/inbound-handset", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();
-    expect(text).toContain("say:");
-    expect(text).toContain("hangup");
+    expect(text).toContain(
+      "<Say>We're unable to take your call right now. Please try again later.</Say>",
+    );
+    expect(text).toContain("<Hangup/>");
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Unhandled error in api.inbound-handset",
       expect.objectContaining({ error: "db down" }),

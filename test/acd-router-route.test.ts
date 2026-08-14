@@ -21,22 +21,6 @@ vi.mock("@/lib/acd/acd-router.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    private parts: string[] = [];
-    say(text: string) {
-      this.parts.push(`say:${text}`);
-    }
-    hangup() {
-      this.parts.push("hangup");
-    }
-    toString() {
-      return `<Response>${this.parts.join("|")}</Response>`;
-    }
-  }
-  return { default: { twiml: { VoiceResponse } } };
-});
-
 function makeRequest() {
   const fd = new FormData();
   fd.set("CallSid", "CA1");
@@ -98,8 +82,10 @@ describe("app/routes/api+/acd-router", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();
-    expect(text).toContain("say:");
-    expect(text).toContain("hangup");
+    expect(text).toContain(
+      "<Say>We're unable to take your call right now. Please try again later.</Say>",
+    );
+    expect(text).toContain("<Hangup/>");
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Unhandled error in api.acd-router",
       expect.objectContaining({ error: "signature check exploded" }),

@@ -9,8 +9,6 @@ const mocks = vi.hoisted(() => {
       { BASE_URL: () => "https://base.example" },
       { get: (target, prop: string) => (target as any)[prop] ?? (() => "test") },
     ),
-    dialNumberThrows: false,
-    numberOpts: null as any,
   };
 });
 
@@ -36,42 +34,10 @@ vi.mock("@/lib/telephony-db.server", () => ({
   findCallBySid: (...args: unknown[]) => findCallBySidMock(...args),
 }));
 
-vi.mock("twilio", () => {
-  class TwilioClient {
-    constructor(..._args: any[]) {}
-  }
-  class VoiceResponse {
-    private said = false;
-    private hungUp = false;
-    dial(_opts: any) {
-      return {
-        number: (opts2: any, _num: string) => {
-          mocks.numberOpts = opts2;
-          if (mocks.dialNumberThrows) throw new Error("dial");
-        },
-      };
-    }
-    say(_text: string) {
-      this.said = true;
-    }
-    hangup() {
-      this.hungUp = true;
-    }
-    toString() {
-      if (this.said || this.hungUp) {
-        return `<Response>${this.said ? "<Say/>" : ""}${this.hungUp ? "<Hangup/>" : ""}</Response>`;
-      }
-      return "<Response/>";
-    }
-  }
-  return { default: { Twilio: TwilioClient, twiml: { VoiceResponse } } };
-});
-
 describe("app/routes/api+/dial/route.$number.tsx", () => {
   beforeEach(() => {
     vi.resetModules();
     mocks.logger.error.mockReset();
-    mocks.dialNumberThrows = false;
     requireTwilioSignatureMock.mockClear();
     requireTwilioSignatureMock.mockResolvedValue(null);
     findCallBySidMock.mockClear();
@@ -104,14 +70,14 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
       params: { number: "+15550001111" },
     } as any));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
-    await expect(res.text()).resolves.toContain("<Response");
-    expect(mocks.numberOpts).toMatchObject({
-      statusCallback: "https://base.example/api/call-status/",
-    });
+    const body = await res.text();
+    expect(body).toContain("<Dial");
+    expect(body).toContain('statusCallback="https://base.example/api/call-status/"');
+    expect(body).toContain(">+15550001111</Number>");
   }, 30000);
 
-  test("logs and returns fallback TwiML (not an HTML error page) when twiml building throws", async () => {
-    mocks.dialNumberThrows = true;
+  test("logs and returns fallback TwiML (not an HTML error page) when the handler throws", async () => {
+    findCallBySidMock.mockRejectedValueOnce(new Error("dial"));
     const mod = await import("../app/routes/api+/dial/$number.route");
     const fd = new FormData();
     fd.set("From", "+1555");

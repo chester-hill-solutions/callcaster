@@ -85,19 +85,6 @@ vi.mock("@/lib/db-rpc.server", () => ({
   rpcClaimQueueEntryForDial: (...args: any[]) => dbRpcState.claimQueueEntryForDial(...args),
 }));
 
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    private said: string[] = [];
-    say(t: string) {
-      this.said.push(t);
-    }
-    toString() {
-      return `<Response>${this.said.map((s) => `<Say>${s}</Say>`).join("")}</Response>`;
-    }
-  }
-  return { default: { twiml: { VoiceResponse } } };
-});
-
 describe("app/routes/api+/dial/tsx.route", () => {
   beforeEach(() => {
     vi.resetModules();
