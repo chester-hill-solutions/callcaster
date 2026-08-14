@@ -274,7 +274,6 @@ const handleParticipantJoin = async (
           (typeof underCase.friendly_name === "string" ? underCase.friendly_name : null) ??
             (typeof underCase.conference_sid === "string" ? underCase.conference_sid : null) ??
             "in-progress",
-          { includeNormalizedFields: true },
         ),
       });
 
