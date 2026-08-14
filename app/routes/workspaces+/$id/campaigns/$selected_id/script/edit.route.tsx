@@ -25,7 +25,10 @@ import {
 import type { Script } from "@/lib/types";
 import type { ScriptEditLoaderData } from "./edit.types";
 import { logger as loggerClient } from "@/lib/logger.client";
-import { normalizeScriptPageDataForComparison } from "@/lib/script-change";
+import {
+  normalizeScriptForComparison,
+  normalizeScriptPageDataForComparison,
+} from "@/lib/script-change";
 
 type LoaderData = ScriptEditLoaderData;
 type PageData = LoaderData["data"];
@@ -49,11 +52,32 @@ export default function ScriptEditor() {
   const [pageData, setPageData] = useState<PageData>(data);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  // The script preview is read-only until the user explicitly opts into
+  // editing — attaching a script and editing its content are different acts,
+  // and conflating them is what silently discarded attachments (#1124).
+  const [isEditingScript, setIsEditingScript] = useState(false);
   const isChanged = useHasChanges(
     pageData,
     initData,
     normalizeScriptPageDataForComparison,
   );
+  // Save-as-copy is only a meaningful question when the script's CONTENT
+  // changed. A selection-only change (attach/detach/switch) has nothing to
+  // copy, so compare against the pristine version of the CURRENTLY selected
+  // script: the loader's copy when the selection is unchanged, the dropdown
+  // list's copy when the user switched scripts.
+  const currentScript = pageData.campaignDetails.script ?? null;
+  const pristineScript =
+    currentScript == null
+      ? null
+      : currentScript.id === initData.campaignDetails.script?.id
+        ? initData.campaignDetails.script
+        : scripts.find((s) => s.id === currentScript.id) ?? null;
+  const scriptContentChanged =
+    currentScript != null &&
+    pristineScript != null &&
+    JSON.stringify(normalizeScriptForComparison(currentScript)) !==
+      JSON.stringify(normalizeScriptForComparison(pristineScript));
   useUnsavedChangesGuard(isChanged);
 
   const handleSaveUpdate = async (saveScriptAsCopy: boolean) => {
@@ -109,6 +133,7 @@ export default function ScriptEditor() {
       setPageData(savedPageData);
       setInitData(savedPageData);
       setShowSaveModal(false);
+      setIsEditingScript(false);
       toast.success(
         pageData.type === "message" ? "Message saved" : "Script saved",
       );
@@ -126,6 +151,7 @@ export default function ScriptEditor() {
 
   const handleReset = () => {
     setPageData(data);
+    setIsEditingScript(false);
   };
 
   const handlePageDataChange = (newPageData: PageData) => {
@@ -141,6 +167,11 @@ export default function ScriptEditor() {
       nextScriptId == null
         ? undefined
         : scripts.find((script) => String(script.id) === String(nextScriptId));
+
+    // Switching scripts replaces the draft with the pristine copy, so any
+    // in-flight content edits to the previous script are gone — leave edit
+    // mode rather than presenting the new script as already-being-edited.
+    setIsEditingScript(false);
 
     handlePageDataChange({
       ...pageData,
@@ -169,19 +200,38 @@ export default function ScriptEditor() {
     };
 
     return (
-      <CampaignSettingsScript
-        pageData={scriptPageData}
-        onPageDataChange={(newData) => {
-          handlePageDataChange({
-            ...pageData,
-            campaignDetails: {
-              ...pageData.campaignDetails,
-              script: newData.campaignDetails.script,
-            },
-          });
-        }}
-        mediaNames={scriptMediaNames}
-      />
+      <div className="space-y-2">
+        {!isEditingScript && (
+          <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Previewing {pageData.campaignDetails.script.name}. The script is
+              attached when you save — editing is optional.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditingScript(true)}
+            >
+              Edit script
+            </Button>
+          </div>
+        )}
+        <CampaignSettingsScript
+          pageData={scriptPageData}
+          onPageDataChange={(newData) => {
+            handlePageDataChange({
+              ...pageData,
+              campaignDetails: {
+                ...pageData.campaignDetails,
+                script: newData.campaignDetails.script,
+              },
+            });
+          }}
+          mediaNames={scriptMediaNames}
+          readOnly={!isEditingScript}
+        />
+      </div>
     );
   };
 
@@ -196,7 +246,9 @@ export default function ScriptEditor() {
           isSaving={isSaving}
           onSave={() => {
             // Message campaigns have no script copy flow — save directly (#1115).
-            if (pageData.type === "message") {
+            // Selection-only changes save directly too: the save-as-copy
+            // question only applies when script content was edited (#1124).
+            if (pageData.type === "message" || !scriptContentChanged) {
               void handleSaveUpdate(false);
               return;
             }
