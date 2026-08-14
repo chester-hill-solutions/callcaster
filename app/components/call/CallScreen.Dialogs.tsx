@@ -72,7 +72,7 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   return (
     <>
       <Dialog onOpenChange={() => { navigate(-1) }} open={!isActive}>
-        <DialogContent className="flex w-full max-w-[450px] flex-col items-center bg-card">
+        <DialogContent className="w-full max-w-[450px] grid-cols-1 bg-card">
           <DialogHeader>
             <DialogTitle className="text-center font-Zilla-Slab text-2xl">
               {campaign.status === "draft" || campaign.status === "pending"
