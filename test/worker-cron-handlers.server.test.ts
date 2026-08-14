@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   readTwilioWorkspaceCredentials: vi.fn(() => ({ sid: "AC_test" })),
   triggerTwilioOpenSync: vi.fn(async () => ({ ok: true, message: "synced" })),
   runNumberRentalBilling: vi.fn(async () => ({ ok: true, processed: 1 })),
+  runCampaignScheduleSync: vi.fn(async () => ({ scanned: 0, transitioned: 0 })),
 }));
 
 // Mock the enqueue layer rather than rescheduleJob: the handlers go through
@@ -47,9 +48,14 @@ vi.mock("@/lib/number-rental-billing.server", () => ({
   runNumberRentalBilling: (...args: unknown[]) =>
     mocks.runNumberRentalBilling(...args),
 }));
+vi.mock("@/lib/campaign-schedule-sync.server", () => ({
+  runCampaignScheduleSync: (...args: unknown[]) =>
+    mocks.runCampaignScheduleSync(...args),
+}));
 
 import {
   billingReconcileHandler,
+  campaignScheduleSyncHandler,
   numberRentalBillingHandler,
   twilioOpenSyncHandler,
 } from "@/lib/worker/handlers/cron.server";
@@ -93,6 +99,24 @@ describe("cron handler self-reschedule gating", () => {
       workspaceId: "ws-1",
       source: "cron",
     });
+  });
+
+  test("campaign_schedule_sync runs the sweep and self-reschedules", async () => {
+    await campaignScheduleSyncHandler(makeJob({ type: "campaign_schedule_sync" }));
+    expect(mocks.runCampaignScheduleSync).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "campaign_schedule_sync" }),
+    );
+  });
+
+  test("campaign_schedule_sync still reschedules when the sweep throws", async () => {
+    mocks.runCampaignScheduleSync.mockRejectedValueOnce(new Error("db down"));
+    await expect(
+      campaignScheduleSyncHandler(makeJob({ type: "campaign_schedule_sync" })),
+    ).rejects.toThrow("db down");
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "campaign_schedule_sync" }),
+    );
   });
 
   test("coordinator twilio_open_sync self-reschedules", async () => {

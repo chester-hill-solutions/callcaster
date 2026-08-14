@@ -673,7 +673,16 @@ export async function getCampaignQueueById({campaign_id,
   });
 }
 
-export function checkSchedule(campaignData: Campaign) {
+/** The subset of campaign fields the schedule check actually reads — callers
+ * with partial rows (e.g. the worker's schedule sweep) need not fake a full
+ * Campaign. */
+export type ScheduleCheckInput = {
+  start_date?: string | null;
+  end_date?: string | null;
+  schedule?: unknown;
+};
+
+export function checkSchedule(campaignData: ScheduleCheckInput) {
   if (!campaignData) return false;
   const { start_date, end_date, schedule } = campaignData;
   if (!schedule) return false;

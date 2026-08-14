@@ -21,6 +21,7 @@ export const SELF_SCHEDULING_JOB_TYPES = [
   "twilio_open_sync",
   "billing_reconcile",
   "number_rental_billing",
+  "campaign_schedule_sync",
 ] as const;
 
 export type SelfSchedulingJobType = (typeof SELF_SCHEDULING_JOB_TYPES)[number];
