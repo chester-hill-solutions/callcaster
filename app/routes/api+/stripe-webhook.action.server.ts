@@ -1,5 +1,6 @@
 import { env } from "@/lib/env.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { db } from "@/server/db";
 import { stripeSessionKey } from "@/lib/billing-keys";
 import { logger } from "@/lib/logger.server";
 import Stripe from "stripe";
@@ -74,7 +75,7 @@ export const action = defineAction({
         return new Response("OK", { status: 200 });
       }
 
-      const { inserted } = await insertTransactionHistoryIdempotent({
+      const { inserted } = await insertTransactionHistoryIdempotent(db, {
         workspaceId,
         type: "CREDIT",
         amount: creditAmount,

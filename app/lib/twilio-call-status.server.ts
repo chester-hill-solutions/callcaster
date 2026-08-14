@@ -14,6 +14,7 @@ import {
   type VoiceBillingKind,
 } from "../../shared/pricing";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { db } from "@/server/db";
 import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
@@ -185,7 +186,7 @@ export async function billTerminalCallStatus(
       ? `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`
       : `Call ${call.sid} (API/staffed dial)`);
 
-  return insertTransactionHistoryIdempotent({
+  return insertTransactionHistoryIdempotent(db, {
     workspaceId: call.workspace,
     type: "DEBIT",
     amount: debitAmountFromCredits(credits),

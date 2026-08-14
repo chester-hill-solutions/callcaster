@@ -2,6 +2,7 @@ import { Campaign, OutreachAttempt } from "@/lib/types";
 import { cancelQueuedMessagesForCampaign } from "@/lib/database/call-actions.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { db } from "@/server/db";
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { markContactLineType } from "@/lib/twilio-lookup.server";
 import { alertSmsGeoPermissionBlocked } from "@/lib/twilio-geo-permissions.server";
@@ -150,7 +151,7 @@ export async function runSmsStatusSideEffects(args: {
     const note = isMms
       ? `MMS ${sid} ${messageStatus}`
       : `SMS ${sid} ${messageStatus} (${numSegments} segment${numSegments === 1 ? "" : "s"})`;
-    await insertTransactionHistoryIdempotent({
+    await insertTransactionHistoryIdempotent(db, {
       workspaceId: messageData.workspace,
       type: "DEBIT",
       amount: debitAmountFromCredits(amount),

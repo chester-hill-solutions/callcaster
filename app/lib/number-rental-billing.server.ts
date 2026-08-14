@@ -6,6 +6,7 @@ import {
   transaction_history as transactionHistoryTable,
 } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
+import { db } from "@/server/db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { notifyOps } from "@/lib/ops-alert.server";
@@ -479,7 +480,7 @@ export async function runNumberRentalBilling(args: {
       }
 
       try {
-        await insertTransactionHistoryIdempotent({
+        await insertTransactionHistoryIdempotent(db, {
           workspaceId: number.workspace,
           type: "DEBIT",
           amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
