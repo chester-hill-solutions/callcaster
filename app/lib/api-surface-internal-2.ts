@@ -189,7 +189,7 @@ export const INTERNAL_API_SURFACE_2: readonly ApiSurfaceEntry[] = [
   seed({
     path: "/api/numbers",
     routeModule: "app/routes/api+/numbers.tsx",
-    authClass: "workspaceAdmin",
+    authClass: "session",
     ownerArea: "telephony",
     exposure: "sessionOnly",
     docsGuide: GUIDE.workspace,
@@ -198,6 +198,10 @@ export const INTERNAL_API_SURFACE_2: readonly ApiSurfaceEntry[] = [
       { method: "GET", handler: "loader", bodyType: "query" },
       { method: "POST", handler: "action", bodyType: "form" },
     ],
+    notes:
+      "Flat alias for /api/workspaces/:workspaceId/numbers used by the number " +
+      "purchase wizard. POST requires the member role or above; the caller " +
+      "role receives 403.",
   }),
   seed({
     path: "/api/outreach-attempts",
