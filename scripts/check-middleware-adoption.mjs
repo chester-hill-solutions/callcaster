@@ -35,10 +35,12 @@ const TREES = [
     name: "data-plane",
     prefix: "api+/workspaces+/$workspaceId/",
     // requireDataPlaneRouteCapability wraps getDataPlaneRouteContext + capability gate.
+    // dataPlaneSessionMinRoleAuth is its role-floor sibling for sessionOnly routes.
     required: [
       /getDataPlaneRouteContext/,
       /requireDataPlaneRouteCapability/,
       /dataPlaneCapabilityAuth/,
+      /dataPlaneSessionMinRoleAuth/,
       /defineDataPlaneListLoader/,
     ],
     forbidden: [
