@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   getContactDetailApi: vi.fn(),
   patchCampaignQueueApi: vi.fn(),
   getCampaignQueueApi: vi.fn(),
+  getCampaignDetailApi: vi.fn(),
+  getScriptDetailApi: vi.fn(),
+  getSurveyDetailApi: vi.fn(),
 }));
 
 // Auth primitive: session vs api_key is decided per-test.
@@ -57,6 +60,9 @@ vi.mock("@/lib/platform-data.server", async (importOriginal) => {
     getContactDetailApi: (...a: unknown[]) => mocks.getContactDetailApi(...a),
     patchCampaignQueueApi: (...a: unknown[]) => mocks.patchCampaignQueueApi(...a),
     getCampaignQueueApi: (...a: unknown[]) => mocks.getCampaignQueueApi(...a),
+    getCampaignDetailApi: (...a: unknown[]) => mocks.getCampaignDetailApi(...a),
+    getScriptDetailApi: (...a: unknown[]) => mocks.getScriptDetailApi(...a),
+    getSurveyDetailApi: (...a: unknown[]) => mocks.getSurveyDetailApi(...a),
   };
 });
 
@@ -259,5 +265,96 @@ describe("data-plane mutation routes reject the caller role end-to-end", () => {
 
     expect(res.status).toBe(403);
     expect(mocks.patchCampaignQueueApi).not.toHaveBeenCalled();
+  });
+
+  // GET routes migrated onto dataPlaneResourceCapabilityAuth (issue #1242,
+  // D3) that had no dedicated test file before the migration.
+  test("GET /api/campaigns/:id — non-member gets the uniform 404", async () => {
+    asSessionUser("u-outsider");
+    mocks.requireWorkspaceAccess.mockRejectedValue(
+      new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND),
+    );
+    const mod = await import("../app/routes/api+/campaigns/$campaignId.action.server");
+
+    const res = await asRouteResponse(
+      mod.loader({
+        request: new Request("http://x/api/campaigns/9"),
+        params: { campaignId: "9" },
+      } as never),
+    );
+
+    expect(res.status).toBe(404);
+    expect(mocks.getCampaignDetailApi).not.toHaveBeenCalled();
+  });
+
+  test("GET /api/campaigns/:id — member 200, detail reached", async () => {
+    asSessionUser("u-member");
+    allowAccess();
+    mocks.getCampaignDetailApi.mockResolvedValue({ ok: true, campaign: { id: 9 } });
+    const mod = await import("../app/routes/api+/campaigns/$campaignId.action.server");
+
+    const res = await asRouteResponse(
+      mod.loader({
+        request: new Request("http://x/api/campaigns/9"),
+        params: { campaignId: "9" },
+      } as never),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.getCampaignDetailApi).toHaveBeenCalledWith("9", "w1");
+  });
+
+  test("GET /api/scripts/:id — non-member gets the uniform 404", async () => {
+    asSessionUser("u-outsider");
+    mocks.requireWorkspaceAccess.mockRejectedValue(
+      new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND),
+    );
+    const mod = await import("../app/routes/api+/scripts/$scriptId.loader.server");
+
+    const res = await asRouteResponse(
+      mod.loader({
+        request: new Request("http://x/api/scripts/3"),
+        params: { scriptId: "3" },
+      } as never),
+    );
+
+    expect(res.status).toBe(404);
+    expect(mocks.getScriptDetailApi).not.toHaveBeenCalled();
+  });
+
+  test("GET /api/surveys/:id — non-member gets the uniform 404", async () => {
+    asSessionUser("u-outsider");
+    mocks.requireWorkspaceAccess.mockRejectedValue(
+      new AppError("Workspace not found", 404, ErrorCode.NOT_FOUND),
+    );
+    const mod = await import("../app/routes/api+/surveys/$surveyId.loader.server");
+
+    const res = await asRouteResponse(
+      mod.loader({
+        request: new Request("http://x/api/surveys/abc"),
+        params: { surveyId: "abc" },
+      } as never),
+    );
+
+    expect(res.status).toBe(404);
+    expect(mocks.getSurveyDetailApi).not.toHaveBeenCalled();
+  });
+
+  test("GET /api/campaigns/:id — API key for a different workspace gets 404", async () => {
+    mocks.verifyApiKeyOrSession.mockResolvedValue({
+      authType: "api_key",
+      workspaceId: "some-other-workspace",
+    });
+    const mod = await import("../app/routes/api+/campaigns/$campaignId.action.server");
+
+    const res = await asRouteResponse(
+      mod.loader({
+        request: new Request("http://x/api/campaigns/9"),
+        params: { campaignId: "9" },
+      } as never),
+    );
+
+    expect(res.status).toBe(404);
+    expect(mocks.getCampaignDetailApi).not.toHaveBeenCalled();
   });
 });
