@@ -506,19 +506,25 @@ async function dequeueCampaignQueueByContact(args: {
  *    if omitted). `household: true` fans the dequeue out to every contact
  *    sharing the source contact's household_id — "household is the unit of
  *    contact" per CONTEXT.md. `household: false` is a real, distinct third
- *    mode, not a no-op alias for the Drizzle path: the RPC only touches rows
- *    currently `queued`/null (see the WHERE clause added in
- *    client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql),
- *    so it's a *guarded*, single-contact dequeue that silently no-ops on a
- *    row in any other queue_state (e.g. `assigned`). As of the B3 census
- *    (2026-08) exactly one call site relies on that guard —
- *    app/lib/auto-dial.server.ts's ambiguous-dial-park path, which
- *    deliberately avoids requeue-and-retry semantics — so `household: false`
- *    is preserved as a distinct, explicit choice rather than folded into the
- *    Drizzle default.
+ *    mode, not a no-op alias for the Drizzle path: the RPC touches a row only
+ *    when it is `queued`/null, or `assigned` to the very user passed as
+ *    `userId` (see
+ *    client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql).
+ *    So it's a *guarded*, single-contact dequeue that silently no-ops on a
+ *    row some other agent now holds — which is the point: it makes a dequeue
+ *    that raced a concurrent reclaim harmless instead of letting it kill
+ *    another agent's live call. app/lib/auto-dial.server.ts's
+ *    ambiguous-dial-park path is the call site that depends on that guard —
+ *    it deliberately avoids requeue-and-retry semantics — so `household:
+ *    false` is preserved as a distinct, explicit choice rather than folded
+ *    into the Drizzle default.
  *
- * Behavior-preserving refactor: this function does not change what any
- * existing call site does, only where the mechanism selection lives.
+ *    Corollary: on this path a `userId` of `null` (system-initiated dequeue)
+ *    can only ever reach `queued`/null rows — the assigned-row case needs a
+ *    claim holder to compare against.
+ *
+ * Mechanism selection here is a behavior-preserving refactor of the original
+ * call sites; what each mechanism does to an `assigned` row changed in #1260.
  */
 type DequeueQueueEntryByIdArgs = {
   by: { id: number };
