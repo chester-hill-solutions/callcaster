@@ -4,12 +4,13 @@ import {
   twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
-import { updateCampaignQueueByContactAndCampaign } from "@/lib/campaign-queue-db.server";
+import {
+  dequeueQueueEntry,
+  updateCampaignQueueByContactAndCampaign,
+} from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
 import { runAutoDialerTurn } from "@/lib/auto-dial.server";
-import { rpcDequeueContact } from "@/lib/db-rpc.server";
-import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
 import { OutreachAttempt } from "@/lib/types";
 import { Tables } from "@/lib/db-types";
@@ -156,16 +157,15 @@ const handleCallStatus = async (
       return;
     }
 
-    const tdb = createTenantDb(workspace);
-    await rpcDequeueContact(tdb, {
-      contactId: outreachStatus.contact_id,
+    await dequeueQueueEntry({
+      by: { contactId: outreachStatus.contact_id },
       workspaceId: workspace,
-      groupOnHousehold: true,
+      household: true,
       // A conference name is `${userId}~${uuid}`, and this argument is bound
       // as ::uuid — passing the raw name raised 22P02 on every terminal call,
       // so the contact was never dequeued and the dialer stopped after one.
-      dequeuedById: resolveUserIdFromConferenceName(callUpdate.conference_id) || null,
-      dequeuedReasonText: `Call ${status?.toLowerCase()}`,
+      userId: resolveUserIdFromConferenceName(callUpdate.conference_id) || null,
+      reason: `Call ${status?.toLowerCase()}`,
     });
     const conferences = await twilio.conferences.list({
       friendlyName: callUpdate.conference_id ?? "",
