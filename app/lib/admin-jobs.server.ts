@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { job as jobTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { logger } from "@/lib/logger.server";
+import { validateStoredJobParams } from "@/lib/worker/job-params.server";
 
 export const DEAD_LETTER_JOB_STATUS = "dead_letter";
 
@@ -27,7 +28,8 @@ export async function listRecentDeadLetteredJobs(limit = 25) {
 
 export type RequeueResult =
   | { ok: true; jobId: number; type: string }
-  | { ok: false; reason: "not_found" };
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "invalid_params"; error: string };
 
 /**
  * Return a dead-lettered job to the queue.
@@ -50,11 +52,39 @@ export type RequeueResult =
  * The status predicate is part of the UPDATE, not a preceding SELECT, so two
  * admins clicking at once cannot both requeue: the second matches no row and
  * gets `not_found`.
+ *
+ * Before flipping the status, the row's stored `type`/`params` are validated
+ * against the job registry (#1239 A3, `validateStoredJobParams`): a
+ * dead-lettered row can be any registered type with arbitrary stored params,
+ * so this can't be pinned to one literal type at compile time the way a
+ * normal enqueue call site can. Reinstating a row whose params no longer
+ * pass validation would just dead-letter it again on the next attempt, so
+ * that's rejected up front with a typed reason instead.
  */
 export async function requeueDeadLetteredJob(
   jobId: number,
   actorUserId: string,
 ): Promise<RequeueResult> {
+  const [existing] = await adminDb
+    .select({ type: jobTable.type, params: jobTable.params })
+    .from(jobTable)
+    .where(and(eq(jobTable.id, jobId), eq(jobTable.status, DEAD_LETTER_JOB_STATUS)));
+
+  if (!existing) {
+    return { ok: false, reason: "not_found" };
+  }
+
+  const validated = validateStoredJobParams(existing.type, existing.params);
+  if (!validated.ok) {
+    logger.error("admin.job.requeue_rejected", {
+      jobId,
+      jobType: existing.type,
+      actorUserId,
+      error: validated.error,
+    });
+    return { ok: false, reason: "invalid_params", error: validated.error };
+  }
+
   const [row] = await adminDb
     .update(jobTable)
     .set({
