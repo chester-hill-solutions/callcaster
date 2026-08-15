@@ -323,9 +323,11 @@ export async function runAutoDialerTurn(
               workspaceId: workspace_id,
               // false, not omitted: the guarded RPC path, not plain Drizzle
               // — deliberately parks only this one row (no household
-              // fan-out) and no-ops rather than requeue-and-retry if the
-              // row isn't currently queued/null. See dequeueQueueEntry's
-              // doc comment for why this differs from the Drizzle default.
+              // fan-out) and no-ops rather than stomping a row this turn no
+              // longer holds. `user_id` is the claim holder
+              // claim_next_queue_contact stamped a few lines up, which is
+              // what lets the RPC dequeue the row while it is still
+              // `assigned` (#1260). See dequeueQueueEntry's doc comment.
               household: false,
               userId: user_id,
               reason:

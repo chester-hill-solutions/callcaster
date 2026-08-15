@@ -9,8 +9,11 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
  * `@/lib/db-rpc.server` is mocked wholesale so these tests exercise only the
  * routing decision (which mechanism gets called, with what args), not the
  * RPC's own household-lookup/emit behavior — that's covered by
- * scope-dequeue-and-outreach-attempt.integration.test.ts and manual
- * verification against a live Postgres instance (see that file's header).
+ * test/integration-db/dequeue-contact-assigned.test.ts, which runs the real
+ * plpgsql function against a real Postgres. Anything about WHICH ROWS the RPC
+ * touches belongs there, not here: a predicate bug (#1260 — the dequeue
+ * silently no-oped on the claimed row it was called for) is invisible to a
+ * wholesale mock of the RPC.
  */
 
 const rpcDequeueContactMock = vi.hoisted(() => vi.fn(async () => undefined));
