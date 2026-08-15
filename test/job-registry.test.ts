@@ -158,3 +158,131 @@ describe("job registry — defineJob params validation (proof migrations)", () =
     ).toEqual({ workspaceId: "ws_1" });
   });
 });
+
+describe("job registry — defineJob params validation (#1239 A2 migrations)", () => {
+  test("audience_upload rejects a coerced-zero uploadId/audienceId like the old bundled falsy check", () => {
+    const registration = jobRegistry.find((r) => r.type === "audience_upload");
+    expect(registration).toBeDefined();
+
+    // 0 is falsy in JS — the old `if (!uploadId || !audienceId || ...) throw`
+    // treated a coerced 0 as "missing", same as an absent field.
+    expect(() => registration!.params.parse({ uploadId: 0, audienceId: 5 })).toThrowError(
+      "audience_upload: missing or invalid uploadId",
+    );
+    expect(() => registration!.params.parse({ uploadId: 5, audienceId: "not-a-number" })).toThrowError(
+      "audience_upload: missing or invalid audienceId",
+    );
+
+    // Numeric-string ids coerce (tenant-db bigint-as-string, #1078); optional
+    // fields fall back exactly like the old `typeof` narrowing.
+    expect(
+      registration!.params.parse({ uploadId: "12", audienceId: "34" }),
+    ).toEqual({
+      uploadId: 12,
+      audienceId: 34,
+      workspaceId: undefined,
+      userId: undefined,
+      fileContent: "",
+      headerMapping: {},
+      splitNameColumn: null,
+      voterListSource: null,
+    });
+
+    // voterListSource is NOT enum-validated (deliberately looser — see
+    // legacyNullableStringParam's doc comment): an out-of-enum string that
+    // the old blind cast would have accepted must still pass.
+    expect(
+      registration!.params.parse({
+        uploadId: 1,
+        audienceId: 2,
+        voterListSource: "not_a_real_source",
+        headerMapping: ["array", "not", "object"],
+      }).voterListSource,
+    ).toBe("not_a_real_source");
+    expect(
+      registration!.params.parse({ uploadId: 1, audienceId: 2, headerMapping: ["a", "b"] })
+        .headerMapping,
+    ).toEqual(["a", "b"]);
+  });
+
+  test("call/sms/recording side-effect job types share one schema factory and reject the same shapes requireSidAndTwilioParams did", () => {
+    const callStatus = jobRegistry.find((r) => r.type === "call_status_side_effects");
+    const smsStatus = jobRegistry.find((r) => r.type === "sms_status_side_effects");
+    const recording = jobRegistry.find((r) => r.type === "recording_side_effects");
+    expect(callStatus).toBeDefined();
+    expect(smsStatus).toBeDefined();
+    expect(recording).toBeDefined();
+
+    expect(() => callStatus!.params.parse({})).toThrowError(
+      "call_status_side_effects: missing callSid or twilioParams",
+    );
+    expect(() => smsStatus!.params.parse({ messageSid: "SM1" })).toThrowError(
+      "sms_status_side_effects: missing messageSid or twilioParams",
+    );
+    expect(() => recording!.params.parse({ callSid: "CA1", twilioParams: "not-an-object" })).toThrowError(
+      "recording_side_effects: missing callSid or twilioParams",
+    );
+
+    // A row queued for call_status_side_effects only ever has `callSid` set;
+    // a stray `messageSid` from an unrelated job shape must be ignored, same
+    // as the old code reading only `params[sidKey]`.
+    expect(
+      callStatus!.params.parse({
+        callSid: "CA1",
+        messageSid: "SM_should_be_ignored",
+        twilioParams: { CallStatus: "completed" },
+      }),
+    ).toEqual({ sid: "CA1", twilioParams: { CallStatus: "completed" } });
+  });
+
+  test("webhook_delivery requires a valid eventType and rejects the same falsy payload/eventCategory the old bundled check did", () => {
+    const registration = jobRegistry.find((r) => r.type === "webhook_delivery");
+    expect(registration).toBeDefined();
+
+    expect(() =>
+      registration!.params.parse({
+        eventCategory: "call",
+        eventType: "DELETE",
+        payload: { a: 1 },
+      }),
+    ).toThrow();
+    expect(() =>
+      registration!.params.parse({ eventCategory: "call", eventType: "INSERT" }),
+    ).toThrowError("webhook_delivery: missing payload");
+    expect(() =>
+      registration!.params.parse({ eventType: "INSERT", payload: { a: 1 } }),
+    ).toThrowError("webhook_delivery: missing eventCategory");
+
+    expect(
+      registration!.params.parse({
+        eventCategory: "call",
+        eventType: "UPDATE",
+        payload: { a: 1 },
+      }),
+    ).toEqual({
+      workspaceId: undefined,
+      eventCategory: "call",
+      eventType: "UPDATE",
+      payload: { a: 1 },
+      optional: false,
+    });
+  });
+
+  test("campaign_export and campaign_dispatch reject a coerced-zero campaignId like the old falsy check, but accept negative ids", () => {
+    const exportReg = jobRegistry.find((r) => r.type === "campaign_export");
+    const dispatchReg = jobRegistry.find((r) => r.type === "campaign_dispatch");
+    expect(exportReg).toBeDefined();
+    expect(dispatchReg).toBeDefined();
+
+    expect(() =>
+      exportReg!.params.parse({ campaignId: 0, exportId: "exp_1", campaignType: "message" }),
+    ).toThrowError("campaign_export: missing or invalid campaignId");
+    expect(() => dispatchReg!.params.parse({ campaignId: 0 })).toThrowError(
+      "campaign_dispatch: missing or invalid campaignId",
+    );
+
+    // Negative numbers are truthy in JS, so the old `!campaignId` check never
+    // rejected them — only an exact falsy 0 (or a non-numeric value).
+    expect(dispatchReg!.params.parse({ campaignId: -5 }).campaignId).toBe(-5);
+  });
+});

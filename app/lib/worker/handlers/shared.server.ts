@@ -68,38 +68,15 @@ export async function rescheduleJob(
   }
 }
 
+// requireStringParam is the last hand-rolled params narrowing left in this
+// file: every other job type's params narrowing now lives in a zod schema
+// next to its `defineJob` registration in handlers.server.ts (#1239 A2). This
+// one is still used by elevenlabs-batch-transcribe.server.ts's handler, which
+// wasn't part of that migration.
 export function requireStringParam(
   params: Record<string, unknown>,
   key: string,
 ): string | undefined {
   const value = params[key];
   return typeof value === "string" ? value : undefined;
-}
-
-export function requireNumberParam(
-  params: Record<string, unknown>,
-  key: string,
-): number | undefined {
-  const value = params[key];
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  // Tenant-db rows serialize serial/bigint ids as strings, and those ids get
-  // enqueued into jsonb job params verbatim. Rejecting "12" here dead-ended
-  // every audience upload job with "Missing required parameters" (#1078).
-  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
-    return Number(value.trim());
-  }
-  return undefined;
-}
-
-export function requireRecordParam(
-  params: Record<string, unknown>,
-  key: string,
-): Record<string, string> | undefined {
-  const value = params[key];
-  if (typeof value === "object" && value !== null) {
-    return value as Record<string, string>;
-  }
-  return undefined;
 }
