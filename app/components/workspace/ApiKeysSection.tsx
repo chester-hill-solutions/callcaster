@@ -18,10 +18,17 @@ import { Section, SectionHeader } from "@/components/shared/Section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { ApiKeyCapabilityPicker } from "@/components/workspace/ApiKeyCapabilityPicker";
+import type { ProductCapabilityId } from "@/lib/capabilities";
 
 type ApiKeysSectionProps = {
   workspaceId: string;
   hasAccess: boolean;
+  /**
+   * Capability scopes the current user may grant — the server-side
+   * `assertScopesWithinActorRole` cap, mirrored so the picker never offers a
+   * scope the mint would reject. Presentational only; the server re-checks.
+   */
+  grantableScopes?: readonly ProductCapabilityId[];
   initialKeys?: ApiKeyRecord[];
   defaultShowCreateForm?: boolean;
   variant?: "elevated" | "flat";
@@ -30,6 +37,7 @@ type ApiKeysSectionProps = {
 export default function ApiKeysSection({
   workspaceId,
   hasAccess,
+  grantableScopes,
   initialKeys = [],
   defaultShowCreateForm = false,
   variant = "elevated",
@@ -221,7 +229,7 @@ export default function ApiKeysSection({
                 placeholder="e.g. Production, Zapier"
               />
             </FormField>
-            <ApiKeyCapabilityPicker />
+            <ApiKeyCapabilityPicker grantableScopes={grantableScopes} />
             <div className="flex gap-2">
               <Button type="submit" data-testid="api-key-submit">
                 Create key

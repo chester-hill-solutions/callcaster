@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/accordion";
 import WebhookEditor from "@/components/workspace/WebhookEditor";
 import ApiKeysSection from "@/components/workspace/ApiKeysSection";
+import type { ProductCapabilityId } from "@/lib/capabilities";
 import { compareMembersByRole } from "@/lib/workspace-members";
 import { getWorkspaceRoleDisplayName } from "@/lib/workspace-role-display";
 import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
@@ -41,6 +42,8 @@ type LoaderData = {
   pendingInvites: (WorkspaceInvite & {user: Partial<User>})[];
   webhook: WorkspaceWebhook;
   hasAccess: boolean;
+  canManageApiKeys: boolean;
+  grantableApiKeyScopes: readonly ProductCapabilityId[];
   apiKeys: {
     id: string;
     name: string;
@@ -62,6 +65,8 @@ export default function WorkspaceSettings() {
   const outlet = useOutlet();
   const {
     hasAccess,
+    canManageApiKeys,
+    grantableApiKeyScopes,
     userRole,
     users,
     activeUserId,
@@ -348,10 +353,11 @@ export default function WorkspaceSettings() {
         </Section>
       ) : null}
 
-      {hasAccess ? (
+      {canManageApiKeys ? (
         <ApiKeysSection
           workspaceId={workspaceRecord?.id ?? ""}
-          hasAccess={hasAccess}
+          hasAccess={canManageApiKeys}
+          grantableScopes={grantableApiKeyScopes}
           initialKeys={apiKeys}
           defaultShowCreateForm={showApiKeyCreateForm}
           variant="flat"
