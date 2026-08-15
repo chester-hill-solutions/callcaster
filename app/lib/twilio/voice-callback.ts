@@ -59,6 +59,14 @@ const voiceCallbackCommon = {
   callStatus: z.string(),
   timestamp: z.string().nullable(),
   durationSeconds: z.number().nullable(),
+  /**
+   * Answering-machine-detection result. Common (not `call-status`-only)
+   * because Twilio's async-AMD callback (`AsyncAmd`) posts `CallSid` +
+   * `AnsweredBy` with no `CallStatus` at all — that payload discriminates to
+   * `unrecognized`, and `dial/status` still needs to read `AnsweredBy` off it
+   * (#1243 E2).
+   */
+  answeredBy: z.string().nullable(),
 };
 
 /** A plain call status callback: `CallSid` + `CallStatus`, no conference, no recording. */
@@ -67,7 +75,6 @@ export const callStatusCallbackSchema = z.object({
   kind: z.literal("call-status"),
   callSid: z.string(),
   callStatus: z.string().min(1),
-  answeredBy: z.string().nullable(),
   direction: z.string().nullable(),
   from: z.string().nullable(),
   to: z.string().nullable(),
@@ -216,6 +223,7 @@ export function parseTwilioVoiceCallback(
       duration === null && callDuration === null
         ? null
         : Math.max(duration ?? 0, callDuration ?? 0),
+    answeredBy: readString(raw, "AnsweredBy"),
   };
 
   if (RECORDING_KEYS.some((key) => readString(raw, key) !== null)) {
@@ -254,7 +262,6 @@ export function parseTwilioVoiceCallback(
       kind: "call-status",
       callSid: common.callSid,
       callStatus: common.callStatus,
-      answeredBy: readString(raw, "AnsweredBy"),
       direction: readString(raw, "Direction"),
       from: readString(raw, "From"),
       to: readString(raw, "To"),

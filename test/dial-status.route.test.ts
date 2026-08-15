@@ -260,6 +260,24 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     expect(mocks.requireTwilioSignature).toHaveBeenCalled();
   });
 
+  /**
+   * The payload is parsed once at the route boundary into a discriminated
+   * union (#1243 E1/E2). A `CallSid` with no `CallStatus` and no `AnsweredBy`
+   * discriminates to `unrecognized` — the route must still ack (not throw),
+   * and must not treat it as a machine-detection callback.
+   */
+  test("an unrecognized payload (CallSid only) acks without hitting the voicemail branch", async () => {
+    const { client, twilio } = makeDbClient();
+    mocks.createClient.mockReturnValueOnce(client);
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
+    const mod = await import("../app/routes/api+/dial/status.route");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", SomethingTwilioAddedLater: "1" }),
+    } as any));
+    await expect(res.json()).resolves.toMatchObject({ success: true });
+    expect(client._callUpdate).not.toHaveBeenCalled();
+  });
+
   test("callStatus missing covers null branch; callError/campaignError/voicemailError bubble to outer catch (Error message)", async () => {
     const { client, twilio } = makeDbClient();
     client._set.callError(new Error("call"));

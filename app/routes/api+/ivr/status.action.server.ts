@@ -13,12 +13,12 @@ import {
 import {
   buildCallUpsertFromTwilioParams,
   processCallStatusWebhook,
-  twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
 import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { defineAction } from "@/lib/handler.server";
 import type Twilio from "twilio";
+import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
 export interface CallEvent {
     Called: string;
@@ -112,19 +112,21 @@ export const action = defineAction({
     auth: async ({ request }) => {
         const formData = await request.clone().formData();
         const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-        const underCase = twilioParamsToUnderCase(params);
-        const callSid = typeof underCase.call_sid === "string" ? underCase.call_sid : null;
+        // Parsed once here (#1243 E2) instead of each field being re-narrowed
+        // with `typeof x === "string"` below.
+        const event = parseTwilioVoiceCallback(params);
+        const callSid = event.callSid;
         if (!callSid) {
             // Preserve the original order: the handler throws "Missing CallSid"
             // (caught into `{ success: false }`) before any signature check.
-            return { params, underCase, callSid };
+            return { params, event, callSid };
         }
         const forbidden = await requireTwilioSignature(request, { callSid });
-        return forbidden ?? { params, underCase, callSid };
+        return forbidden ?? { params, event, callSid };
     },
     sideEffects: ["db-write", "credit", "twilio", "external"],
     handler: async ({ auth }) => {
-    const { params, underCase, callSid } = auth;
+    const { params, event, callSid } = auth;
 
     try {
         if (!callSid) {
@@ -138,10 +140,8 @@ export const action = defineAction({
 
         const twilio = await createWorkspaceTwilioInstance({ workspace_id: dbCall.workspace });
 
-        const callStatus = typeof underCase.call_status === "string" ? underCase.call_status : "";
-        const timestamp = typeof underCase.timestamp === "string" ? underCase.timestamp : '';
-
-        const answeredBy = typeof underCase.answered_by === "string" ? underCase.answered_by : "";
+        const callStatus = event.callStatus;
+        const answeredBy = event.answeredBy ?? "";
         const isMachine =
             Boolean(answeredBy) &&
             answeredBy.includes('machine') &&

@@ -12,11 +12,13 @@ import {
 } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
+import {
+  parseTwilioVoiceCallback,
+  type TwilioVoiceCallback,
+} from "@/lib/twilio/voice-callback";
 
 type DialStatusAuth = {
-  callSid: string | null;
-  answeredBy: string | null;
-  callStatus: string | null;
+  event: TwilioVoiceCallback;
 };
 
 export const action = defineAction({
@@ -24,28 +26,27 @@ export const action = defineAction({
     // Clone before reading — Bun yields empty params on re-read after consume.
     const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    const callSidValue = params.CallSid;
-    const answeredByValue = params.AnsweredBy;
-    const callStatusValue = params.CallStatus;
-
-    const callSid = typeof callSidValue === "string" && callSidValue ? callSidValue : null;
-    const answeredBy = typeof answeredByValue === "string" ? answeredByValue : null;
-    const callStatus = typeof callStatusValue === "string" ? callStatusValue : null;
+    // Parsed once here (#1243 E2) instead of each field being re-narrowed with
+    // `typeof x === "string"` below.
+    const event = parseTwilioVoiceCallback(params);
 
     // Validate the Twilio signature unconditionally (fail closed). Previously
     // this ran only when CallSid was present, so a request without CallSid
     // skipped the webhook auth boundary entirely.
     const forbidden = await requireTwilioSignature(request, {
-      callSid: callSid ?? undefined,
+      callSid: event.callSid ?? undefined,
       params,
     });
     if (forbidden) return forbidden;
 
-    return { callSid, answeredBy, callStatus };
+    return { event };
   },
   sideEffects: ["twilio", "db-write"],
   handler: async ({ auth }) => {
-    const { callSid, answeredBy, callStatus } = auth;
+    const { event } = auth;
+    const callSid = event.callSid;
+    const answeredBy = event.answeredBy;
+    const callStatus = event.callStatus || null;
 
     if (!callSid) {
       return routeData({ success: false, error: "CallSid is required and must be a string" });

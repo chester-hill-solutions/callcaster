@@ -3,8 +3,6 @@ import type { Database, Tables, TablesInsert } from "@/lib/db-types";
 import {
   findCallBySid,
   upsertCallBySid,
-  updateCallBySid,
-  updateOutreachAttemptForWorkspace,
   findCampaignTypeByCampaignId,
 } from "@/lib/telephony-db.server";
 import {
@@ -19,7 +17,6 @@ import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
 import { emitPostgresChangeEvent } from "@/lib/workspace-events.server";
-import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
 export {
   voiceBillingKindFromCampaignType,
@@ -284,88 +281,3 @@ export async function processCallStatusWebhook(
   return { call, billingResult };
 }
 
-/**
- * Persist a call status update from Twilio status-callback form params.
- * Routes `ivr/status` and `auto-dial/status` (and any future status callback
- * route) should route through this so that persistence + disposition use the
- * same canonical path as `call-status` (fixes the double-debit hazard from
- * issue #1004 by ensuring all status routes use `twilioParamsToUnderCase`).
- *
- * Behavior:
- * - Updates `call.end_time` / `call.status` / `call.duration` for `callSid`.
- * - Optionally updates `outreach_attempt.disposition` when provided.
- *
- * Returns the row from the call update (so callers can read
- * `outreach_attempt_id` / `workspace` for billing) when `selectResult` is true.
- */
-export async function persistCallStatusFromParams(args: {
-  params: Record<string, string>;
-  disposition?: string | null;
-  outreachAttemptId?: number | null;
-  selectResult?: boolean;
-}): Promise<Tables<"call"> | null> {
-  const event = parseTwilioVoiceCallback(args.params);
-  const callSid = event.callSid;
-  if (!callSid) {
-    throw new Error("Missing CallSid in status params");
-  }
-  const status = args.disposition
-    ? String(args.disposition).toLowerCase()
-    : event.callStatus.toLowerCase() || null;
-
-  const update: Record<string, unknown> = {};
-  if (event.timestamp) {
-    update.end_time = new Date(event.timestamp).toISOString();
-  }
-  if (status) {
-    update.status = status;
-  }
-  const duration = event.durationSeconds ?? 0;
-  if (duration > 0) {
-    update.duration = String(duration);
-  }
-
-  if (Object.keys(update).length === 0) {
-    return null;
-  }
-
-  const existing = await findCallBySid(callSid);
-  if (!existing?.workspace) {
-    throw new Error(`Call ${callSid} not found or missing workspace`);
-  }
-
-  let data: Tables<"call"> | null = null;
-  if (args.selectResult) {
-    data = (await updateCallBySid(
-      existing.workspace,
-      callSid,
-      update as Partial<Tables<"call">>,
-    )) as Tables<"call"> | null;
-  } else {
-    await updateCallBySid(
-      existing.workspace,
-      callSid,
-      update as Partial<Tables<"call">>,
-    );
-  }
-
-  const outreachAttemptId =
-    args.outreachAttemptId != null
-      ? args.outreachAttemptId
-      : (data as { outreach_attempt_id?: number | null } | null)?.outreach_attempt_id ??
-        existing.outreach_attempt_id ??
-        null;
-
-  if (args.disposition && outreachAttemptId != null && existing.workspace) {
-    const result = await updateOutreachAttemptForWorkspace(
-      existing.workspace,
-      outreachAttemptId,
-      { disposition: args.disposition },
-    );
-    if (result instanceof Response) {
-      throw new Error("Failed to update outreach disposition");
-    }
-  }
-
-  return data ?? (existing as Tables<"call">);
-}
