@@ -11,8 +11,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore -- plain .mjs gate helper, deliberately untyped (see tsconfig)
+// Plain .mjs gate helper — tsconfig excludes *.test.ts, so no shim is needed.
 import { analyzeCapabilityLinkage } from "../scripts/lib/capability-linkage.mjs";
 
 const CAPABILITIES_TS = `export const PRODUCT_CAPABILITIES = {
