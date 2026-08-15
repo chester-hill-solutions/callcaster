@@ -332,6 +332,40 @@ export function getCampaignContentReadinessIssues(
     .filter((message): message is string => Boolean(message));
 }
 
+export type CampaignQueueAudienceCounts = {
+  /**
+   * Total dialable rows ever assigned to the campaign queue, regardless of
+   * dequeue/send status. This is the correct signal for "does this campaign
+   * have an audience" -- it stays stable (and positive) after the campaign
+   * finishes sending.
+   */
+  totalCount?: number | null;
+  /**
+   * Rows not yet dequeued/sent. Used only as a fallback when the total is
+   * unavailable to the caller. Do NOT use this alone to decide readiness:
+   * it legitimately drops to 0 once a campaign completes sending to every
+   * assigned contact, even though the campaign was never audience-empty.
+   */
+  queuedCount?: number | null;
+};
+
+/**
+ * Resolve the `queueCount` fed into {@link getCampaignReadiness}'s
+ * `queue_empty` check from a set of queue counters.
+ *
+ * Bug history (#1255): callers used to pass the *remaining* queued count
+ * (rows not yet dequeued). That count is 0 both before a campaign has any
+ * audience AND after a campaign finishes sending to everyone -- so a fully
+ * completed campaign was misreported as "needs attention: add at least one
+ * contact" on the launch screen. Always prefer the total-ever-assigned
+ * count; fall back to the remaining count only when total isn't available.
+ */
+export function resolveReadinessQueueCount(
+  counts: CampaignQueueAudienceCounts,
+): number {
+  return counts.totalCount ?? counts.queuedCount ?? 0;
+}
+
 export function hasCampaignReadinessCode(
   issues: readonly CampaignReadinessIssue[],
   code: CampaignReadinessCode,

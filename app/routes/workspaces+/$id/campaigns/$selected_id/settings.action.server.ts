@@ -31,7 +31,11 @@ import {
   updateCampaign,
 } from "@/lib/database/campaign.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
-import { getCampaignReadiness, getScheduleValidation } from "@/lib/campaign-readiness";
+import {
+  getCampaignReadiness,
+  getScheduleValidation,
+  resolveReadinessQueueCount,
+} from "@/lib/campaign-readiness";
 import { launchCampaign } from "@/lib/campaign-execution.server";
 import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
@@ -229,7 +233,10 @@ export const action = defineAction({
               campaignDetails: campaignDetails as unknown as CampaignDetails,
               mode,
               userId: user.id,
-              queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
+              queueCount: resolveReadinessQueueCount({
+                totalCount: queueCounts.fullCount,
+                queuedCount: queueCounts.queuedCount,
+              }),
             });
             if (!result.ok) {
               return routeData(
@@ -242,7 +249,10 @@ export const action = defineAction({
 
           // For voice campaigns, use readiness check + status update.
           const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as unknown as CampaignDetails, {
-            queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
+            queueCount: resolveReadinessQueueCount({
+              totalCount: queueCounts.fullCount,
+              queuedCount: queueCounts.queuedCount,
+            }),
             workspacePhoneNumbers: phoneNumbersResult.data ?? [],
             workspaceScriptIds: scripts.map((script) => script.id),
             workspaceAudioNames: audioList.ok

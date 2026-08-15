@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { rowsToCsv } from "@/lib/rpc-csv.server";
-import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
+import { QUEUE_LIFECYCLE_ASSIGNED, QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
 import { emitQueueEvent } from "@/lib/workspace-events.server";
 import { campaign_queue as campaignQueueTable, contact as contactTable } from "@/db/schema";
 import { db, type Database as DbInstance } from "@/server/db";
@@ -274,6 +274,14 @@ export async function rpcDequeueContact(
     }
   }
 
+  // Snapshot of the rows the RPC is about to change, taken so the realtime
+  // UPDATE events below carry a real `old` row. It MUST mirror the RPC's own
+  // WHERE predicate — a row the RPC dequeues but this misses gets no event at
+  // all, so the queue UI keeps showing it as live. See
+  // client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql
+  // for why `assigned` rows are included only for the caller who holds them
+  // (#1260).
+  const dequeuedById = args.dequeuedById ?? null;
   const oldRows = await db
     .select()
     .from(campaignQueueTable)
@@ -285,6 +293,14 @@ export async function rpcDequeueContact(
         or(
           isNull(campaignQueueTable.queue_state),
           eq(campaignQueueTable.queue_state, QUEUE_STATUS_QUEUED),
+          ...(dequeuedById
+            ? [
+                and(
+                  eq(campaignQueueTable.queue_state, QUEUE_LIFECYCLE_ASSIGNED),
+                  eq(campaignQueueTable.assigned_to_user_id, dequeuedById),
+                ),
+              ]
+            : []),
         ),
       ),
     );
@@ -295,7 +311,7 @@ export async function rpcDequeueContact(
       ${args.contactId}::bigint,
       ${args.groupOnHousehold},
       ${args.workspaceId}::uuid,
-      ${args.dequeuedById ?? null}::uuid,
+      ${dequeuedById}::uuid,
       ${args.dequeuedReasonText ?? null}
     )`,
   );
