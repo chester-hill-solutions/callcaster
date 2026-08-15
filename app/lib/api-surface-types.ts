@@ -125,6 +125,76 @@ export type ApiSurfaceEntry = {
   workspaceScoped?: boolean;
 };
 
+/**
+ * ── The generated core ──────────────────────────────────────────────────
+ *
+ * Everything below is DERIVED from the code by scripts/generate-api-surface.ts
+ * (issue #1242, D4) and written to app/lib/api-surface-generated.ts. It is the
+ * half of an inventory entry that the codebase already states authoritatively:
+ * the route tree gives the path and module, the route shim gives loader/action,
+ * the handler gives the methods, and the auth strategy gives the capability.
+ *
+ * The editorial half — what a surface is FOR, which guide documents it, how a
+ * body is encoded — cannot be read off the code and lives in
+ * app/lib/api-surface-annotations.ts. `API_SURFACE` is the two merged.
+ */
+export type ApiSurfaceCoreOperation = {
+  method: HttpMethod;
+  handler: "loader" | "action";
+  /** Capability the auth strategy brands itself with. */
+  capability?: string;
+  /**
+   * Present when the capability comes from scripts/capability-baseline.json
+   * rather than a capability-carrying strategy — a body-resolved preamble D3
+   * has not migrated yet. Marked, never guessed.
+   */
+  capabilitySource?: "baseline";
+};
+
+export type ApiSurfaceCore = {
+  path: string;
+  routeModule: string;
+  /**
+   * Set when an AUTHORITATIVE auth strategy fixes the class outright. `null`
+   * when the handler only uses a base helper (or nothing recognisable), in
+   * which case the annotation supplies the class — see the derivation module
+   * for why deriving from a base would understate real enforcement.
+   */
+  authClass: AuthClass | null;
+  /** Human-readable trace of which strategies produced `authClass`. */
+  authVia: string;
+  operations: readonly ApiSurfaceCoreOperation[];
+};
+
+/**
+ * The hand-written half, keyed by `routeModule` (unique per entry, and stable
+ * across path changes). A generated route with no annotation fails the gate,
+ * and so does an annotation for a route that no longer exists.
+ */
+export type ApiSurfaceAnnotation = {
+  ownerArea: OwnerArea;
+  exposure: ExposureClass;
+  docsGuide: string;
+  /** Request encoding for non-GET operations; loaders are always `query`. */
+  bodyType?: BodyType;
+  /** Per-method override for the rare route that mixes encodings. */
+  bodyTypeByMethod?: Partial<Record<HttpMethod, BodyType>>;
+  /**
+   * Required only when the generated core could not determine the class.
+   * Supplying one that contradicts an authoritative derivation is a gate
+   * failure, not an override.
+   */
+  authClass?: AuthClass;
+  notes?: string;
+  securityWarning?: string;
+  duplicate?: boolean;
+  duplicateGroup?: string;
+  workspaceScoped?: boolean;
+  /** Overrides the default derived from auth class + exposure. */
+  specTarget?: SpecTarget;
+  supported?: boolean;
+};
+
 export function surfaceEntryKey(path: string, method: HttpMethod): string {
   return `${method} ${path}`;
 }
