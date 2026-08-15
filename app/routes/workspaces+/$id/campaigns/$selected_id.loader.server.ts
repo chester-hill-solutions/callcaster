@@ -14,7 +14,7 @@ import {
 } from "@/lib/database/campaign.server";
 import { campaignTypeCollectsIvrResponses } from "@/lib/ivr-results";
 import { getUserRole } from "@/lib/database/workspace.server";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import { getCampaignReadiness, resolveReadinessQueueCount } from "@/lib/campaign-readiness";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { MemberRole } from "@/lib/member-role";
 import { defineLoader } from "@/lib/handler.server";
@@ -71,8 +71,15 @@ export const loader = defineLoader({
         : Promise.resolve([]),
     ]);
 
+    // Total assigned audience, not remaining/undequeued rows -- the
+    // remaining count is 0 both pre-launch and after the campaign finishes
+    // sending, which would flip the "Launch" rail item and this readiness
+    // check to "needs attention" on a fully completed campaign (#1255).
     const readiness = getCampaignReadiness(campaignRow, campaignDetails, {
-      queueCount: queueCounts.queuedCount ?? queueCounts.fullCount,
+      queueCount: resolveReadinessQueueCount({
+        totalCount: queueCounts.fullCount,
+        queuedCount: queueCounts.queuedCount,
+      }),
     });
     const joinDisabled = readiness.startDisabledReason
       ? readiness.startDisabledReason

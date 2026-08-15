@@ -15,6 +15,7 @@ import { CampaignHeader } from "@/components/campaign/home/CampaignHomeScreen/Ca
 import { CampaignStatusRail } from "@/components/campaign/home/CampaignStatusRail";
 import { CampaignShellDirtyProvider } from "@/components/campaign/home/CampaignShellDirty";
 import { buildCampaignStatusRail } from "@/lib/campaign-status-rail";
+import { resolveReadinessQueueCount } from "@/lib/campaign-readiness";
 import {
   Audience,
   Campaign,
@@ -91,7 +92,14 @@ export default function CampaignScreen() {
       campaignData,
       campaignDetails,
       readinessIssues: readiness?.issues ?? [],
-      queueCount: safeQueueCounts.queuedCount,
+      // Defense-in-depth: buildCampaignStatusRail only recomputes readiness
+      // from this queueCount when readinessIssues is absent, but keep it
+      // consistent (total assigned audience, not remaining queue rows) so
+      // a completed campaign never appears "needs attention" here either.
+      queueCount: resolveReadinessQueueCount({
+        totalCount: safeQueueCounts.fullCount,
+        queuedCount: safeQueueCounts.queuedCount,
+      }),
       hasAccess,
       pathname: location.pathname,
       hash: location.hash,
@@ -108,6 +116,7 @@ export default function CampaignScreen() {
     location.pathname,
     readiness?.issues,
     results.length,
+    safeQueueCounts.fullCount,
     safeQueueCounts.queuedCount,
     selected_id,
     workspace,
