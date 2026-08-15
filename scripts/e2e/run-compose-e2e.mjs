@@ -88,6 +88,16 @@ if (process.env.E2E_SKIP_BOOTSTRAP !== "1") {
   });
 }
 
+// The real-Postgres test tier. Every other ledger test mocks the db client and
+// therefore cannot see the plpgsql in
+// apply_ledger_entry_and_sync_credits (ADR-0003/0006); these run it. Placed
+// before the seed and the build so a broken ledger fails in seconds rather than
+// after a full app build and Playwright run.
+console.log("[e2e-compose] running integration-db suites…");
+run("npm", ["run", "test:integration-db"], {
+  env: { ...process.env, DATABASE_URL: databaseUrl },
+});
+
 console.log("[e2e-compose] seeding E2E data…");
 run("npm", ["run", "test:e2e:seed"], {
   env: { ...process.env, DATABASE_URL: databaseUrl },
