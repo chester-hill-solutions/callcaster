@@ -1,31 +1,16 @@
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
-import { requireDataPlaneCapability } from "@/lib/capability-guard.server";
+import { dataPlaneResourceCapabilityAuth } from "@/lib/capability-guard.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
 import {
-  authForResource,
   duplicateCampaignApi,
   getCampaignDetailApi,
   transitionCampaignStatusApi,
 } from "@/lib/platform-data.server";
 import { campaignStatusBodySchema } from "@/lib/schemas/api/platform-data";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
 export const loader = defineLoader({
-  auth: async ({ request, params }: LoaderFunctionArgs) => {
-    const campaignId = params.campaignId;
-    if (!campaignId) {
-      return jsonError("campaignId is required", 400);
-    }
-
-    const auth = await authForResource(request, "campaign", campaignId);
-    if (auth instanceof Response) return auth;
-
-    const capability = await requireDataPlaneCapability(auth, "campaigns.read");
-    if (capability instanceof Response) return capability;
-
-    return { ...auth, campaignId };
-  },
+  auth: dataPlaneResourceCapabilityAuth("campaigns.read", "campaign", "campaignId"),
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     const result = await getCampaignDetailApi(
@@ -41,22 +26,11 @@ export const loader = defineLoader({
 });
 
 export const action = defineAction({
-  auth: async ({ request, params }: ActionFunctionArgs) => {
-    const campaignId = params.campaignId;
-    if (!campaignId) {
-      return jsonError("campaignId is required", 400);
-    }
-
-    // Both branches below (duplicate, status transition) are destructive
-    // mutations: require at least `member`, blocking the `caller` role.
-    const auth = await authForResource(request, "campaign", campaignId, "member");
-    if (auth instanceof Response) return auth;
-
-    const capability = await requireDataPlaneCapability(auth, "campaigns.write");
-    if (capability instanceof Response) return capability;
-
-    return { ...auth, campaignId };
-  },
+  // Both branches below (duplicate, status transition) are destructive
+  // mutations: require at least `member`, blocking the `caller` role.
+  auth: dataPlaneResourceCapabilityAuth("campaigns.write", "campaign", "campaignId", {
+    minRole: "member",
+  }),
   sideEffects: ["db-write"],
   handler: async ({ request, url, auth }) => {
     const operation = url.searchParams.get("operation");

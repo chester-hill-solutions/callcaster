@@ -1,28 +1,10 @@
-import { requireDataPlaneCapability } from "@/lib/capability-guard.server";
+import { dataPlaneResourceCapabilityAuth } from "@/lib/capability-guard.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
-import {
-  authForResource,
-  deleteContactApi,
-  getContactDetailApi,
-} from "@/lib/platform-data.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { deleteContactApi, getContactDetailApi } from "@/lib/platform-data.server";
 
 export const loader = defineLoader({
-  auth: async ({ request, params }: LoaderFunctionArgs) => {
-    const contactId = params.contactId;
-    if (!contactId) {
-      return jsonError("contactId is required", 400);
-    }
-
-    const auth = await authForResource(request, "contact", contactId);
-    if (auth instanceof Response) return auth;
-
-    const capability = await requireDataPlaneCapability(auth, "campaigns.read");
-    if (capability instanceof Response) return capability;
-
-    return { ...auth, contactId };
-  },
+  auth: dataPlaneResourceCapabilityAuth("campaigns.read", "contact", "contactId"),
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     const result = await getContactDetailApi(
@@ -38,27 +20,16 @@ export const loader = defineLoader({
 });
 
 export const action = defineAction({
-  auth: async ({ request, params }: ActionFunctionArgs) => {
-    const contactId = params.contactId;
-    if (!contactId) {
-      return jsonError("contactId is required", 400);
-    }
-
+  // Destructive mutation: require at least `member`, blocking the `caller` role.
+  auth: dataPlaneResourceCapabilityAuth("campaigns.write", "contact", "contactId", {
+    minRole: "member",
+  }),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
     if (request.method !== "DELETE") {
       return jsonError("Method not allowed", 405);
     }
 
-    // Destructive mutation: require at least `member`, blocking the `caller` role.
-    const auth = await authForResource(request, "contact", contactId, "member");
-    if (auth instanceof Response) return auth;
-
-    const capability = await requireDataPlaneCapability(auth, "campaigns.write");
-    if (capability instanceof Response) return capability;
-
-    return { ...auth, contactId };
-  },
-  sideEffects: ["db-write"],
-  handler: async ({ auth }) => {
     const result = await deleteContactApi(
       auth.contactId,
       auth.workspaceId,
