@@ -13,8 +13,9 @@ import {
   contact as contactTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
-import type { TenantDb } from "@/server/tenant-db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { emitQueueEvent } from "@/lib/workspace-events.server";
+import { rpcDequeueContact, type RpcExecutor } from "@/lib/db-rpc.server";
 
 export type ClaimedQueueContact = {
   contact_id: number;
@@ -319,7 +320,13 @@ export async function requeueCampaignQueueById(queueId: number, workspaceId?: st
   });
 }
 
-export async function dequeueCampaignQueueById(args: {
+/**
+ * Internal mechanism — plain Drizzle UPDATE, unconditional on the row's
+ * current queue_state. Not exported: call {@link dequeueQueueEntry} instead
+ * (see the note there for why this file, not the caller, owns the mechanism
+ * choice).
+ */
+async function dequeueCampaignQueueById(args: {
   queueId: number;
   userId: string;
   reason: string;
@@ -450,10 +457,12 @@ export async function resolveContactWorkspaceIdFromQueue(
 }
 
 /**
- * Dequeue campaign_queue rows for a contact (optionally scoped to one campaign).
- * `userId` may be null for system-initiated dequeues (e.g. inbound SMS STOP).
+ * Internal mechanism — plain Drizzle UPDATE, unconditional on the row's
+ * current queue_state, optionally scoped to one campaign. `userId` may be
+ * null for system-initiated dequeues (e.g. inbound SMS STOP). Not exported:
+ * call {@link dequeueQueueEntry} instead.
  */
-export async function dequeueCampaignQueueByContact(args: {
+async function dequeueCampaignQueueByContact(args: {
   contactId: number;
   campaignId?: number | null;
   userId: string | null;
@@ -471,6 +480,98 @@ export async function dequeueCampaignQueueByContact(args: {
   return updateCampaignQueueAndEmit({
     conditions,
     set: buildDequeuedQueueUpdate(args.userId, args.reason),
+    workspaceId: args.workspaceId,
+  });
+}
+
+/**
+ * The single QueueEntry dequeue entry point (issue #1240, part B3). Every
+ * caller in the app routes through here — which of the three underlying
+ * mechanisms actually runs is an implementation detail this function owns:
+ *
+ *  - `by: { id }` (a campaign_queue row id) always uses the plain-Drizzle
+ *    mechanism ({@link dequeueCampaignQueueById}): unconditional on the
+ *    row's current queue_state, optionally workspace-scoped. There's no
+ *    contact to key a household lookup off of, so `household` must be
+ *    omitted for this target.
+ *
+ *  - `by: { contactId, campaignId? }` with `household` omitted uses the
+ *    plain-Drizzle mechanism ({@link dequeueCampaignQueueByContact}): same
+ *    unconditional semantics, optionally scoped to one campaign.
+ *
+ *  - `by: { contactId }` with `household` set (`true` or `false`) uses the
+ *    household-aware `dequeue_contact` Postgres RPC
+ *    (`rpcDequeueContact` in db-rpc.server — kept per ADR-0003, concurrency)
+ *    via a tenant-scoped executor (`exec`, or one built from `workspaceId`
+ *    if omitted). `household: true` fans the dequeue out to every contact
+ *    sharing the source contact's household_id — "household is the unit of
+ *    contact" per CONTEXT.md. `household: false` is a real, distinct third
+ *    mode, not a no-op alias for the Drizzle path: the RPC only touches rows
+ *    currently `queued`/null (see the WHERE clause added in
+ *    client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql),
+ *    so it's a *guarded*, single-contact dequeue that silently no-ops on a
+ *    row in any other queue_state (e.g. `assigned`). As of the B3 census
+ *    (2026-08) exactly one call site relies on that guard —
+ *    app/lib/auto-dial.server.ts's ambiguous-dial-park path, which
+ *    deliberately avoids requeue-and-retry semantics — so `household: false`
+ *    is preserved as a distinct, explicit choice rather than folded into the
+ *    Drizzle default.
+ *
+ * Behavior-preserving refactor: this function does not change what any
+ * existing call site does, only where the mechanism selection lives.
+ */
+export async function dequeueQueueEntry(
+  args:
+    | {
+        by: { id: number };
+        userId: string;
+        reason: string;
+        workspaceId?: string;
+        household?: undefined;
+      }
+    | {
+        by: { contactId: number; campaignId?: number | null };
+        userId: string | null;
+        reason: string;
+        workspaceId?: string;
+        household?: boolean;
+        exec?: RpcExecutor;
+      },
+): Promise<void> {
+  if ("id" in args.by) {
+    await dequeueCampaignQueueById({
+      queueId: args.by.id,
+      userId: args.userId,
+      reason: args.reason,
+      workspaceId: args.workspaceId,
+    });
+    return;
+  }
+
+  const { contactId, campaignId } = args.by;
+
+  if (args.household !== undefined) {
+    if (!args.workspaceId) {
+      throw new Error(
+        "dequeueQueueEntry: workspaceId is required for the household-aware RPC mechanism",
+      );
+    }
+    const exec = args.exec ?? createTenantDb(args.workspaceId);
+    await rpcDequeueContact(exec, {
+      contactId,
+      workspaceId: args.workspaceId,
+      groupOnHousehold: args.household,
+      dequeuedById: args.userId,
+      dequeuedReasonText: args.reason,
+    });
+    return;
+  }
+
+  await dequeueCampaignQueueByContact({
+    contactId,
+    campaignId,
+    userId: args.userId,
+    reason: args.reason,
     workspaceId: args.workspaceId,
   });
 }

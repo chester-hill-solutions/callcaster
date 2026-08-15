@@ -229,6 +229,13 @@ export async function rpcClaimQueueEntryForDial(
   return (result ?? "unavailable") as DialClaimResult;
 }
 
+/**
+ * Household-aware dequeue mechanism (issue #1240 B3). Exported only so
+ * app/lib/campaign-queue-db.server.ts's `dequeueQueueEntry` — the single
+ * caller-facing dequeue entry point — can import it across the module
+ * boundary; no other file should call this directly. Call
+ * `dequeueQueueEntry` instead.
+ */
 export async function rpcDequeueContact(
   executor: RpcExecutor,
   args: {
