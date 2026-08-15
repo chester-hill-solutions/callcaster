@@ -295,7 +295,18 @@ export function classifyHandlerAuth(src, handlerName) {
   return { authClass: null, allows: null, via: "unrecognised", rateLimited };
 }
 
-/** HTTP methods a handler answers. Loaders are GET by construction. */
+/**
+ * HTTP methods a handler answers. Loaders are GET by construction; an action's
+ * methods come from its own branching, and an action that never branches is a
+ * POST.
+ *
+ * Taking the branches as the complete set relies on these handlers ending in a
+ * 405 rather than falling through — an action that branched on PATCH/DELETE and
+ * then quietly POSTed would be under-reported. No route in the tree does that
+ * (checked against all 173 handlers during the D4 migration), and the shim
+ * export list plus the 405 branches are the two parallel encodings of the same
+ * fact, so a new one would show up as a mismatch here rather than pass silently.
+ */
 export function deriveMethods(src, handlerName) {
   if (handlerName === "loader") return ["GET"];
   const found = new Set();

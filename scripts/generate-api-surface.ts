@@ -175,7 +175,7 @@ function compare(
     const why = skipped.find((s) => s.routeModule === mod);
     drift.push(
       `**Phantom entry** \`${lit.path}\` (\`${mod}\`) — the inventory declared ` +
-        `\`${opKey(lit.operations as never)}\` but the module ${why ? why.reason : "is not a callable surface"}.`,
+        `\`${opKey(lit.operations as never)}\`, but the module has ${why ? why.reason : "no callable handler"}.`,
     );
   }
   for (const [mod, core] of genByMod) {
