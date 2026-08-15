@@ -108,7 +108,7 @@ describe("elevenlabsBatchTranscribeHandler billing gate", () => {
     await elevenlabsBatchTranscribeHandler({ params: { callSid: "CA1" } } as never);
 
     expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
-    const args = mocks.insertTransactionHistoryIdempotent.mock.calls[0]?.[0] as {
+    const args = mocks.insertTransactionHistoryIdempotent.mock.calls[0]?.[1] as {
       idempotencyKey: string;
       amount: number;
     };

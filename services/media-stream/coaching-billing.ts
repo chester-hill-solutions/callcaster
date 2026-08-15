@@ -20,6 +20,7 @@
  */
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { db } from "@/server/db";
 import {
   coachingCueKey,
   liveTranscriptionKey,
@@ -35,7 +36,7 @@ export async function billCoachingCue(args: {
   callSid: string;
   eventId: string;
 }): Promise<void> {
-  await insertTransactionHistoryIdempotent({
+  await insertTransactionHistoryIdempotent(db, {
     workspaceId: args.workspaceId,
     type: "DEBIT",
     amount: debitAmountFromCredits(COACHING_CUE_CREDITS),
@@ -72,7 +73,7 @@ export async function billLiveTranscription(args: {
     return { billed: false, credits: 0 };
   }
 
-  await insertTransactionHistoryIdempotent({
+  await insertTransactionHistoryIdempotent(db, {
     workspaceId: args.workspaceId,
     type: "DEBIT",
     amount: debitAmountFromCredits(credits),

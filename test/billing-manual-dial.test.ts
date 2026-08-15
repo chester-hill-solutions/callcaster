@@ -91,6 +91,7 @@ describe("billTerminalCallStatus", () => {
 
     expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
     expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         workspaceId: "ws-1",
         type: "DEBIT",
@@ -99,8 +100,8 @@ describe("billTerminalCallStatus", () => {
         campaignId: 42,
       }),
     );
-    expect(mocks.insertTransactionHistoryIdempotent.mock.calls[0][0].amount).toBeLessThan(0);
-    expect(mocks.insertTransactionHistoryIdempotent.mock.calls[0][0].note).toContain("CAchild123");
+    expect(mocks.insertTransactionHistoryIdempotent.mock.calls[0][1].amount).toBeLessThan(0);
+    expect(mocks.insertTransactionHistoryIdempotent.mock.calls[0][1].note).toContain("CAchild123");
     expect(result).toEqual({ inserted: true, existingId: 101 });
   });
 
@@ -118,6 +119,7 @@ describe("billTerminalCallStatus", () => {
 
     expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
     expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         idempotencyKey: "call:CAchild123",
       }),

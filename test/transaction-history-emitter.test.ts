@@ -59,7 +59,8 @@ describe("insertTransactionHistoryIdempotent event emission", () => {
     const { insertTransactionHistoryIdempotent } = await import(
       "../app/lib/transaction-history.server"
     );
-    const result = await insertTransactionHistoryIdempotent({
+    const { db } = await import("@/server/db");
+    const result = await insertTransactionHistoryIdempotent(db, {
       workspaceId: "ws-1",
       type: "DEBIT",
       amount: -5,
@@ -90,7 +91,8 @@ describe("insertTransactionHistoryIdempotent event emission", () => {
     const { insertTransactionHistoryIdempotent } = await import(
       "../app/lib/transaction-history.server"
     );
-    const result = await insertTransactionHistoryIdempotent({
+    const { db } = await import("@/server/db");
+    const result = await insertTransactionHistoryIdempotent(db, {
       workspaceId: "ws-1",
       type: "DEBIT",
       amount: -5,
@@ -118,7 +120,8 @@ describe("insertTransactionHistoryIdempotent event emission", () => {
     const { insertTransactionHistoryIdempotent } = await import(
       "../app/lib/transaction-history.server"
     );
-    const result = await insertTransactionHistoryIdempotent({
+    const { db } = await import("@/server/db");
+    const result = await insertTransactionHistoryIdempotent(db, {
       workspaceId: "ws-1",
       type: "CREDIT",
       amount: 100,
