@@ -5,6 +5,11 @@ import {
   type EnqueueJobArgs,
   type EnqueueJobResult,
 } from "@/lib/worker/enqueue-job.server";
+import {
+  parseTwilioVoiceCallback,
+  twilioVoiceCallbackSchema,
+  type TwilioVoiceCallback,
+} from "@/lib/twilio/voice-callback";
 
 /**
  * Job registry mechanism (ADR-0007 worker, #1239).
@@ -226,7 +231,7 @@ export type SidAndTwilioParams = {
 };
 
 /**
- * Shared params schema for the three Twilio webhook fast-ack side-effect job
+ * Shared params schema for the Twilio webhook fast-ack side-effect job
  * types (#1239 A2): each one used to re-implement the same
  * `requireSidAndTwilioParams` narrowing (sid key differs, everything else is
  * identical). One factory, parameterized on the sid field name and the label
@@ -273,6 +278,62 @@ export function sidAndTwilioParamsSchema(
         return z.NEVER;
       }
       return { sid, twilioParams };
+    });
+}
+
+export type VoiceSideEffectsParams = SidAndTwilioParams & {
+  /** The webhook body, parsed once by the route that enqueued this job. */
+  event: TwilioVoiceCallback;
+};
+
+/**
+ * Params schema for the VOICE fast-ack side-effect job types
+ * (`call_status_side_effects`, `recording_side_effects`) — #1243 E1.
+ *
+ * Same `{sid, twilioParams}` contract as `sidAndTwilioParamsSchema`, plus the
+ * parsed `event`: the route already discriminated the payload at its boundary,
+ * so the worker should not re-derive its own view of the same body with a
+ * second pass of loose `underCase` reads. `sms_status_side_effects` keeps the
+ * plain schema — it is not a voice callback.
+ *
+ * COMPATIBILITY, both directions:
+ * - Rows queued BEFORE this change carry only `{callSid|sid, twilioParams}`.
+ *   A missing (or malformed) `event` is re-derived from `twilioParams` with
+ *   `parseTwilioVoiceCallback`, so an already-queued job still runs, and runs
+ *   through exactly the same parser the route would have used.
+ * - Rows queued AFTER it are validated against `twilioVoiceCallbackSchema`, so
+ *   a payload written by some other shape falls back to re-deriving
+ *   rather than reaching a handler as a half-typed object.
+ *
+ * `twilioParams` stays on the payload deliberately: it is the raw evidence for
+ * dead-letter inspection and requeue, and E2's remaining routes still read it.
+ */
+export function voiceSideEffectsParamsSchema(
+  label: string,
+): z.ZodType<VoiceSideEffectsParams> {
+  return z
+    .object({
+      sid: legacyStringParam(),
+      callSid: legacyStringParam(),
+      twilioParams: legacyObjectParam<Record<string, string> | undefined>(undefined),
+      event: z.unknown().optional(),
+    })
+    .transform((value, ctx) => {
+      const sid = value.sid ?? value.callSid;
+      const twilioParams = value.twilioParams;
+      if (!sid || !twilioParams) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${label}: missing callSid or twilioParams`,
+        });
+        return z.NEVER;
+      }
+      const parsed = twilioVoiceCallbackSchema.safeParse(value.event);
+      return {
+        sid,
+        twilioParams,
+        event: parsed.success ? parsed.data : parseTwilioVoiceCallback(twilioParams),
+      };
     });
 }
 

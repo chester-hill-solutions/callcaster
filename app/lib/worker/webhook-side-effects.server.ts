@@ -32,8 +32,8 @@ import { emitPredictiveBroadcast } from "@/lib/workspace-events.server";
 import {
   billTerminalCallStatus,
   resolveCallOutreachContext,
-  twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
+import type { TwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { persistCallRecordingToStorage } from "@/lib/call-recording-storage.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE } from "@/lib/worker/job-types.server";
@@ -48,9 +48,15 @@ const CALL_STATUS_TO_DISPOSITION: Record<string, string> = {
   canceled: "canceled",
 };
 
+/**
+ * `event` is the callback the ROUTE already parsed (#1243 E1) — the worker no
+ * longer re-derives its own `underCase` view of the same body. Jobs queued
+ * before E1 get it re-derived from their stored `twilioParams` by
+ * `voiceSideEffectsParamsSchema`, so this always receives a real union member.
+ */
 export async function runCallStatusSideEffects(args: {
   callSid: string;
-  twilioParams: Record<string, string>;
+  event: TwilioVoiceCallback;
 }): Promise<{ ok: true }> {
   const callRow = await findCallBySid(args.callSid);
   if (!callRow) {
@@ -59,7 +65,7 @@ export async function runCallStatusSideEffects(args: {
 
   await billTerminalCallStatus(callRow);
 
-  const underCaseData = twilioParamsToUnderCase(args.twilioParams);
+  const callStatus = args.event.callStatus;
   const { outreachAttemptId, workspaceId } = await resolveCallOutreachContext(callRow);
 
   const currentAttempt =
@@ -71,7 +77,7 @@ export async function runCallStatusSideEffects(args: {
   if (currentAttempt && billingWorkspace) {
     await emitPredictiveBroadcast(billingWorkspace, {
       contact_id: currentAttempt.contact_id,
-      status: String(underCaseData.call_status ?? ""),
+      status: callStatus,
     });
 
     // Provider-terminal statuses stamp a disposition so every call yields a
@@ -80,8 +86,7 @@ export async function runCallStatusSideEffects(args: {
     // transition guard keeps AMD "voicemail" and other terminal values from
     // being downgraded, and an explicit agent choice via /api/questions
     // bypasses this guard entirely, so it always wins.
-    const terminalDisposition =
-      CALL_STATUS_TO_DISPOSITION[String(underCaseData.call_status ?? "").toLowerCase()];
+    const terminalDisposition = CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()];
     if (
       terminalDisposition &&
       shouldUpdateOutreachDisposition({
@@ -244,16 +249,20 @@ export async function runSmsStatusSideEffects(args: {
 
 export async function runRecordingSideEffects(args: {
   callSid: string;
-  twilioParams: Record<string, string>;
+  event: TwilioVoiceCallback;
 }): Promise<{ ok: true }> {
   const callRow = await findCallBySid(args.callSid);
   if (!callRow?.workspace) {
     throw new Error(`Call ${args.callSid} not found for recording side effects`);
   }
 
-  const recordingSid = args.twilioParams.RecordingSid?.trim();
-  const recordingDuration = args.twilioParams.RecordingDuration?.trim();
-  const accountSid = args.twilioParams.AccountSid?.trim();
+  // The parser classifies any payload carrying a recording field as
+  // `recording`, so a non-recording event provably has nothing to persist —
+  // no raw-params fallback needed here.
+  const recording = args.event.kind === "recording" ? args.event : null;
+  const recordingSid = recording?.recordingSid ?? null;
+  const recordingDuration = recording?.recordingDuration ?? null;
+  const accountSid = args.event.accountSid;
 
   const enrichment: Record<string, string> = {};
   if (recordingSid) {

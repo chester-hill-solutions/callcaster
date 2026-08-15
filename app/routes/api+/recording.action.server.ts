@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
+import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { updateCallRecordingUrlBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
@@ -57,6 +58,9 @@ export const action = defineAction({
             params: {
               sid: callSid,
               twilioParams: params,
+              // The route's own handling is untouched here (that is E2); this
+              // only stops the worker from re-parsing the body a second time.
+              event: parseTwilioVoiceCallback(params),
             },
           });
         }

@@ -11,6 +11,7 @@ import {
   legacyRequiredStringParam,
   legacyStringParam,
   sidAndTwilioParamsSchema,
+  voiceSideEffectsParamsSchema,
   type JobParamsEntry,
 } from "@/lib/worker/job-registry.server";
 import {
@@ -179,16 +180,20 @@ export const webhookDeliveryParams = z.object({
   optional: z.preprocess((value) => value === true, z.boolean()),
 });
 
-export const callStatusSideEffectsParams = sidAndTwilioParamsSchema(
-  "callSid",
+/**
+ * The two VOICE side-effect jobs additionally carry the route's parsed
+ * callback event (#1243 E1); SMS keeps the plain sid+params schema. Both voice
+ * schemas re-derive `event` from `twilioParams` when it is absent, so rows
+ * queued before E1 still parse — see `voiceSideEffectsParamsSchema`.
+ */
+export const callStatusSideEffectsParams = voiceSideEffectsParamsSchema(
   "call_status_side_effects",
 );
 export const smsStatusSideEffectsParams = sidAndTwilioParamsSchema(
   "messageSid",
   "sms_status_side_effects",
 );
-export const recordingSideEffectsParams = sidAndTwilioParamsSchema(
-  "callSid",
+export const recordingSideEffectsParams = voiceSideEffectsParamsSchema(
   "recording_side_effects",
 );
 

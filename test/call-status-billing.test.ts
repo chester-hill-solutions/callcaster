@@ -6,6 +6,7 @@ vi.hoisted(() => {
 
 import { asRouteResponse } from "./helpers/route-result";
 import { type TransactionRow } from "./helpers/transaction-history-stub";
+import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
 // Avoid env validation noise when importing server modules in tests.
 vi.mock("@/lib/env.server", () => {
@@ -169,15 +170,15 @@ describe("api.call-status billing + idempotency", () => {
 
     await runCallStatusSideEffects({
       callSid: "CA1",
-      twilioParams: { CallSid: "CA1", CallStatus: "completed", Duration: "1" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "completed", Duration: "1" }),
     });
     await runCallStatusSideEffects({
       callSid: "CA60",
-      twilioParams: { CallSid: "CA60", CallStatus: "completed", Duration: "60" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA60", CallStatus: "completed", Duration: "60" }),
     });
     await runCallStatusSideEffects({
       callSid: "CA61",
-      twilioParams: { CallSid: "CA61", CallStatus: "completed", Duration: "61" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA61", CallStatus: "completed", Duration: "61" }),
     });
 
     const amounts = transactionRowsState.rows.map((r) => r.amount);
@@ -201,15 +202,15 @@ describe("api.call-status billing + idempotency", () => {
 
     await runCallStatusSideEffects({
       callSid: "CA_FAILED",
-      twilioParams: { CallSid: "CA_FAILED", CallStatus: "failed", Duration: "0" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA_FAILED", CallStatus: "failed", Duration: "0" }),
     });
     await runCallStatusSideEffects({
       callSid: "CA_BUSY",
-      twilioParams: { CallSid: "CA_BUSY", CallStatus: "busy", Duration: "0" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA_BUSY", CallStatus: "busy", Duration: "0" }),
     });
     await runCallStatusSideEffects({
       callSid: "CA_NOANSWER",
-      twilioParams: { CallSid: "CA_NOANSWER", CallStatus: "no-answer", Duration: "0" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA_NOANSWER", CallStatus: "no-answer", Duration: "0" }),
     });
 
     expect(transactionRowsState.rows).toHaveLength(0);
@@ -232,11 +233,11 @@ describe("api.call-status billing + idempotency", () => {
 
     await runCallStatusSideEffects({
       callSid: "CA_DUP",
-      twilioParams: { CallSid: "CA_DUP", CallStatus: "completed", Duration: "61" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA_DUP", CallStatus: "completed", Duration: "61" }),
     });
     await runCallStatusSideEffects({
       callSid: "CA_DUP",
-      twilioParams: { CallSid: "CA_DUP", CallStatus: "completed", Duration: "61" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA_DUP", CallStatus: "completed", Duration: "61" }),
     });
 
     const matching = transactionRowsState.rows.filter(
