@@ -6456,7 +6456,7 @@
       "post": {
         "operationId": "postWorkspace_api_keys",
         "summary": "POST /api/workspace-api-keys",
-        "description": "",
+        "description": "Legacy flat route; workspace_id comes from the body/query. The admin floor and the capability-scope cap are enforced by requireApiKeyManager / assertScopesWithinActorRole in platform-members.server.ts (issue #1264).",
         "tags": [
           "Workspace",
           "Workspace Admin"
@@ -6519,7 +6519,7 @@
       "delete": {
         "operationId": "deleteWorkspace_api_keys",
         "summary": "DELETE /api/workspace-api-keys",
-        "description": "",
+        "description": "Legacy flat route; workspace_id comes from the body/query. The admin floor and the capability-scope cap are enforced by requireApiKeyManager / assertScopesWithinActorRole in platform-members.server.ts (issue #1264).",
         "tags": [
           "Workspace",
           "Workspace Admin"
@@ -6570,7 +6570,7 @@
       "get": {
         "operationId": "getWorkspace_api_keys",
         "summary": "GET /api/workspace-api-keys",
-        "description": "",
+        "description": "Legacy flat route; workspace_id comes from the body/query. The admin floor and the capability-scope cap are enforced by requireApiKeyManager / assertScopesWithinActorRole in platform-members.server.ts (issue #1264).",
         "tags": [
           "Workspace",
           "Workspace Admin"
@@ -6994,7 +6994,7 @@
             "sessionCookie": []
           }
         ],
-        "description": "Session-only trust-root route. Returns the full secret once; store it immediately.",
+        "description": "Session-only trust-root route. Requires a workspace admin session. Requested scopes are capped at the capabilities the creating member's role holds — a scope outside that set is rejected with 403 naming it. Returns the full secret once; store it immediately.",
         "requestBody": {
           "required": true,
           "content": {
@@ -7037,7 +7037,7 @@
             }
           },
           "403": {
-            "description": "Member manager role required",
+            "description": "Workspace admin role required, or a requested scope exceeds the creator's role capabilities",
             "content": {
               "application/json": {
                 "schema": {
@@ -7060,7 +7060,7 @@
             "sessionCookie": []
           }
         ],
-        "description": "Session-only trust-root route.",
+        "description": "Session-only trust-root route. Requires a workspace admin session.",
         "requestBody": {
           "required": true,
           "content": {
@@ -7103,7 +7103,7 @@
             }
           },
           "403": {
-            "description": "Member manager role required",
+            "description": "Workspace admin role required",
             "content": {
               "application/json": {
                 "schema": {
@@ -7149,7 +7149,7 @@
             }
           },
           "403": {
-            "description": "Member manager role required",
+            "description": "Workspace admin role required",
             "content": {
               "application/json": {
                 "schema": {
