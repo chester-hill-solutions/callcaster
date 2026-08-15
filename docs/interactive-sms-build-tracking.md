@@ -3,8 +3,8 @@
 > **Branch:** `feat/interactive-sms` (worktree `../callcaster-interactive-sms`)
 > **Plan of record:** `docs/interactive-sms-delivery-plan.md`
 > **Tracker:** GitHub issues under `chester-hill-solutions/callcaster`
-> **Epic:** replaces/augments this doc once created (create Epic issue named
-> *"Interactive SMS/MMS campaigns — release one"*, type `Epic`).
+> **Epic:** [#1268](https://github.com/chester-hill-solutions/callcaster/issues/1268)
+> *"Interactive SMS/MMS campaigns — release one"* (type `Epic`, created 2026-08-15).
 
 This file is the working surface for the EM+PM team during build. It mirrors the
 phases in the plan and tracks each work item's issue number, owner, and exit gate.
@@ -45,8 +45,8 @@ These were settled during planning and are directionally safe. Flag only if a ne
 
 | Milestone | Work | Exit gate | Owner | Issues |
 |---|---|---|---|---|
-| **A. Prerequisites & consolidation** | ratify v2 contracts; message domain ID; inbound attribution; single dispatch coordinator (unify `/api/sms` + worker); credit reservation RPC; consent/disclosure+retention policy; feature flags+observability | both SMS dispatch adapters pass one contract suite; no policy divergence; local messages before SID; reservation concurrency tests pass; legacy API compat | EM | — |
-| **B. Vertical slice** | v2 core, conversion, publish validator; Revisions/Runs/Run queue; Interaction/event/effect persistence; opener→reply→exact→followup; endpoint correlation; editor/simulator/Run API/funnel | one flagged workspace authors/publishes/launches/completes exact-classifier SMS/MMS; no duplicate effects/billing; late failure visible; STOP suppresses; simulator==production | EM | — |
+| **A. Prerequisites & consolidation** | ratify v2 contracts; message domain ID; inbound attribution; single dispatch coordinator (unify `/api/sms` + worker); credit reservation RPC; consent/disclosure+retention policy; feature flags+observability | both SMS dispatch adapters pass one contract suite; no policy divergence; local messages before SID; reservation concurrency tests pass; legacy API compat | EM | [#1269 A1](https://github.com/chester-hill-solutions/callcaster/issues/1269), [#1270 A2](https://github.com/chester-hill-solutions/callcaster/issues/1270), [#1271 A3](https://github.com/chester-hill-solutions/callcaster/issues/1271) |
+| **B. Vertical slice** | v2 core, conversion, publish validator; Revisions/Runs/Run queue; Interaction/event/effect persistence; opener→reply→exact→followup; endpoint correlation; editor/simulator/Run API/funnel | one flagged workspace authors/publishes/launches/completes exact-classifier SMS/MMS; no duplicate effects/billing; late failure visible; STOP suppresses; simulator==production | EM | [#1272 B1](https://github.com/chester-hill-solutions/callcaster/issues/1272) — blocked by A1–A3 |
 | **C. Beta hardening** | model adapter; inbox handoff; full analytics/audit/ops; load+failure injection; MMS; SDK/docs/migration | no Sev-1/2 in 2-wk soak; ledger exact; SLOs; security/privacy+compliance copy; rollback proven | PM+EM | — |
 | **D. Follow-on migration** | migrate eligible message campaigns to v2; deprecate legacy `/api/sms` orchestration; remove obsolete queue assumptions | cloud: beta-stable then migrate; voice/IVR as separate project | PM | — |
 

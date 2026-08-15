@@ -103,6 +103,29 @@ _Avoid_: Presence (use for the UI concept), state (use for the enum value)
 
 **Messaging Service**: Used for outbound SMS sender pool and compliance (A2P 10DLC, toll-free verification), NOT for inbound webhooks. Inbound voice/SMS routes through number-level `voiceUrl`/`smsUrl` on each purchased `workspace_number`.
 
+### Interactive messaging
+
+**Script Revision**: An immutable published snapshot of a Script's executable document, with a version number, checksum, policy/disclosure references, and conversion diagnostics. Interactions execute a pinned Revision; edits create a new draft/Revision and never mutate a published one.
+_Avoid_: Script instance, versioned steps
+
+**Campaign Run**: One immutable execution snapshot of a reusable Campaign — audience Queue Entries, sender, sending windows, Script Revision, disclosure/jurisdiction policy, and reserved budget. A Campaign may have many Runs; subsequent launches create new Runs.
+_Avoid_: Campaign execution, campaign instance
+
+**Interaction**: One Contact executing one Script Revision through a Campaign Run, from dispatch until completion, expiry, opt-out, supersession, or handoff closure. Distinct from the durable message thread (a Conversation). Has its own lifecycle (pending, active, paused, completed, expired, opted_out, failed, cancelled) and a current operation cursor.
+_Avoid_: Run, script session, conversation
+
+**Messaging Endpoint**: The channel address pair of a concrete workspace sender identity and a normalized recipient, plus channel. Interactive reply correlation and active-uniqueness key on it; a Messaging Service pool reserves the recipient before binding the concrete sender after Twilio accepts the message.
+_Avoid_: Conversation identity, sender pair
+
+**Messaging Consent**: A recipient-level, append-only record of grant, revocation (STOP), opt-in (START), import evidence, or override, with source, evidence reference, purpose, channel, and policy version. Contact `opt_out` is at most a compatibility projection during migration.
+_Avoid_: Subscription, marketing consent
+
+**Interaction Event**: An immutable, append-only semantic record of one state transition (command, actor, prior/new state, reason, provider/model/action correlation). The authoritative current state is a projection derived from the event history.
+_Avoid_: Step log, activity
+
+**Action Request**: A durable, idempotent result of a Script `action` operation, validated against an allow-listed domain action registry and settled by an executor; sensitive actions require exact recipient intent, confirmation, and human approval.
+_Avoid_: Webhook call, side effect
+
 ### Live transcription & coaching
 
 **Live Transcription**: Real-time, in-call speech-to-text delivered to the agent's browser via pg-realtime SSE. Built on Twilio Media Streams (unidirectional `<Start><Stream track="both_tracks">`) forked to the media-stream Bun service, which forwards 8kHz mulaw to Deepgram Nova-3 streaming. Gated per-workspace by `workspace.featureFlags.liveTranscription`. Distinct from post-call batch transcription (Cohere).
