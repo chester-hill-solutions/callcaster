@@ -34,12 +34,11 @@
  * Pure + parameterised on `root` so the fixture suite can point it at a tiny
  * synthetic tree; see test/capability-linkage.test.ts.
  */
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
-const SURFACE_FILE = /^api-surface-.+\.ts$/;
-/** Matches the seed(...) / platformSeed(...) entry blocks in the surface files. */
-const SEED_BLOCK = /[a-zA-Z]*[Ss]eed\(\{[\s\S]*?\}\)\s*[,;]/g;
+/** One line per entry in the generated core; see scripts/generate-api-surface.ts. */
+const CORE_ENTRY = /\{\s*path:\s*"([^"]+)",\s*routeModule:\s*"([^"]+)",[\s\S]*?operations:\s*\[([\s\S]*?)\]\s*\}/g;
 
 /** Auth-strategy constructors whose first argument IS the enforced capability. */
 const LINKED_STRATEGIES =
@@ -53,30 +52,39 @@ export function readCapabilityIds(root) {
   return new Set([...block[1].matchAll(/"([a-z][\w.]*)":/g)].map((m) => m[1]));
 }
 
-/** Parse every api-surface-*.ts entry into { path, routeModule, operations }. */
-export function readSurfaceEntries(root) {
-  const dir = join(root, "app", "lib");
+/**
+ * Parse the generated surface core into { path, routeModule, operations }.
+ *
+ * Reads app/lib/api-surface-generated.ts, which since #1242 D4 is the single
+ * place an operation's capability is recorded. Textual rather than an import
+ * so the gate stays a plain node script with no TS toolchain.
+ */
+export function readSurfaceEntries(root, file = "api-surface-generated.ts") {
+  const target = join(root, "app", "lib", file);
+  if (!existsSync(target)) {
+    throw new Error(
+      `capability linkage: ${target} not found — run \`npm run tools:api:surface:generate\``,
+    );
+  }
+  const source = readFileSync(target, "utf8");
   const entries = [];
-  for (const file of readdirSync(dir).filter((f) => SURFACE_FILE.test(f)).sort()) {
-    const source = readFileSync(join(dir, file), "utf8");
-    for (const block of source.match(SEED_BLOCK) ?? []) {
-      const routeModule = block.match(/routeModule:\s*\n?\s*"([^"]+)"/)?.[1];
-      const path = block.match(/path:\s*"([^"]+)"/)?.[1];
-      if (!routeModule || !path) continue;
-      const operations = [];
-      const opsBlock = block.match(/operations:\s*\[([\s\S]*)\]/)?.[1];
-      for (const op of opsBlock?.matchAll(/\{([\s\S]*?)\}/g) ?? []) {
-        const method = op[1].match(/method:\s*"([^"]+)"/)?.[1];
-        const handler = op[1].match(/handler:\s*"(loader|action)"/)?.[1];
-        if (!method || !handler) continue;
-        operations.push({
-          method,
-          handler,
-          declared: op[1].match(/capability:\s*"([^"]+)"/)?.[1],
-        });
-      }
-      entries.push({ surfaceFile: file, path, routeModule, operations });
+  for (const match of source.matchAll(CORE_ENTRY)) {
+    const [, path, routeModule, opsBlock] = match;
+    const operations = [];
+    for (const op of opsBlock.matchAll(/\{([^{}]*)\}/g)) {
+      const method = op[1].match(/method:\s*"([^"]+)"/)?.[1];
+      const handler = op[1].match(/handler:\s*"(loader|action)"/)?.[1];
+      if (!method || !handler) continue;
+      operations.push({
+        method,
+        handler,
+        declared: op[1].match(/capability:\s*"([^"]+)"/)?.[1],
+        // Capabilities the generator took from the D3 baseline rather than
+        // from a strategy call site — already known to be unlinked.
+        baselined: /capabilitySource:\s*"baseline"/.test(op[1]),
+      });
     }
+    entries.push({ surfaceFile: file, path, routeModule, operations });
   }
   return entries;
 }
