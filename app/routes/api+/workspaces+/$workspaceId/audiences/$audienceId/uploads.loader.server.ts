@@ -4,24 +4,16 @@ import { dataPlaneCapabilityAuthWithParam } from "@/lib/capability-guard.server"
 import { defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({
-  auth: async (args) => {
-    const gated = await dataPlaneCapabilityAuthWithParam(
-      "campaigns.read",
-      "audienceId",
-    )(args);
-    if (gated instanceof Response) return gated;
-
-    const parsedAudienceId = Number.parseInt(gated.audienceId, 10);
+  auth: dataPlaneCapabilityAuthWithParam("campaigns.read", "audienceId"),
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => {
+    const parsedAudienceId = Number.parseInt(auth.audienceId, 10);
     if (Number.isNaN(parsedAudienceId)) {
       return jsonError("Invalid audienceId", 400);
     }
 
-    return { workspaceId: gated.workspaceId, parsedAudienceId };
-  },
-  sideEffects: ["db-read"],
-  handler: async ({ auth }) => {
     try {
-      const uploads = await listAudienceUploadsByAudienceId(auth.workspaceId, auth.parsedAudienceId);
+      const uploads = await listAudienceUploadsByAudienceId(auth.workspaceId, parsedAudienceId);
       return jsonResponse({ uploads }, 200);
     } catch (error) {
       return jsonError(
