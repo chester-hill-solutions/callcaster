@@ -12,7 +12,8 @@ const mocks = vi.hoisted(() => {
     resolveCampaignWorkspaceId: vi.fn(async () => "w1"),
     resolveContactWorkspaceId: vi.fn(async () => "w1"),
     rpcSelectAndUpdateCampaignContacts: vi.fn(async () => []),
-    dequeueQueueEntry: vi.fn(async () => undefined),
+    dequeueQueueEntry: vi.fn(async () => ({ dequeuedPrimary: true })),
+    explainDequeueNoOp: vi.fn(async () => "unknown"),
   };
 });
 
@@ -31,6 +32,7 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
   requeueAllCampaignQueueForCampaign: (...args: unknown[]) =>
     mocks.requeueAllCampaignQueueForCampaign(...args),
   dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
+  explainDequeueNoOp: (...args: unknown[]) => mocks.explainDequeueNoOp(...args),
 }));
 vi.mock("@/lib/platform-telephony.server", () => ({
   resolveCampaignWorkspaceId: (...args: unknown[]) => mocks.resolveCampaignWorkspaceId(...args),
@@ -51,6 +53,9 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.resolveContactWorkspaceId.mockReset();
     mocks.rpcSelectAndUpdateCampaignContacts.mockReset();
     mocks.dequeueQueueEntry.mockReset();
+    mocks.explainDequeueNoOp.mockReset();
+    mocks.dequeueQueueEntry.mockResolvedValue({ dequeuedPrimary: true });
+    mocks.explainDequeueNoOp.mockResolvedValue("unknown");
     mocks.resolveCampaignWorkspaceId.mockResolvedValue("w1");
     mocks.resolveContactWorkspaceId.mockResolvedValue("w1");
     mocks.fetchCampaignQueueRowsByIds.mockResolvedValue([]);
@@ -124,7 +129,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
   });
 
   test("action POST returns data on success", async () => {
-    mocks.dequeueQueueEntry.mockResolvedValueOnce(undefined);
+    mocks.dequeueQueueEntry.mockResolvedValueOnce({ dequeuedPrimary: true });
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, household: false });
 
@@ -134,13 +139,93 @@ describe("app/routes/api+/queues/route.tsx", () => {
     } as any)));
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ success: true });
+    await expect(res.json()).resolves.toEqual({ success: true, dequeued: true });
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { contactId: 2 },
       workspaceId: "w1",
       household: false,
       userId: "u1",
       reason: "Manually dequeued by user",
+    });
+    // The reason lookup is the no-op path's cost only.
+    expect(mocks.explainDequeueNoOp).not.toHaveBeenCalled();
+  });
+
+  // ── #1278: a dequeue that changed nothing must not report success ────────
+
+  test("action POST returns 409 when the row is assigned to another agent", async () => {
+    mocks.dequeueQueueEntry.mockResolvedValueOnce({ dequeuedPrimary: false });
+    mocks.explainDequeueNoOp.mockResolvedValueOnce("assigned_elsewhere");
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 3, household: false });
+
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+      request: new Request("http://localhost/api/queues", { method: "POST" }),
+    } as any)));
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({
+      error: "This contact is assigned to another agent.",
+      code: "assigned_elsewhere",
+    });
+    expect(mocks.explainDequeueNoOp).toHaveBeenCalledWith({
+      contactId: 3,
+      workspaceId: "w1",
+      userId: "u1",
+    });
+  });
+
+  test("action POST stays a 200 when the contact was already dequeued", async () => {
+    // The manual-dial "next contact" flow: the hangup route already dequeued
+    // this contact, so the second dequeue legitimately changes nothing. A 409
+    // here would put a conflict toast on every completed call.
+    mocks.dequeueQueueEntry.mockResolvedValueOnce({ dequeuedPrimary: false });
+    mocks.explainDequeueNoOp.mockResolvedValueOnce("already_dequeued");
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 4, household: true });
+
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+      request: new Request("http://localhost/api/queues", { method: "POST" }),
+    } as any)));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ success: true, dequeued: false });
+  });
+
+  test("action POST returns 409 with a generic code for an unexplained no-op", async () => {
+    mocks.dequeueQueueEntry.mockResolvedValueOnce({ dequeuedPrimary: false });
+    mocks.explainDequeueNoOp.mockResolvedValueOnce("unknown");
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 5, household: false });
+
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+      request: new Request("http://localhost/api/queues", { method: "POST" }),
+    } as any)));
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toEqual({
+      error: "This contact could not be dequeued.",
+      code: "not_dequeued",
+    });
+  });
+
+  test("action POST returns 404 when the queue row disappeared under the dequeue", async () => {
+    mocks.dequeueQueueEntry.mockResolvedValueOnce({ dequeuedPrimary: false });
+    mocks.explainDequeueNoOp.mockResolvedValueOnce("not_found");
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 6, household: false });
+
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+      request: new Request("http://localhost/api/queues", { method: "POST" }),
+    } as any)));
+
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toMatchObject({
+      error: "Contact queue entry not found",
     });
   });
 

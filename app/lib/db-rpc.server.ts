@@ -235,6 +235,12 @@ export async function rpcClaimQueueEntryForDial(
  * caller-facing dequeue entry point — can import it across the module
  * boundary; no other file should call this directly. Call
  * `dequeueQueueEntry` instead.
+ *
+ * @returns how many rows the RPC dequeued for `contactId` itself — 0 or 1.
+ * Household siblings are NOT counted (see
+ * client/migrations/20260815130000_dequeue_contact_returns_rows_affected.sql).
+ * 0 means the guarded predicate matched nothing: the row is already dequeued,
+ * or it is `assigned` to someone other than `dequeuedById` (#1278).
  */
 export async function rpcDequeueContact(
   executor: RpcExecutor,
@@ -245,7 +251,7 @@ export async function rpcDequeueContact(
     dequeuedById?: string | null;
     dequeuedReasonText?: string | null;
   },
-): Promise<void> {
+): Promise<number> {
   const contactIds = new Set<number>([args.contactId]);
   if (args.groupOnHousehold) {
     const [sourceContact] = await db
@@ -305,19 +311,21 @@ export async function rpcDequeueContact(
       ),
     );
 
-  await execVoid(
-    executor,
-    sql`select dequeue_contact(
+  const primaryRowsDequeued =
+    (await queryScalarNumber(
+      executor,
+      sql`select dequeue_contact(
       ${args.contactId}::bigint,
       ${args.groupOnHousehold},
       ${args.workspaceId}::uuid,
       ${dequeuedById}::uuid,
       ${args.dequeuedReasonText ?? null}
-    )`,
-  );
+    ) as primary_rows_dequeued`,
+      "dequeue_contact",
+    )) ?? 0;
 
   if (oldRows.length === 0) {
-    return;
+    return primaryRowsDequeued;
   }
 
   const newRows = await db
@@ -338,6 +346,8 @@ export async function rpcDequeueContact(
         ),
       ),
   );
+
+  return primaryRowsDequeued;
 }
 
 export async function rpcGetCampaignQueue(
