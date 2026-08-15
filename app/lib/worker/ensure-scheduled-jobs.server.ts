@@ -13,28 +13,17 @@
 
 import { logger } from "@/lib/logger.server";
 import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import {
+  SELF_SCHEDULING_JOB_TYPES,
+  SELF_SCHEDULING_SEED_PARAMS,
+} from "@/lib/worker/handlers.server";
 
-/** Job types that re-enqueue themselves and therefore need a first row. */
-export const SELF_SCHEDULING_JOB_TYPES = [
-  "low_credit_notify",
-  "twilio_webhook_audit",
-  "twilio_open_sync",
-  "billing_reconcile",
-  "number_rental_billing",
-  "campaign_schedule_sync",
-] as const;
+// Re-exported for backwards compatibility: both are now DERIVED from the job
+// registry (see handlers.server.ts / job-registry.server.ts, #1239 A1)
+// instead of being hand-maintained here.
+export { SELF_SCHEDULING_JOB_TYPES };
 
 export type SelfSchedulingJobType = (typeof SELF_SCHEDULING_JOB_TYPES)[number];
-
-const SELF_SCHEDULING_SEED_PARAMS: Partial<
-  Record<SelfSchedulingJobType, Record<string, unknown>>
-> = {
-  twilio_open_sync: {
-    callLimit: 50,
-    messageLimit: 50,
-    maxAgeMinutes: 120,
-  },
-};
 
 export async function ensureSelfSchedulingJobsSeeded(): Promise<{
   seeded: SelfSchedulingJobType[];
