@@ -525,6 +525,13 @@ async function dequeueCampaignQueueByContact(args: {
  *
  * Mechanism selection here is a behavior-preserving refactor of the original
  * call sites; what each mechanism does to an `assigned` row changed in #1260.
+ *
+ * All three mechanisms report {@link DequeueQueueEntryResult}: whether the
+ * target row itself was actually dequeued. Callers that dequeue their own
+ * claim (auto-dial's park, the hangup and status-callback paths) always match
+ * and are free to ignore it, as they did before #1278; the manual queue-UI
+ * path in app/routes/api+/queues.action.server.ts is the one that must not
+ * report success for a write that no-oped.
  */
 type DequeueQueueEntryByIdArgs = {
   by: { id: number };
@@ -547,6 +554,22 @@ export type DequeueQueueEntryArgs =
   | DequeueQueueEntryByIdArgs
   | DequeueQueueEntryByContactArgs;
 
+/**
+ * What the dequeue actually did to the row it was called for (#1278).
+ *
+ * `dequeuedPrimary: false` is not an error — on the guarded RPC path it is the
+ * concurrency guard doing its job, and on the Drizzle paths it means the
+ * target row no longer exists or is already terminal. Only callers that report
+ * an outcome to a human need to look at it; see
+ * {@link explainDequeueNoOp} for turning a `false` into a reason.
+ *
+ * Household siblings are deliberately excluded: a fan-out that dequeues three
+ * siblings but misses the contact the agent clicked is still a failed dequeue.
+ */
+export type DequeueQueueEntryResult = {
+  dequeuedPrimary: boolean;
+};
+
 // A plain `"id" in args.by` inline check narrows `args.by`'s type but not
 // sibling properties of `args` (e.g. `userId`) back at the call site — a
 // named type predicate narrows the whole `args` union instead.
@@ -554,15 +577,17 @@ function isByIdArgs(args: DequeueQueueEntryArgs): args is DequeueQueueEntryByIdA
   return "id" in args.by;
 }
 
-export async function dequeueQueueEntry(args: DequeueQueueEntryArgs): Promise<void> {
+export async function dequeueQueueEntry(
+  args: DequeueQueueEntryArgs,
+): Promise<DequeueQueueEntryResult> {
   if (isByIdArgs(args)) {
-    await dequeueCampaignQueueById({
+    const rows = await dequeueCampaignQueueById({
       queueId: args.by.id,
       userId: args.userId,
       reason: args.reason,
       workspaceId: args.workspaceId,
     });
-    return;
+    return { dequeuedPrimary: rows.length > 0 };
   }
 
   const { contactId, campaignId } = args.by;
@@ -574,23 +599,82 @@ export async function dequeueQueueEntry(args: DequeueQueueEntryArgs): Promise<vo
       );
     }
     const exec = args.exec ?? createTenantDb(args.workspaceId);
-    await rpcDequeueContact(exec, {
+    const primaryRowsDequeued = await rpcDequeueContact(exec, {
       contactId,
       workspaceId: args.workspaceId,
       groupOnHousehold: args.household,
       dequeuedById: args.userId,
       dequeuedReasonText: args.reason,
     });
-    return;
+    return { dequeuedPrimary: primaryRowsDequeued > 0 };
   }
 
-  await dequeueCampaignQueueByContact({
+  const rows = await dequeueCampaignQueueByContact({
     contactId,
     campaignId,
     userId: args.userId,
     reason: args.reason,
     workspaceId: args.workspaceId,
   });
+  return { dequeuedPrimary: rows.length > 0 };
+}
+
+/**
+ * Why a dequeue reported `dequeuedPrimary: false` (#1278).
+ *
+ * A plain read, run only on the no-op path, so the API can say something true
+ * instead of "assigned to another agent" for every zero-row dequeue — the
+ * manual-dial "next contact" flow dequeues a contact the hangup route has
+ * usually already dequeued, and calling that a conflict would be a new lie in
+ * place of the old one.
+ *
+ * Best-effort by construction: the row can change again between the RPC and
+ * this read. It decides a message, never a write.
+ */
+export type DequeueNoOpReason =
+  | "already_dequeued"
+  | "assigned_elsewhere"
+  | "not_found"
+  | "unknown";
+
+export async function explainDequeueNoOp(args: {
+  contactId: number;
+  workspaceId: string;
+  userId: string | null;
+}): Promise<DequeueNoOpReason> {
+  const rows = await db
+    .select({
+      queue_state: campaignQueueTable.queue_state,
+      assigned_to_user_id: campaignQueueTable.assigned_to_user_id,
+      dequeued_at: campaignQueueTable.dequeued_at,
+    })
+    .from(campaignQueueTable)
+    .where(
+      and(
+        eq(campaignQueueTable.contact_id, args.contactId),
+        eq(campaignQueueTable.workspace, args.workspaceId),
+      ),
+    );
+
+  if (rows.length === 0) {
+    return "not_found";
+  }
+
+  const heldByAnotherAgent = rows.some(
+    (row) =>
+      row.dequeued_at == null &&
+      row.assigned_to_user_id != null &&
+      row.assigned_to_user_id !== args.userId,
+  );
+  if (heldByAnotherAgent) {
+    return "assigned_elsewhere";
+  }
+
+  if (rows.every((row) => row.dequeued_at != null)) {
+    return "already_dequeued";
+  }
+
+  return "unknown";
 }
 
 export async function releaseAssignedQueueForUser(
