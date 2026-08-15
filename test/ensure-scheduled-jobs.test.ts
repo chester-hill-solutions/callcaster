@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const enqueueJobMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
 }));
 
 vi.mock("@/lib/logger.server", () => ({

@@ -57,7 +57,7 @@ vi.mock("@/lib/database/workspace.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: any[]) => mocks.enqueueJob(...args),
+  unsafeEnqueueJob: (...args: any[]) => mocks.enqueueJob(...args),
 }));
 vi.mock("@/lib/sms-status", async (importOriginal) => {
   const actual = (await importOriginal()) as any;

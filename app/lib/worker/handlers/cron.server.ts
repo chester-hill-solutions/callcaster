@@ -15,6 +15,7 @@ import {
 import { listAllWorkspacesOrdered } from "@/lib/workspace-members-db.server";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
+import { TWILIO_WEBHOOK_AUDIT_JOB_TYPE } from "@/lib/worker/job-types.server";
 import { withReschedule } from "./shared.server";
 
 const LOW_CREDIT_NOTIFY_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
@@ -27,7 +28,10 @@ const TWILIO_WEBHOOK_AUDIT_RESCHEDULE_MS = 6 * 60 * 60 * 1000;
 // campaign needs a transition.
 const CAMPAIGN_SCHEDULE_SYNC_RESCHEDULE_MS = 60 * 1000;
 
-export const TWILIO_WEBHOOK_AUDIT_JOB_TYPE = "twilio_webhook_audit";
+// Re-exported for backwards compatibility: moved to job-types.server.ts in
+// #1239 A3 so job-params.server.ts can reference it without importing this
+// file (see job-params.server.ts's doc comment for why that'd cycle).
+export { TWILIO_WEBHOOK_AUDIT_JOB_TYPE };
 
 type TwilioWebhookAuditWorkspaceResult = {
   workspaceId: string;
@@ -109,6 +113,7 @@ export async function billingReconcileHandler(job: ClaimedJobRow): Promise<unkno
     {
       type: "billing_reconcile",
       delayMs: BILLING_RECONCILE_RESCHEDULE_MS,
+      params: {},
       completedJobId: job.id,
       enabled: !workspaceId,
     },
@@ -154,6 +159,7 @@ export async function numberRentalBillingHandler(
     {
       type: "number_rental_billing",
       delayMs: NUMBER_RENTAL_BILLING_RESCHEDULE_MS,
+      params: { workspaceId: undefined },
       completedJobId: job.id,
       enabled: !workspaceId,
     },
@@ -172,6 +178,7 @@ export async function lowCreditNotifyHandler(job: ClaimedJobRow): Promise<unknow
     {
       type: "low_credit_notify",
       delayMs: LOW_CREDIT_NOTIFY_RESCHEDULE_MS,
+      params: {},
       completedJobId: job.id,
     },
     async () => {
@@ -231,6 +238,7 @@ export async function campaignScheduleSyncHandler(job: ClaimedJobRow): Promise<u
     {
       type: "campaign_schedule_sync",
       delayMs: CAMPAIGN_SCHEDULE_SYNC_RESCHEDULE_MS,
+      params: {},
       completedJobId: job.id,
     },
     () => runCampaignScheduleSync(),
@@ -248,6 +256,11 @@ export async function twilioWebhookAuditHandler(
     {
       type: TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
       delayMs: TWILIO_WEBHOOK_AUDIT_RESCHEDULE_MS,
+      // Matches the pre-#1239-A3 behaviour exactly: the reschedule never
+      // carried the current job's `autoRepair` forward, and the schema
+      // defaults a missing value to `true` (`v !== false`) — spelled out
+      // explicitly here since the typed schema requires the key.
+      params: { autoRepair: true },
       completedJobId: job.id,
     },
     () => runTwilioWebhookAudit(params.autoRepair),

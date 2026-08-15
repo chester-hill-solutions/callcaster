@@ -34,7 +34,7 @@ import {
   twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
 import { persistCallRecordingToStorage } from "@/lib/call-recording-storage.server";
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE } from "@/lib/worker/job-types.server";
 import { isBatchTranscriptionEnabled } from "@/lib/worker/handlers/elevenlabs-batch-transcribe.server";
 
@@ -278,7 +278,7 @@ export async function runRecordingSideEffects(args: {
       // enqueue entirely rather than queueing work nothing will bill for.
       if (await isBatchTranscriptionEnabled(callRow.workspace)) {
         try {
-          await enqueueJob({
+          await enqueueRegisteredJob({
             type: ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
             workspaceId: callRow.workspace,
             params: { callSid: args.callSid },

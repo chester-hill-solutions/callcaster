@@ -5,9 +5,12 @@ import {
 } from "@/lib/campaign-export.server";
 import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
 import { runWorkspaceTwilioComplianceJob } from "@/lib/twilio-compliance-job.server";
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { dispatchCampaignSmsBatch } from "@/lib/campaign-sms-dispatch.server";
-import { CAMPAIGN_DISPATCH_JOB_TYPE } from "@/lib/worker/job-types.server";
+import {
+  CAMPAIGN_DISPATCH_JOB_TYPE,
+  WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE,
+} from "@/lib/worker/job-types.server";
 import {
   findCampaignInWorkspace,
   updateCampaignStatusInWorkspace,
@@ -19,7 +22,10 @@ import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 import type { VoterListSource } from "@/lib/audience-upload-process.server";
 
-export const WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE = "workspace_twilio_compliance";
+// Re-exported for backwards compatibility: moved to job-types.server.ts in
+// #1239 A3 so job-params.server.ts can reference it without importing this
+// file (see job-params.server.ts's doc comment for why that'd cycle).
+export { WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE };
 
 export type AudienceUploadParams = {
   uploadId: number;
@@ -89,10 +95,10 @@ export async function enqueueWorkspaceComplianceJob(
   workspaceId: string,
   reason: string,
 ): Promise<void> {
-  const result = await enqueueJob({
+  const result = await enqueueRegisteredJob({
     type: WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE,
     workspaceId,
-    params: { workspaceId, reason },
+    params: { workspaceId, reason, actorUserId: undefined },
     dedupe: { kind: "live", workspaceId },
   });
   if (result.deduped) {
@@ -161,7 +167,7 @@ async function enqueueDispatchSuccessor(args: {
   completedJobId: number;
   delayMs: number;
 }): Promise<void> {
-  await enqueueJob({
+  await enqueueRegisteredJob({
     type: CAMPAIGN_DISPATCH_JOB_TYPE,
     workspaceId: args.workspaceId,
     userId: args.userId,

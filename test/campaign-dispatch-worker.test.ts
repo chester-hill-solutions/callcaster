@@ -26,7 +26,7 @@ vi.mock("@/lib/campaign-sms-dispatch.server", () => ({
   dispatchCampaignSmsBatch: mocks.dispatchCampaignSmsBatch,
 }));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: mocks.enqueueJob,
+  unsafeEnqueueJob: mocks.enqueueJob,
 }));
 vi.mock("@/lib/campaign-ivr.server", () => ({
   findCampaignInWorkspace: mocks.findCampaignInWorkspace,

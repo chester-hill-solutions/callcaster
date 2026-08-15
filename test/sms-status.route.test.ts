@@ -69,7 +69,7 @@ vi.mock("@/lib/twilio-lookup.server", () => ({
 
 const enqueueJobMock = vi.hoisted(() => vi.fn(async () => ({ enqueued: true, jobId: 1 })));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
 }));
 
 function makeSmsStatusRequest(payload: { SmsSid?: string; SmsStatus?: string }) {

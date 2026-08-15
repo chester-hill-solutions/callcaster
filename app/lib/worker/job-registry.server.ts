@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ClaimedJobRow, JobHandler } from "@/lib/worker/poll-jobs.server";
 import {
-  enqueueJob,
+  unsafeEnqueueJob,
   type EnqueueJobArgs,
   type EnqueueJobResult,
 } from "@/lib/worker/enqueue-job.server";
@@ -64,12 +64,27 @@ export type JobDefinition<Type extends string, Params> = {
   handler: (job: ClaimedJobRow, params: Params) => Promise<unknown>;
 };
 
-export type RegisteredJob<Type extends string = string, Params = unknown> = {
+/**
+ * The minimal shape `createTypedEnqueue`/`createRequeueStoredJob` need: a
+ * `job.type` literal paired with the zod schema its params validate against.
+ * `RegisteredJob` (below) extends this with handler wiring, but the
+ * enqueue-side helpers only ever touch `type`/`params` — keeping their
+ * constraint this loose lets a schema-only list (no handler implementations,
+ * see `job-params.server.ts`) satisfy it too, which is what lets
+ * handler-implementation files import the typed enqueue back without a
+ * module cycle through `handlers.server.ts` (#1239 A3).
+ */
+export type JobParamsEntry<Type extends string = string, Params = unknown> = {
   type: Type;
+  params: z.ZodType<Params>;
+};
+
+export type RegisteredJob<Type extends string = string, Params = unknown> = JobParamsEntry<
+  Type,
+  Params
+> & {
   pages: boolean;
   schedule: JobSchedule;
-  /** The zod schema this registration validates `job.params` against. */
-  params: z.ZodType<Params>;
   /** The `(job) => Promise<unknown>` shape `jobHandlers`/the poll loop expects. */
   jobHandler: JobHandler;
 };
@@ -205,8 +220,64 @@ export function legacyRequiredObjectParam(
   );
 }
 
-type ParamsOf<R> = R extends RegisteredJob<string, infer Params> ? Params : never;
-type TypeOf<R> = R extends RegisteredJob<infer Type, unknown> ? Type : never;
+export type SidAndTwilioParams = {
+  sid: string;
+  twilioParams: Record<string, string>;
+};
+
+/**
+ * Shared params schema for the three Twilio webhook fast-ack side-effect job
+ * types (#1239 A2): each one used to re-implement the same
+ * `requireSidAndTwilioParams` narrowing (sid key differs, everything else is
+ * identical). One factory, parameterized on the sid field name and the label
+ * used in the error message, replaces all three copies.
+ *
+ * Moved here from `handlers/webhook-adapters.server.ts` in #1239 A3 so
+ * `job-params.server.ts` (schema-only, no handler-implementation
+ * dependencies — see its module doc) can build these three job types'
+ * registrations without importing `webhook-adapters.server.ts`, which would
+ * otherwise cycle back through `handlers.server.ts`.
+ *
+ * `twilioParams` is DELIBERATELY LOOSER than a "real" schema: the old code
+ * never validated its values are strings (just `typeof value === "object" &&
+ * value !== null`), and neither does `legacyObjectParam`. Exactly equivalent
+ * otherwise.
+ *
+ * `sid` (#1239 A3): `enqueueRegisteredJob`'s `params` argument must match this
+ * schema's OUTPUT shape (`{sid, twilioParams}`), not its pre-transform input
+ * — so new enqueue call sites pass a `sid` field directly instead of the
+ * `callSid`/`messageSid` the old ad-hoc job.params shape used. `callSid` and
+ * `messageSid` stay accepted as a fallback so an already-queued job written
+ * before this migration still parses correctly at dequeue time.
+ */
+export function sidAndTwilioParamsSchema(
+  sidKey: "callSid" | "messageSid",
+  label: string,
+): z.ZodType<SidAndTwilioParams> {
+  return z
+    .object({
+      sid: legacyStringParam(),
+      callSid: legacyStringParam(),
+      messageSid: legacyStringParam(),
+      twilioParams: legacyObjectParam<Record<string, string> | undefined>(undefined),
+    })
+    .transform((value, ctx) => {
+      const legacySid = sidKey === "callSid" ? value.callSid : value.messageSid;
+      const sid = value.sid ?? legacySid;
+      const twilioParams = value.twilioParams;
+      if (!sid || !twilioParams) {
+        ctx.addIssue({
+          code: "custom",
+          message: `${label}: missing ${sidKey} or twilioParams`,
+        });
+        return z.NEVER;
+      }
+      return { sid, twilioParams };
+    });
+}
+
+type ParamsOf<E> = E extends JobParamsEntry<string, infer Params> ? Params : never;
+type TypeOf<E> = E extends JobParamsEntry<infer Type, unknown> ? Type : never;
 
 export type TypedEnqueueArgs<Type extends string, Params> = Omit<
   EnqueueJobArgs,
@@ -217,35 +288,106 @@ export type TypedEnqueueArgs<Type extends string, Params> = Omit<
 };
 
 /**
- * Build a typed `enqueueJob` scoped to a fixed list of `defineJob`
- * registrations: `type` is narrowed to one of the registered literal types,
- * and `params` must match that type's zod-inferred shape (parsed again here,
- * so a bad caller-supplied value fails at enqueue time instead of dequeue
- * time). Wraps the existing untyped `enqueueJob` — every current caller of
- * that function is untouched.
+ * Build a typed `enqueueJob` scoped to a fixed list of job-param entries
+ * (either full `defineJob` registrations or a schema-only `JobParamsEntry`
+ * list — see `job-params.server.ts`): `type` is narrowed to one of the
+ * registered literal types, and `params` must match that type's zod-inferred
+ * shape (parsed again here, so a bad caller-supplied value fails at enqueue
+ * time instead of dequeue time). Wraps `unsafeEnqueueJob`.
  *
- * Every registered job type gets a real `Params` type as of #1239 A2. No
- * enqueue call site has been migrated onto this yet — that's #1239 A3;
- * `enqueueJob` remains the only path every current caller uses.
+ * Every registered job type got a real `Params` type as of #1239 A2. As of
+ * #1239 A3, every production enqueue call site is migrated onto this (or, for
+ * genuinely dynamic types, `requeueStoredJob`) — `unsafeEnqueueJob` is no
+ * longer meant to be called directly outside this file.
  */
-export function createTypedEnqueue<const Regs extends readonly RegisteredJob<string, unknown>[]>(
-  registrations: Regs,
+export function createTypedEnqueue<const Entries extends readonly JobParamsEntry<string, unknown>[]>(
+  entries: Entries,
 ) {
-  type Reg = Regs[number];
-  type ParamsMap = { [R in Reg as TypeOf<R>]: ParamsOf<R> };
+  type Entry = Entries[number];
+  type ParamsMap = { [E in Entry as TypeOf<E>]: ParamsOf<E> };
 
   return async function enqueueRegisteredJob<Type extends keyof ParamsMap & string>(
     args: TypedEnqueueArgs<Type, ParamsMap[Type]>,
   ): Promise<EnqueueJobResult> {
-    const registration = registrations.find(
-      (candidate): candidate is Reg => candidate.type === args.type,
+    const entry = entries.find(
+      (candidate): candidate is Entry => candidate.type === args.type,
     );
-    if (!registration) {
+    if (!entry) {
       throw new Error(
         `enqueueRegisteredJob: no defineJob registration for type "${args.type}"`,
       );
     }
-    const parsed = registration.params.parse(args.params) as Record<string, unknown>;
-    return enqueueJob({ ...args, params: parsed });
+    const parsed = entry.params.parse(args.params) as Record<string, unknown>;
+    return unsafeEnqueueJob({ ...args, params: parsed });
+  };
+}
+
+export type StoredJobValidation =
+  | { ok: true; type: string; params: Record<string, unknown> }
+  | { ok: false; error: string };
+
+/**
+ * Validate arbitrary stored `(type, params)` — e.g. a dead-lettered job's
+ * DB row — against whichever registration matches `type` at runtime. Unlike
+ * `createTypedEnqueue`, `type` here is a plain `string`: this is for
+ * genuinely dynamic call sites that can't pin one literal job type at compile
+ * time (a dead-letter requeue can be any type; a boot-time self-scheduling
+ * seed loop iterates every self-scheduling type). Returns a typed error
+ * instead of throwing so callers can report "unknown job type" or "invalid
+ * params" without a try/catch.
+ */
+export function createValidateStoredJobParams<
+  const Entries extends readonly JobParamsEntry<string, unknown>[],
+>(entries: Entries) {
+  return function validateStoredJobParams(
+    type: string,
+    storedParams: unknown,
+  ): StoredJobValidation {
+    const entry = entries.find((candidate) => candidate.type === type);
+    if (!entry) {
+      return { ok: false, error: `No defineJob registration for job type "${type}"` };
+    }
+    const parsed = entry.params.safeParse(storedParams ?? {});
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: `Stored params failed validation for job type "${type}": ${parsed.error.message}`,
+      };
+    }
+    return { ok: true, type, params: parsed.data as Record<string, unknown> };
+  };
+}
+
+export type StoredJobRequeueResult =
+  | { ok: true; result: EnqueueJobResult }
+  | { ok: false; error: string };
+
+/**
+ * The single sanctioned escape hatch for enqueueing a job whose type isn't
+ * known until runtime (dead-letter requeue, self-scheduling boot seed): runs
+ * the same runtime validation `createValidateStoredJobParams` does, then
+ * enqueues via `unsafeEnqueueJob` with the validated params — never the raw
+ * stored value. Returns a typed error for an unknown type or invalid params
+ * instead of enqueueing garbage that would just dead-letter again.
+ */
+export function createRequeueStoredJob<
+  const Entries extends readonly JobParamsEntry<string, unknown>[],
+>(
+  entries: Entries,
+  validate: ReturnType<typeof createValidateStoredJobParams<Entries>> = createValidateStoredJobParams(
+    entries,
+  ),
+) {
+  return async function requeueStoredJob(
+    type: string,
+    storedParams: unknown,
+    extra: Omit<EnqueueJobArgs, "type" | "params"> = {},
+  ): Promise<StoredJobRequeueResult> {
+    const validated = validate(type, storedParams);
+    if (!validated.ok) {
+      return validated;
+    }
+    const result = await unsafeEnqueueJob({ ...extra, type: validated.type, params: validated.params });
+    return { ok: true, result };
   };
 }

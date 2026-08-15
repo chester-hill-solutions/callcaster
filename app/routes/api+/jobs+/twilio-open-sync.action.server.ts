@@ -8,8 +8,10 @@ import { createCronEnqueueAction } from "@/lib/worker/cron-job-enqueue-route.ser
 export const action = defineAction(
   createCronEnqueueAction({
     type: "twilio_open_sync",
-    buildParams: (body, workspaceId) => ({
-      workspaceId,
+    // `workspaceId` isn't in `twilio_open_sync`'s params schema — the job's
+    // top-level `workspaceId` (passed by `createCronEnqueueAction` alongside
+    // these params) is what `resolveWorkspaceId` reads.
+    buildParams: (body) => ({
       callLimit: typeof body.callLimit === "number" ? body.callLimit : 50,
       messageLimit:
         typeof body.messageLimit === "number" ? body.messageLimit : 50,

@@ -249,8 +249,17 @@ async function enqueueWithLiveDedupe(args: {
  * - `idempotency`: unique key; revives dead-letter rows on conflict
  * - `live`: skip if queued/running row of same type (+ optional workspace) exists
  * - `none`: always insert
+ *
+ * UNSAFE: `type`/`params` are untyped strings/records here — a typo'd type or
+ * a mismatched params shape compiles fine and only surfaces later as a
+ * dead-lettered job. This is the raw primitive the job registry
+ * (`job-registry.server.ts`'s `createTypedEnqueue`/`createRequeueStoredJob`)
+ * wraps; it's the only intended caller (#1239 A3). New call sites should go
+ * through `enqueueRegisteredJob` (typed to a registered job type) or, for
+ * genuinely dynamic types, `requeueStoredJob`/`validateStoredJobParams` — not
+ * this function directly.
  */
-export async function enqueueJob(
+export async function unsafeEnqueueJob(
   args: EnqueueJobArgs,
 ): Promise<EnqueueJobResult> {
   const params = addRequestIdToJobParams(args.params ?? {});

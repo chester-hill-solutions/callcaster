@@ -29,7 +29,7 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
 const enqueueJobMock = vi.hoisted(() => vi.fn(async () => ({ enqueued: true, jobId: 1 })));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
 }));
 
 describe("app/routes/api+/recording", () => {

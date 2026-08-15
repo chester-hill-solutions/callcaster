@@ -1,11 +1,15 @@
 import { describe, expect, test } from "vitest";
 import {
+  enqueueRegisteredJob,
   jobHandlers,
   jobRegistry,
   PAGING_JOB_TYPES,
+  requeueStoredJob,
   SELF_SCHEDULING_JOB_TYPES,
   SELF_SCHEDULING_SEED_PARAMS,
+  validateStoredJobParams,
 } from "@/lib/worker/handlers.server";
+import { jobParamsRegistry } from "@/lib/worker/job-params.server";
 
 /**
  * Drift guard for #1239 A1: `jobHandlers`, `PAGING_JOB_TYPES`, and
@@ -284,5 +288,77 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
     // Negative numbers are truthy in JS, so the old `!campaignId` check never
     // rejected them — only an exact falsy 0 (or a non-numeric value).
     expect(dispatchReg!.params.parse({ campaignId: -5 }).campaignId).toBe(-5);
+  });
+});
+
+/**
+ * Drift guard for #1239 A3: `job-params.server.ts`'s `jobParamsRegistry`
+ * (schema-only, importable by handler-implementation files without a module
+ * cycle back through `handlers.server.ts` — see that module's doc comment)
+ * must register exactly the same job types as `handlers.server.ts`'s
+ * `jobRegistry` (schema + handler + paging/schedule). If a job type is added
+ * to one list without the other, `enqueueRegisteredJob` and the dequeue-side
+ * `jobHandlers` would silently disagree about what's a valid job type.
+ */
+describe("job registry — enqueue-side/dequeue-side registry parity (#1239 A3)", () => {
+  test("jobParamsRegistry and jobRegistry register exactly the same set of job types", () => {
+    const enqueueSideTypes = jobParamsRegistry.map((entry) => entry.type).sort();
+    const dequeueSideTypes = jobRegistry.map((registration) => registration.type).sort();
+    expect(enqueueSideTypes).toEqual(dequeueSideTypes);
+  });
+
+  test("jobParamsRegistry and jobRegistry validate each type against the exact same schema instance", () => {
+    for (const entry of jobParamsRegistry) {
+      const registration = jobRegistry.find((r) => r.type === entry.type);
+      expect(registration).toBeDefined();
+      expect(registration!.params).toBe(entry.params);
+    }
+  });
+});
+
+/**
+ * `requeueStoredJob`/`validateStoredJobParams` are the sanctioned escape
+ * hatch for enqueue sites that can't pin one job type at compile time (a
+ * dead-letter requeue can be any type; `ensure-scheduled-jobs.server.ts`'s
+ * boot seed iterates every self-scheduling type) — see their doc comments in
+ * job-registry.server.ts. Both must reject an unknown type with a typed
+ * error instead of enqueueing garbage or throwing.
+ */
+describe("job registry — requeue/validate escape hatch (#1239 A3)", () => {
+  test("validateStoredJobParams rejects an unregistered job type", () => {
+    const result = validateStoredJobParams("not_a_real_job_type", {});
+    expect(result).toEqual({
+      ok: false,
+      error: 'No defineJob registration for job type "not_a_real_job_type"',
+    });
+  });
+
+  test("validateStoredJobParams rejects params that fail the matched type's schema", () => {
+    const result = validateStoredJobParams("audience_upload", { uploadId: 0, audienceId: 5 });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/audience_upload: missing or invalid uploadId/);
+    }
+  });
+
+  test("validateStoredJobParams accepts valid stored params for a registered type", () => {
+    const result = validateStoredJobParams("billing_reconcile", { workspaceId: "ws_1" });
+    expect(result).toEqual({
+      ok: true,
+      type: "billing_reconcile",
+      params: { workspaceId: "ws_1" },
+    });
+  });
+
+  test("requeueStoredJob rejects an unregistered job type without calling enqueueJob", async () => {
+    const result = await requeueStoredJob("not_a_real_job_type", {});
+    expect(result).toEqual({
+      ok: false,
+      error: 'No defineJob registration for job type "not_a_real_job_type"',
+    });
+  });
+
+  test("enqueueRegisteredJob is exported and callable for a known type (compile-time narrowing smoke test)", () => {
+    expect(typeof enqueueRegisteredJob).toBe("function");
   });
 });

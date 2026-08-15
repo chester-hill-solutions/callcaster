@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 // withReschedule -> rescheduleJob -> enqueueJob, and stubbing the middle of
 // that chain would not exercise the ordering guarantee these tests exist for.
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
 }));
 
 vi.mock("@/lib/cron-workspace-fanout.server", () => ({
