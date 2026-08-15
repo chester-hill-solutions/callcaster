@@ -7,7 +7,7 @@ import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineAction } from "@/lib/handler.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
-import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { isDncDisposition } from "@/lib/outreach-disposition";
 import {
   contact as contactTable,
@@ -142,8 +142,8 @@ export const action = defineAction({
           set: { opt_out: true },
           where: eq(contactTable.id, Number(contact_id)),
         });
-        await dequeueCampaignQueueByContact({
-          contactId: Number(contact_id),
+        await dequeueQueueEntry({
+          by: { contactId: Number(contact_id) },
           userId: user.id,
           reason: "Do not call requested",
           workspaceId: workspace,

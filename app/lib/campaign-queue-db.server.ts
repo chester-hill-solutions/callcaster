@@ -520,25 +520,36 @@ async function dequeueCampaignQueueByContact(args: {
  * Behavior-preserving refactor: this function does not change what any
  * existing call site does, only where the mechanism selection lives.
  */
-export async function dequeueQueueEntry(
-  args:
-    | {
-        by: { id: number };
-        userId: string;
-        reason: string;
-        workspaceId?: string;
-        household?: undefined;
-      }
-    | {
-        by: { contactId: number; campaignId?: number | null };
-        userId: string | null;
-        reason: string;
-        workspaceId?: string;
-        household?: boolean;
-        exec?: RpcExecutor;
-      },
-): Promise<void> {
-  if ("id" in args.by) {
+type DequeueQueueEntryByIdArgs = {
+  by: { id: number };
+  userId: string;
+  reason: string;
+  workspaceId?: string;
+  household?: undefined;
+};
+
+type DequeueQueueEntryByContactArgs = {
+  by: { contactId: number; campaignId?: number | null };
+  userId: string | null;
+  reason: string;
+  workspaceId?: string;
+  household?: boolean;
+  exec?: RpcExecutor;
+};
+
+export type DequeueQueueEntryArgs =
+  | DequeueQueueEntryByIdArgs
+  | DequeueQueueEntryByContactArgs;
+
+// A plain `"id" in args.by` inline check narrows `args.by`'s type but not
+// sibling properties of `args` (e.g. `userId`) back at the call site — a
+// named type predicate narrows the whole `args` union instead.
+function isByIdArgs(args: DequeueQueueEntryArgs): args is DequeueQueueEntryByIdArgs {
+  return "id" in args.by;
+}
+
+export async function dequeueQueueEntry(args: DequeueQueueEntryArgs): Promise<void> {
+  if (isByIdArgs(args)) {
     await dequeueCampaignQueueById({
       queueId: args.by.id,
       userId: args.userId,

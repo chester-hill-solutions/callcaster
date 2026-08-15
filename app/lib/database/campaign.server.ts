@@ -13,7 +13,7 @@ import { fetchCampaignQueueWithContacts } from "../campaign-queue-search.server"
 import { campaign as campaignTable } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { db, type Database } from "@/server/db";
-import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import {
   persistCampaignScript,
@@ -484,8 +484,8 @@ export async function splitMessageCampaign({
   // Remove the redistributed rows from the source so volume isn't double-sent.
   let movedContactCount = 0;
   for (const member of members) {
-    await dequeueCampaignQueueById({
-      queueId: Number(member.id),
+    await dequeueQueueEntry({
+      by: { id: Number(member.id) },
       userId,
       reason: "Moved to parallel split segment",
     });

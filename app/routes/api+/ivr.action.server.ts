@@ -1,5 +1,5 @@
 import { data as routeData } from "react-router";
-import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
@@ -101,8 +101,8 @@ export const action = defineAction({
       if (!callRow) throw new Error("Failed to insert call record");
 
       // Dequeue
-      await dequeueCampaignQueueById({
-        queueId: Number(queue_id),
+      await dequeueQueueEntry({
+        by: { id: Number(queue_id) },
         userId: user_id,
         reason: "IVR call completed",
       });
