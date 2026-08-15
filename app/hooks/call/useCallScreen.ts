@@ -276,7 +276,7 @@ export function useCallScreen() {
   const { saveData, isSaving } = useDebouncedSave({
     update,
     recentAttempt,
-    nextRecipient,
+    questionContact,
     campaign,
     workspaceId,
     disposition,
@@ -315,7 +315,7 @@ export function useCallScreen() {
 
   const handleDequeueNext = useCampaignDequeueActions({
     campaign,
-    nextRecipient,
+    questionContact,
     send: send as unknown as (action: { type: string }) => void,
     setCallDuration,
     handleDialButton,

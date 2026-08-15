@@ -93,7 +93,18 @@ export function useCampaignDialActions({
 
 type UseCampaignDequeueActionsOptions = {
   campaign: Campaign | null | undefined;
-  nextRecipient: QueueItem | null;
+  /**
+   * The contact "Save and Next" records and dequeues. This is the call
+   * screen's questionContact (who the script/disposition panel is currently
+   * showing) — NOT the queue's nextRecipient pointer. hangup.action.server.ts
+   * dequeues the just-finished contact's queue row as soon as the agent
+   * hangs up, which collapses nextRecipient to the following queue item, or
+   * to null once the queue empties, before the agent has recorded anything.
+   * Gating "Save and Next" on nextRecipient made the button a no-op in
+   * exactly that window (#1253); questionContact holds the right contact
+   * until the agent saves or a new dial starts.
+   */
+  questionContact: QueueItem | null;
   send: CallStateMachineSend;
   setCallDuration: (duration: number) => void;
   handleDialButton: () => void;
@@ -108,7 +119,7 @@ type UseCampaignDequeueActionsOptions = {
 
 export function useCampaignDequeueActions({
   campaign,
-  nextRecipient,
+  questionContact,
   send,
   setCallDuration,
   handleDialButton,
@@ -121,7 +132,7 @@ export function useCampaignDequeueActions({
   setUpdate,
 }: UseCampaignDequeueActionsOptions) {
   return useCallback(() => {
-    if (!campaign || !nextRecipient) return;
+    if (!campaign || !questionContact) return;
 
     if (campaign.dial_type === "predictive") {
       send({ type: "HANG_UP" });
@@ -130,7 +141,7 @@ export function useCampaignDequeueActions({
       saveData();
     } else if (campaign.dial_type === "call") {
       saveData();
-      dequeue({ contact: nextRecipient });
+      dequeue({ contact: questionContact });
       fetchMore({ householdMap });
       handleNextNumber(campaign?.group_household_queue || false);
       // NEXT resets a finished call to idle; HANG_UP here parked the FSM in
@@ -142,7 +153,7 @@ export function useCampaignDequeueActions({
     }
   }, [
     campaign,
-    nextRecipient,
+    questionContact,
     send,
     setCallDuration,
     handleDialButton,
