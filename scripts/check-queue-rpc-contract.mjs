@@ -58,21 +58,31 @@ const transitions = loadQueueEntryTransitions(ROOT);
 const rpcSources = selectQueueRpcs(collectCurrentFunctionDefinitions(ROOT));
 const { violations, checked, vocabulary } = analyze({ rpcSources, transitions });
 
-if (update) {
-  const next = {};
-  for (const v of violations) next[v.key] = v.message;
-  writeFileSync(BASELINE_FILE, `${JSON.stringify(next, null, 2)}\n`);
-  console.log(
-    `check-queue-rpc-contract: baseline rewritten with ${violations.length} known violation(s).`,
-  );
-  process.exit(0);
-}
-
 let baseline = {};
 try {
   baseline = JSON.parse(readFileSync(BASELINE_FILE, "utf8"));
 } catch {
   baseline = {};
+}
+
+if (update) {
+  // Carry `$`-prefixed documentation keys and any reason already written by
+  // hand. Regenerating over a curated reason would silently replace "this is
+  // safe because of guard X" with the generic complaint — which is exactly the
+  // unreasoned entry the file's own note warns about.
+  const next = {};
+  for (const [key, value] of Object.entries(baseline)) {
+    if (key.startsWith("$")) next[key] = value;
+  }
+  for (const v of violations) next[v.key] = baseline[v.key] ?? v.message;
+  writeFileSync(BASELINE_FILE, `${JSON.stringify(next, null, 2)}\n`);
+  const kept = violations.filter((v) => baseline[v.key]).length;
+  console.log(
+    `check-queue-rpc-contract: baseline rewritten — ${violations.length} known ` +
+      `violation(s), ${kept} existing reason(s) preserved. Write a reason for ` +
+      `each new entry before committing.`,
+  );
+  process.exit(0);
 }
 const { added, stale, carried } = diffAgainstBaseline(violations, baseline);
 

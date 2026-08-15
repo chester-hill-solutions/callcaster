@@ -580,7 +580,11 @@ export function analyze({
  * cannot sit in the baseline forever pretending to be debt.
  */
 export function diffAgainstBaseline(violations, baseline) {
-  const known = new Map(Object.entries(baseline ?? {}));
+  // `$`-prefixed keys are documentation (the file's own how-to-use note), not
+  // violation keys, and must not be reported as stale entries.
+  const known = new Map(
+    Object.entries(baseline ?? {}).filter(([key]) => !key.startsWith("$")),
+  );
   const added = violations.filter((v) => !known.has(v.key));
   const seen = new Set(violations.map((v) => v.key));
   const stale = [...known.keys()].filter((key) => !seen.has(key)).sort();
