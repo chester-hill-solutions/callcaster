@@ -81,6 +81,12 @@ jobs:
       - run: npm run check:dry
       - run: npm run check:handlers
       - run: npm run check:db-rpcs
+      # check:db-rpcs only asks whether a function EXISTS — its header says it
+      # cannot see inside one. This reads the body: the queue RPCs must write
+      # the campaign_queue columns QUEUE_ENTRY_TRANSITIONS says they write, and
+      # must not reference the dropped `status` column that cost four separate
+      # repair migrations, each found in production rather than here.
+      - run: npm run check:queue-rpc-contract
       - run: npm run db:ledger:check
       # The production install path. Its drift guard sat below a DATABASE_URL
       # exit and no workflow invoked it, so a migration wired into the compose
