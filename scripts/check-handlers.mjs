@@ -315,12 +315,17 @@ if (violations.length) {
       "docs/handler-strictness.md). The factory migration is complete; there is no\n" +
       "grandfather baseline. The credit facet is bidirectional: routes matching a\n" +
       "credit-write signal must declare \"credit\"; routes declaring \"credit\" must\n" +
-      "match a signal. The capability facet is bidirectional too: an API_SURFACE\n" +
-      "`capability` must equal the id the route's auth strategy enforces. If you\n" +
-      "removed a grandfathered preamble, run\n" +
-      "`node scripts/check-handlers.mjs --update-capability-baseline` to ratchet\n" +
-      "scripts/capability-baseline.json down.",
+      "match a signal.",
   );
+  if (capability.lines.length > 0) {
+    console.error(
+      "\nThe capability facet is bidirectional too: an API_SURFACE `capability` must\n" +
+        "equal the id the route's auth strategy enforces, and nothing may enforce a\n" +
+        "capability the surface does not declare. If you migrated a grandfathered\n" +
+        "preamble onto a strategy, run `npm run tools:capability:baseline` to ratchet\n" +
+        "scripts/capability-baseline.json down.",
+    );
+  }
   process.exit(1);
 }
 console.log(
