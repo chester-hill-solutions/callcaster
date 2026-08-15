@@ -59,59 +59,19 @@ vi.mock("@/lib/handset/handset-session.server", () => ({
   findActiveHandsetSessionClientIdentity: (...a: unknown[]) =>
     mocks.findActiveHandsetSessionClientIdentity(...a),
 }));
-vi.mock("@/lib/inbound-voicemail-twiml.server", () => ({
-  resolveInboundVoicemailAudio: vi.fn(),
-  appendInboundVoicemailTwiml: vi.fn(({ twiml, voicemailAudioUrl, phoneNumber }: any) => {
-    if (voicemailAudioUrl) {
-      twiml.play(voicemailAudioUrl);
-    } else {
-      twiml.say(`Thank you for calling ${phoneNumber ?? ""}, we're unable to answer your call at the moment. Please leave us a message and we'll get back to you as soon as possible.`);
-    }
-    twiml.pause({ length: 1 });
-    twiml.record({ transcribe: true, timeout: 10, playBeep: true });
-  }),
-}));
+vi.mock("@/lib/inbound-voicemail-twiml.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/inbound-voicemail-twiml.server")>();
+  return {
+    ...actual,
+    resolveInboundVoicemailAudio: vi.fn(),
+  };
+});
 vi.mock("@/lib/twilio-webhook.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/twilio-webhook.server")>();
   return {
     ...actual,
     requireTwilioSignature: (...a: unknown[]) => mocks.requireTwilioSignature(...a),
   };
-});
-
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    private parts: string[] = [];
-    pause(opts: any) {
-      this.parts.push(`pause:${opts?.length}`);
-    }
-    dial(n?: string | Record<string, unknown>) {
-      if (typeof n === "string") {
-        this.parts.push(`dial:${n}`);
-      }
-      return {
-        number: (number: string) => {
-          this.parts.push(`dial:${number}`);
-        },
-      };
-    }
-    play(u: string) {
-      this.parts.push(`play:${u}`);
-    }
-    say(t: string) {
-      this.parts.push(`say:${t}`);
-    }
-    record(_opts: any) {
-      this.parts.push("record");
-    }
-    hangup() {
-      this.parts.push("hangup");
-    }
-    toString() {
-      return `<Response>${this.parts.join("|")}</Response>`;
-    }
-  }
-  return { default: { twiml: { VoiceResponse } } };
 });
 
 function defaultCallRow() {
@@ -287,7 +247,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any)));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
-    expect(await res.text()).toContain("dial:+15550001111");
+    expect(await res.text()).toContain('<Dial timeout="20"><Number>+15550001111</Number></Dial>');
     expect(mocks.sendWebhookNotification).toHaveBeenCalled();
 
     // email path with voicemail signedUrl => play+record
@@ -305,8 +265,8 @@ describe("app/routes/api+/inbound/route.tsx", () => {
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any)));
     const xml = await res.text();
-    expect(xml).toContain("play:https://signed");
-    expect(xml).toContain("record");
+    expect(xml).toContain("<Play>https://signed</Play>");
+    expect(xml).toContain("<Record");
 
     // email path with no voicemail signedUrl => say+record
     mocks.isPhoneNumber.mockReturnValue(false);
@@ -404,7 +364,7 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     const response = await asRouteResponse(mod.action(withRouteUrl({
       request: new Request("http://x", { method: "POST", body: fd }),
     } as any)));
-    expect(await response.text()).toContain("say:");
+    expect(await response.text()).toContain("<Say>");
 
     // callWebhook empty => does not send webhook
     const prevCalls = mocks.sendWebhookNotification.mock.calls.length;
@@ -476,8 +436,10 @@ describe("app/routes/api+/inbound/route.tsx", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const xml = await res.text();
-    expect(xml).toContain("say:");
-    expect(xml).toContain("hangup");
+    expect(xml).toContain(
+      "<Say>We're unable to take your call right now. Please try again later.</Say>",
+    );
+    expect(xml).toContain("<Hangup/>");
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Unhandled error in api.inbound",
       expect.objectContaining({ error: "db unavailable" }),

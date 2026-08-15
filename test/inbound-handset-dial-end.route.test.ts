@@ -29,31 +29,6 @@ vi.mock("@/lib/inbound-call-db.server", () => ({
     inboundDbMocks.findWorkspaceNumberInboundFallbackByPhone(...args),
 }));
 
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    private parts: string[] = [];
-    say(_opts: unknown, text: string) {
-      this.parts.push(`say:${text}`);
-    }
-    play(url: string) {
-      this.parts.push(`play:${url}`);
-    }
-    pause() {
-      this.parts.push("pause");
-    }
-    record() {
-      this.parts.push("record");
-    }
-    hangup() {
-      this.parts.push("hangup");
-    }
-    toString() {
-      return `<Response>${this.parts.join("|")}</Response>`;
-    }
-  }
-  return { default: { twiml: { VoiceResponse } } };
-});
-
 function makeRequest(opts?: { called?: string; dialCallStatus?: string }) {
   const fd = new FormData();
   if (opts?.called !== undefined) {
@@ -133,7 +108,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();
     expect(text).toContain("No one is available");
-    expect(text).toContain("hangup");
+    expect(text).toContain("<Hangup/>");
   });
 
   test("returns voicemail TwiML when handset misses and inbound action is email", async () => {
@@ -147,7 +122,7 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
       request: makeRequest({ called: "+15551234567", dialCallStatus: "no-answer" }),
     } as never));
     const text = await res.text();
-    expect(text).toContain("record");
+    expect(text).toContain("<Record");
     expect(text).not.toContain("No one is available");
   });
 
@@ -159,6 +134,6 @@ describe("app/routes/api+/inbound-handset-dial-end", () => {
     } as never));
     const text = await res.text();
     expect(text).not.toContain("No one is available");
-    expect(text).toContain("hangup");
+    expect(text).toContain("<Hangup/>");
   });
 });

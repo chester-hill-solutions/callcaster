@@ -1,6 +1,6 @@
-import type Twilio from "twilio";
 import { env } from "@/lib/env.server";
 import { createSignedObjectUrl, listObjects } from "@/lib/object-storage.server";
+import type { TwimlResponse } from "@/lib/twilio-twiml.server";
 
 export async function resolveInboundVoicemailAudio(args: {
   workspaceId: string;
@@ -45,7 +45,7 @@ export async function resolveInboundVoicemailAudio(args: {
 }
 
 export function appendInboundVoicemailTwiml(args: {
-  twiml: Twilio.twiml.VoiceResponse;
+  twiml: TwimlResponse;
   phoneNumber: string;
   voicemailAudioUrl: string | null;
 }): void {

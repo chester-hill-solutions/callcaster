@@ -1,11 +1,10 @@
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { loadInboundIvrPageContext } from "@/lib/inbound-ivr-db.server";
-import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { createVoiceResponse, hangupTwiml } from "@/lib/twilio-twiml.server";
 import { requireTwilioSignatureForIvrPage } from "@/lib/ivr-webhook-auth.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
-import Twilio from "twilio";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -17,7 +16,7 @@ export const action = defineAction({
     requireTwilioSignatureForIvrPage(request, [params.numberId, params.pageId]),
   sideEffects: ["db-read"],
   handler: async ({ params, auth }) => {
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = createVoiceResponse();
   const { numberId, pageId } = params as { numberId: string; pageId: string };
   const { callSid } = auth;
 

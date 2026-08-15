@@ -1,14 +1,13 @@
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { loadInboundIvrBlockContext } from "@/lib/inbound-ivr-db.server";
-import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { createVoiceResponse, hangupTwiml, type TwimlResponse } from "@/lib/twilio-twiml.server";
 import { requireTwilioSignatureForIvrResponse } from "@/lib/ivr-webhook-auth.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
 import {
   appendInboundVoicemailTwiml,
   resolveInboundVoicemailAudio,
 } from "@/lib/inbound-voicemail-twiml.server";
-import Twilio from "twilio";
 import { defineAction } from "@/lib/handler.server";
 
 interface Script {
@@ -70,7 +69,7 @@ const findNextStep = (
 };
 
 const renderTerminalTarget = async (
-  twiml: Twilio.twiml.VoiceResponse,
+  twiml: TwimlResponse,
   target: string,
   numberId: string,
   workspace: string,
@@ -129,7 +128,7 @@ export const action = defineAction({
   sideEffects: ["db-read", "external"],
   handler: async ({ params, auth }) => {
   const baseUrl = env.BASE_URL();
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = createVoiceResponse();
 
   const pageId = params.pageId as string;
   const blockId = params.blockId as string;

@@ -18,7 +18,7 @@ import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { normalizePhoneNumber } from "@/lib/utils";
-import Twilio from 'twilio';
+import { createVoiceResponse } from "@/lib/twilio-twiml.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineAction } from "@/lib/handler.server";
 import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
@@ -128,7 +128,7 @@ export const action = defineAction({
     }
     const to = normalizePhoneNumber(to_number)
     const twilio = await createWorkspaceTwilioInstance({ workspace_id });
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
     // Track the placed SID outside the try: if the call is created but we then
     // fail to persist its row, the active_call redial guard can't see it and a
     // retry would double-dial the same contact. Hang it up in that case — a

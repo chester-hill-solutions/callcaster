@@ -21,7 +21,7 @@ import {
 import { findActiveHandsetSession, findActiveHandsetSessionClientIdentity } from "@/lib/handset/handset-session.server";
 import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
 import { getWorkspaceById, getWorkspaceWebhookRow } from "@/lib/workspace-members-db.server";
-import Twilio from "twilio";
+import { createVoiceResponse, sayHangupTwiml } from "@/lib/twilio-twiml.server";
 import { inboundRingCountToDialTimeoutSeconds } from "../../../shared/inbound-rings";
 import { defineAction } from "@/lib/handler.server";
 import type { TwilioInboundCallWebhook } from "@/lib/twilio.types";
@@ -66,13 +66,13 @@ function dispatchInboundCallWebhookNotification(args: {
 /** Fallback TwiML returned when the handler throws unexpectedly, so Twilio
  * hears a graceful message instead of an HTML error page. */
 function inboundUnavailableTwiml(): Response {
-  const twiml = new Twilio.twiml.VoiceResponse();
-  twiml.say("We're unable to take your call right now. Please try again later.");
-  twiml.hangup();
-  return new Response(twiml.toString(), {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
-  });
+  return new Response(
+    sayHangupTwiml("We're unable to take your call right now. Please try again later."),
+    {
+      status: 200,
+      headers: { "Content-Type": "text/xml" },
+    },
+  );
 }
 
 export const action = defineAction({
@@ -113,7 +113,7 @@ async function handleInboundAction(
   request: ActionFunctionArgs["request"],
   url: URL,
 ) {
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = createVoiceResponse();
   const formData = await request.clone().formData();
   const data = Object.fromEntries(
     formData,
@@ -258,7 +258,7 @@ async function handleInboundAction(
         clientIdentity,
       });
       const baseUrl = env.BASE_URL();
-      const handsetTwiml = new Twilio.twiml.VoiceResponse();
+      const handsetTwiml = createVoiceResponse();
       const session = await findActiveHandsetSession({ workspaceId, clientIdentity });
       const workspace = await getWorkspaceById(workspaceId);
       appendLiveTranscriptionStreamTwiml({

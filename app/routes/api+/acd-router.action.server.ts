@@ -5,18 +5,18 @@ import {
   twilioWebhookForbiddenHangup,
 } from "@/lib/twilio-webhook.server";
 import { defineAction } from "@/lib/handler.server";
-import Twilio from "twilio";
+import { sayHangupTwiml } from "@/lib/twilio-twiml.server";
 
 /** Fallback TwiML returned when the handler throws unexpectedly, so Twilio
  * hears a graceful message instead of an HTML error page. */
 function acdRouterUnavailableTwiml(): Response {
-  const twiml = new Twilio.twiml.VoiceResponse();
-  twiml.say("We're unable to take your call right now. Please try again later.");
-  twiml.hangup();
-  return new Response(twiml.toString(), {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
-  });
+  return new Response(
+    sayHangupTwiml("We're unable to take your call right now. Please try again later."),
+    {
+      status: 200,
+      headers: { "Content-Type": "text/xml" },
+    },
+  );
 }
 
 /** Twilio ACD wait URL — default `/api/acd-router`. */

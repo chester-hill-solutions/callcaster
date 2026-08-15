@@ -1,19 +1,18 @@
 import { fetchCampaignWithScript, ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { createVoiceResponse, hangupTwiml, type TwimlResponse } from "@/lib/twilio-twiml.server";
 import { requireTwilioSignatureForIvrBlock } from "@/lib/ivr-webhook-auth.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
-import Twilio from "twilio";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<string, { id: string; type: string; audioFile: string; options?: Array<{ value: string; next?: string }> }>;
 }
 
-const handleAudio = async (twiml: Twilio.twiml.VoiceResponse, block: { type: string; audioFile: string }, workspace: string) => {
+const handleAudio = async (twiml: TwimlResponse, block: { type: string; audioFile: string }, workspace: string) => {
   const { type, audioFile } = block;
   if (type === "recorded") {
     const signedUrl = await createSignedObjectUrl(
@@ -61,7 +60,7 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
 };
 
 const handleOptions = (
-  twiml: Twilio.twiml.VoiceResponse,
+  twiml: TwimlResponse,
   block: { options?: Array<{ value: string; next?: string }> },
   campaignId: string,
   pageId: string,
@@ -93,7 +92,7 @@ const handleOptions = (
 };
 
 const handleBlock = async (
-    twiml: Twilio.twiml.VoiceResponse,
+    twiml: TwimlResponse,
   block: { type: string; audioFile: string; options?: Array<{ value: string; next?: string }> },
   campaignId: string,
   pageId: string,
@@ -114,7 +113,7 @@ export const action = defineAction({
 
   const baseUrl = env.BASE_URL();
 
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = createVoiceResponse();
 
   const { pageId, blockId, campaignId } = params as { pageId: string; blockId: string; campaignId: string };
 

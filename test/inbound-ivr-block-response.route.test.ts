@@ -25,32 +25,6 @@ vi.mock("@/lib/inbound-ivr-db.server", () => ({
   loadInboundIvrBlockContext: (...a: unknown[]) => mocks.loadInboundIvrBlockContext(...a),
 }));
 
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    private parts: string[] = [];
-    redirect(u: string) {
-      this.parts.push(`redirect:${u}`);
-    }
-    say(t: string) {
-      this.parts.push(`say:${t}`);
-    }
-    hangup() {
-      this.parts.push("hangup");
-    }
-    enqueue() {
-      const q = { queue: (_name: string) => {} };
-      return q;
-    }
-    dial() {
-      return { number: (_p: string) => {} };
-    }
-    toString() {
-      return `<Response>${this.parts.join("|")}</Response>`;
-    }
-  }
-  return { default: { twiml: { VoiceResponse } } };
-});
-
 function makeReq(form: Record<string, string>) {
   const params = new URLSearchParams(form);
   return new Request("https://base.example/api/inbound-ivr/1/page_1/b1/", {

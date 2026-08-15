@@ -6,7 +6,7 @@ import {
 } from "@/lib/telephony-db.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { hangupTwiml } from "@/lib/twilio-twiml.server";
+import { createVoiceResponse, hangupTwiml, type TwimlResponse } from "@/lib/twilio-twiml.server";
 import { requireTwilioSignatureForIvrResponse } from "@/lib/ivr-webhook-auth.server";
 import { defineAction } from "@/lib/handler.server";
 import {
@@ -14,7 +14,6 @@ import {
   syncContactSupportLevelCache,
 } from "@/lib/outreach-typed-fields.server";
 import { createTenantDb } from "@/server/tenant-db";
-import Twilio from "twilio";
 
 import type { Json } from "@/lib/db-types";
 const getOutreach = async (workspaceId: string, outreachId: number) => {
@@ -82,7 +81,7 @@ const findNextStep = (currentBlock: { id: string; options?: Array<{ value: strin
 };
 
 const handleNextStep = (
-  twiml: Twilio.twiml.VoiceResponse,
+  twiml: TwimlResponse,
   nextStep: string,
   campaignId: string,
   pageId: string,
@@ -117,7 +116,7 @@ export const action = defineAction({
   handler: async ({ params, auth }) => {
   const baseUrl = env.BASE_URL();
 
-  const twiml = new Twilio.twiml.VoiceResponse();
+  const twiml = createVoiceResponse();
 
   const pageId = params.pageId as string;
   const blockId = params.blockId as string;

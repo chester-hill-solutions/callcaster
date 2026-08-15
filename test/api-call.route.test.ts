@@ -6,15 +6,6 @@ vi.hoisted(() => {
 
 import { asRouteResponse } from "./helpers/route-result";
 
-const twilioMocks = vi.hoisted(() => {
-  return {
-    dialNumber: vi.fn(),
-    say: vi.fn(),
-    dial: vi.fn(),
-    toString: vi.fn(() => "<Response/>"),
-  };
-});
-
 const loggerMocks = vi.hoisted(() => ({ warn: vi.fn() }));
 
 const handsetState = vi.hoisted(() => ({
@@ -68,27 +59,6 @@ vi.mock("@/lib/workspace-members-db.server", async () => {
   };
 });
 
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    dial(opts: any) {
-      twilioMocks.dial(opts);
-      return { number: twilioMocks.dialNumber };
-    }
-    say(text: string) {
-      twilioMocks.say(text);
-    }
-    toString() {
-      return twilioMocks.toString();
-    }
-  }
-
-  return {
-    default: {
-      twiml: { VoiceResponse },
-    },
-  };
-});
-
 vi.mock("@/lib/env.server", () => {
   return {
     env: new Proxy(
@@ -112,10 +82,6 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
 
 describe("app/routes/api+/call/route.tsx", () => {
   beforeEach(() => {
-    twilioMocks.dialNumber.mockReset();
-    twilioMocks.say.mockReset();
-    twilioMocks.dial.mockReset();
-    twilioMocks.toString.mockClear();
     loggerMocks.warn.mockReset();
     handsetState.activeSession = true;
     handsetState.handsetNumber = null;
@@ -135,20 +101,15 @@ describe("app/routes/api+/call/route.tsx", () => {
     } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
-    await res.text();
-    expect(twilioMocks.dial).toHaveBeenCalledWith(
-      expect.objectContaining({
-        callerId: "+15551234567",
-        record: "record-from-answer",
-        recordingStatusCallback: "https://base.example/api/recording",
-      }),
+    const body = await res.text();
+    expect(body).toContain(
+      '<Dial callerId="+15551234567" record="record-from-answer" recordingStatusCallback="https://base.example/api/recording"',
     );
-    expect(twilioMocks.dialNumber).toHaveBeenCalledWith("+15555550100");
-    expect(twilioMocks.say).not.toHaveBeenCalled();
+    expect(body).toContain("<Number>+15555550100</Number>");
+    expect(body).not.toContain("<Say>");
   });
 
   test("action says invalid when To contains invalid chars", async () => {
-    twilioMocks.dial.mockClear();
     const mod = await import("../app/routes/api+/call");
     const fd = new FormData();
     fd.set("To", "not-a-phone");
@@ -159,11 +120,9 @@ describe("app/routes/api+/call/route.tsx", () => {
       }),
     } as any));
 
-    await res.text();
-    expect(twilioMocks.say).toHaveBeenCalledWith(
-      "The provided phone number is invalid.",
-    );
-    expect(twilioMocks.dial).not.toHaveBeenCalled();
+    const body = await res.text();
+    expect(body).toContain("<Say>The provided phone number is invalid.</Say>");
+    expect(body).not.toContain("<Dial");
   });
 
   test("handset flow rejects when no active handset session", async () => {
@@ -181,11 +140,11 @@ describe("app/routes/api+/call/route.tsx", () => {
       }),
     } as any));
 
-    await res.text();
-    expect(twilioMocks.say).toHaveBeenCalledWith(
-      "Your handset session has expired. Please refresh the page.",
+    const body = await res.text();
+    expect(body).toContain(
+      "<Say>Your handset session has expired. Please refresh the page.</Say>",
     );
-    expect(twilioMocks.dial).not.toHaveBeenCalled();
+    expect(body).not.toContain("<Dial");
     expect(loggerMocks.warn).toHaveBeenCalled();
   });
 
@@ -205,7 +164,7 @@ describe("app/routes/api+/call/route.tsx", () => {
     } as any));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
-    await res.text();
+    const body = await res.text();
     expect(telephonyDbMocks.insertCallForWorkspace).toHaveBeenCalledWith(
       "w1",
       expect.objectContaining({
@@ -217,18 +176,10 @@ describe("app/routes/api+/call/route.tsx", () => {
         status: "initiated",
       }),
     );
-    expect(twilioMocks.dial).toHaveBeenCalledWith(
-      expect.objectContaining({
-        callerId: "+15559876543",
-      }),
-    );
-    expect(twilioMocks.dialNumber).toHaveBeenCalledWith(
-      expect.objectContaining({
-        machineDetection: "Enable",
-        statusCallback: "https://base.example/api/call-status/",
-      }),
-      "+15555550100",
-    );
+    expect(body).toContain('<Dial callerId="+15559876543"');
+    expect(body).toContain('machineDetection="Enable"');
+    expect(body).toContain('statusCallback="https://base.example/api/call-status/"');
+    expect(body).toContain(">+15555550100</Number>");
   });
 
   test("handset flow says no caller id when workspace has no valid number", async () => {
@@ -245,11 +196,9 @@ describe("app/routes/api+/call/route.tsx", () => {
       }),
     } as any));
 
-    await res.text();
-    expect(twilioMocks.say).toHaveBeenCalledWith(
-      "No caller ID is configured for this workspace.",
-    );
-    expect(twilioMocks.dial).not.toHaveBeenCalled();
+    const body = await res.text();
+    expect(body).toContain("<Say>No caller ID is configured for this workspace.</Say>");
+    expect(body).not.toContain("<Dial");
   });
 
   test("falls back to default dial path when client_identity is missing", async () => {
@@ -264,10 +213,8 @@ describe("app/routes/api+/call/route.tsx", () => {
       }),
     } as any));
 
-    await res.text();
-    expect(twilioMocks.dial).toHaveBeenCalledWith(
-      expect.objectContaining({ callerId: "+15551234567" }),
-    );
+    const body = await res.text();
+    expect(body).toContain('<Dial callerId="+15551234567"');
   });
 
   test("says invalid when To is missing", async () => {
@@ -280,9 +227,7 @@ describe("app/routes/api+/call/route.tsx", () => {
       }),
     } as any));
 
-    await res.text();
-    expect(twilioMocks.say).toHaveBeenCalledWith(
-      "The provided phone number is invalid.",
-    );
+    const body = await res.text();
+    expect(body).toContain("<Say>The provided phone number is invalid.</Say>");
   });
 });
