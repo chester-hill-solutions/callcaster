@@ -364,6 +364,7 @@ export function CallScreenLayout({
             isBusy={isBusy || deviceIsBusy}
             predictive={campaign.dial_type === "predictive"}
             nextRecipient={nextRecipient}
+            questionContact={questionContact}
             activeCall={activeCall as unknown as ActiveCall}
             recentCall={recentCall}
             handleVoiceDrop={handleVoiceDrop}

@@ -135,7 +135,7 @@ describe("useCampaignDequeueActions", () => {
     const { result } = renderHook(() =>
       useCampaignDequeueActions({
         campaign: predictiveCampaign,
-        nextRecipient,
+        questionContact: nextRecipient,
         send,
         setCallDuration,
         handleDialButton,
@@ -171,7 +171,7 @@ describe("useCampaignDequeueActions", () => {
     const { result } = renderHook(() =>
       useCampaignDequeueActions({
         campaign: baseCampaign,
-        nextRecipient,
+        questionContact: nextRecipient,
         send,
         setCallDuration,
         handleDialButton,
@@ -197,5 +197,73 @@ describe("useCampaignDequeueActions", () => {
     expect(setUpdate).toHaveBeenCalledWith({});
     expect(setCallDuration).toHaveBeenCalledWith(0);
     expect(handleDialButton).not.toHaveBeenCalled();
+  });
+
+  // Regression for #1253: "Save and Next" used to early-return whenever the
+  // queue's nextRecipient pointer was empty — which is exactly what
+  // hangup.action.server.ts's dequeue produces the instant the agent hangs
+  // up on the last queued contact. The gate (and the dequeue target) must
+  // follow questionContact — the contact the panel is showing — so the
+  // button still works with an empty queue right after a call ends.
+  test("#1253: manual dequeue still saves/dequeues/advances when the queue is empty but questionContact is set", () => {
+    const send = vi.fn();
+    const setCallDuration = vi.fn();
+    const handleDialButton = vi.fn();
+    const saveData = vi.fn();
+    const dequeue = vi.fn();
+    const fetchMore = vi.fn();
+    const handleNextNumber = vi.fn();
+    const setRecentAttempt = vi.fn();
+    const setUpdate = vi.fn();
+
+    const { result } = renderHook(() =>
+      useCampaignDequeueActions({
+        campaign: baseCampaign,
+        questionContact: nextRecipient,
+        send,
+        setCallDuration,
+        handleDialButton,
+        saveData,
+        dequeue,
+        fetchMore,
+        // The queue is empty — this is the "0 of 1 remaining" screenshot
+        // from #1253, reached after hangup.action dequeued the sole contact.
+        householdMap: {},
+        handleNextNumber,
+        setRecentAttempt,
+        setUpdate,
+      }),
+    );
+
+    act(() => result.current());
+    expect(saveData).toHaveBeenCalledTimes(1);
+    expect(dequeue).toHaveBeenCalledWith({ contact: nextRecipient });
+    expect(handleNextNumber).toHaveBeenCalled();
+  });
+
+  test("no-ops when there is no campaign or no questionContact", () => {
+    const saveData = vi.fn();
+    const dequeue = vi.fn();
+
+    const { result } = renderHook(() =>
+      useCampaignDequeueActions({
+        campaign: baseCampaign,
+        questionContact: null,
+        send: vi.fn(),
+        setCallDuration: vi.fn(),
+        handleDialButton: vi.fn(),
+        saveData,
+        dequeue,
+        fetchMore: vi.fn(),
+        householdMap: {},
+        handleNextNumber: vi.fn(),
+        setRecentAttempt: vi.fn(),
+        setUpdate: vi.fn(),
+      }),
+    );
+
+    act(() => result.current());
+    expect(saveData).not.toHaveBeenCalled();
+    expect(dequeue).not.toHaveBeenCalled();
   });
 });

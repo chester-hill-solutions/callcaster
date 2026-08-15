@@ -32,6 +32,16 @@ interface Conference {
 export interface CallAreaProps {
   isBusy: boolean;
   nextRecipient: QueueItem | null;
+  /**
+   * The contact the script/disposition panel is currently recording an
+   * outcome for. Distinct from `nextRecipient` (the queue's next-to-dial
+   * pointer): hanging up dequeues the just-finished contact immediately
+   * (#1253), which can null out or advance `nextRecipient` before the agent
+   * has recorded a disposition. `questionContact` holds steady through that
+   * so the disposition control stays usable until the agent saves or the
+   * next dial starts.
+   */
+  questionContact: QueueItem | null;
   activeCall: ActiveCall | null;
   recentCall: Call | null;
   hangUp: () => void;
@@ -282,7 +292,7 @@ export function CallControls({
 type DispositionBarProps = Pick<
   CallAreaProps,
   | "isBusy"
-  | "nextRecipient"
+  | "questionContact"
   | "handleDequeueNext"
   | "disposition"
   | "dispositionOptions"
@@ -291,7 +301,7 @@ type DispositionBarProps = Pick<
 
 export function DispositionBar({
   isBusy,
-  nextRecipient,
+  questionContact,
   handleDequeueNext,
   disposition,
   dispositionOptions,
@@ -309,7 +319,7 @@ export function DispositionBar({
       <Select
         value={disposition}
         onValueChange={setDisposition}
-        disabled={!nextRecipient}
+        disabled={!questionContact}
       >
         <SelectTrigger
           data-testid="call-screen-disposition"
@@ -348,6 +358,7 @@ export function DispositionBar({
 export const CallArea: React.FC<CallAreaProps> = ({
   isBusy,
   nextRecipient,
+  questionContact,
   displayState,
   hangUp,
   handleVoiceDrop,
@@ -387,7 +398,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
       />
       <DispositionBar
         isBusy={isBusy}
-        nextRecipient={nextRecipient}
+        questionContact={questionContact}
         handleDequeueNext={handleDequeueNext}
         disposition={disposition}
         dispositionOptions={dispositionOptions}

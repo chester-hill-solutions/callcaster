@@ -56,6 +56,7 @@ function baseProps(overrides: Partial<any> = {}) {
   return {
     isBusy: false,
     nextRecipient: makeRecipient(),
+    questionContact: makeRecipient(),
     activeCall: null,
     recentCall: null,
     hangUp: vi.fn(),
@@ -288,7 +289,7 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
     const { rerender } = render(
       <CallArea
         {...baseProps({
-          nextRecipient: null,
+          questionContact: null,
           handleDequeueNext,
           dispositionOptions,
           setDisposition,
@@ -336,5 +337,43 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
       />,
     );
     expect(screen.getByRole("button", { name: "Save and Next" })).toBeDisabled();
+  });
+
+  // Regression for #1253: "survey/script and disposition are all inactive
+  // and can't be filled after hanging up with user". hangup.action.server.ts
+  // dequeues the just-finished contact's queue row the instant the agent
+  // hangs up, which the call screen's queue state (useQueue's updateQueue)
+  // reflects by collapsing `nextRecipient` — to the following queue item, or
+  // to null once the queue empties (the reported case: a single-contact
+  // queue). The disposition Select must stay driven by `questionContact`
+  // (who the panel is currently recording an outcome for), which survives
+  // that collapse, not by the queue's `nextRecipient` pointer.
+  test("#1253: disposition select stays enabled after the queue empties post-hangup (nextRecipient null, questionContact still set)", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+
+    const setDisposition = vi.fn();
+    const handleDequeueNext = vi.fn();
+    const dispositionOptions: any[] = [{ value: "completed", label: "Completed" }];
+
+    render(
+      <CallArea
+        {...baseProps({
+          // The exact post-hangup shape: the queue's forward pointer is
+          // gone, but the contact just called is still the one the agent
+          // needs to record a disposition for.
+          nextRecipient: null,
+          questionContact: makeRecipient(),
+          handleDequeueNext,
+          dispositionOptions,
+          setDisposition,
+        })}
+      />,
+    );
+
+    const sel = screen.getByRole("combobox") as HTMLSelectElement;
+    expect(sel).not.toBeDisabled();
+
+    fireEvent.change(sel, { target: { value: "completed" } });
+    expect(setDisposition).toHaveBeenCalledWith("completed");
   });
 });
