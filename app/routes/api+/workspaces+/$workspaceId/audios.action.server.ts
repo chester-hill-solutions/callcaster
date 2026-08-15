@@ -4,28 +4,11 @@ import {
   uploadWorkspaceAudioApi,
 } from "@/lib/platform-media.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { dataPlaneSessionAuth } from "@/lib/capability-guard.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-
-function requireDataPlaneUser({
-  params,
-  context,
-}: LoaderFunctionArgs | ActionFunctionArgs) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-  const { userId } = getDataPlaneRouteContext(context, workspaceId);
-  if (!userId) {
-    return jsonError("Unauthorized", 401);
-  }
-
-  return { userId, workspaceId };
-}
 
 export const loader = defineLoader({
-  auth: requireDataPlaneUser,
+  auth: dataPlaneSessionAuth(),
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     try {
@@ -43,7 +26,7 @@ export const loader = defineLoader({
 });
 
 export const action = defineAction({
-  auth: requireDataPlaneUser,
+  auth: dataPlaneSessionAuth(),
   sideEffects: ["db-write", "external"],
   handler: async ({ request, auth }) => {
     if (request.method !== "POST") {

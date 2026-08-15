@@ -6,27 +6,11 @@ import {
 } from "@/lib/platform-analytics.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { campaignExportBodySchema } from "@/lib/schemas/api/platform-analytics";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { dataPlaneSessionAuth } from "@/lib/capability-guard.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
-import type { LoaderFunctionArgs } from "react-router";
-
-function requireWorkspaceUser({
-  params,
-  context,
-}: Pick<LoaderFunctionArgs, "params" | "context">) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-  const { userId } = getDataPlaneRouteContext(context, workspaceId);
-  if (!userId) {
-    return jsonError("Unauthorized", 401);
-  }
-  return { workspaceId, userId };
-}
 
 export const loader = defineLoader({
-  auth: requireWorkspaceUser,
+  auth: dataPlaneSessionAuth(),
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     try {
@@ -44,7 +28,7 @@ export const loader = defineLoader({
 });
 
 export const action = defineAction({
-  auth: requireWorkspaceUser,
+  auth: dataPlaneSessionAuth(),
   sideEffects: ["db-write"],
   handler: async ({ request, auth }) => {
     if (request.method !== "POST") {

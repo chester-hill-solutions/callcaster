@@ -1,26 +1,14 @@
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { dataPlaneSessionAuth } from "@/lib/capability-guard.server";
 import { defineLoader } from "@/lib/handler.server";
-import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = defineLoader({
-  // Membership-only by design (declared `authClass: "session"`). Every workspace
-  // role — `caller` included — polls this from the campaign call screen for live
-  // credit reconciliation, so no minRole gate: adding one would break dialing.
-  // Membership itself is enforced by `dataPlaneMiddleware` (non-members → 404).
-  auth: ({ params, context }: LoaderFunctionArgs) => {
-    const workspaceId = params.workspaceId;
-    if (!workspaceId) {
-      return jsonError("workspaceId is required", 400);
-    }
-    const { userId } = getDataPlaneRouteContext(context, workspaceId);
-    if (!userId) {
-      return jsonError("Unauthorized", 401);
-    }
-
-    return { userId, workspaceId };
-  },
+  // Membership-only by design (authClass "session", derived authoritatively
+  // from dataPlaneSessionAuth). Every workspace role — `caller` included —
+  // polls this from the campaign call screen for live credit reconciliation,
+  // so no minRole gate: adding one would break dialing.
+  auth: dataPlaneSessionAuth(),
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     const balance = await getWorkspaceCreditsBalance(auth.workspaceId);

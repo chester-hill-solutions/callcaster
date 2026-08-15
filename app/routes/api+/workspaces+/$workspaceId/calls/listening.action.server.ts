@@ -4,23 +4,11 @@ import {
   stopCallListeningApi,
 } from "@/lib/platform-telephony.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { dataPlaneSessionAuth } from "@/lib/capability-guard.server";
 import { defineAction } from "@/lib/handler.server";
-import type { ActionFunctionArgs } from "react-router";
 
 export const action = defineAction({
-  auth: ({ params, context }: ActionFunctionArgs) => {
-    const workspaceId = params.workspaceId;
-    if (!workspaceId) {
-      return jsonError("workspaceId is required", 400);
-    }
-    const { userId } = getDataPlaneRouteContext(context, workspaceId);
-    if (!userId) {
-      return jsonError("Unauthorized", 401);
-    }
-
-    return { userId, workspaceId };
-  },
+  auth: dataPlaneSessionAuth(),
   sideEffects: ["db-write"],
   handler: async ({ request, auth }) => {
     try {

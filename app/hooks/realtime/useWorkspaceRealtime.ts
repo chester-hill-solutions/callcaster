@@ -302,15 +302,23 @@ export const useWorkspaceRealtime = ({
     [setRecentAttempt],
   );
 
-  /**
-   * @effect CANDIDATE-REMOVE: Pushes nextRecipient up to the parent via setQuestionContact whenever it changes.
-   * @effect-deps nextRecipient (derived queue state from useQueue); setQuestionContact (parent-supplied setter)
-   * @effect-side-effects none — calls the parent's setQuestionContact with the current nextRecipient
-   * @effect-why-not-loader This isn't fetch/loader territory — it's the "adjust state based on a prop/state change" anti-pattern from the React docs (you-might-not-need-an-effect). nextRecipient is already derived local state (from useQueue); syncing it to a parent-owned setState on every change via an effect causes an extra render pass. It would likely be cleaner for the parent to own/derive questionContact directly, or for callers here to invoke setQuestionContact at the point nextRecipient is actually produced (inside useQueue/updateQueue/updateCalls) rather than reactively mirroring it. Left as-is per scope (annotate + flag only, not rewrite).
-   */
-  useEffect(() => {
-    setQuestionContact(nextRecipient);
-  }, [nextRecipient, setQuestionContact]);
+  // REMOVED (#1253): this hook used to unconditionally mirror nextRecipient
+  // into the parent's questionContact on every change via an effect that
+  // just called setQuestionContact(nextRecipient) with those two as its
+  // only dependencies.
+  // nextRecipient is the queue's next-to-dial pointer, not "who the
+  // script/disposition panel is recording an outcome for" — and hanging up
+  // dequeues the just-finished contact immediately (hangup.action.server.ts),
+  // which collapses nextRecipient to the next queue item or to null before
+  // the agent has had a chance to record a disposition. Mirroring that
+  // straight into questionContact nulled out (or silently redirected) the
+  // in-progress script/disposition panel right after every call ended —
+  // exactly the "survey/script and disposition are inactive after hanging
+  // up" bug. useNextRecipientSync (app/hooks/call/useNextRecipientSync.ts)
+  // already advances questionContact whenever a genuine new nextRecipient
+  // shows up (guarded on truthiness), so this duplicate — and uniquely
+  // destructive — sync isn't needed for the legitimate "advance to the next
+  // contact" case either.
 
   return {
     queue,
