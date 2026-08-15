@@ -22,7 +22,7 @@ const CAPABILITIES_TS = `export const PRODUCT_CAPABILITIES = {
 `;
 
 type Fixture = {
-  /** Contents of the single api-surface-fixture.ts file. */
+  /** Contents of the generated api-surface-generated.ts core. */
   surface: string;
   /** repo-relative path -> file contents. */
   files: Record<string, string>;
@@ -32,7 +32,7 @@ let root: string;
 
 function build({ surface, files }: Fixture) {
   writeFile("app/lib/capabilities.ts", CAPABILITIES_TS);
-  writeFile("app/lib/api-surface-fixture.ts", surface);
+  writeFile("app/lib/api-surface-generated.ts", surface);
   for (const [rel, contents] of Object.entries(files)) writeFile(rel, contents);
 }
 
@@ -52,25 +52,17 @@ function analyze(baseline: Record<string, string> = {}) {
   };
 }
 
-/** One entry, one GET loader operation, at /api/thing. */
+/**
+ * One entry, one GET loader operation, at /api/thing — in the shape
+ * scripts/generate-api-surface.ts emits, which is what the linkage reads
+ * since D4 folded the four hand-written surface files into one generated core.
+ */
 function surfaceWith(capability: string | null, routeModule = "app/routes/api+/thing.route.tsx") {
-  return `import { seed } from "@/lib/api-surface-seeds";
-export const FIXTURE = [
-  seed({
-    path: "/api/thing",
-    routeModule: "${routeModule}",
-    authClass: "session",
-    ownerArea: "campaigns",
-    exposure: "sessionOnly",
-    docsGuide: "docs/x.md",
-    operations: [
-      {
-        method: "GET",
-        handler: "loader",
-        bodyType: "query",${capability ? `\n        capability: "${capability}",` : ""}
-      },
-    ],
-  }),
+  const cap = capability ? `, capability: "${capability}"` : "";
+  return `import type { ApiSurfaceCore } from "@/lib/api-surface-types";
+
+export const API_SURFACE_CORE: readonly ApiSurfaceCore[] = [
+  { path: "/api/thing", routeModule: "${routeModule}", authClass: "session", authVia: "loader:test", operations: [{ method: "GET", handler: "loader"${cap} }] },
 ];
 `;
 }

@@ -12,7 +12,9 @@ function main() {
   const lines = [
     "# API Surface Inventory",
     "",
-    "Generated from [`app/lib/api-surface.ts`](../app/lib/api-surface.ts).",
+    "Generated from [`app/lib/api-surface.ts`](../app/lib/api-surface.ts), which merges",
+    "the derived core in [`api-surface-generated.ts`](../app/lib/api-surface-generated.ts)",
+    "with the editorial [`api-surface-annotations.ts`](../app/lib/api-surface-annotations.ts).",
     "Regenerate with `npm run tools:api:surface:report`.",
     "",
     "Interactive specs:",

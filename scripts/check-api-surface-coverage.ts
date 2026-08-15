@@ -1,75 +1,138 @@
 #!/usr/bin/env node
+/**
+ * API surface coverage gate.
+ *
+ * Since #1242 D4 the inventory's mechanical half is GENERATED from the route
+ * tree, so the checks this gate used to make — does every registered route
+ * have an entry, does every entry name a real module — are true by
+ * construction. What replaces them is the pair of checks that construction
+ * makes possible:
+ *
+ *   1. the committed generated core is not stale, and
+ *   2. the hand-written annotations line up with it exactly — no route without
+ *      prose, no prose for a route that no longer exists, and no declared
+ *      `authClass` that the handler's own auth strategy contradicts.
+ *
+ * The OpenAPI and integrator assertions below are unchanged: they check the
+ * published contract (ADR-0014, ADR-0018) rather than the inventory's shape.
+ */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { API_SURFACE, getPublicOpenApiEntries } from "../app/lib/api-surface";
+import { API_SURFACE_ANNOTATIONS } from "../app/lib/api-surface-annotations";
+import { API_SURFACE_CORE } from "../app/lib/api-surface-generated";
 import { completeOpenApiSpec } from "../app/lib/openapi-complete";
 import { openApiSpec } from "../app/lib/openapi";
 import { toOpenApiPath } from "../app/lib/openapi-build";
 import {
   INTEGRATOR_API_PATHS,
 } from "../app/lib/public-api";
-import {
-  groupRouteModulesByPath,
-  parseApiRoutesFromReactRouter,
-} from "./lib/parse-api-routes.mjs";
+import { deriveApiSurfaceCores } from "./lib/api-surface-derive.mjs";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPORT = path.join(ROOT, "docs/api-surface-inventory.md");
 const writeReport = process.argv.includes("--write-report");
 
-function normalizeInventoryPath(pathname: string) {
-  return pathname.startsWith("/") ? pathname : `/${pathname}`;
-}
+type DerivedCore = {
+  path: string;
+  routeModule: string;
+  authClass: string | null;
+  authVia: string;
+  authAllows: string[] | null;
+  operations: { method: string; handler: string; capability?: string }[];
+};
 
 async function main() {
   if (writeReport) {
     await import("./generate-api-surface-report");
   }
 
-  const registered = parseApiRoutesFromReactRouter({ cwd: ROOT });
-  const byPath = groupRouteModulesByPath(registered);
-
   const errors: string[] = [];
 
-  const inventoryPaths = new Set(API_SURFACE.map((e) => e.path));
+  // ── 1. the committed core still matches the code it was derived from ──
+  const { cores, diagnostics } = deriveApiSurfaceCores({ root: ROOT }) as {
+    cores: DerivedCore[];
+    diagnostics: string[];
+  };
+  for (const d of diagnostics) errors.push(`derivation: ${d}`);
 
-  for (const [routePath, modules] of byPath.entries()) {
-    const fullPath = normalizeInventoryPath(routePath);
-    if (!inventoryPaths.has(fullPath)) {
-      errors.push(`missing inventory entry for registered route ${fullPath}`);
+  const committed = new Map(API_SURFACE_CORE.map((c) => [c.routeModule, c]));
+  const derived = new Map(cores.map((c) => [c.routeModule, c]));
+  const shape = (c: { path: string; authClass: string | null; operations: readonly { method: string; handler: string; capability?: string }[] }) =>
+    `${c.path}|${c.authClass ?? "-"}|${c.operations
+      .map((o) => `${o.method}:${o.handler}:${o.capability ?? "-"}`)
+      .sort()
+      .join(",")}`;
+
+  for (const [mod, want] of derived) {
+    const got = committed.get(mod);
+    if (!got) {
+      errors.push(
+        `api-surface-generated.ts is stale — missing ${want.path} (${mod}); run \`npm run tools:api:surface:generate\``,
+      );
+    } else if (shape(got) !== shape(want)) {
+      errors.push(
+        `api-surface-generated.ts is stale for ${want.path}:\n      committed ${shape(got)}\n      derived   ${shape(want)}`,
+      );
+    }
+  }
+  for (const [mod, got] of committed) {
+    if (!derived.has(mod)) {
+      errors.push(
+        `api-surface-generated.ts lists ${got.path} (${mod}) but it is no longer a callable route; run \`npm run tools:api:surface:generate\``,
+      );
+    }
+  }
+
+  // ── 2. annotations line up with the generated core, both directions ──
+  for (const core of API_SURFACE_CORE) {
+    const annotation = API_SURFACE_ANNOTATIONS[core.routeModule];
+    if (!annotation) {
+      errors.push(
+        `no annotation for generated route ${core.path} (${core.routeModule}) — add one to app/lib/api-surface-annotations.ts`,
+      );
       continue;
     }
-    for (const mod of modules) {
-      const known = API_SURFACE.some(
-        (e) => e.path === fullPath && e.routeModule === mod,
+    if (!annotation.docsGuide) errors.push(`annotation ${core.path} missing docsGuide`);
+    if (!annotation.exposure) errors.push(`annotation ${core.path} missing exposure`);
+    if (!annotation.ownerArea) errors.push(`annotation ${core.path} missing ownerArea`);
+
+    // An authoritative derivation is not overridable; a declaration alongside
+    // one is either redundant or a lie, and both should be deleted.
+    if (core.authClass && annotation.authClass) {
+      errors.push(
+        `annotation ${core.path} declares authClass "${annotation.authClass}" but ` +
+          `${core.authVia} authoritatively enforces "${core.authClass}" — remove the declaration`,
       );
-      if (!known) {
+    }
+    if (!core.authClass && !annotation.authClass) {
+      errors.push(
+        `annotation ${core.path} must declare an authClass: no authoritative strategy fixes it (${core.authVia})`,
+      );
+    }
+
+    // A declared class the handler's auth cannot actually produce is drift.
+    const evidence = derived.get(core.routeModule);
+    if (!core.authClass && annotation.authClass && evidence?.authAllows) {
+      if (!evidence.authAllows.includes(annotation.authClass)) {
         errors.push(
-          `inventory missing module ${mod} for registered route ${fullPath}`,
+          `annotation ${core.path} declares authClass "${annotation.authClass}", which ` +
+            `${evidence.authVia} cannot produce (permits ${evidence.authAllows.join(", ")})`,
         );
       }
     }
   }
+  for (const routeModule of Object.keys(API_SURFACE_ANNOTATIONS)) {
+    if (!committed.has(routeModule)) {
+      errors.push(
+        `annotation for ${routeModule} has no generated route — delete it from app/lib/api-surface-annotations.ts`,
+      );
+    }
+  }
 
   for (const entry of API_SURFACE) {
-    if (entry.path === "/api/docs/openapi/all") {
-      continue;
-    }
-    const registeredModules = byPath.get(entry.path);
-    if (!registeredModules && !entry.duplicate) {
-      errors.push(`inventory entry ${entry.path} is not registered in route tree`);
-    }
-    if (!entry.docsGuide) {
-      errors.push(`inventory entry ${entry.path} missing docsGuide`);
-    }
-    if (!entry.authClass) {
-      errors.push(`inventory entry ${entry.path} missing authClass`);
-    }
-    if (!entry.exposure) {
-      errors.push(`inventory entry ${entry.path} missing exposure`);
-    }
     if (entry.authClass === "weakUnknown" && !entry.securityWarning) {
       errors.push(
         `weakUnknown route ${entry.path} must include securityWarning`,
@@ -171,7 +234,9 @@ async function main() {
   }
 
   console.log(
-    `API surface coverage OK (${registered.length} registered paths, ${API_SURFACE.length} inventory entries)`,
+    `API surface coverage OK (${API_SURFACE.length} entries: ` +
+      `${API_SURFACE_CORE.filter((c) => c.authClass).length} authClass derived, ` +
+      `${API_SURFACE_CORE.filter((c) => !c.authClass).length} declared and cross-checked)`,
   );
 }
 

@@ -410,11 +410,16 @@ export function deriveApiSurfaceCores({ root, routes }) {
         continue;
       }
 
+      const auth = resolveEntryAuth(authFacts);
       cores.push({
         path: fullPath,
         routeModule,
+        authClass: auth.authClass,
+        authVia: auth.via,
         operations,
-        auth: resolveEntryAuth(authFacts),
+        // Analysis-only, not part of the committed artifact: the classes a base
+        // helper leaves open, for the gate to constrain the annotation against.
+        authAllows: auth.allows,
         authFacts,
       });
     }
