@@ -72,6 +72,9 @@ export const action = defineAction({
     });
   }
 
+  // Still baselined (issue #1242, D3): workspace_id comes from the parsed
+  // JSON body, not a route param, so the capability check can't move into a
+  // pre-request `auth:` strategy without a body-clone rework of this route.
   const capability = await requireDualAuthCapability({
     auth: authResult,
     workspaceId: workspace_id,
