@@ -3,7 +3,10 @@ import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { RpcExecutor } from "@/lib/db-rpc.server";
-import type { dequeueQueueEntry as DequeueFn } from "@/lib/campaign-queue-db.server";
+import type {
+  dequeueQueueEntry as DequeueFn,
+  explainDequeueNoOp as ExplainFn,
+} from "@/lib/campaign-queue-db.server";
 
 /**
  * The real `dequeue_contact` plpgsql function, exercised through the app's
@@ -24,6 +27,14 @@ import type { dequeueQueueEntry as DequeueFn } from "@/lib/campaign-queue-db.ser
  * who no longer holds it still no-ops. The race-guard tests below are the
  * half of that contract that must not regress if someone later "simplifies"
  * the predicate to an unconditional UPDATE.
+ *
+ * Issue #1278: that no-op was invisible. `20260815130000` makes the function
+ * return the row count of its PRIMARY update, `dequeueQueueEntry` reports it
+ * as `dequeuedPrimary`, and POST /api/queues answers 409 instead of
+ * `{ success: true }` when a supervisor dequeues a row another agent holds.
+ * Every case below now asserts the reported outcome alongside the row state —
+ * a predicate that matched and a count that said so are two separate claims,
+ * and this is the only tier where either can be checked for real.
  *
  * No other automated test runs this function against a real database: the
  * unit tier mocks the db client, and
@@ -86,6 +97,7 @@ describeDb("dequeue_contact against real Postgres", () => {
   let client: postgres.Sql;
   let exec: RpcExecutor;
   let dequeueQueueEntry: typeof DequeueFn;
+  let explainDequeueNoOp: typeof ExplainFn;
   let workspaceId: string;
   let campaignId: string;
   let householdId: string;
@@ -146,7 +158,9 @@ describeDb("dequeue_contact against real Postgres", () => {
       execute: (query) => database.execute(query) as unknown as Promise<unknown[]>,
     };
 
-    ({ dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server"));
+    ({ dequeueQueueEntry, explainDequeueNoOp } = await import(
+      "@/lib/campaign-queue-db.server"
+    ));
 
     await client`
       insert into public."user" (id, username, first_name, last_name)
@@ -231,7 +245,7 @@ describeDb("dequeue_contact against real Postgres", () => {
       provider_status: "initiated",
     });
 
-    await dequeueQueueEntry({
+    const result = await dequeueQueueEntry({
       by: { contactId: Number(loneContactId) },
       workspaceId,
       // The park path: guarded RPC, no household fan-out.
@@ -240,6 +254,8 @@ describeDb("dequeue_contact against real Postgres", () => {
       reason: "Ambiguous dial failure — parked for review",
       exec,
     });
+
+    expect(result).toEqual({ dequeuedPrimary: true });
 
     const row = await queueRow(loneContactId);
     expect(row.queue_state).toBe("dequeued");
@@ -260,7 +276,7 @@ describeDb("dequeue_contact against real Postgres", () => {
       assigned_to_user_id: AGENT_A,
     });
 
-    await dequeueQueueEntry({
+    const result = await dequeueQueueEntry({
       by: { contactId: Number(primaryContactId) },
       workspaceId,
       household: true,
@@ -268,6 +284,9 @@ describeDb("dequeue_contact against real Postgres", () => {
       reason: "Predictive Dialer called contact",
       exec,
     });
+
+    // The count is the PRIMARY row's, not the fan-out total.
+    expect(result).toEqual({ dequeuedPrimary: true });
 
     const primary = await queueRow(primaryContactId);
     const sibling = await queueRow(siblingContactId);
@@ -278,7 +297,7 @@ describeDb("dequeue_contact against real Postgres", () => {
   });
 
   test("a queued row still dequeues (the pre-existing path is unchanged)", async () => {
-    await dequeueQueueEntry({
+    const result = await dequeueQueueEntry({
       by: { contactId: Number(loneContactId) },
       workspaceId,
       household: false,
@@ -286,6 +305,8 @@ describeDb("dequeue_contact against real Postgres", () => {
       reason: "Manually dequeued by user",
       exec,
     });
+
+    expect(result).toEqual({ dequeuedPrimary: true });
 
     const row = await queueRow(loneContactId);
     expect(row.queue_state).toBe("dequeued");
@@ -295,7 +316,7 @@ describeDb("dequeue_contact against real Postgres", () => {
   test("a row with a null queue_state (legacy) still dequeues", async () => {
     await setState(loneContactId, { queue_state: null });
 
-    await dequeueQueueEntry({
+    const result = await dequeueQueueEntry({
       by: { contactId: Number(loneContactId) },
       workspaceId,
       household: false,
@@ -304,6 +325,7 @@ describeDb("dequeue_contact against real Postgres", () => {
       exec,
     });
 
+    expect(result).toEqual({ dequeuedPrimary: true });
     expect((await queueRow(loneContactId)).queue_state).toBe("dequeued");
   });
 
@@ -320,7 +342,7 @@ describeDb("dequeue_contact against real Postgres", () => {
       provider_status: "in-progress",
     });
 
-    await dequeueQueueEntry({
+    const result = await dequeueQueueEntry({
       by: { contactId: Number(loneContactId) },
       workspaceId,
       household: false,
@@ -328,6 +350,10 @@ describeDb("dequeue_contact against real Postgres", () => {
       reason: "Stale dequeue from agent A",
       exec,
     });
+
+    // #1278: the guard held AND said so. Before, this returned nothing and
+    // POST /api/queues answered `{ success: true }`.
+    expect(result).toEqual({ dequeuedPrimary: false });
 
     const row = await queueRow(loneContactId);
     expect(row.queue_state).toBe("assigned");
@@ -347,7 +373,7 @@ describeDb("dequeue_contact against real Postgres", () => {
       provider_status: "ringing",
     });
 
-    await dequeueQueueEntry({
+    const result = await dequeueQueueEntry({
       by: { contactId: Number(primaryContactId) },
       workspaceId,
       household: true,
@@ -355,6 +381,10 @@ describeDb("dequeue_contact against real Postgres", () => {
       reason: "Predictive Dialer called contact",
       exec,
     });
+
+    // The primary landed, so this is a success even though the fan-out skipped
+    // a sibling — the skip is the guard, not a failure the caller reports.
+    expect(result).toEqual({ dequeuedPrimary: true });
 
     expect((await queueRow(primaryContactId)).queue_state).toBe("dequeued");
     const sibling = await queueRow(siblingContactId);
@@ -373,7 +403,7 @@ describeDb("dequeue_contact against real Postgres", () => {
       assigned_to_user_id: AGENT_A,
     });
 
-    await dequeueQueueEntry({
+    const result = await dequeueQueueEntry({
       by: { contactId: Number(loneContactId) },
       workspaceId,
       household: false,
@@ -382,9 +412,111 @@ describeDb("dequeue_contact against real Postgres", () => {
       exec,
     });
 
+    expect(result).toEqual({ dequeuedPrimary: false });
+
     const row = await queueRow(loneContactId);
     expect(row.queue_state).toBe("assigned");
     expect(row.assigned_to_user_id).toBe(AGENT_A);
+  });
+
+  // ── #1278: the no-op is surfaced, and named ─────────────────────────────
+
+  test("a supervisor's manual dequeue of another agent's row is reported, not silent", async () => {
+    // The reported defect: POST /api/queues → dequeueQueueEntry with
+    // household following the campaign setting. Agent B holds the row; the
+    // supervisor is a different user, so the claim token does not match.
+    await setState(primaryContactId, {
+      queue_state: "assigned",
+      assigned_to_user_id: AGENT_B,
+      provider_status: "in-progress",
+    });
+
+    const result = await dequeueQueueEntry({
+      by: { contactId: Number(primaryContactId) },
+      workspaceId,
+      household: true,
+      userId: AGENT_A,
+      reason: "Manually dequeued by user",
+      exec,
+    });
+
+    expect(result).toEqual({ dequeuedPrimary: false });
+
+    // The guard: agent B's live claim is untouched.
+    const row = await queueRow(primaryContactId);
+    expect(row.queue_state).toBe("assigned");
+    expect(row.assigned_to_user_id).toBe(AGENT_B);
+    expect(row.provider_status).toBe("in-progress");
+    expect(row.dequeued_at).toBeNull();
+
+    // ...and the route can say why, rather than answering `{ success: true }`.
+    await expect(
+      explainDequeueNoOp({
+        contactId: Number(primaryContactId),
+        workspaceId,
+        userId: AGENT_A,
+      }),
+    ).resolves.toBe("assigned_elsewhere");
+  });
+
+  test("re-dequeuing an already-dequeued contact is a no-op the route can tell apart", async () => {
+    // The manual-dial flow dequeues on "next contact" after the hangup route
+    // already dequeued the same row. Zero rows affected, but nothing is wrong
+    // — calling it a conflict would toast on every completed call.
+    await dequeueQueueEntry({
+      by: { contactId: Number(loneContactId) },
+      workspaceId,
+      household: false,
+      userId: AGENT_A,
+      reason: "Call completed",
+      exec,
+    });
+
+    const second = await dequeueQueueEntry({
+      by: { contactId: Number(loneContactId) },
+      workspaceId,
+      household: false,
+      userId: AGENT_A,
+      reason: "Manually dequeued by user",
+      exec,
+    });
+
+    expect(second).toEqual({ dequeuedPrimary: false });
+    await expect(
+      explainDequeueNoOp({
+        contactId: Number(loneContactId),
+        workspaceId,
+        userId: AGENT_A,
+      }),
+    ).resolves.toBe("already_dequeued");
+  });
+
+  test("explainDequeueNoOp reports not_found for a contact with no queue row", async () => {
+    await expect(
+      explainDequeueNoOp({ contactId: -1, workspaceId, userId: AGENT_A }),
+    ).resolves.toBe("not_found");
+  });
+
+  test("exactly one dequeue_contact overload exists, and it returns integer", async () => {
+    // The return-type change had to go through DROP + CREATE. An orphaned
+    // overload left behind by a partial DROP is how this repo previously got
+    // `function ... is not unique` at runtime (20260722120000).
+    const overloads = await client<{ args: string; result: string }[]>`
+      select
+        pg_get_function_identity_arguments(p.oid) as args,
+        pg_get_function_result(p.oid) as result
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public'
+        and p.proname = 'dequeue_contact'
+    `;
+
+    expect(overloads).toHaveLength(1);
+    expect(overloads[0].args).toBe(
+      "passed_contact_id bigint, group_on_household boolean, p_workspace uuid, " +
+        "dequeued_by_id uuid, dequeued_reason_text text",
+    );
+    expect(overloads[0].result).toBe("integer");
   });
 
   test("the workspace predicate still scopes every write", async () => {
@@ -403,7 +535,7 @@ describeDb("dequeue_contact against real Postgres", () => {
     const otherWorkspaceId = otherWorkspaces[0].id;
 
     try {
-      await dequeueQueueEntry({
+      const result = await dequeueQueueEntry({
         by: { contactId: Number(loneContactId) },
         workspaceId: otherWorkspaceId,
         household: false,
@@ -411,6 +543,8 @@ describeDb("dequeue_contact against real Postgres", () => {
         reason: "Cross-tenant dequeue attempt",
         exec,
       });
+
+      expect(result).toEqual({ dequeuedPrimary: false });
 
       const row = await queueRow(loneContactId);
       expect(row.queue_state).toBe("assigned");
