@@ -19,11 +19,25 @@ vi.hoisted(() => {
     process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
 });
 
+/**
+ * Defaults are passed to `vi.fn(impl)` rather than assigned in `beforeEach`:
+ * the shared vitest config sets `mockReset: true`, which resets each mock to
+ * the implementation it was *created* with. An implementation installed in a
+ * hook is wiped, and `insertWorkspaceApiKeyRow` would then return undefined —
+ * surfacing as a 500 that looks like a product bug.
+ */
 const mocks = vi.hoisted(() => ({
-  getUserRole: vi.fn(),
-  insertWorkspaceApiKeyRow: vi.fn(),
-  listWorkspaceApiKeyRows: vi.fn(),
-  deleteWorkspaceApiKeyRow: vi.fn(),
+  getUserRole: vi.fn(async () => null as { role: string } | null),
+  insertWorkspaceApiKeyRow: vi.fn(async (input: any) => ({
+    id: "key-1",
+    name: input.name,
+    key_prefix: input.keyPrefix,
+    created_at: "2026-01-01T00:00:00.000Z",
+    scopes: input.scopes,
+    expires_at: input.expiresAt,
+  })),
+  listWorkspaceApiKeyRows: vi.fn(async () => [] as unknown[]),
+  deleteWorkspaceApiKeyRow: vi.fn(async () => undefined),
   recordAudit: vi.fn(async () => undefined),
 }));
 
@@ -55,6 +69,24 @@ vi.mock("@/lib/workspace-members-db.server", () => ({
 vi.mock("@/lib/audit-event.server", () => ({
   safeRecordWorkspaceAuditEvent: (...args: unknown[]) =>
     mocks.recordAudit(...args),
+}));
+
+/**
+ * `test/setup-route-auth-mock.ts` replaces this module wholesale with the five
+ * route-auth strategies, so the key-hashing helpers `platform-members.server`
+ * imports are absent. Re-declare it here with those added; the strategies are
+ * unused on this route (it authenticates via the data-plane context) but are
+ * kept so the shape stays compatible with the global mock.
+ */
+vi.mock("@/lib/api-auth.server", () => ({
+  requireDualAuth: vi.fn(),
+  requireJsonAuth: vi.fn(),
+  requireSudo: vi.fn(),
+  resolveDualAuthSession: vi.fn(),
+  resolveJsonAuthSession: vi.fn(),
+  getDualAuthUser: vi.fn(),
+  API_KEY_PREFIX_LENGTH: 24,
+  hashApiKeyForStorage: (key: string) => `hashed:${key}`,
 }));
 
 vi.mock("@/server/db", () => ({ db: {}, directPool: {} }));
@@ -109,17 +141,6 @@ function withRole(role: string | null) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.recordAudit.mockResolvedValue(undefined);
-  mocks.listWorkspaceApiKeyRows.mockResolvedValue([]);
-  mocks.deleteWorkspaceApiKeyRow.mockResolvedValue(undefined);
-  mocks.insertWorkspaceApiKeyRow.mockImplementation(async (input: any) => ({
-    id: "key-1",
-    name: input.name,
-    key_prefix: input.keyPrefix,
-    created_at: "2026-01-01T00:00:00.000Z",
-    scopes: input.scopes,
-    expires_at: input.expiresAt,
-  }));
 });
 
 describe("POST /api/workspaces/:workspaceId/api-keys — role floor", () => {
