@@ -5,8 +5,10 @@ import { CallInstance } from "twilio/lib/rest/api/v2010/account/call";
 import { eq } from "drizzle-orm";
 import { call as callTable } from "@/db/schema";
 import { insertCallForWorkspace, updateCallBySid } from "@/lib/telephony-db.server";
-import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { hasInsufficientCreditsForOutbound } from "../../shared/credit-floor";
+import {
+  OUTBOUND_CREDITS_BLOCKED_BODY,
+  requireOutboundCredits,
+} from "@/lib/outbound-credit-gate.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
@@ -54,11 +56,14 @@ export async function startAutoDialConference(
     }
   }
 
-  const credits = await getWorkspaceCreditsBalance(workspaceId);
-  if (credits === null) {
-    throw new Error(`Workspace ${workspaceId} not found`);
-  }
-  if (hasInsufficientCreditsForOutbound(credits)) {
+  const credits = await requireOutboundCredits(workspaceId);
+  if (!credits.ok) {
+    if (credits.reason === "workspace_not_found") {
+      // Uniform 404 (matches requireWorkspaceAccess's workspace-probe-
+      // resistance convention, ADR-0004) instead of the 500 an unhandled
+      // throw used to produce here.
+      return { ok: false, status: 404, error: "Workspace not found" };
+    }
     return {
       ok: false,
       status: 402,
@@ -199,5 +204,5 @@ export async function startAutoDialConference(
 export type AutoDialCreditsErrorResponse = ReturnType<typeof routeData>;
 
 export function autoDialCreditsErrorResponse(): AutoDialCreditsErrorResponse {
-  return routeData({ creditsError: true }, { status: 402 });
+  return routeData(OUTBOUND_CREDITS_BLOCKED_BODY, { status: 402 });
 }

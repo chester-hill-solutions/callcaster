@@ -9,6 +9,7 @@ import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.se
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 import { adminDb } from "@/server/admin-db";
+import { db } from "@/server/db";
 import { TRANSCRIPTION_BATCH_CREDITS } from "../../../../shared/billing-rates";
 import { requireStringParam } from "./shared.server";
 
@@ -135,7 +136,7 @@ export async function elevenlabsBatchTranscribeHandler(
 
   const billable = await isBatchTranscriptionEnabled(callRow.workspace);
   if (billable) {
-    await insertTransactionHistoryIdempotent({
+    await insertTransactionHistoryIdempotent(db, {
       workspaceId: callRow.workspace,
       type: "DEBIT",
       amount: debitAmountFromCredits(TRANSCRIPTION_BATCH_CREDITS),

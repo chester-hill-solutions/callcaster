@@ -4,10 +4,8 @@ import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { Database, Tables } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { runAutoDialerTurn } from "@/lib/auto-dial.server";
-import { rpcDequeueContact } from "@/lib/db-rpc.server";
-import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
-import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 import {
@@ -66,20 +64,18 @@ const dequeueContact = async (
   campaignId?: number | null,
 ) => {
     if (groupOnHousehold) {
-        const tdb = createTenantDb(workspace);
-        return await rpcDequeueContact(tdb, {
-            contactId: Number(contactId),
+        return await dequeueQueueEntry({
+            by: { contactId: Number(contactId) },
             workspaceId: workspace,
-            groupOnHousehold,
-            dequeuedById: userId,
-            dequeuedReasonText: "Auto-dial completed",
+            household: true,
+            userId,
+            reason: "Auto-dial completed",
         });
     }
 
     try {
-        return await dequeueCampaignQueueByContact({
-          contactId: Number(contactId),
-          campaignId,
+        return await dequeueQueueEntry({
+          by: { contactId: Number(contactId), campaignId },
           userId,
           reason: "Auto-dial completed",
         });

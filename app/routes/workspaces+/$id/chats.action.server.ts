@@ -14,8 +14,10 @@ import {
   isOptedOutRecipient,
   isSmsIncapableRecipient,
 } from "@/lib/chat-sms-guards.server";
-import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { hasInsufficientCreditsForOutbound } from "../../../../shared/credit-floor";
+import {
+  outboundCreditsBlockedResponse,
+  requireOutboundCredits,
+} from "@/lib/outbound-credit-gate.server";
 import type { BaseUser, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { defineAction } from "@/lib/handler.server";
 import { toUserMessage } from "@/lib/user-message";
@@ -100,14 +102,11 @@ export const action = defineAction({
 
   // Fail-closed credit gate (mirrors api+/chat_sms). Without this the UI
   // composer bypasses the credit floor the API enforces, letting a depleted
-  // workspace rack up unmetered Twilio spend.
-  const creditsBalance = await getWorkspaceCreditsBalance(workspaceId);
-  if (hasInsufficientCreditsForOutbound(creditsBalance)) {
-    return routeData(
-      { error: "Insufficient credits", creditsError: true },
-      { status: 402 },
-    );
-  }
+  // workspace rack up unmetered Twilio spend. workspaceRouteAuth already
+  // guarantees the workspace exists, so an unknown-workspace result is
+  // treated the same as insufficient credits here too.
+  const credits = await requireOutboundCredits(workspaceId);
+  if (!credits.ok) return outboundCreditsBlockedResponse();
 
   let contact_number: string;
   try {

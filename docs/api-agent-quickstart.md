@@ -62,6 +62,10 @@ See [Telephony provisioning](./api-telephony-provisioning.md) for the full compl
 
 ## Billing
 
+`GET /api/workspaces/:workspaceId/billing` requires the workspace `admin` role or
+above; members and callers receive 403. Like the rest of this section it is
+session-only — `$TOKEN` must be a user bearer token, not a workspace API key.
+
 ```bash
 # Balance
 curl -H "Authorization: Bearer $TOKEN" \

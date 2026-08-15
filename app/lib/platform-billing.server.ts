@@ -18,6 +18,7 @@ import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.se
 import { stripeSessionKey } from "@/lib/billing-keys";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
+import { db } from "@/server/db";
 import { STRIPE_CLIENT_OPTIONS } from "@/lib/stripe-client-options";
 
 export const billingPricing = billingPricingSchema.parse({
@@ -263,7 +264,7 @@ export async function pollBillingCheckoutSession(args: {
   }
 
   try {
-    const result = await insertTransactionHistoryIdempotent({
+    const result = await insertTransactionHistoryIdempotent(db, {
       workspaceId,
       type: "CREDIT",
       amount: creditAmount,
@@ -321,7 +322,7 @@ export async function confirmStripeCheckoutSessionForRedirect(args: {
       throw new Error("Invalid session metadata");
     }
 
-    await insertTransactionHistoryIdempotent({
+    await insertTransactionHistoryIdempotent(db, {
       workspaceId,
       type: "CREDIT",
       amount: creditAmount,

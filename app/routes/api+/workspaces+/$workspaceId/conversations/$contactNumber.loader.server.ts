@@ -7,8 +7,7 @@ import { dataPlaneCapabilityAuthWithParam } from "@/lib/capability-guard.server"
 import { defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({
-  auth: (args) =>
-    dataPlaneCapabilityAuthWithParam("campaigns.read", "contactNumber")(args),
+  auth: dataPlaneCapabilityAuthWithParam("campaigns.read", "contactNumber"),
   sideEffects: ["db-read"],
   handler: async ({ auth, url }) => {
     const { workspaceId, contactNumber } = auth;

@@ -7,9 +7,10 @@ import {
   resolveCampaignWorkspaceId,
   resolveContactWorkspaceId,
 } from "@/lib/platform-telephony.server";
-import { requeueAllCampaignQueueForCampaign } from "@/lib/campaign-queue-db.server";
-import { rpcDequeueContact } from "@/lib/db-rpc.server";
-import { createTenantDb } from "@/server/tenant-db";
+import {
+  dequeueQueueEntry,
+  requeueAllCampaignQueueForCampaign,
+} from "@/lib/campaign-queue-db.server";
 import { jsonError } from "@/lib/platform-api.server";
 import { logger } from "@/lib/logger.server";
 import { data as routeData } from "react-router";
@@ -36,14 +37,12 @@ export const action = defineAction({
         workspaceId,
       });
 
-      const tdb = createTenantDb(workspaceId);
-
-      await rpcDequeueContact(tdb, {
-        contactId: Number(contact_id),
+      await dequeueQueueEntry({
+        by: { contactId: Number(contact_id) },
         workspaceId,
-        groupOnHousehold: household,
-        dequeuedById: auth.user.id,
-        dequeuedReasonText: "Manually dequeued by user",
+        household,
+        userId: auth.user.id,
+        reason: "Manually dequeued by user",
       });
 
       return routeData({ success: true });

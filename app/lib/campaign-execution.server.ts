@@ -1,4 +1,5 @@
-import { enqueueJob, type EnqueueJobResult } from "@/lib/worker/enqueue-job.server";
+import type { EnqueueJobResult } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { getCampaignReadiness, type CampaignReadinessIssue } from "@/lib/campaign-readiness";
 import { updateCampaignStatusInWorkspace } from "@/lib/campaign-ivr.server";
 import { CAMPAIGN_DISPATCH_JOB_TYPE } from "@/lib/worker/job-types.server";
@@ -80,7 +81,11 @@ export async function launchCampaign(args: {
   // For message campaigns, enqueue dispatch work.
   // Voice campaigns will be dispatched by the dialer.
   if (campaign.type === "message") {
-    const job = await enqueueJob({
+    // `campaignDispatchHandler` reads the campaign's own `status` column, not
+    // a `mode` param — this call never passed one through the schema either
+    // way (`campaign_dispatch`'s params are `campaignId`/`workspaceId`/`userId`
+    // only), so it's dropped here rather than smuggled in as an extra field.
+    const job = await enqueueRegisteredJob({
       type: CAMPAIGN_DISPATCH_JOB_TYPE,
       workspaceId,
       userId,
@@ -88,7 +93,6 @@ export async function launchCampaign(args: {
         workspaceId,
         campaignId: Number(campaignId),
         userId,
-        mode: status,
       },
       dedupe: { kind: "live", workspaceId, campaignId: Number(campaignId) },
       runAt: mode === "scheduled" ? campaign.start_date : undefined,

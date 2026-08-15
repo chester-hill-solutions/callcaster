@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
-import { requireDataPlaneCapability } from "@/lib/capability-guard.server";
+import { dataPlaneCapabilityAuthWithParam } from "@/lib/capability-guard.server";
 import { getUserRole } from "@/lib/database/workspace.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import { defineAction } from "@/lib/handler.server";
 import { MemberRole } from "@/lib/member-role";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
@@ -12,7 +11,7 @@ import {
   startAutoDialConference,
 } from "@/lib/auto-dial-start.server";
 import { hasMinRole } from "@/lib/workspace-route.server";
-import type { ActionFunctionArgs } from "react-router";
+import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
 
 const dialerStartBodySchema = z.object({
   caller_id: z.string().min(1),
@@ -20,39 +19,8 @@ const dialerStartBodySchema = z.object({
   agentUserId: z.string().min(1).optional(),
 });
 
-async function resolveDialerAuth({ params, context, request }: ActionFunctionArgs) {
-  const workspaceId = params.workspaceId;
-  const campaignIdParam = params.campaignId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-  if (!campaignIdParam) {
-    return jsonError("campaignId is required", 400);
-  }
-
-  const campaignId = Number(campaignIdParam);
-  if (!Number.isFinite(campaignId)) {
-    return jsonError("Invalid campaignId", 400);
-  }
-
-  const auth = getDataPlaneRouteContext(context, workspaceId);
-  const capability = await requireDataPlaneCapability(auth, "calls.start");
-  if (capability instanceof Response) {
-    return capability;
-  }
-
-  return {
-    workspaceId,
-    campaignId,
-    auth,
-    actorType: auth.userId ? ("session" as const) : ("api_key" as const),
-    actorId: auth.userId,
-    requestId: request.headers.get("x-request-id"),
-  };
-}
-
 async function resolveAgentUserId(
-  auth: ReturnType<typeof getDataPlaneRouteContext>,
+  auth: DataPlaneAuthContextValue,
   workspaceId: string,
   agentUserId: string | undefined,
 ): Promise<string | Response> {
@@ -83,9 +51,17 @@ async function resolveAgentUserId(
 }
 
 export const action = defineAction({
-  auth: resolveDialerAuth,
+  auth: dataPlaneCapabilityAuthWithParam("calls.start", "campaignId"),
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth }) => {
+    const campaignId = Number(auth.campaignId);
+    if (!Number.isFinite(campaignId)) {
+      return jsonError("Invalid campaignId", 400);
+    }
+    const actorType = auth.auth.userId ? ("session" as const) : ("api_key" as const);
+    const actorId = auth.auth.userId;
+    const requestId = request.headers.get("x-request-id");
+
     const parsed = await parseJsonBodyOrResponse(request, dialerStartBodySchema);
     if (parsed instanceof Response) {
       return parsed;
@@ -103,7 +79,7 @@ export const action = defineAction({
     const result = await startAutoDialConference({
       userId: agentUserId,
       workspaceId: auth.workspaceId,
-      campaignId: auth.campaignId,
+      campaignId,
       callerId: parsed.caller_id,
       selectedDevice: parsed.selected_device,
     });
@@ -111,13 +87,13 @@ export const action = defineAction({
     if (!result.ok) {
       await safeRecordWorkspaceAuditEvent({
         workspaceId: auth.workspaceId,
-        actorType: auth.actorType,
+        actorType,
         actorId: agentUserId,
         action: "calls.start",
         targetType: "campaign",
-        targetId: String(auth.campaignId),
+        targetId: String(campaignId),
         outcome: "failure",
-        requestId: auth.requestId,
+        requestId,
         metadata: {
           caller_id: parsed.caller_id,
           status: result.status,
@@ -131,13 +107,13 @@ export const action = defineAction({
 
     await safeRecordWorkspaceAuditEvent({
       workspaceId: auth.workspaceId,
-      actorType: auth.actorType,
+      actorType,
       actorId: agentUserId,
       action: "calls.start",
       targetType: "campaign",
-      targetId: String(auth.campaignId),
+      targetId: String(campaignId),
       outcome: "success",
-      requestId: auth.requestId,
+      requestId,
       metadata: {
         caller_id: parsed.caller_id,
         conference_name: result.conferenceName,

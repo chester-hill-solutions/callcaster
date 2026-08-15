@@ -26,7 +26,7 @@ vi.mock("@/lib/campaign-sms-dispatch.server", () => ({
   dispatchCampaignSmsBatch: mocks.dispatchCampaignSmsBatch,
 }));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: mocks.enqueueJob,
+  unsafeEnqueueJob: mocks.enqueueJob,
 }));
 vi.mock("@/lib/campaign-ivr.server", () => ({
   findCampaignInWorkspace: mocks.findCampaignInWorkspace,
@@ -59,7 +59,10 @@ vi.mock("@/lib/twilio-compliance-job.server", () => ({
   runWorkspaceTwilioComplianceJob: vi.fn(),
 }));
 
-import { campaignDispatchHandler } from "@/lib/worker/handlers/campaign.server";
+import {
+  campaignDispatchHandler as realCampaignDispatchHandler,
+  type CampaignDispatchParams,
+} from "@/lib/worker/handlers/campaign.server";
 import { launchCampaign } from "@/lib/campaign-execution.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 
@@ -77,6 +80,14 @@ function makeJob(overrides?: Partial<ClaimedJobRow>): ClaimedJobRow {
     max_attempts: 3,
     ...overrides,
   };
+}
+
+// The registry (handlers.server.ts) now validates `job.params` with a zod
+// schema before calling the handler with the parsed result (#1239 A2). Every
+// fixture in this file is already well-typed, so casting stands in for that
+// parse without pulling in handlers.server.ts's much larger dependency graph.
+function campaignDispatchHandler(job: ClaimedJobRow) {
+  return realCampaignDispatchHandler(job, job.params as CampaignDispatchParams);
 }
 
 function runningMessageCampaign(overrides?: Record<string, unknown>) {

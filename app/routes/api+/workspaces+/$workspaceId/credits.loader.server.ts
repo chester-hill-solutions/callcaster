@@ -5,6 +5,10 @@ import { defineLoader } from "@/lib/handler.server";
 import type { LoaderFunctionArgs } from "react-router";
 
 export const loader = defineLoader({
+  // Membership-only by design (declared `authClass: "session"`). Every workspace
+  // role — `caller` included — polls this from the campaign call screen for live
+  // credit reconciliation, so no minRole gate: adding one would break dialing.
+  // Membership itself is enforced by `dataPlaneMiddleware` (non-members → 404).
   auth: ({ params, context }: LoaderFunctionArgs) => {
     const workspaceId = params.workspaceId;
     if (!workspaceId) {

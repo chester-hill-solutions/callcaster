@@ -4,7 +4,7 @@ vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 });
 
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { unsafeEnqueueJob as enqueueJob } from "@/lib/worker/enqueue-job.server";
 import { runWithRequestContext } from "@/lib/request-context.server";
 import { db } from "@/server/db";
 

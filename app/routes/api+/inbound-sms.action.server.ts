@@ -14,7 +14,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { uploadObject } from "@/lib/object-storage.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
 import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { defineAction } from "@/lib/handler.server";
 import { emitChatMessageEvent } from "@/lib/workspace-events.server";
 
@@ -184,8 +184,8 @@ export const action = defineAction({
         // workspace; log-don't-throw so the inbound message is still recorded.
         try {
           for (const contactId of matchingContactIds) {
-            await dequeueCampaignQueueByContact({
-              contactId,
+            await dequeueQueueEntry({
+              by: { contactId },
               userId: null,
               reason: "Contact opted out via SMS",
               workspaceId: workspaceNumber.workspace,

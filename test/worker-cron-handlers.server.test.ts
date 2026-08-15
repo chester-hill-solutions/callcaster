@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
 // withReschedule -> rescheduleJob -> enqueueJob, and stubbing the middle of
 // that chain would not exercise the ordering guarantee these tests exist for.
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
 }));
 
 vi.mock("@/lib/cron-workspace-fanout.server", () => ({
@@ -56,10 +56,30 @@ vi.mock("@/lib/campaign-schedule-sync.server", () => ({
 import {
   billingReconcileHandler,
   campaignScheduleSyncHandler,
-  numberRentalBillingHandler,
-  twilioOpenSyncHandler,
+  numberRentalBillingHandler as realNumberRentalBillingHandler,
+  twilioOpenSyncHandler as realTwilioOpenSyncHandler,
 } from "@/lib/worker/handlers/cron.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
+
+// The registry (handlers.server.ts) now validates `job.params` with a zod
+// schema before calling the handler with the parsed result (#1239 A2). These
+// wrappers stand in for that parse (same defaulting/coercion the real schemas
+// apply) without pulling in handlers.server.ts's much larger dependency graph.
+function twilioOpenSyncHandler(job: ClaimedJobRow) {
+  const params = (job.params ?? {}) as Record<string, unknown>;
+  return realTwilioOpenSyncHandler(job, {
+    callLimit: typeof params.callLimit === "number" ? params.callLimit : 50,
+    messageLimit: typeof params.messageLimit === "number" ? params.messageLimit : 50,
+    maxAgeMinutes: typeof params.maxAgeMinutes === "number" ? params.maxAgeMinutes : 120,
+  });
+}
+
+function numberRentalBillingHandler(job: ClaimedJobRow) {
+  const params = (job.params ?? {}) as Record<string, unknown>;
+  return realNumberRentalBillingHandler(job, {
+    workspaceId: typeof params.workspaceId === "string" ? params.workspaceId : undefined,
+  });
+}
 
 function makeJob(overrides: Partial<ClaimedJobRow> = {}): ClaimedJobRow {
   return {

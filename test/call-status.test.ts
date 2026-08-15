@@ -18,6 +18,16 @@ describe("call-status", () => {
     expect(normalizeProviderStatus("queued")).toBe("queued");
   });
 
+  test("normalizeProviderStatus trims whitespace and maps snake_case provider variants", () => {
+    expect(normalizeProviderStatus("in-progress")).toBe("in-progress");
+    expect(normalizeProviderStatus("in_progress")).toBe("in-progress");
+    expect(normalizeProviderStatus("no_answer")).toBe("no-answer");
+    expect(normalizeProviderStatus("COMPLETED")).toBe("completed");
+    expect(normalizeProviderStatus("weird")).toBeNull();
+    expect(normalizeProviderStatus("  queued  ")).toBe("queued");
+    expect(normalizeProviderStatus(" IN_PROGRESS ")).toBe("in-progress");
+  });
+
   test("getStateMachineAction maps statuses", () => {
     expect(getStateMachineAction(null)).toBeNull();
     expect(getStateMachineAction("in-progress")).toBe("CONNECT");

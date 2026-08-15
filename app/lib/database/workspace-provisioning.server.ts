@@ -21,6 +21,7 @@ import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { ensureVoiceGeoPermissions } from "@/lib/twilio-geo-permissions.server";
 import { addUserToWorkspace } from "@/lib/workspace-membership.server";
 import { adminDb } from "@/server/admin-db";
+import { db } from "@/server/db";
 import { createStripeContact } from "./stripe.server";
 import {
   createKeys,
@@ -225,7 +226,7 @@ export async function createNewWorkspace({
     }
 
     try {
-      await insertTransactionHistoryIdempotent({
+      await insertTransactionHistoryIdempotent(db, {
         workspaceId: createdWorkspaceId,
         type: "CREDIT",
         amount: NEW_WORKSPACE_WELCOME_CREDITS,

@@ -6,8 +6,10 @@ import {
 } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
 import { rpcClaimQueueEntryForDial } from "@/lib/db-rpc.server";
-import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
+import {
+  outboundCreditsResponse,
+  requireOutboundCredits,
+} from "@/lib/outbound-credit-gate.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { and, eq } from "drizzle-orm";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
@@ -70,13 +72,8 @@ export const action = defineAction({
         }
     }
 
-    const credits = await getWorkspaceCreditsBalance(workspace_id);
-    if (credits === null) {
-        throw new Response("Workspace not found", { status: 404 });
-    }
-    if (hasInsufficientCreditsForOutbound(credits)) {
-        return routeData({ creditsError: true }, { status: 402 });
-    }
+    const credits = await requireOutboundCredits(workspace_id);
+    if (!credits.ok) return outboundCreditsResponse(credits);
     // NOTE: this credit gate is check-then-act — N concurrent dials can all
     // read the same pre-debit balance (the debit lands at call completion).
     // Overdraw is bounded by concurrency × per-call cost; an atomic pre-dial

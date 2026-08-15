@@ -22,7 +22,9 @@ const VALID_CALL_STATUSES: CallStatusEnum[] = [
 /** Normalize provider status to the DB call_status enum (lowercase, valid enum). */
 export function normalizeProviderStatus(providerStatus: string | null | undefined): CallStatusEnum | null {
   if (providerStatus == null || providerStatus === "") return null;
-  const lower = String(providerStatus).toLowerCase();
+  const raw = String(providerStatus).trim().toLowerCase();
+  const lower =
+    raw === "in_progress" ? "in-progress" : raw === "no_answer" ? "no-answer" : raw;
   if (VALID_CALL_STATUSES.includes(lower as CallStatusEnum)) {
     return lower as CallStatusEnum;
   }

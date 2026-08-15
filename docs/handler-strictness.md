@@ -127,6 +127,58 @@ The two credit gates are complementary layers, not duplicates:
   that can reach that mechanism (directly or via a worker job) is declared and
   inventoried.
 
+## The enforced capability IS the declaration
+
+`sideEffects` is a claim the author types, which is why the gate cross-checks it
+against call signals. Product capabilities work the other way round. A route
+never states which capability it enforces; it enforces one, and the enforcement
+carries the id:
+
+```ts
+export const loader = defineLoader({
+  auth: dataPlaneCapabilityAuth("campaigns.read"), // the argument IS the declaration
+  sideEffects: ["db-read"],
+  handler: async ({ auth }) => { /* auth.workspaceId is gated */ },
+});
+```
+
+`dataPlaneCapabilityAuth`, `dataPlaneCapabilityAuthWithParam` and
+`defineDataPlaneListLoader` pass that argument to `requireActorCapability` **and**
+brand the strategy with it (`withEnforcedCapability` in `handler.server.ts`); the
+factory copies the brand onto the handler, so `capabilityOf(loader)` returns the
+value the guard enforces rather than a second claim about it. Pass the strategy
+to `auth:` directly — `auth: (args) => dataPlaneCapabilityAuth("x")(args)` builds
+a fresh unbranded closure and severs the link.
+
+Grounding: 27 API_SURFACE operations declared a `capability` that no mechanism
+checked, and 23 of 38 data-plane modules called no capability guard at all
+(review for #1242).
+
+### The cross-check (bidirectional, ratcheted)
+
+`check:handlers` reads the same strategy call site statically
+(`scripts/lib/capability-linkage.mjs`) and compares it with the `capability`
+field on the matching API_SURFACE operation:
+
+| Direction | Rule | Escape hatch |
+| --- | --- | --- |
+| Linkage | Handler auth is a capability-carrying strategy → the operation must declare *exactly* that id (a different id and a missing id both fail) | none |
+| Linkage | Operation declares a capability enforced by a hand-rolled preamble instead | `scripts/capability-baseline.json` |
+| Truthfulness | Every declared capability must appear in the module defining the handler (no phantom declarations) | none |
+| Truthfulness | Every capability id a handler module references must be declared by at least one of the route's operations (no silently enforced capabilities) | none |
+
+The truthfulness pair does not care *how* the capability is enforced, so it
+covers the grandfathered preambles too — it caught `/api/audiences`, whose
+loader and action enforced `campaigns.read`/`campaigns.write` through
+`requireAudienceWorkspaceAccess` while the surface declared nothing.
+
+The baseline is a per-operation `{"GET /api/…": "campaigns.read"}` map, mirroring
+`scripts/effects-baseline.json`: new routes cannot join it (an unlisted unlinked
+declaration fails), and changing a grandfathered operation's capability fails
+until the baseline is regenerated with `npm run tools:capability:baseline`. It
+started at 21 operations across 19 modules and ratchets to zero as #1242 D3
+migrates the preambles onto strategies.
+
 ## Next strengthen step
 
 Type the signal table's coverage: billing helpers (`processCallStatusWebhook`,

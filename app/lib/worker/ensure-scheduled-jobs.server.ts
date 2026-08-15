@@ -12,29 +12,18 @@
  */
 
 import { logger } from "@/lib/logger.server";
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { requeueStoredJob } from "@/lib/worker/job-params.server";
+import {
+  SELF_SCHEDULING_JOB_TYPES,
+  SELF_SCHEDULING_SEED_PARAMS,
+} from "@/lib/worker/handlers.server";
 
-/** Job types that re-enqueue themselves and therefore need a first row. */
-export const SELF_SCHEDULING_JOB_TYPES = [
-  "low_credit_notify",
-  "twilio_webhook_audit",
-  "twilio_open_sync",
-  "billing_reconcile",
-  "number_rental_billing",
-  "campaign_schedule_sync",
-] as const;
+// Re-exported for backwards compatibility: both are now DERIVED from the job
+// registry (see handlers.server.ts / job-registry.server.ts, #1239 A1)
+// instead of being hand-maintained here.
+export { SELF_SCHEDULING_JOB_TYPES };
 
 export type SelfSchedulingJobType = (typeof SELF_SCHEDULING_JOB_TYPES)[number];
-
-const SELF_SCHEDULING_SEED_PARAMS: Partial<
-  Record<SelfSchedulingJobType, Record<string, unknown>>
-> = {
-  twilio_open_sync: {
-    callLimit: 50,
-    messageLimit: 50,
-    maxAgeMinutes: 120,
-  },
-};
 
 export async function ensureSelfSchedulingJobsSeeded(): Promise<{
   seeded: SelfSchedulingJobType[];
@@ -43,16 +32,21 @@ export async function ensureSelfSchedulingJobsSeeded(): Promise<{
   for (const type of SELF_SCHEDULING_JOB_TYPES) {
     try {
       const params = SELF_SCHEDULING_SEED_PARAMS[type] ?? {};
-      const result = await enqueueJob({
-        type,
-        params,
-        dedupe: { kind: "live" },
-      });
-      if (result.enqueued) {
+      // `type` here is a runtime-derived `string` (iterating every
+      // self-scheduling type, not one compile-time-known literal), so this
+      // goes through the `requeueStoredJob` escape hatch rather than the
+      // per-literal-typed `enqueueRegisteredJob` — see that function's doc
+      // comment in job-registry.server.ts.
+      const outcome = await requeueStoredJob(type, params, { dedupe: { kind: "live" } });
+      if (!outcome.ok) {
+        logger.error("worker.schedule_seed.failed", { type, error: outcome.error });
+        continue;
+      }
+      if (outcome.result.enqueued) {
         seeded.push(type);
         logger.info("worker.schedule_seed.inserted", {
           type,
-          jobId: result.jobId,
+          jobId: outcome.result.jobId,
         });
       }
     } catch (error) {

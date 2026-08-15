@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
-import { rpcDequeueContact } from "@/lib/db-rpc.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { defineAction } from "@/lib/handler.server";
@@ -56,12 +56,13 @@ export const action = defineAction({
                       columns: { group_household_queue: true },
                   })
                 : null;
-            await rpcDequeueContact(tdb, {
-                contactId: call.contact_id,
+            await dequeueQueueEntry({
+                by: { contactId: call.contact_id },
                 workspaceId,
-                groupOnHousehold: campaign?.group_household_queue ?? false,
-                dequeuedById: user.id,
-                dequeuedReasonText: "Call completed",
+                household: campaign?.group_household_queue ?? false,
+                userId: user.id,
+                reason: "Call completed",
+                exec: tdb,
             });
             // Scope the disposition to THIS call's attempt. The old
             // updateOutreachDispositionByContactId rewrote every attempt for

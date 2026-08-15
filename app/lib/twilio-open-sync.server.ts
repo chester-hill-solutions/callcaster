@@ -5,7 +5,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
 import { processCallStatusWebhook } from "@/lib/twilio-call-status.server";
 import { updateMessageBySid } from "@/lib/message-db.server";
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { SMS_STATUS_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
 import { isTerminalSmsStatus, normalizeSmsStatus } from "@/lib/sms-status";
 
@@ -164,12 +164,12 @@ export async function triggerTwilioOpenSync({
         // lost webhook would have run. The job + ledger are both idempotent,
         // so racing a late-arriving webhook cannot double-debit.
         if (isTerminalSmsStatus(normalizeSmsStatus(twilioStatus))) {
-          await enqueueJob({
+          await enqueueRegisteredJob({
             type: SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
             workspaceId,
             idempotencyKey: `sms_status_side_effects:${local.sid}:${twilioStatus}`,
             params: {
-              messageSid: local.sid,
+              sid: local.sid,
               twilioParams: {
                 MessageStatus: twilioStatus,
                 ...(errorCode != null ? { ErrorCode: String(errorCode) } : {}),

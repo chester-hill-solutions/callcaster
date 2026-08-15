@@ -575,7 +575,10 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     const mod = await import("../app/routes/api+/chat_sms");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
-    await expect(res.json()).resolves.toMatchObject({ creditsError: true });
+    await expect(res.json()).resolves.toEqual({
+      creditsError: true,
+      error: "Insufficient credits",
+    });
   });
 
   test("action api_key success path uses authResult.client and user null; covers '+' not at start normalization", async () => {

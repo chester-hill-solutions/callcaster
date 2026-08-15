@@ -43,7 +43,7 @@ vi.mock("@/lib/message-db.server", () => ({
   updateMessageBySid: (...args: unknown[]) => mocks.updateMessageBySid(...args),
 }));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -124,7 +124,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
       expect.objectContaining({
         type: "sms_status_side_effects",
         idempotencyKey: "sms_status_side_effects:SM1:delivered",
-        params: expect.objectContaining({ messageSid: "SM1" }),
+        params: expect.objectContaining({ sid: "SM1" }),
       }),
     );
   });

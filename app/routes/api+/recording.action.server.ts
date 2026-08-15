@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { updateCallRecordingUrlBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { RECORDING_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -50,12 +50,12 @@ export const action = defineAction({
         if (!updated) {
           logger.error("Recording webhook: call not found for CallSid", { callSid });
         } else {
-          await enqueueJob({
+          await enqueueRegisteredJob({
             type: RECORDING_SIDE_EFFECTS_JOB_TYPE,
             workspaceId: updated.workspace ?? null,
             idempotencyKey: recordingSideEffectsIdempotencyKey(callSid, recordingUrl),
             params: {
-              callSid,
+              sid: callSid,
               twilioParams: params,
             },
           });

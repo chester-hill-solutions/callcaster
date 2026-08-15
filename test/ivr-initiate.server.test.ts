@@ -35,7 +35,7 @@ vi.mock("@/lib/telephony-db.server", () => ({
 }));
 
 vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueCampaignQueueById: vi.fn().mockResolvedValue(undefined),
+  dequeueQueueEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("initiateIvrCall", () => {

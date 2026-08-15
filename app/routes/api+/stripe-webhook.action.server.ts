@@ -1,5 +1,6 @@
 import { env } from "@/lib/env.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { createTenantDb } from "@/server/tenant-db";
 import { stripeSessionKey } from "@/lib/billing-keys";
 import { logger } from "@/lib/logger.server";
 import Stripe from "stripe";
@@ -74,13 +75,16 @@ export const action = defineAction({
         return new Response("OK", { status: 200 });
       }
 
-      const { inserted } = await insertTransactionHistoryIdempotent({
-        workspaceId,
-        type: "CREDIT",
-        amount: creditAmount,
-        note: `Added ${creditAmount} credits, stripe_session:${session.id}`,
-        idempotencyKey: stripeSessionKey(session.id),
-      });
+      const { inserted } = await insertTransactionHistoryIdempotent(
+        createTenantDb(workspaceId),
+        {
+          workspaceId,
+          type: "CREDIT",
+          amount: creditAmount,
+          note: `Added ${creditAmount} credits, stripe_session:${session.id}`,
+          idempotencyKey: stripeSessionKey(session.id),
+        },
+      );
 
       if (inserted) {
         logger.debug("Stripe webhook: credited workspace from checkout.session.completed", {

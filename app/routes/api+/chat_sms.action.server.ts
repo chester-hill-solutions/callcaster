@@ -16,8 +16,10 @@ import type { TwilioMessageIntent } from "@/lib/types";
 import { eq } from "drizzle-orm";
 import { contact as contactTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
-import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
+import {
+  OUTBOUND_CREDITS_BLOCKED_BODY,
+  requireOutboundCredits,
+} from "@/lib/outbound-credit-gate.server";
 import {
   isOptedOutRecipient,
   isSmsIncapableRecipient,
@@ -72,6 +74,9 @@ export const action = defineAction({
     });
   }
 
+  // Still baselined (issue #1242, D3): workspace_id comes from the parsed
+  // JSON body, not a route param, so the capability check can't move into a
+  // pre-request `auth:` strategy without a body-clone rework of this route.
   const capability = await requireDualAuthCapability({
     auth: authResult,
     workspaceId: workspace_id,
@@ -83,15 +88,15 @@ export const action = defineAction({
 
   // Fail-closed credit gate: reject sends when the balance is unknown or
   // depleted rather than letting Twilio billing failures surface later.
-  const creditsBalance = await getWorkspaceCreditsBalance(workspace_id);
-  if (hasInsufficientCreditsForOutbound(creditsBalance)) {
-    return new Response(
-      JSON.stringify({ creditsError: true, error: "Insufficient credits" }),
-      {
-        headers: { "Content-Type": "application/json" },
-        status: 402,
-      },
-    );
+  // Workspace existence is already guaranteed above (requireWorkspaceAccess /
+  // API-key workspace match), so an unknown-workspace result is treated the
+  // same as insufficient credits rather than surfacing a distinct 404.
+  const credits = await requireOutboundCredits(workspace_id);
+  if (!credits.ok) {
+    return new Response(JSON.stringify(OUTBOUND_CREDITS_BLOCKED_BODY), {
+      headers: { "Content-Type": "application/json" },
+      status: 402,
+    });
   }
 
   let to;

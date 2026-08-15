@@ -2,6 +2,7 @@ import { Campaign, OutreachAttempt } from "@/lib/types";
 import { cancelQueuedMessagesForCampaign } from "@/lib/database/call-actions.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { db } from "@/server/db";
 import { shouldUpdateOutreachDisposition } from "@/lib/outreach-disposition";
 import { markContactLineType } from "@/lib/twilio-lookup.server";
 import { alertSmsGeoPermissionBlocked } from "@/lib/twilio-geo-permissions.server";
@@ -34,7 +35,7 @@ import {
   twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
 import { persistCallRecordingToStorage } from "@/lib/call-recording-storage.server";
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE } from "@/lib/worker/job-types.server";
 import { isBatchTranscriptionEnabled } from "@/lib/worker/handlers/elevenlabs-batch-transcribe.server";
 
@@ -150,7 +151,7 @@ export async function runSmsStatusSideEffects(args: {
     const note = isMms
       ? `MMS ${sid} ${messageStatus}`
       : `SMS ${sid} ${messageStatus} (${numSegments} segment${numSegments === 1 ? "" : "s"})`;
-    await insertTransactionHistoryIdempotent({
+    await insertTransactionHistoryIdempotent(db, {
       workspaceId: messageData.workspace,
       type: "DEBIT",
       amount: debitAmountFromCredits(amount),
@@ -278,7 +279,7 @@ export async function runRecordingSideEffects(args: {
       // enqueue entirely rather than queueing work nothing will bill for.
       if (await isBatchTranscriptionEnabled(callRow.workspace)) {
         try {
-          await enqueueJob({
+          await enqueueRegisteredJob({
             type: ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
             workspaceId: callRow.workspace,
             params: { callSid: args.callSid },

@@ -28,7 +28,7 @@ vi.mock("@/lib/worker/handlers/elevenlabs-batch-transcribe.server", () => ({
 }));
 
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
 }));
 
 vi.mock("@/lib/telephony-db.server", () => ({
@@ -230,6 +230,7 @@ describe("webhook side-effect handlers", () => {
     });
 
     expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         workspaceId: "w1",
         type: "DEBIT",

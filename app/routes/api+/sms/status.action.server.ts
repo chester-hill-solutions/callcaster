@@ -9,7 +9,7 @@ import {
 import type { TwilioSmsStatusWebhook } from "@/lib/twilio.types";
 import { findMessageBySid, updateMessageBySid } from "@/lib/message-db.server";
 import { defineAction } from "@/lib/handler.server";
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { SMS_STATUS_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -120,13 +120,23 @@ export const action = defineAction({
         return routeData({ error: "Failed to update message" }, { status: 500 });
       }
 
-      await enqueueJob({
+      // Narrow the webhook body to a plain string map at the boundary: the
+      // typed `payload: Partial<TwilioSmsStatusWebhook>` shape (used above
+      // for field access) has no index signature, so it isn't assignable to
+      // the job's `twilioParams: Record<string, string>` schema as-is.
+      const twilioParams: Record<string, string> = Object.fromEntries(
+        Object.entries(payload).filter(
+          (entry): entry is [string, string] => typeof entry[1] === "string",
+        ),
+      );
+
+      await enqueueRegisteredJob({
         type: SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
         workspaceId: messageData.workspace,
         idempotencyKey: smsStatusSideEffectsIdempotencyKey(sid, messageStatus),
         params: {
-          messageSid: sid,
-          twilioParams: payload,
+          sid,
+          twilioParams,
         },
       });
 

@@ -14,7 +14,7 @@
 import {
   messageCampaignRequiresCallerId,
 } from "@/lib/sms-send-resolve";
-import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
 import { getCampaignQueueById } from "@/lib/database/campaign.server";
 import { getWorkspaceTwilioPortalConfig } from "@/lib/database/workspace.server";
@@ -27,8 +27,7 @@ import { isWithinSendWindow, parseSendWindow } from "@/lib/campaign-send-window"
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
-import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { hasInsufficientCreditsForOutbound } from "../../shared/credit-floor";
+import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
 import type { TwilioMessageIntent } from "@/lib/types";
 import {
   sendSingleCampaignSms,
@@ -104,9 +103,12 @@ export async function dispatchCampaignSmsBatch(args: {
 
   // Fail-closed credit gate: check once at entry for the whole batch
   // rather than per contact, so a mid-campaign depletion doesn't burn
-  // through the audience one Twilio failure at a time.
-  const creditsBalance = await getWorkspaceCreditsBalance(workspaceId);
-  if (hasInsufficientCreditsForOutbound(creditsBalance)) {
+  // through the audience one Twilio failure at a time. Workspace existence
+  // is validated by the caller (requireWorkspaceAccess / API-key match)
+  // before this runs, so an unknown-workspace result folds into the same
+  // "insufficient_credits" outcome rather than a new kind.
+  const credits = await requireOutboundCredits(workspaceId);
+  if (!credits.ok) {
     return { kind: "insufficient_credits" };
   }
 
@@ -188,8 +190,8 @@ export async function dispatchCampaignSmsBatch(args: {
         }
 
         if (member.contact?.opt_out) {
-          await dequeueCampaignQueueById({
-            queueId: member.id,
+          await dequeueQueueEntry({
+            by: { id: member.id },
             userId,
             reason: OPTED_OUT_SMS_DEQUEUED_REASON,
           });
@@ -212,8 +214,8 @@ export async function dispatchCampaignSmsBatch(args: {
           : null;
 
         if (isSmsIncapableLineType(lineType)) {
-          await dequeueCampaignQueueById({
-            queueId: member.id,
+          await dequeueQueueEntry({
+            by: { id: member.id },
             userId,
             reason: LANDLINE_SMS_DEQUEUED_REASON,
           });
@@ -234,8 +236,8 @@ export async function dispatchCampaignSmsBatch(args: {
         });
 
         if (duplicateExists) {
-          await dequeueCampaignQueueById({
-            queueId: member.id,
+          await dequeueQueueEntry({
+            by: { id: member.id },
             userId,
             reason: DUPLICATE_SMS_DEQUEUED_REASON,
           });

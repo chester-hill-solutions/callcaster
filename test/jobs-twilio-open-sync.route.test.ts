@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
 }));
 
 const CRON_SECRET = "test-cron-secret";
@@ -65,7 +65,6 @@ describe("app/routes/api+/jobs+/twilio-open-sync.action.server.ts", () => {
       type: "twilio_open_sync",
       workspaceId: "ws-1",
       params: {
-        workspaceId: "ws-1",
         callLimit: 10,
         messageLimit: 50,
         maxAgeMinutes: 120,

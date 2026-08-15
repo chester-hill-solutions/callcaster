@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => {
     requireWorkspaceAccess: vi.fn(),
     safeParseJson: vi.fn(),
     rpcCreateOutreachAttempt: vi.fn(),
-    dequeueCampaignQueueByContact: vi.fn(),
+    dequeueQueueEntry: vi.fn(),
     logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
@@ -41,8 +41,7 @@ vi.mock("@/lib/db-rpc.server", () => ({
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueCampaignQueueByContact: (...args: any[]) =>
-    mocks.dequeueCampaignQueueByContact(...args),
+  dequeueQueueEntry: (...args: any[]) => mocks.dequeueQueueEntry(...args),
 }));
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: () => ({
@@ -83,13 +82,13 @@ describe("app/routes/api+/questions/route.tsx", () => {
     mocks.requireWorkspaceAccess.mockReset();
     mocks.safeParseJson.mockReset();
     mocks.rpcCreateOutreachAttempt.mockReset();
-    mocks.dequeueCampaignQueueByContact.mockReset();
+    mocks.dequeueQueueEntry.mockReset();
     mocks.logger.error.mockReset();
     tenantDbMocks.findFirst.mockReset();
     tenantDbMocks.update.mockReset();
     tenantDbMocks.contactUpdate.mockReset();
     tenantDbMocks.contactUpdate.mockResolvedValue([{ id: 1, opt_out: true }]);
-    mocks.dequeueCampaignQueueByContact.mockResolvedValue([]);
+    mocks.dequeueQueueEntry.mockResolvedValue(undefined);
 
     mocks.getSession.mockResolvedValue({ headers, user: { id: "u1" } });
     mocks.requireJsonAuth.mockResolvedValue({ user: { id: "u1" } });
@@ -292,8 +291,8 @@ describe("app/routes/api+/questions/route.tsx", () => {
         expect.objectContaining({ set: { opt_out: true } }),
       );
       // All-campaigns dequeue: campaignId must be omitted.
-      expect(mocks.dequeueCampaignQueueByContact).toHaveBeenCalledWith({
-        contactId: 1,
+      expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
+        by: { contactId: 1 },
         userId: "u1",
         reason: "Do not call requested",
         workspaceId: "w1",
@@ -303,7 +302,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
     test("matches display-label and cased variants of do_not_call", async () => {
       for (const variant of ["Do not call", "DO-NOT-CALL"]) {
         tenantDbMocks.contactUpdate.mockClear();
-        mocks.dequeueCampaignQueueByContact.mockClear();
+        mocks.dequeueQueueEntry.mockClear();
         mocks.safeParseJson.mockResolvedValueOnce({
           ...defaultBody,
           disposition: variant,
@@ -312,7 +311,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
         const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
         expect(res.status).toBe(200);
         expect(tenantDbMocks.contactUpdate).toHaveBeenCalledTimes(1);
-        expect(mocks.dequeueCampaignQueueByContact).toHaveBeenCalledTimes(1);
+        expect(mocks.dequeueQueueEntry).toHaveBeenCalledTimes(1);
       }
     });
 
@@ -325,7 +324,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
       const res = await asRouteResponse(mod.action({ request: makeRequest(defaultBody) } as any));
       expect(res.status).toBe(200);
       expect(tenantDbMocks.contactUpdate).not.toHaveBeenCalled();
-      expect(mocks.dequeueCampaignQueueByContact).not.toHaveBeenCalled();
+      expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
     });
 
     test("side-effect failures are logged but do not fail the disposition save", async () => {

@@ -1,0 +1,9 @@
+{
+  "DELETE /api/audiences": "campaigns.write",
+  "GET /api/audiences": "campaigns.read",
+  "PATCH /api/audiences": "campaigns.write",
+  "POST /api/campaigns/create-with-script": "campaigns.write",
+  "POST /api/chat_sms": "messages.send",
+  "POST /api/sms": "campaigns.dispatch",
+  "POST /api/workspaces/:workspaceId/members": "members.invite"
+}
