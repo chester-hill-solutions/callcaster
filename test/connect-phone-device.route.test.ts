@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => {
     getWorkspaceCreditsBalance: vi.fn(async () => 10),
     createWorkspaceTwilioInstance: vi.fn(),
     twilioCreate: vi.fn(),
-    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
+    logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn(), warn: vi.fn()},
     env: {
       BASE_URL: () => "https://base.example",
     },
@@ -139,6 +139,58 @@ describe("app/routes/api+/connect-phone-device/route.tsx", () => {
         method: "GET",
       }),
     );
+  });
+
+  test("returns 402 with creditsError when workspace balance is depleted", async () => {
+    mocks.getSession.mockResolvedValueOnce({
+      user: { id: "u1" },
+      headers: new Headers(),
+    });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      phoneNumber: "+15551112222",
+      workspaceId: "w1",
+      campaignId: "1",
+    });
+    mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(0);
+
+    const mod = await import("../app/routes/api+/connect-phone-device");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/connect-phone-device", { method: "POST" }),
+    } as any));
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toEqual({
+      error: "Insufficient credits",
+      creditsError: true,
+    });
+    expect(mocks.twilioCreate).not.toHaveBeenCalled();
+  });
+
+  test("returns 404 when workspace credit balance is not found (null)", async () => {
+    mocks.getSession.mockResolvedValueOnce({
+      user: { id: "u1" },
+      headers: new Headers(),
+    });
+    mocks.safeParseJson.mockResolvedValueOnce({
+      phoneNumber: "+15551112222",
+      workspaceId: "w1",
+      campaignId: "1",
+    });
+    mocks.requireWorkspaceAccess.mockResolvedValueOnce(undefined);
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(null);
+
+    const mod = await import("../app/routes/api+/connect-phone-device");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/connect-phone-device", { method: "POST" }),
+    } as any));
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({
+      error: "Workspace not found",
+      code: "NOT_FOUND",
+      statusCode: 404,
+      details: undefined,
+    });
+    expect(mocks.twilioCreate).not.toHaveBeenCalled();
   });
 
   test("returns 500 when Twilio call create throws", async () => {

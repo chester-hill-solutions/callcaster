@@ -4,7 +4,10 @@ vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 });
 
-import { startAutoDialConference } from "@/lib/auto-dial-start.server";
+import {
+  autoDialCreditsErrorResponse,
+  startAutoDialConference,
+} from "@/lib/auto-dial-start.server";
 
 const autoDialMocks = vi.hoisted(() => ({
   creditsBalance: 5 as number | null,
@@ -118,6 +121,24 @@ describe("startAutoDialConference", () => {
     });
   });
 
+  test("returns 404 (not a 500 throw) when workspace credit balance is not found", async () => {
+    autoDialMocks.creditsBalance = null;
+
+    const result = await startAutoDialConference({
+      userId: "u1",
+      workspaceId: "w1",
+      campaignId: 1,
+      callerId: "+1555",
+      selectedDevice: "computer",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 404,
+      error: "Workspace not found",
+    });
+  });
+
   test("starts conference and returns conferenceName", async () => {
     const result = await startAutoDialConference({
       userId: "u1",
@@ -148,5 +169,20 @@ describe("startAutoDialConference", () => {
       error: "Selected device is not a verified phone number",
     });
     expect(autoDialMocks.insertCalls).toEqual([]);
+  });
+});
+
+describe("autoDialCreditsErrorResponse", () => {
+  test("returns the locked 402 blocked shape", () => {
+    const response = autoDialCreditsErrorResponse() as unknown as {
+      data: unknown;
+      init?: { status?: number };
+    };
+
+    expect(response.data).toEqual({
+      error: "Insufficient credits",
+      creditsError: true,
+    });
+    expect(response.init?.status).toBe(402);
   });
 });

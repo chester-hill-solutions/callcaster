@@ -355,7 +355,10 @@ describe("app/routes/api+/sms/route.tsx", () => {
     const mod = await import("../app/routes/api+/sms");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
-    await expect(res.json()).resolves.toMatchObject({ creditsError: true });
+    await expect(res.json()).resolves.toEqual({
+      creditsError: true,
+      error: "Insufficient credits",
+    });
   });
 
   test("happy path shortens URLs, signs media, templates body, and sends with mediaUrl", async () => {

@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
     createWorkspaceTwilioInstance: vi.fn(),
     getWorkspaceMessagingOnboardingState: vi.fn(),
     getUserVerifiedAudioNumbers: vi.fn(),
-    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
+    logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn(), warn: vi.fn() },
     env: { BASE_URL: () => "https://base.example" },
   };
 });
@@ -163,7 +163,35 @@ describe("app/routes/api+/dial/tsx.route", () => {
     const mod = await import("../app/routes/api+/dial");
     const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
-    expect(res).toMatchObject({ creditsError: true });
+    await expect(res.json()).resolves.toEqual({
+      error: "Insufficient credits",
+      creditsError: true,
+    });
+  });
+
+  test("returns 404 when workspace not found (null credit balance)", async () => {
+    creditsState.credits = null as unknown as number;
+    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      to_number: "+15550001111",
+      user_id: "u1",
+      campaign_id: "1",
+      contact_id: "2",
+      workspace_id: "w1",
+      queue_id: "3",
+      caller_id: "+1555",
+    });
+    queueJsonAuthSession({ user: { id: "u1" } });
+
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(mod.action({ request: new Request("http://localhost/api/dial", { method: "POST" }) } as any));
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({
+      error: "Workspace not found",
+      code: "NOT_FOUND",
+      statusCode: 404,
+      details: undefined,
+    });
   });
 
   test("happy path uses outreach_id when provided and upserts call", async () => {
