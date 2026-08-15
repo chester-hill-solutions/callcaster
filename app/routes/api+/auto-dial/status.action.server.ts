@@ -1,8 +1,16 @@
 import {
   buildCallUpsertFromTwilioParams,
   processCallStatusWebhook,
-  twilioParamsToUnderCase,
 } from "@/lib/twilio-call-status.server";
+import {
+  isParticipantHangup,
+  isParticipantJoin,
+  parseTwilioVoiceCallback,
+  userIdFromConferenceName,
+  type ParticipantJoinEvent,
+  type ParticipantLeaveEvent,
+  type TwilioVoiceCallback,
+} from "@/lib/twilio/voice-callback";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
 import {
   dequeueQueueEntry,
@@ -91,11 +99,18 @@ const updateCampaignQueue = async (
   }
 };
 
+/**
+ * The user id stored inside a `call.conference_id`, which is a conference NAME
+ * (`${userId}~${uuid}`), not a SID. Webhook payloads get this parsed for them
+ * as `conferenceUserId`; this wrapper is for the DB-derived value.
+ *
+ * The `?? conferenceId` fallback is deliberate legacy tolerance: a stored
+ * conference id with no `~` predates the `${userId}~${uuid}` naming and was
+ * always passed through whole.
+ */
 function resolveUserIdFromConferenceName(conferenceId: string | null): string {
   if (!conferenceId) return "";
-  const sep = conferenceId.indexOf("~");
-  if (sep === -1) return conferenceId;
-  return conferenceId.slice(0, sep);
+  return userIdFromConferenceName(conferenceId) ?? conferenceId;
 }
 
 const triggerAutoDialer = async (callData: Tables<"call">) => {
@@ -121,14 +136,13 @@ const triggerAutoDialer = async (callData: Tables<"call">) => {
 };
 
 const handleCallStatus = async (
-  parsedBody: { [x: string]: string },
+  event: TwilioVoiceCallback,
   dbCall: Tables<"call">,
   twilio: TwilioClient,
   status: Tables<"call">["status"],
 ) => {
   try {
-    const callSid = requireValue(parsedBody.CallSid, "CallSid");
-    const updateData = buildCallUpsertFromTwilioParams(parsedBody);
+    const updateData = buildCallUpsertFromTwilioParams(event.raw);
     if (status) {
       updateData.status = status;
     }
@@ -181,22 +195,20 @@ const handleCallStatus = async (
 };
 
 const handleParticipantLeave = async (
-  parsedBody: { [x: string]: string },
+  event: ParticipantLeaveEvent,
   twilio: TwilioClient,
 ) => {
-  const underCase = twilioParamsToUnderCase(parsedBody);
-
   try {
-    const callSid = requireValue(typeof underCase.call_sid === "string" ? underCase.call_sid : null, "CallSid");
-    const timestamp = requireValue(typeof underCase.timestamp === "string" ? underCase.timestamp : null, "Timestamp");
+    const callSid = requireValue(event.callSid, "CallSid");
+    const timestamp = requireValue(event.timestamp, "Timestamp");
     const existingCall = await findCallBySid(callSid);
     if (!existingCall?.workspace) {
       throw new Error("Call not found for participant leave");
     }
     const dbCall = await updateCall(callSid, existingCall.workspace, {
       end_time: new Date(timestamp).toISOString(),
-      duration: Math.max(Number(underCase.duration), Number(underCase.call_duration)).toString(),
-      status: (typeof underCase.call_status === "string" ? underCase.call_status : "")?.toLowerCase() as Tables<"call">["status"]
+      duration: String(event.durationSeconds ?? 0),
+      status: event.callStatus.toLowerCase() as Tables<"call">["status"],
     });
     if (!dbCall.outreach_attempt_id) {
       throw new Error("Missing outreach_attempt_id for participant leave");
@@ -210,7 +222,7 @@ const handleParticipantLeave = async (
     }
 
     const conferences = await twilio.conferences.list({
-      friendlyName: typeof underCase.friendly_name === "string" ? underCase.friendly_name : (typeof underCase.conference_sid === "string" ? underCase.conference_sid : ""),
+      friendlyName: event.conferenceRef ?? "",
       status: "in-progress",
     });
     await Promise.all(
@@ -225,25 +237,21 @@ const handleParticipantLeave = async (
 };
 
 const handleParticipantJoin = async (
-  parsedBody: { [x: string]: string },
+  event: ParticipantJoinEvent,
   dbCall: Tables<"call">,
 ) => {
-  const underCase = twilioParamsToUnderCase(parsedBody);
   try {
     const workspaceId = requireValue(dbCall.workspace, "workspace");
     if (!dbCall.conference_id) {
-      await updateCall(
-        requireValue(typeof underCase.call_sid === "string" ? underCase.call_sid : null, "CallSid"),
-        workspaceId,
-        {
-          conference_id: requireValue(
-          (typeof underCase.friendly_name === "string" ? underCase.friendly_name : null) ??
-            (typeof underCase.conference_sid === "string" ? underCase.conference_sid : null),
-          "ConferenceSid",
-        ),
-          start_time: new Date(requireValue(typeof underCase.timestamp === "string" ? underCase.timestamp : null, "Timestamp")).toISOString(),
-        },
-      );
+      await updateCall(requireValue(event.callSid, "CallSid"), workspaceId, {
+        // `conferenceRef`, not `conferenceUserId`: `call.conference_id` holds
+        // the conference NAME. Reading the user id back out of it is
+        // `resolveUserIdFromConferenceName`'s job, at the point of use.
+        conference_id: requireValue(event.conferenceRef, "ConferenceSid"),
+        start_time: new Date(
+          requireValue(event.timestamp, "Timestamp"),
+        ).toISOString(),
+      });
     }
     if (dbCall.outreach_attempt_id) {
       if (!dbCall.campaign_id) {
@@ -270,13 +278,8 @@ const handleParticipantJoin = async (
         return;
       }
       await updateCampaignQueue(outreachStatus.contact_id, dbCall.campaign_id, {
-        ...buildProviderStatusQueueUpdate(
-          (typeof underCase.friendly_name === "string" ? underCase.friendly_name : null) ??
-            (typeof underCase.conference_sid === "string" ? underCase.conference_sid : null) ??
-            "in-progress",
-        ),
+        ...buildProviderStatusQueueUpdate(event.conferenceRef ?? "in-progress"),
       });
-
     }
   } catch (error) {
     logger.error("Error in handleParticipantJoin:", error);
@@ -289,10 +292,12 @@ export const action = defineAction({
     // Clone before reading — Bun yields empty params on re-read after consume.
     const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    const underCase = twilioParamsToUnderCase(params);
+    // Parse the payload ONCE, here, into a discriminated union. Everything
+    // downstream takes a typed event instead of re-narrowing the same form
+    // fields with `typeof x === "string"` — see @/lib/twilio/voice-callback.
+    const event = parseTwilioVoiceCallback(params);
 
-    const callSidValue =
-      typeof underCase.call_sid === "string" ? underCase.call_sid : null;
+    const callSidValue = event.callSid;
     if (!callSidValue) {
       throw new Error("Missing CallSid");
     }
@@ -303,11 +308,11 @@ export const action = defineAction({
     });
     if (forbidden) return forbidden;
 
-    return { parsedBody: params, underCase, callSidValue };
+    return { event, callSidValue };
   },
   sideEffects: ["db-write", "credit", "twilio"],
   handler: async ({ auth }) => {
-    const { parsedBody, underCase, callSidValue } = auth;
+    const { event, callSidValue } = auth;
     try {
     const dbCall = await findCallBySid(callSidValue);
     if (!dbCall?.workspace) {
@@ -322,8 +327,10 @@ export const action = defineAction({
 
     const twilio = await createWorkspaceTwilioInstance({ workspace_id: requireValue(dbCall.workspace, "workspace"),
     });
-    const callStatusValue =
-      typeof underCase.call_status === "string" ? underCase.call_status : "";
+    // `""` when Twilio sent no CallStatus, on every union member — conference
+    // participant callbacks carry one too, and this switch runs before the
+    // event kind is ever consulted.
+    const callStatusValue = event.callStatus;
 
     // Predictive contact calls send their status callbacks HERE, not to
     // /api/call-status — so this route is the only place that can push
@@ -363,28 +370,17 @@ export const action = defineAction({
           }
         }
         await handleCallStatus(
-          parsedBody,
+          event,
           dbCall,
           twilio,
           callStatusValue?.toLowerCase() as Tables<"call">["status"],
         );
         break;
       default:
-        if (
-          (typeof underCase.status_callback_event === "string"
-            ? underCase.status_callback_event
-            : "") === "participant-leave" &&
-          (typeof underCase.reason_participant_left === "string"
-            ? underCase.reason_participant_left
-            : "") === "participant_hung_up"
-        ) {
-          await handleParticipantLeave(parsedBody, twilio);
-        } else if (
-          (typeof underCase.status_callback_event === "string"
-            ? underCase.status_callback_event
-            : "") === "participant-join"
-        ) {
-          await handleParticipantJoin(parsedBody, dbCall);
+        if (isParticipantHangup(event)) {
+          await handleParticipantLeave(event, twilio);
+        } else if (isParticipantJoin(event)) {
+          await handleParticipantJoin(event, dbCall);
         }
     }
 
