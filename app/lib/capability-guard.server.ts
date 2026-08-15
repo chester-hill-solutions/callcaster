@@ -174,6 +174,44 @@ export function dataPlaneSessionMinRoleAuth(minRole: MemberRole) {
 }
 
 /**
+ * Handler-factory auth strategy for `sessionOnly` data-plane loaders/actions
+ * that require nothing beyond workspace MEMBERSHIP — no capability, no role
+ * floor above the lowest rank.
+ *
+ * Plain sibling of {@link dataPlaneSessionMinRoleAuth}: that one exists for
+ * routes with a real role floor (`MemberRole.Admin`, `.Member`, ...); this one
+ * is for the routes that only ever checked `!userId` after resolving the data
+ * plane context — every workspace member, `caller` included, may proceed.
+ * Deliberately does NOT resolve an API-key actor, for the same reason
+ * {@link dataPlaneSessionMinRoleAuth} does not: these routes are declared
+ * `exposure: "sessionOnly"`, and `resolveDataPlaneAuth` gives API-key requests
+ * `userId: null`, so a key gets the same 401 the hand-rolled preambles
+ * returned.
+ *
+ * Rejection shapes match the hand-rolled preambles this replaces:
+ * - `workspaceId` missing from the route → 400 "workspaceId is required"
+ * - workspace in context doesn't match the route param → 404 "Workspace not
+ *   found" (thrown by {@link getDataPlaneRouteContext} itself, ADR-0004)
+ * - no session user (API key or truly unauthenticated) → 401 "Unauthorized"
+ */
+export function dataPlaneSessionAuth() {
+  return async ({
+    params,
+    context,
+  }: Pick<LoaderFunctionArgs, "params" | "context">) => {
+    const workspaceId = params.workspaceId;
+    if (!workspaceId) {
+      return jsonError("workspaceId is required", 400);
+    }
+    const { userId } = getDataPlaneRouteContext(context, workspaceId);
+    if (!userId) {
+      return jsonError("Unauthorized", 401);
+    }
+    return { workspaceId, userId };
+  };
+}
+
+/**
  * Auth strategy that gates on a capability then attaches one extra route param.
  * Carries the same capability brand as {@link dataPlaneCapabilityAuth}.
  */
