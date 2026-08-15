@@ -15,6 +15,7 @@ export const QUEUE_STATUS_QUEUED = "queued" as const;
 export const QUEUE_STATUS_DEQUEUED = "dequeued" as const;
 export const QUEUE_LIFECYCLE_ASSIGNED = "assigned" as const;
 export const QUEUE_LIFECYCLE_CANCELED = "canceled" as const;
+export const QUEUE_LIFECYCLE_FAILED = "failed" as const;
 export const QUEUE_STATUS_FILTERS = [
   QUEUE_STATUS_QUEUED,
   "assigned",
@@ -240,11 +241,20 @@ export function matchesQueueStatusFilter(
  * read-only value `getQueueLifecycle()` can report, but as of this census
  * (2026-08, B1) no writer — TS or plpgsql RPC — ever sets queue_state to
  * "canceled". Add it here once a real writer exists.
+ *
+ * `failed` ({@link QUEUE_LIFECYCLE_FAILED}) IS included even though no TS
+ * writer sets it: the plpgsql RPC `fail_exhausted_campaign_queue_contacts`
+ * writes it on every auto-dialer turn (PERFORMed by
+ * reset_stale_campaign_queue_claims) when a contact exhausts max attempts.
+ * The same UPDATE stamps `dequeued_at`, so `isDequeued()` reports such rows
+ * as finished — but the state exists in the data and readers switching on
+ * queue_state directly must be able to represent it (#1252).
  */
 export const QUEUE_ENTRY_STATES = [
   QUEUE_STATUS_QUEUED,
   QUEUE_LIFECYCLE_ASSIGNED,
   QUEUE_STATUS_DEQUEUED,
+  QUEUE_LIFECYCLE_FAILED,
 ] as const;
 export type QueueEntryState = (typeof QUEUE_ENTRY_STATES)[number];
 
@@ -267,7 +277,8 @@ export type QueueEntryTransitionName =
   | "queued"
   | "assigned"
   | "provider_status"
-  | "dequeued";
+  | "dequeued"
+  | "failed";
 
 export interface QueueEntryTransitionDef {
   /** The queue_state value this transition writes. */
@@ -288,6 +299,17 @@ const QUEUE_ENTRY_FULL_COLUMN_SET: readonly QueueEntryColumn[] = [
   "assigned_to_user_id",
   "dequeued_at",
   "dequeued_by",
+  "dequeued_reason",
+  "provider_status",
+  "queue_state",
+];
+
+// Exactly what fail_exhausted_campaign_queue_contacts writes — the full set
+// minus `dequeued_by`, which that UPDATE never touches (its WHERE guard
+// `dequeued_at IS NULL` means the column is still NULL on every row it hits).
+const QUEUE_ENTRY_FAILED_COLUMN_SET: readonly QueueEntryColumn[] = [
+  "assigned_to_user_id",
+  "dequeued_at",
   "dequeued_reason",
   "provider_status",
   "queue_state",
@@ -316,6 +338,14 @@ export const QUEUE_ENTRY_TRANSITIONS: Record<
     queueState: QUEUE_STATUS_DEQUEUED,
     legalFrom: "any",
     columns: QUEUE_ENTRY_FULL_COLUMN_SET,
+  },
+  failed: {
+    // plpgsql-only today: no build*QueueUpdate helper writes this transition.
+    // It documents fail_exhausted_campaign_queue_contacts, whose UPDATE
+    // filters on the queued/assigned/failed states mirrored by legalFrom.
+    queueState: QUEUE_LIFECYCLE_FAILED,
+    legalFrom: ["queued", "assigned", "failed"],
+    columns: QUEUE_ENTRY_FAILED_COLUMN_SET,
   },
 };
 
