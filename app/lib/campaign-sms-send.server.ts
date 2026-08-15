@@ -5,7 +5,7 @@
  * Extracted from /api/sms route so both HTTP and worker dispatch use the same path.
  */
 import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";
-import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { countCampaignMessagesToPhone } from "@/lib/message-db.server";
 import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
@@ -124,8 +124,8 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
 
   await Promise.all([
     persistMessageRecord(workspace, messageFields),
-    dequeueCampaignQueueById({
-      queueId: Number(queue_id),
+    dequeueQueueEntry({
+      by: { id: Number(queue_id) },
       userId: user_id,
       reason: "SMS message sent",
     }),

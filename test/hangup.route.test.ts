@@ -32,8 +32,8 @@ vi.mock("@/lib/telephony-db.server", () => ({
   updateOutreachAttemptForWorkspace: vi.fn(),
 }));
 
-vi.mock("@/lib/db-rpc.server", () => ({
-  rpcDequeueContact: vi.fn(),
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueQueueEntry: vi.fn(),
 }));
 
 const tenantDbMocks = vi.hoisted(() => ({
@@ -48,7 +48,7 @@ vi.mock("@/server/tenant-db", () => ({
 }));
 
 import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
-import { rpcDequeueContact } from "@/lib/db-rpc.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 
 function mockCall(overrides?: Partial<{
   workspace: string;
@@ -76,7 +76,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     mocks.logger.error.mockReset();
     vi.mocked(findCallBySid).mockReset();
     vi.mocked(updateOutreachAttemptForWorkspace).mockReset();
-    vi.mocked(rpcDequeueContact).mockReset();
+    vi.mocked(dequeueQueueEntry).mockReset();
     tenantDbMocks.campaignFindFirst.mockReset();
     tenantDbMocks.campaignFindFirst.mockResolvedValue({ group_household_queue: false });
   });
@@ -94,7 +94,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(rpcDequeueContact).toHaveBeenCalled();
+    expect(dequeueQueueEntry).toHaveBeenCalled();
     // Scoped to the specific attempt (9), not every attempt for contact 2.
     expect(updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
       "w1",
@@ -116,9 +116,8 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const mod = await import("../app/routes/api+/hangup");
     await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
 
-    expect(rpcDequeueContact).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ groupOnHousehold: true }),
+    expect(dequeueQueueEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ household: true }),
     );
   });
 
@@ -133,7 +132,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
-    expect(rpcDequeueContact).toHaveBeenCalled();
+    expect(dequeueQueueEntry).toHaveBeenCalled();
     expect(updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 
@@ -154,7 +153,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(rpcDequeueContact).toHaveBeenCalled();
+    expect(dequeueQueueEntry).toHaveBeenCalled();
   });
 
   test("returns 500 when Twilio throws non-21220", async () => {
@@ -199,7 +198,7 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(rpcDequeueContact).not.toHaveBeenCalled();
+    expect(dequeueQueueEntry).not.toHaveBeenCalled();
     expect(updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 

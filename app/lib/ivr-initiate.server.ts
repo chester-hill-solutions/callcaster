@@ -3,7 +3,7 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
-import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
@@ -90,8 +90,8 @@ export async function initiateIvrCall(
       return { success: false, error: "Failed to insert call row" };
     }
 
-    await dequeueCampaignQueueById({
-      queueId: input.contact.id,
+    await dequeueQueueEntry({
+      by: { id: input.contact.id },
       userId: input.user_id,
       reason: "IVR call completed",
     });

@@ -14,7 +14,7 @@
 import {
   messageCampaignRequiresCallerId,
 } from "@/lib/sms-send-resolve";
-import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
 import { getCampaignQueueById } from "@/lib/database/campaign.server";
 import { getWorkspaceTwilioPortalConfig } from "@/lib/database/workspace.server";
@@ -188,8 +188,8 @@ export async function dispatchCampaignSmsBatch(args: {
         }
 
         if (member.contact?.opt_out) {
-          await dequeueCampaignQueueById({
-            queueId: member.id,
+          await dequeueQueueEntry({
+            by: { id: member.id },
             userId,
             reason: OPTED_OUT_SMS_DEQUEUED_REASON,
           });
@@ -212,8 +212,8 @@ export async function dispatchCampaignSmsBatch(args: {
           : null;
 
         if (isSmsIncapableLineType(lineType)) {
-          await dequeueCampaignQueueById({
-            queueId: member.id,
+          await dequeueQueueEntry({
+            by: { id: member.id },
             userId,
             reason: LANDLINE_SMS_DEQUEUED_REASON,
           });
@@ -234,8 +234,8 @@ export async function dispatchCampaignSmsBatch(args: {
         });
 
         if (duplicateExists) {
-          await dequeueCampaignQueueById({
-            queueId: member.id,
+          await dequeueQueueEntry({
+            by: { id: member.id },
             userId,
             reason: DUPLICATE_SMS_DEQUEUED_REASON,
           });

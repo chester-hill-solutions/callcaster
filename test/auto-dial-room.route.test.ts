@@ -80,14 +80,6 @@ vi.mock("@/lib/auto-dial.server", () => ({
 const roomRpcState = vi.hoisted(() => ({ client: null as any }));
 const roomStorageState = vi.hoisted(() => ({ error: null as Error | null }));
 
-vi.mock("@/lib/db-rpc.server", () => ({
-  rpcDequeueContact: async (_db: any) => {
-    const client = roomRpcState.client;
-    const result = await client.rpc("dequeue_contact");
-    if (result?.error) throw result.error;
-  },
-}));
-
 vi.mock("@/lib/object-storage.server", () => ({
   createSignedObjectUrl: async () => {
     if (roomStorageState.error) throw roomStorageState.error;
@@ -129,9 +121,22 @@ const roomDbMocks = vi.hoisted(() => ({
   getUserVerifiedAudioNumbers: vi.fn(async () => ["+1666"] as string[] | null),
 }));
 
+// dequeueQueueEntry (app/lib/campaign-queue-db.server.ts) is the single
+// entry point $roomId.action.server.ts's local dequeueContact helper now
+// calls for both branches (issue #1240 B3) — route it here the same way the
+// real function does: household => the simulated dequeue_contact RPC via
+// the fake postgrest client already wired up per-test through
+// roomRpcState.client; no household => the plain-Drizzle mock below.
 vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueCampaignQueueByContact: (...args: unknown[]) =>
-    roomDbMocks.dequeueCampaignQueueByContact(...args),
+  dequeueQueueEntry: async (args: { household?: boolean }) => {
+    if (args.household) {
+      const client = roomRpcState.client;
+      const result = await client.rpc("dequeue_contact");
+      if (result?.error) throw result.error;
+      return;
+    }
+    return roomDbMocks.dequeueCampaignQueueByContact(args);
+  },
 }));
 
 vi.mock("@/lib/user-audio.server", () => ({

@@ -48,12 +48,11 @@ vi.mock("@/lib/workspace-events.server", () => ({
 }));
 
 const queueDbMocks = vi.hoisted(() => ({
-  dequeueCampaignQueueByContact: vi.fn(),
+  dequeueQueueEntry: vi.fn(),
 }));
 
 vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueCampaignQueueByContact: (...args: unknown[]) =>
-    queueDbMocks.dequeueCampaignQueueByContact(...args),
+  dequeueQueueEntry: (...args: unknown[]) => queueDbMocks.dequeueQueueEntry(...args),
 }));
 
 const onboardingMocks = vi.hoisted(() => ({
@@ -283,8 +282,8 @@ describe("app/routes/api+/inbound-sms", () => {
     mocks.logger.info.mockReset();
     mocks.logger.warn.mockReset();
     mocks.fetch.mockReset();
-    queueDbMocks.dequeueCampaignQueueByContact.mockReset();
-    queueDbMocks.dequeueCampaignQueueByContact.mockResolvedValue([]);
+    queueDbMocks.dequeueQueueEntry.mockReset();
+    queueDbMocks.dequeueQueueEntry.mockResolvedValue(undefined);
     vi.stubGlobal("fetch", mocks.fetch);
     onboardingMocks.getWorkspaceMessagingOnboardingState.mockReset();
     onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValue({
@@ -366,8 +365,8 @@ describe("app/routes/api+/inbound-sms", () => {
       expect(tenantDbStubState.contactUpdateCalls).toContainEqual(
         expect.objectContaining({ set: { opt_out: true } }),
       );
-      expect(queueDbMocks.dequeueCampaignQueueByContact).toHaveBeenCalledWith({
-        contactId: 9,
+      expect(queueDbMocks.dequeueQueueEntry).toHaveBeenCalledWith({
+        by: { contactId: 9 },
         userId: null,
         reason: "Contact opted out via SMS",
         workspaceId: "w1",
@@ -375,7 +374,7 @@ describe("app/routes/api+/inbound-sms", () => {
     });
 
     test("STOP dequeue failure is logged but the message is still recorded", async () => {
-      queueDbMocks.dequeueCampaignQueueByContact.mockRejectedValueOnce(
+      queueDbMocks.dequeueQueueEntry.mockRejectedValueOnce(
         new Error("queue down"),
       );
       const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
@@ -412,7 +411,7 @@ describe("app/routes/api+/inbound-sms", () => {
         expect.objectContaining({ set: { opt_out: false } }),
       );
       // Re-subscribe must NOT touch campaign queues (no re-queueing).
-      expect(queueDbMocks.dequeueCampaignQueueByContact).not.toHaveBeenCalled();
+      expect(queueDbMocks.dequeueQueueEntry).not.toHaveBeenCalled();
     });
   });
 

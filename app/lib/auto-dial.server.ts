@@ -8,11 +8,14 @@ import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
 import {
   rpcCreateOutreachAttempt,
-  rpcDequeueContact,
   rpcResetStaleCampaignQueueClaims,
   rpcTryCompleteCampaignIfDrained,
 } from "@/lib/db-rpc.server";
-import { claimNextQueueContact, requeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import {
+  claimNextQueueContact,
+  dequeueQueueEntry,
+  requeueCampaignQueueById,
+} from "@/lib/campaign-queue-db.server";
 import { updateCallBySid } from "@/lib/telephony-db.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { db } from "@/server/db";
@@ -315,13 +318,19 @@ export async function runAutoDialerTurn(
               contactId: contactRecord.contact_id,
               outreachAttemptId: outreach_attempt_id,
             });
-            await rpcDequeueContact(tdb, {
-              contactId: contactRecord.contact_id,
+            await dequeueQueueEntry({
+              by: { contactId: contactRecord.contact_id },
               workspaceId: workspace_id,
-              groupOnHousehold: false,
-              dequeuedById: user_id,
-              dequeuedReasonText:
+              // false, not omitted: the guarded RPC path, not plain Drizzle
+              // — deliberately parks only this one row (no household
+              // fan-out) and no-ops rather than requeue-and-retry if the
+              // row isn't currently queued/null. See dequeueQueueEntry's
+              // doc comment for why this differs from the Drizzle default.
+              household: false,
+              userId: user_id,
+              reason:
                 "Ambiguous dial failure — call may exist at Twilio; parked for review, not redialed",
+              exec: tdb,
             });
           }
         } catch (revertError) {
@@ -333,12 +342,13 @@ export async function runAutoDialerTurn(
         throw dialError;
       }
 
-      await rpcDequeueContact(tdb, {
-        contactId: contactRecord.contact_id,
+      await dequeueQueueEntry({
+        by: { contactId: contactRecord.contact_id },
         workspaceId: workspace_id,
-        groupOnHousehold: true,
-        dequeuedById: user_id,
-        dequeuedReasonText: "Predictive Dialer called contact",
+        household: true,
+        userId: user_id,
+        reason: "Predictive Dialer called contact",
+        exec: tdb,
       });
 
       // `call.dateUpdated`/`startTime`/`endTime` are `Date` in the Twilio SDK's

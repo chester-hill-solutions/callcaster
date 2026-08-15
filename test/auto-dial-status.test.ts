@@ -30,6 +30,7 @@ const campaignQueueDbMocks = vi.hoisted(() => ({
 vi.mock("@/lib/logger.server", () => ({
   logger: loggerMocks,
 }));
+const dequeueQueueEntryMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   updateCampaignQueueByContactAndCampaign: async (...args: unknown[]) => {
     if (campaignQueueDbMocks.updateError) {
@@ -37,13 +38,13 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
     }
     return campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign(...args);
   },
+  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
 }));
 
 const twilioValidation = vi.hoisted(() => ({
   validateTwilioWebhookParams: vi.fn(() => true),
   requireTwilioSignature: vi.fn(),
 }));
-const rpcDequeueContactMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: (...args: unknown[]) =>
     twilioValidation.requireTwilioSignature(...args),
@@ -67,10 +68,6 @@ vi.mock("@/lib/telephony-db.server", async () => {
     claimTerminalCallStatus: stub.telephonyDbMocks.claimTerminalCallStatus,
   };
 });
-
-vi.mock("@/lib/db-rpc.server", () => ({
-  rpcDequeueContact: rpcDequeueContactMock,
-}));
 
 const runAutoDialerTurnMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auto-dial.server", () => ({
@@ -343,8 +340,8 @@ describe("api.auto-dial.status", () => {
     campaignQueueDbMocks.updateError = null;
     campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign.mockReset();
     loggerMocks.info.mockReset();
-    rpcDequeueContactMock.mockReset();
-    rpcDequeueContactMock.mockImplementation(async () => {});
+    dequeueQueueEntryMock.mockReset();
+    dequeueQueueEntryMock.mockImplementation(async () => {});
     runAutoDialerTurnMock.mockReset();
     runAutoDialerTurnMock.mockResolvedValue({ success: true });
     emitPredictiveBroadcastMock.mockReset();
@@ -447,9 +444,8 @@ describe("api.auto-dial.status", () => {
 
     expect(res.status).toBe(200);
     expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
-    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ contactId: 1 }),
+    expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
+      expect.objectContaining({ by: { contactId: 1 }, household: true }),
     );
   });
 
@@ -488,9 +484,8 @@ describe("api.auto-dial.status", () => {
     } as any));
 
     expect(res.status).toBe(200);
-    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ dequeuedById: userId }),
+    expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userId }),
     );
   });
 
@@ -717,7 +712,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("rpc dequeue_contact error returns 500", async () => {
-    rpcDequeueContactMock.mockRejectedValue(new Error("dq"));
+    dequeueQueueEntryMock.mockRejectedValue(new Error("dq"));
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -734,9 +729,8 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(500);
-    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ contactId: 1 }),
+    expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
+      expect.objectContaining({ by: { contactId: 1 }, household: true }),
     );
     expect(loggerMocks.error).toHaveBeenCalledWith("Error in handleCallStatus:", expect.any(Error));
   });
@@ -853,7 +847,7 @@ describe("api.auto-dial.status", () => {
     await expect(res.json()).resolves.toMatchObject({ success: true, replay: true });
     // The dangerous side effects must not run again: no re-dequeue, no new
     // outbound call, no billing.
-    expect(rpcDequeueContactMock).not.toHaveBeenCalled();
+    expect(dequeueQueueEntryMock).not.toHaveBeenCalled();
     expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
     expect(postgresStub._transactionRows.length).toBe(0);
   });
@@ -886,7 +880,7 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(rpcDequeueContactMock).toHaveBeenCalled();
+    expect(dequeueQueueEntryMock).toHaveBeenCalled();
   });
 
   test("replayed participant-join does not restamp answered_at", async () => {
