@@ -219,6 +219,18 @@ describe("parseTwilioVoiceCallback", () => {
     expect(event.callSid).toBe("CA1");
   });
 
+  /**
+   * `answeredBy` is common (not `call-status`-only) because Twilio's
+   * async-AMD callback posts `CallSid` + `AnsweredBy` with no `CallStatus` at
+   * all (#1243 E2, `dial/status`) — that payload discriminates to
+   * `unrecognized`, and the field must still be readable off it.
+   */
+  test("AnsweredBy is readable on an unrecognized (CallStatus-less) AMD callback", () => {
+    const event = parseTwilioVoiceCallback({ CallSid: "CA1", AnsweredBy: "machine_start" });
+    expect(event.kind).toBe("unrecognized");
+    expect(event.answeredBy).toBe("machine_start");
+  });
+
   test("blank and non-string field values read as absent", () => {
     const event = parseTwilioVoiceCallback({
       CallSid: "  CA1  ",

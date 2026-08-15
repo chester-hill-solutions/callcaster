@@ -1,6 +1,9 @@
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
-import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
+import {
+  parseTwilioVoiceCallback,
+  type TwilioVoiceCallback,
+} from "@/lib/twilio/voice-callback";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { updateCallRecordingUrlBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
@@ -10,6 +13,7 @@ import type { ActionFunctionArgs } from "react-router";
 
 type RecordingAuth = {
   params: Record<string, string>;
+  event: TwilioVoiceCallback;
   callSid: string | null;
 };
 
@@ -25,26 +29,31 @@ export const action = defineAction({
     // Clone before reading — Bun yields empty params on re-read after consume.
     const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    const callSid = params.CallSid?.trim();
+    // Parsed once here (#1243 E2) so the handler reads the typed `recording`
+    // member instead of `params.RecordingUrl?.trim()` directly.
+    const event = parseTwilioVoiceCallback(params);
+    const callSid = event.callSid;
 
     if (!callSid) {
-      return { params, callSid: null };
+      return { params, event, callSid: null };
     }
 
     const forbidden = await requireTwilioSignature(request, { callSid, params });
     if (forbidden) return forbidden;
 
-    return { params, callSid };
+    return { params, event, callSid };
   },
   sideEffects: ["db-write"],
   handler: async ({ auth }) => {
-    const { params, callSid } = auth;
+    const { params, event, callSid } = auth;
 
     if (!callSid) {
       return routeData({ error: "Missing CallSid" }, { status: 400 });
     }
 
-    const recordingUrl = params.RecordingUrl?.trim();
+    // Only a `recording` event carries recording fields — see the parser's
+    // discrimination order in @/lib/twilio/voice-callback.
+    const recordingUrl = event.kind === "recording" ? event.recordingUrl : null;
     if (recordingUrl) {
       try {
         const updated = await updateCallRecordingUrlBySid(callSid, recordingUrl);
@@ -58,9 +67,7 @@ export const action = defineAction({
             params: {
               sid: callSid,
               twilioParams: params,
-              // The route's own handling is untouched here (that is E2); this
-              // only stops the worker from re-parsing the body a second time.
-              event: parseTwilioVoiceCallback(params),
+              event,
             },
           });
         }
