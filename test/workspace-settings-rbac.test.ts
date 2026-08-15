@@ -189,6 +189,63 @@ describe("workspace settings RBAC", () => {
       expect(res.status).toBe(404);
       expect(settingsPageMocks.getWorkspaceSettingsPageData).not.toHaveBeenCalled();
     });
+
+    /**
+     * The loader enumerates its payload field by field, and `settings.route.tsx`
+     * declares `LoaderData` by hand rather than inferring it — so a field added
+     * to `getWorkspaceSettingsPageData` and consumed by the component can be
+     * dropped in between with the compiler none the wiser. That happened to
+     * `canManageApiKeys` (issue #1264): it arrived `undefined`, and the API-keys
+     * section silently vanished for owners and admins too.
+     *
+     * Asserting on the whole key set rather than one field means the next
+     * addition is caught the same way.
+     */
+    test("payload carries every field the settings page renders from", async () => {
+      dbMocks.getUserRole.mockResolvedValue({ role: "owner" });
+      settingsPageMocks.getWorkspaceSettingsPageData.mockResolvedValue({
+        workspace: { id: "w1", name: "Acme" },
+        userRole: "owner",
+        users: [],
+        phoneNumbers: [],
+        pendingInvites: [],
+        webhook: null,
+        hasAccess: true,
+        canManageApiKeys: true,
+        grantableApiKeyScopes: ["campaigns.read", "audit.read"],
+        apiKeys: [],
+      } as never);
+      const mod = await import("../app/routes/workspaces+/$id/settings.loader.server");
+
+      const res = await asRouteResponse(
+        mod.loader(
+          await withWorkspaceRouteArgs(
+            { request: new Request("http://localhost"), params: { id: "w1" } },
+            { workspaceId: "w1", userId: "u1", userRole: "owner" },
+          ),
+        ),
+      );
+      const payload = await res.json();
+
+      expect(Object.keys(payload).sort()).toEqual(
+        [
+          "activeUserId",
+          "apiKeys",
+          "canManageApiKeys",
+          "grantableApiKeyScopes",
+          "hasAccess",
+          "pendingInvites",
+          "phoneNumbers",
+          "userRole",
+          "users",
+          "webhook",
+          "workspace",
+        ].sort(),
+      );
+      // An owner must reach the API-keys section — unchanged product contract.
+      expect(payload.canManageApiKeys).toBe(true);
+      expect(payload.grantableApiKeyScopes).toContain("audit.read");
+    });
   });
 
   describe("settings/numbers loader", () => {

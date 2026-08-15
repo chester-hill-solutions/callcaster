@@ -24,6 +24,8 @@ export const loader = defineLoader({
         pendingInvites: settings.pendingInvites,
         webhook: settings.webhook,
         hasAccess: settings.hasAccess,
+        canManageApiKeys: settings.canManageApiKeys,
+        grantableApiKeyScopes: settings.grantableApiKeyScopes,
         apiKeys: settings.apiKeys,
       },
       { headers },
