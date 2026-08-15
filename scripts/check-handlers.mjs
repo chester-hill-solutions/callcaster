@@ -33,16 +33,28 @@
  * reading balances. The gate also emits docs/credit-handler-inventory.md;
  * ci:local's final `git diff --exit-code` catches a stale inventory.
  *
+ * Capability facet (BIDIRECTIONAL, ratcheted): a `capability` on an
+ * API_SURFACE operation must be the capability the route actually enforces.
+ * Unlike `sideEffects` there is no separate declaration to compare against —
+ * the capability-carrying auth strategies brand themselves with the id they
+ * enforce, so the strategy call site IS the declaration. See
+ * scripts/lib/capability-linkage.mjs for the two directions and
+ * scripts/capability-baseline.json for the hand-rolled preambles that still
+ * enforce a capability without that link (ratcheting to zero via #1242 D3).
+ *
  * Usage:
  *   node scripts/check-handlers.mjs
+ *   node scripts/check-handlers.mjs --update-capability-baseline
  */
 import fs from "node:fs";
 import path from "node:path";
+import { analyzeCapabilityLinkage } from "./lib/capability-linkage.mjs";
 
 const ROOT = process.cwd();
 const ROUTES_DIR = path.join(ROOT, "app", "routes");
 const SKIP_FILE = [/\.test\.[jt]sx?$/, /\.spec\.[jt]sx?$/];
 const CREDIT_INVENTORY_PATH = path.join(ROOT, "docs", "credit-handler-inventory.md");
+const CAPABILITY_BASELINE_PATH = path.join(ROOT, "scripts", "capability-baseline.json");
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -231,6 +243,31 @@ function writeCreditInventory(rows) {
   fs.writeFileSync(CREDIT_INVENTORY_PATH, lines.join("\n"));
 }
 
+/**
+ * Capability cross-check (self-contained section; all logic lives in
+ * scripts/lib/capability-linkage.mjs so this file stays a thin caller).
+ * Returns the violation lines to fold into the shared report.
+ */
+function capabilityViolations() {
+  const baseline = fs.existsSync(CAPABILITY_BASELINE_PATH)
+    ? JSON.parse(fs.readFileSync(CAPABILITY_BASELINE_PATH, "utf8"))
+    : {};
+  const result = analyzeCapabilityLinkage({ root: ROOT, baseline });
+
+  if (process.argv.includes("--update-capability-baseline")) {
+    fs.writeFileSync(
+      CAPABILITY_BASELINE_PATH,
+      `${JSON.stringify(result.suggestedBaseline, null, 2)}\n`,
+    );
+    console.log(
+      `Capability baseline written: ${Object.keys(result.suggestedBaseline).length} grandfathered operation(s).`,
+    );
+    process.exit(0);
+  }
+
+  return { lines: result.violations.map((v) => `  ${v}`), stats: result.stats };
+}
+
 const violations = [];
 const creditRows = [];
 for (const file of walk(ROUTES_DIR).sort()) {
@@ -266,6 +303,9 @@ for (const file of walk(ROUTES_DIR).sort()) {
 
 writeCreditInventory(creditRows);
 
+const capability = capabilityViolations();
+violations.push(...capability.lines);
+
 if (violations.length) {
   console.error("Handler strictness gate FAILED:\n");
   console.error(violations.join("\n"));
@@ -275,10 +315,17 @@ if (violations.length) {
       "docs/handler-strictness.md). The factory migration is complete; there is no\n" +
       "grandfather baseline. The credit facet is bidirectional: routes matching a\n" +
       "credit-write signal must declare \"credit\"; routes declaring \"credit\" must\n" +
-      "match a signal.",
+      "match a signal. The capability facet is bidirectional too: an API_SURFACE\n" +
+      "`capability` must equal the id the route's auth strategy enforces. If you\n" +
+      "removed a grandfathered preamble, run\n" +
+      "`node scripts/check-handlers.mjs --update-capability-baseline` to ratchet\n" +
+      "scripts/capability-baseline.json down.",
   );
   process.exit(1);
 }
 console.log(
   `Handler gate passed: every route action/loader goes through the handler factory, side-effect declarations match call signals, and ${creditRows.length} credit-ledger routes are inventoried.`,
+);
+console.log(
+  `Capability cross-check passed: ${capability.stats.declared} declared capabilities across ${capability.stats.operations} operations — ${capability.stats.linked} linked to a capability-carrying auth strategy, ${capability.stats.grandfathered} grandfathered preambles (ratcheting to 0).`,
 );

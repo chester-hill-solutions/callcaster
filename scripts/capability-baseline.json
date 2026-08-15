@@ -1,0 +1,23 @@
+{
+  "DELETE /api/audiences": "campaigns.write",
+  "DELETE /api/contacts/:contactId": "campaigns.write",
+  "GET /api/audiences": "campaigns.read",
+  "GET /api/campaigns/:campaignId": "campaigns.read",
+  "GET /api/campaigns/:campaignId/queue": "campaigns.read",
+  "GET /api/contacts/:contactId": "campaigns.read",
+  "GET /api/scripts/:scriptId": "campaigns.read",
+  "GET /api/surveys/:surveyId": "campaigns.read",
+  "GET /api/surveys/:surveyId/responses": "campaigns.read",
+  "GET /api/workspaces/:workspaceId": "campaigns.read",
+  "GET /api/workspaces/:workspaceId/audiences/:audienceId/uploads": "campaigns.read",
+  "GET /api/workspaces/:workspaceId/audit-events": "audit.read",
+  "PATCH /api/audiences": "campaigns.write",
+  "PATCH /api/campaigns/:campaignId/queue": "campaigns.write",
+  "POST /api/campaigns/:campaignId": "campaigns.write",
+  "POST /api/campaigns/create-with-script": "campaigns.write",
+  "POST /api/chat_sms": "messages.send",
+  "POST /api/sms": "campaigns.dispatch",
+  "POST /api/workspaces/:workspaceId/calls/:callSid/disconnect": "calls.control",
+  "POST /api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start": "calls.start",
+  "POST /api/workspaces/:workspaceId/members": "members.invite"
+}
