@@ -1,8 +1,8 @@
+import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import {
-  makeApplyLedgerEntryRpcStub,
   makeTransactionHistoryTableStub,
   type TransactionRow,
 } from "./helpers/transaction-history-stub";
@@ -115,6 +115,12 @@ vi.mock("../app/lib/database/workspace.server", async () => {
 
 function makeDbClientStub(args?: { outreachDisposition?: string }) {
   const transactionRows: TransactionRow[] = [];
+  const ledgerCalls: {
+    workspace: string;
+    type: string;
+    amount: number;
+    idempotencyKey: string;
+  }[] = [];
   const outreachUpdateCalls: any[] = [];
   let lastCallSid: string = "CA1";
 
@@ -227,38 +233,38 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
 
   return {
     from,
-    rpc: vi.fn(async (fn: string, rpcArgs: any) => {
-      if (fn === "apply_ledger_entry_and_sync_credits") {
-        return makeApplyLedgerEntryRpcStub(transactionRows)(fn, rpcArgs);
-      }
-      return { data: null, error: rpcDequeueError };
-    }),
+    rpc: vi.fn(async () => ({ data: null, error: rpcDequeueError })),
+    // A RECORDER, not a simulator. This used to re-implement
+    // apply_ledger_entry_and_sync_credits in JS — pulling arguments out of
+    // Drizzle's queryChunks by odd index and reproducing the idempotent-insert
+    // semantics — which meant reordering the SQL arguments kept it green and
+    // the actual plpgsql was never executed by anything. The RPC's real
+    // behaviour (idempotency, credits sync, concurrency) now belongs to
+    // test/integration-db/ledger.test.ts, against a real Postgres. What is
+    // still this suite's business is whether the ROUTE bills, and with which
+    // idempotency key — so record the calls and return a canned row.
     execute: vi.fn(async (query: any) => {
-      const sqlText = typeof query === "string"
-        ? query
-        : typeof query?.toSQL === "function"
-          ? JSON.stringify(query.toSQL())
-          : JSON.stringify(query);
-      if (sqlText.includes("apply_ledger_entry_and_sync_credits")) {
-        const values = query?.queryChunks?.filter((_: unknown, i: number) => i % 2 === 1) ?? [];
-        const [workspace, type, amount, idempotencyKey, note, campaignId, callSid, messageSid] = values;
-        const result = await makeApplyLedgerEntryRpcStub(transactionRows)(
-          "apply_ledger_entry_and_sync_credits",
-          {
-            p_workspace_id: workspace,
-            p_type: type,
-            p_amount: amount,
-            p_idempotency_key: idempotencyKey,
-            p_description: note,
-            p_campaign_id: campaignId,
-            p_call_sid: callSid,
-            p_message_sid: messageSid,
-          },
-        );
-        return result.data ? [result.data] : [];
-      }
-      return [];
+      const { sql: text, params } = new PgDialect().sqlToQuery(query);
+      if (!text.includes("apply_ledger_entry_and_sync_credits")) return [];
+      const [workspace, type, amount, idempotencyKey] = params as [
+        string,
+        string,
+        number,
+        string,
+      ];
+      ledgerCalls.push({ workspace, type, amount, idempotencyKey });
+      return [
+        {
+          id: ledgerCalls.length,
+          inserted: true,
+          amount,
+          type,
+          idempotency_key: idempotencyKey,
+          workspace,
+        },
+      ];
     }),
+    _ledgerCalls: ledgerCalls,
     _transactionRows: transactionRows,
     _outreachUpdateCalls: outreachUpdateCalls,
     _telephonyConfig: {
@@ -373,7 +379,11 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(403);
   }, 60000);
 
-  test("bills idempotently for completed calls (same CallSid)", async () => {
+  // Whether a replayed key actually dedupes is the database's job and is
+  // asserted against a real Postgres in test/integration-db/ledger.test.ts.
+  // The route's job — the only part this suite can see — is to derive the same
+  // deterministic key from the same CallSid every time.
+  test("bills completed calls under one deterministic key per CallSid", async () => {
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const makeReq = () => {
       const fd = new FormData();
@@ -395,11 +405,12 @@ describe("api.auto-dial.status", () => {
     const r2 = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(r2.status).toBe(200);
 
-    expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
-    const matching = postgresStub._transactionRows.filter(
-      (r) => r.idempotency_key === "call:CA_DUP",
-    );
-    expect(matching.length).toBe(1);
+    // Both deliveries billed, and both used the identical key — so the DB's
+    // unique index is what collapses them, not luck about ordering.
+    expect(postgresStub._ledgerCalls).toHaveLength(2);
+    expect(
+      postgresStub._ledgerCalls.every((c) => c.idempotencyKey === "call:CA_DUP"),
+    ).toBe(true);
   });
 
   test("billing kind is derived from campaign type", async () => {
@@ -420,11 +431,11 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
-    const matching = postgresStub._transactionRows.filter(
-      (r) => r.idempotency_key === "call:CA_IVR_KIND",
-    );
-    expect(matching.length).toBe(1);
+    expect(postgresStub._ledgerCalls).toHaveLength(1);
+    expect(postgresStub._ledgerCalls[0]).toMatchObject({
+      type: "DEBIT",
+      idempotencyKey: "call:CA_IVR_KIND",
+    });
   });
 
   test("dequeues by fetched attempt without writing provider status to disposition", async () => {
@@ -855,7 +866,7 @@ describe("api.auto-dial.status", () => {
     // outbound call, no billing.
     expect(rpcDequeueContactMock).not.toHaveBeenCalled();
     expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
-    expect(postgresStub._transactionRows.length).toBe(0);
+    expect(postgresStub._ledgerCalls).toHaveLength(0);
   });
 
   test("a different terminal status for the same call still processes", async () => {
