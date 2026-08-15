@@ -1,4 +1,3 @@
-import { z } from "zod";
 import {
   CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,
   CAMPAIGN_DISPATCH_JOB_TYPE,
@@ -7,20 +6,27 @@ import {
   SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
   WEBHOOK_DELIVERY_JOB_TYPE,
   ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
+  TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
+  WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE,
 } from "@/lib/worker/job-types.server";
 import type { JobHandlers } from "@/lib/worker/poll-jobs.server";
+import { defineJob, type RegisteredJob } from "@/lib/worker/job-registry.server";
 import {
-  createTypedEnqueue,
-  defineJob,
-  legacyNullableStringParam,
-  legacyNumericParam,
-  legacyObjectParam,
-  legacyRequiredNumberParam,
-  legacyRequiredObjectParam,
-  legacyRequiredStringParam,
-  legacyStringParam,
-  type RegisteredJob,
-} from "@/lib/worker/job-registry.server";
+  audienceUploadParams,
+  billingReconcileParams,
+  callStatusSideEffectsParams,
+  campaignDispatchParams,
+  campaignExportParams,
+  elevenlabsBatchTranscribeParams,
+  noParams,
+  numberRentalBillingParams,
+  recordingSideEffectsParams,
+  smsStatusSideEffectsParams,
+  twilioOpenSyncParams,
+  twilioWebhookAuditParams,
+  webhookDeliveryParams,
+  workspaceTwilioComplianceParams,
+} from "@/lib/worker/job-params.server";
 import {
   billingReconcileHandler,
   campaignScheduleSyncHandler,
@@ -28,12 +34,10 @@ import {
   numberRentalBillingHandler,
   twilioOpenSyncHandler,
   twilioWebhookAuditHandler,
-  TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
 } from "./handlers/cron.server";
 import {
   callStatusSideEffectsHandler,
   recordingSideEffectsHandler,
-  sidAndTwilioParamsSchema,
   smsStatusSideEffectsHandler,
 } from "./handlers/webhook-adapters.server";
 import {
@@ -42,12 +46,23 @@ import {
   campaignExportHandler,
   enqueueWorkspaceComplianceJob,
   webhookDeliveryHandler,
-  WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE,
   workspaceTwilioComplianceHandler,
 } from "./handlers/campaign.server";
 import { elevenlabsBatchTranscribeHandler } from "./handlers/elevenlabs-batch-transcribe.server";
 
 export { enqueueWorkspaceComplianceJob };
+
+// The typed enqueue/requeue surface (`enqueueRegisteredJob`,
+// `requeueStoredJob`, `validateStoredJobParams`) is built in
+// `job-params.server.ts` from the SAME schema objects imported above, and
+// re-exported here as the canonical registry surface for callers outside the
+// worker/handlers tree (routes, campaign-execution.server.ts, etc). Handler
+// implementation files that need to enqueue/self-reschedule (cron.server.ts,
+// campaign.server.ts, webhook-side-effects.server.ts, twilio-open-sync.server.ts)
+// import directly from job-params.server.ts instead of from here, to avoid a
+// module cycle — see that module's doc comment for why.
+export { enqueueRegisteredJob, requeueStoredJob, validateStoredJobParams } from "@/lib/worker/job-params.server";
+export type { JobParamsMap } from "@/lib/worker/job-params.server";
 
 /**
  * The worker job registry (ADR-0007, #1239).
@@ -60,169 +75,17 @@ export { enqueueWorkspaceComplianceJob };
  * Every job type is registered via `defineJob`: params are validated with a
  * zod schema before the handler runs (#1239 A1 landed the mechanism plus
  * three proof-of-concept types; A2 migrated the remaining twelve off the
- * `legacyJob` escape hatch, which no longer exists). Each schema below is a
+ * `legacyJob` escape hatch, which no longer exists; A3 migrated every
+ * production enqueue call site onto the typed `enqueueRegisteredJob` built
+ * from these same schemas — see `job-params.server.ts`). Each schema is a
  * direct translation of the hand-rolled `typeof`-narrowing its handler used
  * to do — see the PR body for a per-type equivalence note (exactly-equivalent
  * vs. deliberately-looser-than-the-old-narrowing, and why).
  */
 
-const twilioOpenSyncParams = z.object({
-  callLimit: legacyNumericParam(50),
-  messageLimit: legacyNumericParam(50),
-  maxAgeMinutes: legacyNumericParam(120),
-});
-
-const billingReconcileParams = z.object({
-  workspaceId: z.string().optional(),
-});
-
-const elevenlabsBatchTranscribeParams = z.object({
-  callSid: z.preprocess(
-    (value) => (typeof value === "string" ? value : ""),
-    z.string().min(1, "elevenlabs_batch_transcribe: missing callSid"),
-  ),
-});
-
-/**
- * `workspace_twilio_compliance` — `reason` defaulted to `"worker"` in the
- * handler (`requireStringParam(params, "reason") ?? "worker"`); `workspaceId`
- * and `actorUserId` are resolved against `job.workspace_id`/`job.user_id`
- * first, so both stay optional here. Exactly equivalent.
- */
-const workspaceTwilioComplianceParams = z.object({
-  workspaceId: legacyStringParam(),
-  reason: legacyStringParam().default("worker"),
-  actorUserId: legacyStringParam(),
-});
-
-/**
- * `audience_upload` — the widest hand-rolled narrowing in the worker.
- * `uploadId`/`audienceId` were `requireNumberParam(...)` then combined into a
- * bundled `if (!uploadId || !audienceId || !workspaceId || !userId) throw`;
- * split into per-field zod failures here (still rejects the same falsy
- * values, including a coerced `0` — see `legacyRequiredNumberParam`).
- * `workspaceId`/`userId` are still resolved against the job row in the
- * handler, so they stay optional in the schema. `headerMapping` and
- * `voterListSource` are DELIBERATELY LOOSER than a "real" schema would be:
- * the old code only checked `typeof`, never validated `headerMapping`'s
- * values are strings or that `voterListSource` is one of the six enum
- * members it's typed as (see `normalizeVoterListSource`, which already runs
- * at the one enqueue site) — this schema preserves that permissiveness so an
- * already-queued row with a shape the old code would have blindly accepted
- * doesn't dead-letter.
- */
-const audienceUploadParams = z.object({
-  uploadId: legacyRequiredNumberParam("audience_upload: missing or invalid uploadId"),
-  audienceId: legacyRequiredNumberParam("audience_upload: missing or invalid audienceId"),
-  workspaceId: legacyStringParam(),
-  userId: legacyStringParam(),
-  fileContent: legacyStringParam().default(""),
-  headerMapping: legacyObjectParam<Record<string, string>>({}),
-  splitNameColumn: legacyNullableStringParam(),
-  voterListSource: legacyNullableStringParam(),
-});
-
-/**
- * `campaign_schedule_sync` / `low_credit_notify` — neither handler ever reads
- * `job.params`. `z.unknown()` accepts anything, matching that.
- */
-const noParams = z.unknown();
-
-/**
- * `twilio_webhook_audit` — `autoRepair` defaulted to `true` unless explicitly
- * `false` (`params.autoRepair !== false`); the workspace fanout always runs
- * across every workspace and never reads a `workspaceId` param. Exactly
- * equivalent.
- */
-const twilioWebhookAuditParams = z.object({
-  autoRepair: z.preprocess((value) => value !== false, z.boolean()),
-});
-
-/**
- * `number_rental_billing` — only `workspaceId` is read, resolved against
- * `job.workspace_id` first and never required (absence means "fan out across
- * every workspace"). Exactly equivalent.
- */
-const numberRentalBillingParams = z.object({
-  workspaceId: legacyStringParam(),
-});
-
-/**
- * `campaign_export` — `campaignId`/`exportId`/`campaignType` were bundled
- * into one `if (!x || !y...) throw "missing campaignId, exportId,
- * workspaceId, or campaignType"` alongside `workspaceId`; split into
- * per-field zod failures for the three pure-params fields (still rejects the
- * same falsy values), `workspaceId` stays optional here since it's resolved
- * against `job.workspace_id` in the handler. `campaignType`'s
- * message/live_call/robocall restriction is business logic, not narrowing —
- * it stays in the handler exactly as before (same "unsupported campaign
- * type" error). Exactly equivalent.
- */
-const campaignExportParams = z.object({
-  campaignId: legacyRequiredNumberParam("campaign_export: missing or invalid campaignId"),
-  exportId: legacyRequiredStringParam("campaign_export: missing exportId"),
-  campaignName: legacyStringParam().default(""),
-  campaignType: legacyRequiredStringParam("campaign_export: missing campaignType"),
-  workspaceId: legacyStringParam(),
-});
-
-/**
- * `campaign_dispatch` — `campaignId` is a pure params field (required, same
- * falsy-including-`0` rejection as the old bundled check); `workspaceId` and
- * `userId` are resolved against the job row in the handler, exactly as
- * before, including the separate "missing userId (launching actor)" error.
- * Exactly equivalent.
- */
-const campaignDispatchParams = z.object({
-  campaignId: legacyRequiredNumberParam("campaign_dispatch: missing or invalid campaignId"),
-  workspaceId: legacyStringParam(),
-  userId: legacyStringParam(),
-});
-
-/**
- * `webhook_delivery` — `eventCategory`/`eventType`/`payload` were bundled
- * into the same "missing workspaceId, eventCategory, eventType, or payload"
- * check as `workspaceId`; split into per-field zod failures for the three
- * pure-params fields, `workspaceId` stays optional (resolved against
- * `job.workspace_id`). `eventType` is validated against the same two-value
- * enum the old ternary checked (`"INSERT" | "UPDATE"`, anything else was
- * already treated as missing). `optional` mirrors the old `=== true` check.
- * Exactly equivalent.
- */
-const webhookDeliveryParams = z.object({
-  workspaceId: legacyStringParam(),
-  eventCategory: legacyRequiredStringParam("webhook_delivery: missing eventCategory"),
-  eventType: z.enum(["INSERT", "UPDATE"]),
-  payload: legacyRequiredObjectParam("webhook_delivery: missing payload"),
-  optional: z.preprocess((value) => value === true, z.boolean()),
-});
-
-/**
- * `call_status_side_effects` / `sms_status_side_effects` /
- * `recording_side_effects` — all three used to call the same
- * `requireSidAndTwilioParams(job, sidKey, label)` helper in
- * webhook-adapters.server.ts; that's now `sidAndTwilioParamsSchema(sidKey,
- * label)`, one shared factory instead of three copies. `twilioParams` is
- * DELIBERATELY LOOSER than a "real" schema: the old code never validated its
- * values are strings (just `typeof value === "object" && value !== null`),
- * and neither does `legacyObjectParam`. Exactly equivalent otherwise.
- */
-const callStatusSideEffectsParams = sidAndTwilioParamsSchema(
-  "callSid",
-  "call_status_side_effects",
-);
-const smsStatusSideEffectsParams = sidAndTwilioParamsSchema(
-  "messageSid",
-  "sms_status_side_effects",
-);
-const recordingSideEffectsParams = sidAndTwilioParamsSchema(
-  "callSid",
-  "recording_side_effects",
-);
-
-// Kept as its own (non-widened) tuple so `createTypedEnqueue` below can infer
-// each registration's literal `type` and its zod-inferred `Params` — spread
-// into `jobRegistry` as plain `RegisteredJob`s further down.
+// Kept as its own (non-widened) tuple so a future consumer needing the
+// literal `type`/`Params` union can still infer it — spread into
+// `jobRegistry` as plain `RegisteredJob`s further down.
 const registrations = [
   defineJob({
     type: "twilio_open_sync",
@@ -319,16 +182,6 @@ export const jobRegistry: RegisteredJob[] = [...registrations];
 export const jobHandlers: JobHandlers = Object.fromEntries(
   jobRegistry.map((registration) => [registration.type, registration.jobHandler]),
 );
-
-/**
- * Typed `enqueueJob`, narrowed to every registered job type: `type` is a
- * literal union instead of `string`, and `params` must match that type's zod
- * schema — an enqueue-time typo or shape mismatch is now a compile error (or
- * a `ZodError` at call time) instead of a dead-lettered job discovered later.
- * Wraps `enqueueJob`; existing untyped callers are unaffected. No call site
- * has been migrated onto this yet — that's #1239 A3.
- */
-export const enqueueRegisteredJob = createTypedEnqueue(registrations);
 
 /**
  * Job types whose permanent failure warrants waking someone: the two billing
