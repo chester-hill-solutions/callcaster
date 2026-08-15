@@ -111,7 +111,10 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       }),
     } as any));
     expect(res.status).toBe(402);
-    await expect(res.json()).resolves.toEqual({ creditsError: true });
+    await expect(res.json()).resolves.toEqual({
+      error: "Insufficient credits",
+      creditsError: true,
+    });
     expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
   });
 
@@ -130,6 +133,12 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       }),
     } as any));
     expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({
+      error: "Workspace not found",
+      code: "NOT_FOUND",
+      statusCode: 404,
+      details: undefined,
+    });
     expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
   });
 

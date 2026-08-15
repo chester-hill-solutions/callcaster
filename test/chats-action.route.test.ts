@@ -552,7 +552,32 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       })),
     );
     expect(res.status).toBe(402);
-    await expect(res.json()).resolves.toMatchObject({ creditsError: true });
+    await expect(res.json()).resolves.toEqual({
+      error: "Insufficient credits",
+      creditsError: true,
+    });
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test("rejects the send with 402 (fail-closed) when workspace balance is unknown", async () => {
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(null);
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15550000000",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toEqual({
+      error: "Insufficient credits",
+      creditsError: true,
+    });
     expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 

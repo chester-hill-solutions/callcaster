@@ -21,18 +21,60 @@ Number rental cron uses a **separate** affordability check: monthly rental debit
 
 ## Block tier (hard)
 
-When `hasInsufficientCreditsForOutbound(balance)` is true (`balance === null` or `balance <= OUTBOUND_CREDIT_FLOOR`):
+`app/lib/outbound-credit-gate.server.ts` is the single gate every outbound
+entry point calls — it owns the balance read, the unknown-workspace
+distinction, and the one locked blocked-response shape, so no call site
+hand-rolls its own credit check or its own error body anymore.
 
-New outbound operations return **HTTP 402** with `creditsError: true` (or equivalent error body):
+```ts
+import {
+  requireOutboundCredits,
+  outboundCreditsResponse,        // route sites: 404 for an unknown workspace
+  outboundCreditsBlockedResponse, // fail-closed sites: 402 either way
+} from "@/lib/outbound-credit-gate.server";
+```
 
-| Path | Module |
-|------|--------|
-| Staffed / queue dial | `app/routes/api+/dial.action.server.ts` |
-| IVR outbound | `app/routes/api+/ivr.action.server.ts` |
-| Auto-dial conference start | `app/lib/auto-dial-start.server.ts` |
-| Connect phone device (browser dial) | `app/routes/api+/connect-phone-device.action.server.ts` |
-| Campaign SMS batch send | `app/routes/api+/sms.action.server.ts` |
-| 1:1 chat SMS | `app/routes/api+/chat_sms.action.server.ts` |
+`requireOutboundCredits(workspaceId)` reads the balance and returns a plain
+discriminated result — no HTTP in it, so service-layer callers (not just
+route handlers) can use it directly:
+
+```ts
+type OutboundCreditsResult =
+  | { ok: true; balance: number }
+  | { ok: false; reason: "workspace_not_found" }
+  | { ok: false; reason: "insufficient_credits"; balance: number };
+```
+
+Blocked outbound sends always return the same body:
+
+```json
+{ "error": "Insufficient credits", "creditsError": true }
+```
+
+at **HTTP 402**. An unknown workspace (`balance === null`, i.e. the
+workspace row doesn't exist) is handled one of two ways, chosen per call
+site:
+
+- **`outboundCreditsResponse`** — throws a uniform 404 (the same
+  `AppError("Workspace not found", 404, NOT_FOUND)` shape
+  `requireWorkspaceAccess` produces, ADR-0004's workspace-probe-resistance
+  convention). Used where the credit check is effectively also the
+  workspace-existence check.
+- **`outboundCreditsBlockedResponse`** — always the 402 blocked body,
+  folding `workspace_not_found` into the same outcome as insufficient
+  credits. Used where an earlier `requireWorkspaceAccess` / capability
+  check already guarantees the workspace exists, so `workspace_not_found`
+  here can only be a TOCTOU race and failing closed is the safer default.
+
+| Path | Module | Unknown-workspace handling |
+|------|--------|------|
+| Staffed / queue dial | `app/routes/api+/dial.action.server.ts` | 404 (`outboundCreditsResponse`) |
+| IVR outbound | `app/routes/api+/ivr.action.server.ts` | 404 (`outboundCreditsResponse`) |
+| Connect phone device (browser dial) | `app/routes/api+/connect-phone-device.action.server.ts` | 404 (`outboundCreditsResponse`) |
+| Auto-dial conference start | `app/lib/auto-dial-start.server.ts` | 404, mapped to `jsonError(..., 404)` by the route caller |
+| 1:1 chat SMS | `app/routes/api+/chat_sms.action.server.ts` | 402, fail-closed (`outboundCreditsBlockedResponse`) |
+| Chat composer send | `app/routes/workspaces+/$id/chats.action.server.ts` | 402, fail-closed (`outboundCreditsBlockedResponse`) |
+| Campaign SMS batch send | `app/lib/campaign-sms-dispatch.server.ts` (via `app/routes/api+/sms.action.server.ts`) | 402, fail-closed (folded into the `"insufficient_credits"` outcome) |
 
 ### What is **not** blocked at the floor
 
@@ -47,11 +89,16 @@ There is **no negative-balance grace** for new outbound. Existing product behavi
 
 ## Helper
 
+New outbound entry points should call `requireOutboundCredits` from
+`app/lib/outbound-credit-gate.server.ts` (see Block tier above), not the raw
+predicate. `shared/credit-floor.ts`'s `hasInsufficientCreditsForOutbound` /
+`OUTBOUND_CREDIT_FLOOR` still exist and back the gate internally — reach for
+them directly only in non-route, non-service code that needs the bare floor
+comparison (e.g. tests).
+
 ```ts
 import { hasInsufficientCreditsForOutbound, OUTBOUND_CREDIT_FLOOR } from "../../shared/credit-floor";
 ```
-
-Use this helper at outbound entry points so the floor stays consistent if policy changes.
 
 ## Related billing ops (WS-F)
 

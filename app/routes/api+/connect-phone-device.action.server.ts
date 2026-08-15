@@ -11,8 +11,11 @@ import {
 import { safeParseJson } from "@/lib/request-utils.server";
 import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
-import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
+import {
+  outboundCreditsResponse,
+  requireOutboundCredits,
+} from "@/lib/outbound-credit-gate.server";
+import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -72,13 +75,8 @@ export const action = defineAction({
             return routeData({ error: "Workspace has no configured caller ID" }, { status: 400, headers });
         }
 
-        const credits = await getWorkspaceCreditsBalance(workspaceId);
-        if (credits === null) {
-            throw new Error(`Workspace ${workspaceId} not found`);
-        }
-        if (hasInsufficientCreditsForOutbound(credits)) {
-            return routeData({ error: "Insufficient credits" }, { status: 402, headers });
-        }
+        const credits = await requireOutboundCredits(workspaceId);
+        if (!credits.ok) return outboundCreditsResponse(credits, headers);
 
         if (parsedCampaignId != null) {
             const campaign = await findCampaignInWorkspace(workspaceId, parsedCampaignId);
@@ -109,6 +107,10 @@ export const action = defineAction({
 
         return routeData({ success: true, callSid: call.sid }, { headers });
     } catch (error: any) {
+        // Let a thrown AppError (e.g. the outbound credit gate's uniform
+        // workspace-not-found 404) escape to defineAction's own error
+        // mapping instead of being flattened into a 500 here.
+        if (error instanceof AppError) throw error;
         logger.error('Error connecting phone device:', error);
         return routeData({ error: error.message }, { status: 500 });
     }
