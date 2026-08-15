@@ -15,7 +15,7 @@ import {
 import { listAllWorkspacesOrdered } from "@/lib/workspace-members-db.server";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
-import { withReschedule, requireNumberParam, requireStringParam } from "./shared.server";
+import { withReschedule } from "./shared.server";
 
 const LOW_CREDIT_NOTIFY_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
 const TWILIO_OPEN_SYNC_RESCHEDULE_MS = 5 * 60 * 1000;
@@ -66,12 +66,12 @@ async function withOptionalWorkspaceFanout<T>(args: {
   return args.runOne(args.workspaceId);
 }
 
-export async function twilioOpenSyncHandler(job: ClaimedJobRow): Promise<unknown> {
-  const params = (job.params ?? {}) as Record<string, unknown>;
+export async function twilioOpenSyncHandler(
+  job: ClaimedJobRow,
+  params: { callLimit: number; messageLimit: number; maxAgeMinutes: number },
+): Promise<unknown> {
   const workspaceId = resolveWorkspaceId(job) ?? "";
-  const callLimit = requireNumberParam(params, "callLimit") ?? 50;
-  const messageLimit = requireNumberParam(params, "messageLimit") ?? 50;
-  const maxAgeMinutes = requireNumberParam(params, "maxAgeMinutes") ?? 120;
+  const { callLimit, messageLimit, maxAgeMinutes } = params;
 
   return withReschedule(
     {
@@ -146,8 +146,9 @@ export async function billingReconcileHandler(job: ClaimedJobRow): Promise<unkno
 
 export async function numberRentalBillingHandler(
   job: ClaimedJobRow,
+  params: { workspaceId: string | undefined },
 ): Promise<unknown> {
-  const workspaceId = resolveWorkspaceId(job);
+  const workspaceId = job.workspace_id ?? params.workspaceId;
 
   return withReschedule(
     {
@@ -239,21 +240,21 @@ export async function campaignScheduleSyncHandler(job: ClaimedJobRow): Promise<u
 /**
  * Scheduled Twilio webhook audit + optional auto-repair. Self-re-enqueuing.
  */
-export async function twilioWebhookAuditHandler(job: ClaimedJobRow): Promise<unknown> {
+export async function twilioWebhookAuditHandler(
+  job: ClaimedJobRow,
+  params: { autoRepair: boolean },
+): Promise<unknown> {
   return withReschedule(
     {
       type: TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
       delayMs: TWILIO_WEBHOOK_AUDIT_RESCHEDULE_MS,
       completedJobId: job.id,
     },
-    () => runTwilioWebhookAudit(job),
+    () => runTwilioWebhookAudit(params.autoRepair),
   );
 }
 
-async function runTwilioWebhookAudit(job: ClaimedJobRow): Promise<unknown> {
-  const params = (job.params ?? {}) as Record<string, unknown>;
-  const autoRepair = params.autoRepair !== false;
-
+async function runTwilioWebhookAudit(autoRepair: boolean): Promise<unknown> {
   const workspaces = await listAllWorkspacesOrdered();
   const results: TwilioWebhookAuditWorkspaceResult[] = [];
 
