@@ -5,10 +5,11 @@
  * A route does not get to *say* which product capability it enforces. The
  * capability-carrying auth strategies in app/lib/capability-guard.server.ts
  * (`dataPlaneCapabilityAuth`, `dataPlaneCapabilityAuthWithParam`,
- * `defineDataPlaneListLoader`) take the capability id as their argument and
- * hand that same value to `requireActorCapability`, so the strategy call site
- * IS the enforcement. This module reads that call site and cross-checks it
- * against the `capability` field on the matching API_SURFACE operation.
+ * `dataPlaneCapabilityAuthForResource`, `defineDataPlaneListLoader`) take the
+ * capability id as their argument and hand that same value to
+ * `requireActorCapability`, so the strategy call site IS the enforcement.
+ * This module reads that call site and cross-checks it against the
+ * `capability` field on the matching API_SURFACE operation.
  *
  * Two independent checks, mirroring the bidirectional credit facet:
  *
@@ -41,7 +42,8 @@ const SURFACE_FILE = /^api-surface-.+\.ts$/;
 const SEED_BLOCK = /[a-zA-Z]*[Ss]eed\(\{[\s\S]*?\}\)\s*[,;]/g;
 
 /** Auth-strategy constructors whose first argument IS the enforced capability. */
-const LINKED_STRATEGIES = "dataPlaneCapabilityAuthWithParam|dataPlaneCapabilityAuth";
+const LINKED_STRATEGIES =
+  "dataPlaneCapabilityAuthForResource|dataPlaneCapabilityAuthWithParam|dataPlaneCapabilityAuth";
 
 /** Read the product capability ids so the truthfulness scan can't guess. */
 export function readCapabilityIds(root) {

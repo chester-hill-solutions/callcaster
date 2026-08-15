@@ -21,6 +21,7 @@ import type {
   BearerSessionAuthResult,
   SessionAuthResult,
 } from "@/lib/api-auth.server";
+import { authForResource, type PlatformResourceKind } from "@/lib/platform-data.server";
 
 function capabilityDeniedResponse(error: CapabilityDeniedError): Response {
   return jsonError(
@@ -191,6 +192,42 @@ export function dataPlaneCapabilityAuthWithParam<P extends string>(
     const gated = await base(args);
     if (gated instanceof Response) return gated;
     return Object.assign(gated, { [paramName]: value } as Record<P, string>);
+  });
+}
+
+/**
+ * Handler-factory auth strategy for data-plane loaders/actions gated on a
+ * *resource* (campaign/contact/script/survey) whose owning workspace is
+ * resolved from the resource id itself rather than a `workspaceId` route
+ * param — sibling of {@link dataPlaneCapabilityAuth} for routes shaped
+ * `/api/<resource>/:id` instead of `/api/workspaces/:workspaceId/...`.
+ *
+ * Wraps {@link authForResource} (id → workspace lookup + dual-auth check)
+ * followed by {@link requireDataPlaneCapability} with the same `capability`
+ * value used for the brand, so `check:handlers` can link these routes the
+ * same way it links the workspaceId-param family.
+ */
+export function dataPlaneCapabilityAuthForResource<P extends string>(
+  capability: ProductCapabilityId,
+  kind: PlatformResourceKind,
+  paramName: P,
+  options?: { minRole?: string },
+) {
+  return withEnforcedCapability(capability, async ({
+    request,
+    params,
+  }: Pick<LoaderFunctionArgs, "request" | "params">) => {
+    const id = params[paramName];
+    if (!id) {
+      return jsonError(`${paramName} is required`, 400);
+    }
+    const auth = await authForResource(request, kind, id, options?.minRole);
+    if (auth instanceof Response) return auth;
+
+    const gated = await requireDataPlaneCapability(auth, capability);
+    if (gated instanceof Response) return gated;
+
+    return { ...auth, [paramName]: id } as typeof auth & Record<P, string>;
   });
 }
 

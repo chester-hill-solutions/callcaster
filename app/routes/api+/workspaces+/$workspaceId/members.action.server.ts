@@ -13,33 +13,70 @@ import {
   updateWorkspaceMemberRole,
 } from "@/lib/platform-members.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import { requireDataPlaneCapability } from "@/lib/capability-guard.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import {
+  dataPlaneSessionMinRoleAuth,
+  requireDataPlaneRouteCapability,
+} from "@/lib/capability-guard.server";
+import { MemberRole } from "@/lib/member-role";
 import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-
-function requireWorkspaceUser({
-  params,
-  context,
-}: Pick<LoaderFunctionArgs, "params" | "context">) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-  const { userId } = getDataPlaneRouteContext(context, workspaceId);
-  if (!userId) {
-    return jsonError("Unauthorized", 401);
-  }
-  return { workspaceId, userId };
-}
+import type { ActionFunctionArgs } from "react-router";
 
 type MembersActionAuth =
   | { mode: "invite"; workspaceId: string; auth: DataPlaneAuthContextValue }
   | { mode: "session"; workspaceId: string; userId: string };
 
+/** Session-only member gate shared by the non-POST branches below. */
+const sessionMemberAuth = dataPlaneSessionMinRoleAuth(MemberRole.Caller);
+
+/**
+ * Only POST (invite) declares a capability (`members.invite`); PATCH/DELETE
+ * are session-only per API_SURFACE, role-gated further down inside
+ * updateWorkspaceMemberRole/removeWorkspaceMember/cancelWorkspaceInvite. One
+ * `action` export backs all three methods, and the capability-linkage check
+ * resolves a single enforced capability per handler export (not per method),
+ * so branding this export with `dataPlaneCapabilityAuth("members.invite")`
+ * would falsely claim PATCH/DELETE enforce it too and fail the truthfulness
+ * check. This stays a hand-rolled, per-method dispatch — see the PR body for
+ * why `POST /api/workspaces/:workspaceId/members` is still baselined.
+ */
+async function membersActionAuth({
+  request,
+  params,
+  context,
+}: ActionFunctionArgs): Promise<MembersActionAuth | Response> {
+  const workspaceId = params.workspaceId;
+  if (!workspaceId) {
+    return jsonError("workspaceId is required", 400);
+  }
+
+  if (request.method === "POST") {
+    const gated = await requireDataPlaneRouteCapability(
+      context,
+      workspaceId,
+      "members.invite",
+    );
+    if (gated instanceof Response) {
+      return gated;
+    }
+    if (!gated.auth.userId && !gated.auth.apiKey) {
+      return jsonError("Unauthorized", 401);
+    }
+    return { mode: "invite", workspaceId, auth: gated.auth };
+  }
+
+  const sessionResult = await sessionMemberAuth({ params, context });
+  if (sessionResult instanceof Response) {
+    return sessionResult;
+  }
+  return { mode: "session", workspaceId, userId: sessionResult.userId };
+}
+
 export const loader = defineLoader({
-  auth: requireWorkspaceUser,
+  // GET is session-only per API_SURFACE (no capability declared); any member
+  // may list. Not capability-carrying — see the module-level note above
+  // `action` for why the invite capability can't be linked either.
+  auth: dataPlaneSessionMinRoleAuth(MemberRole.Caller),
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     const { workspaceId, userId } = auth;
@@ -61,33 +98,7 @@ export const loader = defineLoader({
 });
 
 export const action = defineAction({
-  auth: async ({
-    request,
-    params,
-    context,
-  }: ActionFunctionArgs): Promise<MembersActionAuth | Response> => {
-    const workspaceId = params.workspaceId;
-    if (!workspaceId) {
-      return jsonError("workspaceId is required", 400);
-    }
-    const auth = getDataPlaneRouteContext(context, workspaceId);
-
-    if (request.method === "POST") {
-      const capability = await requireDataPlaneCapability(auth, "members.invite");
-      if (capability instanceof Response) {
-        return capability;
-      }
-      if (!auth.userId && !auth.apiKey) {
-        return jsonError("Unauthorized", 401);
-      }
-      return { mode: "invite", workspaceId, auth };
-    }
-
-    if (!auth.userId) {
-      return jsonError("Unauthorized", 401);
-    }
-    return { mode: "session", workspaceId, userId: auth.userId };
-  },
+  auth: membersActionAuth,
   sideEffects: ["db-write", "email"],
   handler: async ({ request, auth }) => {
     const { workspaceId } = auth;
