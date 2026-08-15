@@ -52,7 +52,7 @@ vi.mock("@/lib/workspace-events.server", () => ({
 const enqueueJobMock = vi.hoisted(() => vi.fn(async () => ({ enqueued: true, jobId: 1 })));
 
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
 }));
 
 const transactionRowsState = vi.hoisted(() => ({ rows: [] as TransactionRow[] }));

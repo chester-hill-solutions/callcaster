@@ -28,7 +28,7 @@ vi.mock("@/lib/worker/handlers/elevenlabs-batch-transcribe.server", () => ({
 }));
 
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
 }));
 
 vi.mock("@/lib/telephony-db.server", () => ({
