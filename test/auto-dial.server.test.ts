@@ -15,22 +15,22 @@ vi.mock("@/lib/logger.server", () => ({
 
 const rpcMocks = vi.hoisted(() => ({
   rpcCreateOutreachAttempt: vi.fn(),
-  rpcDequeueContact: vi.fn(),
   rpcTryCompleteCampaignIfDrained: vi.fn(),
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...args: unknown[]) => rpcMocks.rpcCreateOutreachAttempt(...args),
-  rpcDequeueContact: (...args: unknown[]) => rpcMocks.rpcDequeueContact(...args),
   rpcTryCompleteCampaignIfDrained: (...args: unknown[]) =>
     rpcMocks.rpcTryCompleteCampaignIfDrained(...args),
 }));
 
 const claimNextQueueContactMock = vi.hoisted(() => vi.fn());
 const requeueCampaignQueueByIdMock = vi.hoisted(() => vi.fn());
+const dequeueQueueEntryMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   claimNextQueueContact: (...args: unknown[]) => claimNextQueueContactMock(...args),
   requeueCampaignQueueById: (...args: unknown[]) =>
     requeueCampaignQueueByIdMock(...args),
+  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
 }));
 
 const twilioMocks = vi.hoisted(() => ({
@@ -295,9 +295,11 @@ describe("auto-dial.server", () => {
       expect(twilioMocks.callsCreate).toHaveBeenCalledWith(
         expect.objectContaining({ to: "+16045550100" }),
       );
-      expect(rpcMocks.rpcDequeueContact).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({ contactId: 102 }),
+      expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: { contactId: 102 },
+          household: true,
+        }),
       );
       expect(result).toEqual({ success: true });
     });
@@ -338,7 +340,7 @@ describe("auto-dial.server", () => {
       const result = await runAutoDialerTurn(turnInput);
 
       expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(21, "ws-1");
-      expect(rpcMocks.rpcDequeueContact).not.toHaveBeenCalled();
+      expect(dequeueQueueEntryMock).not.toHaveBeenCalled();
       expect(result).toEqual({ success: false, error: "Invalid phone number" });
     });
 
@@ -350,11 +352,11 @@ describe("auto-dial.server", () => {
       const result = await runAutoDialerTurn(turnInput);
 
       expect(requeueCampaignQueueByIdMock).not.toHaveBeenCalled();
-      expect(rpcMocks.rpcDequeueContact).toHaveBeenCalledWith(
-        expect.anything(),
+      expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          contactId: 201,
-          dequeuedReasonText: expect.stringContaining("Ambiguous dial failure"),
+          by: { contactId: 201 },
+          household: false,
+          reason: expect.stringContaining("Ambiguous dial failure"),
         }),
       );
       expect(result).toEqual({ success: false, error: "socket hang up" });

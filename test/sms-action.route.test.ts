@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   getCampaignQueueById: vi.fn(),
   getWorkspaceTwilioPortalConfig: vi.fn(),
   createWorkspaceTwilioInstance: vi.fn(),
-  dequeueCampaignQueueById: vi.fn(async () => undefined),
+  dequeueQueueEntry: vi.fn(async () => undefined),
   countCampaignMessagesToPhone: vi.fn(async () => 0),
   updateOutreachAttemptForWorkspace: vi.fn(async () => ({ campaign_id: 1 })),
   rpcCreateOutreachAttempt: vi.fn(async () => 1),
@@ -59,7 +59,7 @@ vi.mock("@/lib/database/workspace.server", () => ({
     mocks.createWorkspaceTwilioInstance(...args),
 }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueCampaignQueueById: (...args: unknown[]) => mocks.dequeueCampaignQueueById(...args),
+  dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
 }));
 vi.mock("@/lib/message-db.server", () => ({
   countCampaignMessagesToPhone: (...args: unknown[]) =>
@@ -134,7 +134,7 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     mocks.createWorkspaceTwilioInstance.mockResolvedValue({
       messages: { create: vi.fn(async (args: any) => ({ sid: "SM1", ...args })) },
     });
-    mocks.dequeueCampaignQueueById.mockResolvedValue(undefined);
+    mocks.dequeueQueueEntry.mockResolvedValue(undefined);
     mocks.countCampaignMessagesToPhone.mockResolvedValue(0);
     mocks.updateOutreachAttemptForWorkspace.mockResolvedValue({ campaign_id: 1 });
     mocks.rpcCreateOutreachAttempt.mockResolvedValue(1);
@@ -167,8 +167,8 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     expect(body.responses[0]).toEqual({
       9: { success: true, skipped: true, reason: "Contact opted out" },
     });
-    expect(mocks.dequeueCampaignQueueById).toHaveBeenCalledWith({
-      queueId: 501,
+    expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
+      by: { id: 501 },
       userId: "u1",
       reason: "Contact opted out",
     });
@@ -198,7 +198,7 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { responses: Array<Record<string, any>> };
     expect(body.responses[0][10]).toMatchObject({ success: true });
-    expect(mocks.dequeueCampaignQueueById).toHaveBeenCalledWith(
+    expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith(
       expect.objectContaining({ reason: "SMS message sent" }),
     );
   });
@@ -228,8 +228,8 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     expect(body.responses[0]).toEqual({
       11: { success: true, skipped: true, reason: "Landline — cannot receive SMS" },
     });
-    expect(mocks.dequeueCampaignQueueById).toHaveBeenCalledWith({
-      queueId: 503,
+    expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
+      by: { id: 503 },
       userId: "u1",
       reason: "Landline — cannot receive SMS",
     });
@@ -269,7 +269,7 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
       expect(res.status).toBe(200);
       const body = (await res.json()) as { responses: Array<Record<string, any>> };
       expect(body.responses[0][12]).toMatchObject({ success: true });
-      expect(mocks.dequeueCampaignQueueById).toHaveBeenCalledWith(
+      expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith(
         expect.objectContaining({ reason: "SMS message sent" }),
       );
     },

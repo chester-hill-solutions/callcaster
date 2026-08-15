@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => {
     resolveCampaignWorkspaceId: vi.fn(async () => "w1"),
     resolveContactWorkspaceId: vi.fn(async () => "w1"),
     rpcSelectAndUpdateCampaignContacts: vi.fn(async () => []),
-    rpcDequeueContact: vi.fn(async () => ({})),
+    dequeueQueueEntry: vi.fn(async () => undefined),
   };
 });
 
@@ -30,6 +30,7 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
   fetchCampaignQueueRowsByIds: (...args: unknown[]) => mocks.fetchCampaignQueueRowsByIds(...args),
   requeueAllCampaignQueueForCampaign: (...args: unknown[]) =>
     mocks.requeueAllCampaignQueueForCampaign(...args),
+  dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
 }));
 vi.mock("@/lib/platform-telephony.server", () => ({
   resolveCampaignWorkspaceId: (...args: unknown[]) => mocks.resolveCampaignWorkspaceId(...args),
@@ -37,7 +38,6 @@ vi.mock("@/lib/platform-telephony.server", () => ({
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcSelectAndUpdateCampaignContacts: (...args: unknown[]) => mocks.rpcSelectAndUpdateCampaignContacts(...args),
-  rpcDequeueContact: (...args: unknown[]) => mocks.rpcDequeueContact(...args),
 }));
 
 describe("app/routes/api+/queues/route.tsx", () => {
@@ -50,7 +50,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.resolveCampaignWorkspaceId.mockReset();
     mocks.resolveContactWorkspaceId.mockReset();
     mocks.rpcSelectAndUpdateCampaignContacts.mockReset();
-    mocks.rpcDequeueContact.mockReset();
+    mocks.dequeueQueueEntry.mockReset();
     mocks.resolveCampaignWorkspaceId.mockResolvedValue("w1");
     mocks.resolveContactWorkspaceId.mockResolvedValue("w1");
     mocks.fetchCampaignQueueRowsByIds.mockResolvedValue([]);
@@ -108,8 +108,8 @@ describe("app/routes/api+/queues/route.tsx", () => {
     expect(mocks.fetchCampaignQueueRowsByIds).toHaveBeenCalledWith([1, 2]);
   });
 
-  test("action POST returns 500 and logs when rpc errors", async () => {
-    mocks.rpcDequeueContact.mockRejectedValueOnce(new Error("rpc fail"));
+  test("action POST returns 500 and logs when dequeue errors", async () => {
+    mocks.dequeueQueueEntry.mockRejectedValueOnce(new Error("rpc fail"));
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 1, household: true });
 
@@ -124,7 +124,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
   });
 
   test("action POST returns data on success", async () => {
-    mocks.rpcDequeueContact.mockResolvedValueOnce({ ok: true });
+    mocks.dequeueQueueEntry.mockResolvedValueOnce(undefined);
     queueJsonAuthSession({ user: { id: "u1" } });
     mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, household: false });
 
@@ -135,6 +135,13 @@ describe("app/routes/api+/queues/route.tsx", () => {
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true });
+    expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
+      by: { contactId: 2 },
+      workspaceId: "w1",
+      household: false,
+      userId: "u1",
+      reason: "Manually dequeued by user",
+    });
   });
 
   test("action DELETE returns 500 and logs when update errors", async () => {

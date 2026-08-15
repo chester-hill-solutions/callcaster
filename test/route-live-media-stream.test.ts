@@ -43,10 +43,8 @@ const mocks = vi.hoisted(() => ({
   runAutoDialerTurn: vi.fn(async () => undefined),
   getUserVerifiedAudioNumbers: vi.fn(),
   fetchCampaignByIdForWorkspace: vi.fn(),
-  dequeueCampaignQueueByContact: vi.fn(),
-  rpcDequeueContact: vi.fn(),
+  dequeueQueueEntry: vi.fn(),
   createSignedObjectUrl: vi.fn(async () => null),
-  createTenantDb: vi.fn(() => ({})),
 }));
 
 // `twilio`'s package entrypoint pulls in a jsonwebtoken → jwa chain that fails
@@ -118,17 +116,10 @@ vi.mock("@/lib/campaign-ivr.server", () => ({
     mocks.fetchCampaignByIdForWorkspace(...a),
 }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueCampaignQueueByContact: (...a: unknown[]) =>
-    mocks.dequeueCampaignQueueByContact(...a),
-}));
-vi.mock("@/lib/db-rpc.server", () => ({
-  rpcDequeueContact: (...a: unknown[]) => mocks.rpcDequeueContact(...a),
+  dequeueQueueEntry: (...a: unknown[]) => mocks.dequeueQueueEntry(...a),
 }));
 vi.mock("@/lib/object-storage.server", () => ({
   createSignedObjectUrl: (...a: unknown[]) => mocks.createSignedObjectUrl(...a),
-}));
-vi.mock("@/server/tenant-db", () => ({
-  createTenantDb: (...a: unknown[]) => mocks.createTenantDb(...a),
 }));
 
 /** The three capability states each route is exercised against. */
