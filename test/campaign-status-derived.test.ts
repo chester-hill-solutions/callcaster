@@ -31,6 +31,10 @@ vi.mock("@/lib/database/campaign-stats.server", () => ({
 }));
 vi.mock("@/lib/campaign-readiness", () => ({
   getCampaignReadiness: mocks.getCampaignReadiness,
+  resolveReadinessQueueCount: (counts: {
+    totalCount?: number | null;
+    queuedCount?: number | null;
+  }) => counts.totalCount ?? counts.queuedCount ?? 0,
 }));
 vi.mock("@/lib/database/campaign.server", () => ({
   getWorkspaceCampaigns: mocks.getWorkspaceCampaigns,

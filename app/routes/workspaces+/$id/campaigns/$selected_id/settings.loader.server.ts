@@ -13,7 +13,7 @@ import {
   getWorkspaceTwilioSyncSnapshotFromTwilioData,
 } from "@/lib/database/workspace.server";
 import { loadCampaignBillingSummary } from "@/lib/campaign-billing.server";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import { getCampaignReadiness, resolveReadinessQueueCount } from "@/lib/campaign-readiness";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
 import { loadActiveSurveysForWorkspace } from "@/lib/survey-db.server";
@@ -135,7 +135,14 @@ export const loader = defineLoader({
     campaignType as Campaign | null | undefined,
     campaignDetailsForReadiness,
     {
-      queueCount: campaignWithAudience.queue_count ?? 0,
+      // Use the TOTAL assigned audience, not the remaining/undequeued
+      // queue count -- the latter is 0 both pre-launch and after a
+      // campaign finishes sending, which misreports completed campaigns
+      // as "needs attention: add at least one contact" (#1255).
+      queueCount: resolveReadinessQueueCount({
+        totalCount: campaignWithAudience.total_count,
+        queuedCount: campaignWithAudience.queue_count,
+      }),
       smsSenderClass: outboundEstimateInputs.portalConfig.smsSenderClass,
       smsMessagingServiceSendersReady:
         campaignType?.type === "message" &&

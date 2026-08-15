@@ -22,7 +22,7 @@ import {
 } from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
 import { AppError } from "@/lib/errors.server";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import { getCampaignReadiness, resolveReadinessQueueCount } from "@/lib/campaign-readiness";
 import { logger } from "@/lib/logger.server";
 import { isCampaignActive } from "@/lib/campaign-status";
 import { jsonError } from "@/lib/platform-api.server";
@@ -450,7 +450,12 @@ export async function transitionCampaignStatusApi(
       campaignRecord as Campaign,
       campaignDetails as Parameters<typeof getCampaignReadiness>[1],
       {
-        queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
+        // Total assigned audience, not remaining/undequeued rows -- see
+        // resolveReadinessQueueCount for why (#1255).
+        queueCount: resolveReadinessQueueCount({
+          totalCount: queueCounts.fullCount,
+          queuedCount: queueCounts.queuedCount,
+        }),
       },
     );
     const readinessError =
