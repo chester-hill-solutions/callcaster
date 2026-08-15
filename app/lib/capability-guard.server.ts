@@ -4,7 +4,6 @@ import {
   requireActorCapability,
   type AuthorizationActor,
 } from "@chester-hill-solutions/auth";
-import { createRequireCapability } from "@chester-hill-solutions/auth-react-router";
 import type { RouterContextProvider, LoaderFunctionArgs } from "react-router";
 import {
   apiKeyActorFromScopes,
@@ -33,9 +32,10 @@ function capabilityDeniedResponse(error: CapabilityDeniedError): Response {
 
 /**
  * Resolve an AuthorizationActor for data-plane middleware context
- * (session membership role or API-key scope allowlist).
+ * (session membership role or API-key scope allowlist). Internal: routes go
+ * through {@link requireDataPlaneCapability}, which owns the denial shapes.
  */
-export async function resolveDataPlaneAuthorizationActor(
+async function resolveDataPlaneAuthorizationActor(
   auth: DataPlaneAuthContextValue,
 ): Promise<AuthorizationActor | Response> {
   if (auth.apiKey) {
@@ -222,9 +222,10 @@ export function defineDataPlaneListLoader<K extends string>(config: {
 }
 
 /**
- * Build an AuthorizationActor from a dual-auth result once workspaceId is known.
+ * Build an AuthorizationActor from a dual-auth result once workspaceId is
+ * known. Internal, for {@link requireDualAuthCapability}.
  */
-export async function resolveDualAuthAuthorizationActor(args: {
+async function resolveDualAuthAuthorizationActor(args: {
   auth: ApiKeyAuthResult | BearerSessionAuthResult | SessionAuthResult;
   workspaceId: string;
 }): Promise<AuthorizationActor | Response> {
@@ -275,31 +276,3 @@ export async function requireDualAuthCapability(args: {
   }
 }
 
-/**
- * Package factory wired to CallCaster data-plane actor resolution.
- * Prefer `requireDataPlaneCapability` for middleware-backed routes.
- */
-export function createDataPlaneRequireCapability(
-  capability: ProductCapabilityId,
-) {
-  return createRequireCapability({
-    capabilityId: asCapabilityId(capability),
-    resolveActor: async ({ workspaceId, userId }) => {
-      // Session path only — API keys should use requireDataPlaneCapability with
-      // full data-plane context (scopes live on the key, not userId).
-      const membership = await getUserRole({
-        user: { id: userId },
-        workspaceId,
-      });
-      if (!membership) {
-        return jsonError("Workspace not found", 404);
-      }
-      return sessionActorFromMembership({
-        userId,
-        workspaceId,
-        role: membership.role,
-      });
-    },
-    onDenied: capabilityDeniedResponse,
-  });
-}
