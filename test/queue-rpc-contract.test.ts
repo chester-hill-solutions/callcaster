@@ -4,7 +4,6 @@ import path from "node:path";
 import { describe, expect, test } from "vitest";
 
 import { QUEUE_ENTRY_TRANSITIONS } from "@/lib/queue-status";
-// eslint-disable-next-line import/no-unresolved
 import {
   analyze,
   BOOKKEEPING_COLUMNS,
@@ -15,7 +14,6 @@ import {
   selectQueueRpcs,
   stripSqlComments,
 } from "../scripts/lib/queue-rpc-contract.mjs";
-// eslint-disable-next-line import/no-unresolved
 import { parseQueueEntryTransitions } from "../scripts/lib/queue-transitions-source.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
