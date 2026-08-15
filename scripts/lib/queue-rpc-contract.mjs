@@ -311,8 +311,13 @@ const UPDATE_RE = new RegExp(
   `update\\s+(?:only\\s+)?(?:public\\.)?${QUEUE_TABLE}(?:\\s+(?:as\\s+)?([a-z_][a-z0-9_]*))?\\s+set\\b`,
   "gi",
 );
+// The optional alias slot must exclude the keywords that can follow the table
+// name, or `INSERT INTO campaign_queue VALUES (1, 2)` parses "values" as an
+// alias and "(1, 2)" as a column list — a positional insert read as a named
+// one, which is backwards.
 const INSERT_RE = new RegExp(
-  `insert\\s+into\\s+(?:public\\.)?${QUEUE_TABLE}\\s*(?:\\s+(?:as\\s+)?[a-z_][a-z0-9_]*\\s*)?\\(([^)]*)\\)`,
+  `insert\\s+into\\s+(?:public\\.)?${QUEUE_TABLE}\\s*` +
+    `(?:\\s+(?:as\\s+)?(?!values\\b|select\\b|default\\b|overriding\\b|on\\b)[a-z_][a-z0-9_]*\\s*)?\\(([^)]*)\\)`,
   "gi",
 );
 const INSERT_ANY_RE = new RegExp(`insert\\s+into\\s+(?:public\\.)?${QUEUE_TABLE}\\b`, "gi");
