@@ -1,5 +1,5 @@
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
-import { dataPlaneResourceCapabilityAuth } from "@/lib/capability-guard.server";
+import { dataPlaneCapabilityAuthForResource } from "@/lib/capability-guard.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
 import {
@@ -13,7 +13,7 @@ import {
 import { patchCampaignQueueBodySchema } from "@/lib/schemas/api/platform-data";
 
 export const loader = defineLoader({
-  auth: dataPlaneResourceCapabilityAuth("campaigns.read", "campaign", "campaignId"),
+  auth: dataPlaneCapabilityAuthForResource("campaigns.read", "campaign", "campaignId"),
   sideEffects: ["db-read"],
   handler: async ({ request, url, auth }) => {
     const campaignId = auth.campaignId;
@@ -57,7 +57,7 @@ export const loader = defineLoader({
 
 export const action = defineAction({
   // Destructive mutation: require at least `member`, blocking the `caller` role.
-  auth: dataPlaneResourceCapabilityAuth("campaigns.write", "campaign", "campaignId", {
+  auth: dataPlaneCapabilityAuthForResource("campaigns.write", "campaign", "campaignId", {
     minRole: "member",
   }),
   sideEffects: ["db-write"],

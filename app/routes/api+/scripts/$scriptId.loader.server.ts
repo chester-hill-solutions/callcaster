@@ -1,10 +1,10 @@
-import { dataPlaneResourceCapabilityAuth } from "@/lib/capability-guard.server";
+import { dataPlaneCapabilityAuthForResource } from "@/lib/capability-guard.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { getScriptDetailApi } from "@/lib/platform-data.server";
 import { defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({
-  auth: dataPlaneResourceCapabilityAuth("campaigns.read", "script", "scriptId"),
+  auth: dataPlaneCapabilityAuthForResource("campaigns.read", "script", "scriptId"),
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     const result = await getScriptDetailApi(

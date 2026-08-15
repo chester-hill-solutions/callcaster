@@ -207,7 +207,7 @@ export function dataPlaneCapabilityAuthWithParam<P extends string>(
  * value used for the brand, so `check:handlers` can link these routes the
  * same way it links the workspaceId-param family.
  */
-export function dataPlaneResourceCapabilityAuth<P extends string>(
+export function dataPlaneCapabilityAuthForResource<P extends string>(
   capability: ProductCapabilityId,
   kind: PlatformResourceKind,
   paramName: P,

@@ -1,4 +1,4 @@
-import { dataPlaneResourceCapabilityAuth } from "@/lib/capability-guard.server";
+import { dataPlaneCapabilityAuthForResource } from "@/lib/capability-guard.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import {
   exportSurveyResponsesCsv,
@@ -7,7 +7,7 @@ import {
 import { defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({
-  auth: dataPlaneResourceCapabilityAuth("campaigns.read", "survey", "surveyId"),
+  auth: dataPlaneCapabilityAuthForResource("campaigns.read", "survey", "surveyId"),
   sideEffects: ["db-read"],
   handler: async ({ url, auth }) => {
     if (url.searchParams.get("export") === "csv") {

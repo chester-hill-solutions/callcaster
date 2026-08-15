@@ -5,7 +5,7 @@
  * A route does not get to *say* which product capability it enforces. The
  * capability-carrying auth strategies in app/lib/capability-guard.server.ts
  * (`dataPlaneCapabilityAuth`, `dataPlaneCapabilityAuthWithParam`,
- * `dataPlaneResourceCapabilityAuth`, `defineDataPlaneListLoader`) take the
+ * `dataPlaneCapabilityAuthForResource`, `defineDataPlaneListLoader`) take the
  * capability id as their argument and hand that same value to
  * `requireActorCapability`, so the strategy call site IS the enforcement.
  * This module reads that call site and cross-checks it against the
@@ -43,7 +43,7 @@ const SEED_BLOCK = /[a-zA-Z]*[Ss]eed\(\{[\s\S]*?\}\)\s*[,;]/g;
 
 /** Auth-strategy constructors whose first argument IS the enforced capability. */
 const LINKED_STRATEGIES =
-  "dataPlaneResourceCapabilityAuth|dataPlaneCapabilityAuthWithParam|dataPlaneCapabilityAuth";
+  "dataPlaneCapabilityAuthForResource|dataPlaneCapabilityAuthWithParam|dataPlaneCapabilityAuth";
 
 /** Read the product capability ids so the truthfulness scan can't guess. */
 export function readCapabilityIds(root) {

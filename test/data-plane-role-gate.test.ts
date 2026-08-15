@@ -267,7 +267,7 @@ describe("data-plane mutation routes reject the caller role end-to-end", () => {
     expect(mocks.patchCampaignQueueApi).not.toHaveBeenCalled();
   });
 
-  // GET routes migrated onto dataPlaneResourceCapabilityAuth (issue #1242,
+  // GET routes migrated onto dataPlaneCapabilityAuthForResource (issue #1242,
   // D3) that had no dedicated test file before the migration.
   test("GET /api/campaigns/:id — non-member gets the uniform 404", async () => {
     asSessionUser("u-outsider");

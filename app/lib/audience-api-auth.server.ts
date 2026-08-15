@@ -22,7 +22,7 @@ type DualAuthLike =
  * `audienceId` or `workspaceId` via query string (GET) or a parsed body
  * (PATCH/DELETE), resolved dynamically before this runs. That's incompatible
  * with today's pre-request, route-param-shaped capability strategies
- * (`dataPlaneCapabilityAuth`, `dataPlaneResourceCapabilityAuth`), and this
+ * (`dataPlaneCapabilityAuth`, `dataPlaneCapabilityAuthForResource`), and this
  * path also supports bearer-token dual auth that those strategies don't.
  * Closing this baseline entry needs a body/query-aware strategy variant —
  * left for a follow-up.
