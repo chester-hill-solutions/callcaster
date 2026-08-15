@@ -13,6 +13,7 @@ import {
 import type { ProductCapabilityId } from "@/lib/capabilities";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import { getUserRole } from "@/lib/database/workspace.server";
+import { hasMinRole, type MemberRole } from "@/lib/member-role";
 import { defineLoader } from "@/lib/handler.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
@@ -120,6 +121,47 @@ export function dataPlaneCapabilityAuth(capability: ProductCapabilityId) {
       return jsonError("workspaceId is required", 400);
     }
     return requireDataPlaneRouteCapability(context, workspaceId, capability);
+  };
+}
+
+/**
+ * Handler-factory auth strategy for `sessionOnly` data-plane loaders/actions
+ * that gate on a minimum workspace ROLE rather than a product capability.
+ *
+ * Sibling of {@link dataPlaneCapabilityAuth}, for the endpoints whose
+ * authorization is a role floor and where no product capability exists
+ * (billing reads, number provisioning). Deliberately does NOT resolve an
+ * API-key actor: these routes are declared `exposure: "sessionOnly"`, and
+ * `resolveDataPlaneAuth` gives API-key requests `userId: null`, so a key gets
+ * the same 401 the hand-rolled preambles returned. Routing them through
+ * capability actors instead would silently widen a session-only surface.
+ *
+ * Rejection shapes follow the established data-plane conventions:
+ * - non-member → 404 "Workspace not found" (ADR-0004, existence hidden)
+ * - member below `minRole` → 403 "Insufficient role", matching
+ *   `createDataPlaneMiddlewareWithMinRole` in data-plane-middleware.server.ts
+ */
+export function dataPlaneSessionMinRoleAuth(minRole: MemberRole) {
+  return async ({
+    params,
+    context,
+  }: Pick<LoaderFunctionArgs, "params" | "context">) => {
+    const workspaceId = params.workspaceId;
+    if (!workspaceId) {
+      return jsonError("workspaceId is required", 400);
+    }
+    const { userId } = getDataPlaneRouteContext(context, workspaceId);
+    if (!userId) {
+      return jsonError("Unauthorized", 401);
+    }
+    const membership = await getUserRole({ user: { id: userId }, workspaceId });
+    if (!membership) {
+      return jsonError("Workspace not found", 404);
+    }
+    if (!hasMinRole(membership.role, minRole)) {
+      return jsonError("Insufficient role", 403, "insufficient_role");
+    }
+    return { workspaceId, userId };
   };
 }
 

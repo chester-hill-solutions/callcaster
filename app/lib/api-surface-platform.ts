@@ -165,13 +165,16 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
     path: "/api/workspaces/:workspaceId/credits",
     routeModule:
       "app/routes/api+/workspaces+/$workspaceId/credits.route.tsx",
-    authClass: "workspaceAdmin",
+    authClass: "session",
     ownerArea: "billing",
     exposure: "sessionOnly",
     docsGuide: GUIDE.platform,
     workspaceScoped: true,
     operations: [{ method: "GET", handler: "loader", bodyType: "query" }],
-    notes: "Read current workspace credit balance.",
+    notes:
+      "Read current workspace credit balance. Available to any workspace " +
+      "member, including the caller role — the call screen polls it for live " +
+      "balance reconciliation.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/billing/checkout-session",
@@ -222,7 +225,7 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
   platformSeed({
     path: "/api/workspaces/:workspaceId/numbers",
     routeModule: "app/routes/api+/workspaces+/$workspaceId/numbers.route.tsx",
-    authClass: "workspaceAdmin",
+    authClass: "session",
     ownerArea: "telephony",
     exposure: "sessionOnly",
     docsGuide: GUIDE.telephony,
@@ -231,6 +234,9 @@ export const PLATFORM_API_SURFACE: readonly ApiSurfaceEntry[] = [
       { method: "GET", handler: "loader", bodyType: "query" },
       { method: "POST", handler: "action", bodyType: "json" },
     ],
+    notes:
+      "GET lists numbers for any workspace member. POST (purchase) requires " +
+      "the member role or above; the caller role receives 403.",
   }),
   platformSeed({
     path: "/api/workspaces/:workspaceId/numbers/:numberId",

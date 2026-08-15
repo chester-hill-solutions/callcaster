@@ -4301,14 +4301,14 @@
       "get": {
         "operationId": "getNumbers",
         "summary": "GET /api/numbers",
-        "description": "",
+        "description": "Flat alias for /api/workspaces/:workspaceId/numbers used by the number purchase wizard. POST requires the member role or above; the caller role receives 403.",
         "tags": [
-          "Workspace Admin",
+          "User API",
           "telephony"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
@@ -4363,14 +4363,14 @@
       "post": {
         "operationId": "postNumbers",
         "summary": "POST /api/numbers",
-        "description": "",
+        "description": "Flat alias for /api/workspaces/:workspaceId/numbers used by the number purchase wizard. POST requires the member role or above; the caller role receives 403.",
         "tags": [
-          "Workspace Admin",
+          "User API",
           "telephony"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-workspace-admin.md",
         "security": [
           {
@@ -7322,14 +7322,14 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_credits",
         "summary": "GET /api/workspaces/:workspaceId/credits",
-        "description": "Read current workspace credit balance.",
+        "description": "Read current workspace credit balance. Available to any workspace member, including the caller role — the call screen polls it for live balance reconciliation.",
         "tags": [
-          "Workspace Admin",
+          "User API",
           "billing"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
         "security": [
           {
@@ -7707,14 +7707,14 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_numbers",
         "summary": "GET /api/workspaces/:workspaceId/numbers",
-        "description": "",
+        "description": "GET lists numbers for any workspace member. POST (purchase) requires the member role or above; the caller role receives 403.",
         "tags": [
-          "Workspace Admin",
+          "User API",
           "telephony"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
         "security": [
           {
@@ -7769,14 +7769,14 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_numbers",
         "summary": "POST /api/workspaces/:workspaceId/numbers",
-        "description": "",
+        "description": "GET lists numbers for any workspace member. POST (purchase) requires the member role or above; the caller role receives 403.",
         "tags": [
-          "Workspace Admin",
+          "User API",
           "telephony"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-auth-class": "session",
         "x-callcaster-docs-guide": "docs/api-telephony-provisioning.md",
         "security": [
           {

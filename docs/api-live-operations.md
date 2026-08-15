@@ -39,7 +39,9 @@ Existing flat routes (see [Telephony control](./api-telephony-control.md)):
 | --- | --- | --- |
 | GET | `/api/workspaces/:workspaceId/credits` | Current credit balance for the workspace |
 
-`GET /api/workspaces/:workspaceId/credits` — Returns the workspace's current credit balance. Auth is session or bearer. Response: `{ credits: number }`. Not exposed in the integrator OpenAPI surface.
+`GET /api/workspaces/:workspaceId/credits` — Returns the workspace's current credit balance. Response: `{ credits: number }`. Not exposed in the integrator OpenAPI surface.
+
+Auth is session-only: a browser session cookie or a user bearer token. Workspace API keys are rejected with 401. Any workspace member may read the balance, including the `caller` role — the campaign call screen polls this endpoint to reconcile credits after a call.
 
 ## See also
 
