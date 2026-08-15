@@ -450,8 +450,7 @@ export async function transitionCampaignStatusApi(
       campaignRecord as Campaign,
       campaignDetails as Parameters<typeof getCampaignReadiness>[1],
       {
-        // Total assigned audience, not remaining/undequeued rows -- see
-        // resolveReadinessQueueCount for why (#1255).
+        // Total assigned audience, not remaining rows — see resolveReadinessQueueCount (#1255).
         queueCount: resolveReadinessQueueCount({
           totalCount: queueCounts.fullCount,
           queuedCount: queueCounts.queuedCount,
