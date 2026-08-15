@@ -4,6 +4,11 @@ vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 });
 
+// Voice side-effect runners take the callback the ROUTE parsed (#1243 E1), so
+// fixtures stay raw Twilio bodies and go through the real parser rather than
+// being hand-built union members that could drift from what a route produces.
+import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
+
 const mocks = vi.hoisted(() => ({
   findCallBySid: vi.fn(),
   billTerminalCallStatus: vi.fn(),
@@ -156,7 +161,7 @@ describe("webhook side-effect handlers", () => {
 
     await runCallStatusSideEffects({
       callSid: "CA1",
-      twilioParams: { CallSid: "CA1", CallStatus: "completed" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "completed" }),
     });
 
     expect(mocks.billTerminalCallStatus).toHaveBeenCalled();
@@ -183,7 +188,7 @@ describe("webhook side-effect handlers", () => {
     );
     await runCallStatusSideEffects({
       callSid: "CA1",
-      twilioParams: { CallSid: "CA1", CallStatus: status },
+      event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: status }),
     });
     expect(mocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
       "w1",
@@ -203,7 +208,7 @@ describe("webhook side-effect handlers", () => {
     );
     await runCallStatusSideEffects({
       callSid: "CA1",
-      twilioParams: { CallSid: "CA1", CallStatus: "completed" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "completed" }),
     });
     expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
@@ -214,7 +219,7 @@ describe("webhook side-effect handlers", () => {
     );
     await runCallStatusSideEffects({
       callSid: "CA1",
-      twilioParams: { CallSid: "CA1", CallStatus: "in-progress" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "in-progress" }),
     });
     expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
@@ -284,12 +289,12 @@ describe("webhook side-effect handlers", () => {
 
     await runRecordingSideEffects({
       callSid: "CA1",
-      twilioParams: {
+      event: parseTwilioVoiceCallback({
         CallSid: "CA1",
         AccountSid: "ACmain",
         RecordingSid: "RE1",
         RecordingDuration: "12",
-      },
+      }),
     });
 
     expect(mocks.persistCallRecordingToStorage).toHaveBeenCalledWith({
@@ -317,12 +322,12 @@ describe("webhook side-effect handlers", () => {
 
     await runRecordingSideEffects({
       callSid: "CA1",
-      twilioParams: {
+      event: parseTwilioVoiceCallback({
         CallSid: "CA1",
         AccountSid: "ACmain",
         RecordingSid: "RE1",
         RecordingDuration: "12",
-      },
+      }),
     });
 
     // Default-off: the recording still persists, but no batch job is queued.
@@ -340,12 +345,12 @@ describe("webhook side-effect handlers", () => {
 
     await runRecordingSideEffects({
       callSid: "CA1",
-      twilioParams: {
+      event: parseTwilioVoiceCallback({
         CallSid: "CA1",
         AccountSid: "ACmain",
         RecordingSid: "RE1",
         RecordingDuration: "12",
-      },
+      }),
     });
 
     expect(mocks.enqueueJob).toHaveBeenCalledWith(
@@ -371,12 +376,12 @@ describe("webhook side-effect handlers", () => {
     await expect(
       runRecordingSideEffects({
         callSid: "CA1",
-        twilioParams: {
+        event: parseTwilioVoiceCallback({
           CallSid: "CA1",
           AccountSid: "ACmain",
           RecordingSid: "RE1",
           RecordingDuration: "12",
-        },
+        }),
       }),
     ).resolves.toEqual({ ok: true });
 

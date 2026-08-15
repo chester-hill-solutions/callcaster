@@ -19,6 +19,7 @@ import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
 import { emitPostgresChangeEvent } from "@/lib/workspace-events.server";
+import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
 export {
   voiceBillingKindFromCampaignType,
@@ -303,31 +304,23 @@ export async function persistCallStatusFromParams(args: {
   outreachAttemptId?: number | null;
   selectResult?: boolean;
 }): Promise<Tables<"call"> | null> {
-  const underCase = twilioParamsToUnderCase(args.params);
-  const callSid =
-    typeof underCase.call_sid === "string" ? underCase.call_sid : null;
+  const event = parseTwilioVoiceCallback(args.params);
+  const callSid = event.callSid;
   if (!callSid) {
     throw new Error("Missing CallSid in status params");
   }
-  const timestamp =
-    typeof underCase.timestamp === "string" ? underCase.timestamp : null;
   const status = args.disposition
     ? String(args.disposition).toLowerCase()
-    : typeof underCase.call_status === "string"
-      ? String(underCase.call_status).toLowerCase()
-      : null;
+    : event.callStatus.toLowerCase() || null;
 
   const update: Record<string, unknown> = {};
-  if (timestamp) {
-    update.end_time = new Date(timestamp).toISOString();
+  if (event.timestamp) {
+    update.end_time = new Date(event.timestamp).toISOString();
   }
   if (status) {
     update.status = status;
   }
-  const duration = Math.max(
-    Number(underCase.duration) || 0,
-    Number(underCase.call_duration) || 0,
-  );
+  const duration = event.durationSeconds ?? 0;
   if (duration > 0) {
     update.duration = String(duration);
   }

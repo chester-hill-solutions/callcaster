@@ -10,6 +10,7 @@ import {
   validateStoredJobParams,
 } from "@/lib/worker/handlers.server";
 import { jobParamsRegistry } from "@/lib/worker/job-params.server";
+import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
 /**
  * Drift guard for #1239 A1: `jobHandlers`, `PAGING_JOB_TYPES`, and
@@ -236,7 +237,62 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
         messageSid: "SM_should_be_ignored",
         twilioParams: { CallStatus: "completed" },
       }),
-    ).toEqual({ sid: "CA1", twilioParams: { CallStatus: "completed" } });
+    ).toMatchObject({ sid: "CA1", twilioParams: { CallStatus: "completed" } });
+  });
+
+  /**
+   * #1243 E1 added a parsed `event` to the two VOICE side-effect job payloads.
+   * Rows queued before it exist in `job` right now and must still run — the
+   * schema re-derives `event` from the stored `twilioParams` rather than
+   * failing validation and dead-lettering a job that would have billed.
+   */
+  test("voice side-effect rows queued under the pre-E1 shape still parse, with the event re-derived", () => {
+    const callStatus = jobRegistry.find((r) => r.type === "call_status_side_effects");
+    const recording = jobRegistry.find((r) => r.type === "recording_side_effects");
+
+    const oldShape = callStatus!.params.parse({
+      callSid: "CA1",
+      twilioParams: { CallSid: "CA1", CallStatus: "completed", Duration: "61" },
+    });
+    expect(oldShape).toMatchObject({
+      sid: "CA1",
+      event: { kind: "call-status", callSid: "CA1", callStatus: "completed", durationSeconds: 61 },
+    });
+
+    const oldRecordingShape = recording!.params.parse({
+      callSid: "CA1",
+      twilioParams: { CallSid: "CA1", RecordingSid: "RE1", RecordingDuration: "12" },
+    });
+    expect(oldRecordingShape).toMatchObject({
+      sid: "CA1",
+      event: { kind: "recording", recordingSid: "RE1", recordingDuration: "12" },
+    });
+
+    // A payload written by the new enqueue sites is taken as-is.
+    const newShape = callStatus!.params.parse({
+      sid: "CA1",
+      twilioParams: { CallSid: "CA1", CallStatus: "busy" },
+      event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "busy" }),
+    });
+    expect(newShape.event).toEqual(
+      parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "busy" }),
+    );
+
+    // A malformed `event` is not trusted: fall back to the raw params rather
+    // than handing a half-typed object to a handler.
+    const junkEvent = callStatus!.params.parse({
+      callSid: "CA1",
+      twilioParams: { CallSid: "CA1", CallStatus: "completed" },
+      event: { kind: "not-a-kind" },
+    });
+    expect(junkEvent.event).toMatchObject({ kind: "call-status", callStatus: "completed" });
+
+    // sms_status_side_effects is NOT a voice callback and keeps the plain shape.
+    expect(
+      jobRegistry
+        .find((r) => r.type === "sms_status_side_effects")!
+        .params.parse({ messageSid: "SM1", twilioParams: { SmsStatus: "delivered" } }),
+    ).toEqual({ sid: "SM1", twilioParams: { SmsStatus: "delivered" } });
   });
 
   test("webhook_delivery requires a valid eventType and rejects the same falsy payload/eventCategory the old bundled check did", () => {

@@ -1038,6 +1038,73 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
   });
 
+  /**
+   * The payload is parsed once at the route boundary into a discriminated
+   * union (#1243 E1). A body that matches no known shape must still ack:
+   * Twilio retries 5xx for hours, and there is nothing about an unexpected
+   * shape that another delivery would fix.
+   */
+  test("an unrecognized payload acks instead of erroring", async () => {
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("SomethingTwilioAddedLater", "1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(dequeueQueueEntryMock).not.toHaveBeenCalled();
+    expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).not.toHaveBeenCalled();
+  });
+
+  /**
+   * `call.conference_id` holds the conference NAME (`${userId}~${uuid}`), not
+   * the `CF…` SID — the two were previously collapsed into one
+   * `friendly_name ?? conference_sid` expression at each use, which is how the
+   * 22P02 incident (#1004) got its wrong value. The parsed event keeps them
+   * apart, so join must persist the name even when a SID is also present.
+   */
+  test("participant-join stores the conference NAME, not the conference SID", async () => {
+    const conferenceName = "u1~9f3ae1b2-0000-4000-8000-00000000abcd";
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA1",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: null,
+        contact_id: 1,
+        campaign_id: 1,
+      },
+    } as any);
+
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "ringing");
+    fd.set("StatusCallbackEvent", "participant-join");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("ConferenceSid", "CF_SID_NOT_A_NAME");
+    fd.set("FriendlyName", conferenceName);
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+
+    expect(res.status).toBe(200);
+    expect(telephonyStubState.callUpdateCalls).toEqual([
+      expect.objectContaining({
+        patch: expect.objectContaining({ conference_id: conferenceName }),
+      }),
+    ]);
+  });
+
   test("action catch formats non-Error as Unknown error", async () => {
     const dbMod = await import("../app/lib/database/workspace.server");
     (dbMod.createWorkspaceTwilioInstance as any).mockRejectedValueOnce("nope");
