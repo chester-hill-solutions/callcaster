@@ -50,9 +50,24 @@ export const INTERNAL_API_SURFACE_1: readonly ApiSurfaceEntry[] = [
     docsGuide: GUIDE.data,
     workspaceScoped: true,
     operations: [
-      { method: "GET", handler: "loader", bodyType: "query" },
-      { method: "PATCH", handler: "action", bodyType: "form" },
-      { method: "DELETE", handler: "action", bodyType: "form" },
+      {
+        method: "GET",
+        handler: "loader",
+        bodyType: "query",
+        capability: "campaigns.read",
+      },
+      {
+        method: "PATCH",
+        handler: "action",
+        bodyType: "form",
+        capability: "campaigns.write",
+      },
+      {
+        method: "DELETE",
+        handler: "action",
+        bodyType: "form",
+        capability: "campaigns.write",
+      },
     ],
   }),
   seed({

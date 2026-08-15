@@ -4,7 +4,6 @@ import {
   requireActorCapability,
   type AuthorizationActor,
 } from "@chester-hill-solutions/auth";
-import { createRequireCapability } from "@chester-hill-solutions/auth-react-router";
 import type { RouterContextProvider, LoaderFunctionArgs } from "react-router";
 import {
   apiKeyActorFromScopes,
@@ -14,7 +13,7 @@ import type { ProductCapabilityId } from "@/lib/capabilities";
 import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { hasMinRole, type MemberRole } from "@/lib/member-role";
-import { defineLoader } from "@/lib/handler.server";
+import { defineLoader, withEnforcedCapability } from "@/lib/handler.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
 import type {
@@ -33,9 +32,10 @@ function capabilityDeniedResponse(error: CapabilityDeniedError): Response {
 
 /**
  * Resolve an AuthorizationActor for data-plane middleware context
- * (session membership role or API-key scope allowlist).
+ * (session membership role or API-key scope allowlist). Internal: routes go
+ * through {@link requireDataPlaneCapability}, which owns the denial shapes.
  */
-export async function resolveDataPlaneAuthorizationActor(
+async function resolveDataPlaneAuthorizationActor(
   auth: DataPlaneAuthContextValue,
 ): Promise<AuthorizationActor | Response> {
   if (auth.apiKey) {
@@ -110,9 +110,16 @@ export async function requireDataPlaneRouteCapability(
  * Handler-factory auth strategy for data-plane loaders/actions that only need
  * `workspaceId` + a product capability. Prefer this over inlining the same
  * workspaceId check + {@link requireDataPlaneRouteCapability} call.
+ *
+ * The strategy is branded with `capability` — the same value it hands to
+ * `requireActorCapability` — so the factory can propagate it to the handler
+ * and `check:handlers` can cross-check the API_SURFACE declaration against
+ * real enforcement instead of against a second, hand-written claim. Pass the
+ * strategy to `auth:` directly; wrapping it in `(args) => strategy(...)(args)`
+ * builds a fresh unbranded closure and breaks the link.
  */
 export function dataPlaneCapabilityAuth(capability: ProductCapabilityId) {
-  return async ({
+  return withEnforcedCapability(capability, async ({
     params,
     context,
   }: Pick<LoaderFunctionArgs, "params" | "context">) => {
@@ -121,7 +128,7 @@ export function dataPlaneCapabilityAuth(capability: ProductCapabilityId) {
       return jsonError("workspaceId is required", 400);
     }
     return requireDataPlaneRouteCapability(context, workspaceId, capability);
-  };
+  });
 }
 
 /**
@@ -167,13 +174,16 @@ export function dataPlaneSessionMinRoleAuth(minRole: MemberRole) {
 
 /**
  * Auth strategy that gates on a capability then attaches one extra route param.
+ * Carries the same capability brand as {@link dataPlaneCapabilityAuth}.
  */
 export function dataPlaneCapabilityAuthWithParam<P extends string>(
   capability: ProductCapabilityId,
   paramName: P,
 ) {
   const base = dataPlaneCapabilityAuth(capability);
-  return async (args: Pick<LoaderFunctionArgs, "params" | "context">) => {
+  return withEnforcedCapability(capability, async (
+    args: Pick<LoaderFunctionArgs, "params" | "context">,
+  ) => {
     const value = args.params[paramName];
     if (!value) {
       return jsonError(`workspaceId and ${paramName} are required`, 400);
@@ -181,12 +191,16 @@ export function dataPlaneCapabilityAuthWithParam<P extends string>(
     const gated = await base(args);
     if (gated instanceof Response) return gated;
     return Object.assign(gated, { [paramName]: value } as Record<P, string>);
-  };
+  });
 }
 
 type ListFail = { ok: false; error: string; status: number };
 
-/** Shared defineLoader shape for workspace-scoped list endpoints. */
+/**
+ * Shared defineLoader shape for workspace-scoped list endpoints. `capability`
+ * is forwarded straight into {@link dataPlaneCapabilityAuth}, so the loader it
+ * returns inherits the capability brand like any other strategy-built handler.
+ */
 export function defineDataPlaneListLoader<K extends string>(config: {
   capability: ProductCapabilityId;
   key: K;
@@ -208,9 +222,10 @@ export function defineDataPlaneListLoader<K extends string>(config: {
 }
 
 /**
- * Build an AuthorizationActor from a dual-auth result once workspaceId is known.
+ * Build an AuthorizationActor from a dual-auth result once workspaceId is
+ * known. Internal, for {@link requireDualAuthCapability}.
  */
-export async function resolveDualAuthAuthorizationActor(args: {
+async function resolveDualAuthAuthorizationActor(args: {
   auth: ApiKeyAuthResult | BearerSessionAuthResult | SessionAuthResult;
   workspaceId: string;
 }): Promise<AuthorizationActor | Response> {
@@ -261,31 +276,3 @@ export async function requireDualAuthCapability(args: {
   }
 }
 
-/**
- * Package factory wired to CallCaster data-plane actor resolution.
- * Prefer `requireDataPlaneCapability` for middleware-backed routes.
- */
-export function createDataPlaneRequireCapability(
-  capability: ProductCapabilityId,
-) {
-  return createRequireCapability({
-    capabilityId: asCapabilityId(capability),
-    resolveActor: async ({ workspaceId, userId }) => {
-      // Session path only — API keys should use requireDataPlaneCapability with
-      // full data-plane context (scopes live on the key, not userId).
-      const membership = await getUserRole({
-        user: { id: userId },
-        workspaceId,
-      });
-      if (!membership) {
-        return jsonError("Workspace not found", 404);
-      }
-      return sessionActorFromMembership({
-        userId,
-        workspaceId,
-        role: membership.role,
-      });
-    },
-    onDenied: capabilityDeniedResponse,
-  });
-}

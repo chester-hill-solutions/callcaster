@@ -6,8 +6,7 @@ import { dataPlaneCapabilityAuthWithParam } from "@/lib/capability-guard.server"
 import { defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({
-  auth: (args) =>
-    dataPlaneCapabilityAuthWithParam("campaigns.read", "uploadId")(args),
+  auth: dataPlaneCapabilityAuthWithParam("campaigns.read", "uploadId"),
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     const result = await getAudienceUploadStatusApi(

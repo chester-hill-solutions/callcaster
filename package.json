@@ -73,6 +73,7 @@
     "check:dry": "node scripts/check-dry.mjs",
     "tools:dry:baseline": "node scripts/check-dry.mjs --update",
     "check:handlers": "node scripts/check-handlers.mjs",
+    "tools:capability:baseline": "node scripts/check-handlers.mjs --update-capability-baseline",
     "check:db-rpcs": "node scripts/check-db-rpcs.mjs",
     "check:queue-rpc-contract": "node scripts/check-queue-rpc-contract.mjs",
     "tools:queue-rpc:baseline": "node scripts/check-queue-rpc-contract.mjs --update",
