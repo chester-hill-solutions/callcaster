@@ -87,8 +87,12 @@ export function useCampaignCallFlow({
   lifecycleRef.current = lifecycle;
   const previousFsmRef = useRef(fsmState);
 
+  // Fall back to callSid so polling can bootstrap even before any SSE event
+  // has arrived — otherwise a dropped/missed realtime message leaves polling
+  // permanently disabled (pollingTargetSid is only ever set from inside the
+  // SSE/poll callback itself), and a client hangup can go undetected forever.
   const pollingEnabled =
-    !!pollingTargetSid &&
+    !!(pollingTargetSid ?? callSid) &&
     !!workspaceId &&
     (lifecycle.phase === "dialing" || lifecycle.phase === "connected");
 
@@ -109,6 +113,15 @@ export function useCampaignCallFlow({
     if (isTerminalForOutcome(normalized)) {
       const outcome = normalizedToOutcome(normalized);
       dispatch({ type: "PROVIDER_ENDED", outcome });
+
+      // The provider (Twilio) has already ended the customer leg, but that
+      // doesn't guarantee the agent's own WebRTC leg got told — e.g. a
+      // conference customer leg with no statusCallback relies solely on
+      // endConferenceOnExit reaching the browser. If activeCall is still
+      // live here, force it closed so the SDK's own 'disconnect' handling
+      // (including its built-in hangup tone) actually runs instead of the
+      // call silently lingering. A no-op if the SDK already tore it down.
+      activeCall?.disconnect?.();
     }
 
     // Also drive the legacy FSM for backward compat (all statuses).
