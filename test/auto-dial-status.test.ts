@@ -609,6 +609,64 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
   });
 
+  test("participant-leave for the CONTACT's own leg force-completes the conference (#1282 follow-up)", async () => {
+    // Regression: before the contact's conference Dial had a statusCallback
+    // (fixed in $roomId.action.server.ts's handleHumanAnswer), Twilio never
+    // posted this event for the contact's own leg at all, so a client
+    // hangup had no server-driven backstop — only Twilio's platform-level
+    // endConferenceOnExit reaching the agent's browser. handleParticipantLeave
+    // is leg-agnostic (keys off the leaving participant's own CallSid), so
+    // once the event arrives it must force the conference closed exactly
+    // like it already does for the agent leg.
+    const conferenceUpdateSpy = vi.fn(async () => ({ status: "completed" }));
+    const originalConferences = twilioClientMock.conferences;
+    (twilioClientMock as any).conferences = Object.assign(
+      (sid: string) => ({ update: (patch: unknown) => conferenceUpdateSpy(sid, patch) }),
+      { list: vi.fn(async () => [{ sid: "CONF_CONTACT" }]) },
+    );
+
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA_CONTACT",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: 1,
+        campaign_id: 1,
+      },
+    } as any);
+
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_CONTACT");
+    fd.set("CallStatus", "ringing");
+    fd.set("StatusCallbackEvent", "participant-leave");
+    fd.set("ReasonParticipantLeft", "participant_hung_up");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "1");
+    fd.set("CallDuration", "2");
+    fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
+    fd.set("ConferenceSid", "conf1");
+    let res: Response;
+    try {
+      res = await asRouteResponse(mod.action({
+        request: new Request("http://localhost/api/auto-dial/status", {
+          method: "POST",
+          headers: { "x-twilio-signature": "good" },
+          body: fd,
+        }),
+      } as any));
+    } finally {
+      (twilioClientMock as any).conferences = originalConferences;
+    }
+
+    expect(res.status).toBe(200);
+    expect(conferenceUpdateSpy).toHaveBeenCalledWith(
+      "CONF_CONTACT",
+      expect.objectContaining({ status: "completed" }),
+    );
+  });
+
   test("call status busy triggers dialer in-process (no HTTP self-fetch) when conferences exist and status not completed", async () => {
     twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
     const mod = await import("../app/routes/api+/auto-dial/status.route");
