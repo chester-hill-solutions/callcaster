@@ -16,7 +16,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
  * wholesale mock of the RPC.
  */
 
-const rpcDequeueContactMock = vi.hoisted(() => vi.fn(async () => undefined));
+const rpcDequeueContactMock = vi.hoisted(() => vi.fn(async () => 1));
 
 const dbMocks = vi.hoisted(() => ({
   select: vi.fn(),
@@ -74,7 +74,7 @@ beforeEach(() => {
   dbMocks.execute.mockReset();
   emitQueueEventMock.mockClear();
   rpcDequeueContactMock.mockReset();
-  rpcDequeueContactMock.mockResolvedValue(undefined);
+  rpcDequeueContactMock.mockResolvedValue(1);
   updateSetCalls = [];
   updateCount = 0;
   installDbMockImplementations();
@@ -199,6 +199,61 @@ describe("dequeueQueueEntry routing", () => {
     const [execArg] = rpcDequeueContactMock.mock.calls[0] as [unknown, unknown];
     expect(execArg).not.toBe(undefined);
     expect(typeof (execArg as { execute?: unknown }).execute).toBe("function");
+  });
+
+  // ── #1278: the outcome the manual queue path reports to the agent ───────
+
+  test("reports dequeuedPrimary: false when the guarded RPC matched no row", async () => {
+    rpcDequeueContactMock.mockResolvedValueOnce(0);
+    const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
+
+    await expect(
+      dequeueQueueEntry({
+        by: { contactId: 7 },
+        userId: "user-1",
+        reason: "Manually dequeued by user",
+        workspaceId: "workspace-1",
+        household: false,
+      }),
+    ).resolves.toEqual({ dequeuedPrimary: false });
+  });
+
+  test("reports dequeuedPrimary: true when the guarded RPC dequeued the row", async () => {
+    rpcDequeueContactMock.mockResolvedValueOnce(1);
+    const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
+
+    await expect(
+      dequeueQueueEntry({
+        by: { contactId: 7 },
+        userId: "user-1",
+        reason: "Manually dequeued by user",
+        workspaceId: "workspace-1",
+        household: true,
+      }),
+    ).resolves.toEqual({ dequeuedPrimary: true });
+  });
+
+  test("the plain-Drizzle mechanisms report the same shape", async () => {
+    // Unconditional UPDATEs: `false` there means the row simply wasn't there.
+    const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
+
+    await expect(
+      dequeueQueueEntry({
+        by: { id: 42 },
+        userId: "user-1",
+        reason: "SMS message sent",
+        workspaceId: "workspace-1",
+      }),
+    ).resolves.toEqual({ dequeuedPrimary: true });
+
+    await expect(
+      dequeueQueueEntry({
+        by: { contactId: 7, campaignId: 99 },
+        userId: null,
+        reason: "Contact opted out via SMS",
+        workspaceId: "workspace-1",
+      }),
+    ).resolves.toEqual({ dequeuedPrimary: true });
   });
 
   test("household routing throws without a workspaceId (the RPC requires one)", async () => {
