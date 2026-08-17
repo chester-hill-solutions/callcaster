@@ -78,6 +78,10 @@ jobs:
       - run: npm run check:workspace-projection
       - run: npm run check:effects
       - run: npm run check:type-safety
+      # Drizzle nests the Postgres SQLSTATE on error.cause; inline
+      # `.code === "23505"` checks miss it, which is how duplicate campaign
+      # names shipped a generic "Unexpected Server Error" behind green CI.
+      - run: npm run check:pg-errors
       - run: npm run check:dry
       - run: npm run check:handlers
       - run: npm run check:db-rpcs
