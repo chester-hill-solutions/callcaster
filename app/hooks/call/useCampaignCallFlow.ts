@@ -22,6 +22,7 @@ import type {
   QueueItem,
 } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
+import { recordFlashBreadcrumb } from "@/lib/flash-telemetry.client";
 
 type CallStateMachineSend = (action: { type: string }) => void;
 
@@ -105,6 +106,7 @@ export function useCampaignCallFlow({
    * Feeds provider events into the canonical lifecycle and the legacy FSM.
    */
   function acceptCustomerStatus(sid: string, normalized: CallStatusEnum) {
+    recordFlashBreadcrumb("provider-status", `${normalized} (${sid.slice(0, 8)})`);
     setCustomerLegSid(sid);
     setPollingTargetSid(sid);
     setProviderStatus(normalized);
@@ -205,6 +207,7 @@ export function useCampaignCallFlow({
    * is a no-op in the reducer.
    */
   const beginDial = useCallback(() => {
+    recordFlashBreadcrumb("begin-dial", "lifecycle reset for new dial");
     setCustomerLegSid(null);
     setPollingTargetSid(null);
     setProviderStatus(null);
@@ -218,6 +221,7 @@ export function useCampaignCallFlow({
    */
   useEffect(() => {
     if (previousFsmRef.current === fsmState) return;
+    recordFlashBreadcrumb("fsm", `${previousFsmRef.current} -> ${fsmState}`);
     previousFsmRef.current = fsmState;
 
     // A new dial always resets the lifecycle — the reducer starts a fresh

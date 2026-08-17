@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { recordFlashBreadcrumb } from "@/lib/flash-telemetry.client";
 
 type UseDialFailureRecoveryOptions = {
   fetcherState: string;
@@ -46,6 +47,10 @@ export function useDialFailureRecovery({
     handledDataRef.current = fetcherData;
     const { error, creditsError } = fetcherData;
     if (error || creditsError) {
+      recordFlashBreadcrumb(
+        "dial-rejected",
+        `error=${String(error ?? "")} creditsError=${String(Boolean(creditsError))}`,
+      );
       send({ type: "FAIL" });
       if (error) showError(error);
     }
