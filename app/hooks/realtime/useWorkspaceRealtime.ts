@@ -8,6 +8,7 @@ import { fetchCampaignQueueItemWithContact } from "@/lib/chats/messaging-client"
 import { QueueItem, User as AppUser, OutreachAttempt, Call, Contact } from "@/lib/types";
 import type { Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
+import { subscribeToWorkspaceEventSource } from "@/lib/workspace-events-connection.client";
 import {
   parseWorkspaceEventData,
   type PostgresChangePayload,
@@ -258,14 +259,13 @@ export const useWorkspaceRealtime = ({
   /**
    * @effect Open an SSE connection to the workspace events endpoint and route postgres_change events (outreach_attempt, call, campaign_queue, workspace_number, transaction_history) to the appropriate local updater via handleChangeRef.
    * @effect-deps workspace (prop; a change means the campaign session moved to a different workspace and must resubscribe to that workspace's event stream)
-   * @effect-side-effects subscription — opens an EventSource (SSE) connection on mount/workspace-change; removes the listener and closes the connection on cleanup
+   * @effect-side-effects subscription — attaches to the shared workspace EventSource on mount/workspace-change; detaches on cleanup (the connection closes when its last subscriber leaves)
    * @effect-why-not-loader Live server-pushed queue/call/attempt/credit changes can't be modeled as a request/response loader; the connection must persist for the campaign session and fan out to multiple local updaters (updateQueue, updateCalls, updateAttempts, updateWorkspaceNumbers, updateCredits) as events arrive.
    */
   useEffect(() => {
     if (!workspace) return;
 
     const url = `/api/workspaces/${encodeURIComponent(workspace)}/events`;
-    const eventSource = new EventSource(url);
 
     const onWorkspaceEvent = (message: MessageEvent<string>) => {
       try {
@@ -277,19 +277,10 @@ export const useWorkspaceRealtime = ({
       }
     };
 
-    eventSource.addEventListener("workspace_event", onWorkspaceEvent);
-    eventSource.onerror = () => {
-      // Transient EventSource reconnects are normal (e.g. idle-timeout
-      // recycling); the browser retries automatically. Matches the sibling
-      // hook's level (useWorkspaceEventSubscription.ts) so this doesn't
-      // scream ERROR for routine reconnects.
-      logger.debug("Campaign workspace SSE connection interrupted; EventSource will retry");
-    };
-
-    return () => {
-      eventSource.removeEventListener("workspace_event", onWorkspaceEvent);
-      eventSource.close();
-    };
+    // Shares the page-wide EventSource for this workspace instead of opening
+    // another one — see workspace-events-connection.client.ts for why the
+    // per-hook connections were exhausting the HTTP/1.1 pool.
+    return subscribeToWorkspaceEventSource(url, onWorkspaceEvent);
   }, [workspace]);
 
   const handleSetDisposition = useCallback(

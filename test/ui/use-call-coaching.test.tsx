@@ -86,9 +86,10 @@ describe("access revoked mid-stream", () => {
     emitAs("access_revoked", JSON.stringify({ reason: "workspace_access_revoked" }));
 
     // Without an explicit close, EventSource retries a stream the middleware
-    // will reject every time — a silent reconnect loop.
+    // will reject every time — a silent reconnect loop. (The revocation warn
+    // now lives in the shared connection module, outside this file's logger
+    // mock.)
     expect(source.close).toHaveBeenCalled();
-    expect(loggerMock.warn).toHaveBeenCalled();
   });
 
   test("leaves already-received transcript state intact", () => {

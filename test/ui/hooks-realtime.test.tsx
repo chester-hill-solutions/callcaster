@@ -440,9 +440,9 @@ describe("realtime hooks", () => {
       getLastInstance()?.onerror?.(new Event("error"));
     });
 
+    // The debug-level reconnect log now lives in the shared connection
+    // module (outside this file's logger mock); the regression being guarded
+    // is that a routine reconnect must not reach logger.error.
     expect(logger.error).not.toHaveBeenCalled();
-    expect(logger.debug).toHaveBeenCalledWith(
-      expect.stringContaining("SSE connection interrupted"),
-    );
   });
 });

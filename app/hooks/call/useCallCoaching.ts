@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { logger } from "@/lib/logger.client";
+import { subscribeToWorkspaceEventSource } from "@/lib/workspace-events-connection.client";
 import {
   COACHING_EVENT_TYPES,
   safeParseCoachingEvent,
 } from "@/lib/coaching-events.shared";
 import {
-  ACCESS_REVOKED_EVENT,
   safeParseWorkspaceEventData,
 } from "@/lib/workspace-events.shared";
 
@@ -131,8 +131,6 @@ export function useCallCoaching(
     if (!subscribe || !workspaceId || !callSid) return;
 
     const url = `/api/workspaces/${encodeURIComponent(workspaceId)}/events`;
-    const eventSource = new EventSource(url);
-
     const handleWorkspaceEvent = (message: MessageEvent<string>) => {
       const record = safeParseWorkspaceEventData(message.data);
       if (!record) {
@@ -215,27 +213,13 @@ export function useCallCoaching(
       }
     };
 
-    // Workspace access was revoked while this call was live. Close explicitly —
-    // EventSource reconnects after a server-side close, and every retry would be
-    // rejected by the middleware. Live transcript state stays as-is rather than
-    // being cleared: the call screen is about to be navigated away from anyway,
-    // and blanking it mid-call would look like a transcription failure.
-    const handleAccessRevoked = () => {
-      logger.warn("Workspace access revoked; closing coaching SSE");
-      eventSource.close();
-    };
-
-    eventSource.addEventListener("workspace_event", handleWorkspaceEvent);
-    eventSource.addEventListener(ACCESS_REVOKED_EVENT, handleAccessRevoked);
-    eventSource.onerror = () => {
-      logger.debug("Coaching SSE interrupted; EventSource will retry");
-    };
-
-    return () => {
-      eventSource.removeEventListener("workspace_event", handleWorkspaceEvent);
-      eventSource.removeEventListener(ACCESS_REVOKED_EVENT, handleAccessRevoked);
-      eventSource.close();
-    };
+    // Shares the page-wide workspace EventSource instead of opening another
+    // one mid-call (see workspace-events-connection.client.ts). Revocation
+    // closes the shared connection there; live transcript state stays as-is
+    // rather than being cleared — the call screen is about to be navigated
+    // away from anyway, and blanking it mid-call would look like a
+    // transcription failure.
+    return subscribeToWorkspaceEventSource(url, handleWorkspaceEvent);
   }, [workspaceId, callSid, subscribe]);
 
   const acknowledgeCue = useCallback(
