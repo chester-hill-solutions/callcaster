@@ -183,6 +183,29 @@ export function useCampaignCallFlow({
   });
 
   /**
+   * Start a new dial in the *same batch* as the click that triggered it.
+   *
+   * The FSM→lifecycle bridge below is an effect, so it cannot run until after
+   * the browser has painted the render in which the FSM moved to `dialing` —
+   * and that render still derives its display from the finished call's
+   * terminal lifecycle (or, on a re-dial, from the contact's last attempt
+   * disposition). The result was "Call Failed" / "No Answer" repainting for a
+   * single frame on every dial: #1220 removed the version of this that stuck
+   * around, but the flash survived it. Resetting here, alongside the FSM's own
+   * START_DIALING, closes the gap — the first render after the click already
+   * reads `phase: "dialing"`, so there is no stale frame to paint.
+   *
+   * The bridge still fires afterwards; a second START_DIALING from `dialing`
+   * is a no-op in the reducer.
+   */
+  const beginDial = useCallback(() => {
+    setCustomerLegSid(null);
+    setPollingTargetSid(null);
+    setProviderStatus(null);
+    setLifecycle((prev) => callLifecycleReducer(prev, { type: "START_DIALING" }));
+  }, []);
+
+  /**
    * @effect Bridge the legacy FSM (useCallState) transitions into the canonical lifecycle.
    * Only dispatches when fsmState actually changes (not on every render).
    * Skips the initial idle → idle no-op.
@@ -289,7 +312,14 @@ export function useCampaignCallFlow({
       }
     }
 
-    // 5. Recent attempt fallback for terminal displays.
+    // 5. A live FSM outranks any *previous* attempt's disposition: the agent
+    //    has dialed this contact again, so their last outcome is history.
+    //    Below rule 6 this showed the old "No Answer"/"Call Failed" for the
+    //    render between the click and the bridge effect.
+    if (fsmState === "dialing") return "dialing";
+    if (fsmState === "connected") return "connected";
+
+    // 6. Recent attempt fallback for terminal displays.
     if (recentAttemptDisposition && lifecycle.phase !== "dialing" && lifecycle.phase !== "connected") {
       const d = recentAttemptDisposition;
       if (d === "voicemail") return "voicemail";
@@ -297,12 +327,8 @@ export function useCampaignCallFlow({
       if (d === "completed" || d === "failed" || d === "busy") return d;
     }
 
-    // 6. Legacy FSM terminal state as fallback (bridge effect hasn't fired yet).
+    // 7. Legacy FSM terminal state as fallback (bridge effect hasn't fired yet).
     if (FSM_TERMINAL.has(fsmState)) return fsmState;
-
-    // 7. FSM dialing/connected as fallback for initial render (before bridge).
-    if (fsmState === "dialing") return "dialing";
-    if (fsmState === "connected") return "connected";
 
     return "idle";
   })();
@@ -317,6 +343,7 @@ export function useCampaignCallFlow({
   return {
     displayState,
     displayColor,
+    beginDial,
     getDisplayState: (
       callStateValue: string,
       _statusValue: string | undefined,
