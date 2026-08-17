@@ -166,10 +166,20 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: str
         );
     }
 
+    // A statusCallback here — mirroring the agent's own leg in
+    // addToConference — is what lets a CLIENT hangup be detected at all.
+    // Without it, Twilio never posts a participant-leave event for this
+    // leg, so the app has no server-driven signal and depends entirely on
+    // Twilio's platform-level endConferenceOnExit reaching the agent's
+    // browser. handleParticipantLeave (auto-dial/status) already forces the
+    // conference closed on `participant_hung_up` for whichever leg posts
+    // it — it just never received the contact's events before.
     const dial = twiml.dial();
     dial.conference({
         beep: 'onExit',
         endConferenceOnExit: true,
+        statusCallback: `${env.BASE_URL()}/api/auto-dial/status`,
+        statusCallbackEvent: ['join', 'leave', 'modify'],
     }, `${conferenceName}`);
 
     return new Response(twiml.toString(), {

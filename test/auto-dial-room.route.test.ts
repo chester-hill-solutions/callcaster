@@ -892,6 +892,78 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalled();
   });
 
+  test("human answer: conference dial carries a statusCallback so a contact hangup is detected", async () => {
+    // Regression (#1282 follow-up): only the agent's conference leg had a
+    // statusCallback wired (addToConference). The contact's own
+    // <Dial><Conference> had none, so Twilio never posted a
+    // participant-leave event when the CLIENT hung up — the app had no
+    // server-driven signal and depended entirely on Twilio's platform-level
+    // endConferenceOnExit reaching the agent's browser.
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      calls: () => ({ update: vi.fn() }),
+      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
+    } as any);
+
+    const outreachSelect = vi.fn(async () => ({ data: [{ ok: 1 }], error: null }));
+    const client = makeDbClient({});
+    roomRpcState.client = client;
+    client.from.mockImplementation((table: string) => {
+      if (table === "call") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: { campaign_id: 1, outreach_attempt_id: 1, contact_id: 2, workspace: "w1", conference_id: "u1~00000000-0000-0000-0000-000000000000" },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "campaign") {
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { voicemail_file: "vm.mp3", group_household_queue: false, caller_id: "+1555" }, error: null }) }) }) };
+      }
+      if (table === "user") {
+        return { select: () => ({ eq: () => ({ single: async () => ({ data: { verified_audio_numbers: null }, error: null }) }) }) };
+      }
+      if (table === "outreach_attempt") {
+        return { update: () => ({ eq: () => ({ select: outreachSelect }) }) };
+      }
+      if (table === "campaign_queue") {
+        return { update: () => ({ eq: () => ({ select: async () => ({ data: [], error: null }) }) }) };
+      }
+      if (table === "workspace") {
+        return {
+          select: () => ({
+            eq: () => ({
+              single: async () => ({
+                data: { twilio_data: { sid: "ACtest", authToken: "auth" } },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+    useRoomPostgres(client);
+
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("AnsweredBy", "");
+    fd.set("CallStatus", "in-progress");
+    fd.set("Called", "+1888");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
+    } as any));
+
+    const body = await res.text();
+    expect(body).toContain('statusCallback="https://base.example/api/auto-dial/status"');
+    expect(body).toContain('statusCallbackEvent="join leave modify"');
+  });
+
   test("errors are caught and return Hangup response", async () => {
     const client = makeDbClient({});
     roomRpcState.client = client;
