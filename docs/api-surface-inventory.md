@@ -140,6 +140,7 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/calls/listening` | POST, DELETE | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/calls/listening.route.tsx` | `docs/api-live-operations.md` |  |
 | `/api/workspaces/:workspaceId/campaigns` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/campaigns.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/workspaces/:workspaceId/campaigns/:campaignId/dialer/start` | POST | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/start.route.tsx` | `docs/api-telephony-provisioning.md` | Start predictive/manual auto-dial conference for authenticated caller+ agent. Capability: calls.start. |
+| `/api/workspaces/:workspaceId/client-flash` | POST | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/client-flash.route.tsx` | `docs/api-live-operations.md` | Telemetry sink for client flash events (transient error toasts/banners, #1293): logs each event server-side; no reads, no state. |
 | `/api/workspaces/:workspaceId/contacts` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/contacts.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/workspaces/:workspaceId/conversations` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/conversations.route.tsx` | `docs/api-data-plane.md` |  |
 | `/api/workspaces/:workspaceId/conversations/:contactNumber` | POST, GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.route.tsx` | `docs/api-data-plane.md` |  |
@@ -158,5 +159,5 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/voicemails` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/voicemails.route.tsx` | `docs/api-analytics-export.md` |  |
 | `/api/workspaces/:workspaceId/webhook` | POST, PUT, GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/webhook.route.tsx` | `docs/api-workspace-admin.md` | POST tests webhook delivery. |
 
-Total entries: **145**
+Total entries: **146**
 

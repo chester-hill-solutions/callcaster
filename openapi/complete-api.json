@@ -9995,6 +9995,71 @@
         }
       }
     },
+    "/api/workspaces/{workspaceId}/client-flash": {
+      "post": {
+        "operationId": "postWorkspaces_workspaceId_client_flash",
+        "summary": "POST /api/workspaces/:workspaceId/client-flash",
+        "description": "Telemetry sink for client flash events (transient error toasts/banners, #1293): logs each event server-side; no reads, no state.",
+        "tags": [
+          "User API",
+          "misc"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{workspaceId}/contacts": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_contacts",

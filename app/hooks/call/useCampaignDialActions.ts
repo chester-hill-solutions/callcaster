@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { recordFlashBreadcrumb } from "@/lib/flash-telemetry.client";
 import type { Call } from "@twilio/voice-sdk";
 import type {
   Campaign,
@@ -61,6 +62,7 @@ export function useCampaignDialActions({
 }: UseCampaignDialActionsOptions) {
   return useCallback(() => {
     if (!campaign) return;
+    recordFlashBreadcrumb("dial-press", `type=${campaign.dial_type}`);
 
     if (campaign.dial_type === "predictive") {
       if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {

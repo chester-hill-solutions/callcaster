@@ -152,6 +152,7 @@ export const API_SURFACE_ANNOTATIONS: Readonly<
   "app/routes/api+/workspaces+/$workspaceId/audios.route.tsx": { ownerArea: "media", exposure: "sessionOnly", docsGuide: "docs/api-analytics-export.md", bodyType: "multipart", workspaceScoped: true },
   "app/routes/api+/workspaces+/$workspaceId/voicemails.route.tsx": { ownerArea: "media", exposure: "sessionOnly", docsGuide: "docs/api-analytics-export.md", workspaceScoped: true },
   "app/routes/api+/workspaces+/$workspaceId/analytics.route.tsx": { ownerArea: "analytics", exposure: "sessionOnly", docsGuide: "docs/api-analytics-export.md", workspaceScoped: true },
+  "app/routes/api+/workspaces+/$workspaceId/client-flash.route.tsx": { ownerArea: "misc", exposure: "sessionOnly", docsGuide: "docs/api-live-operations.md", bodyType: "json", workspaceScoped: true, notes: "Telemetry sink for client flash events (transient error toasts/banners, #1293): logs each event server-side; no reads, no state." },
   "app/routes/api+/workspaces+/$workspaceId/exports.route.tsx": { ownerArea: "analytics", exposure: "sessionOnly", docsGuide: "docs/api-analytics-export.md", bodyType: "json", workspaceScoped: true },
   "app/routes/api+/workspaces+/$workspaceId/calls.route.tsx": { ownerArea: "telephony", exposure: "sessionOnly", docsGuide: "docs/api-live-operations.md", workspaceScoped: true },
   "app/routes/api+/workspaces+/$workspaceId/calls/listening.route.tsx": { ownerArea: "telephony", exposure: "sessionOnly", docsGuide: "docs/api-live-operations.md", bodyType: "json", workspaceScoped: true },
