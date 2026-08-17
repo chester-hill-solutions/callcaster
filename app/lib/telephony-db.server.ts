@@ -144,7 +144,10 @@ export async function claimTerminalCallStatus(
     set: { status: normalized } as unknown as Partial<CallRow>,
     where: and(
       eq(callTable.sid, sid),
-      or(isNull(callTable.status), sql`LOWER(${callTable.status}) <> ${normalized}`),
+      // ::text — call.status is the call_status ENUM in every real database
+      // and lower(call_status) does not exist; without the cast this guard
+      // throws instead of guarding (#1289).
+      or(isNull(callTable.status), sql`LOWER(${callTable.status}::text) <> ${normalized}`),
     ),
   });
   return rows.length > 0;
@@ -173,7 +176,13 @@ export async function updateCallBySid(
   // not, otherwise apply the incoming status. Doing this in one statement
   // removes the read-then-write round trip and the race between the guard
   // check and the write.
-  const guardedStatus = sql`CASE WHEN LOWER(${callTable.status}) = ANY(${TERMINAL_CALL_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_CALL_STATUSES_SQL}) THEN ${callTable.status} ELSE ${update.status} END`;
+  // ::text on the column: call.status is the call_status ENUM in every real
+  // database, and lower(call_status) does not exist — without the cast this
+  // UPDATE throws, so every status-bearing webhook/sync write failed and rows
+  // accumulated in 'queued' forever (#1289). The unit tier mocks the db
+  // client and could not see it; test/integration-db/call-status-guard.test.ts
+  // runs this statement against a real database.
+  const guardedStatus = sql`CASE WHEN LOWER(${callTable.status}::text) = ANY(${TERMINAL_CALL_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_CALL_STATUSES_SQL}) THEN ${callTable.status} ELSE ${update.status} END`;
 
   const [row] = await tdb.call.update({
     set: {
