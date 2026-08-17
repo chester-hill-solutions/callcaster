@@ -1,5 +1,13 @@
 import "@testing-library/jest-dom/vitest";
-import { beforeAll, beforeEach, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, vi } from "vitest";
+import { resetWorkspaceEventSourcesForTests } from "@/lib/workspace-events-connection.client";
+
+// Tests stub the global EventSource per test (createWorkspaceEventSourceMock);
+// the shared workspace-events connection cache would otherwise hand one test's
+// dead mock to the next.
+afterEach(() => {
+  resetWorkspaceEventSourcesForTests();
+});
 
 beforeAll(() => {
   // matchMedia is used by some UI libs (theme, radix, etc.)

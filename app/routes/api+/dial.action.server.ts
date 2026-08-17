@@ -93,6 +93,18 @@ export const action = defineAction({
         userId: user.id,
     });
     if (claim !== "claimed") {
+        // The refusal reaches the agent as a toast + "Call Failed" bar, but
+        // until this line it left no server-side trace at all — a support
+        // report of "an error flashed when I pressed dial" was unattributable
+        // from the logs. Keep every field needed to reconstruct the refusal.
+        logger.warn("Dial claim refused", {
+            claim,
+            queueId: Number(queue_id),
+            campaignId: Number(campaign_id),
+            contactId: Number(contact_id),
+            workspaceId: workspace_id,
+            userId: user.id,
+        });
         const messages: Record<string, string> = {
             claimed_by_other: "This contact is being dialed by another agent.",
             active_call: "This contact already has a call in progress.",
