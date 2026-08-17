@@ -221,7 +221,11 @@ export async function updateMessageBySid(
       ? update
       : ({
           ...update,
-          status: sql`CASE WHEN LOWER(${messageTable.status}) = ANY(${TERMINAL_MESSAGE_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_MESSAGE_STATUSES_SQL}) THEN ${messageTable.status} ELSE ${update.status} END`,
+          // ::text — message.status is the message_status ENUM in every real
+          // database; lower(message_status) does not exist and the uncast
+          // guard threw instead of guarding (#1289, sibling of the call
+          // guard in telephony-db.server.ts).
+          status: sql`CASE WHEN LOWER(${messageTable.status}::text) = ANY(${TERMINAL_MESSAGE_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_MESSAGE_STATUSES_SQL}) THEN ${messageTable.status} ELSE ${update.status} END`,
         } as unknown as Partial<MessageRow>);
 
   const [row] = await tdb.message.update({
