@@ -26,6 +26,8 @@ import {
   type CampaignProductGoal,
 } from "@/lib/campaign-goals";
 import { validatePeopleReturnPath } from "@/lib/people-return-path";
+import { isUniqueViolation } from "@/lib/parse-utils.server";
+import { toUserMessage } from "@/lib/user-message";
 
 type CampaignType =
   | "live_call"
@@ -300,11 +302,7 @@ export async function handleNewCampaign({formData,
         `/workspaces/${workspaceId}/campaigns/${campaignData.id}/settings`,
     );
   } catch (campaignError) {
-    const code =
-      campaignError && typeof campaignError === "object" && "code" in campaignError
-        ? String((campaignError as { code?: string }).code)
-        : null;
-    if (code === "23505") {
+    if (isUniqueViolation(campaignError)) {
       return routeData(
         {
           campaignData: null,
@@ -312,9 +310,21 @@ export async function handleNewCampaign({formData,
             message: "There is already a campaign with that name. Please use a unique campaign name.",
           },
         },
-        { headers },
+        { status: 409, headers },
       );
     }
-    return routeData({ campaignData: null, error: campaignError }, { headers });
+    logger.error("Error in handleNewCampaign:", campaignError);
+    return routeData(
+      {
+        campaignData: null,
+        error: {
+          message: toUserMessage(
+            campaignError,
+            "Failed to create the campaign. Please try again.",
+          ),
+        },
+      },
+      { status: 500, headers },
+    );
   }
 }
