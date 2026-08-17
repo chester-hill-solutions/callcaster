@@ -23,10 +23,7 @@ import {
   invalidateWorkspaceTwilioData,
 } from "@/lib/merge-workspace-twilio-data.server";
 import { logger } from "../logger.server";
-import {
-  rpcGetWorkspaceUsers,
-  rpcUpdateUserWorkspaceLastAccessTime,
-} from "@/lib/db-rpc.server";
+import { rpcGetWorkspaceUsers, rpcUpdateUserWorkspaceLastAccessTime } from "@/lib/db-rpc.server";
 import {
   getWorkspaceMessagingOnboardingState,
   updateWorkspaceMessagingOnboardingState,
