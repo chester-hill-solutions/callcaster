@@ -74,7 +74,7 @@ describe("POST /api/workspaces/:workspaceId/client-flash", () => {
       expect.objectContaining({
         workspaceId: WORKSPACE,
         kind: "toast-error",
-        message: "This contact already has a call in progress.",
+        flashMessage: "This contact already has a call in progress.",
         breadcrumbs: expect.arrayContaining([
           expect.objectContaining({ kind: "dial-press" }),
         ]),
@@ -115,7 +115,7 @@ describe("POST /api/workspaces/:workspaceId/client-flash", () => {
       },
       { workspaceId: WORKSPACE },
     );
-    const response = asRouteResponse(await action(routeArgs));
+    const response = await asRouteResponse(await action(routeArgs));
     expect(response.status).toBe(405);
   });
 });

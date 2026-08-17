@@ -57,7 +57,9 @@ export const action = defineAction({
           workspaceId: auth.workspaceId,
           userId: auth.userId,
           kind: event.kind,
-          message: event.message,
+          // Not `message`: logger-core owns that key for the log line itself
+          // and renames colliding fields, which made this unqueryable.
+          flashMessage: event.message,
           url: event.url,
           clientTs: event.ts,
           stack: event.stack,
