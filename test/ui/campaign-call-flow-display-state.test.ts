@@ -4,14 +4,17 @@ import { describe, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   onPollStatus: null as ((status: string, resolvedSid?: string) => void) | null,
   onCallRowChange: null as ((payload: unknown) => void) | null,
+  pollingEnabled: null as boolean | null,
   send: vi.fn(),
 }));
 
 vi.mock("@/hooks/call/useCallStatusPolling", () => ({
   useCallStatusPolling: (opts: {
+    enabled: boolean;
     onStatus: (status: string, resolvedSid?: string) => void;
   }) => {
     mocks.onPollStatus = opts.onStatus;
+    mocks.pollingEnabled = opts.enabled;
   },
 }));
 
@@ -306,6 +309,68 @@ describe("useCampaignCallFlow displayState", () => {
 
       // Canonical lifecycle retains "completed" outcome — no terminal latch needed.
       expect(result.current.displayState).toBe("completed");
+    });
+
+    test("polling fallback is live on a connected call with no prior SSE event", () => {
+      // Regression: if the customer-leg SSE event that reports the hangup
+      // is ever dropped (missed realtime message, tab backgrounded, etc.),
+      // the 5s poll is the only remaining way to learn the call ended. But
+      // polling was gated on `pollingTargetSid`, which is only set inside
+      // the SSE/poll callback itself — a call that has NEVER received an
+      // SSE event (this test's exact setup) could poll only after SSE
+      // already worked, defeating its purpose as a fallback.
+      const { rerender } = renderFlow({
+        state: "idle",
+        callSid: null,
+        agentLegSid: null,
+        activeCall: null,
+      });
+
+      rerender(baseProps({
+        state: "dialing",
+        callSid: "CA-live",
+        agentLegSid: "CA-live",
+        activeCall: null,
+      }));
+
+      rerender(baseProps({
+        state: "connected",
+        callSid: "CA-live",
+        agentLegSid: "CA-live",
+        activeCall: {} as any,
+      }));
+
+      expect(mocks.pollingEnabled).toBe(true);
+    });
+
+    test("terminal customer-leg status forces the live SDK call to disconnect", () => {
+      // Regression: a provider-detected hangup (SSE/poll) only ever flipped
+      // FSM/UI state — it never told the still-live Twilio SDK Call object
+      // the leg was over. That's why a client hangup could update the
+      // display yet play no hangup tone and leave the WebRTC session open:
+      // the built-in SDK sound only fires off the SDK's own 'disconnect'
+      // event, which nothing forced here.
+      const mockCall = { disconnect: vi.fn() };
+      const { rerender } = renderFlow({
+        state: "connected",
+        callSid: "CA-live",
+        agentLegSid: "CA-live",
+        activeCall: mockCall as any,
+      });
+
+      act(() => {
+        mocks.onCallRowChange?.({
+          new: { sid: "CA-child", parent_call_sid: "CA-live", status: "completed" },
+        });
+      });
+      rerender(baseProps({
+        state: "connected",
+        callSid: "CA-live",
+        agentLegSid: "CA-live",
+        activeCall: mockCall as any,
+      }));
+
+      expect(mockCall.disconnect).toHaveBeenCalled();
     });
   });
 
