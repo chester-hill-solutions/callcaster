@@ -110,9 +110,13 @@ describe("app/routes/api+/scripts/route.tsx", () => {
       workspace: "w1",
       saveAsCopy: false,
     });
-    mocks.persistWorkspaceScript.mockRejectedValueOnce(
-      new Error("duplicate key value violates unique constraint 23505"),
+    // Drizzle wrapper shape: SQLSTATE on `cause`, not on the error itself.
+    const wrapped = new Error("Failed query: insert into script ...");
+    (wrapped as Error & { cause: unknown }).cause = Object.assign(
+      new Error("duplicate key value violates unique constraint"),
+      { code: "23505" },
     );
+    mocks.persistWorkspaceScript.mockRejectedValueOnce(wrapped);
 
     const mod = await import("../app/routes/api+/scripts");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
@@ -139,7 +143,10 @@ describe("app/routes/api+/scripts/route.tsx", () => {
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as never),
     );
     expect(res.status).toBe(500);
-    await expect(res.json()).resolves.toEqual({ error: "nope" });
+    // Raw internals are no longer echoed to the client; a safe fallback is.
+    await expect(res.json()).resolves.toEqual({
+      error: "Failed to save the script. Please try again.",
+    });
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 });

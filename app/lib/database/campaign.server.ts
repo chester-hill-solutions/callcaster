@@ -9,6 +9,7 @@ import {
   Contact,
 } from "../types";
 import { logger } from "../logger.server";
+import { isUniqueViolation } from "@/lib/parse-utils.server";
 import { fetchCampaignQueueWithContacts } from "../campaign-queue-search.server";
 import { campaign as campaignTable } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -330,8 +331,7 @@ export async function createCampaign({
   try {
     [createdCampaign] = await tdb.campaign.insert(cleanCampaignData);
   } catch (error: unknown) {
-    const pgError = error as { code?: string; message?: string };
-    if (pgError.code === "23505") {
+    if (isUniqueViolation(error)) {
       const newCampaignName = `${campaignData.title} (Copy)`;
       try {
         [createdCampaign] = await tdb.campaign.insert({
@@ -525,8 +525,7 @@ export async function updateOrCopyScript({
       timestamp: created_at,
     });
   } catch (error: unknown) {
-    const pgError = error as { code?: string; message?: string };
-    if (pgError.code === "23505") {
+    if (isUniqueViolation(error)) {
       logger.error("Duplicate script conflict", error);
       throw new Error(
         `A script with this name (${scriptData.name}) already exists in the workspace`,
@@ -588,8 +587,7 @@ export async function updateCampaignWithScript(args: {
       { isolationLevel: "serializable" },
     );
   } catch (error: unknown) {
-    const pgError = error as { code?: string };
-    if (pgError.code === "23505") {
+    if (isUniqueViolation(error)) {
       logger.error("Duplicate script conflict", error);
       throw new Error(
         `A script with this name (${args.scriptData.name}) already exists in the workspace`,

@@ -5,6 +5,8 @@ import { safeParseJson } from "@/lib/request-utils.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { persistWorkspaceScript } from "@/lib/script-persistence.server";
 import { AppError } from "@/lib/errors.server";
+import { isUniqueViolation } from "@/lib/parse-utils.server";
+import { toUserMessage } from "@/lib/user-message";
 import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
@@ -74,14 +76,16 @@ export const action = defineAction({
     if (error instanceof AppError) {
       return routeData({ error: error.message }, { status: error.statusCode });
     }
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("duplicate key") || message.includes("23505")) {
+    if (isUniqueViolation(error)) {
       return routeData(
         { error: "A script with this name already exists in the workspace" },
         { status: 400 }
       );
     }
-    return routeData({ error: message }, { status: 500 });
+    return routeData(
+      { error: toUserMessage(error, "Failed to save the script. Please try again.") },
+      { status: 500 },
+    );
   }
   },
 });
