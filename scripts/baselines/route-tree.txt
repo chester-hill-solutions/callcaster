@@ -124,6 +124,7 @@ calls
 campaigns
 chats
 checkout-session
+client-flash
 complete
 confirm-payment
 contacts
