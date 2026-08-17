@@ -183,16 +183,26 @@ export function useTwilioConnection({
         onDeviceBusyChangeRef.current?.(false);
       };
 
-      const scheduleRetry = (reason: string) => {
+      const scheduleRetry = (reason: string, fixedDelayMs?: number) => {
         if (unmountedRef.current) return;
         const retries = retryCountRef.current;
         const BASE_DELAY_MS = 2000;
         const MAX_DELAY_MS = 60000;
-        const delay = Math.min(BASE_DELAY_MS * 2 ** retries, MAX_DELAY_MS);
+        const delay = fixedDelayMs ?? Math.min(BASE_DELAY_MS * 2 ** retries, MAX_DELAY_MS);
         logger.info(`Scheduling device reconnect (${reason}) in ${delay}ms`, { retry: retries + 1 });
         retryCountRef.current = retries + 1;
         retryTimerRef.current = setTimeout(() => {
-          if (!unmountedRef.current) reconnectRef.current();
+          if (unmountedRef.current) return;
+          // Rebuilding the device destroys its calls. If the agent is mid-call
+          // when the timer fires, killing the call to fix the phone is worse
+          // than waiting — defer until the call ends (#1294/31206 storm: the
+          // 2s retry after a signaling error tore down a LIVE call).
+          if ((deviceRef.current?.calls?.length ?? 0) > 0) {
+            logger.info("Deferring device reconnect: call in progress");
+            scheduleRetry(`${reason} (deferred: call in progress)`, delay);
+            return;
+          }
+          reconnectRef.current();
         }, delay);
       };
 
@@ -205,8 +215,14 @@ export function useTwilioConnection({
         // never opened, was disconnected (e.g. token expiry, network blip), or
         // the heartbeat timed out. Auto-recover by recreating the Device from
         // scratch instead of leaving it stuck in Error state until the user
-        // manually clicks "Reconnect phone".
+        // manually clicks "Reconnect phone" — unless a call is live: the
+        // rebuild destroys the call, so mid-call recovery waits for hangup.
         if (code === 31009 && !isReconnectingRef.current) {
+          if ((deviceRef.current?.calls?.length ?? 0) > 0) {
+            logger.info("TransportError (31009) mid-call; deferring device rebuild");
+            scheduleRetry("transport error (deferred: call in progress)");
+            return;
+          }
           isReconnectingRef.current = true;
           logger.info("TransportError (31009) detected, auto-reconnecting device");
           reconnectRef.current();
@@ -219,6 +235,17 @@ export function useTwilioConnection({
         setError(error);
         onErrorRef.current?.(error);
         onCallStateChangeRef.current?.("failed");
+
+        // RateExceededError (31206): Twilio is telling us we sent too much —
+        // the ICE-restart/re-invite loop of a failing call can trip this all
+        // by itself. Retrying on the normal 2s backoff walks straight back
+        // into the limit and (worse) the retry used to destroy the live call
+        // it fired under (#1294). Cool down hard instead.
+        const RATE_LIMIT_COOLDOWN_MS = 60000;
+        if (code === 31206) {
+          scheduleRetry("rate limited (31206 cooldown)", RATE_LIMIT_COOLDOWN_MS);
+          return;
+        }
         scheduleRetry("device error");
       };
 
@@ -281,6 +308,19 @@ export function useTwilioConnection({
     setError(null);
     setStatus("disconnected");
     if (stale) {
+      // destroy() internally runs disconnectAll(), whose hangup publish over a
+      // dead transport THROWS mid-teardown (31009) — leaving the old call's
+      // media handler ICE-restarting against nothing forever, and its
+      // signaling spam feeding the very rate limit (31206) that triggered the
+      // rebuild. Disconnect each call individually first, isolating throws,
+      // so one dead transport can't abort the rest of the teardown (#1294).
+      for (const call of stale.calls ?? []) {
+        try {
+          call.disconnect();
+        } catch (err) {
+          logger.debug("Stale call disconnect failed during reconnect:", err);
+        }
+      }
       try {
         stale.destroy();
       } catch (err) {
