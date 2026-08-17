@@ -33,6 +33,14 @@ type UseCampaignDialActionsOptions = {
   recentAttempt: OutreachAttempt | null;
   selectedDevice: string;
   send: (action: { type: string }) => void;
+  /**
+   * Resets the canonical call lifecycle for the new dial, in the same batch as
+   * the FSM's START_DIALING. Without it the finished call's outcome (or this
+   * contact's last attempt disposition) paints for one frame before the
+   * FSM→lifecycle bridge effect can clear it — the residual flash left over
+   * from #1220.
+   */
+  beginDial: () => void;
 };
 
 export function useCampaignDialActions({
@@ -49,6 +57,7 @@ export function useCampaignDialActions({
   recentAttempt,
   selectedDevice,
   send,
+  beginDial,
 }: UseCampaignDialActionsOptions) {
   return useCallback(() => {
     if (!campaign) return;
@@ -64,6 +73,7 @@ export function useCampaignDialActions({
       if (callState === "dialing" || callState === "connected") return;
 
       send({ type: "START_DIALING" });
+      beginDial();
       startCall({
         contact: nextRecipient.contact,
         campaign,
@@ -88,6 +98,7 @@ export function useCampaignDialActions({
     recentAttempt,
     selectedDevice,
     send,
+    beginDial,
   ]);
 }
 

@@ -200,7 +200,7 @@ export function useCallScreen() {
 
   const agentLegSid = getCallSid(activeCall) ?? null;
 
-  const { displayState, displayColor } = useCampaignCallFlow({
+  const { displayState, displayColor, beginDial } = useCampaignCallFlow({
     callSid,
     agentLegSid,
     workspaceId,
@@ -311,6 +311,7 @@ export function useCallScreen() {
     recentAttempt,
     selectedDevice: phoneVerification.selectedDevice,
     send: send as unknown as (action: { type: string }) => void,
+    beginDial,
   });
 
   const handleDequeueNext = useCampaignDequeueActions({

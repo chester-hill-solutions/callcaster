@@ -24,6 +24,7 @@ const nextRecipient = {
 
 describe("useCampaignDialActions", () => {
   test("predictive dial calls begin when device is ready", () => {
+    const beginDial = vi.fn();
     const begin = vi.fn();
     const startCall = vi.fn();
     const { result } = renderHook(() =>
@@ -39,6 +40,7 @@ describe("useCampaignDialActions", () => {
         workspaceId: "ws",
         recentAttempt: null,
         selectedDevice: "computer",
+        beginDial,
       }),
     );
 
@@ -48,6 +50,7 @@ describe("useCampaignDialActions", () => {
   });
 
   test("predictive dial is blocked when device is busy or not registered", () => {
+    const beginDial = vi.fn();
     const begin = vi.fn();
     const startCall = vi.fn();
     const { result: busyResult } = renderHook(() =>
@@ -63,6 +66,7 @@ describe("useCampaignDialActions", () => {
         workspaceId: "ws",
         recentAttempt: null,
         selectedDevice: "computer",
+        beginDial,
       }),
     );
 
@@ -82,6 +86,7 @@ describe("useCampaignDialActions", () => {
         workspaceId: "ws",
         recentAttempt: null,
         selectedDevice: "computer",
+        beginDial,
       }),
     );
     act(() => notReadyResult.current());
@@ -89,6 +94,7 @@ describe("useCampaignDialActions", () => {
   });
 
   test("manual dial starts call for next recipient", () => {
+    const beginDial = vi.fn();
     const begin = vi.fn();
     const startCall = vi.fn();
     const send = vi.fn();
@@ -107,6 +113,7 @@ describe("useCampaignDialActions", () => {
         recentAttempt: null,
         selectedDevice: "computer",
         send,
+        beginDial,
       }),
     );
 
@@ -121,6 +128,35 @@ describe("useCampaignDialActions", () => {
       selectedDevice: "computer",
     });
     expect(begin).not.toHaveBeenCalled();
+    // Same handler, so both land in one batch and no render sees the previous
+    // call's outcome (#1220 residual flash).
+    expect(send).toHaveBeenCalledWith({ type: "START_DIALING" });
+    expect(beginDial).toHaveBeenCalledTimes(1);
+  });
+
+  test("a blocked manual dial does not reset the call lifecycle", () => {
+    const beginDial = vi.fn();
+    const { result } = renderHook(() =>
+      useCampaignDialActions({
+        campaign: baseCampaign,
+        deviceIsBusy: false,
+        incomingCall: null,
+        deviceStatus: "Registered",
+        callState: "connected",
+        begin: vi.fn(),
+        startCall: vi.fn(),
+        nextRecipient,
+        user: { id: "u1" },
+        workspaceId: "ws",
+        recentAttempt: null,
+        selectedDevice: "computer",
+        send: vi.fn(),
+        beginDial,
+      }),
+    );
+
+    act(() => result.current());
+    expect(beginDial).not.toHaveBeenCalled();
   });
 });
 
