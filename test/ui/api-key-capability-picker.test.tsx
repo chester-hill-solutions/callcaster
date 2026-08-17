@@ -43,4 +43,68 @@ describe("ApiKeyCapabilityPicker", () => {
     ).toBeTruthy();
     expect(screen.getByLabelText("1 selected")).toBeTruthy();
   });
+
+  /**
+   * Issue #1264 — the picker mirrors the server-side scope cap so a minter is
+   * never offered a capability the mint would refuse. `audit.read` is
+   * owner-only, so an admin's picker must not carry it.
+   */
+  describe("grantableScopes cap", () => {
+    const ADMIN_SCOPES = [
+      "campaigns.read",
+      "campaigns.write",
+      "campaigns.dispatch",
+      "calls.start",
+      "calls.control",
+      "messages.send",
+      "members.invite",
+    ] as const;
+
+    test("omits capabilities outside the grantable set", () => {
+      const { container } = render(
+        <ApiKeyCapabilityPicker grantableScopes={ADMIN_SCOPES} />,
+      );
+      expect(
+        container.querySelector('input[data-scope-value="members.invite"]'),
+      ).toBeTruthy();
+      expect(
+        container.querySelector('input[data-scope-value="audit.read"]'),
+      ).toBeNull();
+    });
+
+    test("a capped-out capability stays hidden from search", () => {
+      const { container } = render(
+        <ApiKeyCapabilityPicker grantableScopes={ADMIN_SCOPES} />,
+      );
+      fireEvent.change(
+        screen.getByPlaceholderText("Find capability by name or description…"),
+        { target: { value: "audit" } },
+      );
+      expect(
+        container.querySelector('input[data-scope-value="audit.read"]'),
+      ).toBeNull();
+    });
+
+    test("select-all cannot sweep in a capped-out capability", () => {
+      const { container } = render(
+        <ApiKeyCapabilityPicker grantableScopes={ADMIN_SCOPES} />,
+      );
+      fireEvent.click(screen.getByLabelText("Select all visible capabilities"));
+      expect(
+        container.querySelector(
+          'input[type="hidden"][name="scopes"][value="audit.read"]',
+        ),
+      ).toBeNull();
+      expect(
+        container.querySelectorAll('input[type="hidden"][name="scopes"]').length,
+      ).toBe(ADMIN_SCOPES.length);
+    });
+
+    test("omitting the prop offers the full catalogue", () => {
+      const { container } = render(<ApiKeyCapabilityPicker />);
+      expect(
+        container.querySelector('input[data-scope-value="audit.read"]'),
+      ).toBeTruthy();
+    });
+  });
 });

@@ -8166,7 +8166,7 @@
       "post": {
         "operationId": "postWorkspace_api_keys",
         "summary": "POST /api/workspace-api-keys",
-        "description": "",
+        "description": "Legacy flat route; workspace_id comes from the body/query. The admin floor and the capability-scope cap are enforced by requireApiKeyManager / assertScopesWithinActorRole in platform-members.server.ts (issue #1264).",
         "tags": [
           "Workspace Admin",
           "workspace"
@@ -8229,7 +8229,7 @@
       "delete": {
         "operationId": "deleteWorkspace_api_keys",
         "summary": "DELETE /api/workspace-api-keys",
-        "description": "",
+        "description": "Legacy flat route; workspace_id comes from the body/query. The admin floor and the capability-scope cap are enforced by requireApiKeyManager / assertScopesWithinActorRole in platform-members.server.ts (issue #1264).",
         "tags": [
           "Workspace Admin",
           "workspace"
@@ -8280,7 +8280,7 @@
       "get": {
         "operationId": "getWorkspace_api_keys",
         "summary": "GET /api/workspace-api-keys",
-        "description": "",
+        "description": "Legacy flat route; workspace_id comes from the body/query. The admin floor and the capability-scope cap are enforced by requireApiKeyManager / assertScopesWithinActorRole in platform-members.server.ts (issue #1264).",
         "tags": [
           "Workspace Admin",
           "workspace"
@@ -8712,7 +8712,7 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_api_keys",
         "summary": "POST /api/workspaces/:workspaceId/api-keys",
-        "description": "",
+        "description": "Session-only: API-key actors get 401, so a key cannot mint another key. GET/POST/DELETE all require an admin session (requireApiKeyManager). POST caps requested scopes at the creator's own role capabilities and 403s naming any scope beyond them (issue #1264).",
         "tags": [
           "Workspace Admin",
           "workspace"
@@ -8775,7 +8775,7 @@
       "delete": {
         "operationId": "deleteWorkspaces_workspaceId_api_keys",
         "summary": "DELETE /api/workspaces/:workspaceId/api-keys",
-        "description": "",
+        "description": "Session-only: API-key actors get 401, so a key cannot mint another key. GET/POST/DELETE all require an admin session (requireApiKeyManager). POST caps requested scopes at the creator's own role capabilities and 403s naming any scope beyond them (issue #1264).",
         "tags": [
           "Workspace Admin",
           "workspace"
@@ -8826,7 +8826,7 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_api_keys",
         "summary": "GET /api/workspaces/:workspaceId/api-keys",
-        "description": "",
+        "description": "Session-only: API-key actors get 401, so a key cannot mint another key. GET/POST/DELETE all require an admin session (requireApiKeyManager). POST caps requested scopes at the creator's own role capabilities and 403s naming any scope beyond them (issue #1264).",
         "tags": [
           "Workspace Admin",
           "workspace"

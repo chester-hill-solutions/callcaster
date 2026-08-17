@@ -27,7 +27,7 @@
  *
  *  - BASE helpers only establish a floor. `requireJsonAuth` proves "a session",
  *    but the route may then gate on an admin role — sometimes several frames
- *    away in the service layer (`listWorkspaceApiKeys` → `requireMemberManager`).
+ *    away in the service layer (`listWorkspaceApiKeys` → `requireApiKeyManager`).
  *    A route-level analyser cannot see that, so deriving from a base would
  *    silently DOWNGRADE a correct `workspaceAdmin` declaration. For these the
  *    annotation supplies the class and this module supplies a CONSTRAINT: the
