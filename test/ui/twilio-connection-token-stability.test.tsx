@@ -132,3 +132,126 @@ describe("useTwilioConnection error recovery", () => {
     expect(result.current.status).toBe("disconnected");
   });
 });
+
+
+// #1294: a mid-call RateExceededError (31206) was fast-retried on the 2s
+// backoff — straight back into the rate limit — and the retry's reconnect()
+// destroyed the device with the agent's LIVE call still on it. destroy()'s
+// hangup publish then threw over the dead transport, orphaning the call's
+// ICE-restart loop (endless 31009 spam after hangup, feeding the same rate
+// limit). These pin the storm-breaking behaviors.
+describe("useTwilioConnection reconnect storm (#1294)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetTwilioVoiceSdkMock();
+    mockTwilioDevice.calls = [];
+  });
+
+  function rateError(code: number, message: string) {
+    return Object.assign(new Error(message), { code });
+  }
+
+  test("31206 cools down for 60s instead of the 2s fast retry", async () => {
+    vi.useFakeTimers();
+    try {
+      renderHook(() => useTwilioConnection({ token: "tok-1" }));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(mockTwilioDevice.register).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        mockTwilioDevice.emit("error", rateError(31206, "rate exceeded"));
+      });
+
+      // The old 2s fast path must NOT fire.
+      await act(async () => {
+        vi.advanceTimersByTime(5_000);
+        await Promise.resolve();
+      });
+      expect(mockTwilioDevice.destroy).not.toHaveBeenCalled();
+
+      // After the full cooldown the rebuild happens.
+      await act(async () => {
+        vi.advanceTimersByTime(60_000);
+        await Promise.resolve();
+      });
+      expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
+      expect(mockTwilioDevice.register).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("a retry timer firing mid-call defers instead of destroying the live call", async () => {
+    vi.useFakeTimers();
+    try {
+      renderHook(() => useTwilioConnection({ token: "tok-1" }));
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // A live call is on the device when the error fires and stays live
+      // through the first timer.
+      mockTwilioDevice.calls = [{ disconnect: vi.fn() }];
+      act(() => {
+        mockTwilioDevice.emit("error", rateError(99999, "some device error"));
+      });
+
+      await act(async () => {
+        vi.advanceTimersByTime(2_000);
+        await Promise.resolve();
+      });
+      // Deferred: no rebuild while the call is live.
+      expect(mockTwilioDevice.destroy).not.toHaveBeenCalled();
+
+      // Call ends; the deferred timer fires and the rebuild proceeds.
+      mockTwilioDevice.calls = [];
+      await act(async () => {
+        vi.advanceTimersByTime(2_000);
+        await Promise.resolve();
+      });
+      expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("31009 mid-call defers the rebuild instead of killing the call", async () => {
+    renderHook(() => useTwilioConnection({ token: "tok-1" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    mockTwilioDevice.calls = [{ disconnect: vi.fn() }];
+    act(() => {
+      mockTwilioDevice.emit("error", rateError(31009, "no transport"));
+    });
+
+    // No immediate rebuild with a live call on the device.
+    expect(mockTwilioDevice.destroy).not.toHaveBeenCalled();
+  });
+
+  test("reconnect() disconnects every stale call, isolating dead-transport throws", async () => {
+    const throwing = {
+      disconnect: vi.fn(() => {
+        throw Object.assign(new Error("no transport"), { code: 31009 });
+      }),
+    };
+    const healthy = { disconnect: vi.fn() };
+    const { result } = renderHook(() => useTwilioConnection({ token: "tok-1" }));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    mockTwilioDevice.calls = [throwing, healthy];
+    act(() => {
+      result.current.reconnect();
+    });
+
+    // The first call's throw must not stop the second disconnect or destroy.
+    expect(throwing.disconnect).toHaveBeenCalledTimes(1);
+    expect(healthy.disconnect).toHaveBeenCalledTimes(1);
+    expect(mockTwilioDevice.destroy).toHaveBeenCalledTimes(1);
+  });
+});

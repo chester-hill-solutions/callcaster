@@ -121,7 +121,13 @@ export function useCampaignCallFlow({
       // live here, force it closed so the SDK's own 'disconnect' handling
       // (including its built-in hangup tone) actually runs instead of the
       // call silently lingering. A no-op if the SDK already tore it down.
-      activeCall?.disconnect?.();
+      // Guarded: with a dead signaling transport this disconnect THROWS
+      // (31009), and this runs inside the workspace SSE fan-out (#1294).
+      try {
+        activeCall?.disconnect?.();
+      } catch (error) {
+        logger.debug("activeCall.disconnect after provider-terminal status failed", error);
+      }
     }
 
     // Also drive the legacy FSM for backward compat (all statuses).
