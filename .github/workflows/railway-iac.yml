@@ -52,7 +52,7 @@ jobs:
       - name: Plan Railway dev configuration
         run: |
           set +e
-          railway config plan --file .railway/railway.ts --detailed-exit-code --json > railway-dev-plan.json
+          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-dev-plan.json
           status=$?
           cat railway-dev-plan.json
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
@@ -64,7 +64,7 @@ jobs:
           fi
       - name: Apply Railway dev configuration
         if: github.event_name == 'push'
-        run: railway config apply --file .railway/railway.ts --yes
+        run: railway config apply --file "$GITHUB_WORKSPACE/.railway/railway.ts" --yes
 
   # Staging deploys from `master` (the promotion branch: dev → master →
   # production). Applies on master pushes; plans on PRs to master and, as an
@@ -99,7 +99,7 @@ jobs:
       - name: Plan Railway staging configuration
         run: |
           set +e
-          railway config plan --file .railway/railway.ts --detailed-exit-code --json > railway-staging-plan.json
+          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-staging-plan.json
           status=$?
           cat railway-staging-plan.json
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
@@ -111,7 +111,7 @@ jobs:
           fi
       - name: Apply Railway staging configuration
         if: github.event_name == 'push'
-        run: railway config apply --file .railway/railway.ts --yes
+        run: railway config apply --file "$GITHUB_WORKSPACE/.railway/railway.ts" --yes
 
   production:
     if: >-
@@ -142,7 +142,7 @@ jobs:
       - name: Plan Railway production configuration
         run: |
           set +e
-          railway config plan --file .railway/railway.ts --detailed-exit-code --json > railway-production-plan.json
+          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-production-plan.json
           status=$?
           cat railway-production-plan.json
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
@@ -154,4 +154,4 @@ jobs:
           fi
       - name: Apply Railway production configuration
         if: github.event_name == 'push'
-        run: railway config apply --file .railway/railway.ts --yes
+        run: railway config apply --file "$GITHUB_WORKSPACE/.railway/railway.ts" --yes
