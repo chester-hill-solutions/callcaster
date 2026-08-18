@@ -1,19 +1,41 @@
-import { service } from "railway/iac";
+import { postgres, service, volume } from "railway/iac";
 import { preservedVariables, source } from "../config/shared.js";
 
+// Staging is a Railway environment mirroring production (#1300): v2 topology,
+// same code lineage, test-mode Stripe keys as the only intended difference.
+// Values are populated from dev by scripts/railway/sync-staging-vars.sh —
+// dev's Stripe keys are already test-mode and Twilio is shared for now.
+//
+// Applying this DELETES the legacy hearty-expression service (the Supabase-era
+// staging app, frozen since 2026-06-24). That is the point of phase 2, but the
+// apply is destructive and stays human-reviewed/manual — CI only ever plans
+// staging on PRs (applies fire on production pushes, and this graph reaches
+// the production branch only at cutover).
+//
+// Source: `master` during the rehearsal (it carries v2 as of #1120; the
+// `production` branch is still pre-v2). Phase 3 flips this to
+// source("production") in the same change that promotes v2 to that branch.
 const appVariables = [
   "BASE_URL",
-  "OPENAI_API_KEY",
+  "BETTER_AUTH_SECRET",
+  "BETTER_AUTH_URL",
+  "COHERE_API_KEY",
+  "DATABASE_URL",
+  "ELEVENLABS_API_KEY",
+  "HOST",
+  "NODE_ENV",
+  "PORT",
   "RESEND_API_KEY",
-  "SENDGRID_API_KEY",
+  "RUN_CLIENT_MIGRATIONS_ON_BOOT",
+  "S3_ACCESS_KEY_ID",
+  "S3_BUCKET",
+  "S3_ENDPOINT",
+  "S3_REGION",
+  "S3_SECRET_ACCESS_KEY",
+  "SIGNUP_OPEN",
   "STRIPE_API_KEY",
   "STRIPE_SECRET_KEY",
-  "SUPABASE_ANON_KEY",
-  "SUPABASE_PUBLISHABLE_KEY",
-  "SUPABASE_SECRET_KEY",
-  "SUPABASE_SERVICE_KEY",
-  "SUPABASE_SKEY",
-  "SUPABASE_URL",
+  "STRIPE_WEBHOOK_SECRET",
   "TWILIO_API_KEY",
   "TWILIO_API_SECRET",
   "TWILIO_APP_SID",
@@ -21,20 +43,59 @@ const appVariables = [
   "TWILIO_PHONE_NUMBER",
   "TWILIO_SID",
 ] as const;
+// DISABLE_2FA_ENFORCEMENT is deliberately absent: dev-only. Staging matches
+// production behavior.
+
+const workerVariables = [
+  "BASE_URL",
+  "BETTER_AUTH_SECRET",
+  "DATABASE_URL",
+  "NODE_ENV",
+  "RAILWAY_DOCKERFILE_PATH",
+  "RESEND_API_KEY",
+  "S3_ACCESS_KEY_ID",
+  "S3_BUCKET",
+  "S3_ENDPOINT",
+  "S3_REGION",
+  "S3_SECRET_ACCESS_KEY",
+  "STRIPE_SECRET_KEY",
+  "TWILIO_APP_SID",
+  "TWILIO_AUTH_TOKEN",
+  "TWILIO_PHONE_NUMBER",
+  "TWILIO_SID",
+] as const;
 
 export function stagingResources() {
-  // Models staging exactly as it runs today: the Supabase-era app deployed
-  // from `master`, no database services. Phase 2 of #1300 replaces this with
-  // the v2 topology (app + worker + PostgreSQL) sourced from the `production`
-  // branch — staging is a Railway environment mirroring production with
-  // test-mode Stripe keys, not a promotion-branch stage. Destructive apply,
-  // human-reviewed only; do not "align" it as a side effect.
-  const app = service("hearty-expression", {
-    source: source("master"),
-    build: { builder: "NIXPACKS" },
-    replicas: { "us-west2": 1 },
+  const appSource = source("master");
+  // Same custom image as dev's database; the SDK type omits the option.
+  // @ts-expect-error Railway's runtime supports an image override for database helpers.
+  const database = postgres("PostgreSQL 18", {
+    image: "xlab/postgres-ssl-18:latest",
+    region: "us-east4-eqdc4a",
+  });
+  const databaseVolume = volume("postgresql-18-volume", {
+    alerts: { usage: { "100": {}, "80": {}, "95": {} } },
+    allowOnlineResize: true,
+    region: "us-east4-eqdc4a",
+    sizeMB: 50000,
+  });
+  const app = service("CallCaster", {
+    source: appSource,
+    healthcheck: "/readyz",
+    healthcheckTimeout: 30,
+    replicas: { "us-east4-eqdc4a": 1 },
     env: preservedVariables(appVariables),
   });
+  const worker = service("callcaster-worker", {
+    source: appSource,
+    build: {
+      buildEnvironment: "V3",
+      builder: "DOCKERFILE",
+      dockerfilePath: "Dockerfile.worker",
+    },
+    replicas: { "us-east4-eqdc4a": 1 },
+    env: preservedVariables(workerVariables),
+  });
 
-  return [app];
+  return [database, app, worker, databaseVolume];
 }
