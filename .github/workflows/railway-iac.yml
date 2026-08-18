@@ -62,6 +62,48 @@ jobs:
         if: github.event_name == 'push'
         run: railway config apply --file .railway/railway.ts --yes
 
+  # Staging has no branch of its own yet (issue #1300 phase 2 decides its
+  # promotion model), so this job only ever plans — drift shows up on PRs and
+  # dev pushes, and applies stay manual.
+  staging:
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
+      (github.event_name == 'pull_request' && github.base_ref == 'dev' &&
+      github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+      - name: Install Railway CLI
+        run: npm install --global @railway/cli@5.30.4
+      - name: Link Railway staging environment
+        run: railway link --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT_ID"
+      - name: Plan Railway staging configuration
+        run: |
+          set +e
+          railway config plan --file .railway/railway.ts --detailed-exit-code --json > railway-staging-plan.json
+          status=$?
+          cat railway-staging-plan.json
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
+            exit "$status"
+          fi
+          if jq -e '.changeSet.changes[]? | select(.severity == "destructive")' railway-staging-plan.json > /dev/null; then
+            echo "Destructive staging Railway plan detected. Review it manually."
+            exit 1
+          fi
+
   production:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
