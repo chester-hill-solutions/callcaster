@@ -1,18 +1,20 @@
 name: Railway IaC
 
-# Promotion pipeline (#1300): dev → master (staging) → production.
-# Each environment applies on pushes to its own branch and plans on PRs
-# targeting it; staging additionally plans on dev PRs for early drift checks.
+# Promotion (#1300): dev → production. Staging is not a branch — it is a
+# Railway environment mirroring production with test-mode Stripe keys, so it
+# plans/applies alongside production and additionally plans on dev PRs for
+# early drift checks. master is just the GitHub default branch; only the
+# legacy staging service still watches it until phase 2 replaces that.
 on:
   push:
-    branches: [dev, master, production]
+    branches: [dev, production]
     paths:
       - ".railway/**"
       - ".github/workflows/railway-iac.yml"
       - "package.json"
       - "package-lock.json"
   pull_request:
-    branches: [dev, master, production]
+    branches: [dev, production]
     paths:
       - ".railway/**"
       - ".github/workflows/railway-iac.yml"
@@ -66,14 +68,11 @@ jobs:
         if: github.event_name == 'push'
         run: railway config apply --file "$GITHUB_WORKSPACE/.railway/railway.ts" --yes
 
-  # Staging deploys from `master` (the promotion branch: dev → master →
-  # production). Applies on master pushes; plans on PRs to master and, as an
-  # early drift check, on PRs to dev.
   staging:
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/production') ||
       (github.event_name == 'pull_request' &&
-      (github.base_ref == 'dev' || github.base_ref == 'master') &&
+      (github.base_ref == 'dev' || github.base_ref == 'production') &&
       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     environment: staging
