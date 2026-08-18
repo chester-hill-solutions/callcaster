@@ -16,87 +16,15 @@ import type { TwilioMessageIntent } from "@/lib/types";
 import { eq } from "drizzle-orm";
 import { contact as contactTable } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
-import { findMatchingContactIds } from "@/lib/inbound-sms-context.server";
-import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
-import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
+import {
+  OUTBOUND_CREDITS_BLOCKED_BODY,
+  requireOutboundCredits,
+} from "@/lib/outbound-credit-gate.server";
+import {
+  isOptedOutRecipient,
+  isSmsIncapableRecipient,
+} from "@/lib/chat-sms-guards.server";
 import { defineAction } from "@/lib/handler.server";
-
-/**
- * Fail-open contact-level opt-out lookup: resolves by contact_id when known,
- * otherwise by a single unambiguous match on the destination number. Lookup
- * errors are logged and swallowed so a transient DB issue never blocks
- * delivery — this is a compliance guard, not the source of truth.
- */
-async function findOptedOutContact(
-  workspaceId: string,
-  to: string,
-  contactId: string | undefined,
-): Promise<boolean> {
-  try {
-    const tdb = createTenantDb(workspaceId);
-    if (contactId) {
-      const contact = await tdb.contact.findFirst({
-        where: eq(contactTable.id, Number(contactId)),
-      });
-      return Boolean(contact?.opt_out);
-    }
-
-    const matchingIds = await findMatchingContactIds(workspaceId, to);
-    const [singleMatchId] = matchingIds;
-    if (matchingIds.length !== 1 || singleMatchId == null) {
-      return false;
-    }
-    const contact = await tdb.contact.findFirst({
-      where: eq(contactTable.id, singleMatchId),
-    });
-    return Boolean(contact?.opt_out);
-  } catch (error) {
-    logger.error("Error checking contact opt-out status for chat_sms:", error);
-    return false;
-  }
-}
-
-/**
- * Fail-open landline gate: resolves the destination contact the same way as
- * {@link findOptedOutContact} (explicit contact_id, or a single unambiguous
- * match on the destination number), then looks up/caches its Twilio line
- * type. Errors are logged and swallowed — a lookup failure must never block
- * delivery.
- */
-async function findLandlineContact(
-  workspaceId: string,
-  to: string,
-  contactId: string | undefined,
-): Promise<boolean> {
-  try {
-    let resolvedContactId: number | null = null;
-
-    if (contactId) {
-      resolvedContactId = Number(contactId);
-    } else {
-      const matchingIds = await findMatchingContactIds(workspaceId, to);
-      const [singleMatchId] = matchingIds;
-      if (matchingIds.length === 1 && singleMatchId != null) {
-        resolvedContactId = singleMatchId;
-      }
-    }
-
-    if (resolvedContactId == null) {
-      return false;
-    }
-
-    const lineType = await getOrLookupLineType({
-      workspaceId,
-      contactId: resolvedContactId,
-      phone: to,
-    });
-    return isSmsIncapableLineType(lineType);
-  } catch (error) {
-    logger.error("Error checking contact line type for chat_sms:", error);
-    return false;
-  }
-}
 
 export const action = defineAction({
   auth: async ({ request }) => {
@@ -146,6 +74,9 @@ export const action = defineAction({
     });
   }
 
+  // Still baselined (issue #1242, D3): workspace_id comes from the parsed
+  // JSON body, not a route param, so the capability check can't move into a
+  // pre-request `auth:` strategy without a body-clone rework of this route.
   const capability = await requireDualAuthCapability({
     auth: authResult,
     workspaceId: workspace_id,
@@ -157,15 +88,15 @@ export const action = defineAction({
 
   // Fail-closed credit gate: reject sends when the balance is unknown or
   // depleted rather than letting Twilio billing failures surface later.
-  const creditsBalance = await getWorkspaceCreditsBalance(workspace_id);
-  if (hasInsufficientCreditsForOutbound(creditsBalance)) {
-    return new Response(
-      JSON.stringify({ creditsError: true, error: "Insufficient credits" }),
-      {
-        headers: { "Content-Type": "application/json" },
-        status: 402,
-      },
-    );
+  // Workspace existence is already guaranteed above (requireWorkspaceAccess /
+  // API-key workspace match), so an unknown-workspace result is treated the
+  // same as insufficient credits rather than surfacing a distinct 404.
+  const credits = await requireOutboundCredits(workspace_id);
+  if (!credits.ok) {
+    return new Response(JSON.stringify(OUTBOUND_CREDITS_BLOCKED_BODY), {
+      headers: { "Content-Type": "application/json" },
+      status: 402,
+    });
   }
 
   let to;
@@ -181,7 +112,7 @@ export const action = defineAction({
     });
   }
 
-  if (await findOptedOutContact(workspace_id, to, contact_id)) {
+  if (await isOptedOutRecipient(workspace_id, to, contact_id)) {
     return new Response(
       JSON.stringify({
         error: "This contact has opted out of messages.",
@@ -194,7 +125,7 @@ export const action = defineAction({
     );
   }
 
-  if (await findLandlineContact(workspace_id, to, contact_id)) {
+  if (await isSmsIncapableRecipient(workspace_id, to, contact_id)) {
     return new Response(
       JSON.stringify({
         error: "This number is a landline and can't receive SMS.",

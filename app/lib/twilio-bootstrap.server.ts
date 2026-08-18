@@ -34,7 +34,7 @@ export type WorkspaceTwilioBootstrapResult = {
   driftMessages: string[];
 };
 
-import { persistWorkspaceTwilioData as saveWorkspaceTwilioData, loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
+import { mergeWorkspaceTwilioData, loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 function buildBootstrapUrls(callbackBaseUrl: string) {
   return {
     callbackBaseUrl,
@@ -276,10 +276,10 @@ export async function ensureWorkspaceTwilioBootstrap({
 
   const outcome = resolveBootstrapOutcome(nextOnboarding, bootstrapThrew);
 
-  await saveWorkspaceTwilioData(workspaceId, {
-    ...currentTwilioData,
+  await mergeWorkspaceTwilioData(workspaceId, (current) => ({
+    ...current,
     onboarding: nextOnboarding,
-  });
+  }));
 
   return {
     outcome,
@@ -335,10 +335,10 @@ export async function syncWorkspaceTwilioBootstrapState({
   });
   nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
 
-  await saveWorkspaceTwilioData(workspaceId, {
-    ...currentTwilioData,
+  await mergeWorkspaceTwilioData(workspaceId, (current) => ({
+    ...current,
     onboarding: nextOnboarding,
-  });
+  }));
 
   return nextOnboarding;
 }
@@ -399,10 +399,10 @@ export async function repairWorkspaceTwilioWebhooks({
   });
   nextOnboarding.steps = buildOnboardingStepsForState(nextOnboarding);
 
-  await saveWorkspaceTwilioData(workspaceId, {
-    ...currentTwilioData,
+  await mergeWorkspaceTwilioData(workspaceId, (current) => ({
+    ...current,
     onboarding: nextOnboarding,
-  });
+  }));
 
   return { repaired, onboarding: nextOnboarding };
 }

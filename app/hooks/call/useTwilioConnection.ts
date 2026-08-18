@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Call, Device } from "@twilio/voice-sdk";
 import { logger } from "@/lib/logger.client";
 import { attachTwilioListener } from "@/lib/twilio/call-listener-utils.client";
@@ -16,6 +16,13 @@ interface UseTwilioConnectionOptions {
   onError?: (error: Error) => void;
   onCallStateChange?: (callState: string) => void;
   onDeviceBusyChange?: (isBusy: boolean) => void;
+  /**
+   * Called when the Twilio SDK signals that the current access token is about
+   * to expire. The caller should fetch a fresh token (e.g. via route
+   * revalidation) so the existing `updateToken()` flow picks it up before the
+   * signaling WebSocket is closed.
+   */
+  onTokenWillExpire?: () => void;
 }
 
 interface UseTwilioConnectionReturn {
@@ -23,6 +30,14 @@ interface UseTwilioConnectionReturn {
   status: string;
   error: Error | null;
   isRegistered: boolean;
+  /**
+   * Tear down the current Device (if any) and create a fresh one from
+   * scratch. Terminal states (Error/RegistrationFailed/Unregistered) never
+   * self-heal — nothing retries registration — so without this, the only
+   * recovery is a full page reload. Safe to call at any time; a healthy
+   * Device is simply replaced.
+   */
+  reconnect: () => void;
 }
 
 /**
@@ -36,10 +51,24 @@ export function useTwilioConnection({
   onError,
   onCallStateChange,
   onDeviceBusyChange,
+  onTokenWillExpire,
 }: UseTwilioConnectionOptions): UseTwilioConnectionReturn {
   const deviceRef = useRef<Device | null>(null);
+  const [device, setDevice] = useState<Device | null>(null);
   const [status, setStatus] = useState<string>("disconnected");
   const [error, setError] = useState<Error | null>(null);
+  const tokenRef = useRef(token);
+  const listenerCleanupsRef = useRef<Array<() => void>>([]);
+  const unmountedRef = useRef(false);
+  const isReconnectingRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onTokenWillExpireRef = useRef(onTokenWillExpire);
+  onTokenWillExpireRef.current = onTokenWillExpire;
+  // Bumping this forces the setup effect to run again with deviceRef already
+  // cleared, taking the "create a new device" branch instead of the
+  // "update the existing device's token" branch.
+  const [reconnectNonce, setReconnectNonce] = useState(0);
 
   const onIncomingCallRef = useRef(onIncomingCall);
   const onStatusChangeRef = useRef(onStatusChange);
@@ -53,21 +82,28 @@ export function useTwilioConnection({
   onDeviceBusyChangeRef.current = onDeviceBusyChange;
 
   /**
-   * @effect Create and register a Twilio Voice SDK `Device` for the given auth
-   * token, lazily loading the SDK, and wire all device-level lifecycle events
-   * (registered/unregistered/connecting/connected/disconnected/cancel/error/
-   * incoming) to the latest caller-supplied callbacks.
-   * @effect-deps token, deviceOptions (a new/changed token or device options
-   * means a new Device must be created and registered; callback props are read
-   * via refs so they don't need to be deps and don't retrigger setup)
+   * @effect Ensure a Twilio Voice SDK `Device` exists and carries the current
+   * auth token. The Device is created ONCE for the component's lifetime;
+   * subsequent token changes are applied in place via `device.updateToken()`.
+   * Rebuilding on every new token string tore the phone down mid-call, because
+   * the call-screen loader re-mints the JWT on every revalidation (every
+   * fetcher submit: script auto-save, dial, audiodrop, queue ops).
+   * @effect-deps token, deviceOptions (a token change is applied via
+   * updateToken on the existing device, or triggers first-time creation;
+   * callback props are read via refs so they don't retrigger setup),
+   * reconnectNonce (bumped by the returned `reconnect()` — the manual
+   * recovery path for terminal Error/RegistrationFailed/Unregistered states,
+   * which nothing retries automatically)
    * @effect-side-effects subscription (Twilio Device event listeners) + network
-   * (lazy SDK import, device.register()/unregister()); all listeners detached
-   * and the device unregistered in the cleanup function.
-   * @effect-why-not-loader Establishes and tears down a stateful, imperative
-   * WebRTC device registration with the Twilio SDK that must persist for the
-   * component's lifetime; it isn't a request/response data fetch.
+   * (lazy SDK import, device.register()/updateToken()); teardown lives in the
+   * separate unmount-only effect below, NOT in this effect's cleanup — pairing
+   * teardown with this effect is exactly what caused the rebuild storm.
+   * @effect-why-not-loader Establishes a stateful, imperative WebRTC device
+   * registration with the Twilio SDK that must persist for the component's
+   * lifetime; it isn't a request/response data fetch.
    */
   useEffect(() => {
+    tokenRef.current = token;
     if (!token) {
       logger.error("No token provided");
       setError(new Error("No token provided"));
@@ -77,21 +113,42 @@ export function useTwilioConnection({
 
     if (typeof window === "undefined") return;
 
-    let cancelled = false;
-    let device: Device | null = null;
-    let listenerCleanups: Array<() => void> = [];
+    const existing = deviceRef.current;
+    if (existing) {
+      try {
+        existing.updateToken(token);
+        setError(null);
+      } catch (err) {
+        logger.error("Failed to update Twilio device token:", err);
+      }
+      return;
+    }
 
     const setupDevice = async () => {
       // Load the Twilio Voice SDK lazily so it isn't bundled into routes
       // that merely render call UI but never actually connect a call.
       const { Device: TwilioDevice } = await import("@twilio/voice-sdk");
-      if (cancelled) return;
+      if (unmountedRef.current || deviceRef.current) return;
 
-      device = new TwilioDevice(token, deviceOptions ?? undefined);
+      // Emit tokenWillExpire 5 minutes before the token's TTL elapses, giving
+      // the caller plenty of time to fetch a fresh token via onTokenWillExpire.
+      const mergedOptions: DeviceOptions = {
+        ...deviceOptions,
+        tokenRefreshMs: 300000,
+      };
+      const device = new TwilioDevice(tokenRef.current, mergedOptions);
       deviceRef.current = device;
+      setDevice(device);
 
       const handleRegistered = () => {
+        isReconnectingRef.current = false;
+        if (retryTimerRef.current) {
+          clearTimeout(retryTimerRef.current);
+          retryTimerRef.current = null;
+        }
+        retryCountRef.current = 0;
         setStatus("Registered");
+        setError(null);
         onStatusChangeRef.current?.("Registered");
         onDeviceBusyChangeRef.current?.(false);
       };
@@ -108,6 +165,7 @@ export function useTwilioConnection({
 
       const handleConnected = () => {
         setStatus("Connected");
+        setError(null);
         onStatusChangeRef.current?.("Connected");
         onCallStateChangeRef.current?.("connected");
       };
@@ -125,21 +183,82 @@ export function useTwilioConnection({
         onDeviceBusyChangeRef.current?.(false);
       };
 
+      const scheduleRetry = (reason: string, fixedDelayMs?: number) => {
+        if (unmountedRef.current) return;
+        const retries = retryCountRef.current;
+        const BASE_DELAY_MS = 2000;
+        const MAX_DELAY_MS = 60000;
+        const delay = fixedDelayMs ?? Math.min(BASE_DELAY_MS * 2 ** retries, MAX_DELAY_MS);
+        logger.info(`Scheduling device reconnect (${reason}) in ${delay}ms`, { retry: retries + 1 });
+        retryCountRef.current = retries + 1;
+        retryTimerRef.current = setTimeout(() => {
+          if (unmountedRef.current) return;
+          // Rebuilding the device destroys its calls. If the agent is mid-call
+          // when the timer fires, killing the call to fix the phone is worse
+          // than waiting — defer until the call ends (#1294/31206 storm: the
+          // 2s retry after a signaling error tore down a LIVE call).
+          if ((deviceRef.current?.calls?.length ?? 0) > 0) {
+            logger.info("Deferring device reconnect: call in progress");
+            scheduleRetry(`${reason} (deferred: call in progress)`, delay);
+            return;
+          }
+          reconnectRef.current();
+        }, delay);
+      };
+
       const handleError = (err: unknown) => {
         const error = err instanceof Error ? err : new Error("Twilio device error");
+        const code = (err as { code?: number })?.code;
+
+        // TransportError (code 31009) means the signaling WebSocket is closed
+        // and no messages can be sent. This happens when the transport was
+        // never opened, was disconnected (e.g. token expiry, network blip), or
+        // the heartbeat timed out. Auto-recover by recreating the Device from
+        // scratch instead of leaving it stuck in Error state until the user
+        // manually clicks "Reconnect phone" — unless a call is live: the
+        // rebuild destroys the call, so mid-call recovery waits for hangup.
+        if (code === 31009 && !isReconnectingRef.current) {
+          if ((deviceRef.current?.calls?.length ?? 0) > 0) {
+            logger.info("TransportError (31009) mid-call; deferring device rebuild");
+            scheduleRetry("transport error (deferred: call in progress)");
+            return;
+          }
+          isReconnectingRef.current = true;
+          logger.info("TransportError (31009) detected, auto-reconnecting device");
+          reconnectRef.current();
+          return;
+        }
+
         logger.error("Twilio Device Error:", error);
         onDeviceBusyChangeRef.current?.(false);
         setStatus("Error");
         setError(error);
         onErrorRef.current?.(error);
         onCallStateChangeRef.current?.("failed");
+
+        // RateExceededError (31206): Twilio is telling us we sent too much —
+        // the ICE-restart/re-invite loop of a failing call can trip this all
+        // by itself. Retrying on the normal 2s backoff walks straight back
+        // into the limit and (worse) the retry used to destroy the live call
+        // it fired under (#1294). Cool down hard instead.
+        const RATE_LIMIT_COOLDOWN_MS = 60000;
+        if (code === 31206) {
+          scheduleRetry("rate limited (31206 cooldown)", RATE_LIMIT_COOLDOWN_MS);
+          return;
+        }
+        scheduleRetry("device error");
       };
 
       const handleIncoming = (call: unknown) => {
         onIncomingCallRef.current?.(call as Call);
       };
 
-      listenerCleanups = [
+      const handleTokenWillExpire = () => {
+        logger.info("Twilio token about to expire, requesting refresh");
+        onTokenWillExpireRef.current?.();
+      };
+
+      listenerCleanupsRef.current = [
         attachTwilioListener(device, "registered", handleRegistered),
         attachTwilioListener(device, "unregistered", handleUnregistered),
         attachTwilioListener(device, "connecting", handleConnecting),
@@ -148,15 +267,10 @@ export function useTwilioConnection({
         attachTwilioListener(device, "cancel", handleCancel),
         attachTwilioListener(device, "error", handleError),
         attachTwilioListener(device, "incoming", handleIncoming),
+        attachTwilioListener(device, "tokenWillExpire", handleTokenWillExpire),
       ];
 
       device.register().catch((err: unknown) => {
-        // Twilio's Voice SDK can reject register() with `undefined` (not an
-        // Error) for signaling-level auth failures — the real error is
-        // delivered separately via the device "error" event. The
-        // `(err: Error)` annotation this replaced was a lie: at runtime
-        // `err` could be undefined, and passing it straight through crashed
-        // downstream `err.message` accesses (see useSoftphoneController.ts).
         const error =
           err instanceof Error ? err : new Error("Twilio device registration failed");
         logger.error("Failed to register device:", error);
@@ -164,11 +278,12 @@ export function useTwilioConnection({
         setStatus("RegistrationFailed");
         onErrorRef.current?.(error);
         onCallStateChangeRef.current?.("failed");
+        scheduleRetry("registration failed");
       });
     };
 
     setupDevice().catch((err: unknown) => {
-      if (cancelled) return;
+      if (unmountedRef.current) return;
       const error =
         err instanceof Error ? err : new Error("Failed to load Twilio Voice SDK");
       logger.error("Failed to load Twilio Voice SDK:", error);
@@ -177,23 +292,82 @@ export function useTwilioConnection({
       onErrorRef.current?.(error);
       onCallStateChangeRef.current?.("failed");
     });
+  }, [token, deviceOptions, reconnectNonce]);
 
-    return () => {
-      cancelled = true;
-      if (device && device.state === "registered") {
-        device.unregister().catch((err: Error) =>
-          logger.error("Error unregistering device:", err),
-        );
+  const reconnect = useCallback(() => {
+    isReconnectingRef.current = true;
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    const stale = deviceRef.current;
+    deviceRef.current = null;
+    listenerCleanupsRef.current.forEach((cleanup) => cleanup());
+    listenerCleanupsRef.current = [];
+    setDevice(null);
+    setError(null);
+    setStatus("disconnected");
+    if (stale) {
+      // destroy() internally runs disconnectAll(), whose hangup publish over a
+      // dead transport THROWS mid-teardown (31009) — leaving the old call's
+      // media handler ICE-restarting against nothing forever, and its
+      // signaling spam feeding the very rate limit (31206) that triggered the
+      // rebuild. Disconnect each call individually first, isolating throws,
+      // so one dead transport can't abort the rest of the teardown (#1294).
+      for (const call of stale.calls ?? []) {
+        try {
+          call.disconnect();
+        } catch (err) {
+          logger.debug("Stale call disconnect failed during reconnect:", err);
+        }
       }
-      listenerCleanups.forEach((cleanup) => cleanup());
+      try {
+        stale.destroy();
+      } catch (err) {
+        logger.error("Error destroying Twilio device during reconnect:", err);
+      }
+    }
+    setReconnectNonce((n) => n + 1);
+  }, []);
+  const reconnectRef = useRef(reconnect);
+  reconnectRef.current = reconnect;
+
+  /**
+   * @effect Tear the Device down on unmount only: detach listeners and
+   * `destroy()` it. destroy() (not just unregister()) closes the signalling
+   * socket — the old unregister-only teardown leaked one socket per rebuild
+   * over a shift.
+   * @effect-deps [] — mount-once, cleanup-only; reads live values via refs.
+   * @effect-side-effects subscription cleanup + network (device.destroy()).
+   * @effect-why-not-loader Imperative SDK teardown tied to component unmount.
+   */
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      listenerCleanupsRef.current.forEach((cleanup) => cleanup());
+      listenerCleanupsRef.current = [];
+      const device = deviceRef.current;
       deviceRef.current = null;
+      if (device) {
+        try {
+          device.destroy();
+        } catch (err) {
+          logger.error("Error destroying Twilio device:", err);
+        }
+      }
     };
-  }, [token, deviceOptions]);
+  }, []);
 
   return {
-    device: deviceRef.current,
+    device,
     status,
     error,
     isRegistered: status === "Registered" || status === "Connected",
+    reconnect,
   };
 }

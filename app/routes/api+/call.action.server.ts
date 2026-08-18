@@ -8,7 +8,7 @@ import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { defineAction } from "@/lib/handler.server";
-import Twilio from "twilio";
+import { createVoiceResponse } from "@/lib/twilio-twiml.server";
 import type { ActionFunctionArgs } from "react-router";
 
 function isAValidPhoneNumber(number: string): boolean {
@@ -42,7 +42,7 @@ export const action = defineAction({
   handler: async ({ auth }) => {
     const { toNumber, workspaceId, clientIdentity, callSid } = auth;
     const baseUrl = env.BASE_URL();
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
 
   // Handset outbound: validate session and use workspace handset number as callerId
   if (workspaceId && clientIdentity && toNumber && isPhoneNumber(toNumber)) {
@@ -102,8 +102,6 @@ export const action = defineAction({
       record: "record-from-answer",
       recordingStatusCallback: `${baseUrl}/api/recording`,
       recordingStatusCallbackEvent: ["completed"],
-      transcribe: true,
-      transcribeCallback: `${baseUrl}/api/transcribe`,
     } as Record<string, unknown>);
     dial.number(
       {
@@ -126,8 +124,6 @@ export const action = defineAction({
       record: "record-from-answer",
       recordingStatusCallback: `${baseUrl}/api/recording`,
       recordingStatusCallbackEvent: ["completed"],
-      transcribe: true,
-      transcribeCallback: `${baseUrl}/api/transcribe`,
     } as Record<string, unknown>);
     dial.number(toNumber);
   } else {

@@ -29,6 +29,8 @@ import {
 } from "@/hooks/call/useCampaignDialActions";
 import { usePredictiveCallSync } from "@/hooks/call/usePredictiveCallSync";
 import { useNextRecipientSync } from "@/hooks/call/useNextRecipientSync";
+import { useDialFailureRecovery } from "@/hooks/call/useDialFailureRecovery";
+import { useCreditReconciliation } from "@/hooks/billing/useCreditReconciliation";
 import { getCallSid } from "@/lib/twilio/twilio-call-params";
 import { KEYPAD_KEYS } from "@/lib/dtmf";
 import type {
@@ -65,6 +67,9 @@ export function useCallScreen() {
     initialCoaching,
   } = useLoaderData<LoaderData>();
   const revalidator = useRevalidator();
+  const handleTokenWillExpire = useCallback(() => {
+    revalidator.revalidate();
+  }, [revalidator]);
   useWorkspaceEventSubscription({
     workspaceId,
     table: "campaign",
@@ -101,7 +106,7 @@ export function useCallScreen() {
     verifiedNumbers,
   });
 
-  const { state, context, send } = useCallState();
+  const { state, send } = useCallState();
   const navigate = useNavigate();
   const {
     device,
@@ -110,7 +115,7 @@ export function useCallScreen() {
     incomingCall,
     isMicMuted,
     setMicMuted,
-    hangUp,
+    hangUp: sdkHangUp,
     answer,
     holdAndAnswer,
     callState,
@@ -118,12 +123,26 @@ export function useCallScreen() {
     setCallDuration,
     deviceIsBusy,
     error: deviceError,
+    reconnect: reconnectDevice,
   } = useTwilioDevice(
     token,
     phoneVerification.selectedDevice,
     workspaceId,
     send as unknown as (action: { type: string }) => void,
+    handleTokenWillExpire,
   );
+
+  // Wrap hangUp to drive lifecycle immediately before SDK teardown.
+  // This ensures the display transitions to ending/ended synchronously,
+  // even if the /api/hangup call or SDK disconnect is delayed.
+  const hangUp = useCallback(async () => {
+    send({ type: "HANG_UP" });
+    try {
+      await sdkHangUp();
+    } catch {
+      // SDK hangup failure is non-fatal; lifecycle already transitioned.
+    }
+  }, [sdkHangUp, send]);
 
   const audioControls = useCallAudioControls({
     device,
@@ -156,6 +175,7 @@ export function useCallScreen() {
     householdMap,
     nextRecipient,
     setNextRecipient,
+    reconcileCredits,
   } = useWorkspaceRealtime({
     user: user as unknown as AppUser,
     init: {
@@ -178,14 +198,31 @@ export function useCallScreen() {
 
   const callSid = getCallSid(activeCall) ?? recentCall?.sid ?? null;
 
-  const { displayState, displayColor } = useCampaignCallFlow({
+  const agentLegSid = getCallSid(activeCall) ?? null;
+
+  const { displayState, displayColor, beginDial } = useCampaignCallFlow({
     callSid,
+    agentLegSid,
     workspaceId,
     state,
     activeCall,
     recentAttemptDisposition: recentAttempt?.disposition,
     predictiveState,
+    isPredictive: campaign?.dial_type === "predictive",
     send: send as unknown as (action: { type: string }) => void,
+  });
+
+  // A missed ledger SSE event would leave the credit display stale after a
+  // billable call — converge on the server balance within 30s (#1234).
+  useCreditReconciliation({
+    workspaceId,
+    isTerminal:
+      displayState === "completed" ||
+      displayState === "failed" ||
+      displayState === "no-answer" ||
+      displayState === "voicemail",
+    credits: availableCredits,
+    reconcile: reconcileCredits,
   });
 
   const { begin, conference, setConference, creditsError: conferenceCreditsError } = useStartConferenceAndDial(
@@ -198,12 +235,19 @@ export function useCallScreen() {
     },
   );
 
-  const fetcher = useFetcher<{ creditsError?: boolean }>();
+  const fetcher = useFetcher<{ creditsError?: boolean; error?: string }>();
   const submit = fetcher.submit;
   const creditsError =
     fetcher.data?.creditsError ||
     conferenceCreditsError ||
-    (credits ?? 0) <= 0;
+    availableCredits <= 0;
+
+  useDialFailureRecovery({
+    fetcherState: fetcher.state,
+    fetcherData: fetcher.data,
+    send,
+    showError: (message) => toast.error(message),
+  });
 
   const { startCall } = handleCall({ submit });
   const { handleConferenceEnd } = handleConference({
@@ -232,10 +276,13 @@ export function useCallScreen() {
   const { saveData, isSaving } = useDebouncedSave({
     update,
     recentAttempt,
-    nextRecipient,
+    questionContact,
     campaign,
     workspaceId,
     disposition,
+    // Autosave fires every 2s while the agent types mid-call; success toasts
+    // would spam over the call UI. Errors still surface.
+    silent: true,
     toast: toast as unknown as {
       success: (message: React.ReactNode, data?: unknown) => string | number;
       error: (message: React.ReactNode, data?: unknown) => string | number;
@@ -264,11 +311,12 @@ export function useCallScreen() {
     recentAttempt,
     selectedDevice: phoneVerification.selectedDevice,
     send: send as unknown as (action: { type: string }) => void,
+    beginDial,
   });
 
   const handleDequeueNext = useCampaignDequeueActions({
     campaign,
-    nextRecipient,
+    questionContact,
     send: send as unknown as (action: { type: string }) => void,
     setCallDuration,
     handleDialButton,
@@ -323,6 +371,16 @@ export function useCallScreen() {
    */
   useEffect(() => {
     const handleKeypress = (e: KeyboardEvent) => {
+      // Typing digits into a questionnaire field must not fire DTMF tones
+      // into the live call.
+      const target = e.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.closest("input, textarea, select") !== null)
+      ) {
+        return;
+      }
       if (KEYPAD_KEYS.includes(e.key)) {
         handleDTMFRef.current(e.key);
       }
@@ -347,6 +405,7 @@ export function useCallScreen() {
     send: send as unknown as (action: { type: string }) => void,
     setNextRecipient,
     setUpdate,
+    conference,
   });
 
   const handleDeviceSelect = useCallback(
@@ -373,6 +432,13 @@ export function useCallScreen() {
       availableCredits > 0 && availableCredits < queue.length ? "WARNING" :
         "BAD";
 
+  const resetCall = useCallback(() => {
+    // hangUp wrapper already sends HANG_UP to the lifecycle.
+    hangUp().catch(() => {});
+    send({ type: "NEXT" });
+    reconnectDevice();
+  }, [hangUp, send, reconnectDevice]);
+
   const callControls = {
     hangUp,
     answer,
@@ -397,6 +463,8 @@ export function useCallScreen() {
     availableCredits,
     creditState,
     deviceError,
+    reconnectDevice,
+    resetCall,
   };
 
   const queueControls = {
@@ -451,7 +519,7 @@ export function useCallScreen() {
     completed,
     workspaceId,
     campaignDetails,
-    credits,
+    credits: availableCredits,
     isActive,
     hasAccess,
     verifiedNumbers,

@@ -1,11 +1,11 @@
-import { and, gte, inArray } from "drizzle-orm";
+import { asc, inArray } from "drizzle-orm";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { call, message } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
 import { processCallStatusWebhook } from "@/lib/twilio-call-status.server";
 import { updateMessageBySid } from "@/lib/message-db.server";
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { SMS_STATUS_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
 import { isTerminalSmsStatus, normalizeSmsStatus } from "@/lib/sms-status";
 
@@ -26,6 +26,10 @@ const OPEN_MESSAGE_STATUSES = [
 /**
  * Reconcile stale LOCAL call/message statuses against Twilio REST for a
  * workspace.
+ *
+ * `maxAgeMinutes` bounds the bulk list() prefetch window and sets the grace
+ * age before a Twilio-404 call row is terminalized — it does NOT bound which
+ * rows are swept. Selection is every locally-open row, oldest first (#1289).
  *
  * The sync is driven by local rows stuck in an open (non-terminal) status —
  * the population left behind when a Twilio status callback was lost. Each
@@ -59,18 +63,23 @@ export async function triggerTwilioOpenSync({
 
     const tdb = createTenantDb(workspaceId);
     const since = new Date(Date.now() - maxAgeMinutes * 60_000);
-    const sinceIso = since.toISOString();
 
     // ─── Calls ─────────────────────────────────────────────
     let callsUpdated = 0;
     let callsBilled = 0;
     let callsSkipped = 0;
 
+    // Sweep EVERY open row, oldest first — not just rows created inside the
+    // prefetch window. The previous `date_created >= since` selection meant a
+    // row that stayed open longer than maxAgeMinutes graduated permanently
+    // out of the sweep: the dev environment accumulated 19 calls stuck in
+    // 'queued' for weeks (#1289), each blocking its contact from being
+    // re-dialed while inside claim_queue_entry_for_dial's active_call window.
+    // Once a row is repaired it leaves this population, so the backlog drains
+    // at callLimit rows per run.
     const localOpenCalls = await tdb.call.findMany({
-      where: and(
-        inArray(call.status, [...OPEN_CALL_STATUSES]),
-        gte(call.date_created, sinceIso),
-      ),
+      where: inArray(call.status, [...OPEN_CALL_STATUSES]),
+      orderBy: [asc(call.date_created)],
       limit: callLimit,
     });
 
@@ -89,7 +98,34 @@ export async function triggerTwilioOpenSync({
         if (!remote) {
           try {
             remote = await twilio.calls(local.sid).fetch();
-          } catch {
+          } catch (error) {
+            // Twilio definitively not knowing the SID (REST 404 / 20404) is
+            // an answer, not an outage: the call never existed there or was
+            // purged. Left as a skip, such a row stays open forever and gets
+            // re-fetched every run (#1289). Terminalize it as 'failed' once
+            // it is old enough that a race with call creation is impossible;
+            // the canonical processor writes the guarded status, and billing
+            // never debits a terminal call without a duration. Transient
+            // failures (auth, 5xx, network) still skip and retry next run.
+            const status = (error as { status?: number; code?: number }) ?? {};
+            const isNotFound = status.status === 404 || status.code === 20404;
+            const rowAgeMs = Date.now() - new Date(local.date_created).getTime();
+            if (isNotFound && rowAgeMs > maxAgeMinutes * 60_000) {
+              await processCallStatusWebhook(
+                {
+                  sid: local.sid,
+                  date_created: local.date_created,
+                  is_last: local.is_last,
+                  status: "failed",
+                },
+                {
+                  workspaceId,
+                  note: `Call ${local.sid} (open-sync 404 terminalization)`,
+                },
+              );
+              callsUpdated++;
+              continue;
+            }
             callsSkipped++;
             continue;
           }
@@ -121,11 +157,14 @@ export async function triggerTwilioOpenSync({
     let messagesUpdated = 0;
     let messagesSkipped = 0;
 
+    // Same open-population sweep as calls (#1289): the old windowed selection
+    // let a message stuck longer than maxAgeMinutes escape the sweep forever.
+    // A Twilio 404 still skips (never terminalizes) here: the SMS side-effects
+    // job debits terminal messages per SID, and fabricating a terminal status
+    // for a message Twilio never had risks billing a send that never happened.
     const localOpenMessages = await tdb.message.findMany({
-      where: and(
-        inArray(message.status, [...OPEN_MESSAGE_STATUSES]),
-        gte(message.date_created, sinceIso),
-      ),
+      where: inArray(message.status, [...OPEN_MESSAGE_STATUSES]),
+      orderBy: [asc(message.date_created)],
       limit: messageLimit,
     });
 
@@ -164,12 +203,12 @@ export async function triggerTwilioOpenSync({
         // lost webhook would have run. The job + ledger are both idempotent,
         // so racing a late-arriving webhook cannot double-debit.
         if (isTerminalSmsStatus(normalizeSmsStatus(twilioStatus))) {
-          await enqueueJob({
+          await enqueueRegisteredJob({
             type: SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
             workspaceId,
             idempotencyKey: `sms_status_side_effects:${local.sid}:${twilioStatus}`,
             params: {
-              messageSid: local.sid,
+              sid: local.sid,
               twilioParams: {
                 MessageStatus: twilioStatus,
                 ...(errorCode != null ? { ErrorCode: String(errorCode) } : {}),

@@ -1,6 +1,3 @@
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-
 export type AudienceUploadFileSummaryProps = {
   fileName: string;
   rowCount: number;
@@ -13,16 +10,15 @@ export function AudienceUploadFileSummary({
   columnCount,
 }: AudienceUploadFileSummaryProps) {
   return (
-    <Alert>
-      <AlertDescription>
-        <div className="flex flex-wrap items-center gap-2">
-          <span>
-            File: <span className="font-medium text-foreground">{fileName}</span>
-          </span>
-          <Badge variant="outline">{rowCount.toLocaleString()} rows</Badge>
-          <Badge variant="outline">{columnCount} columns</Badge>
-        </div>
-      </AlertDescription>
-    </Alert>
+    <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm">
+      <div className="truncate">
+        File: <span className="font-medium text-foreground">{fileName}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+        <span className="shrink-0 text-muted-foreground">
+          {rowCount.toLocaleString()} rows {columnCount} columns
+        </span>
+      </div>
+    </div>
   );
 }

@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useFetcher } from "react-router";
 import { handleContact, handleQueue } from "@/lib/callscreenActions";
+import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import type { Call, Campaign, OutreachAttempt, QueueItem } from "@/lib/types";
 
 type UseCampaignQueueFlowOptions = {
@@ -39,7 +40,22 @@ export function useCampaignQueueFlow({
   setNextRecipient,
   setQueue,
 }: UseCampaignQueueFlowOptions) {
-  const queueFetcher = useFetcher<{ queueError?: boolean }>();
+  const queueFetcher = useFetcher<{
+    queueError?: boolean;
+    error?: string;
+    code?: string;
+  }>();
+
+  // POST /api/queues answers a manual dequeue with 409 + `{ error, code }`
+  // when the row was NOT dequeued — it is `assigned` to another agent, so the
+  // guarded RPC left it alone (#1278). Without this the agent saw the contact
+  // vanish from their list and nothing else: the fetcher result was read by no
+  // one. Success carries no message on purpose (the row disappearing is the
+  // feedback), and an already-dequeued contact answers 200, so the routine
+  // "next contact" dequeue after a hangup stays silent.
+  useActionFeedback(queueFetcher.data, {
+    enabled: queueFetcher.state === "idle",
+  });
 
   const { switchQuestionContact, nextNumber } = handleContact({
     setQuestionContact,

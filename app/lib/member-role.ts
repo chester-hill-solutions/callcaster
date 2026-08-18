@@ -19,6 +19,10 @@ export function hasMinRole(
   minRole: string | undefined,
 ): boolean {
   if (!minRole) return true;
+  // Fail closed on an unrecognized gate (e.g. a typo'd or renamed constant):
+  // an unknown minRole must DENY, not silently authorize everyone.
+  const minRank = WORKSPACE_ROLE_RANK[minRole];
+  if (minRank === undefined) return false;
   if (!role) return false;
-  return (WORKSPACE_ROLE_RANK[role] ?? 0) >= (WORKSPACE_ROLE_RANK[minRole] ?? 0);
+  return (WORKSPACE_ROLE_RANK[role] ?? 0) >= minRank;
 }

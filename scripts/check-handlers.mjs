@@ -33,16 +33,42 @@
  * reading balances. The gate also emits docs/credit-handler-inventory.md;
  * ci:local's final `git diff --exit-code` catches a stale inventory.
  *
+ * TwiML seam (ratchet COMPLETE — hard fail, baseline 0): app/lib/twilio-
+ * twiml.server.ts is the only file allowed to construct a Twilio TwiML
+ * VoiceResponse (`new Twilio.twiml.VoiceResponse()`) or reference its type
+ * (`Twilio.twiml.VoiceResponse`). Before #1243 (E3), 16 route files each
+ * built one inline, and ~14 test files hand-rolled fake VoiceResponse
+ * classes to test them — a string format ("pause:5|dial:+1555...") that
+ * existed nowhere in production. Every call site now goes through
+ * createVoiceResponse()/TwimlResponse from that module instead, so tests
+ * assert on real serialized XML. Scoped to app/ (not scripts/, test/, or
+ * worker/) since that is where TwiML gets built.
+ *
+ * Capability facet (BIDIRECTIONAL, ratcheted): a `capability` on an
+ * API_SURFACE operation must be the capability the route actually enforces.
+ * Unlike `sideEffects` there is no separate declaration to compare against —
+ * the capability-carrying auth strategies brand themselves with the id they
+ * enforce, so the strategy call site IS the declaration. See
+ * scripts/lib/capability-linkage.mjs for the two directions and
+ * scripts/capability-baseline.json for the hand-rolled preambles that still
+ * enforce a capability without that link (ratcheting to zero via #1242 D3).
+ *
  * Usage:
  *   node scripts/check-handlers.mjs
+ *   node scripts/check-handlers.mjs --update-capability-baseline
  */
 import fs from "node:fs";
 import path from "node:path";
+import { analyzeCapabilityLinkage } from "./lib/capability-linkage.mjs";
 
 const ROOT = process.cwd();
+const APP_DIR = path.join(ROOT, "app");
 const ROUTES_DIR = path.join(ROOT, "app", "routes");
 const SKIP_FILE = [/\.test\.[jt]sx?$/, /\.spec\.[jt]sx?$/];
 const CREDIT_INVENTORY_PATH = path.join(ROOT, "docs", "credit-handler-inventory.md");
+const TWIML_SEAM_PATH = path.join(ROOT, "app", "lib", "twilio-twiml.server.ts");
+const TWIML_LEAK_RE = /new\s+Twilio\.twiml\.|\.twiml\.VoiceResponse\b/;
+const CAPABILITY_BASELINE_PATH = path.join(ROOT, "scripts", "capability-baseline.json");
 
 function walk(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
@@ -54,6 +80,32 @@ function walk(dir, out = []) {
     }
   }
   return out;
+}
+
+/**
+ * Files under app/ (excluding the seam module itself) that construct a
+ * Twilio TwiML VoiceResponse directly or reference its SDK type, instead of
+ * going through app/lib/twilio-twiml.server.ts's createVoiceResponse()/
+ * TwimlResponse. Baseline is 0 as of #1243 (E3) — any hit is a regression.
+ */
+function twimlLeaks() {
+  const leaks = [];
+  for (const file of walk(APP_DIR).sort()) {
+    if (file === TWIML_SEAM_PATH) continue;
+    const src = fs.readFileSync(file, "utf8");
+    const lines = src.split("\n");
+    const hitLines = [];
+    lines.forEach((line, i) => {
+      if (TWIML_LEAK_RE.test(line)) hitLines.push(i + 1);
+    });
+    if (hitLines.length > 0) {
+      const rel = path.relative(ROOT, file);
+      leaks.push(
+        `  ${rel}: line ${hitLines.join(", ")} touches Twilio.twiml.VoiceResponse directly — use createVoiceResponse()/TwimlResponse from app/lib/twilio-twiml.server.ts instead`,
+      );
+    }
+  }
+  return leaks;
 }
 
 /** Raw (non-factory) handlers in a file: which of action/loader bypass the factory. */
@@ -231,6 +283,31 @@ function writeCreditInventory(rows) {
   fs.writeFileSync(CREDIT_INVENTORY_PATH, lines.join("\n"));
 }
 
+/**
+ * Capability cross-check (self-contained section; all logic lives in
+ * scripts/lib/capability-linkage.mjs so this file stays a thin caller).
+ * Returns the violation lines to fold into the shared report.
+ */
+function capabilityViolations() {
+  const baseline = fs.existsSync(CAPABILITY_BASELINE_PATH)
+    ? JSON.parse(fs.readFileSync(CAPABILITY_BASELINE_PATH, "utf8"))
+    : {};
+  const result = analyzeCapabilityLinkage({ root: ROOT, baseline });
+
+  if (process.argv.includes("--update-capability-baseline")) {
+    fs.writeFileSync(
+      CAPABILITY_BASELINE_PATH,
+      `${JSON.stringify(result.suggestedBaseline, null, 2)}\n`,
+    );
+    console.log(
+      `Capability baseline written: ${Object.keys(result.suggestedBaseline).length} grandfathered operation(s).`,
+    );
+    process.exit(0);
+  }
+
+  return { lines: result.violations.map((v) => `  ${v}`), stats: result.stats };
+}
+
 const violations = [];
 const creditRows = [];
 for (const file of walk(ROUTES_DIR).sort()) {
@@ -266,6 +343,14 @@ for (const file of walk(ROUTES_DIR).sort()) {
 
 writeCreditInventory(creditRows);
 
+const twimlViolations = twimlLeaks();
+if (twimlViolations.length) {
+  violations.push(...twimlViolations);
+}
+
+const capability = capabilityViolations();
+violations.push(...capability.lines);
+
 if (violations.length) {
   console.error("Handler strictness gate FAILED:\n");
   console.error(violations.join("\n"));
@@ -275,10 +360,24 @@ if (violations.length) {
       "docs/handler-strictness.md). The factory migration is complete; there is no\n" +
       "grandfather baseline. The credit facet is bidirectional: routes matching a\n" +
       "credit-write signal must declare \"credit\"; routes declaring \"credit\" must\n" +
-      "match a signal.",
+      "match a signal. Twilio TwiML VoiceResponse construction/typing must go\n" +
+      "through app/lib/twilio-twiml.server.ts — see the TwiML seam note at the top\n" +
+      "of this file and #1243 (E3).",
   );
+  if (capability.lines.length > 0) {
+    console.error(
+      "\nThe capability facet is bidirectional too: an API_SURFACE `capability` must\n" +
+        "equal the id the route's auth strategy enforces, and nothing may enforce a\n" +
+        "capability the surface does not declare. If you migrated a grandfathered\n" +
+        "preamble onto a strategy, run `npm run tools:capability:baseline` to ratchet\n" +
+        "scripts/capability-baseline.json down.",
+    );
+  }
   process.exit(1);
 }
 console.log(
-  `Handler gate passed: every route action/loader goes through the handler factory, side-effect declarations match call signals, and ${creditRows.length} credit-ledger routes are inventoried.`,
+  `Handler gate passed: every route action/loader goes through the handler factory, side-effect declarations match call signals, ${creditRows.length} credit-ledger routes are inventoried, and no file outside app/lib/twilio-twiml.server.ts touches Twilio.twiml.VoiceResponse directly.`,
+);
+console.log(
+  `Capability cross-check passed: ${capability.stats.declared} declared capabilities across ${capability.stats.operations} operations — ${capability.stats.linked} linked to a capability-carrying auth strategy, ${capability.stats.grandfathered} grandfathered preambles (ratcheting to 0).`,
 );

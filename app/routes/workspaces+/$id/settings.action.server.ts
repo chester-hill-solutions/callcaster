@@ -51,10 +51,13 @@ export const action = defineAction({
         }
         break;
       }
+      // Admin, not member: an API key is a durable bearer credential that
+      // outlives its minter's membership. Mirrors `requireApiKeyManager` in
+      // platform-members.server.ts, which enforces the same floor server-side.
       case "createApiKey": {
-        if (!hasMinRole(role, MemberRole.Member)) {
+        if (!hasMinRole(role, MemberRole.Admin)) {
           return routeData(
-            { error: "You don't have permission to perform this action" },
+            { error: "Workspace admin role required to manage API keys" },
             { headers, status: 403 },
           );
         }

@@ -59,7 +59,8 @@ describe("insertTransactionHistoryIdempotent event emission", () => {
     const { insertTransactionHistoryIdempotent } = await import(
       "../app/lib/transaction-history.server"
     );
-    const result = await insertTransactionHistoryIdempotent({
+    const { db } = await import("@/server/db");
+    const result = await insertTransactionHistoryIdempotent(db, {
       workspaceId: "ws-1",
       type: "DEBIT",
       amount: -5,
@@ -90,7 +91,8 @@ describe("insertTransactionHistoryIdempotent event emission", () => {
     const { insertTransactionHistoryIdempotent } = await import(
       "../app/lib/transaction-history.server"
     );
-    const result = await insertTransactionHistoryIdempotent({
+    const { db } = await import("@/server/db");
+    const result = await insertTransactionHistoryIdempotent(db, {
       workspaceId: "ws-1",
       type: "DEBIT",
       amount: -5,
@@ -118,7 +120,8 @@ describe("insertTransactionHistoryIdempotent event emission", () => {
     const { insertTransactionHistoryIdempotent } = await import(
       "../app/lib/transaction-history.server"
     );
-    const result = await insertTransactionHistoryIdempotent({
+    const { db } = await import("@/server/db");
+    const result = await insertTransactionHistoryIdempotent(db, {
       workspaceId: "ws-1",
       type: "CREDIT",
       amount: 100,
@@ -127,6 +130,50 @@ describe("insertTransactionHistoryIdempotent event emission", () => {
     });
 
     expect(result).toEqual({ inserted: true, existingId: 22 });
+    expect(mocks.logger.error).toHaveBeenCalled();
+  });
+
+  // Kept from the deleted test/billing-idempotency.test.ts. The rest of that
+  // file re-implemented apply_ledger_entry_and_sync_credits in JS; these two
+  // are wrapper behaviour that never needed a database at all. The RPC's own
+  // behaviour is covered in test/integration-db/ledger.test.ts.
+  test("rejects a blank idempotency key before reaching the database", async () => {
+    const { insertTransactionHistoryIdempotent } = await import(
+      "../app/lib/transaction-history.server"
+    );
+    const { db } = await import("@/server/db");
+
+    await expect(
+      insertTransactionHistoryIdempotent(db, {
+        workspaceId: "ws-1",
+        type: "DEBIT",
+        amount: -1,
+        note: "n",
+        idempotencyKey: "   ",
+      }),
+    ).rejects.toThrow("idempotencyKey is required");
+
+    expect(db.execute).not.toHaveBeenCalled();
+  });
+
+  test("propagates a failing ledger RPC", async () => {
+    const { insertTransactionHistoryIdempotent } = await import(
+      "../app/lib/transaction-history.server"
+    );
+    const { db } = await import("@/server/db");
+    (db.execute as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error("rpc failed"),
+    );
+
+    await expect(
+      insertTransactionHistoryIdempotent(db, {
+        workspaceId: "ws-1",
+        type: "DEBIT",
+        amount: -1,
+        note: "n",
+        idempotencyKey: "k",
+      }),
+    ).rejects.toThrow("rpc failed");
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 });

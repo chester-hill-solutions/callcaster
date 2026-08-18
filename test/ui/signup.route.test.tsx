@@ -1,7 +1,14 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { createElement } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
+
+// The route re-exports its loader/action from .server modules; importing them
+// for real drags the whole server graph (auth → db → twilio/stripe) into
+// jsdom, which is slow enough to blow the test timeout under suite load. The
+// tests below install their own in-router loaders anyway.
+vi.mock("../../app/routes/signup.loader.server", () => ({ loader: vi.fn() }));
+vi.mock("../../app/routes/signup.action.server", () => ({ action: vi.fn() }));
 
 // Regression test for audit-F DESIGN.md violation #3: /signup used to render
 // two <h1> elements ("Sign Up" from the page itself, "Create Account" from

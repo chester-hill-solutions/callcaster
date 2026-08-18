@@ -1,3 +1,6 @@
+Always talk in ASD-STE100 Simplified Technical English.
+Always talk to me like I have ADHD.
+
 ## Learned User Preferences
 
 > **Platform context:** Read [docs/AGENT-PLATFORM-GUIDE.md](docs/AGENT-PLATFORM-GUIDE.md) for CHS portfolio role, shared `@chester-hill-solutions/*` packages, and migration-branch boundaries before cross-cutting work.
@@ -6,6 +9,7 @@
 - For broad bug, typecheck, test, or coverage sweeps, keep iterating until the issue list is exhausted or a real blocker is reached.
 - When implementing from an attached plan whose todos already exist, update the existing todos instead of recreating them and work through the full list before stopping.
 - Do not modify, overwrite, or reset the user's existing `.env` or environment variables during setup work.
+- When work reveals a repeatable task, always assess whether to document it: use a `.agents/skills/` skill for reusable guided workflows, a `.opencode/tools/` tool for deterministic commands or automation, or a `.opencode/agents/` agent for delegable multi-step work. Add the smallest useful artifact when it will prevent future rediscovery.
 
 ## Design System
 

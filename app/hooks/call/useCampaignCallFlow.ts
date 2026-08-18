@@ -7,6 +7,13 @@ import {
 } from "@/lib/call-status";
 import { useCallStatusPolling } from "@/hooks/call/useCallStatusPolling";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
+import {
+  callLifecycleReducer,
+  type CallLifecycleEvent,
+  type CallLifecycleState,
+  type CallPhase,
+  type CallOutcome,
+} from "@/lib/twilio/call-session-types";
 import type {
   ActiveCall,
   Campaign,
@@ -14,6 +21,8 @@ import type {
   OutreachAttempt,
   QueueItem,
 } from "@/lib/types";
+import { logger } from "@/lib/logger.client";
+import { recordFlashBreadcrumb } from "@/lib/flash-telemetry.client";
 
 type CallStateMachineSend = (action: { type: string }) => void;
 
@@ -24,51 +33,126 @@ type PredictiveState = {
 
 type UseCampaignCallFlowOptions = {
   callSid: string | null;
+  agentLegSid: string | null;
   workspaceId: string;
   state: string;
   activeCall: Call | null;
   recentAttemptDisposition: string | null | undefined;
   predictiveState: PredictiveState;
+  isPredictive: boolean;
   send: CallStateMachineSend;
 };
 
+const INITIAL_LIFECYCLE: CallLifecycleState = {
+  phase: "idle",
+  outcome: null,
+  generation: 0,
+  agentSid: null,
+  customerSid: null,
+};
+
+const TERMINAL_PHASES: ReadonlySet<CallPhase> = new Set(["ending", "ended"]);
+const FSM_TERMINAL = new Set(["completed", "failed"]);
+
+function normalizedToOutcome(normalized: CallStatusEnum): CallOutcome {
+  if (normalized === "completed" || normalized === "canceled") return normalized;
+  if (normalized === "no-answer") return "no-answer";
+  if (normalized === "busy" || normalized === "failed") return normalized;
+  return null;
+}
+
+function isTerminalForOutcome(normalized: CallStatusEnum): boolean {
+  return ["completed", "canceled", "failed", "busy", "no-answer"].includes(normalized);
+}
+
 export function useCampaignCallFlow({
   callSid,
+  agentLegSid,
   workspaceId,
-  state,
+  state: fsmState,
   activeCall,
   recentAttemptDisposition,
   predictiveState,
+  isPredictive,
   send,
 }: UseCampaignCallFlowOptions) {
-  const [providerState, setProviderState] = useState<{
-    callSid: string | null;
-    status: CallStatusEnum | null;
-  }>({ callSid: null, status: null });
-  const providerStatus =
-    providerState.callSid === callSid ? providerState.status : null;
-  const pollingEnabled =
-    !!callSid &&
-    !!workspaceId &&
-    (state === "dialing" || state === "connected");
+  const [lifecycle, setLifecycle] = useState<CallLifecycleState>(INITIAL_LIFECYCLE);
+  const [providerStatus, setProviderStatus] = useState<CallStatusEnum | null>(null);
+  const [customerLegSid, setCustomerLegSid] = useState<string | null>(null);
+  const [pollingTargetSid, setPollingTargetSid] = useState<string | null>(null);
 
-  function dispatchCallStatus(normalized: CallStatusEnum) {
+  const agentLegSidRef = useRef(agentLegSid);
+  agentLegSidRef.current = agentLegSid;
+  const dialGenerationRef = useRef(0);
+  const lifecycleRef = useRef(lifecycle);
+  lifecycleRef.current = lifecycle;
+  const previousFsmRef = useRef(fsmState);
+
+  // Fall back to callSid so polling can bootstrap even before any SSE event
+  // has arrived — otherwise a dropped/missed realtime message leaves polling
+  // permanently disabled (pollingTargetSid is only ever set from inside the
+  // SSE/poll callback itself), and a client hangup can go undetected forever.
+  const pollingEnabled =
+    !!(pollingTargetSid ?? callSid) &&
+    !!workspaceId &&
+    (lifecycle.phase === "dialing" || lifecycle.phase === "connected");
+
+  function dispatch(event: CallLifecycleEvent) {
+    setLifecycle((prev) => callLifecycleReducer(prev, event));
+  }
+
+  /**
+   * Track a customer-leg status update from any source (SSE or polling).
+   * Feeds provider events into the canonical lifecycle and the legacy FSM.
+   */
+  function acceptCustomerStatus(sid: string, normalized: CallStatusEnum) {
+    recordFlashBreadcrumb("provider-status", `${normalized} (${sid.slice(0, 8)})`);
+    setCustomerLegSid(sid);
+    setPollingTargetSid(sid);
+    setProviderStatus(normalized);
+
+    // Drive canonical lifecycle for terminal outcomes.
+    if (isTerminalForOutcome(normalized)) {
+      const outcome = normalizedToOutcome(normalized);
+      dispatch({ type: "PROVIDER_ENDED", outcome });
+
+      // The provider (Twilio) has already ended the customer leg, but that
+      // doesn't guarantee the agent's own WebRTC leg got told — e.g. a
+      // conference customer leg with no statusCallback relies solely on
+      // endConferenceOnExit reaching the browser. If activeCall is still
+      // live here, force it closed so the SDK's own 'disconnect' handling
+      // (including its built-in hangup tone) actually runs instead of the
+      // call silently lingering. A no-op if the SDK already tore it down.
+      // Guarded: with a dead signaling transport this disconnect THROWS
+      // (31009), and this runs inside the workspace SSE fan-out (#1294).
+      try {
+        activeCall?.disconnect?.();
+      } catch (error) {
+        logger.debug("activeCall.disconnect after provider-terminal status failed", error);
+      }
+    }
+
+    // Also drive the legacy FSM for backward compat (all statuses).
     const action = getStateMachineAction(normalized);
     if (action === "CONNECT") send({ type: "CONNECT" });
     else if (action === "HANG_UP") send({ type: "HANG_UP" });
     else if (action === "FAIL") send({ type: "FAIL" });
   }
 
+  // Polling: use the customer leg SID if known, otherwise fall back to
+  // the parent/SDK SID (the server will resolve the child for us).
   useCallStatusPolling({
-    callSid,
+    callSid: pollingTargetSid ?? callSid,
     workspaceId,
     enabled: pollingEnabled,
     intervalMs: 5000,
-    onStatus: (status) => {
+    agentLegSid,
+    onStatus: (status, resolvedSid) => {
       const normalized = normalizeProviderStatus(status);
-      if (normalized) {
-        setProviderState({ callSid, status: normalized });
-        dispatchCallStatus(normalized);
+      if (!normalized) return;
+      const sid = resolvedSid ?? pollingTargetSid ?? callSid;
+      if (sid) {
+        acceptCustomerStatus(sid, normalized);
       }
     },
   });
@@ -76,90 +160,188 @@ export function useCampaignCallFlow({
   const callSidRef = useRef(callSid);
   callSidRef.current = callSid;
 
-  // Opens a second EventSource to the same workspace events endpoint that
-  // useWorkspaceRealtime already connects to. Eliminating this would require
-  // restructuring useCallScreen's hook call order (useWorkspaceRealtime runs
-  // before useCampaignCallFlow, creating a circular dependency on callbacks).
-  // The overhead is negligible — SSE connections are lightweight — and the
-  // 5-second polling fallback remains as a safety net for both paths.
+  // SSE events: accept direct matches OR child events keyed on parent_call_sid
   useWorkspaceEventSubscription({
     workspaceId,
     table: "call",
     filter: `workspace=eq.${workspaceId}`,
     onChange: (payload) => {
-      const callRow = payload.new as { sid?: string; status?: string } | null;
+      const callRow = payload.new as {
+        sid?: string;
+        parent_call_sid?: string;
+        status?: string;
+      } | null;
       if (!callRow?.sid || !callRow?.status) return;
-      if (callRow.sid !== callSidRef.current) return;
+
+      if (customerLegSid != null) {
+        if (callRow.sid !== customerLegSid) return;
+      } else {
+        const matchesDirect = callRow.sid === callSidRef.current;
+        const matchesParent =
+          agentLegSidRef.current != null &&
+          callRow.parent_call_sid === agentLegSidRef.current;
+        if (!matchesDirect && !matchesParent) return;
+      }
 
       const normalized = normalizeProviderStatus(callRow.status);
       if (!normalized) return;
 
-      setProviderState({ callSid: callRow.sid, status: normalized });
-      dispatchCallStatus(normalized);
+      acceptCustomerStatus(callRow.sid, normalized);
     },
   });
 
   /**
-   * @effect Reset provider call state back to idle when the active call SID
-   * clears (call ended, navigated away, or component unmount).
-   * @effect-deps callSid (only fires when the tracked SID changes to null)
-   * @effect-side-effects none (plain setState)
-   * @effect-why-not-loader Call lifecycle state is ephemeral client state,
-   * not request/response data.
+   * Start a new dial in the *same batch* as the click that triggered it.
+   *
+   * The FSM→lifecycle bridge below is an effect, so it cannot run until after
+   * the browser has painted the render in which the FSM moved to `dialing` —
+   * and that render still derives its display from the finished call's
+   * terminal lifecycle (or, on a re-dial, from the contact's last attempt
+   * disposition). The result was "Call Failed" / "No Answer" repainting for a
+   * single frame on every dial: #1220 removed the version of this that stuck
+   * around, but the flash survived it. Resetting here, alongside the FSM's own
+   * START_DIALING, closes the gap — the first render after the click already
+   * reads `phase: "dialing"`, so there is no stale frame to paint.
+   *
+   * The bridge still fires afterwards; a second START_DIALING from `dialing`
+   * is a no-op in the reducer.
+   */
+  const beginDial = useCallback(() => {
+    recordFlashBreadcrumb("begin-dial", "lifecycle reset for new dial");
+    setCustomerLegSid(null);
+    setPollingTargetSid(null);
+    setProviderStatus(null);
+    setLifecycle((prev) => callLifecycleReducer(prev, { type: "START_DIALING" }));
+  }, []);
+
+  /**
+   * @effect Bridge the legacy FSM (useCallState) transitions into the canonical lifecycle.
+   * Only dispatches when fsmState actually changes (not on every render).
+   * Skips the initial idle → idle no-op.
    */
   useEffect(() => {
-    if (!callSid) {
-      setProviderState({ callSid: null, status: null });
-    }
-  }, [callSid]);
+    if (previousFsmRef.current === fsmState) return;
+    recordFlashBreadcrumb("fsm", `${previousFsmRef.current} -> ${fsmState}`);
+    previousFsmRef.current = fsmState;
 
-  const getDisplayState = useCallback(
-    (
-      callStateValue: string,
-      statusValue: string | undefined,
-      activeCallValue: ActiveCall | null,
-    ): string => {
-      if (callStateValue === "failed" || statusValue === "failed" || statusValue === "busy") {
-        return "failed";
-      }
+    // A new dial always resets the lifecycle — the reducer starts a fresh
+    // generation even from terminal phases (#1220). Drop the previous call's
+    // provider tracking too, so a stale leg's late events can't repaint the
+    // old outcome over the new dial.
+    if (fsmState === "dialing") {
+      setCustomerLegSid(null);
+      setPollingTargetSid(null);
+      setProviderStatus(null);
+      dispatch({ type: "START_DIALING" });
+      return;
+    }
+
+    // FSM returning to idle (the NEXT action after a finished call) clears
+    // the lifecycle too — the reducer ignores RESET mid-call, so this only
+    // wipes terminal outcomes, never a live dial.
+    if (fsmState === "idle") {
+      setCustomerLegSid(null);
+      setPollingTargetSid(null);
+      setProviderStatus(null);
+      dispatch({ type: "RESET" });
+      return;
+    }
+
+    const currentPhase = lifecycleRef.current.phase;
+    if (TERMINAL_PHASES.has(currentPhase)) return;
+
+    switch (fsmState) {
+      case "connected":
+        dispatch({ type: "CONNECT" });
+        break;
+      case "completed":
+        dispatch({ type: "HANG_UP" });
+        break;
+      case "failed":
+        dispatch({ type: "FAIL" });
+        break;
+    }
+  }, [fsmState]);
+
+  /**
+   * @effect Start a new dial generation when agentLegSid changes.
+   */
+  useEffect(() => {
+    if (agentLegSid) {
+      dialGenerationRef.current += 1;
+      setCustomerLegSid(null);
+      setPollingTargetSid(null);
+      setProviderStatus(null);
+      setLifecycle((prev) =>
+        TERMINAL_PHASES.has(prev.phase)
+          ? { ...INITIAL_LIFECYCLE, generation: prev.generation + 1 }
+          : prev,
+      );
+    }
+  }, [agentLegSid]);
+
+  // ---------------------------------------------------------------------------
+  // Display derivation: one source of truth for the call screen UI.
+  // ---------------------------------------------------------------------------
+  const displayState = ((): string => {
+    const { phase } = lifecycle;
+
+    // 1. Terminal lifecycle wins unconditionally — fixes #1206.
+    if (TERMINAL_PHASES.has(phase)) {
+      const outcome = lifecycle.outcome;
+      if (outcome === "completed" || outcome === "canceled") return "completed";
+      if (outcome === "failed" || outcome === "busy") return "failed";
+      if (outcome === "no-answer") return "no-answer";
+      if (outcome === "voicemail") return "voicemail";
+      return "completed";
+    }
+
+    // 2. Provider non-terminal status fills gap between local and provider state.
+    if (providerStatus) {
+      if (providerStatus === "in-progress") return "connected";
       if (
-        statusValue === "initiated" ||
-        statusValue === "queued" ||
-        statusValue === "ringing" ||
-        (activeCallValue && statusValue !== "in-progress")
+        providerStatus === "initiated" ||
+        providerStatus === "queued" ||
+        providerStatus === "ringing"
       ) {
         return "dialing";
       }
-      if (statusValue === "in-progress") return "connected";
-      if (statusValue === "no-answer") return "no-answer";
-      if (statusValue === "voicemail") return "voicemail";
-      if (
-        statusValue === "completed" ||
-        statusValue === "canceled" ||
-        (callStateValue === "completed" && statusValue)
-      ) {
-        return "completed";
-      }
-      if (!activeCallValue && !statusValue) return "idle";
-      return "idle";
-    },
-    [],
-  );
+      if (providerStatus === "no-answer") return "no-answer";
+    }
 
-  const displayState =
-    predictiveState.status === "dialing"
-      ? "dialing"
-      : predictiveState.status === "connected"
-        ? state === "dialing" ? "dialing" : "connected"
-        : predictiveState.status === "completed"
-          ? "completed"
-          : predictiveState.status === "idle"
-            ? "idle"
-            : getDisplayState(
-                state,
-                providerStatus ?? recentAttemptDisposition ?? undefined,
-                activeCall as unknown as ActiveCall,
-              );
+    // 3. Non-terminal lifecycle phase.
+    if (phase === "dialing") return "dialing";
+    if (phase === "connected") return "connected";
+
+    // 4. Predictive dialer broadcasts override when present.
+    if (isPredictive) {
+      const ps = predictiveState.status;
+      if (ps === "dialing" || ps === "connected" || ps === "completed" ||
+          ps === "failed" || ps === "no-answer" || ps === "idle") {
+        return ps;
+      }
+    }
+
+    // 5. A live FSM outranks any *previous* attempt's disposition: the agent
+    //    has dialed this contact again, so their last outcome is history.
+    //    Below rule 6 this showed the old "No Answer"/"Call Failed" for the
+    //    render between the click and the bridge effect.
+    if (fsmState === "dialing") return "dialing";
+    if (fsmState === "connected") return "connected";
+
+    // 6. Recent attempt fallback for terminal displays.
+    if (recentAttemptDisposition && lifecycle.phase !== "dialing" && lifecycle.phase !== "connected") {
+      const d = recentAttemptDisposition;
+      if (d === "voicemail") return "voicemail";
+      if (d === "no-answer") return "no-answer";
+      if (d === "completed" || d === "failed" || d === "busy") return d;
+    }
+
+    // 7. Legacy FSM terminal state as fallback (bridge effect hasn't fired yet).
+    if (FSM_TERMINAL.has(fsmState)) return fsmState;
+
+    return "idle";
+  })();
 
   const displayColor =
     displayState === "failed"
@@ -171,7 +353,16 @@ export function useCampaignCallFlow({
   return {
     displayState,
     displayColor,
-    getDisplayState,
+    beginDial,
+    getDisplayState: (
+      callStateValue: string,
+      _statusValue: string | undefined,
+      _activeCallValue: ActiveCall | null,
+    ): string => {
+      return callStateValue === "completed" || callStateValue === "failed"
+        ? callStateValue
+        : displayState;
+    },
   };
 }
 
@@ -185,4 +376,3 @@ export type StartCallArgs = {
   recentAttempt: OutreachAttempt | null;
   selectedDevice: string | null;
 };
-

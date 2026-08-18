@@ -41,7 +41,6 @@ function campaignBase(id, workspaceId, title, type, extra = {}) {
     type,
     workspace: workspaceId,
     status: extra.status ?? "draft",
-    is_active: extra.is_active ?? false,
     caller_id: "+15555501001",
     start_date: start,
     end_date: end,
@@ -239,13 +238,18 @@ async function seed() {
 
   const campaigns = [
     campaignBase(CAMPAIGNS.liveCall, readyId, "E2E Live Call", "live_call", {
-      is_active: true,
+      status: "running",
+      script_id: SCRIPT_IDS.live,
+      disposition_options: ["answered", "no_answer", "busy"],
+      live_questions: {},
+    }),
+    campaignBase(CAMPAIGNS.launchReady, readyId, "E2E Launch Ready", "live_call", {
       script_id: SCRIPT_IDS.live,
       disposition_options: ["answered", "no_answer", "busy"],
       live_questions: {},
     }),
     campaignBase(CAMPAIGNS.livePredictive, readyId, "E2E Predictive Live", "live_call", {
-      is_active: true,
+      status: "running",
       dial_type: "predictive",
       script_id: SCRIPT_IDS.live,
       disposition_options: ["answered", "no_answer", "busy"],
@@ -270,7 +274,7 @@ async function seed() {
   for (const row of campaigns) {
     await sql`
       INSERT INTO campaign (
-        id, title, type, workspace, status, is_active, caller_id, start_date, end_date,
+        id, title, type, workspace, status, caller_id, start_date, end_date,
         schedule, dial_type, dial_ratio, group_household_queue, next_queue_order,
         sms_send_mode, script_id, disposition_options, live_questions, body_text, message_media
       )
@@ -280,7 +284,6 @@ async function seed() {
         ${row.type},
         ${row.workspace},
         ${row.status},
-        ${row.is_active},
         ${row.caller_id},
         ${row.start_date},
         ${row.end_date},
@@ -301,7 +304,6 @@ async function seed() {
         type = EXCLUDED.type,
         workspace = EXCLUDED.workspace,
         status = EXCLUDED.status,
-        is_active = EXCLUDED.is_active,
         caller_id = EXCLUDED.caller_id,
         start_date = EXCLUDED.start_date,
         end_date = EXCLUDED.end_date,
@@ -381,6 +383,37 @@ async function seed() {
     ON CONFLICT (campaign_id, audience_id) DO UPDATE SET
       campaign_id = EXCLUDED.campaign_id,
       audience_id = EXCLUDED.audience_id
+  `;
+
+  await sql`
+    INSERT INTO campaign_audience (campaign_id, audience_id)
+    VALUES (${CAMPAIGNS.launchReady}, ${AUDIENCE_ID})
+    ON CONFLICT (campaign_id, audience_id) DO UPDATE SET
+      campaign_id = EXCLUDED.campaign_id,
+      audience_id = EXCLUDED.audience_id
+  `;
+
+  await sql`
+    INSERT INTO campaign_queue (
+      id, campaign_id, contact_id, queue_order, queue_state,
+      attempts, attempt_count, created_at, workspace
+    )
+    VALUES (
+      980020,
+      ${CAMPAIGNS.launchReady},
+      ${contacts[0].id},
+      1,
+      'queued',
+      0,
+      0,
+      ${new Date().toISOString()},
+      ${readyId}
+    )
+    ON CONFLICT (id) DO UPDATE SET
+      campaign_id = EXCLUDED.campaign_id,
+      contact_id = EXCLUDED.contact_id,
+      queue_order = EXCLUDED.queue_order,
+      queue_state = EXCLUDED.queue_state
   `;
 
   await sql`

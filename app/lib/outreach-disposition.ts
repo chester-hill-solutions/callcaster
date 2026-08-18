@@ -33,7 +33,11 @@ export function canTransitionOutreachDisposition(
 export const DNC_DISPOSITION = "do_not_call";
 
 const DISPOSITION_LABELS: Record<string, string> = {
-  [DNC_DISPOSITION]: "Do not call",
+  answered: "Answered",
+  no_answer: "No Answer",
+  busy: "Busy",
+  voicemail: "Voicemail",
+  [DNC_DISPOSITION]: "Do Not Call",
 };
 
 /**
@@ -57,18 +61,32 @@ export function formatDispositionLabel(option: string): string {
 }
 
 /**
+ * Sensible default disposition options for campaigns that do not have custom
+ * options configured. Includes the most common call outcomes.
+ */
+export const DEFAULT_DISPOSITION_OPTIONS = [
+  "answered",
+  "no_answer",
+  "busy",
+  "voicemail",
+] as const;
+
+/**
  * `campaign.disposition_options` is a nullable jsonb column (`Json`), so it can be
  * null, a scalar, or an array of anything. Narrow it to the string list the call
  * screen expects instead of casting the `Json` away.
+ *
+ * When the campaign has not configured any disposition options (null/undefined/
+ * non-array/empty), a sensible default set is returned instead of an empty list.
  *
  * Always appends {@link DNC_DISPOSITION} (deduped case/format-insensitively) so
  * every campaign offers a "do not call" option regardless of its configuration.
  */
 export function normalizeDispositionOptions(value: unknown): string[] {
-  const options = Array.isArray(value)
+  const options = Array.isArray(value) && value.length > 0
     ? value.filter((option): option is string => typeof option === "string")
-    : [];
-  if (!options.some((option) => isDncDisposition(option))) {
+    : [...DEFAULT_DISPOSITION_OPTIONS];
+  if (options.length > 0 && !options.some((option) => isDncDisposition(option))) {
     options.push(DNC_DISPOSITION);
   }
   return options;

@@ -1,8 +1,8 @@
+import { PgDialect } from "drizzle-orm/pg-core";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import {
-  makeApplyLedgerEntryRpcStub,
   makeTransactionHistoryTableStub,
   type TransactionRow,
 } from "./helpers/transaction-history-stub";
@@ -30,6 +30,7 @@ const campaignQueueDbMocks = vi.hoisted(() => ({
 vi.mock("@/lib/logger.server", () => ({
   logger: loggerMocks,
 }));
+const dequeueQueueEntryMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   updateCampaignQueueByContactAndCampaign: async (...args: unknown[]) => {
     if (campaignQueueDbMocks.updateError) {
@@ -37,13 +38,13 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
     }
     return campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign(...args);
   },
+  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
 }));
 
 const twilioValidation = vi.hoisted(() => ({
   validateTwilioWebhookParams: vi.fn(() => true),
   requireTwilioSignature: vi.fn(),
 }));
-const rpcDequeueContactMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: (...args: unknown[]) =>
     twilioValidation.requireTwilioSignature(...args),
@@ -64,17 +65,29 @@ vi.mock("@/lib/telephony-db.server", async () => {
     insertCallForWorkspace: stub.telephonyDbMocks.insertCallForWorkspace,
     findCampaignTypeByCampaignId: stub.telephonyDbMocks.findCampaignTypeByCampaignId,
     upsertCallBySid: stub.telephonyDbMocks.upsertCallBySid,
+    claimTerminalCallStatus: stub.telephonyDbMocks.claimTerminalCallStatus,
   };
 });
-
-vi.mock("@/lib/db-rpc.server", () => ({
-  rpcDequeueContact: rpcDequeueContactMock,
-}));
 
 const runAutoDialerTurnMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/auto-dial.server", () => ({
   runAutoDialerTurn: (...args: unknown[]) => runAutoDialerTurnMock(...args),
 }));
+
+const emitPredictiveBroadcastMock = vi.hoisted(() => vi.fn(async () => null));
+// Several modules in this route's graph (twilio-call-status, campaign-queue-db,
+// transaction-history, …) also import from workspace-events.server, so keep
+// every other export intact and stub only what this suite asserts on.
+vi.mock("@/lib/workspace-events.server", async (importOriginal) => {
+  const actual = await importOriginal<
+    typeof import("@/lib/workspace-events.server")
+  >();
+  return {
+    ...actual,
+    emitPredictiveBroadcast: (...args: unknown[]) =>
+      emitPredictiveBroadcastMock(...(args as [unknown, unknown])),
+  };
+});
 
 const twilioClientMock = {
   conferences: Object.assign(
@@ -99,6 +112,12 @@ vi.mock("../app/lib/database/workspace.server", async () => {
 
 function makeDbClientStub(args?: { outreachDisposition?: string }) {
   const transactionRows: TransactionRow[] = [];
+  const ledgerCalls: {
+    workspace: string;
+    type: string;
+    amount: number;
+    idempotencyKey: string;
+  }[] = [];
   const outreachUpdateCalls: any[] = [];
   let lastCallSid: string = "CA1";
 
@@ -211,38 +230,38 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
 
   return {
     from,
-    rpc: vi.fn(async (fn: string, rpcArgs: any) => {
-      if (fn === "apply_ledger_entry_and_sync_credits") {
-        return makeApplyLedgerEntryRpcStub(transactionRows)(fn, rpcArgs);
-      }
-      return { data: null, error: rpcDequeueError };
-    }),
+    rpc: vi.fn(async () => ({ data: null, error: rpcDequeueError })),
+    // A RECORDER, not a simulator. This used to re-implement
+    // apply_ledger_entry_and_sync_credits in JS — pulling arguments out of
+    // Drizzle's queryChunks by odd index and reproducing the idempotent-insert
+    // semantics — which meant reordering the SQL arguments kept it green and
+    // the actual plpgsql was never executed by anything. The RPC's real
+    // behaviour (idempotency, credits sync, concurrency) now belongs to
+    // test/integration-db/ledger.test.ts, against a real Postgres. What is
+    // still this suite's business is whether the ROUTE bills, and with which
+    // idempotency key — so record the calls and return a canned row.
     execute: vi.fn(async (query: any) => {
-      const sqlText = typeof query === "string"
-        ? query
-        : typeof query?.toSQL === "function"
-          ? JSON.stringify(query.toSQL())
-          : JSON.stringify(query);
-      if (sqlText.includes("apply_ledger_entry_and_sync_credits")) {
-        const values = query?.queryChunks?.filter((_: unknown, i: number) => i % 2 === 1) ?? [];
-        const [workspace, type, amount, idempotencyKey, note, campaignId, callSid, messageSid] = values;
-        const result = await makeApplyLedgerEntryRpcStub(transactionRows)(
-          "apply_ledger_entry_and_sync_credits",
-          {
-            p_workspace_id: workspace,
-            p_type: type,
-            p_amount: amount,
-            p_idempotency_key: idempotencyKey,
-            p_description: note,
-            p_campaign_id: campaignId,
-            p_call_sid: callSid,
-            p_message_sid: messageSid,
-          },
-        );
-        return result.data ? [result.data] : [];
-      }
-      return [];
+      const { sql: text, params } = new PgDialect().sqlToQuery(query);
+      if (!text.includes("apply_ledger_entry_and_sync_credits")) return [];
+      const [workspace, type, amount, idempotencyKey] = params as [
+        string,
+        string,
+        number,
+        string,
+      ];
+      ledgerCalls.push({ workspace, type, amount, idempotencyKey });
+      return [
+        {
+          id: ledgerCalls.length,
+          inserted: true,
+          amount,
+          type,
+          idempotency_key: idempotencyKey,
+          workspace,
+        },
+      ];
     }),
+    _ledgerCalls: ledgerCalls,
     _transactionRows: transactionRows,
     _outreachUpdateCalls: outreachUpdateCalls,
     _telephonyConfig: {
@@ -251,6 +270,7 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
       callUpdateError,
       campaignType: args?.campaignType,
       outreachDisposition: args?.outreachDisposition,
+      outreachAnsweredAt: (args as any)?.outreachAnsweredAt,
       outreachFetchError,
       outreachUpdateError,
       outreachUpdateThrows,
@@ -326,10 +346,12 @@ describe("api.auto-dial.status", () => {
     campaignQueueDbMocks.updateError = null;
     campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign.mockReset();
     loggerMocks.info.mockReset();
-    rpcDequeueContactMock.mockReset();
-    rpcDequeueContactMock.mockImplementation(async () => {});
+    dequeueQueueEntryMock.mockReset();
+    dequeueQueueEntryMock.mockImplementation(async () => {});
     runAutoDialerTurnMock.mockReset();
     runAutoDialerTurnMock.mockResolvedValue({ success: true });
+    emitPredictiveBroadcastMock.mockReset();
+    emitPredictiveBroadcastMock.mockResolvedValue(null);
   });
 
   test("rejects invalid Twilio signature", async () => {
@@ -354,7 +376,11 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(403);
   }, 60000);
 
-  test("bills idempotently for completed calls (same CallSid)", async () => {
+  // Whether a replayed key actually dedupes is the database's job and is
+  // asserted against a real Postgres in test/integration-db/ledger.test.ts.
+  // The route's job — the only part this suite can see — is to derive the same
+  // deterministic key from the same CallSid every time.
+  test("bills completed calls under one deterministic key per CallSid", async () => {
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const makeReq = () => {
       const fd = new FormData();
@@ -376,11 +402,12 @@ describe("api.auto-dial.status", () => {
     const r2 = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(r2.status).toBe(200);
 
-    expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
-    const matching = postgresStub._transactionRows.filter(
-      (r) => r.idempotency_key === "call:CA_DUP",
-    );
-    expect(matching.length).toBe(1);
+    // Both deliveries billed, and both used the identical key — so the DB's
+    // unique index is what collapses them, not luck about ordering.
+    expect(postgresStub._ledgerCalls).toHaveLength(2);
+    expect(
+      postgresStub._ledgerCalls.every((c) => c.idempotencyKey === "call:CA_DUP"),
+    ).toBe(true);
   });
 
   test("billing kind is derived from campaign type", async () => {
@@ -401,11 +428,11 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
-    expect(postgresStub._transactionRows.length).toBeGreaterThan(0);
-    const matching = postgresStub._transactionRows.filter(
-      (r) => r.idempotency_key === "call:CA_IVR_KIND",
-    );
-    expect(matching.length).toBe(1);
+    expect(postgresStub._ledgerCalls).toHaveLength(1);
+    expect(postgresStub._ledgerCalls[0]).toMatchObject({
+      type: "DEBIT",
+      idempotencyKey: "call:CA_IVR_KIND",
+    });
   });
 
   test("dequeues by fetched attempt without writing provider status to disposition", async () => {
@@ -428,9 +455,8 @@ describe("api.auto-dial.status", () => {
 
     expect(res.status).toBe(200);
     expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
-    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ contactId: 1 }),
+    expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
+      expect.objectContaining({ by: { contactId: 1 }, household: true }),
     );
   });
 
@@ -469,9 +495,8 @@ describe("api.auto-dial.status", () => {
     } as any));
 
     expect(res.status).toBe(200);
-    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ dequeuedById: userId }),
+    expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userId }),
     );
   });
 
@@ -582,6 +607,64 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
+  });
+
+  test("participant-leave for the CONTACT's own leg force-completes the conference (#1282 follow-up)", async () => {
+    // Regression: before the contact's conference Dial had a statusCallback
+    // (fixed in $roomId.action.server.ts's handleHumanAnswer), Twilio never
+    // posted this event for the contact's own leg at all, so a client
+    // hangup had no server-driven backstop — only Twilio's platform-level
+    // endConferenceOnExit reaching the agent's browser. handleParticipantLeave
+    // is leg-agnostic (keys off the leaving participant's own CallSid), so
+    // once the event arrives it must force the conference closed exactly
+    // like it already does for the agent leg.
+    const conferenceUpdateSpy = vi.fn(async () => ({ status: "completed" }));
+    const originalConferences = twilioClientMock.conferences;
+    (twilioClientMock as any).conferences = Object.assign(
+      (sid: string) => ({ update: (patch: unknown) => conferenceUpdateSpy(sid, patch) }),
+      { list: vi.fn(async () => [{ sid: "CONF_CONTACT" }]) },
+    );
+
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA_CONTACT",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: 1,
+        campaign_id: 1,
+      },
+    } as any);
+
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_CONTACT");
+    fd.set("CallStatus", "ringing");
+    fd.set("StatusCallbackEvent", "participant-leave");
+    fd.set("ReasonParticipantLeft", "participant_hung_up");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "1");
+    fd.set("CallDuration", "2");
+    fd.set("FriendlyName", "u1~00000000-0000-0000-0000-000000000000");
+    fd.set("ConferenceSid", "conf1");
+    let res: Response;
+    try {
+      res = await asRouteResponse(mod.action({
+        request: new Request("http://localhost/api/auto-dial/status", {
+          method: "POST",
+          headers: { "x-twilio-signature": "good" },
+          body: fd,
+        }),
+      } as any));
+    } finally {
+      (twilioClientMock as any).conferences = originalConferences;
+    }
+
+    expect(res.status).toBe(200);
+    expect(conferenceUpdateSpy).toHaveBeenCalledWith(
+      "CONF_CONTACT",
+      expect.objectContaining({ status: "completed" }),
+    );
   });
 
   test("call status busy triggers dialer in-process (no HTTP self-fetch) when conferences exist and status not completed", async () => {
@@ -698,7 +781,7 @@ describe("api.auto-dial.status", () => {
   });
 
   test("rpc dequeue_contact error returns 500", async () => {
-    rpcDequeueContactMock.mockRejectedValue(new Error("dq"));
+    dequeueQueueEntryMock.mockRejectedValue(new Error("dq"));
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
@@ -715,9 +798,8 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(500);
-    expect(rpcDequeueContactMock).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ contactId: 1 }),
+    expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
+      expect.objectContaining({ by: { contactId: 1 }, household: true }),
     );
     expect(loggerMocks.error).toHaveBeenCalledWith("Error in handleCallStatus:", expect.any(Error));
   });
@@ -801,6 +883,182 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
   });
 
+  test("replayed terminal status acks without re-dequeuing or re-dialing", async () => {
+    twilioClientMock.conferences.list.mockResolvedValueOnce([{ sid: "CONF1" }]);
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA_REPLAY",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: 1,
+        campaign_id: 1,
+        // First delivery already wrote the terminal status onto the row.
+        status: "busy",
+      },
+    } as any);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_REPLAY");
+    fd.set("CallStatus", "busy");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "1");
+    fd.set("CallDuration", "1");
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ success: true, replay: true });
+    // The dangerous side effects must not run again: no re-dequeue, no new
+    // outbound call, no billing.
+    expect(dequeueQueueEntryMock).not.toHaveBeenCalled();
+    expect(runAutoDialerTurnMock).not.toHaveBeenCalled();
+    expect(postgresStub._ledgerCalls).toHaveLength(0);
+  });
+
+  test("a different terminal status for the same call still processes", async () => {
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA_PROGRESS",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: 1,
+        campaign_id: 1,
+        status: "ringing",
+      },
+    } as any);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_PROGRESS");
+    fd.set("CallStatus", "completed");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "10");
+    fd.set("CallDuration", "10");
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(dequeueQueueEntryMock).toHaveBeenCalled();
+  });
+
+  test("replayed participant-join does not restamp answered_at", async () => {
+    postgresStub = await usePostgresStub({
+      outreachAnsweredAt: "2026-08-05T00:00:00.000Z",
+      dbCall: {
+        sid: "CA1",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: 1,
+        campaign_id: 1,
+      },
+    } as any);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "ringing");
+    fd.set("StatusCallbackEvent", "participant-join");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("ConferenceSid", "conf1");
+    fd.set("FriendlyName", "in-progress");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
+  });
+
+  // Predictive contact calls send status callbacks only to this route (see
+  // statusCallback in app/lib/auto-dial.server.ts), so it must emit the
+  // predictive_broadcast events the agent call screen subscribes to — the
+  // generic /api/call-status side-effects job never runs for these calls.
+  test("emits predictive_broadcast for contact-leg progress statuses", async () => {
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "ringing");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(emitPredictiveBroadcastMock).toHaveBeenCalledWith("w1", {
+      contact_id: 1,
+      status: "ringing",
+    });
+  });
+
+  test("emits predictive_broadcast for terminal statuses before dequeue handling", async () => {
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "completed");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("Duration", "1");
+    fd.set("CallDuration", "1");
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(emitPredictiveBroadcastMock).toHaveBeenCalledWith("w1", {
+      contact_id: 1,
+      status: "completed",
+    });
+  });
+
+  test("does not emit predictive_broadcast for calls without a contact (agent leg)", async () => {
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA_AGENT",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: "u1~00000000-0000-0000-0000-000000000000",
+        contact_id: null,
+        campaign_id: 1,
+      },
+    } as any);
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA_AGENT");
+    fd.set("CallStatus", "in-progress");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("ConferenceSid", "conf1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(emitPredictiveBroadcastMock).not.toHaveBeenCalled();
+  });
+
   test("CallStatus failed is handled", async () => {
     const mod = await import("../app/routes/api+/auto-dial/status.route");
     const fd = new FormData();
@@ -836,6 +1094,73 @@ describe("api.auto-dial.status", () => {
       }),
     } as any));
     expect(res.status).toBe(200);
+  });
+
+  /**
+   * The payload is parsed once at the route boundary into a discriminated
+   * union (#1243 E1). A body that matches no known shape must still ack:
+   * Twilio retries 5xx for hours, and there is nothing about an unexpected
+   * shape that another delivery would fix.
+   */
+  test("an unrecognized payload acks instead of erroring", async () => {
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("SomethingTwilioAddedLater", "1");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+    expect(res.status).toBe(200);
+    expect(dequeueQueueEntryMock).not.toHaveBeenCalled();
+    expect(campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign).not.toHaveBeenCalled();
+  });
+
+  /**
+   * `call.conference_id` holds the conference NAME (`${userId}~${uuid}`), not
+   * the `CF…` SID — the two were previously collapsed into one
+   * `friendly_name ?? conference_sid` expression at each use, which is how the
+   * 22P02 incident (#1004) got its wrong value. The parsed event keeps them
+   * apart, so join must persist the name even when a SID is also present.
+   */
+  test("participant-join stores the conference NAME, not the conference SID", async () => {
+    const conferenceName = "u1~9f3ae1b2-0000-4000-8000-00000000abcd";
+    postgresStub = await usePostgresStub({
+      dbCall: {
+        sid: "CA1",
+        workspace: "w1",
+        outreach_attempt_id: 1,
+        conference_id: null,
+        contact_id: 1,
+        campaign_id: 1,
+      },
+    } as any);
+
+    const mod = await import("../app/routes/api+/auto-dial/status.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("CallStatus", "ringing");
+    fd.set("StatusCallbackEvent", "participant-join");
+    fd.set("Timestamp", new Date().toISOString());
+    fd.set("ConferenceSid", "CF_SID_NOT_A_NAME");
+    fd.set("FriendlyName", conferenceName);
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/status", {
+        method: "POST",
+        headers: { "x-twilio-signature": "good" },
+        body: fd,
+      }),
+    } as any));
+
+    expect(res.status).toBe(200);
+    expect(telephonyStubState.callUpdateCalls).toEqual([
+      expect.objectContaining({
+        patch: expect.objectContaining({ conference_id: conferenceName }),
+      }),
+    ]);
   });
 
   test("action catch formats non-Error as Unknown error", async () => {

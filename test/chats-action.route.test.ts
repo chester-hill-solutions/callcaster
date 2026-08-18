@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => {
     linkContactToConversation: vi.fn(),
     getEffectivePortalConfig: vi.fn(),
     getOrLookupLineType: vi.fn(async () => null as string | null),
+    findMatchingContactIds: vi.fn(async () => [] as number[]),
+    getWorkspaceCreditsBalance: vi.fn(async () => 100),
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   };
 });
@@ -48,6 +50,12 @@ vi.mock("@/lib/twilio-lookup.server", () => ({
   isSmsIncapableLineType: (lineType: string | null | undefined) =>
     lineType === "landline" || lineType === "fax",
 }));
+vi.mock("@/lib/inbound-sms-context.server", () => ({
+  findMatchingContactIds: (...args: unknown[]) => mocks.findMatchingContactIds(...args),
+}));
+vi.mock("@/lib/workspace-credits.server", () => ({
+  getWorkspaceCreditsBalance: (...args: unknown[]) => mocks.getWorkspaceCreditsBalance(...args),
+}));
 
 function makeFormRequest(fields: Record<string, string>) {
   const body = new FormData();
@@ -79,6 +87,10 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     mocks.logger.error.mockReset();
     mocks.getOrLookupLineType.mockReset();
     mocks.getOrLookupLineType.mockResolvedValue(null);
+    mocks.findMatchingContactIds.mockReset();
+    mocks.findMatchingContactIds.mockResolvedValue([]);
+    mocks.getWorkspaceCreditsBalance.mockReset();
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(100);
     tenantDbMocks.contact.findFirst.mockReset();
     tenantDbMocks.contact.findFirst.mockResolvedValue(null);
     tenantDbMocks.workspace_number.findMany.mockReset();
@@ -523,6 +535,72 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     await expect(res.json()).resolves.toEqual({
       error: "Message is no longer cancelable",
     });
+  });
+
+  test("rejects the send with 402 when the workspace has no credits", async () => {
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(0);
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15550000000",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toEqual({
+      error: "Insufficient credits",
+      creditsError: true,
+    });
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test("rejects the send with 402 (fail-closed) when workspace balance is unknown", async () => {
+    mocks.getWorkspaceCreditsBalance.mockResolvedValueOnce(null);
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15550000000",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+    expect(res.status).toBe(402);
+    await expect(res.json()).resolves.toEqual({
+      error: "Insufficient credits",
+      creditsError: true,
+    });
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  test("blocks an opted-out contact resolved by phone when no contact_id is present", async () => {
+    // M9 regression: the "new number" composer sends no contact_id, but the
+    // recipient still resolves by an unambiguous phone match.
+    mocks.findMatchingContactIds.mockResolvedValueOnce([9]);
+    tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ id: 9, opt_out: true });
+    const mod = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: makeFormRequest({
+          body: "hi",
+          contact_number: "+15551234567",
+          from: "+15550000000",
+        }),
+        params: { id: "w1", contact_number: "+15551234567" },
+      })),
+    );
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ optedOut: true });
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
   test("link_contact intent is unaffected by the opt-out gate", async () => {

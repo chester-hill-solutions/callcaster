@@ -65,6 +65,9 @@ export async function getIdempotentResponse(
   if (usesMemoryBackend()) {
     const record = getMemoryBackend().get(`${scope}:${key}`);
     if (!record) return null;
+    // Pending reservation (status 0) — a concurrent request is mid-flight; not
+    // a completed response to replay.
+    if (record.status === 0) return null;
     if (record.createdAt + DEFAULT_TTL_MS < Date.now()) {
       getMemoryBackend().delete(`${scope}:${key}`);
       return null;
@@ -82,6 +85,8 @@ export async function getIdempotentResponse(
       .limit(1);
     const row = rows[0];
     if (!row) return null;
+    // Pending reservation (status 0) — a concurrent request is mid-flight.
+    if (row.status === 0) return null;
 
     const createdAt = new Date(row.created_at).getTime();
     if (createdAt + DEFAULT_TTL_MS < Date.now()) {
@@ -102,6 +107,80 @@ export async function getIdempotentResponse(
       error: error instanceof Error ? error.message : String(error),
     });
     return null;
+  }
+}
+
+/**
+ * Reserve an idempotency key before running the handler. Returns true when THIS
+ * request claimed the key (must run the handler), false when another request
+ * already holds it (in-flight or completed — caller must replay or 409).
+ *
+ * Without this, two concurrent requests carrying the same Idempotency-Key both
+ * read no cached response and both execute the side-effecting handler (e.g. two
+ * Stripe checkout sessions). The DB primary key on (scope, key) makes the
+ * reservation insert atomic.
+ */
+async function reserveIdempotencyKey(scope: string, key: string): Promise<boolean> {
+  if (usesMemoryBackend()) {
+    const mapKey = `${scope}:${key}`;
+    const map = getMemoryBackend();
+    if (map.has(mapKey)) return false;
+    map.set(mapKey, { status: 0, body: "", headers: {}, createdAt: Date.now() });
+    return true;
+  }
+
+  try {
+    const rows = await db
+      .insert(idempotency_record)
+      .values({
+        scope,
+        key,
+        status: 0,
+        body: "",
+        headers: {},
+        created_at: new Date().toISOString(),
+      })
+      .onConflictDoNothing()
+      .returning({ key: idempotency_record.key });
+    return rows.length > 0;
+  } catch (error) {
+    // Fail open: if the reservation write fails, don't block the request — run
+    // the handler, matching the pre-reservation behavior.
+    logger.error("idempotency.reserve_failed", {
+      scope,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return true;
+  }
+}
+
+/** Release a still-pending reservation so a later retry can proceed. Never
+ * deletes a completed response (status <> 0). */
+async function releaseIdempotencyReservation(scope: string, key: string): Promise<void> {
+  if (usesMemoryBackend()) {
+    const mapKey = `${scope}:${key}`;
+    const record = getMemoryBackend().get(mapKey);
+    if (record && record.status === 0) {
+      getMemoryBackend().delete(mapKey);
+    }
+    return;
+  }
+
+  try {
+    await db
+      .delete(idempotency_record)
+      .where(
+        and(
+          eq(idempotency_record.scope, scope),
+          eq(idempotency_record.key, key),
+          eq(idempotency_record.status, 0),
+        ),
+      );
+  } catch (error) {
+    logger.error("idempotency.release_failed", {
+      scope,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -138,9 +217,18 @@ export async function storeIdempotentResponse(
         headers,
         created_at: new Date().toISOString(),
       })
-      // First writer wins: a concurrent duplicate must not overwrite the
-      // response the other request already returned to the client.
-      .onConflictDoNothing();
+      // Complete the reservation this request inserted (status 0 → real
+      // response). Only the reserving request reaches here — a concurrent
+      // duplicate loses the reservation and 409s — so overwriting is safe.
+      .onConflictDoUpdate({
+        target: [idempotency_record.scope, idempotency_record.key],
+        set: {
+          status: response.status,
+          body: serializedBody,
+          headers,
+          created_at: new Date().toISOString(),
+        },
+      });
   } catch (error) {
     logger.error("idempotency.store_failed", {
       scope,
@@ -165,9 +253,39 @@ export async function withIdempotency(
     return cached;
   }
 
-  const result = await handler();
+  // Reserve the key before running the side-effecting handler so a concurrent
+  // duplicate can't also execute it.
+  const reserved = await reserveIdempotencyKey(scope, key);
+  if (!reserved) {
+    // Another request holds this key. It may have completed between our lookup
+    // and reserve; otherwise it is in-flight and the client should retry.
+    const completed = await getIdempotentResponse(scope, key);
+    if (completed) {
+      return completed;
+    }
+    return new Response(
+      JSON.stringify({
+        error: "A request with this Idempotency-Key is already in progress.",
+      }),
+      { status: 409, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  let result: { response: Response; body: unknown };
+  try {
+    result = await handler();
+  } catch (error) {
+    // Free the reservation so the failed request can be retried.
+    await releaseIdempotencyReservation(scope, key);
+    throw error;
+  }
+
   if (result.response.status >= 200 && result.response.status < 300) {
     await storeIdempotentResponse(scope, key, result.response, result.body);
+  } else {
+    // Non-success responses are not cached; release the reservation so a retry
+    // can run the handler again (matches the pre-reservation behavior).
+    await releaseIdempotencyReservation(scope, key);
   }
   return result.response;
 }

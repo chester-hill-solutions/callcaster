@@ -31,7 +31,7 @@ ownerTest("AUD-05 upload wizard completes end-to-end via the job worker", async 
 
   // Submit → job enqueue → worker claim (≤5s poll) → chunk insert → status
   // flip. 20s leaves headroom over the observed ~6s without masking a hang.
-  await expect(page.getByText("Upload Complete")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Upload completed successfully!")).toBeVisible({ timeout: 20_000 });
 
   // The finished list is reachable and carries the name it was given.
   await page.getByRole("button", { name: "View Call list" }).click();

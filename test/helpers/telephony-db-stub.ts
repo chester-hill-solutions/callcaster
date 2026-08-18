@@ -12,6 +12,7 @@ export type TelephonyStubConfig = {
   }>;
   campaignType?: string | null;
   outreachDisposition?: string;
+  outreachAnsweredAt?: string | null;
   outreachFetchError?: Error | null;
   outreachUpdateError?: Error | null;
   outreachUpdateThrows?: unknown;
@@ -61,6 +62,7 @@ export const telephonyDbMocks = {
   insertCallForWorkspace: vi.fn(),
   findCampaignTypeByCampaignId: vi.fn(),
   upsertCallBySid: vi.fn(),
+  claimTerminalCallStatus: vi.fn(),
 };
 
 function applyTelephonyMockImplementations() {
@@ -90,12 +92,28 @@ function applyTelephonyMockImplementations() {
     },
   );
 
+  // Mirror the real compare-and-set: the claim wins unless the row is already at
+  // this terminal status (a replay / concurrent duplicate loses).
+  telephonyDbMocks.claimTerminalCallStatus.mockImplementation(
+    async (_workspaceId: string, _sid: string, terminalStatus: string) => {
+      const cfg = readConfig();
+      const current = (cfg.callRow as { status?: unknown } | null | undefined)?.status;
+      return (
+        typeof current !== "string" ||
+        current.toLowerCase() !== terminalStatus.toLowerCase()
+      );
+    },
+  );
+
   telephonyDbMocks.findOutreachAttemptById.mockImplementation(async () => {
     const cfg = readConfig();
     if (cfg.outreachFetchError) return null;
     return {
       disposition: cfg.outreachDisposition ?? "in-progress",
       contact_id: 1,
+      ...(cfg.outreachAnsweredAt !== undefined
+        ? { answered_at: cfg.outreachAnsweredAt }
+        : {}),
     };
   });
 

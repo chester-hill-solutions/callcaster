@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import {
   getCampaignContentReadinessIssues,
   getCampaignReadiness,
+  resolveReadinessQueueCount,
 } from "../app/lib/campaign-readiness";
 
 const validSchedule = {
@@ -301,7 +302,8 @@ describe("app/lib/campaign-readiness.ts", () => {
     );
 
     expect(readiness.startIssues).toContain("Start and end dates are required");
-    expect(readiness.startIssues).toContain("Calling hours are required");
+    // Message campaigns with no schedule are unrestricted (send anytime).
+    expect(readiness.startIssues).not.toContain("Calling hours are required");
     expect(readiness.startIssues).not.toContain(
       "Start and end dates must be valid",
     );
@@ -511,5 +513,57 @@ describe("app/lib/campaign-readiness.ts", () => {
     expect(readiness.startIssues).toContain(
       "Bulk SMS at this queue size requires verified toll-free or a Canadian short code sender. Canadian local long codes are not recommended for campaign volume.",
     );
+  });
+});
+
+describe("app/lib/campaign-readiness.ts resolveReadinessQueueCount", () => {
+  // Regression test for #1255: a fully-sent campaign has 0 *remaining* queued
+  // rows (everything has been dequeued), but it was clearly never
+  // audience-empty. The readiness "queue_empty" check must be driven by the
+  // total number of contacts ever assigned to the campaign, not by how many
+  // are still waiting to be dequeued -- otherwise every campaign that
+  // finishes sending flips back into "needs attention" on the launch screen.
+  test("prefers total assigned count over remaining queued count", () => {
+    expect(
+      resolveReadinessQueueCount({ totalCount: 500, queuedCount: 0 }),
+    ).toBe(500);
+  });
+
+  test("treats a fully-dequeued completed campaign as audience-ready, not queue_empty", () => {
+    const count = resolveReadinessQueueCount({ totalCount: 500, queuedCount: 0 });
+    const readiness = getCampaignReadiness(
+      {
+        type: "message",
+        caller_id: "+15555550100",
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+        schedule: {
+          monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
+        },
+      } as any,
+      {
+        body_text: "Hello there",
+        message_media: [],
+      } as any,
+      { queueCount: count },
+    );
+
+    expect(readiness.startIssues).not.toContain(
+      "Add at least one contact before starting or scheduling",
+    );
+  });
+
+  test("falls back to remaining queued count when total is unavailable", () => {
+    expect(
+      resolveReadinessQueueCount({ totalCount: null, queuedCount: 3 }),
+    ).toBe(3);
+    expect(resolveReadinessQueueCount({})).toBe(0);
+  });
+
+  test("does not fall back to 0 total (draft campaign with no queue yet) losing the real remaining count", () => {
+    // A brand-new campaign has totalCount 0 and queuedCount 0 -- still correctly queue_empty.
+    expect(
+      resolveReadinessQueueCount({ totalCount: 0, queuedCount: 0 }),
+    ).toBe(0);
   });
 });

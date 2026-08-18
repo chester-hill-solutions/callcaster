@@ -13,11 +13,21 @@ type ToastType = {
 interface UseDebouncedSaveParams {
     update: Record<string, unknown> | null;
     recentAttempt: OutreachAttempt | null;
-    nextRecipient: QueueItem | null;
+    /**
+     * The contact this save applies to. Pass the call screen's
+     * `questionContact` (who the script/disposition panel is currently
+     * recording an outcome for) here — NOT the queue's `nextRecipient`
+     * pointer. Hanging up dequeues the just-finished contact immediately, so
+     * `nextRecipient` can go null (or jump to a different contact) before
+     * the agent saves; using it here silently dropped the save (#1253).
+     */
+    questionContact: QueueItem | null;
     campaign: Campaign | null;
     workspaceId: string;
     disposition: string | null;
     toast: ToastType;
+    /** Suppress the "Saved successfully" success toast (errors still toast). */
+    silent?: boolean;
 }
 
 interface UseDebouncedSaveReturn {
@@ -40,7 +50,8 @@ interface FetcherData {
  * @param params - Configuration object
  * @param params.update - Update data object containing question responses
  * @param params.recentAttempt - Recent outreach attempt to associate with update
- * @param params.nextRecipient - Next recipient in queue (must have contact.id)
+ * @param params.questionContact - Contact the panel is recording for (must have contact.id);
+ *   the call screen's questionContact, not the queue's nextRecipient pointer
  * @param params.campaign - Current campaign
  * @param params.workspaceId - Workspace ID
  * @param params.disposition - Call disposition/outcome
@@ -58,7 +69,7 @@ interface FetcherData {
  * } = useDebouncedSave({
  *   update: { question1: 'answer1', question2: 'answer2' },
  *   recentAttempt: currentAttempt,
- *   nextRecipient: queueItem,
+ *   questionContact: queueItem,
  *   campaign: currentCampaign,
  *   workspaceId: workspace.id,
  *   disposition: 'answered',
@@ -76,78 +87,90 @@ interface FetcherData {
 const useDebouncedSave = ({
     update,
     recentAttempt,
-    nextRecipient,
+    questionContact,
     campaign,
     workspaceId,
     disposition,
-    toast
+    toast,
+    silent = false
 }: UseDebouncedSaveParams): UseDebouncedSaveReturn => {
     const fetcher = useFetcher<FetcherData>();
     const previousUpdateRef = useRef<Record<string, unknown> | null>(update);
     const previousDispositionRef = useRef<string | null>(disposition);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+    // A save is meaningful when the agent has answered something or chosen a
+    // real outcome. "idle" is the between-calls sentinel derived from a null
+    // recentAttempt — submitting it after "Save and Next" wrote phantom
+    // attempts against the NEXT contact with empty answers.
+    const hasAnswers = update != null && Object.keys(update).length > 0;
+    const hasRealDisposition = Boolean(disposition && disposition !== "idle");
+    const isMeaningful = hasAnswers || hasRealDisposition;
+
     const saveData = useCallback(() => {
-        if (nextRecipient?.contact?.id) {
-            const formData = new FormData();
-            formData.append("update", JSON.stringify(update));
-            if (recentAttempt?.id != null) {
-                formData.append("callId", recentAttempt.id.toString());
-            }
-            formData.append("selected_workspace_id", workspaceId);
-            formData.append("contact_id", nextRecipient.contact.id.toString());
-            formData.append("queue_id", nextRecipient.id.toString());
-            if (campaign?.id != null) {
-                formData.append("campaign_id", campaign.id.toString());
-            }
-            formData.append("workspace", workspaceId);
-            formData.append("disposition", disposition || '');
+        if (!(update != null && Object.keys(update).length > 0) &&
+            !(disposition && disposition !== "idle")) {
+            return;
+        }
+        if (questionContact?.contact?.id) {
+            // JSON on purpose: the route parses JSON natively, and FormData's
+            // urlencoded serialization was 400ing at the JSON-only parser.
+            const payload: Record<string, unknown> = {
+                update: update ?? {},
+                callId: recentAttempt?.id ?? null,
+                contact_id: Number(questionContact.contact.id),
+                campaign_id: campaign?.id != null ? Number(campaign.id) : null,
+                queue_id: Number(questionContact.id),
+                workspace: workspaceId,
+                disposition: disposition || "",
+            };
             fetcher.submit(
-                formData,
+                payload as Parameters<typeof fetcher.submit>[0],
                 {
                     method: "PATCH",
                     action: `/api/questions`,
+                    encType: "application/json",
                 }
             );
         } else {
-            logger.warn("Cannot save: nextRecipient.contact.id is missing");
+            logger.warn("Cannot save: questionContact.contact.id is missing");
             toast.warning("Cannot save at this time. Some data is missing.");
         }
-    }, [fetcher, update, recentAttempt?.id, workspaceId, nextRecipient, campaign?.id, disposition, toast]);
+    }, [fetcher, update, recentAttempt?.id, workspaceId, questionContact, campaign?.id, disposition, toast]);
   
     /**
      * @effect Debounce saveData() by 2s after `update`/`disposition` change, skipping no-op edits.
-     * @effect-deps update, disposition, nextRecipient (only schedules a save when a recipient exists
-     *   and the value actually changed vs. the previous* refs), saveData
+     * @effect-deps update, disposition, questionContact (only schedules a save when a contact is
+     *   under review and the value actually changed vs. the previous* refs), saveData
      * @effect-side-effects timer (setTimeout; cleared on re-schedule/unmount) — saveData() itself
      *   submits via fetcher.submit (fetch), but that call happens inside the timer callback, not here
      * @effect-why-not-loader Debounced auto-save on local edits needs a client timer; it's a mutation
      *   (fetcher.submit) triggered by user input, not something a loader can express.
      */
     useEffect(() => {
-        const shouldUpdate = nextRecipient &&
+        const shouldUpdate = questionContact && isMeaningful &&
             (!deepEqual(update, previousUpdateRef.current) ||
              !deepEqual(disposition, previousDispositionRef.current));
-    
+
         if (shouldUpdate) {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
             }
-    
+
             timeoutRef.current = setTimeout(() => {
                 saveData();
                 previousUpdateRef.current = update;
                 previousDispositionRef.current = disposition;
             }, 2000);
         }
-    
+
         return () => {
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
                 timeoutRef.current = null;
             }
         };
-    }, [update, disposition, nextRecipient, saveData]);
+    }, [update, disposition, questionContact, saveData, isMeaningful]);
   
     /**
      * @effect CANDIDATE-REMOVE Toast success/failure once the save fetcher settles.
@@ -161,13 +184,13 @@ const useDebouncedSave = ({
     useEffect(() => {
         if (fetcher.state === 'idle' && fetcher.data) {
             if (fetcher.data.id) {
-                toast.success("Saved successfully");
+                if (!silent) toast.success("Saved successfully");
             } else {
                 logger.error("Save failed:", fetcher.data.error);
                 toast.error(`Save failed: ${fetcher.data.error || 'Unknown error'}`);
             }
         }
-    }, [fetcher.state, fetcher.data, toast]);
+    }, [fetcher.state, fetcher.data, toast, silent]);
   
     return { saveData, isSaving: fetcher.state === 'submitting' };
 };

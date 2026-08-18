@@ -44,7 +44,7 @@ vi.mock("@/lib/workspace-events.server", () => ({
 }));
 
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 1 })),
+  unsafeEnqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 1 })),
 }));
 
 describe("outreach disposition transitions", () => {

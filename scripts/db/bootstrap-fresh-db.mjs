@@ -101,6 +101,14 @@ const steps = [
   "client/migrations/20260803120000_fix_queue_rpcs_on_queue_state.sql",
   "client/migrations/20260803130000_claim_next_queue_contact_attempt_count.sql",
   "client/migrations/20260803140000_workspace_number_rental_warned_cycle.sql",
+  "client/migrations/20260805120000_atomic_manual_dial_claims.sql",
+  "client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql",
+  "client/migrations/20260807130000_manual_dial_claim_attempt_count.sql",
+  "client/migrations/20260813120000_drop_campaign_is_active.sql",
+  "client/migrations/20260814000000_drop_supabase_era_orphans.sql",
+  "client/migrations/20260814120000_requeue_clears_assigned_user.sql",
+  "client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql",
+  "client/migrations/20260815130000_dequeue_contact_returns_rows_affected.sql",
 ];
 
 /**

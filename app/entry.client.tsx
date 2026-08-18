@@ -5,11 +5,17 @@
  */
 
 import { HydratedRouter } from "react-router/dom";
+import { installFlashTelemetry } from "@/lib/flash-telemetry.client";
 import { Buffer } from "buffer-polyfill";
 import { startTransition, StrictMode } from "react";
 import { hydrateRoot } from "react-dom/client";
 
 globalThis.Buffer = Buffer as unknown as BufferConstructor;
+
+// Observe transient error UI (toasts, alert banners) and ship each
+// appearance to the server with a call-site stack + client breadcrumbs, so
+// "an error flashed" is attributable from server logs (#1293).
+installFlashTelemetry();
 
 startTransition(() => {
   hydrateRoot(

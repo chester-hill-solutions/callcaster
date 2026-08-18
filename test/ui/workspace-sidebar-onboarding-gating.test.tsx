@@ -2,13 +2,9 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import Workspace from "@/routes/workspaces+/$id";
 
-// The workspace sidebar stays hidden until onboarding is complete:
-//   1. while the onboarding wizard child route is active (its loader data is
-//      present in useMatches), and
-//   2. on any workspace page while the workspace is fresh enough that the
-//      root loader would still bounce it into the wizard
-//      (onboardingReadiness.shouldRedirectToOnboarding).
-// Once neither holds, the sidebar renders as before.
+// The workspace sidebar stays hidden only while the onboarding wizard child
+// route is active. Workspace pages remain navigable while onboarding is
+// incomplete, including when the workspace has no phone number yet.
 const mocks = vi.hoisted(() => ({
   revalidate: vi.fn(),
   state: {
@@ -90,10 +86,10 @@ describe("workspaces+/$id.tsx sidebar onboarding gating", () => {
     expect(screen.getByTestId("workspace-nav")).toBeInTheDocument();
   });
 
-  test("hides the sidebar while the workspace still redirects to onboarding", () => {
+  test("shows the sidebar while the workspace still needs onboarding", () => {
     mocks.state.shouldRedirectToOnboarding = true;
     render(<Workspace />);
-    expect(screen.queryByTestId("workspace-nav")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-nav")).toBeInTheDocument();
   });
 
   test("hides the sidebar while the onboarding wizard route is active", () => {

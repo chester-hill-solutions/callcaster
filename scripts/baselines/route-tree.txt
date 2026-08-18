@@ -124,11 +124,13 @@ calls
 campaigns
 chats
 checkout-session
+client-flash
 complete
 confirm-payment
 contacts
 conversations
 create-with-script
+credits
 dead-letters
 docs
 edit

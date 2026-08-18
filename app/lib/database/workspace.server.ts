@@ -12,6 +12,7 @@ import {
   workspace_number,
 } from "@/db/schema";
 import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
+import { PG_ERROR_CODES } from "@/lib/parse-utils.server";
 import { WorkspaceData, WorkspaceNumbers } from "../types";
 import type { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
@@ -22,10 +23,7 @@ import {
   invalidateWorkspaceTwilioData,
 } from "@/lib/merge-workspace-twilio-data.server";
 import { logger } from "../logger.server";
-import {
-  rpcGetWorkspaceUsers,
-  rpcUpdateUserWorkspaceLastAccessTime,
-} from "@/lib/db-rpc.server";
+import { rpcGetWorkspaceUsers, rpcUpdateUserWorkspaceLastAccessTime } from "@/lib/db-rpc.server";
 import {
   getWorkspaceMessagingOnboardingState,
   updateWorkspaceMessagingOnboardingState,
@@ -77,7 +75,7 @@ function parseTwilioDataColumn(raw: unknown): unknown {
 
 function notFoundError(message = "Row not found"): Error & { code: string } {
   const err = new Error(message) as Error & { code: string };
-  err.code = "PGRST116";
+  err.code = PG_ERROR_CODES.POSTGREST_NOT_FOUND;
   return err;
 }
 

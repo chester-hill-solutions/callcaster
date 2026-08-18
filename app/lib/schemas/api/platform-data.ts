@@ -8,10 +8,12 @@ export const campaignStatusSchema = z.enum([
   "paused",
   "draft",
   "archived",
+  "waiting",
 ]);
 
 export const campaignStatusBodySchema = z.object({
   status: campaignStatusSchema,
+  // Deprecated: accepted for compatibility, ignored — derived from status (#1216).
   is_active: z.boolean().optional(),
 });
 

@@ -25,6 +25,7 @@ import {
   NUMBER_RENTAL_MONTHLY_CREDITS,
 } from "@/lib/number-rental";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { db } from "@/server/db";
 import { attachPhoneNumberToMessagingService } from "@/lib/twilio-bootstrap.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { twilioErrorUserMessage } from "@/lib/twilio-errors";
@@ -315,7 +316,7 @@ export async function purchaseWorkspaceNumber(
       }
     }
 
-    await insertTransactionHistoryIdempotent({
+    await insertTransactionHistoryIdempotent(db, {
       workspaceId,
       type: "DEBIT",
       amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),

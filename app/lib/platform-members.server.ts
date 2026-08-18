@@ -6,6 +6,7 @@ import {
 import {
   API_KEY_DEFAULT_TTL_DAYS,
   API_KEY_MAX_TTL_DAYS,
+  capabilityIdsForRole,
   isProductCapabilityId,
   type ProductCapabilityId,
 } from "@/lib/capabilities";
@@ -16,7 +17,7 @@ import {
 } from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
-import { MemberRole } from "@/lib/member-role";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { WORKSPACE_ROLE_RANK } from "@/lib/workspace-route.server";
 import { requireTwoFactorForPrivilegedRoleAssignment } from "@/lib/two-factor.server";
 import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
@@ -74,6 +75,66 @@ async function requireMemberManager(
 }
 
 /**
+ * API keys are a stricter class of artifact than member management. A key is a
+ * durable, workspace-scoped bearer credential: `apiKeyActorFromScopes` builds
+ * its capability set from the stored scopes alone and never re-checks the
+ * minter's current role, so a key outlives the membership that created it (up
+ * to `API_KEY_MAX_TTL_DAYS`). Demoting or removing the minter does not weaken
+ * the key. That durability is why minting sits at admin, above the member floor
+ * `requireMemberManager` establishes for member management — and it matches the
+ * `workspaceAdmin` authClass this route has always declared in the API surface.
+ */
+async function requireApiKeyManager(
+  userId: string,
+  workspaceId: string,
+): Promise<
+  | { ok: true; actorRole: string }
+  | { ok: false; error: string; status: number }
+> {
+  const access = await requireMemberManager(userId, workspaceId);
+  if (!access.ok) return access;
+
+  if (!hasMinRole(access.actorRole, MemberRole.Admin)) {
+    return {
+      ok: false,
+      error: "Workspace admin role required to manage API keys",
+      status: 403,
+    };
+  }
+
+  return { ok: true, actorRole: access.actorRole };
+}
+
+/**
+ * Cap the mintable capability set at the intersection of the minter's own role
+ * capabilities: a key may never carry a capability its creator does not hold.
+ * Without this, the role→capability matrix is advisory — an actor could mint a
+ * key granting powers their own role is denied and then present that key on
+ * capability-gated Data Plane routes, laundering the role gate into a scope
+ * they chose themselves. Applies at mint time; scopes are immutable afterwards
+ * (there is no update path), so this is the only place the cap is needed.
+ */
+function assertScopesWithinActorRole(
+  actorRole: string,
+  scopes: readonly ProductCapabilityId[],
+): { ok: true } | { ok: false; error: string; status: number } {
+  const granted = new Set<string>(capabilityIdsForRole(actorRole));
+  const disallowed = scopes.filter((scope) => !granted.has(scope));
+
+  if (disallowed.length > 0) {
+    return {
+      ok: false,
+      error:
+        `Your role (${actorRole}) cannot grant these capability scopes: ` +
+        `${disallowed.join(", ")}. An API key may only carry capabilities its creator holds.`,
+      status: 403,
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
  * Prevent privilege escalation: an actor may never grant a role that outranks
  * their own. Without this, a `member` (who can manage members) could promote
  * themselves or anyone to `admin`/`owner`. Applies to both role edits and
@@ -92,6 +153,37 @@ function assertNoRoleEscalation(
       status: 403,
     };
   }
+  return { ok: true };
+}
+
+/**
+ * An actor may only manage (demote or remove) a member whose current rank is
+ * at or below the actor's own. Without this, `requireMemberManager` alone lets
+ * a `member` remove or demote an `admin`: the escalation guards only inspect
+ * the *assigned* role, never the target's *existing* rank. Actor-at-or-above
+ * (rather than strictly-above) preserves peer management and self-service while
+ * closing the escalation.
+ */
+async function requireActorOutranksTarget(
+  actorRole: string,
+  workspaceId: string,
+  targetUserId: string,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const targetMembership = await findWorkspaceMembership(workspaceId, targetUserId);
+  if (!targetMembership) {
+    return { ok: false, error: "Member not found", status: 404 };
+  }
+
+  const actorRank = WORKSPACE_ROLE_RANK[actorRole] ?? 0;
+  const targetRank = WORKSPACE_ROLE_RANK[targetMembership.role] ?? 0;
+  if (actorRank < targetRank) {
+    return {
+      ok: false,
+      error: "You cannot manage a member who outranks you.",
+      status: 403,
+    };
+  }
+
   return { ok: true };
 }
 
@@ -269,7 +361,10 @@ export async function inviteWorkspaceMemberAsApiKey(
   email: string,
   role: "owner" | "admin" | "member" | "caller",
 ) {
-  return inviteWorkspaceMemberWithActorRole("admin", workspaceId, email, role);
+  // Actor rank `member`, not `admin`: a `members.invite` key must not be able to
+  // mint an `admin`/`owner` invite. assertNoRoleEscalation blocks anything above
+  // `member`, matching this function's member/caller-only policy.
+  return inviteWorkspaceMemberWithActorRole("member", workspaceId, email, role);
 }
 
 export async function updateWorkspaceMemberRole(
@@ -284,6 +379,11 @@ export async function updateWorkspaceMemberRole(
   // Owner-role transitions keep their specific owner-only gate first.
   const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId, role);
   if (!ownerCheck.ok) return ownerCheck;
+
+  // The actor must at least match the target's current rank, or a `member`
+  // could demote an `admin` (the owner gate above only covers owner targets).
+  const rankCheck = await requireActorOutranksTarget(access.actorRole, workspaceId, targetUserId);
+  if (!rankCheck.ok) return rankCheck;
 
   // No privilege escalation: an actor cannot grant a role above their own.
   // This is what stops a `member` (who may manage members) from promoting
@@ -326,6 +426,11 @@ export async function removeWorkspaceMember(
 
   const ownerCheck = await requireOwnerForOwnerChange(userId, workspaceId, targetUserId);
   if (!ownerCheck.ok) return ownerCheck;
+
+  // The actor must at least match the target's current rank, or a `member`
+  // could remove an `admin` (the owner gate above only covers owner targets).
+  const rankCheck = await requireActorOutranksTarget(access.actorRole, workspaceId, targetUserId);
+  if (!rankCheck.ok) return rankCheck;
 
   const soleOwnerCheck = await requireSoleOwnerProtection(workspaceId, targetUserId);
   if (!soleOwnerCheck.ok) return soleOwnerCheck;
@@ -484,7 +589,7 @@ export async function listWorkspaceApiKeys(
   userId: string,
   workspaceId: string,
 ) {
-  const access = await requireMemberManager(userId, workspaceId);
+  const access = await requireApiKeyManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {
@@ -507,7 +612,7 @@ export async function createWorkspaceApiKey(
   scopes: readonly string[],
   expiresInDays: number = API_KEY_DEFAULT_TTL_DAYS,
 ) {
-  const access = await requireMemberManager(userId, workspaceId);
+  const access = await requireApiKeyManager(userId, workspaceId);
   if (!access.ok) return access;
 
   const normalizedScopes = [
@@ -527,6 +632,29 @@ export async function createWorkspaceApiKey(
       error: `Unknown capability scopes: ${invalid.join(", ")}`,
       status: 400,
     };
+  }
+
+  // Unknown scopes are a client error (400) and are rejected above; scopes that
+  // are real but outrank the minter are an authorization failure (403).
+  const withinRole = assertScopesWithinActorRole(
+    access.actorRole,
+    normalizedScopes as ProductCapabilityId[],
+  );
+  if (!withinRole.ok) {
+    await safeRecordWorkspaceAuditEvent({
+      workspaceId,
+      actorType: "session",
+      actorId: userId,
+      action: "api_keys.create",
+      targetType: "api_key",
+      outcome: "denied",
+      metadata: {
+        reason: "scope_exceeds_role",
+        actor_role: access.actorRole,
+        requested_scopes: normalizedScopes,
+      },
+    });
+    return { ok: false as const, error: withinRole.error, status: withinRole.status };
   }
 
   const ttlDays = Number.isFinite(expiresInDays)
@@ -611,7 +739,7 @@ export async function deleteWorkspaceApiKey(
   workspaceId: string,
   keyId: string,
 ) {
-  const access = await requireMemberManager(userId, workspaceId);
+  const access = await requireApiKeyManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {

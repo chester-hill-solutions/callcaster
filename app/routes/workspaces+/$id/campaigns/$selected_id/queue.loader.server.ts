@@ -9,6 +9,7 @@ import { Audience, QueueItem, Contact } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
 import { campaign_audience as campaignAudienceTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { requireWorkspaceLoaderContext } from "@/lib/workspace-route.server";
 import type { AppError } from "@/lib/errors.server";
 // campaign_audience is a join table without a workspace column; tdb cannot scope it.
@@ -43,6 +44,14 @@ export const loader = defineLoader({
     if (!selected_id) throw redirect("../../");
 
     const campaignIdNum = Number(selected_id);
+    const { workspaceId } = auth.ctx;
+
+    // This loader must verify the campaign belongs to the workspace itself: the
+    // parent layout loader's guard can be bypassed under single-fetch route
+    // filtering (?_routes=), and without this the queue (contact PII) leaks
+    // cross-tenant via an enumerable campaign id.
+    const campaign = await findCampaignInWorkspace(workspaceId, campaignIdNum);
+    if (!campaign) throw redirect("../../");
 
     const filters: QueueSearchFilters = {
       name: searchParams.get("name") || "",
@@ -65,6 +74,7 @@ export const loader = defineLoader({
           filters,
           offset,
           limit: pageSize,
+          workspaceId,
         }),
         countCampaignQueueRows(campaignIdNum),
         countQueuedCampaignQueueRows(campaignIdNum),

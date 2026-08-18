@@ -1,7 +1,7 @@
 import { logger } from "@/lib/logger.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { normalizePhoneNumber } from "@/lib/utils";
-import Twilio from "twilio";
+import { createVoiceResponse } from "@/lib/twilio-twiml.server";
 import {
   appendVerifiedAudioNumber,
   findPendingVerificationSession,
@@ -18,7 +18,7 @@ export const action = defineAction({
   },
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request }) => {
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
 
     const formData = await request.formData();
     const from = formData.get("From") as string | null;

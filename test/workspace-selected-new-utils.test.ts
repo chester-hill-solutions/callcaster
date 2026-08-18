@@ -205,15 +205,35 @@ describe("WorkspaceSelectedNewUtils", () => {
     fd.set("campaign-name", "C");
     fd.set("campaign-type", "live_call");
 
+    // Direct driver shape: SQLSTATE on the error itself.
     tenantDbState.campaignInsertError = new Error("duplicate");
     tenantDbState.campaignInsertErrorCode = "23505";
     const r1 = await asRouteResponse(mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
+    expect(r1.status).toBe(409);
     expect((await r1.json()).error.message).toContain("already a campaign");
 
-    tenantDbState.campaignInsertError = new Error("nope");
+    // Drizzle shape: DrizzleQueryError wrapper, SQLSTATE nested on `cause`.
+    // This is what the app actually catches in production (issue: duplicate
+    // campaign names surfaced as "Unexpected Server Error").
+    const wrapped = new Error("Failed query: insert into campaign ...");
+    (wrapped as Error & { cause: unknown }).cause = Object.assign(
+      new Error("duplicate key value violates unique constraint"),
+      { code: "23505" },
+    );
+    tenantDbState.campaignInsertError = wrapped;
+    tenantDbState.campaignInsertErrorCode = null;
+    const r1b = await asRouteResponse(mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
+    expect(r1b.status).toBe(409);
+    expect((await r1b.json()).error.message).toContain("already a campaign");
+
+    // Generic failures return a safe message, never the raw error object.
+    tenantDbState.campaignInsertError = new Error("connection terminated unexpectedly");
     tenantDbState.campaignInsertErrorCode = "X";
     const r2 = await asRouteResponse(mod.handleNewCampaign({ formData: fd, workspaceId: "w1", headers }));
-    expect((await r2.json()).error).toMatchObject({ code: "X", message: "nope" });
+    expect(r2.status).toBe(500);
+    expect((await r2.json()).error).toEqual({
+      message: "Failed to create the campaign. Please try again.",
+    });
 
     tenantDbState.campaignInsertError = null;
     tenantDbState.campaignId = 2;

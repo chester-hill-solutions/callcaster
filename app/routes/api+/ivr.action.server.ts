@@ -1,13 +1,15 @@
 import { data as routeData } from "react-router";
-import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { createErrorResponse } from "@/lib/errors.server";
 import {
   createWorkspaceTwilioInstance,
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
-import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
+import {
+  outboundCreditsResponse,
+  requireOutboundCredits,
+} from "@/lib/outbound-credit-gate.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
@@ -59,13 +61,8 @@ export const action = defineAction({
         );
       }
 
-      const credits = await getWorkspaceCreditsBalance(workspace_id);
-      if (credits === null) {
-        return routeData({ error: "Workspace not found" }, { status: 404 });
-      }
-      if (hasInsufficientCreditsForOutbound(credits)) {
-        return routeData({ creditsError: true }, { status: 402 });
-      }
+      const credits = await requireOutboundCredits(workspace_id);
+      if (!credits.ok) return outboundCreditsResponse(credits);
 
       const tdb = createTenantDb(workspace_id);
       outreachAttemptId = await rpcCreateOutreachAttempt(tdb, {
@@ -101,8 +98,8 @@ export const action = defineAction({
       if (!callRow) throw new Error("Failed to insert call record");
 
       // Dequeue
-      await dequeueCampaignQueueById({
-        queueId: Number(queue_id),
+      await dequeueQueueEntry({
+        by: { id: Number(queue_id) },
         userId: user_id,
         reason: "IVR call completed",
       });

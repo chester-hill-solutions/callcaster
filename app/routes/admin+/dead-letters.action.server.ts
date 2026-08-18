@@ -17,6 +17,12 @@ export const action = defineAction({
     const result = await requeueDeadLetteredJob(jobId, auth.user.id);
 
     if (!result.ok) {
+      if (result.reason === "invalid_params") {
+        return routeData(
+          { error: `Job #${jobId} can't be requeued — its stored params no longer pass validation: ${result.error}` },
+          { status: 422 },
+        );
+      }
       // Either the id is wrong or another admin already requeued it. Both mean
       // "no dead-lettered job with that id right now", which is what to say.
       return routeData(

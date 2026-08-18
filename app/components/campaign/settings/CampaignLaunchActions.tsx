@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 
 export type CampaignLifecycleState =
   | "running"
+  | "waiting"
   | "paused"
   | "archived"
   | "draft"
@@ -42,6 +43,7 @@ export function getCampaignLaunchButtonStates(
 
   switch (campaignState) {
     case "running":
+    case "waiting":
       states.pause = "Inactive";
       states.play = "Active";
       states.schedule = "Disabled";

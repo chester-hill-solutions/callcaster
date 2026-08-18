@@ -51,6 +51,7 @@ type WorkspaceResourceListShellProps = {
   emptyDescription?: string;
   emptyIcon?: ReactNode;
   addAction?: ReactNode;
+  hideTitle?: boolean;
   children?: ReactNode;
 };
 
@@ -62,6 +63,7 @@ export function WorkspaceResourceListShell({
   emptyDescription,
   emptyIcon,
   addAction,
+  hideTitle = false,
   children,
 }: WorkspaceResourceListShellProps) {
   const showError = Boolean(error) && !isEmpty;
@@ -69,14 +71,16 @@ export function WorkspaceResourceListShell({
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <Heading
-          as="h1"
-          level={2}
-          branded={false}
-          className="text-center sm:text-left"
-        >
-          {title}
-        </Heading>
+        {hideTitle ? null : (
+          <Heading
+            as="h1"
+            level={2}
+            branded={false}
+            className="text-center sm:text-left"
+          >
+            {title}
+          </Heading>
+        )}
         {!isEmpty ? addAction : null}
       </div>
 

@@ -3,7 +3,7 @@ import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { markContactLineType } from "@/lib/twilio-lookup.server";
-import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
+import { pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import {
   findCallBySid,
@@ -12,11 +12,13 @@ import {
 } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
+import {
+  parseTwilioVoiceCallback,
+  type TwilioVoiceCallback,
+} from "@/lib/twilio/voice-callback";
 
 type DialStatusAuth = {
-  callSid: string | null;
-  answeredBy: string | null;
-  callStatus: string | null;
+  event: TwilioVoiceCallback;
 };
 
 export const action = defineAction({
@@ -24,24 +26,27 @@ export const action = defineAction({
     // Clone before reading — Bun yields empty params on re-read after consume.
     const formData = await request.clone().formData();
     const params = Object.fromEntries(formData.entries()) as Record<string, string>;
-    const callSidValue = params.CallSid;
-    const answeredByValue = params.AnsweredBy;
-    const callStatusValue = params.CallStatus;
+    // Parsed once here (#1243 E2) instead of each field being re-narrowed with
+    // `typeof x === "string"` below.
+    const event = parseTwilioVoiceCallback(params);
 
-    const callSid = typeof callSidValue === "string" && callSidValue ? callSidValue : null;
-    const answeredBy = typeof answeredByValue === "string" ? answeredByValue : null;
-    const callStatus = typeof callStatusValue === "string" ? callStatusValue : null;
+    // Validate the Twilio signature unconditionally (fail closed). Previously
+    // this ran only when CallSid was present, so a request without CallSid
+    // skipped the webhook auth boundary entirely.
+    const forbidden = await requireTwilioSignature(request, {
+      callSid: event.callSid ?? undefined,
+      params,
+    });
+    if (forbidden) return forbidden;
 
-    if (callSid) {
-      const forbidden = await requireTwilioSignature(request, { callSid, params });
-      if (forbidden) return forbidden;
-    }
-
-    return { callSid, answeredBy, callStatus };
+    return { event };
   },
   sideEffects: ["twilio", "db-write"],
   handler: async ({ auth }) => {
-    const { callSid, answeredBy, callStatus } = auth;
+    const { event } = auth;
+    const callSid = event.callSid;
+    const answeredBy = event.answeredBy;
+    const callStatus = event.callStatus || null;
 
     if (!callSid) {
       return routeData({ success: false, error: "CallSid is required and must be a string" });
@@ -87,34 +92,20 @@ export const action = defineAction({
       answeredBy &&
       answeredBy.includes("machine") &&
       !answeredBy.includes("other") &&
-      callStatus !== "completed"
+      callStatus !== "completed" &&
+      voicemailData?.signedUrl
     ) {
       try {
-        if (voicemailData && voicemailData.signedUrl) {
-          if (dbCall.outreach_attempt_id) {
-            const outreachResult = await updateOutreachAttemptForWorkspace(dbCall.workspace, dbCall.outreach_attempt_id, {
-              disposition: "voicemail",
-            });
-            if (outreachResult instanceof Response) {
-              throw new Error(await outreachResult.text());
-            }
-          }
-          await call.update({
-            twiml: pausePlayTwiml(voicemailData.signedUrl, 5),
-          });
-          return routeData({ success: true });
-        }
-
         if (dbCall.outreach_attempt_id) {
           const outreachResult = await updateOutreachAttemptForWorkspace(dbCall.workspace, dbCall.outreach_attempt_id, {
-            disposition: "no-answer",
+            disposition: "voicemail",
           });
           if (outreachResult instanceof Response) {
             throw new Error(await outreachResult.text());
           }
         }
         await call.update({
-          twiml: hangupTwiml(),
+          twiml: pausePlayTwiml(voicemailData.signedUrl, 5),
         });
         return routeData({ success: true });
       } catch (error) {
@@ -123,6 +114,12 @@ export const action = defineAction({
         return routeData({ success: false, error: errorMessage });
       }
     }
+    // A detected machine with no voicemail-drop audio configured for this
+    // campaign falls through to the same path as a human answer: the call
+    // is never auto-hung-up on AMD alone, only when there's an actual
+    // message to leave. Product decision (issue #1143) — the previous
+    // behavior hung up silently with nothing left behind, which read to
+    // agents as "the call just died" rather than "voicemail wasn't set up."
 
     await updateCallBySid(dbCall.workspace, callSid, { answered_by: answeredBy });
     if (dbCall.outreach_attempt_id) {

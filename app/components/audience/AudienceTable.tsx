@@ -202,7 +202,9 @@ export function AudienceTable({
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedContacts(contacts.map(contact => contact.id.toString()));
+      // Only the rows actually shown (after the active search filter), so
+      // "select all → Remove Selected" never removes contacts the user can't see.
+      setSelectedContacts(filteredContacts.map(contact => contact.id.toString()));
     } else {
       setSelectedContacts([]);
     }
@@ -236,6 +238,29 @@ export function AudienceTable({
   );
 
   const totalPages = Math.ceil((pagination.totalCount || 0) / pagination.pageSize);
+
+  // Sortable column header: keyboard-operable <button> inside the <th>, with
+  // aria-sort announcing the current sort so screen-reader / keyboard users can
+  // sort (the old mouse-only onClick on the <th> could not).
+  const renderSortableHeader = (column: string, label: string) => {
+    const isActive = sorting.sortKey === column;
+    return (
+      <TableHead
+        aria-sort={
+          isActive ? (sorting.sortDirection === "asc" ? "ascending" : "descending") : "none"
+        }
+      >
+        <button
+          type="button"
+          className="flex items-center gap-1 cursor-pointer"
+          onClick={() => handleSort(column)}
+        >
+          {label}
+          {isActive ? (sorting.sortDirection === "asc" ? " ↑" : " ↓") : ""}
+        </button>
+      </TableHead>
+    );
+  };
 
   return (
     <div className="w-full space-y-4">
@@ -309,52 +334,20 @@ export function AudienceTable({
             <TableRow>
               <TableHead className="w-[50px]">
                 <Checkbox
-                  checked={selectedContacts.length === contacts.length && contacts.length > 0}
+                  checked={
+                    selectedContacts.length === filteredContacts.length &&
+                    filteredContacts.length > 0
+                  }
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => handleSort('id')}
-              >
-                ID {sorting.sortKey === 'id' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
-              </TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => handleSort('firstname')}
-              >
-                First Name {sorting.sortKey === 'firstname' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
-              </TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => handleSort('surname')}
-              >
-                Last Name {sorting.sortKey === 'surname' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
-              </TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => handleSort('phone')}
-              >
-                Phone {sorting.sortKey === 'phone' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
-              </TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => handleSort('email')}
-              >
-                Email {sorting.sortKey === 'email' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
-              </TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => handleSort('address')}
-              >
-                Address {sorting.sortKey === 'address' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
-              </TableHead>
-              <TableHead
-                className="cursor-pointer"
-                onClick={() => handleSort('city')}
-              >
-                City {sorting.sortKey === 'city' && (sorting.sortDirection === 'asc' ? '↑' : '↓')}
-              </TableHead>
+              {renderSortableHeader('id', 'ID')}
+              {renderSortableHeader('firstname', 'First Name')}
+              {renderSortableHeader('surname', 'Last Name')}
+              {renderSortableHeader('phone', 'Phone')}
+              {renderSortableHeader('email', 'Email')}
+              {renderSortableHeader('address', 'Address')}
+              {renderSortableHeader('city', 'City')}
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>

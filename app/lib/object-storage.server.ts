@@ -2,6 +2,7 @@ import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectC
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/lib/env.server";
 import { objectStorageUsesPathStyle } from "@/lib/object-storage-config";
+import { logger } from "@/lib/logger.server";
 
 /** Postgres-compatible logical bucket names. */
 export type ObjectStorageBucket =
@@ -172,7 +173,14 @@ export async function uploadObject(
         Key: key,
         Body: payload,
         ContentType: options.contentType,
-        CacheControl: options.cacheControl,
+        // Supabase Storage took bare seconds ("60") and expanded them to
+        // max-age; S3 stores the header verbatim, so a bare number is an
+        // invalid directive that caches nothing (#1228). Normalize here so
+        // no call site can regress.
+        CacheControl:
+          options.cacheControl && /^\d+$/.test(options.cacheControl)
+            ? `max-age=${options.cacheControl}`
+            : options.cacheControl,
         // `upsert` predates the S3 migration (it was a Supabase storage flag)
         // and was silently dropped here, so callers asking not to overwrite
         // were overwriting anyway. For audio that is not just a lost file: a
@@ -236,11 +244,25 @@ export async function deleteObject(
   );
 }
 
+/** SigV4's hard ceiling for presigned URLs — the signer rejects anything longer. */
+const MAX_SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
+
 export async function createSignedObjectUrl(
   logicalBucket: ObjectStorageBucket,
   objectPath: string,
   expiresInSeconds: number,
 ): Promise<string> {
+  // Clamp rather than let the signer throw: an over-long TTL silently killed
+  // every voicemail email for months (#1224) because the failure surfaced
+  // only at send time, deep inside a webhook handler.
+  let expiresIn = expiresInSeconds;
+  if (expiresIn > MAX_SIGNED_URL_TTL_SECONDS) {
+    logger.warn("createSignedObjectUrl: TTL exceeds the SigV4 7-day cap; clamping", {
+      requested: expiresInSeconds,
+      objectPath,
+    });
+    expiresIn = MAX_SIGNED_URL_TTL_SECONDS;
+  }
   const { bucketName, key } = resolveLocation(logicalBucket, objectPath);
   return getSignedUrl(
     getS3Client(),
@@ -248,7 +270,7 @@ export async function createSignedObjectUrl(
       Bucket: bucketName,
       Key: key,
     }),
-    { expiresIn: expiresInSeconds },
+    { expiresIn },
   );
 }
 

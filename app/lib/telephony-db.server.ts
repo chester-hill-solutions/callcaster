@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import {
   call as callTable,
   campaign as campaignTable,
@@ -122,6 +122,37 @@ export async function findActiveConferenceIdsForUser(
   return (rows as unknown as { conference_id: string }[]).map((row) => row.conference_id);
 }
 
+/**
+ * Atomically claim a terminal-status transition for a call.
+ *
+ * Returns true only for the delivery that actually moves the row TO
+ * `terminalStatus` (from a different or null status); a concurrent/duplicate
+ * delivery of the same terminal status sees 0 rows and returns false. This is a
+ * compare-and-set — the UPDATE's row lock serializes concurrent callbacks — so
+ * it replaces a check-then-act guard that let two overlapping Twilio retries
+ * both re-dequeue the contact and place a second outbound call.
+ */
+export async function claimTerminalCallStatus(
+  workspaceId: string,
+  sid: string,
+  terminalStatus: string,
+  options?: { tdb?: TenantDb },
+): Promise<boolean> {
+  const tdb = options?.tdb ?? createTenantDb(workspaceId);
+  const normalized = terminalStatus.toLowerCase();
+  const rows = await tdb.call.update({
+    set: { status: normalized } as unknown as Partial<CallRow>,
+    where: and(
+      eq(callTable.sid, sid),
+      // ::text — call.status is the call_status ENUM in every real database
+      // and lower(call_status) does not exist; without the cast this guard
+      // throws instead of guarding (#1289).
+      or(isNull(callTable.status), sql`LOWER(${callTable.status}::text) <> ${normalized}`),
+    ),
+  });
+  return rows.length > 0;
+}
+
 export async function updateCallBySid(
   workspaceId: string,
   sid: string,
@@ -145,7 +176,13 @@ export async function updateCallBySid(
   // not, otherwise apply the incoming status. Doing this in one statement
   // removes the read-then-write round trip and the race between the guard
   // check and the write.
-  const guardedStatus = sql`CASE WHEN LOWER(${callTable.status}) = ANY(${TERMINAL_CALL_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_CALL_STATUSES_SQL}) THEN ${callTable.status} ELSE ${update.status} END`;
+  // ::text on the column: call.status is the call_status ENUM in every real
+  // database, and lower(call_status) does not exist — without the cast this
+  // UPDATE throws, so every status-bearing webhook/sync write failed and rows
+  // accumulated in 'queued' forever (#1289). The unit tier mocks the db
+  // client and could not see it; test/integration-db/call-status-guard.test.ts
+  // runs this statement against a real database.
+  const guardedStatus = sql`CASE WHEN LOWER(${callTable.status}::text) = ANY(${TERMINAL_CALL_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_CALL_STATUSES_SQL}) THEN ${callTable.status} ELSE ${update.status} END`;
 
   const [row] = await tdb.call.update({
     set: {
@@ -243,7 +280,8 @@ export async function upsertCallBySid(
 ): Promise<CallRow | null> {
   const existingWorkspace = values.workspace ?? null;
   if (existingWorkspace) {
-    return updateCallBySid(existingWorkspace, values.sid, values as Partial<CallRow>);
+    const updated = await updateCallBySid(existingWorkspace, values.sid, values as Partial<CallRow>);
+    if (updated) return updated;
   }
 
   const [row] = await db
@@ -300,12 +338,18 @@ export async function findCampaignTypeByCampaignId(
 }
 
 export async function findCallSidByParentCallSid(
+  workspaceId: string,
   parentCallSid: string,
 ): Promise<string | null> {
   const rows = await db
     .select({ sid: callTable.sid })
     .from(callTable)
-    .where(eq(callTable.parent_call_sid, parentCallSid))
+    .where(
+      and(
+        eq(callTable.parent_call_sid, parentCallSid),
+        eq(callTable.workspace, workspaceId),
+      ),
+    )
     .limit(1);
   return rows[0]?.sid ?? null;
 }

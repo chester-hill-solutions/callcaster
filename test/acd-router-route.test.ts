@@ -10,27 +10,16 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: (...args: unknown[]) => mocks.requireTwilioSignature(...args),
+  twilioWebhookForbiddenHangup: () =>
+    new Response("<Response><Say>hangup</Say></Response>", {
+      status: 403,
+      headers: { "Content-Type": "text/xml" },
+    }),
 }));
 vi.mock("@/lib/acd/acd-router.server", () => ({
   handleAcdRouterRequest: (...args: unknown[]) => mocks.handleAcdRouterRequest(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-
-vi.mock("twilio", () => {
-  class VoiceResponse {
-    private parts: string[] = [];
-    say(text: string) {
-      this.parts.push(`say:${text}`);
-    }
-    hangup() {
-      this.parts.push("hangup");
-    }
-    toString() {
-      return `<Response>${this.parts.join("|")}</Response>`;
-    }
-  }
-  return { default: { twiml: { VoiceResponse } } };
-});
 
 function makeRequest() {
   const fd = new FormData();
@@ -50,6 +39,24 @@ describe("app/routes/api+/acd-router", () => {
       }),
     );
     mocks.logger.error.mockReset();
+  });
+
+  // Regression: this route used to build the signature-check option as
+  // `callSid ? { callSid } : {}` — omitting CallSid silently downgraded
+  // validation to the main-account token instead of failing. A genuine
+  // Twilio callback to this URL always carries CallSid.
+  test("rejects with 403 hangup when CallSid is missing, without calling requireTwilioSignature", async () => {
+    const mod = await import("../app/routes/api+/acd-router.route");
+    const res = await asRouteResponse(
+      mod.action({
+        request: new Request("http://localhost/api/acd-router", {
+          method: "POST",
+          body: new FormData(),
+        }),
+      } as never),
+    );
+    expect(res.status).toBe(403);
+    expect(mocks.requireTwilioSignature).not.toHaveBeenCalled();
   });
 
   test("returns 403 when Twilio signature validation fails", async () => {
@@ -75,8 +82,10 @@ describe("app/routes/api+/acd-router", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const text = await res.text();
-    expect(text).toContain("say:");
-    expect(text).toContain("hangup");
+    expect(text).toContain(
+      "<Say>We're unable to take your call right now. Please try again later.</Say>",
+    );
+    expect(text).toContain("<Hangup/>");
     expect(mocks.logger.error).toHaveBeenCalledWith(
       "Unhandled error in api.acd-router",
       expect.objectContaining({ error: "signature check exploded" }),

@@ -1,5 +1,5 @@
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
-import { requireDataPlaneCapability } from "@/lib/capability-guard.server";
+import { dataPlaneCapabilityAuthForResource } from "@/lib/capability-guard.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
 import {
@@ -7,28 +7,13 @@ import {
   mapCampaignQueueItemForUi,
 } from "@/lib/campaign-queue-search.server";
 import {
-  authForResource,
   getCampaignQueueApi,
   patchCampaignQueueApi,
 } from "@/lib/platform-data.server";
 import { patchCampaignQueueBodySchema } from "@/lib/schemas/api/platform-data";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
 export const loader = defineLoader({
-  auth: async ({ request, params }: LoaderFunctionArgs) => {
-    const campaignId = params.campaignId;
-    if (!campaignId) {
-      return jsonError("campaignId is required", 400);
-    }
-
-    const auth = await authForResource(request, "campaign", campaignId);
-    if (auth instanceof Response) return auth;
-
-    const capability = await requireDataPlaneCapability(auth, "campaigns.read");
-    if (capability instanceof Response) return capability;
-
-    return { ...auth, campaignId };
-  },
+  auth: dataPlaneCapabilityAuthForResource("campaigns.read", "campaign", "campaignId"),
   sideEffects: ["db-read"],
   handler: async ({ request, url, auth }) => {
     const campaignId = auth.campaignId;
@@ -71,27 +56,16 @@ export const loader = defineLoader({
 });
 
 export const action = defineAction({
-  auth: async ({ request, params }: ActionFunctionArgs) => {
-    const campaignId = params.campaignId;
-    if (!campaignId) {
-      return jsonError("campaignId is required", 400);
-    }
-
+  // Destructive mutation: require at least `member`, blocking the `caller` role.
+  auth: dataPlaneCapabilityAuthForResource("campaigns.write", "campaign", "campaignId", {
+    minRole: "member",
+  }),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
     if (request.method !== "PATCH") {
       return jsonError("Method not allowed", 405);
     }
 
-    // Destructive mutation: require at least `member`, blocking the `caller` role.
-    const auth = await authForResource(request, "campaign", campaignId, "member");
-    if (auth instanceof Response) return auth;
-
-    const capability = await requireDataPlaneCapability(auth, "campaigns.write");
-    if (capability instanceof Response) return capability;
-
-    return { ...auth, campaignId };
-  },
-  sideEffects: ["db-write"],
-  handler: async ({ request, auth }) => {
     const parsed = await parseJsonBodyOrResponse(request, patchCampaignQueueBodySchema);
     if (parsed instanceof Response) return parsed;
 

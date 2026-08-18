@@ -22,8 +22,9 @@ import {
 } from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
 import { AppError } from "@/lib/errors.server";
-import { getCampaignReadiness } from "@/lib/campaign-readiness";
+import { getCampaignReadiness, resolveReadinessQueueCount } from "@/lib/campaign-readiness";
 import { logger } from "@/lib/logger.server";
+import { isCampaignActive } from "@/lib/campaign-status";
 import { jsonError } from "@/lib/platform-api.server";
 import { parsePagination, type PaginationMeta } from "@/lib/pagination.server";
 import {
@@ -299,7 +300,8 @@ export async function listWorkspaceCampaignsApi(
     logger.error("listWorkspaceCampaignsApi", error);
     return { ok: false as const, error: error.message, status: 500 };
   }
-  return { ok: true as const, campaigns: data ?? [] };
+  const campaigns = (data ?? []).map((row) => ({ ...row, is_active: isCampaignActive(row.status) }));
+  return { ok: true as const, campaigns };
 }
 
 export async function getCampaignDetailApi(
@@ -330,6 +332,7 @@ export async function getCampaignDetailApi(
     ok: true as const,
     campaign: {
       ...campaign,
+      is_active: isCampaignActive(campaign.status),
       details,
       queue_counts: queueCounts,
     },
@@ -356,7 +359,6 @@ export async function duplicateCampaignApi(
     ...rest,
     title: `${campaign.title} (Copy)`,
     status: "draft" as const,
-    is_active: false,
   };
 
   const tdb = createTenantDb(workspaceId);
@@ -428,7 +430,7 @@ export async function transitionCampaignStatusApi(
 
   const { status, is_active } = body;
 
-  if (status === "running" || status === "scheduled") {
+  if (status === "running" || status === "waiting" || status === "scheduled") {
     if (
       !campaignRecord.type ||
       !["live_call", "message", "robocall", "simple_ivr", "complex_ivr"].includes(
@@ -448,7 +450,11 @@ export async function transitionCampaignStatusApi(
       campaignRecord as Campaign,
       campaignDetails as Parameters<typeof getCampaignReadiness>[1],
       {
-        queueCount: queueCounts.queuedCount ?? queueCounts.fullCount ?? 0,
+        // Total assigned audience, not remaining/undequeued rows; see resolveReadinessQueueCount (#1255).
+        queueCount: resolveReadinessQueueCount({
+          totalCount: queueCounts.fullCount,
+          queuedCount: queueCounts.queuedCount,
+        }),
       },
     );
     const readinessError =
@@ -461,16 +467,10 @@ export async function transitionCampaignStatusApi(
     }
   }
 
+  void is_active; // accepted for compatibility, ignored — derived from status (#1216)
   const update: Database["public"]["Tables"]["campaign"]["Update"] = {
     status: status as Database["public"]["Enums"]["campaign_status"],
   };
-  if (is_active !== undefined) {
-    update.is_active = is_active;
-  } else if (status === "running") {
-    update.is_active = true;
-  } else if (status === "paused") {
-    update.is_active = false;
-  }
 
   const tdb = createTenantDb(workspaceId);
   try {
@@ -486,7 +486,7 @@ export async function transitionCampaignStatusApi(
     };
   }
 
-  return { ok: true as const, status, is_active: update.is_active ?? null };
+  return { ok: true as const, status, is_active: isCampaignActive(status) };
 }
 
 export async function getCampaignQueueApi(

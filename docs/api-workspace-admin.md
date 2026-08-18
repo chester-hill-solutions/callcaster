@@ -24,7 +24,15 @@ Legacy `POST /api/workspace` is removed (SEC-01). Use the scoped routes above.
 
 Legacy flat routes (`/api/workspace-api-keys`) remain for UI compatibility; prefer scoped routes above.
 
-Auth: workspace member manager session (admin+ or member with manage rights).
+Auth: workspace **admin** session. API-key actors are refused (401) on the scoped
+route, so a key cannot mint another key.
+
+**Capability scope cap.** A key may only carry capabilities the creating member's
+own role holds, per `CALLCASTER_ROLE_CAPABILITY_MATRIX`. Requesting a scope
+outside that set returns 403 naming each disallowed capability. In practice an
+owner can grant all eight capabilities and an admin can grant every one except
+`audit.read`, which is owner-only. Scopes are fixed at creation — there is no
+update path — so revoke and re-mint to change them.
 
 ## Members
 

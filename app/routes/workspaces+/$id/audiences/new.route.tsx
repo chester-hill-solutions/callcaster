@@ -53,14 +53,14 @@ export default function AudiencesNew() {
 
   return (
     <section id="form">
-      <PageShell title="Add a Call list" maxWidth="narrow">
+      <PageShell title="Add a Call list" titleAs="h2" maxWidth="narrow">
         {actionData?.error ? (
           <Text className="text-center text-destructive">
             Error: {actionData.error}
           </Text>
         ) : null}
         <Tabs value={`step-${currentStep}`} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger 
               value="step-1" 
               disabled={currentStep !== 1}
@@ -70,18 +70,26 @@ export default function AudiencesNew() {
               Name
             </TabsTrigger>
             <TabsTrigger 
-              value="step-2" 
+              value="step-2"
               disabled={currentStep !== 2}
               className={currentStep > 2 ? "text-green-800" : ""}
             >
               {currentStep > 2 && <MdCheck className="mr-1" />}
-              Upload
+              Select File
             </TabsTrigger>
             <TabsTrigger 
               value="step-3" 
               disabled={currentStep !== 3}
+              className={currentStep > 3 ? "text-green-800" : ""}
             >
-              Process
+              {currentStep > 3 && <MdCheck className="mr-1" />}
+              Map Columns
+            </TabsTrigger>
+            <TabsTrigger
+              value="step-4"
+              disabled={currentStep !== 4}
+            >
+              Upload
             </TabsTrigger>
           </TabsList>
 
@@ -114,56 +122,52 @@ export default function AudiencesNew() {
                     disabled={!audienceName.trim()}
                     className="bg-brand-primary text-white hover:bg-brand-secondary"
                   >
-                    Next: Upload Contacts <MdArrowForward className="ml-2" />
+                    Next: Select File <MdArrowForward className="ml-2" />
                   </Button>
                 </div>
               </form>
             </Section>
           ) : null}
 
-          {currentStep === 2 ? (
-            <Section variant="flat" className="space-y-4">
-              <div className="mb-4 text-center" data-testid="audience-upload-step">
-                <h3 className="text-lg font-medium">Upload Contacts</h3>
-              </div>
-              
+          {currentStep >= 2 ? (
+            <Section
+              variant="flat"
+              className="space-y-4"
+              data-testid="audience-upload-step"
+            >
               <div className="space-y-6">
                 <AudienceUploader
                   audienceName={audienceName}
                   campaignId={campaignId}
                   returnTo={returnTo}
+                  onStageChange={(stage) => {
+                    setCurrentStep(stage === "file" ? 2 : stage === "map" ? 3 : 4);
+                  }}
                   onUploadComplete={(audienceId) => {
                     setCompletedAudienceId(audienceId);
-                    setCurrentStep(3);
                   }}
                 />
+                {completedAudienceId ? (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      className="bg-brand-primary text-white hover:bg-brand-secondary"
+                      onClick={() => {
+                        if (!workspaceId) return;
+                        navigate(
+                          returnTo ??
+                            `/workspaces/${workspaceId}/audiences/${completedAudienceId}`,
+                        );
+                      }}
+                    >
+                      {returnTo ? "Continue setup" : "View Call list"}
+                    </Button>
+                  </div>
+                ) : null}
               </div>
             </Section>
           ) : null}
 
-          {currentStep === 3 ? (
-            <Section variant="flat" className="space-y-4">
-              <div className="text-center space-y-4">
-                <h3 className="mb-2 text-lg font-medium">Upload Complete</h3>
-                <Text variant="muted">
-                  Your Call list is ready and contacts are being processed.
-                </Text>
-                <Button
-                  type="button"
-                  className="bg-brand-primary text-white hover:bg-brand-secondary"
-                  onClick={() => {
-                    if (!workspaceId || !completedAudienceId) return;
-                    navigate(
-                      returnTo ??
-                        `/workspaces/${workspaceId}/audiences/${completedAudienceId}`,
-                    );
-                  }}
-                >
-                  {returnTo ? "Continue setup" : "View Call list"}
-                </Button>
-              </div>
-            </Section>
-          ) : null}
         </Tabs>
       </PageShell>
     </section>

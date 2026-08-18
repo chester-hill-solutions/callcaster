@@ -3,22 +3,12 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => {
-  const say = vi.fn();
-  const hangup = vi.fn();
-  const toString = vi.fn(() => "<Response />");
-  const VoiceResponse = vi.fn(function (this: unknown) {
-    return { say, hangup, toString };
-  });
   return {
     env: {
       BETTER_AUTH_URL: vi.fn(() => "http://client"),
       BETTER_AUTH_SERVICE_KEY: vi.fn(() => "service"),
     },
     logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
-    VoiceResponse,
-    say,
-    hangup,
-    toString,
   };
 });
 
@@ -33,9 +23,6 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
 
 vi.mock("@/lib/env.server", () => ({ env: mocks.env }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-vi.mock("twilio", () => ({
-  default: { twiml: { VoiceResponse: mocks.VoiceResponse } },
-}));
 
 const verificationDbMocks = vi.hoisted(() => ({
   findPendingVerificationSession: vi.fn(),
@@ -60,11 +47,6 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
     vi.resetModules();
     twilioWebhookMocks.requireTwilioSignature.mockReset();
     twilioWebhookMocks.requireTwilioSignature.mockResolvedValue(null);
-    mocks.VoiceResponse.mockClear();
-    mocks.say.mockReset();
-    mocks.hangup.mockReset();
-    mocks.toString.mockReset();
-    mocks.toString.mockReturnValue("<Response />");
     verificationDbMocks.findPendingVerificationSession.mockReset();
     verificationDbMocks.getUserVerifiedAudioNumbers.mockReset();
     verificationDbMocks.appendVerifiedAudioNumber.mockReset();
@@ -103,9 +85,8 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
       }),
     } as never));
     expect(res.headers.get("Content-Type")).toBe("text/xml");
-    expect(mocks.say).toHaveBeenCalledWith(
-      "Invalid request. Missing caller information."
-    );
+    const body = await res.text();
+    expect(body).toContain("<Say>Invalid request. Missing caller information.</Say>");
   });
 
   test("action returns error TwiML when no matching session", async () => {
@@ -119,9 +100,8 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
         body: formData,
       }),
     } as never));
-    expect(mocks.say).toHaveBeenCalledWith(
-      expect.stringContaining("No active verification session")
-    );
+    const body = await res.text();
+    expect(body).toContain("No active verification session");
   });
 
   test("action success updates user and returns success TwiML", async () => {
@@ -145,8 +125,9 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
     } as never));
 
     expect(res.headers.get("Content-Type")).toBe("text/xml");
-    expect(mocks.say).toHaveBeenCalledWith(
-      "Your phone number has been successfully verified. You may now hang up."
+    const body = await res.text();
+    expect(body).toContain(
+      "<Say>Your phone number has been successfully verified. You may now hang up.</Say>",
     );
     expect(verificationDbMocks.appendVerifiedAudioNumber).toHaveBeenCalledWith("u1", "+15551234567");
     expect(verificationDbMocks.markVerificationSessionVerified).toHaveBeenCalledWith("vs-1");
@@ -171,9 +152,8 @@ describe("app/routes/api+/inbound/route-verification.tsx", () => {
       }),
     } as never));
 
-    expect(mocks.say).toHaveBeenCalledWith(
-      "This number is already verified."
-    );
+    const body = await res.text();
+    expect(body).toContain("<Say>This number is already verified.</Say>");
     expect(verificationDbMocks.markVerificationSessionVerified).toHaveBeenCalledWith("vs-1");
   });
 });

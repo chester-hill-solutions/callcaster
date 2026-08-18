@@ -18,7 +18,7 @@
  * produces about twenty false positives, because this codebase legitimately
  * puts the membership check in the SERVICE layer. `api+/numbers` looks
  * unguarded but `purchaseWorkspaceNumber` calls requireWorkspaceAccess
- * internally; `workspace-api-keys` is guarded by requireMemberManager inside
+ * internally; `workspace-api-keys` is guarded by requireApiKeyManager inside
  * listWorkspaceApiKeys; `caller-id` by requireNumbersManager. Flagging those
  * would mean an allowlist of ~20 entries — another hand-maintained list, which
  * is the bug class this whole exercise exists to remove.
@@ -42,7 +42,7 @@ const ROUTES = path.join(ROOT, "app/routes");
 
 /** Anything that proves the caller belongs to the workspace being touched. */
 const MEMBERSHIP_PROOF =
-  /requireWorkspaceAccess\s*\(|requireWorkspaceLoaderContext\s*\(|requireMemberManager\s*\(|requireNumbersManager\s*\(|getWorkspaceRouteContext\s*\(|getDataPlaneRouteContext\s*\(|dataPlaneCapabilityAuth\w*\s*\(|withWorkspaceApi\w*\s*\(|authFor(?:Campaign|Contact|Script|Survey|OutreachAttempt)\s*\(|workspaceRouteAuth\b|workspaceLoaderAuth\b|enforceWorkspaceRole\s*\(|requireSudo\s*\(|adminRouteAuth\b|getAdminRouteContext\s*\(|requireAdmin\w*\s*\(|context\.get\(\s*workspaceContext\s*\)|context\.get\(\s*dataPlaneAuthContext\s*\)/;
+  /requireWorkspaceAccess\s*\(|requireWorkspaceLoaderContext\s*\(|requireMemberManager\s*\(|requireApiKeyManager\s*\(|requireNumbersManager\s*\(|getWorkspaceRouteContext\s*\(|getDataPlaneRouteContext\s*\(|dataPlaneCapabilityAuth\w*\s*\(|withWorkspaceApi\w*\s*\(|authFor(?:Campaign|Contact|Script|Survey|OutreachAttempt)\s*\(|workspaceRouteAuth\b|workspaceLoaderAuth\b|enforceWorkspaceRole\s*\(|requireSudo\s*\(|adminRouteAuth\b|getAdminRouteContext\s*\(|requireAdmin\w*\s*\(|context\.get\(\s*workspaceContext\s*\)|context\.get\(\s*dataPlaneAuthContext\s*\)/;
 
 /** Requests that are authenticated as Twilio/Stripe/cron rather than as a user. */
 const NON_USER_SURFACE =

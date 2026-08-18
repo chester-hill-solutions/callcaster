@@ -1,201 +1,19 @@
-import {
-  messageCampaignRequiresCallerId,
-  resolveTwilioSmsMessagingServiceSid,
-} from "@/lib/sms-send-resolve";
-import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";
-import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
-import { countCampaignMessagesToPhone } from "@/lib/message-db.server";
-import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
-import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
-import { getCampaignQueueById } from "@/lib/database/campaign.server";
-import {
-  createWorkspaceTwilioInstance,
-  getWorkspaceTwilioPortalConfig,
-  requireWorkspaceAccess,
-} from "@/lib/database/workspace.server";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { normalizePhoneNumber, processTemplateTags } from "@/lib/utils";
 import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { requireDualAuthCapability } from "@/lib/capability-guard.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { campaignSmsDispatchBodySchema } from "@/lib/schemas/api/sms";
-import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
-import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
-import { withTwilioRetry } from "@/lib/twilio-client.server";
-import {
-  persistMessageRecord,
-  twilioMessageToPersistFields,
-} from "@/lib/sms-send.server";
-import {
-  claimBatchSizeForRate,
-  configuredDispatcherSmsMps,
-} from "@/lib/throughput-config.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
+import type { TwilioMessageIntent } from "@/lib/types";
 import { parseOptionalString } from "@/lib/parse-utils.server";
-import { isWithinSendWindow, parseSendWindow } from "@/lib/campaign-send-window";
-import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
-import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
-import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
-import { createTenantDb } from "@/server/tenant-db";
-import { createSignedObjectUrl } from "@/lib/object-storage.server";
-import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
 import { defineAction } from "@/lib/handler.server";
+import { dispatchCampaignSmsBatch } from "@/lib/campaign-sms-dispatch.server";
 
-const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
-const OPTED_OUT_SMS_DEQUEUED_REASON = "Contact opted out";
-const LANDLINE_SMS_DEQUEUED_REASON = "Landline — cannot receive SMS";
-
-interface SendMessageParams {
-  body: string;
-  to: string;
-  from: string;
-  media: string[];
-  campaign_id: string;
-  workspace: string;
-  contact_id: string | number;
-  queue_id: number | string;
-  user_id: string;
-  portalConfig: WorkspaceTwilioOpsConfig;
-  messageIntent?: TwilioMessageIntent | null;
-  messagingServiceSidFromRequest: string | null;
-  campaignSmsRow?: {
-    end_time: string;
-    sms_send_mode?: string | null;
-    sms_messaging_service_sid?: string | null;
-    caller_id?: string | null;
-  };
-}
-
-async function hasDuplicateCampaignSms(args: {
-  workspaceId: string;
-  campaignId: string;
-  to: string;
-}): Promise<boolean> {
-  const count = await countCampaignMessagesToPhone(
-    args.workspaceId,
-    args.campaignId,
-    args.to,
-  );
-  return count > 0;
-}
-
-const sendMessage = async ({
-  body,
-  to,
-  from,
-  media,
-    campaign_id,
-  workspace,
-  contact_id,
-  queue_id,
-  user_id,
-  portalConfig,
-  messageIntent,
-  messagingServiceSidFromRequest,
-  campaignSmsRow,
-}: SendMessageParams) => {
-
-  await assertWorkspaceCanSendSms({workspaceId: workspace });
-
-  const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspace,
-  });
-
-  const processedBody = body;
-
-  const resolvedMessagingServiceSid = resolveTwilioSmsMessagingServiceSid({
-    explicitRequestSid: messagingServiceSidFromRequest,
-    campaignSmsSendMode: campaignSmsRow?.sms_send_mode,
-    campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
-    portalConfig,
-  });
-
-  const [message, outreachAttempt] = await Promise.all([
-    withTwilioRetry(
-      () =>
-        twilio.messages.create(
-          buildTwilioOutboundSmsCreateParams({
-            body: processedBody,
-            to,
-            from,
-            media,
-            statusCallback: `${env.BASE_URL()}/api/sms/status`,
-            portalConfig,
-            messageIntent,
-            explicitMessagingServiceSid: resolvedMessagingServiceSid,
-            campaignSmsSendMode: campaignSmsRow?.sms_send_mode,
-            campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
-          }),
-        ),
-      { workspaceId: workspace, operation: "messages.create.campaign" },
-    ).catch((e) => ({ error: e })),
-    createOutreachAttempt({
-      contact_id,
-      campaign_id,
-      queue_id,
-      workspace,
-      user_id,
-    })
-  ]);
-
-  if ('error' in message) {
-    throw message.error;
-  }
-
-  const messageFields = twilioMessageToPersistFields(
-    { ...message, sid: message.sid || `failed-${to}-${Date.now()}` },
-    { workspace, campaign_id, contact_id },
-  );
-
-  const outreachUpdate = await updateOutreachAttemptForWorkspace(
-    workspace,
-    outreachAttempt,
-    { disposition: "completed" },
-  );
-  if (outreachUpdate instanceof Response) {
-    throw new Error(await outreachUpdate.text());
-  }
-
-  await Promise.all([
-    persistMessageRecord(workspace, messageFields),
-    dequeueCampaignQueueById({
-      queueId: Number(queue_id),
-      userId: user_id,
-      reason: "SMS message sent",
-    }),
-  ]);
-
-  return { message };
-};
-
-const createOutreachAttempt = async ({
-  contact_id,
-  campaign_id,
-  queue_id,
-  workspace,
-  user_id,
-}: {
-  contact_id: string | number;
-  campaign_id: string | number;
-  queue_id: string | number;
-  workspace: string;
-  user_id: string;
-}) => {
-  const tdb = createTenantDb(workspace);
-  try {
-    return await rpcCreateOutreachAttempt(tdb, {
-      contactId: Number(contact_id),
-      campaignId: Number(campaign_id),
-      userId: user_id,
-      workspaceId: workspace,
-      queueId: Number(queue_id),
-    });
-  } catch (outreachError) {
-    logger.error("Error creating outreach attempt:", outreachError);
-    throw outreachError;
-  }
-};
-
+/**
+ * HTTP adapter for campaign SMS dispatch. Auth, capability, and request
+ * parsing live here; every send gate and the batch loop live in
+ * `dispatchCampaignSmsBatch` so the worker dispatch path shares them.
+ */
 export const action = defineAction({
   auth: async ({ request }: { request: Request }) => {
     const authResult = await verifyApiKeyOrSession(request);
@@ -248,8 +66,6 @@ export const action = defineAction({
     const messagingServiceSidFromRequest = parseOptionalString(
       messaging_service_sid,
     );
-    const callerIdStr =
-      typeof caller_id === "string" ? caller_id.trim() : "";
 
     if (authResult.authType === "api_key") {
       if (workspace_id !== authResult.workspaceId) {
@@ -267,6 +83,9 @@ export const action = defineAction({
       });
     }
 
+    // Still baselined (issue #1242, D3): workspace_id comes from the parsed
+    // JSON body, not a route param, so the capability check can't move into a
+    // pre-request `auth:` strategy without a body-clone rework of this route.
     const capability = await requireDualAuthCapability({
       auth: authResult,
       workspaceId: workspace_id,
@@ -276,205 +95,55 @@ export const action = defineAction({
       return capability;
     }
 
-    // Fail-closed credit gate: check once at entry for the whole batch
-    // rather than per contact, so a mid-campaign depletion doesn't burn
-    // through the audience one Twilio failure at a time.
-    const creditsBalance = await getWorkspaceCreditsBalance(workspace_id);
-    if (hasInsufficientCreditsForOutbound(creditsBalance)) {
-      return new Response(
-        JSON.stringify({ creditsError: true, error: "Insufficient credits" }),
-        {
-          status: 402,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
+    const outcome = await dispatchCampaignSmsBatch({
+      workspaceId: workspace_id,
+      campaignId: campaign_id,
+      userId: effectiveUserId as string,
+      callerId: typeof caller_id === "string" ? caller_id : null,
+      requireExplicitCallerId: true,
+      messageIntent,
+      messagingServiceSidFromRequest,
+    });
 
-    const [campaign, audience, portalConfig] = await Promise.all([
-      loadCampaignSmsDispatchData(workspace_id, campaign_id),
-      getCampaignQueueById({campaign_id,
-        onlyQueued: true,
-      }),
-      getWorkspaceTwilioPortalConfig({workspaceId: workspace_id,
-      }),
-    ]);
-
-    const requiresCallerId = messageCampaignRequiresCallerId(
-      campaign.campaign?.sms_send_mode,
-    );
-    if (requiresCallerId && !callerIdStr) {
-      return new Response(
-        JSON.stringify({ error: "caller_id is required for this campaign" }),
-        {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Campaign send-window / CASL quiet-hours gate. This is the authoritative
-    // Send-Now SMS path and is campaign-only — 1:1 chat sends use a different
-    // route (chat_sms) and are never gated here. When the current tick falls
-    // outside the campaign's send window we DEFER the whole batch: nothing is
-    // dispatched and nothing is dequeued, so contacts remain queued for a
-    // later in-window tick. A `null` window is unrestricted.
-    if (!isWithinSendWindow(parseSendWindow(campaign.campaign?.sms_send_window ?? null))) {
-      return new Response(
-        JSON.stringify({
-          deferred: true,
-          reason: "Outside campaign send window",
-          responses: [],
-        }),
-        {
+    switch (outcome.kind) {
+      case "insufficient_credits":
+        return new Response(
+          JSON.stringify({ creditsError: true, error: "Insufficient credits" }),
+          {
+            status: 402,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      case "caller_id_required":
+        return new Response(
+          JSON.stringify({ error: "caller_id is required for this campaign" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      case "deferred_send_window":
+        return new Response(
+          JSON.stringify({
+            deferred: true,
+            reason: "Outside campaign send window",
+            responses: [],
+          }),
+          {
+            headers: { "Content-Type": "application/json" },
+            status: 200,
+          },
+        );
+      case "dispatched":
+        return new Response(JSON.stringify({ responses: outcome.responses }), {
           headers: { "Content-Type": "application/json" },
           status: 200,
-        },
-      );
+        });
     }
-
-    const media = campaign.message_media?.length
-      ? await Promise.all(
-          campaign.message_media.map(mediaItem =>
-            createSignedObjectUrl("messageMedia", `${workspace_id}/${mediaItem}`, 3600)
-          )
-        )
-      : [];
-
-    // Legacy direct-send path: bypasses queue-next dispatcher. When parallel dispatch
-    // is enabled, cap batch concurrency using portal throughput settings.
-    const LEGACY_MAX_BATCH = 25;
-    const BATCH_SIZE = portalConfig.parallelDispatchEnabled
-      ? Math.min(
-          LEGACY_MAX_BATCH,
-          claimBatchSizeForRate(
-            configuredDispatcherSmsMps(portalConfig),
-            1000,
-          ),
-        )
-      : LEGACY_MAX_BATCH;
-    const results = [];
-    const queueMembers = audience ?? [];
-    
-    for (let i = 0; i < queueMembers.length; i += BATCH_SIZE) {
-      const batch = queueMembers.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.all(
-        batch.map(async member => {
-          const normalizedPhone = normalizePhoneNumber(member.contact?.phone || "");
-
-          // Recipient-local quiet hours (CASL/TCPA — 8am–9pm recipient
-          // time). Unlike opt-out/landline/duplicate below, this is
-          // temporary: leave the row queued (no dequeue) so a later
-          // in-window dispatch picks it up.
-          const windowStatus = recipientCallingWindowStatus(normalizedPhone);
-          if (!windowStatus.allowed) {
-            return {
-              [member.contact_id]: {
-                success: true,
-                skipped: true,
-                deferred: true,
-                reason: "Outside recipient quiet-hours window",
-              },
-            };
-          }
-
-          if (member.contact?.opt_out) {
-            await dequeueCampaignQueueById({
-              queueId: member.id,
-              userId: effectiveUserId as string,
-              reason: OPTED_OUT_SMS_DEQUEUED_REASON,
-            });
-            return {
-              [member.contact_id]: {
-                success: true,
-                skipped: true,
-                reason: OPTED_OUT_SMS_DEQUEUED_REASON,
-              },
-            };
-          }
-
-          const lineType = member.contact
-            ? await getOrLookupLineType({
-                workspaceId: workspace_id,
-                contactId: member.contact_id,
-                phone: normalizedPhone,
-              })
-            : null;
-
-          if (isSmsIncapableLineType(lineType)) {
-            await dequeueCampaignQueueById({
-              queueId: member.id,
-              userId: effectiveUserId as string,
-              reason: LANDLINE_SMS_DEQUEUED_REASON,
-            });
-            return {
-              [member.contact_id]: {
-                success: true,
-                skipped: true,
-                reason: LANDLINE_SMS_DEQUEUED_REASON,
-              },
-            };
-          }
-
-          const duplicateExists = await hasDuplicateCampaignSms({
-            workspaceId: workspace_id,
-            campaignId: campaign_id,
-            to: normalizedPhone,
-          });
-
-          if (duplicateExists) {
-            await dequeueCampaignQueueById({
-              queueId: member.id,
-              userId: effectiveUserId as string,
-              reason: DUPLICATE_SMS_DEQUEUED_REASON,
-            });
-            return {
-              [member.contact_id]: {
-                success: true,
-                skipped: true,
-                reason: DUPLICATE_SMS_DEQUEUED_REASON,
-              },
-            };
-          }
-
-          // Process template tags for this specific contact
-          let processedBody = campaign.body_text;
-          if (member.contact && campaign.body_text) {
-            processedBody = processTemplateTags(campaign.body_text, member.contact);
-          }
-          
-          return sendMessage({
-            body: processedBody,
-            media: media.filter(Boolean) as string[],
-            to: normalizedPhone,
-            from:
-              callerIdStr ||
-              String(campaign.campaign?.caller_id ?? "").trim(),
-                        campaign_id,
-            workspace: workspace_id,
-            contact_id: member.contact_id,
-            queue_id: member.id,
-            user_id: effectiveUserId as string,
-            portalConfig,
-            messageIntent,
-            messagingServiceSidFromRequest,
-            campaignSmsRow: campaign.campaign,
-          }).then(
-            result => ({ [member.contact_id]: { success: true, ...result }}),
-            error => ({ [member.contact_id]: { success: false, error: error.message }})
-          );
-        })
-      );
-      results.push(...batchResults);
-    }
-
-    return new Response(JSON.stringify({ responses: results }), {
-      headers: { "Content-Type": "application/json" },
-      status: 200,
-    });
   } catch (error) {
     logger.error("Error in action:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), 
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
       {
         headers: { "Content-Type": "application/json" },
         status: 500,

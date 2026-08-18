@@ -13,8 +13,9 @@ import {
   contact as contactTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
-import type { TenantDb } from "@/server/tenant-db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { emitQueueEvent } from "@/lib/workspace-events.server";
+import { rpcDequeueContact, type RpcExecutor } from "@/lib/db-rpc.server";
 
 export type ClaimedQueueContact = {
   contact_id: number;
@@ -319,7 +320,13 @@ export async function requeueCampaignQueueById(queueId: number, workspaceId?: st
   });
 }
 
-export async function dequeueCampaignQueueById(args: {
+/**
+ * Internal mechanism — plain Drizzle UPDATE, unconditional on the row's
+ * current queue_state. Not exported: call {@link dequeueQueueEntry} instead
+ * (see the note there for why this file, not the caller, owns the mechanism
+ * choice).
+ */
+async function dequeueCampaignQueueById(args: {
   queueId: number;
   userId: string;
   reason: string;
@@ -450,10 +457,12 @@ export async function resolveContactWorkspaceIdFromQueue(
 }
 
 /**
- * Dequeue campaign_queue rows for a contact (optionally scoped to one campaign).
- * `userId` may be null for system-initiated dequeues (e.g. inbound SMS STOP).
+ * Internal mechanism — plain Drizzle UPDATE, unconditional on the row's
+ * current queue_state, optionally scoped to one campaign. `userId` may be
+ * null for system-initiated dequeues (e.g. inbound SMS STOP). Not exported:
+ * call {@link dequeueQueueEntry} instead.
  */
-export async function dequeueCampaignQueueByContact(args: {
+async function dequeueCampaignQueueByContact(args: {
   contactId: number;
   campaignId?: number | null;
   userId: string | null;
@@ -473,6 +482,199 @@ export async function dequeueCampaignQueueByContact(args: {
     set: buildDequeuedQueueUpdate(args.userId, args.reason),
     workspaceId: args.workspaceId,
   });
+}
+
+/**
+ * The single QueueEntry dequeue entry point (issue #1240, part B3). Every
+ * caller in the app routes through here — which of the three underlying
+ * mechanisms actually runs is an implementation detail this function owns:
+ *
+ *  - `by: { id }` (a campaign_queue row id) always uses the plain-Drizzle
+ *    mechanism ({@link dequeueCampaignQueueById}): unconditional on the
+ *    row's current queue_state, optionally workspace-scoped. There's no
+ *    contact to key a household lookup off of, so `household` must be
+ *    omitted for this target.
+ *
+ *  - `by: { contactId, campaignId? }` with `household` omitted uses the
+ *    plain-Drizzle mechanism ({@link dequeueCampaignQueueByContact}): same
+ *    unconditional semantics, optionally scoped to one campaign.
+ *
+ *  - `by: { contactId }` with `household` set (`true` or `false`) uses the
+ *    household-aware `dequeue_contact` Postgres RPC
+ *    (`rpcDequeueContact` in db-rpc.server — kept per ADR-0003, concurrency)
+ *    via a tenant-scoped executor (`exec`, or one built from `workspaceId`
+ *    if omitted). `household: true` fans the dequeue out to every contact
+ *    sharing the source contact's household_id — "household is the unit of
+ *    contact" per CONTEXT.md. `household: false` is a real, distinct third
+ *    mode, not a no-op alias for the Drizzle path: the RPC touches a row only
+ *    when it is `queued`/null, or `assigned` to the very user passed as
+ *    `userId` (see
+ *    client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql).
+ *    So it's a *guarded*, single-contact dequeue that silently no-ops on a
+ *    row some other agent now holds — which is the point: it makes a dequeue
+ *    that raced a concurrent reclaim harmless instead of letting it kill
+ *    another agent's live call. app/lib/auto-dial.server.ts's
+ *    ambiguous-dial-park path is the call site that depends on that guard —
+ *    it deliberately avoids requeue-and-retry semantics — so `household:
+ *    false` is preserved as a distinct, explicit choice rather than folded
+ *    into the Drizzle default.
+ *
+ *    Corollary: on this path a `userId` of `null` (system-initiated dequeue)
+ *    can only ever reach `queued`/null rows — the assigned-row case needs a
+ *    claim holder to compare against.
+ *
+ * Mechanism selection here is a behavior-preserving refactor of the original
+ * call sites; what each mechanism does to an `assigned` row changed in #1260.
+ *
+ * All three mechanisms report {@link DequeueQueueEntryResult}: whether the
+ * target row itself was actually dequeued. Callers that dequeue their own
+ * claim (auto-dial's park, the hangup and status-callback paths) always match
+ * and are free to ignore it, as they did before #1278; the manual queue-UI
+ * path in app/routes/api+/queues.action.server.ts is the one that must not
+ * report success for a write that no-oped.
+ */
+type DequeueQueueEntryByIdArgs = {
+  by: { id: number };
+  userId: string;
+  reason: string;
+  workspaceId?: string;
+  household?: undefined;
+};
+
+type DequeueQueueEntryByContactArgs = {
+  by: { contactId: number; campaignId?: number | null };
+  userId: string | null;
+  reason: string;
+  workspaceId?: string;
+  household?: boolean;
+  exec?: RpcExecutor;
+};
+
+export type DequeueQueueEntryArgs =
+  | DequeueQueueEntryByIdArgs
+  | DequeueQueueEntryByContactArgs;
+
+/**
+ * What the dequeue actually did to the row it was called for (#1278).
+ *
+ * `dequeuedPrimary: false` is not an error — on the guarded RPC path it is the
+ * concurrency guard doing its job, and on the Drizzle paths it means the
+ * target row no longer exists or is already terminal. Only callers that report
+ * an outcome to a human need to look at it; see
+ * {@link explainDequeueNoOp} for turning a `false` into a reason.
+ *
+ * Household siblings are deliberately excluded: a fan-out that dequeues three
+ * siblings but misses the contact the agent clicked is still a failed dequeue.
+ */
+export type DequeueQueueEntryResult = {
+  dequeuedPrimary: boolean;
+};
+
+// A plain `"id" in args.by` inline check narrows `args.by`'s type but not
+// sibling properties of `args` (e.g. `userId`) back at the call site — a
+// named type predicate narrows the whole `args` union instead.
+function isByIdArgs(args: DequeueQueueEntryArgs): args is DequeueQueueEntryByIdArgs {
+  return "id" in args.by;
+}
+
+export async function dequeueQueueEntry(
+  args: DequeueQueueEntryArgs,
+): Promise<DequeueQueueEntryResult> {
+  if (isByIdArgs(args)) {
+    const rows = await dequeueCampaignQueueById({
+      queueId: args.by.id,
+      userId: args.userId,
+      reason: args.reason,
+      workspaceId: args.workspaceId,
+    });
+    return { dequeuedPrimary: rows.length > 0 };
+  }
+
+  const { contactId, campaignId } = args.by;
+
+  if (args.household !== undefined) {
+    if (!args.workspaceId) {
+      throw new Error(
+        "dequeueQueueEntry: workspaceId is required for the household-aware RPC mechanism",
+      );
+    }
+    const exec = args.exec ?? createTenantDb(args.workspaceId);
+    const primaryRowsDequeued = await rpcDequeueContact(exec, {
+      contactId,
+      workspaceId: args.workspaceId,
+      groupOnHousehold: args.household,
+      dequeuedById: args.userId,
+      dequeuedReasonText: args.reason,
+    });
+    return { dequeuedPrimary: primaryRowsDequeued > 0 };
+  }
+
+  const rows = await dequeueCampaignQueueByContact({
+    contactId,
+    campaignId,
+    userId: args.userId,
+    reason: args.reason,
+    workspaceId: args.workspaceId,
+  });
+  return { dequeuedPrimary: rows.length > 0 };
+}
+
+/**
+ * Why a dequeue reported `dequeuedPrimary: false` (#1278).
+ *
+ * A plain read, run only on the no-op path, so the API can say something true
+ * instead of "assigned to another agent" for every zero-row dequeue — the
+ * manual-dial "next contact" flow dequeues a contact the hangup route has
+ * usually already dequeued, and calling that a conflict would be a new lie in
+ * place of the old one.
+ *
+ * Best-effort by construction: the row can change again between the RPC and
+ * this read. It decides a message, never a write.
+ */
+export type DequeueNoOpReason =
+  | "already_dequeued"
+  | "assigned_elsewhere"
+  | "not_found"
+  | "unknown";
+
+export async function explainDequeueNoOp(args: {
+  contactId: number;
+  workspaceId: string;
+  userId: string | null;
+}): Promise<DequeueNoOpReason> {
+  const rows = await db
+    .select({
+      queue_state: campaignQueueTable.queue_state,
+      assigned_to_user_id: campaignQueueTable.assigned_to_user_id,
+      dequeued_at: campaignQueueTable.dequeued_at,
+    })
+    .from(campaignQueueTable)
+    .where(
+      and(
+        eq(campaignQueueTable.contact_id, args.contactId),
+        eq(campaignQueueTable.workspace, args.workspaceId),
+      ),
+    );
+
+  if (rows.length === 0) {
+    return "not_found";
+  }
+
+  const heldByAnotherAgent = rows.some(
+    (row) =>
+      row.dequeued_at == null &&
+      row.assigned_to_user_id != null &&
+      row.assigned_to_user_id !== args.userId,
+  );
+  if (heldByAnotherAgent) {
+    return "assigned_elsewhere";
+  }
+
+  if (rows.every((row) => row.dequeued_at != null)) {
+    return "already_dequeued";
+  }
+
+  return "unknown";
 }
 
 export async function releaseAssignedQueueForUser(

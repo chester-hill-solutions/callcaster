@@ -6,8 +6,7 @@ import { dataPlaneCapabilityAuthWithParam } from "@/lib/capability-guard.server"
 import { defineLoader } from "@/lib/handler.server";
 
 export const loader = defineLoader({
-  auth: (args) =>
-    dataPlaneCapabilityAuthWithParam("campaigns.read", "audienceId")(args),
+  auth: dataPlaneCapabilityAuthWithParam("campaigns.read", "audienceId"),
   sideEffects: ["db-read"],
   handler: async ({ auth, url }) => {
     const result = await getAudienceDetailApi(

@@ -1,23 +1,18 @@
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { purchaseNumberBodySchema } from "@/lib/schemas/api/platform-workspace-admin";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { dataPlaneSessionMinRoleAuth } from "@/lib/capability-guard.server";
+import { MemberRole } from "@/lib/member-role";
 import { purchaseWorkspaceNumber } from "@/lib/platform-workspace-numbers.server";
 import { defineAction } from "@/lib/handler.server";
-import type { ActionFunctionArgs } from "react-router";
 
 export const action = defineAction({
-  auth: ({ params, context }: Pick<ActionFunctionArgs, "params" | "context">) => {
-    const workspaceId = params.workspaceId;
-    if (!workspaceId) {
-      return jsonError("workspaceId is required", 400);
-    }
-    const { userId } = getDataPlaneRouteContext(context, workspaceId);
-    if (!userId) {
-      return jsonError("Unauthorized", 401);
-    }
-    return { workspaceId, userId };
-  },
+  // Buying a number debits workspace credits, so the role floor belongs at the
+  // route, not three layers down in `requireNumbersManager`. Member (not admin):
+  // the purchase wizard at /workspaces/:id/settings/numbers/purchase is open to
+  // members and `requireNumbersManager` has always allowed them — the declared
+  // authClass was downgraded to match rather than tightening the live flow (D1).
+  auth: dataPlaneSessionMinRoleAuth(MemberRole.Member),
   sideEffects: ["db-write", "twilio", "credit"],
   handler: async ({ request, auth }) => {
     if (request.method !== "POST") {

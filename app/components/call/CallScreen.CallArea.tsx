@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Mic, MicOff } from "lucide-react";
 import type { Tables } from "@/lib/db-types";
 import { QueueItem } from "@/lib/types";
 import { formatTime, cn } from "@/lib/utils";
@@ -31,6 +32,16 @@ interface Conference {
 export interface CallAreaProps {
   isBusy: boolean;
   nextRecipient: QueueItem | null;
+  /**
+   * The contact the script/disposition panel is currently recording an
+   * outcome for. Distinct from `nextRecipient` (the queue's next-to-dial
+   * pointer): hanging up dequeues the just-finished contact immediately
+   * (#1253), which can null out or advance `nextRecipient` before the agent
+   * has recorded a disposition. `questionContact` holds steady through that
+   * so the disposition control stays usable until the agent saves or the
+   * next dial starts.
+   */
+  questionContact: QueueItem | null;
   activeCall: ActiveCall | null;
   recentCall: Call | null;
   hangUp: () => void;
@@ -47,7 +58,10 @@ export interface CallAreaProps {
   displayState: string;
   callState: string;
   callDuration: number;
-  showDisposition?: boolean;
+  isMicrophoneMuted?: boolean;
+  onToggleMute?: () => void;
+  onLoadQueue?: () => void;
+  onResetCall?: () => void;
 }
 
 function statusBarClass(displayState: string): string {
@@ -121,7 +135,6 @@ type CallControlsProps = Pick<
   CallAreaProps,
   | "isBusy"
   | "nextRecipient"
-  | "displayState"
   | "hangUp"
   | "handleVoiceDrop"
   | "handleDialNext"
@@ -129,12 +142,21 @@ type CallControlsProps = Pick<
   | "conference"
   | "voiceDrop"
   | "callState"
+  | "isMicrophoneMuted"
+  | "onToggleMute"
+  | "onLoadQueue"
+  | "onResetCall"
 >;
 
+/**
+ * State-driven action area: exactly one primary action per call state.
+ * In a call → Hang Up (with Audio Drop / mute as secondaries). Idle with an
+ * empty queue → Load Queue. Idle with a loaded queue → Dial (power) or
+ * Start/Start Dialing (predictive).
+ */
 export function CallControls({
   isBusy,
   nextRecipient,
-  displayState,
   hangUp,
   handleVoiceDrop,
   handleDialNext,
@@ -142,6 +164,10 @@ export function CallControls({
   conference,
   voiceDrop,
   callState,
+  isMicrophoneMuted,
+  onToggleMute,
+  onLoadQueue,
+  onResetCall,
 }: CallControlsProps) {
   const [confirmingHangUp, setConfirmingHangUp] = useState(false);
   const confirmTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -170,58 +196,95 @@ export function CallControls({
     }
   };
 
-  const hangUpDisabled = callState !== "connected" && callState !== "dialing";
+  const inCall = callState === "connected" || callState === "dialing";
+  const showInCall = inCall && (!predictive || !!conference);
+
+  if (showInCall) {
+    return (
+      <div className="flex flex-col gap-3 px-4 py-3">
+        <div className="flex flex-1 gap-2">
+          <Button
+            onClick={handleHangUpClick}
+            variant="destructive"
+            className="flex-1 rounded-full"
+          >
+            {confirmingHangUp ? "Click again to hang up" : "Hang Up"}
+          </Button>
+          {voiceDrop ? (
+            <Button
+              onClick={handleVoiceDrop}
+              className="flex-1 rounded-full bg-primary text-primary-foreground"
+              disabled={callState !== "connected"}
+            >
+              Audio Drop
+            </Button>
+          ) : null}
+          {onToggleMute ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="rounded-full"
+              onClick={onToggleMute}
+              aria-label={
+                isMicrophoneMuted ? "Unmute microphone" : "Mute microphone"
+              }
+              aria-pressed={Boolean(isMicrophoneMuted)}
+            >
+              {isMicrophoneMuted ? (
+                <MicOff className="h-4 w-4" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
+            </Button>
+          ) : null}
+        </div>
+        {onResetCall ? (
+          <button
+            type="button"
+            onClick={onResetCall}
+            className="text-xs text-muted-foreground underline hover:text-foreground"
+            data-testid="call-screen-reset-call"
+          >
+            Reset call
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  const needsQueue = !predictive && !nextRecipient;
+
+  if (needsQueue) {
+    return (
+      <div className="flex flex-col gap-3 px-4 py-3">
+        <Button
+          onClick={onLoadQueue}
+          disabled={isBusy || !onLoadQueue}
+          className="w-full rounded-full"
+          data-testid="call-screen-load-queue"
+        >
+          Load Queue
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3 px-4 py-3">
-      {!conference && predictive && callState === "idle" ? (
-        <Button
-          disabled={isBusy}
-          onClick={handleDialNext}
-          className="self-center"
-        >
-          Start Dialing
-        </Button>
-      ) : null}
-      <div className="flex flex-1 gap-2">
-        <Button
-          onClick={handleHangUpClick}
-          variant={confirmingHangUp ? "destructive" : "destructive"}
-          className="flex-1 rounded-full"
-          disabled={hangUpDisabled}
-        >
-          {confirmingHangUp ? "Click again to hang up" : "Hang Up"}
-        </Button>
-        {voiceDrop ? (
-          <Button
-            onClick={handleVoiceDrop}
-            className="flex-1 rounded-full bg-primary text-primary-foreground"
-            disabled={callState !== "connected"}
-          >
-            Audio Drop
-          </Button>
-        ) : null}
-        <Button
-          onClick={handleDialNext}
-          disabled={
-            displayState === "dialing" ||
-            displayState === "connected" ||
-            isBusy ||
-            (!predictive && !nextRecipient)
-          }
-          data-testid="call-screen-dial"
-          className="flex-1 rounded-full bg-success text-success-foreground hover:bg-success/80"
-          title={
-            callState === "connected" ||
-            callState === "dialing" ||
-            !nextRecipient
-              ? "Load your queue to get started"
-              : `Dial ${nextRecipient?.contact?.phone}`
-          }
-        >
-          {!predictive ? "Dial" : "Start"}
-        </Button>
-      </div>
+      <Button
+        onClick={handleDialNext}
+        disabled={isBusy}
+        data-testid="call-screen-dial"
+        className="w-full rounded-full bg-success text-success-foreground hover:bg-success/80"
+        title={
+          nextRecipient?.contact?.phone
+            ? `Dial ${nextRecipient.contact.phone}`
+            : undefined
+        }
+      >
+        {!predictive ? "Dial" : conference ? "Start" : "Start Dialing"}
+      </Button>
     </div>
   );
 }
@@ -229,7 +292,7 @@ export function CallControls({
 type DispositionBarProps = Pick<
   CallAreaProps,
   | "isBusy"
-  | "nextRecipient"
+  | "questionContact"
   | "handleDequeueNext"
   | "disposition"
   | "dispositionOptions"
@@ -238,7 +301,7 @@ type DispositionBarProps = Pick<
 
 export function DispositionBar({
   isBusy,
-  nextRecipient,
+  questionContact,
   handleDequeueNext,
   disposition,
   dispositionOptions,
@@ -252,11 +315,11 @@ export function DispositionBar({
     );
 
   return (
-    <div className="sticky bottom-0 z-10 flex gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/85">
+    <div className="flex gap-2 border-t bg-card px-4 py-3">
       <Select
         value={disposition}
         onValueChange={setDisposition}
-        disabled={!nextRecipient}
+        disabled={!questionContact}
       >
         <SelectTrigger
           data-testid="call-screen-disposition"
@@ -282,7 +345,6 @@ export function DispositionBar({
       </Select>
       <Button
         type="button"
-        variant="outline"
         disabled={isBusy || !hasValidDisposition}
         onClick={handleDequeueNext}
         className="flex-1 rounded-full text-xs"
@@ -296,6 +358,7 @@ export function DispositionBar({
 export const CallArea: React.FC<CallAreaProps> = ({
   isBusy,
   nextRecipient,
+  questionContact,
   displayState,
   hangUp,
   handleVoiceDrop,
@@ -309,7 +372,10 @@ export const CallArea: React.FC<CallAreaProps> = ({
   callDuration,
   dispositionOptions,
   voiceDrop = false,
-  showDisposition = true,
+  isMicrophoneMuted,
+  onToggleMute,
+  onLoadQueue,
+  onResetCall,
 }: CallAreaProps) => {
   return (
     <div className={cn(callPanelShellClass, "min-h-0 justify-between")}>
@@ -318,7 +384,6 @@ export const CallArea: React.FC<CallAreaProps> = ({
       <CallControls
         isBusy={isBusy}
         nextRecipient={nextRecipient}
-        displayState={displayState}
         hangUp={hangUp}
         handleVoiceDrop={handleVoiceDrop}
         handleDialNext={handleDialNext}
@@ -326,17 +391,19 @@ export const CallArea: React.FC<CallAreaProps> = ({
         conference={conference}
         voiceDrop={voiceDrop}
         callState={state}
+        isMicrophoneMuted={isMicrophoneMuted}
+        onToggleMute={onToggleMute}
+        onLoadQueue={onLoadQueue}
+        onResetCall={onResetCall}
       />
-      {showDisposition ? (
-        <DispositionBar
-          isBusy={isBusy}
-          nextRecipient={nextRecipient}
-          handleDequeueNext={handleDequeueNext}
-          disposition={disposition}
-          dispositionOptions={dispositionOptions}
-          setDisposition={setDisposition}
-        />
-      ) : null}
+      <DispositionBar
+        isBusy={isBusy}
+        questionContact={questionContact}
+        handleDequeueNext={handleDequeueNext}
+        disposition={disposition}
+        dispositionOptions={dispositionOptions}
+        setDisposition={setDisposition}
+      />
     </div>
   );
 };

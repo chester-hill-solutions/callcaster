@@ -31,25 +31,35 @@ describe("call hooks", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    // Restore real timers here rather than at the end of each fake-timer
+    // test body: a mid-test assertion failure would otherwise skip the
+    // restore and leak fake timers into every later test in the file.
+    vi.useRealTimers();
   });
 
-  test("useCallState state machine and timer", async () => {
-    vi.useFakeTimers();
+  test("useCallState enforces state machine transitions", async () => {
     const { useCallState } = await import("@/hooks/call/useCallState");
     const { result } = renderHook(() => useCallState());
 
+    expect(result.current.state).toBe("idle");
+    // Invalid from idle — stays idle.
     act(() => result.current.send({ type: "CONNECT" }));
+    expect(result.current.state).toBe("idle");
+
     act(() => result.current.send({ type: "START_DIALING" }));
+    expect(result.current.state).toBe("dialing");
     act(() => result.current.send({ type: "CONNECT" }));
-    act(() => result.current.send({ type: "SET_DISPOSITION", disposition: "yes" }));
-    act(() => vi.advanceTimersByTime(1000));
-    expect(result.current.context.callDuration).toBeGreaterThan(0);
+    expect(result.current.state).toBe("connected");
     act(() => result.current.send({ type: "HANG_UP" }));
+    expect(result.current.state).toBe("completed");
     act(() => result.current.send({ type: "NEXT" }));
-    act(() => result.current.send({ type: "FAIL" }));
+    expect(result.current.state).toBe("idle");
+
     act(() => result.current.send({ type: "START_DIALING" }));
+    act(() => result.current.send({ type: "FAIL" }));
+    expect(result.current.state).toBe("failed");
     act(() => result.current.send({ type: "NEXT" }));
-    vi.useRealTimers();
+    expect(result.current.state).toBe("idle");
   });
 
   test("useCallDuration tracks connected state", async () => {
@@ -65,7 +75,6 @@ describe("call hooks", () => {
     expect(result.current.callDuration).toBeGreaterThan(0);
     rerender({ state: "idle" });
     expect(result.current.callDuration).toBe(0);
-    vi.useRealTimers();
   });
 
   test("useCallStatusPolling polls when enabled", async () => {
@@ -82,10 +91,13 @@ describe("call hooks", () => {
       }),
     );
 
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 150));
-    });
-    expect(onStatus).toHaveBeenCalledWith("in-progress");
+    // Poll-until rather than a fixed sleep: a 150ms wait on a 100ms interval
+    // left a 50ms scheduling margin, which is exactly the kind of budget a
+    // loaded fork-pool CI worker blows through.
+    await vi.waitFor(
+      () => expect(onStatus).toHaveBeenCalledWith("in-progress", undefined),
+      { timeout: 2000 },
+    );
   });
 
   test("useStartConferenceAndDial begin paths", async () => {
@@ -351,6 +363,30 @@ describe("call hooks", () => {
     expect(result.current.deviceIsBusy).toBe(true);
   });
 
+  // Regression: useTwilioDevice keeps its own `error` state (set via the
+  // onError callback from useTwilioConnection) separate from the
+  // connection's internal error — clearing one without the other still left
+  // the call screen's banner (which reads useTwilioDevice's error) stuck.
+  test("useTwilioDevice clears its own error state on the next successful registration, and exposes reconnect", async () => {
+    const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
+    const send = vi.fn();
+
+    const { result } = renderHook(() =>
+      useTwilioDevice("tok", "computer", "ws", send),
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    act(() => mockTwilioDevice.emit("error", new Error("device down")));
+    expect(result.current.error?.message).toBe("device down");
+
+    act(() => mockTwilioDevice.emit("registered"));
+    expect(result.current.error).toBeNull();
+
+    expect(typeof result.current.reconnect).toBe("function");
+  });
+
   test("autoAcceptIncoming accepts client-ringed outbound legs and never surfaces the incoming box", async () => {
     const { useCallHandling } = await import("@/hooks/call/useCallHandling");
 
@@ -398,6 +434,9 @@ describe("call hooks", () => {
     expect(incoming.accept).toHaveBeenCalledTimes(1);
     expect(result.current.activeCall).toBe(incoming);
     expect(result.current.incomingCall).toBeNull();
-    expect(send).toHaveBeenCalledWith({ type: "CONNECT" });
+    // Campaign outbound auto-accept no longer dispatches CONNECT — the
+    // customer-leg in-progress callback is the only signal that advances
+    // the FSM from dialing to connected.
+    expect(send).not.toHaveBeenCalledWith({ type: "CONNECT" });
   });
 });

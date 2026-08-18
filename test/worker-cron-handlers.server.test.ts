@@ -14,13 +14,14 @@ const mocks = vi.hoisted(() => ({
   readTwilioWorkspaceCredentials: vi.fn(() => ({ sid: "AC_test" })),
   triggerTwilioOpenSync: vi.fn(async () => ({ ok: true, message: "synced" })),
   runNumberRentalBilling: vi.fn(async () => ({ ok: true, processed: 1 })),
+  runCampaignScheduleSync: vi.fn(async () => ({ scanned: 0, transitioned: 0 })),
 }));
 
 // Mock the enqueue layer rather than rescheduleJob: the handlers go through
 // withReschedule -> rescheduleJob -> enqueueJob, and stubbing the middle of
 // that chain would not exercise the ordering guarantee these tests exist for.
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
 }));
 
 vi.mock("@/lib/cron-workspace-fanout.server", () => ({
@@ -47,13 +48,38 @@ vi.mock("@/lib/number-rental-billing.server", () => ({
   runNumberRentalBilling: (...args: unknown[]) =>
     mocks.runNumberRentalBilling(...args),
 }));
+vi.mock("@/lib/campaign-schedule-sync.server", () => ({
+  runCampaignScheduleSync: (...args: unknown[]) =>
+    mocks.runCampaignScheduleSync(...args),
+}));
 
 import {
   billingReconcileHandler,
-  numberRentalBillingHandler,
-  twilioOpenSyncHandler,
+  campaignScheduleSyncHandler,
+  numberRentalBillingHandler as realNumberRentalBillingHandler,
+  twilioOpenSyncHandler as realTwilioOpenSyncHandler,
 } from "@/lib/worker/handlers/cron.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
+
+// The registry (handlers.server.ts) now validates `job.params` with a zod
+// schema before calling the handler with the parsed result (#1239 A2). These
+// wrappers stand in for that parse (same defaulting/coercion the real schemas
+// apply) without pulling in handlers.server.ts's much larger dependency graph.
+function twilioOpenSyncHandler(job: ClaimedJobRow) {
+  const params = (job.params ?? {}) as Record<string, unknown>;
+  return realTwilioOpenSyncHandler(job, {
+    callLimit: typeof params.callLimit === "number" ? params.callLimit : 50,
+    messageLimit: typeof params.messageLimit === "number" ? params.messageLimit : 50,
+    maxAgeMinutes: typeof params.maxAgeMinutes === "number" ? params.maxAgeMinutes : 120,
+  });
+}
+
+function numberRentalBillingHandler(job: ClaimedJobRow) {
+  const params = (job.params ?? {}) as Record<string, unknown>;
+  return realNumberRentalBillingHandler(job, {
+    workspaceId: typeof params.workspaceId === "string" ? params.workspaceId : undefined,
+  });
+}
 
 function makeJob(overrides: Partial<ClaimedJobRow> = {}): ClaimedJobRow {
   return {
@@ -93,6 +119,24 @@ describe("cron handler self-reschedule gating", () => {
       workspaceId: "ws-1",
       source: "cron",
     });
+  });
+
+  test("campaign_schedule_sync runs the sweep and self-reschedules", async () => {
+    await campaignScheduleSyncHandler(makeJob({ type: "campaign_schedule_sync" }));
+    expect(mocks.runCampaignScheduleSync).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "campaign_schedule_sync" }),
+    );
+  });
+
+  test("campaign_schedule_sync still reschedules when the sweep throws", async () => {
+    mocks.runCampaignScheduleSync.mockRejectedValueOnce(new Error("db down"));
+    await expect(
+      campaignScheduleSyncHandler(makeJob({ type: "campaign_schedule_sync" })),
+    ).rejects.toThrow("db down");
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "campaign_schedule_sync" }),
+    );
   });
 
   test("coordinator twilio_open_sync self-reschedules", async () => {

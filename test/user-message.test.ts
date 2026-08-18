@@ -36,6 +36,14 @@ describe("app/lib/user-message.ts", () => {
         FALLBACK,
       );
       expect(toUserMessage(new Error("Supabase client error"), FALLBACK)).toBe(FALLBACK);
+      // Connection/pool failures that otherwise read as plain English.
+      expect(toUserMessage(new Error("Connection terminated unexpectedly"), FALLBACK)).toBe(
+        FALLBACK,
+      );
+      expect(toUserMessage(new Error("Connection reset by peer"), FALLBACK)).toBe(FALLBACK);
+      expect(toUserMessage(new Error("Timeout exceeded when trying to connect"), FALLBACK)).toBe(
+        FALLBACK,
+      );
     });
 
     test("returns fallback for lowercase, empty, or overlong messages", () => {
@@ -49,6 +57,28 @@ describe("app/lib/user-message.ts", () => {
       expect(toUserMessage(null, FALLBACK)).toBe(FALLBACK);
       expect(toUserMessage(undefined, FALLBACK)).toBe(FALLBACK);
       expect(toUserMessage(42, FALLBACK)).toBe(FALLBACK);
+    });
+
+    test("allowlist rejects messages with curly braces, newlines, or control chars", () => {
+      expect(toUserMessage(new Error("Has {brace}"), FALLBACK)).toBe(FALLBACK);
+      expect(toUserMessage(new Error("Has\nnewline"), FALLBACK)).toBe(FALLBACK);
+    });
+
+    test("allowlist rejects lowercase-start or all-lowercase messages", () => {
+      expect(toUserMessage(new Error("something broke unexpectedly"), FALLBACK)).toBe(FALLBACK);
+    });
+
+    test("passes through messages with common product punctuation", () => {
+      expect(toUserMessage("Campaign name is required.", FALLBACK)).toBe("Campaign name is required.");
+      expect(toUserMessage("Could not load this audio file. The link may have expired.", FALLBACK)).toBe(
+        "Could not load this audio file. The link may have expired.",
+      );
+    });
+
+    test("rejects partial matches of infra patterns that look like English", () => {
+      expect(toUserMessage(new Error("Connection reset by peer"), FALLBACK)).toBe(FALLBACK);
+      expect(toUserMessage(new Error("econn something"), FALLBACK)).toBe(FALLBACK);
+      expect(toUserMessage(new Error("Disconnected"), FALLBACK)).toBe("Disconnected");
     });
   });
 

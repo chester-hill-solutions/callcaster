@@ -206,6 +206,69 @@ describe("twilio-handler", () => {
     expect(stream?.send).toHaveBeenCalledWith(Buffer.from("mulaw-audio"));
   });
 
+  test("a stop during STT open closes the orphaned stream and never assigns it", async () => {
+    const { handleTwilioStreamMessage } = await import("../services/media-stream/twilio-handler");
+    const ws = createMockWebSocket({
+      workspaceId: "ws-1",
+      campaignId: "camp-1",
+      userId: "user-1",
+      sessionId: "session-1",
+      exp: Math.floor(Date.now() / 1000) + 60,
+      requestId: "req-1",
+    });
+
+    // Control when the STT open resolves so we can inject a stop mid-await.
+    let resolveOpen!: (v: { send: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }) => void;
+    const opening = new Promise<{ send: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }>(
+      (resolve) => {
+        resolveOpen = resolve;
+      },
+    );
+    sttMocks.openElevenLabsRealtimeStream.mockReturnValueOnce(opening);
+
+    const startPromise = handleTwilioStreamMessage(ws, {
+      event: "start",
+      streamSid: "MZstream",
+      start: {
+        streamSid: "MZstream",
+        accountSid: "AC123",
+        callSid: "CA123",
+        tracks: ["inbound"],
+        mediaFormat: { encoding: "audio/x-mulaw", sampleRate: 8000, channels: 1 },
+        customParameters: { direction: "outbound" },
+      },
+    });
+
+    // Let the start handler run up to the (still-pending) STT open await.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The call ends while STT is still opening.
+    await handleTwilioStreamMessage(ws, { event: "stop", streamSid: "MZstream" });
+
+    // STT finishes opening after the stop — the resumed start handler must close it.
+    const send = vi.fn();
+    const close = vi.fn();
+    resolveOpen({ send, close });
+    await startPromise;
+
+    expect(close).toHaveBeenCalledTimes(1);
+
+    // The orphaned stream was never wired to state, so media doesn't forward to it.
+    await handleTwilioStreamMessage(ws, {
+      event: "media",
+      streamSid: "MZstream",
+      media: {
+        track: "inbound",
+        chunk: "1",
+        timestamp: "5",
+        payload: Buffer.from("x").toString("base64"),
+      },
+    });
+    expect(send).not.toHaveBeenCalled();
+    // No billing for a stream that only opened after the call ended.
+    expect(billingMocks.billLiveTranscription).not.toHaveBeenCalled();
+  });
+
   test("committed transcript persists segment and publishes workspace event", async () => {
     const { handleTwilioStreamMessage } = await import("../services/media-stream/twilio-handler");
     const ws = createMockWebSocket({

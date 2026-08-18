@@ -24,6 +24,16 @@ vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
     }
     twilioDataMocks.persistCalls.push(data);
   }),
+  mergeWorkspaceTwilioData: vi.fn(
+    async (_workspaceId: string, updater: (current: unknown) => unknown) => {
+      const next = updater(twilioDataMocks.data);
+      if (twilioDataMocks.persistError) {
+        throw twilioDataMocks.persistError;
+      }
+      twilioDataMocks.persistCalls.push(next);
+      return next;
+    },
+  ),
 }));
 
 // The real flag defaults to enabled now that RCS onboarding has shipped. Individual

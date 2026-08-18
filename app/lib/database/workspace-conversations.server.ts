@@ -344,9 +344,12 @@ export async function fetchConversationSummary(
 
   const chats: ConversationSummary[] = pageRows.map((row) => {
     const conversationKey = getConversationPhoneKey(row.contact_phone);
-    if (conversationKey && typeof row.primary_contact_id === "number") {
-      conversationContactIds.set(conversationKey, row.primary_contact_id);
-      contactIds.add(row.primary_contact_id);
+    // bigint aggregate arrives as a string from the raw execute (#1227);
+    // the sibling counts are ::int-cast in SQL, this one is coerced here.
+    const primaryContactId = Number(row.primary_contact_id);
+    if (conversationKey && Number.isFinite(primaryContactId)) {
+      conversationContactIds.set(conversationKey, primaryContactId);
+      contactIds.add(primaryContactId);
     }
 
     return {

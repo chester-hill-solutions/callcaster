@@ -1,4 +1,5 @@
-import { MemberRole } from "@/lib/member-role";
+import { capabilityIdsForRole, type ProductCapabilityId } from "@/lib/capabilities";
+import { hasMinRole, MemberRole } from "@/lib/member-role";
 import type { User, WorkspaceInvite, WorkspaceWebhook } from "@/lib/types";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import {
@@ -22,6 +23,19 @@ export type WorkspaceSettingsPageData = {
   pendingInvites: (WorkspaceInvite & { user: Partial<User> | null })[];
   webhook: WorkspaceWebhook | null;
   hasAccess: boolean;
+  /**
+   * API-key management sits a rung above the rest of settings (admin+, not
+   * member+) because a key is a durable credential that outlives its minter.
+   * Mirrors `requireApiKeyManager` in `platform-members.server.ts`; keeping the
+   * two in step is what stops the UI offering a form the service will 403.
+   */
+  canManageApiKeys: boolean;
+  /**
+   * Capability scopes this user may put on a new key — the intersection cap
+   * from `assertScopesWithinActorRole`, precomputed so the picker cannot offer
+   * a scope the minter does not hold (e.g. `audit.read` is owner-only).
+   */
+  grantableApiKeyScopes: readonly ProductCapabilityId[];
   apiKeys: Awaited<ReturnType<typeof listWorkspaceApiKeyRows>>;
 };
 
@@ -52,7 +66,8 @@ export async function getWorkspaceSettingsPageData(
     username: member.username,
   }));
   const hasAccess = userRole !== MemberRole.Caller;
-  const apiKeys = hasAccess
+  const canManageApiKeys = hasMinRole(userRole, MemberRole.Admin);
+  const apiKeys = canManageApiKeys
     ? await listWorkspaceApiKeyRows(workspaceId, tdb)
     : [];
 
@@ -67,6 +82,10 @@ export async function getWorkspaceSettingsPageData(
     })),
     webhook: (webhookRow as WorkspaceWebhook | null) ?? null,
     hasAccess,
+    canManageApiKeys,
+    grantableApiKeyScopes: canManageApiKeys
+      ? capabilityIdsForRole(userRole ?? "")
+      : [],
     apiKeys,
   };
 }

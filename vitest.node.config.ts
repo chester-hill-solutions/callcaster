@@ -9,7 +9,15 @@ export default mergeConfig(
       environment: "node",
       testTimeout: 60000,
       include: ["test/**/*.test.ts"],
-      exclude: ["test/ui/**", "test/server-runtime.test.ts", "test/twilio-webhook-prehandler.test.ts"],
+      exclude: [
+        "test/ui/**",
+        // Real-Postgres tier — own config + own gate (vitest.integration-db.config.ts).
+        // Excluded here because test/setup.node.ts defaults DATABASE_URL to a
+        // fake localhost URL, which would point those suites at nothing.
+        "test/integration-db/**",
+        "test/server-runtime.test.ts",
+        "test/twilio-webhook-prehandler.test.ts",
+      ],
       setupFiles: ["test/setup.node.ts"],
       coverage: {
         provider: "istanbul",

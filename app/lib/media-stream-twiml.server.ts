@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type Twilio from "twilio";
 import { env } from "@/lib/env.server";
 import type { WorkspaceFeatureFlags } from "@/lib/coaching-schemas";
 import { liveMediaCapabilities } from "@/lib/live-media-capabilities";
 import { createMediaStreamToken } from "@/lib/media-stream-token.server";
 import { logger } from "@/lib/logger.server";
+import type { TwimlResponse } from "@/lib/twilio-twiml.server";
 
 export type LiveTranscriptionDirection = "outbound" | "predictive" | "inbound";
 
@@ -20,7 +20,7 @@ export type LiveTranscriptionStreamParams = {
 };
 
 export type AppendLiveTranscriptionStreamInput = {
-  twiml: Twilio.twiml.VoiceResponse;
+  twiml: TwimlResponse;
   featureFlags: WorkspaceFeatureFlags | Record<string, unknown> | null | undefined;
   params: LiveTranscriptionStreamParams;
 };

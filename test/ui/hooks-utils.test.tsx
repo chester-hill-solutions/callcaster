@@ -78,7 +78,7 @@ describe("utils hooks", () => {
     const base = {
       update: { q1: "a" },
       recentAttempt: { id: 9 } as any,
-      nextRecipient: { id: 2, contact: { id: 10 } } as any,
+      questionContact: { id: 2, contact: { id: 10 } } as any,
       campaign: { id: 3 } as any,
       workspaceId: "ws1",
       disposition: "answered",
@@ -96,7 +96,7 @@ describe("utils hooks", () => {
 
     act(() => result.current.saveData());
 
-    rerender({ ...base, nextRecipient: { id: 2, contact: {} } as any });
+    rerender({ ...base, questionContact: { id: 2, contact: {} } as any });
     act(() => result.current.saveData());
     expect(toast.warning).toHaveBeenCalled();
 
@@ -104,6 +104,81 @@ describe("utils hooks", () => {
     Object.assign(fetcher, { data: { error: "nope" } });
     rerender({ ...base, update: { q1: "d" } });
     act(() => vi.advanceTimersByTime(2000));
+    await act(async () => Promise.resolve());
+    expect(toast.error).toHaveBeenCalled();
+  });
+
+  // Regression for #1253: "survey/script and disposition are all inactive
+  // and can't be filled after hanging up with user". hangup.action.server.ts
+  // dequeues the just-finished contact's campaign_queue row the instant the
+  // agent hangs up. The call screen's queue pointer (nextRecipient) reacts
+  // to that dequeue and can go null (or jump to a different contact) before
+  // the agent records anything — so saveData must key off questionContact
+  // (who the panel is showing), never a queue-derived recipient, or the
+  // save silently no-ops right when it matters most.
+  test("useDebouncedSave targets questionContact even when the queue has nothing else in it", async () => {
+    const fetcher = createMockFetcher({ state: "idle" });
+    mockUseFetcher.mockReturnValue(fetcher);
+
+    const useDebouncedSave = (await import("@/hooks/utils/useDebouncedSave")).default;
+    const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn() };
+
+    const questionContact = { id: 42, contact: { id: 99 } } as any;
+    const { result } = renderHook(() =>
+      useDebouncedSave({
+        update: { q1: "a" },
+        recentAttempt: { id: 7 } as any,
+        questionContact,
+        campaign: { id: 3 } as any,
+        workspaceId: "ws1",
+        disposition: "completed",
+        toast,
+      }),
+    );
+
+    act(() => result.current.saveData());
+
+    expect(fetcher.submit).toHaveBeenCalledWith(
+      expect.objectContaining({ contact_id: 99, queue_id: 42, disposition: "completed" }),
+      expect.objectContaining({ action: "/api/questions" }),
+    );
+    expect(toast.warning).not.toHaveBeenCalled();
+  });
+
+  test("useDebouncedSave silent option suppresses success toast but keeps error toast", async () => {
+    const fetcher = createMockFetcher({ state: "idle" });
+    mockUseFetcher.mockReturnValue(fetcher);
+
+    const useDebouncedSave = (await import("@/hooks/utils/useDebouncedSave")).default;
+    const toast = {
+      success: vi.fn(),
+      error: vi.fn(),
+      warning: vi.fn(),
+    };
+
+    const base = {
+      update: { q1: "a" },
+      recentAttempt: { id: 9 } as any,
+      questionContact: { id: 2, contact: { id: 10 } } as any,
+      campaign: { id: 3 } as any,
+      workspaceId: "ws1",
+      disposition: "answered",
+      toast,
+      silent: true,
+    };
+
+    const { rerender } = renderHook(
+      (props) => useDebouncedSave(props),
+      { initialProps: base },
+    );
+
+    Object.assign(fetcher, { data: { id: 1 } });
+    rerender({ ...base, update: { q1: "b" } });
+    await act(async () => Promise.resolve());
+    expect(toast.success).not.toHaveBeenCalled();
+
+    Object.assign(fetcher, { data: { error: "nope" } });
+    rerender({ ...base, update: { q1: "c" } });
     await act(async () => Promise.resolve());
     expect(toast.error).toHaveBeenCalled();
   });

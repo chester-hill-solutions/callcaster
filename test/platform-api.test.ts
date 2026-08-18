@@ -1,16 +1,17 @@
-import { describe, expect, test, beforeEach } from "vitest";
+import { describe, expect, test, beforeEach, vi } from "vitest";
 import {
   registerBodySchema,
   tokenBodySchema,
   createWorkspaceBodySchema,
 } from "../app/lib/schemas/api/platform-auth";
-import { PLATFORM_API_SURFACE } from "../app/lib/api-surface-platform";
+import { API_SURFACE } from "../app/lib/api-surface";
 import { enforceAuthRateLimit } from "../app/lib/platform-auth-rate-limit.server";
 import {
   getIdempotentResponse,
   readIdempotencyKey,
   resetIdempotencyForTests,
   storeIdempotentResponse,
+  withIdempotency,
 } from "../app/lib/platform-idempotency.server";
 import { resetRateLimitsForTests } from "../app/lib/platform-rate-limit.server";
 import { openApiSpec } from "../app/lib/openapi";
@@ -45,21 +46,36 @@ describe("platform auth schemas", () => {
   });
 });
 
+/**
+ * These used to iterate `PLATFORM_API_SURFACE`, one of the four positional
+ * chunks the inventory literal was split into for the app file-size gate.
+ * #1242 D4 replaced that split with a generated core, and the chunk boundary
+ * turned out to carry no meaning — so the assertion is now pinned to the
+ * platform routes by name, which is what it was really protecting.
+ */
 describe("platform api surface inventory", () => {
+  const PLATFORM_PATHS = [
+    "/api/auth/register",
+    "/api/auth/token",
+    "/api/workspaces",
+    "/api/workspaces/:workspaceId/billing/checkout-session",
+    "/api/workspaces/:workspaceId/onboarding/actions",
+    "/api/admin/dashboard",
+  ];
+
   test("includes core platform routes", () => {
-    const paths = PLATFORM_API_SURFACE.map((e) => e.path);
-    expect(paths).toContain("/api/auth/register");
-    expect(paths).toContain("/api/auth/token");
-    expect(paths).toContain("/api/workspaces");
-    expect(paths).toContain("/api/workspaces/:workspaceId/billing/checkout-session");
-    expect(paths).toContain("/api/workspaces/:workspaceId/onboarding/actions");
-    expect(paths).toContain("/api/admin/dashboard");
+    const paths = API_SURFACE.map((e) => e.path);
+    for (const platformPath of PLATFORM_PATHS) {
+      expect(paths).toContain(platformPath);
+    }
   });
 
   test("platform routes target publicOpenApi", () => {
-    for (const entry of PLATFORM_API_SURFACE) {
-      expect(entry.specTarget).toBe("publicOpenApi");
-      expect(entry.supported).toBe(true);
+    for (const platformPath of PLATFORM_PATHS) {
+      const entry = API_SURFACE.find((e) => e.path === platformPath);
+      expect(entry, `no inventory entry for ${platformPath}`).toBeDefined();
+      expect(entry?.specTarget).toBe("publicOpenApi");
+      expect(entry?.supported).toBe(true);
     }
   });
 });
@@ -106,6 +122,66 @@ describe("platform idempotency", () => {
     expect(replay?.status).toBe(201);
     expect(replay?.headers.get("Idempotency-Replayed")).toBe("true");
     await expect(replay?.json()).resolves.toEqual({ id: "w1", name: "Acme" });
+  });
+
+  test("concurrent same-key requests: only one runs the handler, the other 409s", async () => {
+    resetIdempotencyForTests();
+    const makeRequest = () =>
+      new Request("http://localhost/api/workspaces", {
+        method: "POST",
+        headers: { "Idempotency-Key": "concurrent-1" },
+      });
+
+    let releaseFirst: () => void = () => {};
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const handler1 = vi.fn(async () => {
+      await firstGate;
+      return { response: Response.json({ id: "w1" }, { status: 201 }), body: { id: "w1" } };
+    });
+    const handler2 = vi.fn(async () => ({
+      response: Response.json({ id: "w2" }, { status: 201 }),
+      body: { id: "w2" },
+    }));
+
+    // Start the first request and let it reserve the key + block inside the handler.
+    const first = withIdempotency(makeRequest(), "workspaces:create", handler1);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // The second request must not run its handler — the key is reserved.
+    const secondResponse = await withIdempotency(makeRequest(), "workspaces:create", handler2);
+    expect(secondResponse.status).toBe(409);
+    expect(handler2).not.toHaveBeenCalled();
+
+    releaseFirst();
+    const firstResponse = await first;
+    expect(firstResponse.status).toBe(201);
+    expect(handler1).toHaveBeenCalledTimes(1);
+  });
+
+  test("a failed handler releases the reservation so a retry can run", async () => {
+    resetIdempotencyForTests();
+    const makeRequest = () =>
+      new Request("http://localhost/api/workspaces", {
+        method: "POST",
+        headers: { "Idempotency-Key": "retry-1" },
+      });
+
+    const failing = await withIdempotency(makeRequest(), "workspaces:create", async () => ({
+      response: Response.json({ error: "boom" }, { status: 500 }),
+      body: { error: "boom" },
+    }));
+    expect(failing.status).toBe(500);
+
+    // The reservation was released, so a retry runs the handler again.
+    const retryHandler = vi.fn(async () => ({
+      response: Response.json({ id: "w1" }, { status: 201 }),
+      body: { id: "w1" },
+    }));
+    const retry = await withIdempotency(makeRequest(), "workspaces:create", retryHandler);
+    expect(retry.status).toBe(201);
+    expect(retryHandler).toHaveBeenCalledTimes(1);
   });
 });
 

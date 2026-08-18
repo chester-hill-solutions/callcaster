@@ -40,6 +40,8 @@ Poll `GET .../onboarding` until `status` indicates readiness.
 
 Flat aliases: `GET/POST /api/numbers` (search/purchase with JSON body).
 
+Roles: listing numbers is open to any workspace member. Purchasing, updating, and releasing a number require the `member` role or above — the `caller` role receives 403. This applies equally to the flat aliases.
+
 ## Caller ID
 
 | Method | Path | Purpose |

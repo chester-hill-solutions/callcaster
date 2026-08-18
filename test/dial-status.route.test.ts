@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { configureTelephonyStub } from "./helpers/telephony-db-stub";
+import { configureTelephonyStub, telephonyStubState } from "./helpers/telephony-db-stub";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -250,6 +250,34 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     await expect(res.json()).resolves.toMatchObject({ success: false });
   });
 
+  test("validates the Twilio signature even when CallSid is absent (fail closed)", async () => {
+    mocks.requireTwilioSignature.mockResolvedValueOnce(
+      new Response("forbidden", { status: 403 }),
+    );
+    const mod = await import("../app/routes/api+/dial/status.route");
+    const res = await asRouteResponse(mod.action({ request: makeReq({}) } as any));
+    expect(res.status).toBe(403);
+    expect(mocks.requireTwilioSignature).toHaveBeenCalled();
+  });
+
+  /**
+   * The payload is parsed once at the route boundary into a discriminated
+   * union (#1243 E1/E2). A `CallSid` with no `CallStatus` and no `AnsweredBy`
+   * discriminates to `unrecognized` — the route must still ack (not throw),
+   * and must not treat it as a machine-detection callback.
+   */
+  test("an unrecognized payload (CallSid only) acks without hitting the voicemail branch", async () => {
+    const { client, twilio } = makeDbClient();
+    mocks.createClient.mockReturnValueOnce(client);
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
+    const mod = await import("../app/routes/api+/dial/status.route");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", SomethingTwilioAddedLater: "1" }),
+    } as any));
+    await expect(res.json()).resolves.toMatchObject({ success: true });
+    expect(client._callUpdate).not.toHaveBeenCalled();
+  });
+
   test("callStatus missing covers null branch; callError/campaignError/voicemailError bubble to outer catch (Error message)", async () => {
     const { client, twilio } = makeDbClient();
     client._set.callError(new Error("call"));
@@ -321,7 +349,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     await expect(res.json()).resolves.toMatchObject({ success: true });
   });
 
-  test("machine answer plays voicemail or hangs up; machine handler catch formats errors", async () => {
+  test("machine answer plays voicemail or lets the call ring through; machine handler catch formats errors", async () => {
     const { client, twilio } = makeDbClient();
     mocks.createClient.mockReturnValueOnce(client);
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
@@ -336,7 +364,12 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
       expect.objectContaining({ twiml: expect.stringContaining("<Play>https://signed</Play>") }),
     );
 
-    // voicemail missing signedUrl => hangup + no-answer
+    // voicemail missing signedUrl (no voicemail-drop audio configured for
+    // this campaign) => falls through to the same "let it ring through"
+    // path as a human answer. Product decision (issue #1143): a detected
+    // machine is never auto-hung-up on its own — only when there's an
+    // actual voicemail message to leave. No TwiML update at all: the
+    // call's own <Dial> verb keeps running untouched.
     const { client: sup2, twilio: tw2 } = makeDbClient();
     dialStatusStorageState.signedUrl = null;
     mocks.createClient.mockReturnValueOnce(sup2);
@@ -344,12 +377,14 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
-    await expect(res.json()).resolves.toEqual({ success: true });
-    expect(sup2._callUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ twiml: expect.stringContaining("<Hangup/>") }),
-    );
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      attempt: expect.objectContaining({ answered_at: expect.any(String) }),
+    });
+    expect(sup2._callUpdate).not.toHaveBeenCalled();
 
-    // handler catch: outreach update errors -> returns success:false with message
+    // Still no signedUrl (fallthrough path) — outreach update errors ->
+    // returns success:false with message, same as the human-answer path.
     const { client: sup3, twilio: tw3 } = makeDbClient();
     sup3._set.outreachUpdateError(new Error("upd"));
     mocks.createClient.mockReturnValueOnce(sup3);
@@ -359,7 +394,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: upd" });
 
-    // handler catch: non-Error thrown -> "Failed to handle voicemail"
+    // Still no signedUrl (fallthrough path) — non-Error thrown.
     const { client: sup4, twilio: tw4 } = makeDbClient();
     sup4._set.outreachUpdateThrows("nope");
     mocks.createClient.mockReturnValueOnce(sup4);
@@ -368,6 +403,29 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Error updating outreach attempt: Unknown error" });
+  });
+
+  // Regression for issue #1143: "ring ring ring, voicemail -> 'please leave
+  // your message at the tone' -> it hung up". Root cause was this exact
+  // shape — AMD detects a machine, the campaign has no voicemail-drop audio
+  // configured, and the old code hung up immediately with no message left.
+  // Decision: never auto-hang-up on AMD alone; only when there's an actual
+  // voicemail message to leave.
+  test("a campaign with no voicemail_file configured never hangs up on a detected machine", async () => {
+    const { client, twilio } = makeDbClient();
+    client._set.campaignRow({ voicemail_file: null });
+    mocks.createClient.mockReturnValueOnce(client);
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce(twilio as any);
+    const mod = await import("../app/routes/api+/dial/status.route");
+
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_end_beep", CallStatus: "in-progress" }),
+    } as any));
+
+    await expect(res.json()).resolves.toMatchObject({ success: true });
+    expect(client._callUpdate).not.toHaveBeenCalled();
+    const patch = telephonyStubState.callUpdateCalls.at(-1)?.patch;
+    expect(patch).toMatchObject({ answered_by: "machine_end_beep" });
   });
 
   test("human/other path upserts call, updates attempt, and outer catch formats non-Error", async () => {
@@ -410,7 +468,7 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ success: false, error: "An unexpected error occurred" });
   });
 
-  test("covers campaign not found + no voicemail_file path + outreachError throw in voicemail-present path", async () => {
+  test("covers campaign not found + no voicemail_file falls through + outreachError throw in voicemail-present path", async () => {
     const mod = await import("../app/routes/api+/dial/status.route");
 
     // campaign not found
@@ -424,7 +482,8 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     } as any));
     await expect(res.json()).resolves.toEqual({ success: false, error: "Campaign 1 not found" });
 
-    // voicemail_file falsy => ternary else branch and machine no-answer hangup path
+    // voicemail_file falsy => ternary else branch; falls through to the
+    // same "let it ring through" path as a human answer (issue #1143).
     const { client: sup2, twilio: tw2 } = makeDbClient();
     sup2._set.campaignRow({ voicemail_file: null });
     mocks.createClient.mockReturnValueOnce(sup2);
@@ -432,7 +491,11 @@ describe("app/routes/api+/dial/status.route.tsx", () => {
     res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", AnsweredBy: "machine_start", CallStatus: "ringing" }),
     } as any));
-    await expect(res.json()).resolves.toEqual({ success: true });
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      attempt: expect.objectContaining({ answered_at: expect.any(String) }),
+    });
+    expect(sup2._callUpdate).not.toHaveBeenCalled();
 
     // voicemail present but outreach update returns error => hits `if (outreachError) throw outreachError`
     const { client: sup3, twilio: tw3 } = makeDbClient();

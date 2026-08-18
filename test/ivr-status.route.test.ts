@@ -27,10 +27,6 @@ const campaignIvrMocks = vi.hoisted(() => ({
   resolveCampaignScript: vi.fn((campaign: any) => campaign?.script ?? null),
 }));
 
-const callStatusMocks = vi.hoisted(() => ({
-  persistCallStatusFromParams: vi.fn(),
-}));
-
 const objectStorageMocks = vi.hoisted(() => ({
   createSignedObjectUrl: vi.fn(),
 }));
@@ -60,13 +56,6 @@ vi.mock("@/lib/campaign-ivr.server", () => ({
   fetchCampaignWithScript: (...args: any[]) => campaignIvrMocks.fetchCampaignWithScript(...args),
   resolveCampaignScript: (...args: any[]) => campaignIvrMocks.resolveCampaignScript(...args),
 }));
-vi.mock("@/lib/twilio-call-status.server", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    persistCallStatusFromParams: (...args: any[]) => callStatusMocks.persistCallStatusFromParams(...args),
-  };
-});
 vi.mock("@/lib/object-storage.server", () => ({
   createSignedObjectUrl: (...args: any[]) => objectStorageMocks.createSignedObjectUrl(...args),
 }));
@@ -122,7 +111,6 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockReset();
     campaignIvrMocks.fetchCampaignWithScript.mockReset();
     campaignIvrMocks.resolveCampaignScript.mockReset();
-    callStatusMocks.persistCallStatusFromParams.mockReset();
     objectStorageMocks.createSignedObjectUrl.mockReset();
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
     telephonyDbMocks.findCallBySid.mockResolvedValue(makeCallRow());
@@ -133,7 +121,6 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     campaignIvrMocks.fetchCampaignWithScript.mockResolvedValue(makeCampaign({ type: "robocall" }));
     campaignIvrMocks.resolveCampaignScript.mockImplementation((campaign: any) => campaign?.script ?? null);
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValue({});
-    callStatusMocks.persistCallStatusFromParams.mockResolvedValue(undefined);
     objectStorageMocks.createSignedObjectUrl.mockResolvedValue("https://signed");
     transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue({ inserted: true, existingId: 1 });
   });
@@ -235,7 +222,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce(makeCallRow({ outreach_attempt_id: null }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
     res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "completed", Timestamp: new Date().toISOString() }) } as any));
-    // persistCallStatusFromParams accepts null outreachAttemptId; no updateResult call needed
+    // processCallStatusWebhook accepts a null outreachAttemptId; no updateResult call needed
     await expect(res.json()).resolves.toMatchObject({ success: true });
   });
 
@@ -350,6 +337,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     expect(telephonyDbMocks.upsertCallBySid).toHaveBeenCalled();
     expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
     expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         idempotencyKey: "call:CA1",
         type: "DEBIT",
@@ -416,5 +404,23 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "human", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
+  });
+
+  /**
+   * The payload is parsed once at the route boundary into a discriminated
+   * union (#1243 E1/E2). A `CallSid` with no `CallStatus` at all discriminates
+   * to `unrecognized` — the route must still ack (not throw), and must not
+   * treat it as machine detection or a terminal status.
+   */
+  test("an unrecognized payload (CallSid with no CallStatus) acks without billing or disposition writes", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: async () => ({}) }) });
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", SomethingTwilioAddedLater: "1" }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+    expect(telephonyDbMocks.upsertCallBySid).not.toHaveBeenCalled();
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
   });
 });

@@ -17,7 +17,7 @@ import {
 } from "@/lib/messaging-onboarding.server";
 import {
   loadWorkspaceTwilioData,
-  persistWorkspaceTwilioData,
+  mergeWorkspaceTwilioData,
 } from "@/lib/merge-workspace-twilio-data.server";
 import {
   createTrustHubCustomerProfile,
@@ -114,10 +114,12 @@ export async function ensureTrustHubCustomerProfile(args: {
     lastUpdatedBy: actorUserId,
   });
 
-  await persistWorkspaceTwilioData(workspaceId, {
-    ...(twilioData as Record<string, unknown>),
+  // Atomic merge over the fresh locked row so a concurrent onboarding save
+  // can't wipe the customerProfileBundleSid we just wrote (and vice versa).
+  await mergeWorkspaceTwilioData(workspaceId, (current) => ({
+    ...current,
     onboarding: nextOnboarding,
-  });
+  }));
 
   logger.info("twilio.compliance.trusthub.created", {
     workspaceId,

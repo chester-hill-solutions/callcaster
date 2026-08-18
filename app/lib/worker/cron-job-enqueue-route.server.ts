@@ -1,9 +1,7 @@
 import { secureCompare } from "@/lib/secure-compare";
 import { data as routeData } from "react-router";
-import {
-  enqueueJob,
-  type EnqueueJobResult,
-} from "@/lib/worker/enqueue-job.server";
+import type { EnqueueJobResult } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob, type JobParamsMap } from "@/lib/worker/job-params.server";
 import type { SideEffect } from "@/lib/handler.server";
 
 function toEnqueueResponse(result: EnqueueJobResult) {
@@ -34,13 +32,20 @@ export function parseCronWorkspaceId(
 /**
  * Legacy HTTP cron entry points enqueue coordinator/workspace jobs only.
  * WS-A: Bun worker owns execution after enqueue.
+ *
+ * `type` is narrowed to a registered job type and `buildParams` must return
+ * that type's zod-inferred params shape (#1239 A3) — `body` is still an
+ * untrusted `Record<string, unknown>` parsed straight off the request, so
+ * `buildParams` is where callers narrow individual fields out of it (see
+ * `twilio-open-sync.action.server.ts`'s `typeof body.callLimit === "number"`
+ * checks) rather than spreading it wholesale into `params`.
  */
-export function createCronEnqueueAction(args: {
-  type: string;
+export function createCronEnqueueAction<Type extends keyof JobParamsMap & string>(args: {
+  type: Type;
   buildParams: (
     body: Record<string, unknown>,
     workspaceId?: string,
-  ) => Record<string, unknown>;
+  ) => JobParamsMap[Type];
   /** Downstream effects of the enqueued job (e.g. "credit" for billing jobs). */
   extraSideEffects?: SideEffect[];
 }): {
@@ -58,7 +63,7 @@ export function createCronEnqueueAction(args: {
         () => ({} as Record<string, unknown>),
       );
       const workspaceId = parseCronWorkspaceId(body);
-      const result = await enqueueJob({
+      const result = await enqueueRegisteredJob({
         type: args.type,
         workspaceId,
         params: args.buildParams(body, workspaceId),

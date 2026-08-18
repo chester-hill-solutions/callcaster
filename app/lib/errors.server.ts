@@ -1,4 +1,5 @@
 import { data as routeData, redirect } from "react-router";
+import { getPostgresErrorCode, PG_ERROR_CODES } from "@/lib/parse-utils.server";
 import { logger } from "@/lib/logger.server";
 import { captureException } from "@/lib/sentry.server";
 import { recordServerError } from "@/lib/error-rate.server";
@@ -137,21 +138,20 @@ export function handleDatabaseError(error: { code?: string; message?: string; de
   }
 
   const contextMessage = context ? `${context}: ` : "";
-  
-  // Map common Postgres errors to appropriate status codes
+
+  // Map common Postgres errors to appropriate status codes. The code helper
+  // unwraps ORM wrappers (DrizzleQueryError keeps it on `cause`).
+  const pgCode = getPostgresErrorCode(error);
   let statusCode = 500;
   let code = ErrorCode.DATABASE_ERROR;
 
-  if (error.code === "23505") {
-    // Unique constraint violation
+  if (pgCode === PG_ERROR_CODES.UNIQUE_VIOLATION) {
     statusCode = 409;
     code = ErrorCode.CONFLICT;
-  } else if (error.code === "23503") {
-    // Foreign key violation
+  } else if (pgCode === PG_ERROR_CODES.FOREIGN_KEY_VIOLATION) {
     statusCode = 400;
     code = ErrorCode.VALIDATION_ERROR;
-  } else if (error.code === "PGRST116") {
-    // Not found
+  } else if (pgCode === PG_ERROR_CODES.POSTGREST_NOT_FOUND) {
     statusCode = 404;
     code = ErrorCode.NOT_FOUND;
   }
@@ -160,7 +160,7 @@ export function handleDatabaseError(error: { code?: string; message?: string; de
     `${contextMessage}${error.message}`,
     statusCode,
     code,
-    { postgresCode: error.code, details: error.details }
+    { postgresCode: pgCode, details: error.details }
   );
 }
 

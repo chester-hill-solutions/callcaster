@@ -3,8 +3,6 @@ import type { Database, Tables, TablesInsert } from "@/lib/db-types";
 import {
   findCallBySid,
   upsertCallBySid,
-  updateCallBySid,
-  updateOutreachAttemptForWorkspace,
   findCampaignTypeByCampaignId,
 } from "@/lib/telephony-db.server";
 import {
@@ -14,6 +12,7 @@ import {
   type VoiceBillingKind,
 } from "../../shared/pricing";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import { db } from "@/server/db";
 import { callKey } from "@/lib/billing-keys";
 import { debitAmountFromCredits } from "@/lib/pricing";
 import { logger } from "@/lib/logger.server";
@@ -185,7 +184,7 @@ export async function billTerminalCallStatus(
       ? `Call ${call.sid}, Contact ${call.contact_id}, Outreach Attempt ${call.outreach_attempt_id}`
       : `Call ${call.sid} (API/staffed dial)`);
 
-  return insertTransactionHistoryIdempotent({
+  return insertTransactionHistoryIdempotent(db, {
     workspaceId: call.workspace,
     type: "DEBIT",
     amount: debitAmountFromCredits(credits),
@@ -282,96 +281,3 @@ export async function processCallStatusWebhook(
   return { call, billingResult };
 }
 
-/**
- * Persist a call status update from Twilio status-callback form params.
- * Routes `ivr/status` and `auto-dial/status` (and any future status callback
- * route) should route through this so that persistence + disposition use the
- * same canonical path as `call-status` (fixes the double-debit hazard from
- * issue #1004 by ensuring all status routes use `twilioParamsToUnderCase`).
- *
- * Behavior:
- * - Updates `call.end_time` / `call.status` / `call.duration` for `callSid`.
- * - Optionally updates `outreach_attempt.disposition` when provided.
- *
- * Returns the row from the call update (so callers can read
- * `outreach_attempt_id` / `workspace` for billing) when `selectResult` is true.
- */
-export async function persistCallStatusFromParams(args: {
-  params: Record<string, string>;
-  disposition?: string | null;
-  outreachAttemptId?: number | null;
-  selectResult?: boolean;
-}): Promise<Tables<"call"> | null> {
-  const underCase = twilioParamsToUnderCase(args.params);
-  const callSid =
-    typeof underCase.call_sid === "string" ? underCase.call_sid : null;
-  if (!callSid) {
-    throw new Error("Missing CallSid in status params");
-  }
-  const timestamp =
-    typeof underCase.timestamp === "string" ? underCase.timestamp : null;
-  const status = args.disposition
-    ? String(args.disposition).toLowerCase()
-    : typeof underCase.call_status === "string"
-      ? String(underCase.call_status).toLowerCase()
-      : null;
-
-  const update: Record<string, unknown> = {};
-  if (timestamp) {
-    update.end_time = new Date(timestamp).toISOString();
-  }
-  if (status) {
-    update.status = status;
-  }
-  const duration = Math.max(
-    Number(underCase.duration) || 0,
-    Number(underCase.call_duration) || 0,
-  );
-  if (duration > 0) {
-    update.duration = String(duration);
-  }
-
-  if (Object.keys(update).length === 0) {
-    return null;
-  }
-
-  const existing = await findCallBySid(callSid);
-  if (!existing?.workspace) {
-    throw new Error(`Call ${callSid} not found or missing workspace`);
-  }
-
-  let data: Tables<"call"> | null = null;
-  if (args.selectResult) {
-    data = (await updateCallBySid(
-      existing.workspace,
-      callSid,
-      update as Partial<Tables<"call">>,
-    )) as Tables<"call"> | null;
-  } else {
-    await updateCallBySid(
-      existing.workspace,
-      callSid,
-      update as Partial<Tables<"call">>,
-    );
-  }
-
-  const outreachAttemptId =
-    args.outreachAttemptId != null
-      ? args.outreachAttemptId
-      : (data as { outreach_attempt_id?: number | null } | null)?.outreach_attempt_id ??
-        existing.outreach_attempt_id ??
-        null;
-
-  if (args.disposition && outreachAttemptId != null && existing.workspace) {
-    const result = await updateOutreachAttemptForWorkspace(
-      existing.workspace,
-      outreachAttemptId,
-      { disposition: args.disposition },
-    );
-    if (result instanceof Response) {
-      throw new Error("Failed to update outreach disposition");
-    }
-  }
-
-  return data ?? (existing as Tables<"call">);
-}

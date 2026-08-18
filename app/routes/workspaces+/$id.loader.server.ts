@@ -15,6 +15,7 @@ import { getWorkspaceUnreadConversationCount } from "@/lib/database/workspace-co
 import { getWorkspaceRecentOutboundMessageCount } from "@/lib/database/workspace-twilio-portal-snapshot.server";
 import { workspaceContext } from "@/lib/route-context.server";
 import { defineLoader } from "@/lib/handler.server";
+import { isNotFoundError } from "@/lib/parse-utils.server";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 import {
   selectWorkspaceToday,
@@ -159,12 +160,7 @@ export const loader = defineLoader({
         ),
       } satisfies LoaderData, { headers });
     } catch (error) {
-      if (
-        error &&
-        typeof error === "object" &&
-        "code" in error &&
-        error.code === "PGRST116"
-      ) {
+      if (isNotFoundError(error)) {
         throw redirect("/workspaces", { headers });
       }
       throw error;

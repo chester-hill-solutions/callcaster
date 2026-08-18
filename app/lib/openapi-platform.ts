@@ -325,7 +325,8 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       summary: "List workspace API keys",
       tags: ["Platform API", "Workspace"],
       security: sessionOnlySecurity,
-      description: "Session-only trust-root route. Lists key metadata without secrets.",
+      description:
+        "Session-only trust-root route. Lists key metadata without secrets.",
       responses: {
         "200": {
           description: "API keys",
@@ -336,7 +337,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
           },
         },
         "401": errorResponse("Unauthorized"),
-        "403": errorResponse("Member manager role required"),
+        "403": errorResponse("Workspace admin role required"),
       },
     },
     post: {
@@ -345,7 +346,10 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       tags: ["Platform API", "Workspace"],
       security: sessionOnlySecurity,
       description:
-        "Session-only trust-root route. Returns the full secret once; store it immediately.",
+        "Session-only trust-root route. Requires a workspace admin session. " +
+        "Requested scopes are capped at the capabilities the creating member's " +
+        "role holds — a scope outside that set is rejected with 403 naming it. " +
+        "Returns the full secret once; store it immediately.",
       requestBody: {
         required: true,
         content: {
@@ -365,7 +369,9 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         },
         "400": errorResponse("Validation error"),
         "401": errorResponse("Unauthorized"),
-        "403": errorResponse("Member manager role required"),
+        "403": errorResponse(
+          "Workspace admin role required, or a requested scope exceeds the creator's role capabilities",
+        ),
       },
     },
     delete: {
@@ -373,7 +379,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       summary: "Revoke a workspace API key",
       tags: ["Platform API", "Workspace"],
       security: sessionOnlySecurity,
-      description: "Session-only trust-root route.",
+      description: "Session-only trust-root route. Requires a workspace admin session.",
       requestBody: {
         required: true,
         content: {
@@ -393,7 +399,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         },
         "400": errorResponse("Validation error"),
         "401": errorResponse("Unauthorized"),
-        "403": errorResponse("Member manager role required"),
+        "403": errorResponse("Workspace admin role required"),
       },
     },
   },

@@ -37,6 +37,16 @@ vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
     }
     mocks.persistCalls.push(data);
   }),
+  mergeWorkspaceTwilioData: vi.fn(
+    async (_workspaceId: string, updater: (current: unknown) => unknown) => {
+      const next = updater(mocks.twilioData);
+      if (mocks.persistError) {
+        throw mocks.persistError;
+      }
+      mocks.persistCalls.push(next);
+      return next;
+    },
+  ),
 }));
 
 vi.mock("@/lib/database/workspace.server", () => ({

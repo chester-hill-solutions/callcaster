@@ -53,7 +53,7 @@ export {
 export const agent_state = pgEnum("agent_state", ["offline","available","busy","wrap_up","away"]);
 export const answered_by = pgEnum("answered_by", ["human","machine","unknown"]);
 export const call_status = pgEnum("call_status", ["queued","ringing","in-progress","canceled","completed","failed","busy","no-answer","initiated"]);
-export const campaign_status = pgEnum("campaign_status", ["pending","scheduled","running","complete","paused","draft","archived"]);
+export const campaign_status = pgEnum("campaign_status", ["pending","scheduled","running","complete","paused","draft","archived","waiting"]);
 export const campaign_type = pgEnum("campaign_type", ["message","robocall","simple_ivr","complex_ivr","live_call","email"]);
 export const dial_types = pgEnum("dial_types", ["call","predictive"]);
 export const message_direction = pgEnum("message_direction", ["inbound","outbound-api","outbound-call","outbound-reply"]);
@@ -227,7 +227,6 @@ export const campaign = pgTable("campaign", {
   end_date: text(),
   group_household_queue: boolean().notNull(),
   id: serial().notNull().primaryKey(),
-  is_active: boolean().notNull(),
   live_questions: jsonb(),
   message_media: text().array(),
   next_queue_order: integer().notNull(),

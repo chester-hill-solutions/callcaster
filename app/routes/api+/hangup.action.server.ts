@@ -3,11 +3,13 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
-import { findCallBySid, updateOutreachDispositionByContactId } from "@/lib/telephony-db.server";
+import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
+import { campaign as campaignTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
-import { rpcDequeueContact } from "@/lib/db-rpc.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { hangupTwiml } from "@/lib/twilio-twiml.server";
 import { defineAction } from "@/lib/handler.server";
@@ -45,17 +47,37 @@ export const action = defineAction({
             }
         }
         if (call.contact_id) {
-            await rpcDequeueContact(tdb, {
-                contactId: call.contact_id,
-                groupOnHousehold: true,
-                dequeuedById: user.id,
-                dequeuedReasonText: "Call completed",
-            });
-            await updateOutreachDispositionByContactId(
+            // Household fan-out follows the campaign's setting; it was
+            // hardcoded true, dequeuing whole households on campaigns that
+            // never asked for household grouping.
+            const campaign = call.campaign_id
+                ? await tdb.campaign.findFirst({
+                      where: eq(campaignTable.id, call.campaign_id),
+                      columns: { group_household_queue: true },
+                  })
+                : null;
+            await dequeueQueueEntry({
+                by: { contactId: call.contact_id },
                 workspaceId,
-                call.contact_id,
-                "completed",
-            );
+                household: campaign?.group_household_queue ?? false,
+                userId: user.id,
+                reason: "Call completed",
+                exec: tdb,
+            });
+            // Scope the disposition to THIS call's attempt. The old
+            // updateOutreachDispositionByContactId rewrote every attempt for
+            // the contact across all campaigns to "completed", destroying
+            // do_not_call/voicemail history. The workspace-scoped update also
+            // applies the terminal-transition guard, so a real disposition
+            // already on the attempt is never downgraded.
+            if (call.outreach_attempt_id) {
+                await updateOutreachAttemptForWorkspace(
+                    workspaceId,
+                    call.outreach_attempt_id,
+                    { disposition: "completed" },
+                    { tdb },
+                );
+            }
         }
         return routeData({ success: true });
 

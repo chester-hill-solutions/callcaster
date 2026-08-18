@@ -4,51 +4,40 @@ import {
   runSmsStatusSideEffects,
 } from "@/lib/worker/webhook-side-effects.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
-import { requireRecordParam, requireStringParam } from "./shared.server";
-
-function requireSidAndTwilioParams(
-  job: ClaimedJobRow,
-  sidKey: "callSid" | "messageSid",
-  label: string,
-): { sid: string; twilioParams: Record<string, string> } {
-  const params = (job.params ?? {}) as Record<string, unknown>;
-  const sid = requireStringParam(params, sidKey);
-  const twilioParams = requireRecordParam(params, "twilioParams");
-  if (!sid || !twilioParams) {
-    throw new Error(`${label}: missing ${sidKey} or twilioParams`);
-  }
-  return { sid, twilioParams };
-}
+// `sidAndTwilioParamsSchema` moved to job-registry.server.ts in #1239 A3 so
+// job-params.server.ts (schema-only) can build these registrations without
+// depending on this file — see that module's doc comment for why.
+import type {
+  SidAndTwilioParams,
+  VoiceSideEffectsParams,
+} from "@/lib/worker/job-registry.server";
 
 export async function callStatusSideEffectsHandler(
   job: ClaimedJobRow,
+  params: VoiceSideEffectsParams,
 ): Promise<unknown> {
-  const { sid, twilioParams } = requireSidAndTwilioParams(
-    job,
-    "callSid",
-    "call_status_side_effects",
-  );
-  return runCallStatusSideEffects({ callSid: sid, twilioParams });
+  return runCallStatusSideEffects({
+    callSid: params.sid,
+    event: params.event,
+  });
 }
 
 export async function smsStatusSideEffectsHandler(
   job: ClaimedJobRow,
+  params: SidAndTwilioParams,
 ): Promise<unknown> {
-  const { sid, twilioParams } = requireSidAndTwilioParams(
-    job,
-    "messageSid",
-    "sms_status_side_effects",
-  );
-  return runSmsStatusSideEffects({ messageSid: sid, twilioParams });
+  return runSmsStatusSideEffects({
+    messageSid: params.sid,
+    twilioParams: params.twilioParams,
+  });
 }
 
 export async function recordingSideEffectsHandler(
   job: ClaimedJobRow,
+  params: VoiceSideEffectsParams,
 ): Promise<unknown> {
-  const { sid, twilioParams } = requireSidAndTwilioParams(
-    job,
-    "callSid",
-    "recording_side_effects",
-  );
-  return runRecordingSideEffects({ callSid: sid, twilioParams });
+  return runRecordingSideEffects({
+    callSid: params.sid,
+    event: params.event,
+  });
 }

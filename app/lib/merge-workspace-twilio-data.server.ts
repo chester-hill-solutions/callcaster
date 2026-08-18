@@ -78,6 +78,32 @@ export function invalidateWorkspaceTwilioData(workspaceId: string): void {
   );
 }
 
+/** Parse the raw `twilio_data` column (json or json-string) into an object. */
+function parseTwilioData(raw: unknown): WorkspaceTwilioData {
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return isObject(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return isObject(raw) ? raw : {};
+}
+
+/** Drop the derived `onboarding.steps` before persisting — it is recomputed on read. */
+function stripOnboardingStepsForPersistence(
+  twilioData: WorkspaceTwilioData,
+): WorkspaceTwilioData {
+  const onboarding = twilioData.onboarding;
+  return isObject(onboarding) && "steps" in onboarding
+    ? {
+        ...twilioData,
+        onboarding: (({ steps: _steps, ...rest }) => rest)(onboarding),
+      }
+    : twilioData;
+}
+
 export async function loadWorkspaceTwilioData(
   workspaceId: string,
 ): Promise<WorkspaceTwilioData> {
@@ -98,18 +124,7 @@ export async function loadWorkspaceTwilioData(
     throw new Error(`Workspace ${workspaceId} not found`);
   }
 
-  const raw = row.twilio_data;
-  let data: WorkspaceTwilioData;
-  if (typeof raw === "string") {
-    try {
-      const parsed = JSON.parse(raw);
-      data = isObject(parsed) ? parsed : {};
-    } catch {
-      data = {};
-    }
-  } else {
-    data = isObject(raw) ? raw : {};
-  }
+  const data = parseTwilioData(row.twilio_data);
 
   workspaceTwilioDataCache.set(workspaceId, {
     data,
@@ -123,29 +138,55 @@ export async function persistWorkspaceTwilioData(
   workspaceId: string,
   twilioData: WorkspaceTwilioData,
 ): Promise<void> {
-  const onboarding = twilioData.onboarding;
-  const dataForPersistence =
-    isObject(onboarding) && "steps" in onboarding
-      ? {
-          ...twilioData,
-          onboarding: (({ steps: _steps, ...rest }) => rest)(onboarding),
-        }
-      : twilioData;
-
   await adminDb
     .update(workspaceTable)
-    .set({ twilio_data: JSON.stringify(dataForPersistence) })
+    .set({ twilio_data: JSON.stringify(stripOnboardingStepsForPersistence(twilioData)) })
     .where(eq(workspaceTable.id, workspaceId));
   invalidateWorkspaceTwilioData(workspaceId);
 }
 
+/**
+ * Atomically read-modify-write `workspace.twilio_data`.
+ *
+ * `twilio_data` is a single JSON blob written by many unrelated code paths
+ * (onboarding, A2P/Trust Hub provisioning, billing reconciliation, low-credit
+ * notices). A plain load→spread→persist is a read-modify-write with no lock,
+ * so two concurrent writers each overwrite the whole column and the later one
+ * silently wipes the earlier one's keys (e.g. an onboarding save clobbering a
+ * brandSid/campaignSid the compliance job just wrote). It is also served from
+ * a per-process TTL cache, so a writer could re-serialize stale data.
+ *
+ * This runs the updater inside a transaction that locks the row (`FOR UPDATE`)
+ * and reads the row FRESH from the database — never the cache — so concurrent
+ * merges serialize on the row and every merge sees the latest committed value.
+ */
 export async function mergeWorkspaceTwilioData(
   workspaceId: string,
   updater: (current: WorkspaceTwilioData) => WorkspaceTwilioData,
 ): Promise<WorkspaceTwilioData> {
-  const current = await loadWorkspaceTwilioData(workspaceId);
-  const next = updater(current);
-  await persistWorkspaceTwilioData(workspaceId, next);
+  const next = await adminDb.transaction(async (tx) => {
+    const [row] = await tx
+      .select({ twilio_data: workspaceTable.twilio_data })
+      .from(workspaceTable)
+      .where(eq(workspaceTable.id, workspaceId))
+      .for("update")
+      .limit(1);
+
+    if (!row) {
+      throw new Error(`Workspace ${workspaceId} not found`);
+    }
+
+    const merged = updater(parseTwilioData(row.twilio_data));
+
+    await tx
+      .update(workspaceTable)
+      .set({ twilio_data: JSON.stringify(stripOnboardingStepsForPersistence(merged)) })
+      .where(eq(workspaceTable.id, workspaceId));
+
+    return merged;
+  });
+
+  invalidateWorkspaceTwilioData(workspaceId);
   return next;
 }
 

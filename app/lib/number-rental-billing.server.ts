@@ -6,6 +6,7 @@ import {
   transaction_history as transactionHistoryTable,
 } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
+import { db } from "@/server/db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { notifyOps } from "@/lib/ops-alert.server";
@@ -463,7 +464,9 @@ export async function runNumberRentalBilling(args: {
       // negative and keep the number active for free. Check funds explicitly
       // and route an unaffordable new charge to the unpaid/grace path instead.
       const balance = await getWorkspaceCreditsBalance(number.workspace);
-      if (balance != null && balance < NUMBER_RENTAL_MONTHLY_CREDITS) {
+      // Treat an unknown balance (null → workspace row missing / replication
+      // gap) as unaffordable rather than debiting it negative.
+      if (balance == null || balance < NUMBER_RENTAL_MONTHLY_CREDITS) {
         unpaid++;
         logger.info("Number rental left unpaid: insufficient credits", {
           numberId: number.id,
@@ -477,7 +480,7 @@ export async function runNumberRentalBilling(args: {
       }
 
       try {
-        await insertTransactionHistoryIdempotent({
+        await insertTransactionHistoryIdempotent(db, {
           workspaceId: number.workspace,
           type: "DEBIT",
           amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),

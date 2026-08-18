@@ -121,7 +121,7 @@ export function selectWorkspaceToday(
   const runningCampaign = [...input.campaigns]
     .filter(
       (campaign) =>
-        campaign.type === "live_call" && campaign.status === "running",
+        campaign.type === "live_call" && (campaign.status === "running" || campaign.status === "waiting"),
     )
     .sort(campaignIdCompare)[0];
 

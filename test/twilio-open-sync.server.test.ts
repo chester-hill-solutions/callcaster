@@ -43,7 +43,7 @@ vi.mock("@/lib/message-db.server", () => ({
   updateMessageBySid: (...args: unknown[]) => mocks.updateMessageBySid(...args),
 }));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -105,6 +105,99 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
     );
   });
 
+  // #1289: rows stuck longer than maxAgeMinutes must still be swept, and a
+  // Twilio 404 on an old row is an answer (terminalize), not a retry.
+  test("sweeps open rows older than the window (no date_created lower bound)", async () => {
+    mocks.callFindMany.mockResolvedValue([]);
+    await triggerTwilioOpenSync({ workspaceId: "ws-1", maxAgeMinutes: 120 });
+
+    const where = mocks.callFindMany.mock.calls[0]?.[0]?.where;
+    // Selection must not filter on date_created — the old shape wrapped the
+    // status filter in and(status, gte(date_created, since)), which let a row
+    // stuck >2h escape the sweep forever. Drizzle where objects are circular,
+    // so walk them collecting referenced column names instead of serializing.
+    const columns = new Set<string>();
+    const seen = new Set<object>();
+    const walk = (node: unknown) => {
+      if (node == null || typeof node !== "object" || seen.has(node)) return;
+      seen.add(node);
+      const name = (node as { name?: unknown }).name;
+      const table = (node as { table?: unknown }).table;
+      if (typeof name === "string" && table != null) {
+        // A column reference: record it, but do NOT recurse into its .table —
+        // that would enumerate every column of the table and defeat the check.
+        columns.add(name);
+        return;
+      }
+      for (const value of Object.values(node)) walk(value);
+    };
+    walk(where);
+    expect([...columns]).toContain("status");
+    expect([...columns]).not.toContain("date_created");
+  });
+
+  test("terminalizes an old Twilio-404 call as failed through the canonical processor", async () => {
+    mocks.callFindMany.mockResolvedValue([
+      // Far older than any window.
+      { sid: "CA404", status: "queued", date_created: "2026-07-01T00:00:00Z", is_last: false },
+    ]);
+    mocks.callsList.mockResolvedValue([]);
+    mocks.callFetch.mockRejectedValue(
+      Object.assign(new Error("not found"), { status: 404, code: 20404 }),
+    );
+
+    const result = await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+
+    expect(result.ok).toBe(true);
+    expect(mocks.processCallStatusWebhook).toHaveBeenCalledWith(
+      expect.objectContaining({ sid: "CA404", status: "failed" }),
+      expect.objectContaining({ workspaceId: "ws-1" }),
+    );
+  });
+
+  test("a young Twilio-404 call is skipped, not terminalized", async () => {
+    mocks.callFindMany.mockResolvedValue([
+      { sid: "CAyoung", status: "queued", date_created: new Date().toISOString(), is_last: false },
+    ]);
+    mocks.callsList.mockResolvedValue([]);
+    mocks.callFetch.mockRejectedValue(
+      Object.assign(new Error("not found"), { status: 404, code: 20404 }),
+    );
+
+    await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+
+    expect(mocks.processCallStatusWebhook).not.toHaveBeenCalled();
+  });
+
+  test("a transient fetch failure on an old row skips (retries next run) rather than terminalizing", async () => {
+    mocks.callFindMany.mockResolvedValue([
+      { sid: "CAflaky", status: "queued", date_created: "2026-07-01T00:00:00Z", is_last: false },
+    ]);
+    mocks.callsList.mockResolvedValue([]);
+    mocks.callFetch.mockRejectedValue(
+      Object.assign(new Error("service unavailable"), { status: 503 }),
+    );
+
+    await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+
+    expect(mocks.processCallStatusWebhook).not.toHaveBeenCalled();
+  });
+
+  test("a Twilio-404 message is never terminalized (billing side-effects risk)", async () => {
+    mocks.messageFindMany.mockResolvedValue([
+      { sid: "SM404", status: "queued", date_created: "2026-07-01T00:00:00Z", date_updated: null },
+    ]);
+    mocks.messagesList.mockResolvedValue([]);
+    mocks.messageFetch.mockRejectedValue(
+      Object.assign(new Error("not found"), { status: 404, code: 20404 }),
+    );
+
+    await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+
+    expect(mocks.updateMessageBySid).not.toHaveBeenCalled();
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+  });
+
   test("terminal message discovery updates the row and enqueues the billing side-effects job", async () => {
     mocks.messageFindMany.mockResolvedValue([
       { sid: "SM1", status: "sending", date_created: "2026-07-29T00:00:00Z", date_updated: null },
@@ -124,7 +217,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
       expect.objectContaining({
         type: "sms_status_side_effects",
         idempotencyKey: "sms_status_side_effects:SM1:delivered",
-        params: expect.objectContaining({ messageSid: "SM1" }),
+        params: expect.objectContaining({ sid: "SM1" }),
       }),
     );
   });

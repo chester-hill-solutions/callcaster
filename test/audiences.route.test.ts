@@ -298,13 +298,14 @@ describe("api.audiences route", () => {
       request: new Request("http://localhost/api/audiences?audienceId=not-a-number"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any);
-    expect(contactAudienceMocks.listAudienceContactsJson).toHaveBeenLastCalledWith(undefined);
+    // Always scoped to the authorized workspace (never called without it).
+    expect(contactAudienceMocks.listAudienceContactsJson).toHaveBeenLastCalledWith("w1", undefined);
 
     await mod.loader({
       request: new Request("http://localhost/api/audiences?audienceId=12"),
       deps: { verifyAuth, parseActionRequest, requireWorkspaceAccess },
     } as any);
-    expect(contactAudienceMocks.listAudienceContactsJson).toHaveBeenLastCalledWith(12);
+    expect(contactAudienceMocks.listAudienceContactsJson).toHaveBeenLastCalledWith("w1", 12);
 
     contactAudienceMocks.listAudienceContactsJson.mockRejectedValueOnce(new Error("q"));
     // The handler factory maps rethrown errors through createErrorResponse

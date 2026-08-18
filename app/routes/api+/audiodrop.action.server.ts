@@ -59,7 +59,10 @@ export const action = defineAction({
     const twilio = await d.createWorkspaceTwilioInstance({
       workspace_id: workspaceId,
     });
-    const childCallSid = await d.findCallSidByParentCallSid(callId as string);
+    const childCallSid = await d.findCallSidByParentCallSid(
+      workspaceId,
+      callId as string,
+    );
     if (!childCallSid) {
       throw { call: new Error("Call not found") };
     }

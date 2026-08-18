@@ -113,11 +113,14 @@ export async function findMatchingContactIds(workspaceId: string,
     return [];
   }
 
+  // Coerce rather than type-filter: raw-SQL bigint ids arrive as strings,
+  // and the old `typeof === "number"` filter dropped every match — inbound
+  // SMS never linked to a contact and STOP opt-outs never applied (#1225).
   return Array.from(
     new Set(
       (contacts ?? [])
-        .map((contact) => contact?.id)
-        .filter((contactId): contactId is number => typeof contactId === "number"),
+        .map((contact) => Number(contact?.id))
+        .filter((contactId) => Number.isFinite(contactId)),
     ),
   );
 }

@@ -58,7 +58,6 @@ export const action = defineAction({
     audience_ids = [],
     status = "draft",
     enqueue_audience_contacts = true,
-    is_active,
     start_date,
     end_date,
     schedule,
@@ -85,6 +84,9 @@ export const action = defineAction({
     workspaceId = bodyWorkspaceId;
   }
 
+  // Still baselined (issue #1242, D3): workspace_id comes from the parsed
+  // JSON body, not a route param, so the capability check can't move into a
+  // pre-request `auth:` strategy without a body-clone rework of this route.
   const capability = await requireDualAuthCapability({
     auth: authResult,
     workspaceId,
@@ -122,7 +124,6 @@ export const action = defineAction({
     caller_id,
     script_id: scriptResult.scriptId,
     status,
-    is_active: Boolean(is_active),
     start_date: start_date ?? undefined,
     end_date: end_date ?? undefined,
     schedule: schedule ?? undefined,

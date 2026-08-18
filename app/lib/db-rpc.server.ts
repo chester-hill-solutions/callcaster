@@ -1,6 +1,6 @@
 import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { rowsToCsv } from "@/lib/rpc-csv.server";
-import { QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
+import { QUEUE_LIFECYCLE_ASSIGNED, QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
 import { emitQueueEvent } from "@/lib/workspace-events.server";
 import { campaign_queue as campaignQueueTable, contact as contactTable } from "@/db/schema";
 import { db, type Database as DbInstance } from "@/server/db";
@@ -24,6 +24,47 @@ async function queryScalar<T>(
   if (!first) return null;
   const value = Object.values(first)[0];
   return value ?? null;
+}
+
+/**
+ * Scalar RPC result coerced to a finite number. Postgres `bigint` (int8)
+ * comes back from the driver as a string — postgres.js only auto-parses
+ * int2/int4/oid/float — so a `RETURNS bigint` function silently fails
+ * `typeof === "number"` / `Number.isFinite` checks downstream (#1218).
+ */
+async function queryScalarNumber(
+  executor: RpcExecutor,
+  query: SQL,
+  label: string,
+): Promise<number | null> {
+  const raw = await queryScalar<number | string>(executor, query);
+  if (raw == null) return null;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    throw new Error(`${label} returned a non-numeric value: ${String(raw)}`);
+  }
+  return value;
+}
+
+/**
+ * Coerce named columns of raw-SQL rows to finite numbers. Same driver quirk
+ * as queryScalarNumber: bigint/numeric arrive as strings from postgres.js,
+ * and downstream `typeof === "number"` checks silently drop them
+ * (#1225/#1226/#1227). Non-finite values become null rather than NaN.
+ */
+function coerceRowNumbers<T extends Record<string, unknown>>(
+  rows: T[],
+  keys: ReadonlyArray<string>,
+): T[] {
+  return rows.map((row) => {
+    const patched: Record<string, unknown> = { ...row };
+    for (const key of keys) {
+      if (patched[key] == null) continue;
+      const value = Number(patched[key]);
+      patched[key] = Number.isFinite(value) ? value : null;
+    }
+    return patched as T;
+  });
 }
 
 async function execVoid(executor: RpcExecutor, query: SQL): Promise<void> {
@@ -137,7 +178,7 @@ export async function rpcCreateOutreachAttempt(
     queueId: number;
   },
 ): Promise<number> {
-  const id = await queryScalar<number>(
+  const id = await queryScalarNumber(
     executor,
     sql`select create_outreach_attempt(
       ${args.contactId}::bigint,
@@ -146,6 +187,7 @@ export async function rpcCreateOutreachAttempt(
       ${args.workspaceId}::uuid,
       ${args.queueId}::bigint
     ) as id`,
+    "create_outreach_attempt",
   );
   if (id == null) {
     throw new Error("create_outreach_attempt returned no id");
@@ -153,59 +195,137 @@ export async function rpcCreateOutreachAttempt(
   return id;
 }
 
+export type DialClaimResult =
+  | "claimed"
+  | "unavailable"
+  | "claimed_by_other"
+  | "not_queued"
+  | "active_call";
+
+/**
+ * Atomically claim a specific queue row before dialing it (manual dial path).
+ * Anything but "claimed" means the dial must not proceed — see
+ * client/migrations/20260805120000_atomic_manual_dial_claims.sql for the
+ * exact semantics of each refusal code.
+ */
+export async function rpcClaimQueueEntryForDial(
+  executor: RpcExecutor,
+  args: {
+    queueId: number;
+    campaignId: number;
+    workspaceId: string;
+    userId: string;
+  },
+): Promise<DialClaimResult> {
+  const result = await queryScalar<string>(
+    executor,
+    sql`select claim_queue_entry_for_dial(
+      ${args.queueId}::bigint,
+      ${args.campaignId}::bigint,
+      ${args.workspaceId}::uuid,
+      ${args.userId}::uuid
+    ) as result`,
+  );
+  return (result ?? "unavailable") as DialClaimResult;
+}
+
+/**
+ * Household-aware dequeue mechanism (issue #1240 B3). Exported only so
+ * app/lib/campaign-queue-db.server.ts's `dequeueQueueEntry` — the single
+ * caller-facing dequeue entry point — can import it across the module
+ * boundary; no other file should call this directly. Call
+ * `dequeueQueueEntry` instead.
+ *
+ * @returns how many rows the RPC dequeued for `contactId` itself — 0 or 1.
+ * Household siblings are NOT counted (see
+ * client/migrations/20260815130000_dequeue_contact_returns_rows_affected.sql).
+ * 0 means the guarded predicate matched nothing: the row is already dequeued,
+ * or it is `assigned` to someone other than `dequeuedById` (#1278).
+ */
 export async function rpcDequeueContact(
   executor: RpcExecutor,
   args: {
     contactId: number;
+    workspaceId: string;
     groupOnHousehold: boolean;
     dequeuedById?: string | null;
     dequeuedReasonText?: string | null;
   },
-): Promise<void> {
+): Promise<number> {
   const contactIds = new Set<number>([args.contactId]);
   if (args.groupOnHousehold) {
     const [sourceContact] = await db
       .select({ household_id: contactTable.household_id })
       .from(contactTable)
-      .where(eq(contactTable.id, args.contactId))
+      .where(
+        and(
+          eq(contactTable.id, args.contactId),
+          eq(contactTable.workspace, args.workspaceId),
+        ),
+      )
       .limit(1);
     if (sourceContact?.household_id != null) {
       const householdContacts = await db
         .select({ id: contactTable.id })
         .from(contactTable)
-        .where(eq(contactTable.household_id, sourceContact.household_id));
+        .where(
+          and(
+            eq(contactTable.household_id, sourceContact.household_id),
+            eq(contactTable.workspace, args.workspaceId),
+          ),
+        );
       for (const row of householdContacts) {
         contactIds.add(row.id);
       }
     }
   }
 
+  // Snapshot of the rows the RPC is about to change, taken so the realtime
+  // UPDATE events below carry a real `old` row. It MUST mirror the RPC's own
+  // WHERE predicate — a row the RPC dequeues but this misses gets no event at
+  // all, so the queue UI keeps showing it as live. See
+  // client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql
+  // for why `assigned` rows are included only for the caller who holds them
+  // (#1260).
+  const dequeuedById = args.dequeuedById ?? null;
   const oldRows = await db
     .select()
     .from(campaignQueueTable)
     .where(
       and(
         inArray(campaignQueueTable.contact_id, [...contactIds]),
+        eq(campaignQueueTable.workspace, args.workspaceId),
         isNull(campaignQueueTable.dequeued_at),
         or(
           isNull(campaignQueueTable.queue_state),
           eq(campaignQueueTable.queue_state, QUEUE_STATUS_QUEUED),
+          ...(dequeuedById
+            ? [
+                and(
+                  eq(campaignQueueTable.queue_state, QUEUE_LIFECYCLE_ASSIGNED),
+                  eq(campaignQueueTable.assigned_to_user_id, dequeuedById),
+                ),
+              ]
+            : []),
         ),
       ),
     );
 
-  await execVoid(
-    executor,
-    sql`select dequeue_contact(
+  const primaryRowsDequeued =
+    (await queryScalarNumber(
+      executor,
+      sql`select dequeue_contact(
       ${args.contactId}::bigint,
       ${args.groupOnHousehold},
-      ${args.dequeuedById ?? null}::uuid,
+      ${args.workspaceId}::uuid,
+      ${dequeuedById}::uuid,
       ${args.dequeuedReasonText ?? null}
-    )`,
-  );
+    ) as primary_rows_dequeued`,
+      "dequeue_contact",
+    )) ?? 0;
 
   if (oldRows.length === 0) {
-    return;
+    return primaryRowsDequeued;
   }
 
   const newRows = await db
@@ -226,6 +346,8 @@ export async function rpcDequeueContact(
         ),
       ),
   );
+
+  return primaryRowsDequeued;
 }
 
 export async function rpcGetCampaignQueue(
@@ -242,10 +364,11 @@ export async function rpcGetCampaignStats(
   executor: RpcExecutor,
   campaignId: number | string,
 ): Promise<CampaignStatRow[]> {
-  return queryRows<CampaignStatRow>(
+  const rows = await queryRows<CampaignStatRow>(
     executor,
     sql`select * from get_campaign_stats(${Number(campaignId)})`,
   );
+  return coerceRowNumbers(rows, ["count", "expected_total"]);
 }
 
 export async function rpcResetCampaign(
@@ -316,10 +439,11 @@ export async function rpcFindContactByPhone(
   workspaceId: string,
   phoneNumber: string,
 ): Promise<Record<string, unknown>[]> {
-  return queryRows(
+  const rows = await queryRows(
     db,
     sql`select * from find_contact_by_phone(${phoneNumber}, ${workspaceId}::uuid)`,
   );
+  return coerceRowNumbers(rows, ["id"]);
 }
 
 export async function rpcFindContactsByPhones(
@@ -327,13 +451,14 @@ export async function rpcFindContactsByPhones(
   phoneNumbers: string[],
 ): Promise<Record<string, unknown>[]> {
   if (phoneNumbers.length === 0) return [];
-  return queryRows(
+  const rows = await queryRows(
     db,
     sql`select * from find_contacts_by_phones(${workspaceId}::uuid, array[${sql.join(
       phoneNumbers.map((phone) => sql`${phone}`),
       sql`, `,
     )}]::text[])`,
   );
+  return coerceRowNumbers(rows, ["id"]);
 }
 
 export async function rpcGetAudiencesByCampaign(
@@ -344,7 +469,7 @@ export async function rpcGetAudiencesByCampaign(
       db,
       sql`select * from get_audiences_by_campaign(${campaignId})`,
     );
-    return { data, error: null };
+    return { data: coerceRowNumbers(data, ["id"]), error: null };
   } catch (error) {
     return {
       data: null,
@@ -378,14 +503,15 @@ export async function rpcReserveCampaignQueueOrderRange(
   executor: RpcExecutor,
   args: { campaignId: number; count: number },
 ): Promise<number> {
-  const startOrder = await queryScalar<number>(
+  const startOrder = await queryScalarNumber(
     executor,
     sql`select reserve_campaign_queue_order_range(
       ${args.campaignId},
       ${args.count}
     ) as start_order`,
+    "reserve_campaign_queue_order_range",
   );
-  if (typeof startOrder !== "number" || !Number.isFinite(startOrder)) {
+  if (startOrder == null) {
     throw new Error(
       `Invalid start queue order returned for campaign ${args.campaignId}`,
     );

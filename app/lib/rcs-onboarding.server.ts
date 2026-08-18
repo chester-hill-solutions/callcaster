@@ -12,7 +12,7 @@ import {
 } from "@/lib/messaging-onboarding.server";
 import {
   loadWorkspaceTwilioData,
-  persistWorkspaceTwilioData,
+  mergeWorkspaceTwilioData,
 } from "@/lib/merge-workspace-twilio-data.server";
 import type {
   TwilioAccountData,
@@ -21,7 +21,6 @@ import type {
   WorkspaceOnboardingStatus,
 } from "@/lib/types";
 
-import { isObject } from "@/lib/type-safety-utils";
 
 export { RCS_ONBOARDING_ENABLED, isRcsOnboardingEnabled } from "@/lib/rcs-onboarding-flags";
 
@@ -137,19 +136,18 @@ export function getWorkspaceRcsBlockingIssues(
 
 async function persistWorkspaceRcsState({
   workspaceId,
-  twilioData,
   onboarding,
 }: {
   null?: never | null;
   workspaceId: string;
-  twilioData: TwilioAccountData;
   onboarding: ReturnType<typeof getWorkspaceMessagingOnboardingFromTwilioData>;
 }) {
-  const baseData = isObject(twilioData) ? twilioData : {};
-  await persistWorkspaceTwilioData(workspaceId, {
-    ...baseData,
+  // Atomic merge over the fresh locked row so a concurrent writer's top-level
+  // keys are preserved rather than clobbered.
+  await mergeWorkspaceTwilioData(workspaceId, (current) => ({
+    ...current,
     onboarding,
-  });
+  }));
 }
 
 export async function updateWorkspaceRcsOnboarding({
@@ -242,7 +240,6 @@ export async function updateWorkspaceRcsOnboarding({
 
   await persistWorkspaceRcsState({
     workspaceId,
-    twilioData,
     onboarding: nextOnboarding,
   });
 

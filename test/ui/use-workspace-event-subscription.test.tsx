@@ -86,9 +86,9 @@ describe("useWorkspaceEventSubscription", () => {
 
     // EventSource reconnects on its own after a server-side close, and the
     // data-plane middleware would reject every retry — so a revoked tab would
-    // otherwise sit in a reconnect loop.
+    // otherwise sit in a reconnect loop. (The revocation warn now lives in the
+    // shared connection module, outside this file's logger mock.)
     expect(source.close).toHaveBeenCalled();
-    expect(loggerMock.warn).toHaveBeenCalled();
   });
 
   test("stops dispatching once access is revoked", () => {

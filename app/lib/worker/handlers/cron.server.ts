@@ -5,6 +5,7 @@ import { runCronWorkspaceFanout } from "@/lib/cron-workspace-fanout.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { runLowCreditNotify } from "@/lib/low-credit-notify.server";
+import { runCampaignScheduleSync } from "@/lib/campaign-schedule-sync.server";
 import { pruneExpiredIdempotencyRecords } from "@/lib/platform-idempotency.server";
 import { pruneCompletedJobs, pruneWorkspaceEvents } from "@/lib/worker/job-retention.server";
 import {
@@ -14,15 +15,23 @@ import {
 import { listAllWorkspacesOrdered } from "@/lib/workspace-members-db.server";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
-import { withReschedule, requireNumberParam, requireStringParam } from "./shared.server";
+import { TWILIO_WEBHOOK_AUDIT_JOB_TYPE } from "@/lib/worker/job-types.server";
+import { withReschedule } from "./shared.server";
 
 const LOW_CREDIT_NOTIFY_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
 const TWILIO_OPEN_SYNC_RESCHEDULE_MS = 5 * 60 * 1000;
 const BILLING_RECONCILE_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
 const NUMBER_RENTAL_BILLING_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
 const TWILIO_WEBHOOK_AUDIT_RESCHEDULE_MS = 6 * 60 * 60 * 1000;
+// Minute cadence: the status flip should land within a minute of a calling
+// window opening or closing, and the sweep is a single indexed read when no
+// campaign needs a transition.
+const CAMPAIGN_SCHEDULE_SYNC_RESCHEDULE_MS = 60 * 1000;
 
-export const TWILIO_WEBHOOK_AUDIT_JOB_TYPE = "twilio_webhook_audit";
+// Re-exported for backwards compatibility: moved to job-types.server.ts in
+// #1239 A3 so job-params.server.ts can reference it without importing this
+// file (see job-params.server.ts's doc comment for why that'd cycle).
+export { TWILIO_WEBHOOK_AUDIT_JOB_TYPE };
 
 type TwilioWebhookAuditWorkspaceResult = {
   workspaceId: string;
@@ -61,12 +70,12 @@ async function withOptionalWorkspaceFanout<T>(args: {
   return args.runOne(args.workspaceId);
 }
 
-export async function twilioOpenSyncHandler(job: ClaimedJobRow): Promise<unknown> {
-  const params = (job.params ?? {}) as Record<string, unknown>;
+export async function twilioOpenSyncHandler(
+  job: ClaimedJobRow,
+  params: { callLimit: number; messageLimit: number; maxAgeMinutes: number },
+): Promise<unknown> {
   const workspaceId = resolveWorkspaceId(job) ?? "";
-  const callLimit = requireNumberParam(params, "callLimit") ?? 50;
-  const messageLimit = requireNumberParam(params, "messageLimit") ?? 50;
-  const maxAgeMinutes = requireNumberParam(params, "maxAgeMinutes") ?? 120;
+  const { callLimit, messageLimit, maxAgeMinutes } = params;
 
   return withReschedule(
     {
@@ -104,6 +113,7 @@ export async function billingReconcileHandler(job: ClaimedJobRow): Promise<unkno
     {
       type: "billing_reconcile",
       delayMs: BILLING_RECONCILE_RESCHEDULE_MS,
+      params: {},
       completedJobId: job.id,
       enabled: !workspaceId,
     },
@@ -141,13 +151,15 @@ export async function billingReconcileHandler(job: ClaimedJobRow): Promise<unkno
 
 export async function numberRentalBillingHandler(
   job: ClaimedJobRow,
+  params: { workspaceId: string | undefined },
 ): Promise<unknown> {
-  const workspaceId = resolveWorkspaceId(job);
+  const workspaceId = job.workspace_id ?? params.workspaceId;
 
   return withReschedule(
     {
       type: "number_rental_billing",
       delayMs: NUMBER_RENTAL_BILLING_RESCHEDULE_MS,
+      params: { workspaceId: undefined },
       completedJobId: job.id,
       enabled: !workspaceId,
     },
@@ -166,6 +178,7 @@ export async function lowCreditNotifyHandler(job: ClaimedJobRow): Promise<unknow
     {
       type: "low_credit_notify",
       delayMs: LOW_CREDIT_NOTIFY_RESCHEDULE_MS,
+      params: {},
       completedJobId: job.id,
     },
     async () => {
@@ -217,23 +230,44 @@ export async function lowCreditNotifyHandler(job: ClaimedJobRow): Promise<unknow
 }
 
 /**
+ * Keep voice campaign statuses truthful around calling hours (#1168):
+ * running ↔ waiting per checkSchedule. Self-re-enqueuing every minute.
+ */
+export async function campaignScheduleSyncHandler(job: ClaimedJobRow): Promise<unknown> {
+  return withReschedule(
+    {
+      type: "campaign_schedule_sync",
+      delayMs: CAMPAIGN_SCHEDULE_SYNC_RESCHEDULE_MS,
+      params: {},
+      completedJobId: job.id,
+    },
+    () => runCampaignScheduleSync(),
+  );
+}
+
+/**
  * Scheduled Twilio webhook audit + optional auto-repair. Self-re-enqueuing.
  */
-export async function twilioWebhookAuditHandler(job: ClaimedJobRow): Promise<unknown> {
+export async function twilioWebhookAuditHandler(
+  job: ClaimedJobRow,
+  params: { autoRepair: boolean },
+): Promise<unknown> {
   return withReschedule(
     {
       type: TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
       delayMs: TWILIO_WEBHOOK_AUDIT_RESCHEDULE_MS,
+      // Matches the pre-#1239-A3 behaviour exactly: the reschedule never
+      // carried the current job's `autoRepair` forward, and the schema
+      // defaults a missing value to `true` (`v !== false`) — spelled out
+      // explicitly here since the typed schema requires the key.
+      params: { autoRepair: true },
       completedJobId: job.id,
     },
-    () => runTwilioWebhookAudit(job),
+    () => runTwilioWebhookAudit(params.autoRepair),
   );
 }
 
-async function runTwilioWebhookAudit(job: ClaimedJobRow): Promise<unknown> {
-  const params = (job.params ?? {}) as Record<string, unknown>;
-  const autoRepair = params.autoRepair !== false;
-
+async function runTwilioWebhookAudit(autoRepair: boolean): Promise<unknown> {
   const workspaces = await listAllWorkspacesOrdered();
   const results: TwilioWebhookAuditWorkspaceResult[] = [];
 

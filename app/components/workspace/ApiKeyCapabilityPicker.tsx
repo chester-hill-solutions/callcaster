@@ -17,6 +17,12 @@ import type { ProductCapabilityId } from "@/lib/capabilities";
 type ApiKeyCapabilityPickerProps = {
   name?: string;
   initialSelected?: readonly ProductCapabilityId[];
+  /**
+   * Restrict the offered options to the scopes the current user may grant.
+   * Undefined means "no client-side restriction" (the server still caps at the
+   * minter's role capabilities, so this is convenience, not enforcement).
+   */
+  grantableScopes?: readonly ProductCapabilityId[];
 };
 
 function CapabilityRow({
@@ -89,6 +95,7 @@ function CapabilityCategorySection({
 export function ApiKeyCapabilityPicker({
   name = "scopes",
   initialSelected = [],
+  grantableScopes,
 }: ApiKeyCapabilityPickerProps) {
   const [tab, setTab] = useState<CatalogPickerTab>("all");
   const [query, setQuery] = useState("");
@@ -96,23 +103,34 @@ export function ApiKeyCapabilityPicker({
     () => new Set(initialSelected),
   );
 
+  // Narrow the catalogue once; every downstream view derives from this list, so
+  // a scope the user cannot grant is absent from search, categories, and the
+  // select-all sweep alike.
+  const offeredOptions = useMemo(() => {
+    if (!grantableScopes) return API_KEY_CAPABILITY_OPTIONS;
+    const grantable = new Set<string>(grantableScopes);
+    return API_KEY_CAPABILITY_OPTIONS.filter((option) =>
+      grantable.has(option.value),
+    );
+  }, [grantableScopes]);
+
   const trimmedQuery = query.trim();
   const visibleOptions = useMemo(
     () =>
       tab === "selected"
-        ? API_KEY_CAPABILITY_OPTIONS.filter((option) => selected.has(option.value))
-        : filterApiKeyCapabilityOptions(API_KEY_CAPABILITY_OPTIONS, trimmedQuery),
-    [selected, tab, trimmedQuery],
+        ? offeredOptions.filter((option) => selected.has(option.value))
+        : filterApiKeyCapabilityOptions(offeredOptions, trimmedQuery),
+    [offeredOptions, selected, tab, trimmedQuery],
   );
   const categories = useMemo(
     () =>
       visibleApiKeyCapabilityCategories({
-        options: API_KEY_CAPABILITY_OPTIONS,
+        options: offeredOptions,
         query: tab === "all" ? trimmedQuery : "",
         tab,
         selected,
       }),
-    [selected, tab, trimmedQuery],
+    [offeredOptions, selected, tab, trimmedQuery],
   );
   const selectAllState = apiKeyCapabilitySelectionCoverage(visibleOptions, selected);
 

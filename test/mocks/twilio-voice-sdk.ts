@@ -21,6 +21,10 @@ export const mockTwilioDevice = {
   unregister: vi.fn(async () => {
     mockTwilioDevice.state = "unregistered";
   }),
+  updateToken: vi.fn(),
+  destroy: vi.fn(() => {
+    mockTwilioDevice.state = "destroyed";
+  }),
   connect: vi.fn(async () => ({
     parameters: { CallSid: "CA-mock", To: "client:user" },
     accept: vi.fn(),
@@ -52,4 +56,6 @@ export function resetTwilioVoiceSdkMock() {
   mockTwilioDevice.unregister.mockClear();
   mockTwilioDevice.connect.mockClear();
   mockTwilioDevice.disconnectAll.mockClear();
+  mockTwilioDevice.updateToken.mockClear();
+  mockTwilioDevice.destroy.mockClear();
 }

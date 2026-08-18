@@ -192,8 +192,11 @@ export function extractScriptQuestions(script: ExportScript | null | undefined):
         (block.type === "question" || block.type === "recorded" || block.type === "dtmf")
       ) {
         scriptQuestions.push({
+          // Must match the key the IVR webhook stores responses under (see ivr-results.ts).
           id: block.title || block.id,
-          title: block.title || block.id,
+          // Displayed label: block.content holds the actual question text authors write;
+          // block.title is a short, often-blank internal label — fall back to it, then the id.
+          title: block.content || block.title || block.id,
         });
       }
     }

@@ -17,7 +17,7 @@ import {
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { toUserMessage } from "@/lib/user-message";
 import type { ActionFunctionArgs } from "react-router";
 import type { Database } from "@/lib/db-types";
@@ -58,7 +58,7 @@ type AudienceUploadDeps = Partial<{
     headers: Headers;
     user: { id: string } | null;
   }>;
-  enqueueJob: typeof enqueueJob;
+  enqueueJob: typeof enqueueRegisteredJob;
   requireWorkspaceAccess: (args: {
     user: { id: string };
     workspaceId: string;
@@ -74,7 +74,7 @@ export const action = defineAction({
 
   const d = {
     verifyAuth: deps?.verifyAuth ?? resolveDualAuthSession,
-    enqueueJob: deps?.enqueueJob ?? enqueueJob,
+    enqueueJob: deps?.enqueueJob ?? enqueueRegisteredJob,
     requireWorkspaceAccess: deps?.requireWorkspaceAccess ?? requireWorkspaceAccess,
   };
   const { headers, user } = await d.verifyAuth(request);

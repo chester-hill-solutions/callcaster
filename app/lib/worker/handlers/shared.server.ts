@@ -1,5 +1,5 @@
 import { logger } from "@/lib/logger.server";
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { enqueueRegisteredJob, type JobParamsMap } from "@/lib/worker/job-params.server";
 
 /**
  * Run a self-scheduling job's work, guaranteeing the next occurrence is
@@ -15,11 +15,11 @@ import { enqueueJob } from "@/lib/worker/enqueue-job.server";
  * on a live row excluding this job, so a retry of the same job finds the
  * successor already queued and no-ops.
  */
-export async function withReschedule<T>(
+export async function withReschedule<T, Type extends keyof JobParamsMap & string>(
   args: {
-    type: string;
+    type: Type;
     delayMs: number;
-    params?: Record<string, unknown>;
+    params: JobParamsMap[Type];
     completedJobId: number;
     /** Skip for per-workspace child jobs; only the root job carries the chain. */
     enabled?: boolean;
@@ -33,7 +33,7 @@ export async function withReschedule<T>(
       await rescheduleJob(
         args.type,
         args.delayMs,
-        args.params ?? {},
+        args.params,
         args.completedJobId,
       );
     }
@@ -41,17 +41,20 @@ export async function withReschedule<T>(
 }
 
 /**
- * Enqueue the next run of a self-scheduling cron/coordinator job.
+ * Enqueue the next run of a self-scheduling cron/coordinator job. Typed
+ * (#1239 A3) against the same registered-job param schemas every other
+ * enqueue call site validates against — `type` must be a registered job
+ * type, and `params` must match its zod-inferred shape at compile time.
  */
-export async function rescheduleJob(
-  type: string,
+export async function rescheduleJob<Type extends keyof JobParamsMap & string>(
+  type: Type,
   delayMs: number,
-  params: Record<string, unknown>,
+  params: JobParamsMap[Type],
   completedJobId: number,
 ): Promise<void> {
   const nextRunAt = new Date(Date.now() + delayMs).toISOString();
   try {
-    await enqueueJob({
+    await enqueueRegisteredJob({
       type,
       params,
       runAt: nextRunAt,
@@ -68,38 +71,15 @@ export async function rescheduleJob(
   }
 }
 
+// requireStringParam is the last hand-rolled params narrowing left in this
+// file: every other job type's params narrowing now lives in a zod schema
+// next to its `defineJob` registration in handlers.server.ts (#1239 A2). This
+// one is still used by elevenlabs-batch-transcribe.server.ts's handler, which
+// wasn't part of that migration.
 export function requireStringParam(
   params: Record<string, unknown>,
   key: string,
 ): string | undefined {
   const value = params[key];
   return typeof value === "string" ? value : undefined;
-}
-
-export function requireNumberParam(
-  params: Record<string, unknown>,
-  key: string,
-): number | undefined {
-  const value = params[key];
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  // Tenant-db rows serialize serial/bigint ids as strings, and those ids get
-  // enqueued into jsonb job params verbatim. Rejecting "12" here dead-ended
-  // every audience upload job with "Missing required parameters" (#1078).
-  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
-    return Number(value.trim());
-  }
-  return undefined;
-}
-
-export function requireRecordParam(
-  params: Record<string, unknown>,
-  key: string,
-): Record<string, string> | undefined {
-  const value = params[key];
-  if (typeof value === "object" && value !== null) {
-    return value as Record<string, string>;
-  }
-  return undefined;
 }

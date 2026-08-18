@@ -48,6 +48,16 @@ export async function reviewWorkspaceEmergencyVoice(args: {
     };
   }
 
+  // Hoisted so the catch can tell an address-creation failure (nothing applied
+  // yet → a reject reset is correct) from a later failure after some number rows
+  // were already flipped to emergency-live (→ persist the partial success we
+  // achieved, so number capabilities and onboarding state don't disagree).
+  const eligiblePhoneNumbers: string[] = [];
+  const ineligibleCallerIds: string[] = [];
+  const now = new Date().toISOString();
+  let addressValidated = false;
+  let addressSid: string | null = null;
+
   try {
     const twilio = (await createWorkspaceTwilioInstance({       workspace_id: workspaceId,
     })) as Twilio.Twilio;
@@ -67,10 +77,9 @@ export async function reviewWorkspaceEmergencyVoice(args: {
       address.addressSid && typeof twilio.addresses === "function"
         ? await twilio.addresses(address.addressSid).update(addressPayload as never)
         : await twilio.addresses.create(addressPayload as never);
-
-    const eligiblePhoneNumbers: string[] = [];
-    const ineligibleCallerIds: string[] = [];
-    const now = new Date().toISOString();
+    // The address exists now; a failure past this point is post-address.
+    addressValidated = true;
+    addressSid = twilioAddress.sid ?? null;
 
     for (const workspaceNumber of workspacePhoneNumbers.data ?? []) {
       const phoneNumber = workspaceNumber?.phone_number ?? null;
@@ -183,6 +192,43 @@ export async function reviewWorkspaceEmergencyVoice(args: {
           : `Emergency voice reviewed. ${eligiblePhoneNumbers.length} number(s) are emergency-ready.`,
     };
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Emergency address validation failed.";
+
+    if (addressValidated) {
+      // The Twilio address was created and some number rows may already be
+      // emergency-live. Persist the partial success actually achieved rather
+      // than wiping it — a blanket reject would leave the number capabilities
+      // (emergency_eligible/'live') and onboarding state contradicting each other.
+      await persistWorkspaceOnboardingState({
+        workspaceId,
+        actorUserId,
+        updates: {
+          emergencyVoice: {
+            ...current.emergencyVoice,
+            enabled: eligiblePhoneNumbers.length > 0,
+            status: eligiblePhoneNumbers.length > 0 ? "live" : "approved",
+            emergencyEligiblePhoneNumbers: eligiblePhoneNumbers,
+            ineligibleCallerIds,
+            address: {
+              ...current.emergencyVoice.address,
+              customerName,
+              countryCode,
+              addressSid,
+              status: "validated",
+              validationError: null,
+              lastValidatedAt: now,
+            },
+            lastReviewedAt: now,
+          },
+        },
+      });
+
+      return { ok: false, error: message, status: 500 };
+    }
+
+    // Address creation itself failed — nothing was applied, so a reject reset
+    // is accurate.
     await persistWorkspaceOnboardingState({
       workspaceId,
       actorUserId,
@@ -195,19 +241,13 @@ export async function reviewWorkspaceEmergencyVoice(args: {
           address: {
             ...current.emergencyVoice.address,
             status: "invalid",
-            validationError:
-              error instanceof Error ? error.message : "Emergency address validation failed.",
+            validationError: message,
           },
           lastReviewedAt: null,
         },
       },
     });
 
-    return {
-      ok: false,
-      error:
-        error instanceof Error ? error.message : "Emergency address validation failed.",
-      status: 500,
-    };
+    return { ok: false, error: message, status: 500 };
   }
 }

@@ -29,7 +29,7 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
 const enqueueJobMock = vi.hoisted(() => vi.fn(async () => ({ enqueued: true, jobId: 1 })));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
-  enqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
+  unsafeEnqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
 }));
 
 describe("app/routes/api+/recording", () => {
@@ -104,6 +104,31 @@ describe("app/routes/api+/recording", () => {
     );
     expect(res.status).toBe(200);
     expect(mocks.updateCallRecordingUrlBySid).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The payload is parsed once at the route boundary into a discriminated
+   * union (#1243 E1/E2). A `CallSid` with none of the recording fields (and
+   * no `CallStatus`) discriminates to `unrecognized`, and the route must
+   * still ack — echoing params back — rather than erroring.
+   */
+  test("an unrecognized payload acks and echoes params instead of erroring", async () => {
+    mocks.createClient.mockReturnValueOnce({ from: vi.fn() });
+    const mod = await import("../app/routes/api+/recording");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("SomethingTwilioAddedLater", "1");
+    const res = await asRouteResponse(mod.action({
+        request: new Request("http://x", { method: "POST", body: fd }),
+      } as never),
+    );
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      CallSid: "CA1",
+      SomethingTwilioAddedLater: "1",
+    });
+    expect(mocks.updateCallRecordingUrlBySid).not.toHaveBeenCalled();
+    expect(enqueueJobMock).not.toHaveBeenCalled();
   });
 
   test("still returns 200 with payload when persistence fails (webhook must not fail loudly)", async () => {

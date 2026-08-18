@@ -146,7 +146,7 @@ export async function updateCampaignVoicedropAudio(
 export async function updateCampaignStatusInWorkspace(
   workspaceId: string,
   campaignId: number,
-  update: { status: string; is_active?: boolean },
+  update: { status: string },
 ) {
   const tdb = createTenantDb(workspaceId);
   const existingRows = await tdb.campaign.findMany({

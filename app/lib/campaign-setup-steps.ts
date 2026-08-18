@@ -25,80 +25,8 @@ import {
 /** Product default for new-campaign calling hours (CASL / Eastern Canada). */
 export const DEFAULT_CALLING_HOURS_TIMEZONE = "America/Toronto";
 
-/**
- * Convert a wall-clock HH:mm in `timeZone` to a UTC HH:mm string for storage
- * in `campaign.schedule` (evaluated in UTC by `checkSchedule`).
- */
-export function wallClockToUtcHm(
-  wallHm: string,
-  timeZone: string,
-  at: Date = new Date(),
-): string {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(wallHm.trim());
-  if (!match) {
-    throw new Error(`Invalid wall-clock time: ${wallHm}`);
-  }
-  const wallHour = Number(match[1]);
-  const wallMinute = Number(match[2]);
-
-  const dateParts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-      .formatToParts(at)
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, part.value]),
-  ) as Record<string, string>;
-
-  const year = Number(dateParts.year);
-  const month = Number(dateParts.month);
-  const day = Number(dateParts.day);
-
-  // Interpret the desired wall time as if it were UTC, then correct by the
-  // zone's offset at that instant (iterate once for DST boundaries).
-  let utcMillis = Date.UTC(year, month - 1, day, wallHour, wallMinute, 0, 0);
-  for (let i = 0; i < 2; i += 1) {
-    const offsetMillis = timezoneOffsetMillis(timeZone, new Date(utcMillis));
-    utcMillis =
-      Date.UTC(year, month - 1, day, wallHour, wallMinute, 0, 0) - offsetMillis;
-  }
-
-  const corrected = new Date(utcMillis);
-  return `${String(corrected.getUTCHours()).padStart(2, "0")}:${String(
-    corrected.getUTCMinutes(),
-  ).padStart(2, "0")}`;
-}
-
-function timezoneOffsetMillis(timeZone: string, date: Date): number {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone,
-      hour12: false,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    })
-      .formatToParts(date)
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, part.value]),
-  ) as Record<string, string>;
-
-  const asUtc = Date.UTC(
-    Number(parts.year),
-    Number(parts.month) - 1,
-    Number(parts.day),
-    parts.hour === "24" ? 0 : Number(parts.hour),
-    Number(parts.minute),
-    Number(parts.second),
-  );
-  return asUtc - date.getTime();
-}
+import { wallClockToUtcHm } from "@/lib/schedule-timezone";
+export { wallClockToUtcHm };
 
 /** Mon–Fri 09:00–17:00 in `timeZone`, stored as UTC clock times. */
 export function buildWeekdayCallingSchedule(

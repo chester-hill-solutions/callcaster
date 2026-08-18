@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { logger } from "@/lib/logger.client";
+import { subscribeToWorkspaceEventSource } from "@/lib/workspace-events-connection.client";
 import {
-  ACCESS_REVOKED_EVENT,
   matchesPostgresChangeFilter,
   parseWorkspaceEventData,
   type PostgresChangePayload,
@@ -49,14 +49,13 @@ export const useWorkspaceEventSubscription = ({
   /**
    * @effect Open an SSE connection to the workspace events endpoint and dispatch matching postgres_change events to the caller's onChange handler.
    * @effect-deps workspaceId (which workspace's event stream to open); tablesForSubscription (memoized table-name filter, stable unless the table list's content changes); filter (postgres row filter string, e.g. `workspace=eq.<id>`)
-   * @effect-side-effects subscription — opens an EventSource (SSE) connection on mount/dep-change; removes the listener and closes the connection on cleanup
+   * @effect-side-effects subscription — attaches to the shared workspace EventSource on mount/dep-change; detaches on cleanup (the underlying connection closes when its last subscriber leaves)
    * @effect-why-not-loader Live server-pushed row changes can't be modeled as a request/response loader; the connection must stay open for the component's lifetime and react to filter/table changes by resubscribing.
    */
   useEffect(() => {
     if (!workspaceId) return;
 
     const url = `/api/workspaces/${encodeURIComponent(workspaceId)}/events`;
-    const eventSource = new EventSource(url);
 
     const handleWorkspaceEvent = (message: MessageEvent<string>) => {
       try {
@@ -75,25 +74,11 @@ export const useWorkspaceEventSubscription = ({
       }
     };
 
-    // The server sends this when the user's workspace access is revoked while
-    // the stream is open. Close explicitly: EventSource reconnects on its own
-    // after a server-side close, and every retry would be rejected by the
-    // middleware, so without this the tab retries forever.
-    const handleAccessRevoked = () => {
-      logger.warn("Workspace access revoked; closing SSE subscription");
-      eventSource.close();
-    };
-
-    eventSource.addEventListener("workspace_event", handleWorkspaceEvent);
-    eventSource.addEventListener(ACCESS_REVOKED_EVENT, handleAccessRevoked);
-    eventSource.onerror = () => {
-      logger.debug("Workspace SSE connection interrupted; EventSource will retry");
-    };
-
-    return () => {
-      eventSource.removeEventListener("workspace_event", handleWorkspaceEvent);
-      eventSource.removeEventListener(ACCESS_REVOKED_EVENT, handleAccessRevoked);
-      eventSource.close();
-    };
+    // One shared EventSource per URL — a per-hook connection multiplied by
+    // every subscriber on the page and exhausted the browser's 6-connection
+    // HTTP/1.1 pool, hanging all later same-origin fetches (dial submits,
+    // route discovery, navigation). Revocation handling lives in the shared
+    // connection module.
+    return subscribeToWorkspaceEventSource(url, handleWorkspaceEvent);
   }, [workspaceId, tablesForSubscription, filter]);
 };

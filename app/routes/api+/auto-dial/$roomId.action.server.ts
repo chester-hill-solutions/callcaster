@@ -4,10 +4,8 @@ import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { Database, Tables } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { runAutoDialerTurn } from "@/lib/auto-dial.server";
-import { rpcDequeueContact } from "@/lib/db-rpc.server";
-import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
-import { dequeueCampaignQueueByContact } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 import {
@@ -15,12 +13,12 @@ import {
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
-import { hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
+import { createVoiceResponse, hangupTwiml, pausePlayTwiml } from "@/lib/twilio-twiml.server";
 import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { defineAction } from "@/lib/handler.server";
-import Twilio from "twilio";
+import type Twilio from "twilio";
 
 const getAdmin = () => null /* removed service client */;
 
@@ -66,19 +64,18 @@ const dequeueContact = async (
   campaignId?: number | null,
 ) => {
     if (groupOnHousehold) {
-        const tdb = createTenantDb(workspace);
-        return await rpcDequeueContact(tdb, {
-            contactId: Number(contactId),
-            groupOnHousehold,
-            dequeuedById: userId,
-            dequeuedReasonText: "Auto-dial completed",
+        return await dequeueQueueEntry({
+            by: { contactId: Number(contactId) },
+            workspaceId: workspace,
+            household: true,
+            userId,
+            reason: "Auto-dial completed",
         });
     }
 
     try {
-        return await dequeueCampaignQueueByContact({
-          contactId: Number(contactId),
-          campaignId,
+        return await dequeueQueueEntry({
+          by: { contactId: Number(contactId), campaignId },
           userId,
           reason: "Auto-dial completed",
         });
@@ -127,7 +124,7 @@ const handleMachineAnswer = async (
     signedUrl: string,
     outreachStatus: OutreachStatusItem[]
 ) => {
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
     const firstOutreachStatus = outreachStatus[0];
     if (!firstOutreachStatus) {
         await call.update({ twiml: hangupTwiml() });
@@ -158,7 +155,7 @@ const handleMachineAnswer = async (
 };
 
 const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: string) => {
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
     const conferenceName = dbCall.conference_id?.toString() ?? '';
 
     if (dbCall.outreach_attempt_id && !called.startsWith('client')) {
@@ -169,10 +166,20 @@ const handleHumanAnswer = async (dbCall: NonNullable<Partial<Call>>, called: str
         );
     }
 
+    // A statusCallback here — mirroring the agent's own leg in
+    // addToConference — is what lets a CLIENT hangup be detected at all.
+    // Without it, Twilio never posts a participant-leave event for this
+    // leg, so the app has no server-driven signal and depends entirely on
+    // Twilio's platform-level endConferenceOnExit reaching the agent's
+    // browser. handleParticipantLeave (auto-dial/status) already forces the
+    // conference closed on `participant_hung_up` for whichever leg posts
+    // it — it just never received the contact's events before.
     const dial = twiml.dial();
     dial.conference({
         beep: 'onExit',
         endConferenceOnExit: true,
+        statusCallback: `${env.BASE_URL()}/api/auto-dial/status`,
+        statusCallbackEvent: ['join', 'leave', 'modify'],
     }, `${conferenceName}`);
 
     return new Response(twiml.toString(), {
@@ -187,7 +194,7 @@ const handleDeviceCheck = async (dbCall: NonNullable<Partial<Call>>) => {
 };
 
 async function addToConference(conferenceId: string, campaignId: string, workspaceId: string, userId: string) {
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
     const workspace = await getWorkspaceById(workspaceId);
     appendLiveTranscriptionStreamTwiml({
         twiml,

@@ -200,6 +200,7 @@ describe("runNumberRentalBilling", () => {
       autoReleaseImplemented: true,
     });
     expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
         workspaceId: "workspace-1",
         type: "DEBIT",
@@ -242,6 +243,7 @@ describe("runNumberRentalBilling", () => {
     expect(atRenewal).toMatchObject({ charged: 1 });
     expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
     expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({ note: expect.stringContaining("2026-05") }),
     );
   });
@@ -261,7 +263,7 @@ describe("runNumberRentalBilling", () => {
 
     expect(result).toMatchObject({ charged: 2, unpaid: 0 });
     const notes = transactionHistoryMocks.insertTransactionHistoryIdempotent.mock.calls.map(
-      ([args]) => (args as { note: string }).note,
+      ([, args]) => (args as { note: string }).note,
     );
     expect(notes).toEqual([
       expect.stringContaining("2026-05"),
@@ -283,6 +285,24 @@ describe("runNumberRentalBilling", () => {
 
     // Two cycles are owed, but only one unpaid is recorded — later cycles are
     // skipped rather than spamming the log for the same broke workspace.
+    expect(result).toMatchObject({ charged: 0, unpaid: 1 });
+    expect(
+      transactionHistoryMocks.insertTransactionHistoryIdempotent,
+    ).not.toHaveBeenCalled();
+  });
+
+  test("treats an unknown (null) balance as unaffordable, never debiting negative", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-10" }),
+    ]);
+    tdbMocks.transaction_history.findFirst.mockResolvedValue(null);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(null);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-12T00:00:00.000Z"),
+    });
+
     expect(result).toMatchObject({ charged: 0, unpaid: 1 });
     expect(
       transactionHistoryMocks.insertTransactionHistoryIdempotent,

@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger.server";
 import { runWithRequestContext } from "@/lib/request-context.server";
 import { captureException } from "@/lib/sentry.server";
 import { notifyOps } from "@/lib/ops-alert.server";
+import { PAGING_JOB_TYPES } from "@/lib/worker/handlers.server";
 
 export type ClaimedJobRow = {
   id: number;
@@ -35,20 +36,6 @@ function getJobRequestId(job: ClaimedJobRow): string {
   }
   return `job-${job.id}`;
 }
-
-/**
- * Job types whose permanent failure warrants waking someone: the two billing
- * debit paths, the two recurring money jobs, and compliance provisioning.
- * Everything else (exports, uploads, webhook delivery, notifications) is
- * log-only — a customer reports those.
- */
-const PAGING_JOB_TYPES = new Set([
-  "call_status_side_effects",
-  "sms_status_side_effects",
-  "billing_reconcile",
-  "number_rental_billing",
-  "workspace_twilio_compliance",
-]);
 
 const DEFAULT_POLL_INTERVAL_MS = 5_000;
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 30_000;

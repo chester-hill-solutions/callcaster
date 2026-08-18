@@ -2,6 +2,7 @@ import { NavLink } from "react-router";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useState } from "react";
 import { useFilterPagination } from "@/hooks/utils/useFilterPagination";
+import { isCampaignActive } from "@/lib/campaign-status";
 
 import { AdminAsyncExportButton } from "@/components/campaign/home/CampaignHomeScreen/AdminAsyncExportButton";
 import { Badge } from "@/components/ui/badge";
@@ -201,7 +202,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
                                         <TableCell>
                                             <Badge
                                                 variant={
-                                                    campaign.status === "running"
+                                                    campaign.status === "running" || campaign.status === "waiting"
                                                         ? "secondary"
                                                         : campaign.status === "paused"
                                                           ? "outline"
@@ -214,7 +215,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
                                             </Badge>
                                         </TableCell>
                                         <TableCell>
-                                            {campaign.is_active ? (
+                                            {isCampaignActive(campaign.status) ? (
                                                 <Badge variant="secondary">Active</Badge>
                                             ) : (
                                                 <Badge variant="outline">Inactive</Badge>
@@ -237,7 +238,7 @@ export function AdminCampaignsPanel({ campaigns, workspaces }: AdminCampaignsPan
                                                     workspaceId={campaign.workspace?.id}
                                                 />
                                                 <Button variant="outline" size="sm" className="text-red-500">
-                                                    {campaign.is_active ? "Deactivate" : "Activate"}
+                                                    {isCampaignActive(campaign.status) ? "Deactivate" : "Activate"}
                                                 </Button>
                                             </div>
                                         </TableCell>

@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { recordFlashBreadcrumb } from "@/lib/flash-telemetry.client";
 import type { Call } from "@twilio/voice-sdk";
 import type {
   Campaign,
@@ -33,6 +34,14 @@ type UseCampaignDialActionsOptions = {
   recentAttempt: OutreachAttempt | null;
   selectedDevice: string;
   send: (action: { type: string }) => void;
+  /**
+   * Resets the canonical call lifecycle for the new dial, in the same batch as
+   * the FSM's START_DIALING. Without it the finished call's outcome (or this
+   * contact's last attempt disposition) paints for one frame before the
+   * FSM→lifecycle bridge effect can clear it — the residual flash left over
+   * from #1220.
+   */
+  beginDial: () => void;
 };
 
 export function useCampaignDialActions({
@@ -49,9 +58,11 @@ export function useCampaignDialActions({
   recentAttempt,
   selectedDevice,
   send,
+  beginDial,
 }: UseCampaignDialActionsOptions) {
   return useCallback(() => {
     if (!campaign) return;
+    recordFlashBreadcrumb("dial-press", `type=${campaign.dial_type}`);
 
     if (campaign.dial_type === "predictive") {
       if (deviceIsBusy || incomingCall || deviceStatus !== "Registered") {
@@ -64,6 +75,7 @@ export function useCampaignDialActions({
       if (callState === "dialing" || callState === "connected") return;
 
       send({ type: "START_DIALING" });
+      beginDial();
       startCall({
         contact: nextRecipient.contact,
         campaign,
@@ -88,12 +100,24 @@ export function useCampaignDialActions({
     recentAttempt,
     selectedDevice,
     send,
+    beginDial,
   ]);
 }
 
 type UseCampaignDequeueActionsOptions = {
   campaign: Campaign | null | undefined;
-  nextRecipient: QueueItem | null;
+  /**
+   * The contact "Save and Next" records and dequeues. This is the call
+   * screen's questionContact (who the script/disposition panel is currently
+   * showing) — NOT the queue's nextRecipient pointer. hangup.action.server.ts
+   * dequeues the just-finished contact's queue row as soon as the agent
+   * hangs up, which collapses nextRecipient to the following queue item, or
+   * to null once the queue empties, before the agent has recorded anything.
+   * Gating "Save and Next" on nextRecipient made the button a no-op in
+   * exactly that window (#1253); questionContact holds the right contact
+   * until the agent saves or a new dial starts.
+   */
+  questionContact: QueueItem | null;
   send: CallStateMachineSend;
   setCallDuration: (duration: number) => void;
   handleDialButton: () => void;
@@ -108,7 +132,7 @@ type UseCampaignDequeueActionsOptions = {
 
 export function useCampaignDequeueActions({
   campaign,
-  nextRecipient,
+  questionContact,
   send,
   setCallDuration,
   handleDialButton,
@@ -121,7 +145,7 @@ export function useCampaignDequeueActions({
   setUpdate,
 }: UseCampaignDequeueActionsOptions) {
   return useCallback(() => {
-    if (!campaign || !nextRecipient) return;
+    if (!campaign || !questionContact) return;
 
     if (campaign.dial_type === "predictive") {
       send({ type: "HANG_UP" });
@@ -130,17 +154,19 @@ export function useCampaignDequeueActions({
       saveData();
     } else if (campaign.dial_type === "call") {
       saveData();
-      dequeue({ contact: nextRecipient });
+      dequeue({ contact: questionContact });
       fetchMore({ householdMap });
       handleNextNumber(campaign?.group_household_queue || false);
-      send({ type: "HANG_UP" });
+      // NEXT resets a finished call to idle; HANG_UP here parked the FSM in
+      // "completed" even from idle, which the next dial then flashed (#1220).
+      send({ type: "NEXT" });
       setRecentAttempt(null);
       setUpdate({});
       setCallDuration(0);
     }
   }, [
     campaign,
-    nextRecipient,
+    questionContact,
     send,
     setCallDuration,
     handleDialButton,

@@ -5,8 +5,11 @@ import {
   requireWorkspaceAccess,
 } from "@/lib/database/workspace.server";
 import { parseActionRequest } from "@/lib/request-utils.server";
-import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { hasInsufficientCreditsForOutbound } from "../../../shared/credit-floor";
+import { rpcClaimQueueEntryForDial } from "@/lib/db-rpc.server";
+import {
+  outboundCreditsResponse,
+  requireOutboundCredits,
+} from "@/lib/outbound-credit-gate.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { and, eq } from "drizzle-orm";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
@@ -15,7 +18,7 @@ import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { normalizePhoneNumber } from "@/lib/utils";
-import Twilio from 'twilio';
+import { createVoiceResponse } from "@/lib/twilio-twiml.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineAction } from "@/lib/handler.server";
 import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
@@ -69,14 +72,50 @@ export const action = defineAction({
         }
     }
 
-    const credits = await getWorkspaceCreditsBalance(workspace_id);
-    if (credits === null) {
-        throw new Response("Workspace not found", { status: 404 });
-    }
-    if (hasInsufficientCreditsForOutbound(credits)) {
-        return routeData({ creditsError: true }, { status: 402 });
-    }
+    const credits = await requireOutboundCredits(workspace_id);
+    if (!credits.ok) return outboundCreditsResponse(credits);
+    // NOTE: this credit gate is check-then-act — N concurrent dials can all
+    // read the same pre-debit balance (the debit lands at call completion).
+    // Overdraw is bounded by concurrency × per-call cost; an atomic pre-dial
+    // hold via apply_ledger_entry_and_sync_credits is the follow-up if that
+    // bound ever matters.
     const tdb = createTenantDb(workspace_id);
+
+    // Atomically claim the queue row before placing a real call. This is the
+    // server-side guard the client's callState check cannot provide: without
+    // it a double-click, a second tab, or two agents holding the same
+    // unclaimed row each dialed a real person. Refusals are 409s the call
+    // screen surfaces as a failed dial rather than a stuck "Dialing…".
+    const claim = await rpcClaimQueueEntryForDial(tdb, {
+        queueId: Number(queue_id),
+        campaignId: Number(campaign_id),
+        workspaceId: workspace_id,
+        userId: user.id,
+    });
+    if (claim !== "claimed") {
+        // The refusal reaches the agent as a toast + "Call Failed" bar, but
+        // until this line it left no server-side trace at all — a support
+        // report of "an error flashed when I pressed dial" was unattributable
+        // from the logs. Keep every field needed to reconstruct the refusal.
+        logger.warn("Dial claim refused", {
+            claim,
+            queueId: Number(queue_id),
+            campaignId: Number(campaign_id),
+            contactId: Number(contact_id),
+            workspaceId: workspace_id,
+            userId: user.id,
+        });
+        const messages: Record<string, string> = {
+            claimed_by_other: "This contact is being dialed by another agent.",
+            active_call: "This contact already has a call in progress.",
+            not_queued: "This contact is no longer queued.",
+            unavailable: "This contact is not available to dial.",
+        };
+        return routeData(
+            { error: messages[claim] ?? messages.unavailable, claim },
+            { status: 409 },
+        );
+    }
     const [callerIdRecord, onboarding] = await Promise.all([
         tdb.workspace_number.findFirst({
             where: eq(workspaceNumberTable.phone_number, caller_id),
@@ -101,7 +140,21 @@ export const action = defineAction({
     }
     const to = normalizePhoneNumber(to_number)
     const twilio = await createWorkspaceTwilioInstance({ workspace_id });
-    const twiml = new Twilio.twiml.VoiceResponse();
+    const twiml = createVoiceResponse();
+    // Track the placed SID outside the try: if the call is created but we then
+    // fail to persist its row, the active_call redial guard can't see it and a
+    // retry would double-dial the same contact. Hang it up in that case — a
+    // killed call the agent retries is far safer than a duplicate live call to a
+    // real person plus a duplicate completion charge.
+    let placedCallSid: string | null = null;
+    const hangUpUntrackedCall = async (reason: string) => {
+        if (!placedCallSid) return;
+        try {
+            await twilio.calls(placedCallSid).update({ status: "completed" });
+        } catch (hangupError) {
+            logger.error(`Failed to hang up untracked call (${reason}):`, hangupError);
+        }
+    };
     try {
         const call = await withTwilioRetry(
           () =>
@@ -115,6 +168,7 @@ export const action = defineAction({
             }),
           { workspaceId: workspace_id, operation: "calls.create" },
         );
+        placedCallSid = call.sid ?? null;
         let outreach_attempt_id;
         const campaignId = parseInt(campaign_id, 10);
         const contactId = parseInt(contact_id, 10);
@@ -134,7 +188,7 @@ export const action = defineAction({
             outreach_attempt_id = Number(outreach_id)
         }
 
-        await saveCallToDatabase(workspace_id, {
+        const callSaved = await saveCallToDatabase(workspace_id, {
             sid: call.sid,
             date_updated: call.dateUpdated?.toISOString() ?? new Date().toISOString(),
             parent_call_sid: call.parentCallSid ?? null,
@@ -161,8 +215,17 @@ export const action = defineAction({
             outreach_attempt_id: Number.isFinite(outreach_attempt_id) ? outreach_attempt_id : undefined,
             queue_id: queueId,
         });
+
+        // saveCallToDatabase swallows its own DB errors (returns false) so a
+        // status callback can't be blocked by a transient write failure; here on
+        // the dial path a failed write means the redial guard is blind, so hang up.
+        if (!callSaved) {
+            logger.error('Call placed but its row was not persisted; hanging up to avoid an untracked live call.');
+            await hangUpUntrackedCall('save failed');
+        }
     } catch (error) {
         logger.error('Error placing call:', error);
+        await hangUpUntrackedCall('error placing call');
         twiml.say('There was an error placing your call. Please try again later.');
     }
 

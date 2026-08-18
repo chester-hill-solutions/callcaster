@@ -22,7 +22,9 @@ const VALID_CALL_STATUSES: CallStatusEnum[] = [
 /** Normalize provider status to the DB call_status enum (lowercase, valid enum). */
 export function normalizeProviderStatus(providerStatus: string | null | undefined): CallStatusEnum | null {
   if (providerStatus == null || providerStatus === "") return null;
-  const lower = String(providerStatus).toLowerCase();
+  const raw = String(providerStatus).trim().toLowerCase();
+  const lower =
+    raw === "in_progress" ? "in-progress" : raw === "no_answer" ? "no-answer" : raw;
   if (VALID_CALL_STATUSES.includes(lower as CallStatusEnum)) {
     return lower as CallStatusEnum;
   }
@@ -60,6 +62,40 @@ export function getStateMachineAction(
   if (normalizedStatus === "completed" || normalizedStatus === "canceled") return "HANG_UP";
   if (["failed", "no-answer", "busy"].includes(normalizedStatus)) return "FAIL";
   return null;
+}
+
+/**
+ * Dialer-room display vocabulary used by the predictive call screen
+ * (usePredictiveCallSync / useCampaignCallFlow's predictive mapping).
+ */
+const DIALER_STATUSES = new Set<string>([
+  "idle",
+  "dialing",
+  "connected",
+  "completed",
+  "failed",
+  "no-answer",
+]);
+
+/**
+ * Map a predictive_broadcast status to the dialer display vocabulary.
+ *
+ * Broadcasts carry raw provider (Twilio) call statuses, while the dialer UI
+ * speaks idle/dialing/connected/completed/failed/no-answer. Already-normalized
+ * dialer values pass through unchanged, and so do unrecognized strings — the
+ * consumers treat unknown statuses as "fall through to FSM/provider display",
+ * and this keeps that behavior intact.
+ */
+export function toDialerStatus(status: string): string {
+  if (DIALER_STATUSES.has(status)) return status;
+  const normalized = normalizeProviderStatus(status);
+  if (normalized == null) return status;
+  if (DIALING_STATUSES.has(normalized)) return "dialing";
+  if (CONNECTED_STATUSES.has(normalized)) return "connected";
+  if (normalized === "completed" || normalized === "canceled") return "completed";
+  if (normalized === "failed" || normalized === "busy") return "failed";
+  if (normalized === "no-answer") return "no-answer";
+  return status;
 }
 
 /** Whether the status is terminal (call ended); polling can stop. */

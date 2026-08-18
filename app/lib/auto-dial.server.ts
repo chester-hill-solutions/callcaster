@@ -8,11 +8,14 @@ import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
 import {
   rpcCreateOutreachAttempt,
-  rpcDequeueContact,
   rpcResetStaleCampaignQueueClaims,
   rpcTryCompleteCampaignIfDrained,
 } from "@/lib/db-rpc.server";
-import { claimNextQueueContact, requeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import {
+  claimNextQueueContact,
+  dequeueQueueEntry,
+  requeueCampaignQueueById,
+} from "@/lib/campaign-queue-db.server";
 import { updateCallBySid } from "@/lib/telephony-db.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { db } from "@/server/db";
@@ -100,7 +103,7 @@ export async function saveCallToDatabase(
 ) {
   if (!callData.sid) {
     logger.error("Cannot save call without sid");
-    return;
+    return false;
   }
 
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
@@ -120,15 +123,20 @@ export async function saveCallToDatabase(
         row as Parameters<typeof updateCallBySid>[2],
         { tdb },
       );
-      return;
+      return true;
     }
     await tdb.call.insert({
       ...row,
       date_created: new Date().toISOString(),
       is_last: false,
     });
+    return true;
   } catch (error) {
+    // Swallowed so a late status callback can't be blocked by a transient write
+    // failure. Callers that need to know whether the row landed (e.g. the dial
+    // path's redial guard) must check the returned boolean.
     logger.error("Error saving the call to the database:", error);
+    return false;
   }
 }
 
@@ -191,6 +199,17 @@ export async function runAutoDialerTurn(
 
   const twilioClient = await createWorkspaceTwilioInstance({ workspace_id });
   const tdb = createTenantDb(workspace_id);
+
+  if (conferenceId && conferenceId.includes("~")) {
+    const activeConfs = await twilioClient.conferences.list({
+      friendlyName: conferenceId,
+      status: "in-progress",
+      limit: 1,
+    });
+    if (!activeConfs.length) {
+      return { success: true, message: "Conference ended, stopping auto-dial" };
+    }
+  }
 
   // Sweep before claiming. A claim is only released by the turn that made it,
   // so a turn that dies between claiming and dialling strands the row as
@@ -299,12 +318,21 @@ export async function runAutoDialerTurn(
               contactId: contactRecord.contact_id,
               outreachAttemptId: outreach_attempt_id,
             });
-            await rpcDequeueContact(tdb, {
-              contactId: contactRecord.contact_id,
-              groupOnHousehold: false,
-              dequeuedById: user_id,
-              dequeuedReasonText:
+            await dequeueQueueEntry({
+              by: { contactId: contactRecord.contact_id },
+              workspaceId: workspace_id,
+              // false, not omitted: the guarded RPC path, not plain Drizzle
+              // — deliberately parks only this one row (no household
+              // fan-out) and no-ops rather than stomping a row this turn no
+              // longer holds. `user_id` is the claim holder
+              // claim_next_queue_contact stamped a few lines up, which is
+              // what lets the RPC dequeue the row while it is still
+              // `assigned` (#1260). See dequeueQueueEntry's doc comment.
+              household: false,
+              userId: user_id,
+              reason:
                 "Ambiguous dial failure — call may exist at Twilio; parked for review, not redialed",
+              exec: tdb,
             });
           }
         } catch (revertError) {
@@ -316,11 +344,13 @@ export async function runAutoDialerTurn(
         throw dialError;
       }
 
-      await rpcDequeueContact(tdb, {
-        contactId: contactRecord.contact_id,
-        groupOnHousehold: true,
-        dequeuedById: user_id,
-        dequeuedReasonText: "Predictive Dialer called contact",
+      await dequeueQueueEntry({
+        by: { contactId: contactRecord.contact_id },
+        workspaceId: workspace_id,
+        household: true,
+        userId: user_id,
+        reason: "Predictive Dialer called contact",
+        exec: tdb,
       });
 
       // `call.dateUpdated`/`startTime`/`endTime` are `Date` in the Twilio SDK's

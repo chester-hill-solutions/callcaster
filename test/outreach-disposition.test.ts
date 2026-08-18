@@ -44,15 +44,45 @@ describe("outreach disposition helpers", () => {
     ).toBe(true);
   });
 
-  test("normalizeDispositionOptions yields only do_not_call for null/undefined jsonb", () => {
-    expect(normalizeDispositionOptions(null)).toEqual([DNC_DISPOSITION]);
-    expect(normalizeDispositionOptions(undefined)).toEqual([DNC_DISPOSITION]);
+  test("normalizeDispositionOptions returns sensible defaults for null/undefined jsonb", () => {
+    expect(normalizeDispositionOptions(null)).toEqual([
+      "answered",
+      "no_answer",
+      "busy",
+      "voicemail",
+      DNC_DISPOSITION,
+    ]);
+    expect(normalizeDispositionOptions(undefined)).toEqual([
+      "answered",
+      "no_answer",
+      "busy",
+      "voicemail",
+      DNC_DISPOSITION,
+    ]);
   });
 
-  test("normalizeDispositionOptions yields only do_not_call for non-array jsonb values", () => {
-    expect(normalizeDispositionOptions("answered")).toEqual([DNC_DISPOSITION]);
-    expect(normalizeDispositionOptions(42)).toEqual([DNC_DISPOSITION]);
-    expect(normalizeDispositionOptions({ answered: true })).toEqual([DNC_DISPOSITION]);
+  test("normalizeDispositionOptions returns sensible defaults for non-array jsonb values", () => {
+    expect(normalizeDispositionOptions("answered")).toEqual([
+      "answered",
+      "no_answer",
+      "busy",
+      "voicemail",
+      DNC_DISPOSITION,
+    ]);
+    expect(normalizeDispositionOptions(42)).toEqual([
+      "answered",
+      "no_answer",
+      "busy",
+      "voicemail",
+      DNC_DISPOSITION,
+    ]);
+    expect(normalizeDispositionOptions({ answered: true })).toEqual([
+      "answered",
+      "no_answer",
+      "busy",
+      "voicemail",
+      DNC_DISPOSITION,
+    ]);
   });
 
   test("normalizeDispositionOptions keeps only string entries and appends do_not_call last", () => {
@@ -66,7 +96,13 @@ describe("outreach disposition helpers", () => {
       "busy",
       DNC_DISPOSITION,
     ]);
-    expect(normalizeDispositionOptions([])).toEqual([DNC_DISPOSITION]);
+    expect(normalizeDispositionOptions([])).toEqual([
+      "answered",
+      "no_answer",
+      "busy",
+      "voicemail",
+      DNC_DISPOSITION,
+    ]);
   });
 
   test("normalizeDispositionOptions does not duplicate campaign-defined DNC variants", () => {
@@ -92,10 +128,14 @@ describe("outreach disposition helpers", () => {
     expect(isDncDisposition("")).toBe(false);
   });
 
-  test("formatDispositionLabel maps do_not_call variants and passes other strings through", () => {
-    expect(formatDispositionLabel("do_not_call")).toBe("Do not call");
-    expect(formatDispositionLabel("Do Not Call")).toBe("Do not call");
-    expect(formatDispositionLabel("answered")).toBe("answered");
+  test("formatDispositionLabel maps known dispositions to title-cased labels and passes unknown strings through", () => {
+    expect(formatDispositionLabel("do_not_call")).toBe("Do Not Call");
+    expect(formatDispositionLabel("Do Not Call")).toBe("Do Not Call");
+    expect(formatDispositionLabel("answered")).toBe("Answered");
+    expect(formatDispositionLabel("no_answer")).toBe("No Answer");
+    expect(formatDispositionLabel("busy")).toBe("Busy");
+    expect(formatDispositionLabel("voicemail")).toBe("Voicemail");
+    expect(formatDispositionLabel("custom_value")).toBe("custom_value");
   });
 });
 

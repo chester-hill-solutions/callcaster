@@ -123,7 +123,7 @@ describe("useCallScreen", () => {
     );
 
     Object.assign(fetcher, { submit: vi.fn(), state: "idle", data: undefined });
-    Object.assign(queueFetcher, { submit: vi.fn(), state: "idle" });
+    Object.assign(queueFetcher, { submit: vi.fn(), state: "idle", data: undefined });
     Object.assign(verifyFetcher, {
       load: vi.fn(),
       data: {
@@ -196,5 +196,24 @@ describe("useCallScreen", () => {
     act(() => result.current.phoneVerification.setSelectedDevice("+15559998888"));
 
     window.dispatchEvent(new KeyboardEvent("keypress", { key: "3" }));
+  });
+
+  test("keyboard DTMF ignores keypresses from editable fields", async () => {
+    const { useCallScreen } = await import("@/hooks/call/useCallScreen");
+    const { playTone } = await import("@/lib/utils");
+    renderHook(() => useCallScreen());
+
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.dispatchEvent(
+      new KeyboardEvent("keypress", { key: "3", bubbles: true }),
+    );
+    expect(playTone).not.toHaveBeenCalled();
+    input.remove();
+
+    document.body.dispatchEvent(
+      new KeyboardEvent("keypress", { key: "3", bubbles: true }),
+    );
+    expect(playTone).toHaveBeenCalled();
   });
 });

@@ -2,35 +2,43 @@ import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
-import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
+import {
+    requireTwilioSignature,
+    twilioWebhookForbiddenHangup,
+} from "@/lib/twilio-webhook.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { defineAction } from "@/lib/handler.server";
-import Twilio from 'twilio';
+import { createVoiceResponse, sayHangupTwiml } from "@/lib/twilio-twiml.server";
 
 /** Fallback TwiML returned when the handler throws unexpectedly, so Twilio
  * hears a graceful message instead of an HTML error page. */
 function dialUnavailableTwiml(): Response {
-    const twiml = new Twilio.twiml.VoiceResponse();
-    twiml.say("We're unable to take your call right now. Please try again later.");
-    twiml.hangup();
-    return new Response(twiml.toString(), {
-        status: 200,
-        headers: { "Content-Type": "text/xml" },
-    });
+    return new Response(
+        sayHangupTwiml("We're unable to take your call right now. Please try again later."),
+        {
+            status: 200,
+            headers: { "Content-Type": "text/xml" },
+        },
+    );
 }
 
 export const action = defineAction({
     auth: async ({ request }) => {
         const formData = await request.clone().formData();
         const callSid = String(formData.get("CallSid") ?? "");
-        const forbidden = await requireTwilioSignature(request, callSid ? { callSid } : {});
+        // Twilio always supplies CallSid when fetching a call's TwiML action
+        // URL. Omitting the option here (rather than requiring it) would
+        // silently downgrade validation to the main-account token instead of
+        // this call's workspace token — fail closed instead.
+        if (!callSid) return twilioWebhookForbiddenHangup();
+        const forbidden = await requireTwilioSignature(request, { callSid });
         return forbidden ?? null;
     },
     sideEffects: ["twilio"],
     handler: async ({ request, params }) => {
         try {
             const formData = await request.clone().formData();
-            const twiml = new Twilio.twiml.VoiceResponse();
+            const twiml = createVoiceResponse();
             const number = params.number;
             const callSid = String(formData.get("CallSid") ?? "");
 

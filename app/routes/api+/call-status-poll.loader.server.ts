@@ -14,6 +14,7 @@ import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineLoader } from "@/lib/handler.server";
 import {
   findCallBySid,
+  findCallSidByParentCallSid,
   updateCallBySid,
 } from "@/lib/telephony-db.server";
 
@@ -23,14 +24,25 @@ export const loader = defineLoader({
   handler: async ({ request, url, auth }) => {
     const { headers } = await getSession(request);
     const user = auth.user;
-    const callSid = url.searchParams.get("callSid");
+    let callSid = url.searchParams.get("callSid");
     const workspaceId = url.searchParams.get("workspaceId");
+    const agentLegSid = url.searchParams.get("agentLegSid");
 
     if (!callSid || !workspaceId) {
       return routeData(
         { error: "Missing callSid or workspaceId" },
         { status: 400, headers },
       );
+    }
+
+    // If the caller passed an agentLegSid (parent), try to resolve the
+    // child customer leg first — polling the parent leg always returns
+    // "in-progress" once the agent answers, masking the customer's state.
+    if (agentLegSid && callSid === agentLegSid) {
+      const childSid = await findCallSidByParentCallSid(workspaceId, agentLegSid);
+      if (childSid) {
+        callSid = childSid;
+      }
     }
 
     const dbCall = await findCallBySid(callSid);
@@ -62,7 +74,7 @@ export const loader = defineLoader({
 
       if (normalizedStatus == null) {
         return routeData(
-          { status: rawStatus ?? undefined, error: "Unsupported status" },
+          { status: rawStatus ?? undefined, callSid, error: "Unsupported status" },
           { status: 200, headers },
         );
       }
@@ -93,7 +105,7 @@ export const loader = defineLoader({
 
       }
 
-      return routeData({ status: normalizedStatus }, { headers });
+      return routeData({ status: normalizedStatus, callSid }, { headers });
     } catch (err) {
       logger.error("Error polling call status", err);
       return createErrorResponse(err, "Failed to fetch call status", 500, { headers });

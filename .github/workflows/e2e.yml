@@ -3,10 +3,22 @@ name: E2E
 on:
   push:
     branches: [main, master]
+    paths-ignore:
+      # Agent metadata does not affect the Bun application runtime.
+      - AGENTS.md
+      - .agents/**
+      - .opencode/**
+      - .gitignore
   # The app server runs under Bun in production; PR-level CI otherwise never
   # boots it, so Bun-only regressions (e.g. react-dom/server export shape)
   # would only surface after merge.
   pull_request:
+    paths-ignore:
+      # Keep workflow, dependency, and runtime configuration changes in E2E.
+      - AGENTS.md
+      - .agents/**
+      - .opencode/**
+      - .gitignore
   schedule:
     - cron: "0 6 * * *"
 

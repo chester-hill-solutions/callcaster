@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => {
     requireJsonAuth: vi.fn(),
     rpcCreateOutreachAttempt: vi.fn(),
     insertCallForWorkspace: vi.fn(),
-    dequeueCampaignQueueById: vi.fn(),
+    dequeueQueueEntry: vi.fn(),
     env: {
       BETTER_AUTH_URL: () => "https://sb.example",
       BETTER_AUTH_SERVICE_KEY: () => "svc",
@@ -50,7 +50,7 @@ vi.mock("@/lib/telephony-db.server", () => ({
   insertCallForWorkspace: (...a: any[]) => mocks.insertCallForWorkspace(...a),
 }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueCampaignQueueById: (...a: any[]) => mocks.dequeueCampaignQueueById(...a),
+  dequeueQueueEntry: (...a: any[]) => mocks.dequeueQueueEntry(...a),
 }));
 vi.mock("@/lib/workspace-credits.server", () => ({
   getWorkspaceCreditsBalance: vi.fn(async () => creditsState.credits),
@@ -72,7 +72,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     mocks.requireJsonAuth.mockReset();
     mocks.rpcCreateOutreachAttempt.mockReset();
     mocks.insertCallForWorkspace.mockReset();
-    mocks.dequeueCampaignQueueById.mockReset();
+    mocks.dequeueQueueEntry.mockReset();
     mocks.logger.error.mockReset();
     mocks.requireJsonAuth.mockResolvedValue({ user: { id: "u1" } });
     mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
@@ -81,7 +81,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       calls: { create: async () => ({ sid: "CA1" }) },
     });
     mocks.insertCallForWorkspace.mockResolvedValue({ sid: "CA1" });
-    mocks.dequeueCampaignQueueById.mockResolvedValue(undefined);
+    mocks.dequeueQueueEntry.mockResolvedValue(undefined);
     creditsState.credits = 10;
   });
 
@@ -111,7 +111,10 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       }),
     } as any));
     expect(res.status).toBe(402);
-    await expect(res.json()).resolves.toEqual({ creditsError: true });
+    await expect(res.json()).resolves.toEqual({
+      error: "Insufficient credits",
+      creditsError: true,
+    });
     expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
   });
 
@@ -130,6 +133,12 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       }),
     } as any));
     expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({
+      error: "Workspace not found",
+      code: "NOT_FOUND",
+      statusCode: 404,
+      details: undefined,
+    });
     expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
   });
 
@@ -169,8 +178,8 @@ describe("app/routes/api+/ivr/tsx.route", () => {
         outreach_attempt_id: 99,
       },
     );
-    expect(mocks.dequeueCampaignQueueById).toHaveBeenCalledWith({
-      queueId: 3,
+    expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
+      by: { id: 3 },
       userId: "u1",
       reason: "IVR call completed",
     });
@@ -206,7 +215,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
       statusCode: 500,
     });
 
-    mocks.dequeueCampaignQueueById.mockRejectedValueOnce(new Error("dequeue"));
+    mocks.dequeueQueueEntry.mockRejectedValueOnce(new Error("dequeue"));
     res = await asRouteResponse(mod.action({ request: makeReq() } as any));
     expect(res.status).toBe(500);
     await expect(res.json()).resolves.toMatchObject({

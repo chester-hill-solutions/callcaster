@@ -3,18 +3,18 @@ import { logger } from "@/lib/logger.server";
 import { findWorkspaceNumberByPhoneNumber } from "@/lib/inbound-call-db.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import { defineAction } from "@/lib/handler.server";
-import Twilio from "twilio";
+import { createVoiceResponse, sayHangupTwiml } from "@/lib/twilio-twiml.server";
 
 /** Fallback TwiML returned when the handler throws unexpectedly, so Twilio
  * hears a graceful message instead of an HTML error page. */
 function handsetUnavailableTwiml(): Response {
-  const twiml = new Twilio.twiml.VoiceResponse();
-  twiml.say("We're unable to take your call right now. Please try again later.");
-  twiml.hangup();
-  return new Response(twiml.toString(), {
-    status: 200,
-    headers: { "Content-Type": "text/xml" },
-  });
+  return new Response(
+    sayHangupTwiml("We're unable to take your call right now. Please try again later."),
+    {
+      status: 200,
+      headers: { "Content-Type": "text/xml" },
+    },
+  );
 }
 
 type InboundHandsetAuth = { called: string };
@@ -40,7 +40,7 @@ export const action = defineAction({
   sideEffects: ["db-read", "twilio"],
   handler: async ({ auth }) => {
     try {
-      const twiml = new Twilio.twiml.VoiceResponse();
+      const twiml = createVoiceResponse();
       const { called } = auth;
 
       if (!called) {

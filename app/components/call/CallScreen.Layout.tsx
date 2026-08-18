@@ -1,15 +1,12 @@
 import { QueueList } from "@/components/call/CallScreen.QueueList";
-import {
-  CallArea,
-  DispositionBar,
-} from "@/components/call/CallScreen.CallArea";
+import { CallArea } from "@/components/call/CallScreen.CallArea";
 import { CallQuestionnaire } from "@/components/call/CallScreen.Questionnaire";
 import { Household } from "@/components/call/CallScreen.Household";
 import { CampaignHeader, TopChrome } from "@/components/call/CallScreen.Header";
 import { PhoneKeypad } from "@/components/call/CallScreen.DTMFPhone";
 import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
 import { CallScreenLiveCoachingPanels } from "@/components/call/CallScreen.LiveCoachingPanels";
-import { OperatorColumn } from "@/components/call/CallScreen.OperatorColumn";
+import { CallWorkbench } from "@/components/call/CallScreen.Workbench";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -105,6 +102,8 @@ export function CallScreenLayout({
     recentAttempt,
     availableCredits,
     creditState,
+    reconnectDevice,
+    resetCall,
   } = callControls;
 
   const {
@@ -163,6 +162,22 @@ export function CallScreenLayout({
     label: option,
   }));
 
+  // One queue list instance shared by the mobile sheet and the desktop rail.
+  const queueList = (
+    <QueueList
+      isBusy={isBusy}
+      householdMap={householdMap}
+      groupByHousehold={groupByHousehold}
+      queue={campaign.dial_type === "call" ? queue : predictiveQueue}
+      handleNextNumber={handleNextNumber}
+      nextRecipient={nextRecipient}
+      handleQueueButton={() => fetchMore({ householdMap })}
+      predictive={campaign.dial_type === "predictive"}
+      count={count}
+      completed={completed}
+    />
+  );
+
   return (
     <div className="w-full space-y-6">
       {Number(credits) <= 0 ? (
@@ -194,9 +209,14 @@ export function CallScreenLayout({
       ) : null}
       {deviceError ? (
         <ErrorBanner
+          testId="device-error-banner"
           title="Phone connection error"
           text={deviceError.message}
-        />
+        >
+          <Button className="mt-3" onClick={reconnectDevice}>
+            Reconnect phone
+          </Button>
+        </ErrorBanner>
       ) : null}
       <TopChrome
         campaign={campaign}
@@ -221,6 +241,7 @@ export function CallScreenLayout({
               size="icon"
               variant="ghost"
               aria-label="Open queue"
+              className="lg:hidden"
             >
               <List className="h-5 w-5" />
             </Button>
@@ -232,18 +253,7 @@ export function CallScreenLayout({
                 Review recipients, skip contacts, or load the next queue.
               </SheetDescription>
             </SheetHeader>
-            <QueueList
-              isBusy={isBusy}
-              householdMap={householdMap}
-              groupByHousehold={groupByHousehold}
-              queue={campaign.dial_type === "call" ? queue : predictiveQueue}
-              handleNextNumber={handleNextNumber}
-              nextRecipient={nextRecipient}
-              handleQueueButton={() => fetchMore({ householdMap })}
-              predictive={campaign.dial_type === "predictive"}
-              count={count}
-              completed={completed}
-            />
+            {queueList}
           </SheetContent>
         </Sheet>
         <Sheet>
@@ -332,7 +342,7 @@ export function CallScreenLayout({
           </SheetContent>
         </Sheet>
       </TopChrome>
-      <OperatorColumn
+      <CallWorkbench
         incoming={
           incomingCall &&
           callState !== "dialing" &&
@@ -354,6 +364,7 @@ export function CallScreenLayout({
             isBusy={isBusy || deviceIsBusy}
             predictive={campaign.dial_type === "predictive"}
             nextRecipient={nextRecipient}
+            questionContact={questionContact}
             activeCall={activeCall as unknown as ActiveCall}
             recentCall={recentCall}
             handleVoiceDrop={handleVoiceDrop}
@@ -379,17 +390,10 @@ export function CallScreenLayout({
             callState={callState}
             callDuration={callDuration}
             voiceDrop={Boolean(campaignDetails.voicedrop_audio)}
-            showDisposition={false}
-          />
-        }
-        disposition={
-          <DispositionBar
-            isBusy={isBusy || deviceIsBusy}
-            nextRecipient={nextRecipient}
-            handleDequeueNext={handleDequeueNext}
-            disposition={disposition}
-            dispositionOptions={dispositionOptions}
-            setDisposition={setDisposition}
+            isMicrophoneMuted={isMicrophoneMuted}
+            onToggleMute={handleMuteMicrophone}
+            onLoadQueue={() => fetchMore({ householdMap })}
+            onResetCall={resetCall}
           />
         }
         household={
@@ -470,6 +474,7 @@ export function CallScreenLayout({
             disabled={!questionContact}
           />
         }
+        queue={queueList}
       />
       <CallScreenLiveCoachingPanels
         workspaceId={workspaceId}

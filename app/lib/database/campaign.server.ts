@@ -9,11 +9,12 @@ import {
   Contact,
 } from "../types";
 import { logger } from "../logger.server";
+import { isUniqueViolation } from "@/lib/parse-utils.server";
 import { fetchCampaignQueueWithContacts } from "../campaign-queue-search.server";
 import { campaign as campaignTable } from "@/db/schema";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { db, type Database } from "@/server/db";
-import { dequeueCampaignQueueById } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import {
   persistCampaignScript,
@@ -170,7 +171,7 @@ function stripCampaignMetaFields(rest: Record<string, unknown>): Record<string, 
     message_media: undefined,
     voicedrop_audio: undefined,
     live_questions: undefined,
-    is_active: Boolean(rest.is_active),
+    is_active: undefined,
   });
 }
 
@@ -330,8 +331,7 @@ export async function createCampaign({
   try {
     [createdCampaign] = await tdb.campaign.insert(cleanCampaignData);
   } catch (error: unknown) {
-    const pgError = error as { code?: string; message?: string };
-    if (pgError.code === "23505") {
+    if (isUniqueViolation(error)) {
       const newCampaignName = `${campaignData.title} (Copy)`;
       try {
         [createdCampaign] = await tdb.campaign.insert({
@@ -465,7 +465,6 @@ export async function splitMessageCampaign({
         workspace: workspaceId,
         title,
         status: "draft",
-        is_active: false,
       } as unknown as CampaignData,
       tdb,
     });
@@ -485,8 +484,8 @@ export async function splitMessageCampaign({
   // Remove the redistributed rows from the source so volume isn't double-sent.
   let movedContactCount = 0;
   for (const member of members) {
-    await dequeueCampaignQueueById({
-      queueId: Number(member.id),
+    await dequeueQueueEntry({
+      by: { id: Number(member.id) },
       userId,
       reason: "Moved to parallel split segment",
     });
@@ -526,8 +525,7 @@ export async function updateOrCopyScript({
       timestamp: created_at,
     });
   } catch (error: unknown) {
-    const pgError = error as { code?: string; message?: string };
-    if (pgError.code === "23505") {
+    if (isUniqueViolation(error)) {
       logger.error("Duplicate script conflict", error);
       throw new Error(
         `A script with this name (${scriptData.name}) already exists in the workspace`,
@@ -589,8 +587,7 @@ export async function updateCampaignWithScript(args: {
       { isolationLevel: "serializable" },
     );
   } catch (error: unknown) {
-    const pgError = error as { code?: string };
-    if (pgError.code === "23505") {
+    if (isUniqueViolation(error)) {
       logger.error("Duplicate script conflict", error);
       throw new Error(
         `A script with this name (${args.scriptData.name}) already exists in the workspace`,
@@ -674,7 +671,16 @@ export async function getCampaignQueueById({campaign_id,
   });
 }
 
-export function checkSchedule(campaignData: Campaign) {
+/** The subset of campaign fields the schedule check actually reads — callers
+ * with partial rows (e.g. the worker's schedule sweep) need not fake a full
+ * Campaign. */
+export type ScheduleCheckInput = {
+  start_date?: string | null;
+  end_date?: string | null;
+  schedule?: unknown;
+};
+
+export function checkSchedule(campaignData: ScheduleCheckInput) {
   if (!campaignData) return false;
   const { start_date, end_date, schedule } = campaignData;
   if (!schedule) return false;
@@ -716,8 +722,11 @@ export function checkSchedule(campaignData: Campaign) {
   if (!dayKey) {
     return false;
   }
+  // Partial/legacy schedules (e.g. an API-created campaign whose schedule JSON
+  // omits some weekdays, or a day with no intervals array) must read as "outside
+  // the calling window", not throw a 500 on the auto-dial/call-screen hot path.
   const todaySchedule = scheduleObject[dayKey];
-  if (!todaySchedule.active) {
+  if (!todaySchedule?.active || !Array.isArray(todaySchedule.intervals)) {
     return false;
   }
 

@@ -16,7 +16,7 @@ import {
 } from "@/lib/messaging-onboarding.server";
 import {
   loadWorkspaceTwilioData,
-  persistWorkspaceTwilioData,
+  mergeWorkspaceTwilioData,
 } from "@/lib/merge-workspace-twilio-data.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
 import { ensureTrustHubCustomerProfile } from "@/lib/twilio-trusthub.server";
@@ -277,11 +277,12 @@ async function persistOnboarding(
   workspaceId: string,
   onboarding: WorkspaceMessagingOnboardingState,
 ): Promise<void> {
-  const twilioData = await loadWorkspaceTwilioData(workspaceId);
-  await persistWorkspaceTwilioData(workspaceId, {
-    ...(twilioData as Record<string, unknown>),
+  // Atomic merge preserves any top-level keys (brandSid/campaignSid/…) a
+  // concurrent onboarding save may have written between our load and write.
+  await mergeWorkspaceTwilioData(workspaceId, (current) => ({
+    ...current,
     onboarding,
-  });
+  }));
 }
 
 async function persistActionNeeded(args: {

@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { useCreditBalance } from "@/hooks/billing/useCreditBalance";
 import { useQueue } from "@/hooks/queue/useQueue";
 import { useAttempts } from "@/hooks/queue/useAttempts";
 import { useCalls } from "@/hooks/queue/useCalls";
@@ -7,6 +8,7 @@ import { fetchCampaignQueueItemWithContact } from "@/lib/chats/messaging-client"
 import { QueueItem, User as AppUser, OutreachAttempt, Call, Contact } from "@/lib/types";
 import type { Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
+import { subscribeToWorkspaceEventSource } from "@/lib/workspace-events-connection.client";
 import {
   parseWorkspaceEventData,
   type PostgresChangePayload,
@@ -80,12 +82,11 @@ export const useWorkspaceRealtime = ({
   const { phoneNumbers, setPhoneNumbers, updateWorkspaceNumbers } =
     usePhoneNumbers(init.phoneNumbers || [], workspace);
 
-  const [availableCredits, setAvailableCredits] = useState(init.credits || 0);
-  const updateCredits = useCallback((payload: PostgresChangePayload) => {
-    if (payload.eventType === "INSERT" && payload.new?.amount) {
-      setAvailableCredits((prev: number) => prev + Number(payload.new!.amount));
-    }
-  }, []);
+  const {
+    credits: availableCredits,
+    applyLedgerEntry: updateCredits,
+    reconcileFromServer: reconcileCredits,
+  } = useCreditBalance(init.credits || 0);
 
   const callsListRef = useRef(callsList);
   const queueRef = useRef(queue);
@@ -258,14 +259,13 @@ export const useWorkspaceRealtime = ({
   /**
    * @effect Open an SSE connection to the workspace events endpoint and route postgres_change events (outreach_attempt, call, campaign_queue, workspace_number, transaction_history) to the appropriate local updater via handleChangeRef.
    * @effect-deps workspace (prop; a change means the campaign session moved to a different workspace and must resubscribe to that workspace's event stream)
-   * @effect-side-effects subscription — opens an EventSource (SSE) connection on mount/workspace-change; removes the listener and closes the connection on cleanup
+   * @effect-side-effects subscription — attaches to the shared workspace EventSource on mount/workspace-change; detaches on cleanup (the connection closes when its last subscriber leaves)
    * @effect-why-not-loader Live server-pushed queue/call/attempt/credit changes can't be modeled as a request/response loader; the connection must persist for the campaign session and fan out to multiple local updaters (updateQueue, updateCalls, updateAttempts, updateWorkspaceNumbers, updateCredits) as events arrive.
    */
   useEffect(() => {
     if (!workspace) return;
 
     const url = `/api/workspaces/${encodeURIComponent(workspace)}/events`;
-    const eventSource = new EventSource(url);
 
     const onWorkspaceEvent = (message: MessageEvent<string>) => {
       try {
@@ -277,19 +277,10 @@ export const useWorkspaceRealtime = ({
       }
     };
 
-    eventSource.addEventListener("workspace_event", onWorkspaceEvent);
-    eventSource.onerror = () => {
-      // Transient EventSource reconnects are normal (e.g. idle-timeout
-      // recycling); the browser retries automatically. Matches the sibling
-      // hook's level (useWorkspaceEventSubscription.ts) so this doesn't
-      // scream ERROR for routine reconnects.
-      logger.debug("Campaign workspace SSE connection interrupted; EventSource will retry");
-    };
-
-    return () => {
-      eventSource.removeEventListener("workspace_event", onWorkspaceEvent);
-      eventSource.close();
-    };
+    // Shares the page-wide EventSource for this workspace instead of opening
+    // another one — see workspace-events-connection.client.ts for why the
+    // per-hook connections were exhausting the HTTP/1.1 pool.
+    return subscribeToWorkspaceEventSource(url, onWorkspaceEvent);
   }, [workspace]);
 
   const handleSetDisposition = useCallback(
@@ -302,15 +293,23 @@ export const useWorkspaceRealtime = ({
     [setRecentAttempt],
   );
 
-  /**
-   * @effect CANDIDATE-REMOVE: Pushes nextRecipient up to the parent via setQuestionContact whenever it changes.
-   * @effect-deps nextRecipient (derived queue state from useQueue); setQuestionContact (parent-supplied setter)
-   * @effect-side-effects none — calls the parent's setQuestionContact with the current nextRecipient
-   * @effect-why-not-loader This isn't fetch/loader territory — it's the "adjust state based on a prop/state change" anti-pattern from the React docs (you-might-not-need-an-effect). nextRecipient is already derived local state (from useQueue); syncing it to a parent-owned setState on every change via an effect causes an extra render pass. It would likely be cleaner for the parent to own/derive questionContact directly, or for callers here to invoke setQuestionContact at the point nextRecipient is actually produced (inside useQueue/updateQueue/updateCalls) rather than reactively mirroring it. Left as-is per scope (annotate + flag only, not rewrite).
-   */
-  useEffect(() => {
-    setQuestionContact(nextRecipient);
-  }, [nextRecipient, setQuestionContact]);
+  // REMOVED (#1253): this hook used to unconditionally mirror nextRecipient
+  // into the parent's questionContact on every change via an effect that
+  // just called setQuestionContact(nextRecipient) with those two as its
+  // only dependencies.
+  // nextRecipient is the queue's next-to-dial pointer, not "who the
+  // script/disposition panel is recording an outcome for" — and hanging up
+  // dequeues the just-finished contact immediately (hangup.action.server.ts),
+  // which collapses nextRecipient to the next queue item or to null before
+  // the agent has had a chance to record a disposition. Mirroring that
+  // straight into questionContact nulled out (or silently redirected) the
+  // in-progress script/disposition panel right after every call ended —
+  // exactly the "survey/script and disposition are inactive after hanging
+  // up" bug. useNextRecipientSync (app/hooks/call/useNextRecipientSync.ts)
+  // already advances questionContact whenever a genuine new nextRecipient
+  // shows up (guarded on truthiness), so this duplicate — and uniquely
+  // destructive — sync isn't needed for the legitimate "advance to the next
+  // contact" case either.
 
   return {
     queue,
@@ -329,5 +328,6 @@ export const useWorkspaceRealtime = ({
     householdMap,
     setPhoneNumbers,
     availableCredits,
+    reconcileCredits,
   };
 };

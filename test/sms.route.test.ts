@@ -41,7 +41,7 @@ const mocks = vi.hoisted(() => {
     createWorkspaceTwilioInstance: vi.fn(),
     requireWorkspaceAccess: vi.fn(),
     processTemplateTags: vi.fn((text: string) => text),
-    dequeueCampaignQueueById: vi.fn(async () => []),
+    dequeueQueueEntry: vi.fn(async () => undefined),
     loadCampaignSmsDispatchData: vi.fn(),
     countCampaignMessagesToPhone: vi.fn(),
     updateOutreachAttemptForWorkspace: vi.fn(),
@@ -135,7 +135,7 @@ vi.mock("@/server/tenant-db", () => ({
 }));
 
 vi.mock("@/lib/campaign-queue-db.server", () => ({
-  dequeueCampaignQueueById: (...args: unknown[]) => mocks.dequeueCampaignQueueById(...args),
+  dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
 }));
 
 vi.mock("@/lib/sms-campaign-db.server", () => ({
@@ -277,7 +277,7 @@ describe("app/routes/api+/sms/route.tsx", () => {
     mocks.createWorkspaceTwilioInstance.mockReset();
     mocks.requireWorkspaceAccess.mockReset();
     mocks.processTemplateTags.mockReset();
-    mocks.dequeueCampaignQueueById.mockReset();
+    mocks.dequeueQueueEntry.mockReset();
     mocks.loadCampaignSmsDispatchData.mockReset();
     mocks.countCampaignMessagesToPhone.mockReset();
     mocks.updateOutreachAttemptForWorkspace.mockReset();
@@ -355,7 +355,10 @@ describe("app/routes/api+/sms/route.tsx", () => {
     const mod = await import("../app/routes/api+/sms");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(402);
-    await expect(res.json()).resolves.toMatchObject({ creditsError: true });
+    await expect(res.json()).resolves.toEqual({
+      creditsError: true,
+      error: "Insufficient credits",
+    });
   });
 
   test("happy path shortens URLs, signs media, templates body, and sends with mediaUrl", async () => {

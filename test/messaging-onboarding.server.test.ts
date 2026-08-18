@@ -10,6 +10,18 @@ const twilioDataMocks = vi.hoisted(() => ({
 vi.mock("@/lib/merge-workspace-twilio-data.server", () => ({
   loadWorkspaceTwilioData: vi.fn(async () => twilioDataMocks.data),
   persistWorkspaceTwilioData: (...args: unknown[]) => twilioDataMocks.persist(...args),
+  // Mirror the real atomic merge: run the updater against the current data,
+  // then route the write through the same persist spy so error/called
+  // assertions keep working.
+  mergeWorkspaceTwilioData: async (
+    workspaceId: string,
+    updater: (current: unknown) => unknown,
+  ) => {
+    const next = updater(twilioDataMocks.data);
+    await twilioDataMocks.persist(workspaceId, next);
+    twilioDataMocks.data = next;
+    return next;
+  },
 }));
 
 // These cases document the pre-RCS (flag-off) behavior; the flag-on paths are
@@ -256,7 +268,7 @@ describe("messaging onboarding helpers", () => {
       "bad" as any,
     );
 
-    expect(fromNull.currentStep).toBe("business_identity");
+    expect(fromNull.currentStep).toBe("path_selection");
     expect(fromPrimitive.selectedChannels).toEqual([]);
   });
 
@@ -333,7 +345,7 @@ describe("messaging onboarding helpers", () => {
     const loaded = await getWorkspaceMessagingOnboardingState({
       workspaceId: "w1",
     });
-    expect(loaded.currentStep).toBe("business_identity");
+    expect(loaded.currentStep).toBe("path_selection");
 
     const updated = await updateWorkspaceMessagingOnboardingState({
       workspaceId: "w1",

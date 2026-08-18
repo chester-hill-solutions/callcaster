@@ -92,7 +92,7 @@ describe("coaching-billing", () => {
       durationMs: 5 * 60_000,
     });
 
-    const args = ledgerMocks.insertTransactionHistoryIdempotent.mock.calls[0]?.[0] as {
+    const args = ledgerMocks.insertTransactionHistoryIdempotent.mock.calls[0]?.[1] as {
       amount: number;
       idempotencyKey: string;
       type: string;
@@ -110,7 +110,7 @@ describe("coaching-billing", () => {
     await billCoachingCue({ workspaceId: "ws-1", callSid: "CA123", eventId: "evt-2" });
 
     const keys = ledgerMocks.insertTransactionHistoryIdempotent.mock.calls.map(
-      (call) => (call[0] as { idempotencyKey: string }).idempotencyKey,
+      (call) => (call[1] as { idempotencyKey: string }).idempotencyKey,
     );
     // Two writes for evt-1 collapse on one key (the ledger RPC dedupes on it);
     // a distinct cue gets a distinct key and is charged separately.
@@ -126,7 +126,7 @@ describe("coaching-billing", () => {
     const { billCoachingCue } = await import("../services/media-stream/coaching-billing");
     await billCoachingCue({ workspaceId: "ws-1", callSid: "CA123", eventId: "evt-1" });
 
-    const args = ledgerMocks.insertTransactionHistoryIdempotent.mock.calls[0]?.[0] as {
+    const args = ledgerMocks.insertTransactionHistoryIdempotent.mock.calls[0]?.[1] as {
       amount: number;
     };
     expect(args.amount).toBeLessThan(0);

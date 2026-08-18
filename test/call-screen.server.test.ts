@@ -240,7 +240,7 @@ describe("call-screen.server", () => {
     expect(result.completedCount).toBe(4);
   });
 
-  test("getCallScreenData defaults null disposition_options to the DNC-only list", async () => {
+  test("getCallScreenData defaults null disposition_options to sensible defaults", async () => {
     tenantDbMocks.fetchCampaignWithScriptForWorkspace.mockResolvedValue({
       id: 1,
       script: null,
@@ -250,8 +250,15 @@ describe("call-screen.server", () => {
     tenantDbMocks.callFindMany.mockResolvedValue([]);
 
     const result = await getCallScreenData("1", "ws-1", "user-1");
-    // "do_not_call" is always offered, even for unconfigured campaigns.
-    expect(result.campaignDetails.disposition_options).toEqual(["do_not_call"]);
+    // Sensible defaults are offered for unconfigured campaigns, with
+    // "do_not_call" appended last.
+    expect(result.campaignDetails.disposition_options).toEqual([
+      "answered",
+      "no_answer",
+      "busy",
+      "voicemail",
+      "do_not_call",
+    ]);
     // The call screen maps over this directly — it must never be null.
     expect(() => result.campaignDetails.disposition_options.map((o) => o)).not.toThrow();
   });

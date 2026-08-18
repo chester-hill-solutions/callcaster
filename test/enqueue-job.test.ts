@@ -4,7 +4,7 @@ vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 });
 
-import { enqueueJob } from "@/lib/worker/enqueue-job.server";
+import { unsafeEnqueueJob as enqueueJob } from "@/lib/worker/enqueue-job.server";
 import { runWithRequestContext } from "@/lib/request-context.server";
 import { db } from "@/server/db";
 
@@ -70,24 +70,49 @@ vi.mock("@/server/db", () => ({
           execute: vi.fn(async (query: unknown) => {
             executeCount += 1;
             if (executeCount === 1) return [];
+            // Reconstruct the live-dedupe SELECT's bound params by the SQL
+            // text immediately preceding each placeholder, so the mock
+            // enforces the same workspace/campaign/exclude matching as the
+            // real query.
             const chunks =
               (query as { queryChunks?: unknown[] }).queryChunks ?? [];
-            const excludedId = chunks
-              .filter(
-                (chunk) =>
-                  chunk != null &&
-                  (typeof chunk !== "object" ||
-                    chunk.constructor.name !== "StringChunk"),
-              )
-              .map((chunk) =>
+            let lastText = "";
+            let workspaceParam: unknown;
+            let campaignParam: number | null = null;
+            let excludedId: number | undefined;
+            for (const chunk of chunks) {
+              const isStringChunk =
+                chunk != null &&
+                typeof chunk === "object" &&
+                chunk.constructor.name === "StringChunk";
+              if (isStringChunk) {
+                const value = (chunk as { value: unknown }).value;
+                lastText = Array.isArray(value) ? value.join("") : String(value);
+                continue;
+              }
+              const param =
                 typeof chunk === "object" && chunk !== null
                   ? chunk.valueOf()
-                  : chunk,
-              )
-              .find((value): value is number => typeof value === "number");
-            const live = mockState.jobs.filter((job) =>
-              ["queued", "running"].includes(job.status) &&
-              job.id !== excludedId,
+                  : chunk;
+              if (lastText.includes("workspace_id IS NOT DISTINCT FROM")) {
+                workspaceParam = param;
+              } else if (lastText.includes("params->>'campaignId'")) {
+                campaignParam = typeof param === "number" ? param : null;
+              } else if (lastText.includes("id <>")) {
+                excludedId = typeof param === "number" ? param : undefined;
+              }
+              lastText = "";
+            }
+            const live = mockState.jobs.filter(
+              (job) =>
+                ["queued", "running"].includes(job.status) &&
+                job.id !== excludedId &&
+                (workspaceParam === undefined ||
+                  (job.workspace_id ?? null) === workspaceParam) &&
+                (campaignParam == null ||
+                  Number(
+                    (job.params as Record<string, unknown> | null)?.campaignId,
+                  ) === campaignParam),
             );
             return live.slice(0, 1).map((job) => ({ id: job.id }));
           }),
@@ -219,6 +244,79 @@ describe("enqueueJob", () => {
 
     expect(result.enqueued).toBe(true);
     expect(mockState.jobs.at(-1)?.retry_at).toBe(runAt);
+  });
+
+  test("campaign-scoped live dedupe lets a second campaign in the same workspace enqueue", async () => {
+    mockState.jobs.push({
+      id: 11,
+      type: "campaign_dispatch",
+      status: "queued",
+      params: { campaignId: 100, workspaceId: "w1" },
+      workspace_id: "w1",
+      idempotency_key: null,
+    });
+
+    const result = await enqueueJob({
+      type: "campaign_dispatch",
+      workspaceId: "w1",
+      params: { campaignId: 200, workspaceId: "w1" },
+      dedupe: { kind: "live", workspaceId: "w1", campaignId: 200 },
+    });
+
+    expect(result.enqueued).toBe(true);
+    expect(mockState.jobs).toHaveLength(2);
+  });
+
+  test("campaign-scoped live dedupe still dedupes the same campaign", async () => {
+    mockState.jobs.push({
+      id: 12,
+      type: "campaign_dispatch",
+      status: "queued",
+      params: { campaignId: 100, workspaceId: "w1" },
+      workspace_id: "w1",
+      idempotency_key: null,
+    });
+
+    const result = await enqueueJob({
+      type: "campaign_dispatch",
+      workspaceId: "w1",
+      params: { campaignId: 100, workspaceId: "w1" },
+      dedupe: { kind: "live", workspaceId: "w1", campaignId: 100 },
+    });
+
+    expect(result.enqueued).toBe(false);
+    expect(result.deduped).toBe(true);
+    expect(result.jobId).toBe(12);
+  });
+
+  test("campaign-scoped successor excludes the running job but dedupes a queued twin", async () => {
+    mockState.jobs.push({
+      id: 13,
+      type: "campaign_dispatch",
+      status: "running",
+      params: { campaignId: 100, workspaceId: "w1" },
+      workspace_id: "w1",
+      idempotency_key: null,
+    });
+
+    // Successor from job 13 itself: must ignore its own row and insert.
+    const successor = await enqueueJob({
+      type: "campaign_dispatch",
+      workspaceId: "w1",
+      params: { campaignId: 100, workspaceId: "w1" },
+      dedupe: { kind: "live", workspaceId: "w1", campaignId: 100, excludeJobId: 13 },
+    });
+    expect(successor.enqueued).toBe(true);
+
+    // A retry of job 13 scheduling again now finds the queued successor.
+    const retry = await enqueueJob({
+      type: "campaign_dispatch",
+      workspaceId: "w1",
+      params: { campaignId: 100, workspaceId: "w1" },
+      dedupe: { kind: "live", workspaceId: "w1", campaignId: 100, excludeJobId: 13 },
+    });
+    expect(retry.enqueued).toBe(false);
+    expect(retry.deduped).toBe(true);
   });
 
   test("copies the active request id into job params", async () => {

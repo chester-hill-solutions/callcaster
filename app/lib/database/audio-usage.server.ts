@@ -6,7 +6,7 @@
  * So the only way to know a file's blast radius is to scan the columns and the
  * script JSON that reference it by name.
  */
-import { eq, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import {
   campaign as campaignTable,
   inbound_queue as inboundQueueTable,
@@ -96,10 +96,16 @@ export async function findAudioUsage(
         voicemail_file: campaignTable.voicemail_file,
       })
       .from(campaignTable)
+      // Filenames are bare (no workspace prefix) and collide across tenants, so
+      // every query must be scoped to this workspace or it leaks other tenants'
+      // campaign/number/queue metadata on a name collision.
       .where(
-        or(
-          eq(campaignTable.voicedrop_audio, target),
-          eq(campaignTable.voicemail_file, target),
+        and(
+          eq(campaignTable.workspace, workspaceId),
+          or(
+            eq(campaignTable.voicedrop_audio, target),
+            eq(campaignTable.voicemail_file, target),
+          ),
         ),
       ),
     db
@@ -108,11 +114,21 @@ export async function findAudioUsage(
         friendly_name: workspaceNumberTable.friendly_name,
       })
       .from(workspaceNumberTable)
-      .where(eq(workspaceNumberTable.inbound_audio, target)),
+      .where(
+        and(
+          eq(workspaceNumberTable.workspace, workspaceId),
+          eq(workspaceNumberTable.inbound_audio, target),
+        ),
+      ),
     db
       .select({ id: inboundQueueTable.id, name: inboundQueueTable.name })
       .from(inboundQueueTable)
-      .where(eq(inboundQueueTable.hold_audio, target)),
+      .where(
+        and(
+          eq(inboundQueueTable.workspace_id, workspaceId),
+          eq(inboundQueueTable.hold_audio, target),
+        ),
+      ),
     // Script bodies are JSON, so the filename cannot be matched in SQL without
     // depending on a step shape that is not stable. Fetch this workspace's
     // scripts and walk them instead.

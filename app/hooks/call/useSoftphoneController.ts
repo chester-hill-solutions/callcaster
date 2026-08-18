@@ -48,12 +48,16 @@ export function useSoftphoneController({
     onDeviceBusyChange: noop,
   });
 
+  const handleCallError = useCallback(
+    (err: Error) => onError(err?.message ?? "Call error"),
+    [onError],
+  );
+
   const callHandling = useCallHandling({
     device: connection.device,
     workspaceId,
     onStatusChange: noop,
-    // Same defensive guard as handleConnectionError above.
-    onError: (err) => onError(err?.message ?? "Call error"),
+    onError: handleCallError,
     onDeviceBusyChange: noop,
   });
 
