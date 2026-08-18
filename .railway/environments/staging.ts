@@ -67,15 +67,13 @@ const workerVariables = [
 
 export function stagingResources() {
   const appSource = source("master");
-  // Same custom image as dev's database; the SDK type omits the option.
-  // @ts-expect-error Railway's runtime supports an image override for database helpers.
-  const database = postgres("PostgreSQL 18", {
-    image: "xlab/postgres-ssl-18:latest",
-    region: "us-east4-eqdc4a",
-  });
-  const databaseVolume = volume("postgresql-18-volume", {
-    alerts: { usage: { "100": {}, "80": {}, "95": {} } },
-    allowOnlineResize: true,
+  // Standard Railway Postgres template. The 2026-08-18 apply silently failed
+  // to create dev's custom-image database ("PostgreSQL 18" / xlab image —
+  // plans fine, never materializes), so staging got `railway add --database
+  // postgres` instead; this models what actually exists. Note for phase 3:
+  // do NOT model a custom-image database for a fresh environment.
+  const database = postgres("Postgres-mgzk", { region: "us-east4-eqdc4a" });
+  const databaseVolume = volume("postgres-volume-uPSP", {
     region: "us-east4-eqdc4a",
     sizeMB: 50000,
   });

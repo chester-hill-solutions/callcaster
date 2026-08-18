@@ -20,7 +20,7 @@ STAGING_URL="${1:?usage: sync-staging-vars.sh <staging base url, e.g. https://st
 PROJECT_ID="32b36c6c-5f3d-463b-8c7f-bbcd70351e8f"
 APP_SERVICE_ID="d7a21d02-a448-4970-9989-ab2a7a2589ee"        # CallCaster
 WORKER_SERVICE_ID="9cba9fa7-f3d4-47d8-92a9-7317cea681bf"     # callcaster-worker
-DB_REFERENCE='${{PostgreSQL 18.DATABASE_URL}}'
+DB_REFERENCE='${{Postgres-mgzk.DATABASE_URL}}'
 
 APP_COPY_VARS=(
   BETTER_AUTH_SECRET COHERE_API_KEY ELEVENLABS_API_KEY HOST NODE_ENV PORT
