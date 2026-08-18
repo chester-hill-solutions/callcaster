@@ -25,8 +25,10 @@ const appVariables = [
 export function stagingResources() {
   // Models staging exactly as it runs today: the Supabase-era app deployed
   // from `master`, no database services. Phase 2 of #1300 replaces this with
-  // the v2 topology (app + worker + PostgreSQL) via a reviewed, destructive
-  // apply — do not "align" it here as a side effect of an unrelated change.
+  // the v2 topology (app + worker + PostgreSQL) sourced from the `production`
+  // branch — staging is a Railway environment mirroring production with
+  // test-mode Stripe keys, not a promotion-branch stage. Destructive apply,
+  // human-reviewed only; do not "align" it as a side effect.
   const app = service("hearty-expression", {
     source: source("master"),
     build: { builder: "NIXPACKS" },
