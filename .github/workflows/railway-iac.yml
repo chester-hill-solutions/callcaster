@@ -34,6 +34,9 @@ jobs:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
       RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+      # npm's .bin symlinks are mode 777 on Linux, so the CLI's tamper check
+      # rejects the project runner; point it at the real file instead.
+      RAILWAY_IAC_TS_BIN: ${{ github.workspace }}/node_modules/railway/dist/iac/bin.js
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -78,6 +81,9 @@ jobs:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
       RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+      # npm's .bin symlinks are mode 777 on Linux, so the CLI's tamper check
+      # rejects the project runner; point it at the real file instead.
+      RAILWAY_IAC_TS_BIN: ${{ github.workspace }}/node_modules/railway/dist/iac/bin.js
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -118,6 +124,9 @@ jobs:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
       RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+      # npm's .bin symlinks are mode 777 on Linux, so the CLI's tamper check
+      # rejects the project runner; point it at the real file instead.
+      RAILWAY_IAC_TS_BIN: ${{ github.workspace }}/node_modules/railway/dist/iac/bin.js
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
