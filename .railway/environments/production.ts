@@ -26,7 +26,9 @@ const appVariables = [
 
 export function productionResources() {
   const app = service("callcaster", {
-    source: source("prod"),
+    // Deploy branch renamed prod → production 2026-08-18 (#1300); the Railway
+    // service still points at the deleted `prod` until this is applied.
+    source: source("production"),
     build: { buildEnvironment: "V2", builder: "NIXPACKS" },
     replicas: { "us-east4-eqdc4a": 1 },
     env: preservedVariables(appVariables),

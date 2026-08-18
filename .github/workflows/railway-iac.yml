@@ -1,15 +1,18 @@
 name: Railway IaC
 
+# Promotion pipeline (#1300): dev → master (staging) → production.
+# Each environment applies on pushes to its own branch and plans on PRs
+# targeting it; staging additionally plans on dev PRs for early drift checks.
 on:
   push:
-    branches: [dev, master]
+    branches: [dev, master, production]
     paths:
       - ".railway/**"
       - ".github/workflows/railway-iac.yml"
       - "package.json"
       - "package-lock.json"
   pull_request:
-    branches: [dev, master]
+    branches: [dev, master, production]
     paths:
       - ".railway/**"
       - ".github/workflows/railway-iac.yml"
@@ -62,13 +65,14 @@ jobs:
         if: github.event_name == 'push'
         run: railway config apply --file .railway/railway.ts --yes
 
-  # Staging has no branch of its own yet (issue #1300 phase 2 decides its
-  # promotion model), so this job only ever plans — drift shows up on PRs and
-  # dev pushes, and applies stay manual.
+  # Staging deploys from `master` (the promotion branch: dev → master →
+  # production). Applies on master pushes; plans on PRs to master and, as an
+  # early drift check, on PRs to dev.
   staging:
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/dev') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'dev' &&
+      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
+      (github.event_name == 'pull_request' &&
+      (github.base_ref == 'dev' || github.base_ref == 'master') &&
       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     environment: staging
@@ -100,14 +104,17 @@ jobs:
             exit "$status"
           fi
           if jq -e '.changeSet.changes[]? | select(.severity == "destructive")' railway-staging-plan.json > /dev/null; then
-            echo "Destructive staging Railway plan detected. Review it manually."
+            echo "Refusing to apply a destructive staging Railway plan. Review it manually."
             exit 1
           fi
+      - name: Apply Railway staging configuration
+        if: github.event_name == 'push'
+        run: railway config apply --file .railway/railway.ts --yes
 
   production:
     if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
-      (github.event_name == 'pull_request' && github.base_ref == 'master' &&
+      (github.event_name == 'push' && github.ref == 'refs/heads/production') ||
+      (github.event_name == 'pull_request' && github.base_ref == 'production' &&
       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     environment: production
