@@ -46,8 +46,6 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - name: Install Railway CLI
         run: npm install --global @railway/cli@5.30.4
-      - name: Link Railway dev environment
-        run: railway link --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT_ID"
       - name: Plan Railway dev configuration
         run: |
           set +e
@@ -92,8 +90,6 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - name: Install Railway CLI
         run: npm install --global @railway/cli@5.30.4
-      - name: Link Railway staging environment
-        run: railway link --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT_ID"
       - name: Plan Railway staging configuration
         run: |
           set +e
@@ -134,8 +130,6 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - name: Install Railway CLI
         run: npm install --global @railway/cli@5.30.4
-      - name: Link Railway production environment
-        run: railway link --project "$RAILWAY_PROJECT_ID" --environment "$RAILWAY_ENVIRONMENT_ID"
       - name: Plan Railway production configuration
         run: |
           set +e
