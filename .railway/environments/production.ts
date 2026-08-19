@@ -3,8 +3,26 @@ import { preservedVariables, source } from "../config/shared.js";
 
 const appVariables = [
   "BASE_URL",
+  // v2 vars pre-staged 2026-08-18 by scripts/railway/stage-production-vars.sh
+  // (--skip-deploys; the cutover build inherits them). They MUST be preserved
+  // here or a plan treats them as deletions — caught live 2026-08-19 when a
+  // plan proposed 14 destructive variable deletes.
+  "BETTER_AUTH_SECRET",
+  "BETTER_AUTH_URL",
+  "COHERE_API_KEY",
   "DATABASE_DIRECT_URL",
   "DATABASE_URL",
+  "ELEVENLABS_API_KEY",
+  "HOST",
+  "NODE_ENV",
+  "PORT",
+  "RUN_CLIENT_MIGRATIONS_ON_BOOT",
+  "S3_ACCESS_KEY_ID",
+  "S3_BUCKET",
+  "S3_ENDPOINT",
+  "S3_REGION",
+  "S3_SECRET_ACCESS_KEY",
+  "SIGNUP_OPEN",
   "OPENAI_API_KEY",
   "RESEND_API_KEY",
   "STRIPE_API_KEY",
@@ -64,11 +82,13 @@ export function productionResources() {
     region: "us-east4-eqdc4a",
     sizeMB: 50000,
   });
-  // Created at apply time; builds from `production` FAIL until the v2
-  // promotion lands there (no Dockerfile.worker on the old tree) — expected
-  // and harmless, the instance just waits for the cutover.
+  // Cut over early (2026-08-19, Nathaniel): the worker builds from `master`
+  // (the v2 code that will be promoted) so it runs and validates the staged
+  // production environment ahead of the app. It idles — postgres-production
+  // has no queued jobs, and the cutover clone resets its rows. The promotion
+  // change (#1303) flips this to source("production") alongside the app.
   const worker = service("callcaster-worker", {
-    source: source("production"),
+    source: source("master"),
     build: {
       buildEnvironment: "V3",
       builder: "DOCKERFILE",
