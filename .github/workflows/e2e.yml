@@ -52,6 +52,12 @@ jobs:
       - name: Install psql client and ffmpeg
         timeout-minutes: 5
         run: |
+          # ubuntu-latest images ship both tools; apt only runs if an image
+          # ever drops them, so a dead mirror can't stall a normal run.
+          if command -v psql >/dev/null && command -v ffmpeg >/dev/null; then
+            psql --version; ffmpeg -version | head -1
+            exit 0
+          fi
           for attempt in 1 2 3; do
             if sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update &&
                sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 install -y --no-install-recommends postgresql-client ffmpeg; then
