@@ -64,7 +64,11 @@ export function devResources() {
     region: "us-east4-eqdc4a",
     sizeMB: 50000,
   });
-  const uploads = bucket("callcaster", { region: "iad" });
+  // Renamed from "callcaster" 2026-08-18: the display name collided with the
+  // production app service (also "callcaster"), which made ${{callcaster.*}}
+  // bucket references resolve against the SERVICE (to empty) in dev. Per-env
+  // bucket names are now callcaster-dev / -staging / -production.
+  const uploads = bucket("callcaster-dev", { region: "iad" });
   const app = service("CallCaster", {
     source: appSource,
     healthcheck: "/readyz",
