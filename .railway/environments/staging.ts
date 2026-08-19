@@ -1,4 +1,4 @@
-import { postgres, service, volume } from "railway/iac";
+import { bucket, postgres, service, volume } from "railway/iac";
 import { preservedVariables, source } from "../config/shared.js";
 
 // Staging is a Railway environment mirroring production (#1300): v2 topology,
@@ -82,6 +82,7 @@ export function stagingResources() {
     healthcheck: "/readyz",
     healthcheckTimeout: 30,
     replicas: { "us-east4-eqdc4a": 1 },
+    networking: { privateNetworkEndpoint: "callcaster" },
     env: preservedVariables(appVariables),
   });
   const worker = service("callcaster-worker", {
@@ -95,5 +96,7 @@ export function stagingResources() {
     env: preservedVariables(workerVariables),
   });
 
-  return [database, app, worker, databaseVolume];
+  const uploads = bucket("callcaster-staging", { region: "iad" });
+
+  return [database, app, worker, databaseVolume, uploads];
 }
