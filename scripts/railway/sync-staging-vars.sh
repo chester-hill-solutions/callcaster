@@ -7,7 +7,9 @@
 #   - DATABASE_URL          -> Railway reference to staging's own Postgres
 #   - BASE_URL              -> the staging app URL (argument)
 #   - BETTER_AUTH_URL       -> the staging app URL (argument)
-# DISABLE_2FA_ENFORCEMENT is dev-only and never copied.
+# DISABLE_2FA_ENFORCEMENT is dev-only and never copied. S3_* is never copied
+# either: staging has its own bucket (callcaster-staging) — populate S3 vars
+# from `railway bucket credentials --bucket callcaster-staging`, not dev.
 #
 # Usage:
 #   scripts/railway/sync-staging-vars.sh https://<staging-app-domain>
@@ -25,14 +27,12 @@ DB_REFERENCE='${{Postgres-mgzk.DATABASE_URL}}'
 APP_COPY_VARS=(
   BETTER_AUTH_SECRET COHERE_API_KEY ELEVENLABS_API_KEY HOST NODE_ENV PORT
   RESEND_API_KEY RUN_CLIENT_MIGRATIONS_ON_BOOT
-  S3_ACCESS_KEY_ID S3_BUCKET S3_ENDPOINT S3_REGION S3_SECRET_ACCESS_KEY
   SIGNUP_OPEN STRIPE_API_KEY STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET
   TWILIO_API_KEY TWILIO_API_SECRET TWILIO_APP_SID TWILIO_AUTH_TOKEN
   TWILIO_PHONE_NUMBER TWILIO_SID
 )
 WORKER_COPY_VARS=(
   BETTER_AUTH_SECRET NODE_ENV RAILWAY_DOCKERFILE_PATH RESEND_API_KEY
-  S3_ACCESS_KEY_ID S3_BUCKET S3_ENDPOINT S3_REGION S3_SECRET_ACCESS_KEY
   STRIPE_SECRET_KEY TWILIO_APP_SID TWILIO_AUTH_TOKEN TWILIO_PHONE_NUMBER
   TWILIO_SID
 )
