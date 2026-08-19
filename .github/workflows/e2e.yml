@@ -47,8 +47,20 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
 
       # The compose bootstrap applies drizzle/ + client/migrations via psql.
+      # Bounded + retried: apt mirror hangs stalled three runs for 20+ min
+      # each on 2026-08-18/19; a dead mirror must fail fast, not wedge CI.
       - name: Install psql client and ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client ffmpeg
+        timeout-minutes: 5
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update &&
+               sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 install -y --no-install-recommends postgresql-client ffmpeg; then
+              exit 0
+            fi
+            echo "apt attempt $attempt failed; retrying"
+            sleep 10
+          done
+          exit 1
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
