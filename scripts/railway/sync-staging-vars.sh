@@ -8,9 +8,10 @@
 #   - DATABASE_URL          -> ${{Postgres-mgzk.DATABASE_URL}}
 #   - BASE_URL/BETTER_AUTH_URL (app) -> https://${{RAILWAY_PUBLIC_DOMAIN}}
 #   - BASE_URL (worker)     -> https://${{CallCaster.RAILWAY_PUBLIC_DOMAIN}}
-# DISABLE_2FA_ENFORCEMENT is dev-only and never copied. S3_* is never copied
-# either: staging has its own bucket (callcaster-staging) — populate S3 vars
-# from `railway bucket credentials --bucket callcaster-staging`, not dev.
+#   - S3_*                  -> ${{callcaster-staging.*}} bucket references
+#     (ENDPOINT / ACCESS_KEY_ID / SECRET_ACCESS_KEY / REGION / BUCKET —
+#     BUCKET is the real S3 storage name; RAILWAY_BUCKET_NAME is the label)
+# DISABLE_2FA_ENFORCEMENT is dev-only and never copied.
 #
 # Usage:
 #   scripts/railway/sync-staging-vars.sh
@@ -24,6 +25,7 @@ WORKER_SERVICE_ID="9cba9fa7-f3d4-47d8-92a9-7317cea681bf"     # callcaster-worker
 DB_REFERENCE='${{Postgres-mgzk.DATABASE_URL}}'
 SELF_URL_REFERENCE='https://${{RAILWAY_PUBLIC_DOMAIN}}'
 APP_URL_REFERENCE='https://${{CallCaster.RAILWAY_PUBLIC_DOMAIN}}'
+BUCKET='callcaster-staging'
 
 APP_COPY_VARS=(
   BETTER_AUTH_SECRET COHERE_API_KEY ELEVENLABS_API_KEY HOST NODE_ENV PORT
@@ -62,12 +64,24 @@ sync_service "$APP_SERVICE_ID" "${APP_COPY_VARS[@]}"
 railway variable set "DATABASE_URL=$DB_REFERENCE" --service "$APP_SERVICE_ID" --environment staging --skip-deploys >/dev/null
 railway variable set "BASE_URL=$SELF_URL_REFERENCE" --service "$APP_SERVICE_ID" --environment staging --skip-deploys >/dev/null
 railway variable set "BETTER_AUTH_URL=$SELF_URL_REFERENCE" --service "$APP_SERVICE_ID" --environment staging --skip-deploys >/dev/null
-echo "   DATABASE_URL, BASE_URL, BETTER_AUTH_URL (references)"
+set_bucket_refs() {
+  local svc="$1"
+  railway variable set \
+    "S3_ENDPOINT=\${{${BUCKET}.ENDPOINT}}" \
+    "S3_ACCESS_KEY_ID=\${{${BUCKET}.ACCESS_KEY_ID}}" \
+    "S3_SECRET_ACCESS_KEY=\${{${BUCKET}.SECRET_ACCESS_KEY}}" \
+    "S3_REGION=\${{${BUCKET}.REGION}}" \
+    "S3_BUCKET=\${{${BUCKET}.BUCKET}}" \
+    --service "$svc" --environment staging --skip-deploys >/dev/null
+}
+set_bucket_refs "$APP_SERVICE_ID"
+echo "   DATABASE_URL, BASE_URL, BETTER_AUTH_URL, S3_* (references)"
 
 echo "== callcaster-worker =="
 sync_service "$WORKER_SERVICE_ID" "${WORKER_COPY_VARS[@]}"
 railway variable set "DATABASE_URL=$DB_REFERENCE" --service "$WORKER_SERVICE_ID" --environment staging --skip-deploys >/dev/null
 railway variable set "BASE_URL=$APP_URL_REFERENCE" --service "$WORKER_SERVICE_ID" --environment staging --skip-deploys >/dev/null
-echo "   DATABASE_URL, BASE_URL (references)"
+set_bucket_refs "$WORKER_SERVICE_ID"
+echo "   DATABASE_URL, BASE_URL, S3_* (references)"
 
 echo "Done. Redeploy staging services to pick up the variables."
