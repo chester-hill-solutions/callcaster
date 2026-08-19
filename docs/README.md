@@ -51,6 +51,12 @@ ADRs live in [`adr/`](adr/) and document hard-to-reverse, surprising, trade-off-
 - [0029 — Post-call golden transcript via Cohere Transcribe batch](adr/0029-post-call-golden-transcript-cohere-batch-worker.md)
 - [0030 — Media-stream Bun service as third Railway process](adr/0030-media-stream-bun-service-third-railway-process.md)
 
+### Interactive messaging (ADR-0032–0034)
+
+- [0032 — ScriptDocument v2 as a channel-neutral interaction model in a new package](adr/0032-interactive-sms-script-document-v2.md)
+- [0033 — Immutable Script Revision, Campaign Run, and audited Interaction state](adr/0033-immutable-revision-run-and-audited-interaction-state.md)
+- [0034 — Recipient Messaging Consent ledger and fail-closed disclosure for automated SMS](adr/0034-recipient-messaging-consent-and-fail-closed-disclosure.md)
+
 ## Active docs
 
 - `design-system.md`
