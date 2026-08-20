@@ -64,12 +64,13 @@ const workerVariables = [
 
 export function productionResources() {
   const app = service("callcaster", {
-    // The 2026-08-18 branch-repoint apply triggered a live redeploy — treat
-    // every config change to this service as deploy-triggering. Build config
-    // stays Supabase-era until the cutover window (#1303) flips it with the
-    // v2 promotion; do not "modernize" it in passing.
+    // Every config change to this service is deploy-triggering. v2 build
+    // config landed with the #1303 cutover: the /readyz healthcheck gates
+    // go-live, so a failed or unhealthy build leaves the prior deploy serving.
     source: source("production"),
-    build: { buildEnvironment: "V2", builder: "NIXPACKS" },
+    build: { buildEnvironment: "V3", builder: "DOCKERFILE" },
+    healthcheck: "/readyz",
+    healthcheckTimeout: 30,
     replicas: { "us-east4-eqdc4a": 1 },
     env: preservedVariables(appVariables),
   });
@@ -82,13 +83,10 @@ export function productionResources() {
     region: "us-east4-eqdc4a",
     sizeMB: 50000,
   });
-  // Cut over early (2026-08-19, Nathaniel): the worker builds from `master`
-  // (the v2 code that will be promoted) so it runs and validates the staged
-  // production environment ahead of the app. It idles — postgres-production
-  // has no queued jobs, and the cutover clone resets its rows. The promotion
-  // change (#1303) flips this to source("production") alongside the app.
+  // Ran early from `master` (2026-08-19) to pre-validate the staged
+  // environment; repointed to `production` with the #1303 promotion.
   const worker = service("callcaster-worker", {
-    source: source("master"),
+    source: source("production"),
     build: {
       buildEnvironment: "V3",
       builder: "DOCKERFILE",
