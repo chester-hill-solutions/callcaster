@@ -50,6 +50,7 @@ const workerVariables = [
   "NODE_ENV",
   "RAILWAY_DOCKERFILE_PATH",
   "RESEND_API_KEY",
+  "STRIPE_WEBHOOK_SECRET",
   "S3_ACCESS_KEY_ID",
   "S3_BUCKET",
   "S3_ENDPOINT",
@@ -78,7 +79,8 @@ export function productionResources() {
   // prep (verified 0 workspaces / 0 users on 2026-08-18); the cutover clone
   // refreshes it. The legacy "Postgres" service is decommissioned post-soak.
   const database = postgres("Postgres-jAO4", { region: "us-east4-eqdc4a" });
-  const legacyDatabase = postgres("Postgres", { region: "us-east4-eqdc4a" });
+  // Legacy "Postgres" service was deleted from the live environment before
+  // the #1303 cutover apply (the 2026-08-20 plan proposed recreating it).
   const databaseVolume = volume("postgres-volume", {
     region: "us-east4-eqdc4a",
     sizeMB: 50000,
@@ -97,5 +99,5 @@ export function productionResources() {
   });
   const uploads = bucket("callcaster-production", { region: "iad" });
 
-  return [database, legacyDatabase, app, worker, databaseVolume, uploads];
+  return [database, app, worker, databaseVolume, uploads];
 }
