@@ -13,10 +13,10 @@ A faster, smaller, cleaner CallCaster with zero behavior change:
 
 | Metric | ID | Measure (lower is better) | Keep threshold |
 |---|---|---|---|
-| Test suite wall time | `test_s` | `npm run test:node && npm run test:ui`, seconds | ≥ 2% better |
+| Test suite wall time | `test_s` | `npm run test:node && npm run test:ui`, seconds | ≥ 8% better (observed jitter up to ±11% under load) |
 | Typecheck wall time | `typecheck_s` | `npm run typecheck`, seconds | ≥ 8% better (observed jitter ~±10%) |
 | Client bundle size | `bundle_bytes` | sum of bytes in `build/client/assets/**/*.js` | ≥ 0.5% smaller |
-| Quality count | `quality_count` | type-safety `total` + dry `clones` + effects sum | ≥ 1 lower, others not higher |
+| Quality count | `quality_count` | LIVE counts from `check-type-safety` + `check-dry` + `check-effects` (baselines are ratchets, not the metric) | ≥ 1 lower, others not higher |
 
 All four numbers come from `autoresearch/metric.sh`. Gate status comes from
 `autoresearch/gate.sh`. Never compute these yourself; run the scripts.

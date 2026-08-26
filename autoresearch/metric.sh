@@ -40,14 +40,32 @@ BUILD_S=$(run_timed /tmp/ar-metric-build.log npm run --silent build) \
 BUNDLE_BYTES=$(find build/client/assets -type f -name '*.js' -printf '%s\n' 2>/dev/null \
   | awk '{s+=$1} END{print s+0}')
 
-QUALITY_JSON=$(node --input-type=module -e '
-import { readFileSync } from "node:fs";
-const rd = (p) => JSON.parse(readFileSync(p, "utf8"));
-const ts = rd("scripts/type-safety-baseline.json");
-const dry = rd("scripts/dry-baseline.json");
-const eff = rd("scripts/effects-baseline.json");
-const effects = Object.values(eff).reduce((a, b) => a + Number(b), 0);
-console.log(JSON.stringify({ type_safety_total: ts.total ?? null, dry_clones: dry.clones ?? null, effects }));
+# Live quality counts from the three ratchet referees.
+# Each exits non-zero on regression vs its baseline, which fails measurement.
+TS_OUT=$(node scripts/check-type-safety.mjs 2>&1)
+if [[ $? -ne 0 ]]; then echo "type-safety regression" >&2; echo "$TS_OUT" >&2; exit 6; fi
+TS_JSON=$(printf '%s' "$TS_OUT" | grep -o '{.*}')
+
+if ! npm run --silent check:dry > /tmp/ar-metric-dry.log 2>&1; then
+  echo "dry regression — see /tmp/ar-metric-dry.log" >&2; exit 6
+fi
+DRY_CLONES=$(grep -oE '[0-9]+ clones' /tmp/ar-metric-dry.log | head -1 | grep -oE '[0-9]+')
+
+if ! npm run --silent check:effects > /tmp/ar-metric-effects.log 2>&1; then
+  echo "effects regression — see /tmp/ar-metric-effects.log" >&2; exit 6
+fi
+EFF_GRAND=$(grep -oE '[0-9]+ grandfathered' /tmp/ar-metric-effects.log | head -1 | grep -oE '^[0-9]+')
+
+QUALITY_JSON=$( \
+TS_JSON="$TS_JSON" DRY_CLONES="$DRY_CLONES" EFF_GRAND="$EFF_GRAND" \
+node --input-type=module -e '
+const ts = JSON.parse(process.env.TS_JSON);
+const q = {
+  type_safety_total: Object.values(ts).reduce((a, b) => a + Number(b), 0),
+  dry_clones: Number(process.env.DRY_CLONES),
+  effects: Number(process.env.EFF_GRAND),
+};
+console.log(JSON.stringify(q));
 ')
 
 METRICS_JSON=$( \
