@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { ensureBlockTitles } from "@/lib/call-script-service";
 import { ScriptBlockEditor } from "./ScriptBlockEditor";
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
@@ -51,7 +50,7 @@ export function ScriptEditorShell({
   const editor = useScriptEditorState({
     initialDocument: document,
     palette: "callcaster",
-    onChange: (nextDocument) => onChange(ensureBlockTitles(nextDocument)),
+    onChange,
   });
 
   const activePageIndex = editor.orderedPages.findIndex(

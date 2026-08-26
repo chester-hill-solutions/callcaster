@@ -1,9 +1,5 @@
 import { describe, expect, test } from "vitest";
-import {
-  documentToScript,
-  ensureBlockTitles,
-  scriptToDocument,
-} from "@/lib/call-script-service";
+import { documentToScript, scriptToDocument } from "@/lib/call-script-service";
 import type { Script } from "@/lib/types";
 
 describe("Callcaster ScriptKit adapter", () => {
@@ -98,25 +94,5 @@ describe("Callcaster ScriptKit adapter", () => {
 
     expect(once.blocks.a?.title).toBe("Block 1");
     expect(twice.blocks.a?.title).toBe("Block 1");
-  });
-
-  test("ensureBlockTitles is a no-op that preserves identity when every block is titled", () => {
-    const script = {
-      id: 45,
-      name: "All titled",
-      type: "script",
-      steps: {
-        pages: {
-          page1: { id: "page1", title: "Page 1", blocks: ["a"] },
-        },
-        blocks: {
-          a: { id: "a", type: "textarea", title: "Named", prompt: "Q" },
-        },
-      },
-    } as unknown as Script;
-
-    const doc = scriptToDocument(script);
-
-    expect(ensureBlockTitles(doc)).toBe(doc);
   });
 });

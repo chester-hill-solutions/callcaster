@@ -6,7 +6,7 @@ import type { Script } from "@/lib/types";
 
 const scripts = createCallScriptService();
 
-export function ensureBlockTitles(doc: ScriptDocument): ScriptDocument {
+function ensureBlockTitles(doc: ScriptDocument): ScriptDocument {
   let untitledCount = 0;
   const blocks = Object.fromEntries(
     Object.entries(doc.blocks).map(([id, block]) => {
