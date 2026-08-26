@@ -5,8 +5,7 @@ import { InviteCheckbox } from "./InviteCheckbox";
 type PendingInvite = {
   created_at: string;
   id: string;
-  isNew: boolean;
-  role: "admin" | "owner" | "caller" | "member";
+  role: string;
   user_id: string;
   workspace: { name: string; id: string };
 };
