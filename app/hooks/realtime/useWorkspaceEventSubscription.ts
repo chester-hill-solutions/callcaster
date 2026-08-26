@@ -10,8 +10,11 @@ import {
 
 /**
  * Subscribe to workspace postgres_change events via SSE.
+ *
+ * Pass a row type (`useWorkspaceEventSubscription<AudienceUpload>({...})`) to
+ * receive typed `payload.new` / `payload.old` without casting at the call site.
  */
-export const useWorkspaceEventSubscription = ({
+export const useWorkspaceEventSubscription = <TNew extends object = Record<string, unknown>>({
   workspaceId,
   table,
   filter,
@@ -20,7 +23,7 @@ export const useWorkspaceEventSubscription = ({
   workspaceId: string;
   table?: string | string[];
   filter?: string;
-  onChange: (payload: RealtimeChangePayload) => void;
+  onChange: (payload: RealtimeChangePayload<TNew>) => void;
 }) => {
   const onChangeRef = useRef(onChange);
 
@@ -68,7 +71,7 @@ export const useWorkspaceEventSubscription = ({
         }
         if (!matchesPostgresChangeFilter(payload, filter)) return;
 
-        onChangeRef.current(payload as RealtimeChangePayload);
+        onChangeRef.current(payload as RealtimeChangePayload<TNew>);
       } catch (error) {
         logger.error("Failed to handle workspace SSE event", error);
       }

@@ -53,13 +53,14 @@ export function useAudienceUploads({
   }, [refresh]);
 
   // Phase 3B: Postgres Realtime subscription for live upload progress updates.
-  useWorkspaceEventSubscription({
+  useWorkspaceEventSubscription<AudienceUpload>({
     workspaceId,
     table: "audience_upload",
     filter: `audience_id=eq.${audienceId}`,
     onChange: (payload) => {
-      if (payload.eventType === "INSERT" && payload.new) {
-        setUploads(prev => [payload.new as unknown as AudienceUpload, ...prev]);
+      const inserted = payload.new;
+      if (payload.eventType === "INSERT" && inserted) {
+        setUploads(prev => [inserted, ...prev]);
       } else if (payload.eventType === "UPDATE" && payload.new) {
         const newData = payload.new as Partial<AudienceUpload> & { id?: number };
         setUploads(prev =>
