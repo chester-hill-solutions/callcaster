@@ -24,6 +24,7 @@ Interactive specs:
 | `/api/audience-upload` | POST | User API | sessionOnly | yes | `routes/api+/audience-upload.tsx` | `docs/api-data-management.md` | Upload audience CSV with column mapping. |
 | `/api/audience-upload-status` | GET | User API | sessionOnly | yes | `routes/api+/audience-upload-status.tsx` | `docs/api-data-management.md` | Poll audience CSV upload job status. |
 | `/api/audiences` | PATCH, DELETE, GET | User API | sessionOnly | yes | `routes/api+/audiences.tsx` | `docs/api-data-management.md` |  |
+| `/api/audio-upload` | POST | User API | sessionOnly | yes | `routes/api+/audio-upload.tsx` | `docs/api-data-management.md` | Inline workspace audio upload from the script editor; normalizes to canonical MP3. |
 | `/api/audiodrop` | POST | User API | sessionOnly | yes | `routes/api+/audiodrop.tsx` | `docs/api-telephony-control.md` | Voicemail drop during live call. |
 | `/api/auth/*` | POST, GET | Public Form | publicUnauthenticated | yes | `routes/api+/auth/$.route.tsx` | `docs/api-auth-matrix.md` | Better Auth catch-all (sign-in, session, sign-out, OAuth callbacks). POSTs are rate-limited: sign-in/two-factor 10/min per IP, other POSTs 30/min. |
 | `/api/auth/callback` | GET | Public Form | publicUnauthenticated | yes | `routes/api+/auth/callback.route.tsx` | `docs/api-auth-matrix.md` | Postgres auth callback; sets session cookies and redirects. |
@@ -159,5 +160,5 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/voicemails` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/voicemails.route.tsx` | `docs/api-analytics-export.md` |  |
 | `/api/workspaces/:workspaceId/webhook` | POST, PUT, GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/webhook.route.tsx` | `docs/api-workspace-admin.md` | POST tests webhook delivery. |
 
-Total entries: **146**
+Total entries: **147**
 

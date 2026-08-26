@@ -1,3 +1,8 @@
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import type {
   ScriptBlock,
   ScriptOption,
@@ -15,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 
 /** Sentinel for "no routing target" — Radix Select rejects empty-string values. */
 const NO_ROUTING_TARGET = "__none__";
@@ -23,6 +29,7 @@ export type ScriptBlockEditorProps = {
   block: ScriptBlock;
   readOnly?: boolean;
   mediaNames: string[];
+  onUploadAudio?: (file: File) => Promise<string | null>;
   routingTargets: RoutingTarget[];
   onChange: (patch: Partial<ScriptBlock>) => void;
   onRemove: () => void;
@@ -38,6 +45,7 @@ export function ScriptBlockEditor({
   block,
   readOnly = false,
   mediaNames,
+  onUploadAudio,
   routingTargets,
   onChange,
   onRemove,
@@ -62,6 +70,24 @@ export function ScriptBlockEditor({
     block.type === "radio" ||
     block.type === "checkbox" ||
     options.length > 0;
+
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+
+  const handleAudioFileSelected = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !onUploadAudio) return;
+    setIsUploadingAudio(true);
+    try {
+      const name = await onUploadAudio(file);
+      if (name) onChange({ audioFile: name } as Partial<ScriptBlock>);
+    } finally {
+      setIsUploadingAudio(false);
+    }
+  };
 
   const routingOptions = [
     { value: NO_ROUTING_TARGET, label: "(no target)" },
@@ -197,6 +223,27 @@ export function ScriptBlockEditor({
               />
             )}
           </Label>
+          {!readOnly && onUploadAudio && block.callcasterType === "recorded" && (
+            <>
+              <input
+                ref={audioInputRef}
+                type="file"
+                accept={getAudioUploadAcceptValue()}
+                className="hidden"
+                onChange={handleAudioFileSelected}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-self-start"
+                disabled={isUploadingAudio}
+                onClick={() => audioInputRef.current?.click()}
+              >
+                {isUploadingAudio ? "Uploading…" : "Upload audio"}
+              </Button>
+            </>
+          )}
         </>
       )}
       {takesOptions && (

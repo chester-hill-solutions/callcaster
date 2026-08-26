@@ -35,6 +35,7 @@ api/agent-status
 api/audience-upload
 api/audience-upload-status
 api/audiences
+api/audio-upload
 api/audiodrop
 api/auth/*
 api/auth/callback

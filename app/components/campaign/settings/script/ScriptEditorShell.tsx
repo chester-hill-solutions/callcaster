@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { ensureBlockTitles } from "@/lib/call-script-service";
 import { ScriptBlockEditor } from "./ScriptBlockEditor";
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
@@ -30,6 +31,7 @@ export type ScriptEditorShellProps = {
   document: ScriptDocument;
   onChange: (doc: ScriptDocument) => void;
   mediaNames?: string[];
+  onUploadAudio?: (file: File) => Promise<string | null>;
   readOnly?: boolean;
   className?: string;
 };
@@ -38,6 +40,7 @@ export function ScriptEditorShell({
   document,
   onChange,
   mediaNames = [],
+  onUploadAudio,
   readOnly = false,
   className,
 }: ScriptEditorShellProps) {
@@ -48,7 +51,7 @@ export function ScriptEditorShell({
   const editor = useScriptEditorState({
     initialDocument: document,
     palette: "callcaster",
-    onChange,
+    onChange: (nextDocument) => onChange(ensureBlockTitles(nextDocument)),
   });
 
   const activePageIndex = editor.orderedPages.findIndex(
@@ -261,6 +264,7 @@ export function ScriptEditorShell({
                           block={block}
                           readOnly={readOnly}
                           mediaNames={mediaNames}
+                          onUploadAudio={onUploadAudio}
                           routingTargets={editor.routingTargets}
                           onChange={(patch) =>
                             editor.updateBlock(blockId, patch)
