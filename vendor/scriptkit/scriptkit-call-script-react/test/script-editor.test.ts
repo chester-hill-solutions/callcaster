@@ -183,6 +183,22 @@ describe("useScriptEditorState — blocks", () => {
     ]);
   });
 
+  test("addBlock titles new blocks past everything already in the document", () => {
+    const { result } = renderEditor();
+
+    let first = "";
+    let second = "";
+    act(() => {
+      first = result.current.addBlock("textarea");
+    });
+    act(() => {
+      second = result.current.addBlock("textarea", 0);
+    });
+
+    expect(result.current.document.blocks[first]?.title).toBe("Block 2");
+    expect(result.current.document.blocks[second]?.title).toBe("Block 3");
+  });
+
   test("moveBlock reorders within the page", () => {
     const { result } = renderEditor();
     let second = "";

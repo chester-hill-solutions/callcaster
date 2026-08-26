@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link, useLoaderData } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -22,12 +22,49 @@ export { action } from "./$scriptId.action.server";
 export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 export default function ScriptEditor() {
-  const { script: loaderScript, mediaNames } = useLoaderData<ScriptIdLoaderData>();
+  const { script: loaderScript, mediaNames: loaderMediaNames, workspace_id } =
+    useLoaderData<ScriptIdLoaderData>();
   const [initScript, setInitScript] = useState(loaderScript);
   const [script, setScript] = useState(loaderScript);
   const [isSaving, setIsSaving] = useState(false);
+  const [mediaNames, setMediaNames] = useState(() =>
+    (loaderMediaNames ?? []).map((media) =>
+      typeof media === "string" ? media : media.name,
+    ),
+  );
   const isChanged = useHasChanges(script, initScript, normalizeScriptForComparison);
   useUnsavedChangesGuard(isChanged);
+
+  const handleUploadAudio = useCallback(
+    async (file: File): Promise<string | null> => {
+      try {
+        const formData = new FormData();
+        formData.set("workspaceId", workspace_id);
+        formData.set("media", file);
+        const response = await fetch("/api/audio-upload", {
+          method: "POST",
+          body: formData,
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || result?.error) {
+          throw new Error(result?.error ?? "Failed to upload audio.");
+        }
+        const name = result.name as string;
+        setMediaNames((current) =>
+          current.includes(name) ? current : [...current, name],
+        );
+        return name;
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Couldn't upload the audio file.",
+        );
+        return null;
+      }
+    },
+    [workspace_id],
+  );
 
   const handleSaveUpdate = async () => {
     setIsSaving(true);
@@ -121,9 +158,8 @@ export default function ScriptEditor() {
           onPageDataChange={(newData: PageData) => {
             handlePageDataChange(newData);
           }}
-          mediaNames={(mediaNames ?? []).map((media) =>
-            typeof media === "string" ? media : media.name,
-          )}
+          mediaNames={mediaNames}
+          onUploadAudio={handleUploadAudio}
         />
       </div>
     </div>

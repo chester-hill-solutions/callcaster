@@ -197,7 +197,13 @@ export function useScriptEditorState(options: UseScriptEditorStateOptions) {
     updateDocument({
       ...document,
       pages: { ...document.pages, [activePageId]: { ...page, blockIds } },
-      blocks: { ...document.blocks, [blockId]: createBlock(type, blockId) },
+      blocks: {
+        ...document.blocks,
+        [blockId]: withDefaultBlockTitle(
+          createBlock(type, blockId),
+          document.blocks,
+        ),
+      },
     });
     setActiveBlockId(blockId);
     return blockId;
@@ -606,4 +612,21 @@ function createBlock(type: ScriptBlock["type"], id: string): ScriptBlock {
       throw new Error(`Unsupported block type: ${String(_exhaustive)}`);
     }
   }
+}
+
+/**
+ * Every block carries a human-readable label: exports use it for data
+ * labelling and routing pickers render it, so a fresh block must not open
+ * with an undefined title its editor cannot even display. Number it past
+ * everything already in the document ("Block 4", ...) rather than leaving
+ * authoring tools to patch one in after the fact.
+ */
+function withDefaultBlockTitle(
+  block: ScriptBlock,
+  existingBlocks: ScriptDocument["blocks"],
+): ScriptBlock {
+  if (block.title !== undefined) {
+    return block;
+  }
+  return { ...block, title: `Block ${Object.keys(existingBlocks).length + 1}` };
 }
