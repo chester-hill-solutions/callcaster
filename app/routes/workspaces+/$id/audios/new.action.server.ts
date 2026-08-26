@@ -42,8 +42,8 @@ export const action = defineAction({
       const normalizedAudio = await normalizeUploadedAudio(mediaToUpload);
       try {
         await uploadObject("workspaceAudio", `${workspaceId}/${safeMediaName}.${normalizedAudio.extension}`, normalizedAudio.buffer, { contentType: normalizedAudio.contentType });
-      } catch (uploadError: any) {
-        return routeData({ success: false, error: uploadError?.message || "Upload failed" }, { headers });
+      } catch (uploadError: unknown) {
+        return routeData({ success: false, error: uploadError instanceof Error ? uploadError.message : "Upload failed" }, { headers });
       }
 
       // Absolute path — the previous `../audios` was resolved by React

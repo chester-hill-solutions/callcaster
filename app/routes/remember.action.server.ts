@@ -25,8 +25,8 @@ export const action = defineAction({
         headers: request.headers,
       });
       return routeData({ data: { success: true }, error: null });
-    } catch (error: any) {
-      return routeData({ data: null, error: { message: error?.message || "Failed to send reset email" } });
+    } catch (error: unknown) {
+      return routeData({ data: null, error: { message: error instanceof Error ? error.message : "Failed to send reset email" } });
     }
   },
 });
