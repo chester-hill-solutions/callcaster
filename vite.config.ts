@@ -8,6 +8,19 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
 
+// Lazy-loaded only when ANALYZE=1 to keep normal builds fast.
+let visualizerPlugin: Plugin[] = [];
+if (process.env.ANALYZE === "1") {
+  const { visualizer } = await import("rollup-plugin-visualizer");
+  visualizerPlugin = [
+    visualizer({
+      filename: "build/stats.json",
+      json: true,
+      brotliSize: true,
+    }),
+  ];
+}
+
 function resolveAppModuleSuffix(suffix: ".server" | ".client"): Plugin {
   return {
     name: `resolve-app-${suffix.slice(1)}-modules`,
@@ -53,6 +66,7 @@ export default defineConfig({
     resolveAppModuleSuffix(".client"),
     reactRouter(),
     tsconfigPaths({ projects: ["./tsconfig.json"] }),
+    ...visualizerPlugin,
   ],
   server: {
     port: Number(process.env.PORT ?? 3000),
