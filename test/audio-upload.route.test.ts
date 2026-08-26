@@ -5,12 +5,17 @@ import { asRouteResponse } from "./helpers/route-result";
 const mocks = vi.hoisted(() => ({
   requireDualAuth: vi.fn(),
   getDualAuthUser: vi.fn(),
+  requireWorkspaceAccess: vi.fn(),
   uploadWorkspaceAudioApi: vi.fn(),
 }));
 
 vi.mock("@/lib/api-auth.server", () => ({
   requireDualAuth: (...args: unknown[]) => mocks.requireDualAuth(...args),
   getDualAuthUser: (auth: unknown) => mocks.getDualAuthUser(auth),
+}));
+vi.mock("@/lib/database/workspace.server", () => ({
+  requireWorkspaceAccess: (...args: unknown[]) =>
+    mocks.requireWorkspaceAccess(...args),
 }));
 vi.mock("@/lib/platform-media.server", () => ({
   uploadWorkspaceAudioApi: (...args: unknown[]) =>
@@ -21,6 +26,7 @@ function sessionAuth() {
   const auth = { authType: "session" as const, user: { id: "u1" } };
   mocks.requireDualAuth.mockResolvedValue(auth);
   mocks.getDualAuthUser.mockReturnValue(auth.user);
+  mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
   return auth;
 }
 
@@ -48,6 +54,7 @@ describe("app/routes/api+/audio-upload action", () => {
     vi.resetModules();
     mocks.requireDualAuth.mockReset();
     mocks.getDualAuthUser.mockReset();
+    mocks.requireWorkspaceAccess.mockReset();
     mocks.uploadWorkspaceAudioApi.mockReset();
   });
 
@@ -79,6 +86,7 @@ describe("app/routes/api+/audio-upload action", () => {
     );
 
     expect(res.status).toBe(400);
+    expect(mocks.requireWorkspaceAccess).not.toHaveBeenCalled();
     expect(mocks.uploadWorkspaceAudioApi).not.toHaveBeenCalled();
   });
 
@@ -94,6 +102,7 @@ describe("app/routes/api+/audio-upload action", () => {
     );
 
     expect(res.status).toBe(400);
+    expect(mocks.requireWorkspaceAccess).not.toHaveBeenCalled();
     expect(mocks.uploadWorkspaceAudioApi).not.toHaveBeenCalled();
   });
 
@@ -116,6 +125,10 @@ describe("app/routes/api+/audio-upload action", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ name: "greeting.mp3" });
+    expect(mocks.requireWorkspaceAccess).toHaveBeenCalledWith({
+      user: { id: "u1" },
+      workspaceId: "w1",
+    });
     expect(mocks.uploadWorkspaceAudioApi).toHaveBeenCalledWith(
       "u1",
       "w1",

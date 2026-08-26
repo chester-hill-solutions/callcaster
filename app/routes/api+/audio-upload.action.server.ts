@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
+import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { defineAction } from "@/lib/handler.server";
 import { uploadWorkspaceAudioApi } from "@/lib/platform-media.server";
 
@@ -31,6 +32,8 @@ export const action = defineAction({
       typeof rawMediaName === "string" && rawMediaName.trim().length > 0
         ? rawMediaName
         : file.name;
+
+    await requireWorkspaceAccess({ user, workspaceId });
 
     const result = await uploadWorkspaceAudioApi(
       user.id,
