@@ -13,7 +13,7 @@ fi
 
 : "${AUTORESEARCH_TAG:=pilot1}"
 : "${AUTORESEARCH_BRANCH:=autoresearch/${AUTORESEARCH_TAG}}"
-: "${AUTORESEARCH_MODEL:=opencode/x-preview-f-free}"
+: "${AUTORESEARCH_MODEL:=opencode/big-pickle}"
 : "${AUTORESEARCH_REVIEW_MODEL:=opencode/gpt-5.6-sol}"
 : "${AUTORESEARCH_REMEDIATE_MODEL:=$AUTORESEARCH_MODEL}"
 : "${AUTORESEARCH_MAX_TURNS:=5}"
