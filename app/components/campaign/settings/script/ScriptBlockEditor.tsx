@@ -1,4 +1,5 @@
 import {
+  useId,
   useRef,
   useState,
   type ChangeEvent,
@@ -72,6 +73,8 @@ export function ScriptBlockEditor({
     options.length > 0;
 
   const audioInputRef = useRef<HTMLInputElement>(null);
+  const ivrBlockTypeSelectId = useId();
+  const speechTypeSelectId = useId();
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
 
   const handleAudioFileSelected = async (
@@ -149,7 +152,7 @@ export function ScriptBlockEditor({
       )}
       {isIvrBlock && (
         <>
-          <FormField label="IVR block type">
+          <FormField label="IVR block type" htmlFor={ivrBlockTypeSelectId}>
             <Select
               value={block.callcasterType ?? "say"}
               disabled={readOnly}
@@ -157,7 +160,7 @@ export function ScriptBlockEditor({
                 onChange({ callcasterType: value } as Partial<ScriptBlock>)
               }
             >
-              <SelectTrigger>
+              <SelectTrigger id={ivrBlockTypeSelectId}>
                 <SelectValue placeholder="Select…" />
               </SelectTrigger>
               <SelectContent>
@@ -168,7 +171,7 @@ export function ScriptBlockEditor({
             </Select>
           </FormField>
           {block.speechType !== undefined && (
-            <FormField label="Speech type">
+            <FormField label="Speech type" htmlFor={speechTypeSelectId}>
               <Select
                 value={block.speechType}
                 disabled={readOnly}
@@ -176,7 +179,7 @@ export function ScriptBlockEditor({
                   onChange({ speechType: value } as Partial<ScriptBlock>)
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id={speechTypeSelectId}>
                   <SelectValue placeholder="Select…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -278,7 +281,10 @@ export function ScriptBlockEditor({
                   }
                 />
               </Label>
-              <FormField label="Next target">
+              <FormField
+                label="Next target"
+                htmlFor={`next-target-${option.id ?? index}`}
+              >
                 <Select
                   value={option.next || NO_ROUTING_TARGET}
                   disabled={readOnly}
@@ -288,7 +294,7 @@ export function ScriptBlockEditor({
                     })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id={`next-target-${option.id ?? index}`}>
                     <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent>

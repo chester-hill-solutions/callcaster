@@ -100,7 +100,17 @@ describe("handleTwilioWebhookRequest", () => {
     });
 
     expect(Object.fromEntries(await request.formData())).toEqual({ CallSid: "CA1" });
-    expect(Object.fromEntries(await request.clone().formData())).toEqual({});
+    // Bun's clone-after-consume contract changed across versions: older
+    // releases replay an empty body, newer ones reject the read. The
+    // invariant under test is that a consumed body is never re-served.
+    const replay = await request
+      .clone()
+      .formData()
+      .then(
+        (data) => Object.fromEntries(data),
+        () => null,
+      );
+    expect(replay === null || Object.keys(replay).length === 0).toBe(true);
   });
 
   test("logs and returns 403 hangup when prehandler throws", async () => {
