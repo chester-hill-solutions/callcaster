@@ -1,17 +1,17 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@f838c367` · Generated: 2026-08-27T01:54:10.580Z · 74 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@30865a6d` · 74 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
 1. Pick from **Fix now** first (confirmed, with an exact resolution path).
 2. Read the full issue before starting: `gh issue view <number>`.
 3. Claim it: `gh issue edit <number> --add-assignee @me`.
-4. Branch from `dev` via `gh issue develop`. Follow branch/PR rules in `AGENTS.md`.
+4. Branch from `dev` via `gh issue develop --base dev`. Follow branch/PR rules in `AGENTS.md`.
 5. Issues marked **Verify and close** need a verification pass, not new code.
 
 Lane assignments, root causes, resolution paths, and test gaps come from the audit in
-`scripts/issue-board-enrichment.json` — update that file when evidence changes.
+`scripts/issue-board-enrichment/` — update those files when evidence changes.
 
 ---
 
@@ -118,6 +118,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Root cause: Seed-before-goal timing plus no durable sample marker.
 - Resolution: Implement #1070 first (durable is_sample marker), then create or replace marked sample content when the goal is first saved. Only marked rows may be replaced.
 - Look in: `app/lib/seed/seed-workspace-sample-data.server.ts`, `app/lib/seed/sample-script.server.ts`, `app/lib/database/workspace-provisioning.server.ts`, `app/lib/platform-onboarding-handlers.server.ts`
+- Blocked by: [#1070](https://github.com/chester-hill-solutions/callcaster/issues/1070)
 - Existing tests: test/seed-workspace-sample-data.server.test.ts (expects live_call)
 - Missing tests: SMS/IVR goal samples; repeated goal save
 - Done when: Live/SMS/menu goals get suitable samples; Only marked sample rows replaced; User content never touched
@@ -157,6 +158,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Root cause: Unpolished enrollment UI; some generic feedback overlaps #1335.
 - Resolution: Scope to /account and /account/security: rename Save->Next, add accessible icon copy buttons with temporary check states, add backup-code copy + secure-storage guidance, move generic feedback conversion to #1335. Do not change session/logout behavior.
 - Look in: `app/routes/account.tsx`, `app/routes/account.security.tsx`, `app/routes/two-factor.tsx`
+- Blocked by: [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335)
 - Existing tests: test/two-factor.server.test.ts (server gates only)
 - Missing tests: button labels; clipboard success/failure; enrollment keeps session
 - Done when: Password step says Next; Copy buttons accessible with check states; Backup codes have secure-storage prompt; Session behavior unchanged
@@ -391,6 +393,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Root cause: No browser test exercises registration -> session -> first navigation.
 - Resolution: Add one unique-user test; sequence the onboarding-state assertion behind #1070 (seeded samples must not count as complete).
 - Look in: `e2e/specs/auth.spec.ts`, `e2e/fixtures/seed.ts`, `app/routes/signup.action.server.ts`
+- Blocked by: [#1070](https://github.com/chester-hill-solutions/callcaster/issues/1070)
 - Existing tests: e2e/specs/auth.spec.ts (form opens only)
 - Missing tests: successful submit; duplicate email; new-session verification; post-#1070 fresh-workspace assertion
 - Done when: Unique user signs up with session; Reaches expected workspace/onboarding route; Runs headless and headed
@@ -430,6 +433,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Root cause: valueMissing and typeMismatch conflated; no server-side URL validation.
 - Resolution: Distinguish valueMissing from typeMismatch and add server-side URL parsing; error copy: 'Please enter a valid url e.g. https://example.com'.
 - Look in: `app/routes/workspaces+/$id/onboarding/useRequiredBusinessProfileFields.ts`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/platform-onboarding-handlers.server.ts`
+- Blocked by: [#1311](https://github.com/chester-hill-solutions/callcaster/issues/1311)
 - Existing tests: blank/valid only
 - Missing tests: malformed format; server/API validation parity
 - Done when: sai.com reports format example; blank reports required only when required; valid https URLs save; server matches browser
@@ -598,7 +602,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Tracker: Verify on dev and close.
 
 ### [#1185](https://github.com/chester-hill-solutions/callcaster/issues/1185) Platform side analytics
-- Verdict: **Verify and close** · Size: XS-S · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-08-07
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-08-07
 - Recommended title: **docs: close billing analytics issue and update reconciliation runbook**
 - Platform-side billing analytics already exists: billing-reconciliation.server.ts compares billable entities with ledger debits and the admin Twilio portal has a BillingReconciliationPanel with a run action.
 - Current behavior: Reconciliation service + admin panel + core/server tests present.
@@ -786,6 +790,7 @@ Product, security, or operations decision required before implementation can be 
 - Root cause: Not a product gap; one-off infra task.
 - Resolution: Run a one-off runbook: confirm ownership, transfer in Twilio, insert/update destination workspace row, repoint callbacks/messaging service, verify inbound/outbound, remove old row, record rollback + evidence.
 - Look in: `app/routes/workspaces+/$id/settings/numbers.action.server.ts`, `app/lib/platform-workspace-numbers.server.ts`
+- Blocked by: [#1329](https://github.com/chester-hill-solutions/callcaster/issues/1329)
 - Existing tests: n/a — operational
 - Missing tests: before/after evidence, rollback steps
 - Done when: Ownership confirmed before transfer; Voice/SMS/callbacks work in new workspace; Single owner after migration
@@ -831,6 +836,7 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Root cause: No server-side provider abstraction.
 - Resolution: Introduce a provider factory + synthetic SMS transport first; add voice and number rental as later slices. Provider selection explicit and fail-closed by environment.
 - Look in: `app/lib/database/workspace.server.ts`, `app/lib/ivr-initiate.server.ts`, `app/lib/platform-workspace-numbers.server.ts`, `app/lib/sms-send.server.ts`, `e2e/fixtures/twilio-mocks.ts`
+- Blocked by: [#1270](https://github.com/chester-hill-solutions/callcaster/issues/1270)
 - Existing tests: e2e mocks (browser-level only)
 - Missing tests: server-side synthetic contract; status callback delivery; no external Twilio request assertion; synthetic number lifecycle
 - Done when: Provider selection explicit and fail-closed; Synthetic sends create deterministic events without creds; Tests prove no Twilio network call; Real Twilio unchanged
@@ -844,6 +850,7 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Root cause: Not implemented; hard-blocked by A1/A2/A3.
 - Resolution: Split into: revision/run schema; interaction persistence; opener dispatch + endpoint correlation; exact classification + follow-up; flagged API/editor/simulator/funnel. Do not assign as one task.
 - Look in: `docs/adr/0033-immutable-revision-run-and-audited-interaction-state.md`, `app/db/schema.ts`, `docs/interactive-sms-delivery-plan.md`
+- Blocked by: [#1269](https://github.com/chester-hill-solutions/callcaster/issues/1269), [#1270](https://github.com/chester-hill-solutions/callcaster/issues/1270), [#1271](https://github.com/chester-hill-solutions/callcaster/issues/1271)
 - Existing tests: none
 - Missing tests: flagged end-to-end slice; no duplicate effects/billing on retries; simulator parity
 - Done when: Flagged workspace publishes + launches one run; One queue entry -> one interaction + idempotent opener; Exact reply advances reducer + one follow-up
@@ -896,6 +903,7 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Root cause: Dependent on the synthetic provider (#1328).
 - Resolution: Keep as parent epic; implement #1192 (server-owned scenario profiles) only after the synthetic provider model exists; #1193 is the final acceptance journey.
 - Look in: `e2e/fixtures/seed.ts`, `app/components/audience/AudienceUploader.tsx`, `app/components/audience/AudienceUploadMapStep.tsx`
+- Blocked by: [#1328](https://github.com/chester-hill-solutions/callcaster/issues/1328)
 - Existing tests: seed fixture only
 - Missing tests: scenario safety and telemetry
 - Done when: Test audiences reference server-owned scenario ids; Simulator rejects real recipient numbers; Runs report timing metrics; No billable traffic
@@ -909,6 +917,7 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Root cause: Blocked by the synthetic provider (#1328).
 - Resolution: Add a server-owned profile registry and an audience-level profile reference; reject unknown/unauthorized profiles and CSV behavior fields.
 - Look in: `app/components/audience/AudienceUploadMapStep.tsx`, `app/components/audience/AudienceUploader.tsx`, `scripts/e2e/seed-data.mjs`
+- Blocked by: [#1328](https://github.com/chester-hill-solutions/callcaster/issues/1328)
 - Existing tests: none
 - Missing tests: unknown profile rejection; CSV behavior-field rejection; profile-to-provider contract
 - Done when: Clients submit only a profile id; Unknown/unauthorized rejected server-side; CSV cannot define outcomes; Profile reaches provider unchanged
@@ -921,8 +930,8 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 Same root cause as the linked canonical issue. Do not implement separately — fold scope in and close.
 
 ### [#1352](https://github.com/chester-hill-solutions/callcaster/issues/1352) Campaign window opens at 3:05 yet the singular contact got the message at 3:15
-- Verdict: **Duplicate** · Size: S-M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-08-26
-- Duplicate of: [#1351](https://github.com/chester-hill-solutions/callcaster/issues/1351) — fix(sms): align deferred dispatch and ETA to the next send-window opening
+- Verdict: **Duplicates** · Size: S-M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-08-26
+- Duplicate of: [#1351](https://github.com/chester-hill-solutions/callcaster/issues/1351)
 - Recommended title: **fix(sms): align deferred dispatch and ETA to the next send-window opening**
 - Same send-window scheduling contract as #1351 (delivery at 3:15 vs window at 3:05).
 - Current behavior: Fixed 15-min worker retry defers past the window opening.
@@ -934,8 +943,8 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 - Tracker: Merge into #1351 (already parent).
 
 ### [#1332](https://github.com/chester-hill-solutions/callcaster/issues/1332) dark mode opt out info box has black text
-- Verdict: **Duplicate** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
-- Duplicate of: [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335) — design(feedback): standardize page-level feedback with shared Alert variants and one themed toaster
+- Verdict: **Duplicates** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
+- Duplicate of: [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335)
 - Recommended title: **Use the shared warning Alert for the chat opt-out banner**
 - ChatOptOutBanner converted to the shared warning Alert (role=status) under #1335 slice 2, resolving the dark-mode contrast concern. Ready to verify and close.
 - Current behavior: Migrated: banner uses Alert variant=warning with semantic tokens instead of raw amber classes.
@@ -947,8 +956,8 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 - Tracker: Verify and close as duplicate of #1335.
 
 ### [#1312](https://github.com/chester-hill-solutions/callcaster/issues/1312) dark mode red error box can be the default error box no need to change for dark mode (true for all error/info boxes)
-- Verdict: **Duplicate** · Size: S-M · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
-- Duplicate of: [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335) — design(feedback): standardize page-level feedback with shared Alert variants and one themed toaster
+- Verdict: **Duplicates** · Size: S-M · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
+- Duplicate of: [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335)
 - Recommended title: **Replace remaining hand-built feedback boxes with semantic shared Alerts**
 - Dark-mode error-box residue: the three confirmed hand-built red divs (CallScreen.Layout, workspaces+/$id, MessageSettings) and ChatOptOutBanner were converted to shared Alert variants under #1335 slice 2. Ready to verify and close.
 - Current behavior: Migrated: CallScreen ErrorBanner, workspace depleted/low-credit banners, MessageSettings media error/success, ChatOptOutBanner all use shared Alert variants with semantic contrast.
@@ -960,8 +969,8 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 - Tracker: Verify and close as duplicate of #1335.
 
 ### [#1314](https://github.com/chester-hill-solutions/callcaster/issues/1314) Calling Screen pushes out of the VW
-- Verdict: **Duplicate** · Size: M · Risk: medium · Labels: design · Assignee: @wra-sol · Updated: 2026-08-19
-- Duplicate of: [#1343](https://github.com/chester-hill-solutions/callcaster/issues/1343) — fix(call): prevent call workbench overflow inside the workspace sidebar layout
+- Verdict: **Duplicates** · Size: M · Risk: medium · Labels: design · Assignee: @wra-sol · Updated: 2026-08-19
+- Duplicate of: [#1343](https://github.com/chester-hill-solutions/callcaster/issues/1343)
 - Recommended title: **Merge into #1343: constrain the call workbench to available width**
 - Exact duplicate of #1343 (viewport overflow).
 - Current behavior: Forced 1172px 3-column min activated by viewport breakpoint inside sidebar layout.
@@ -973,8 +982,8 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 - Tracker: Close as duplicate of #1343.
 
 ### [#1309](https://github.com/chester-hill-solutions/callcaster/issues/1309) When workspace dropdown gets too long it can get cut off by the screen
-- Verdict: **Duplicate** · Size: XS · Risk: low · Labels: design, ux · Assignee: @sai-sy · Updated: 2026-08-19
-- Duplicate of: [#1310](https://github.com/chester-hill-solutions/callcaster/issues/1310) — design(nav): replace the desktop workspace dropdown with an accessible searchable combobox
+- Verdict: **Duplicates** · Size: XS · Risk: low · Labels: design, ux · Assignee: @sai-sy · Updated: 2026-08-19
+- Duplicate of: [#1310](https://github.com/chester-hill-solutions/callcaster/issues/1310)
 - Recommended title: **Bound and scroll the workspace results list under #1310**
 - Long workspace dropdown gets cut off by the screen. Strict subset of the #1310 combobox work.
 - Current behavior: Desktop DropdownMenuContent has no max-height/overflow; mobile already scrolls.
@@ -986,8 +995,8 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 - Tracker: Close as duplicate of #1310.
 
 ### [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292) if the call recipient hangs up, I get call completed but still the option to hang up
-- Verdict: **Duplicate** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-08-17
-- Duplicate of: [#1342](https://github.com/chester-hill-solutions/callcaster/issues/1342) — feat(call): show a confirmed 'Call back' action after a completed call
+- Verdict: **Duplicates** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-08-17
+- Duplicate of: [#1342](https://github.com/chester-hill-solutions/callcaster/issues/1342)
 - Recommended title: **Merge into #1342: verify remote hangup removes call-only controls and preserves disposition context**
 - Recipient hangup -> 'call completed' but stale Hang Up option; contact info disappears. The stale Hang Up symptom is likely already fixed by terminal handling; the remaining ask is finished-contact retention + callback.
 - Current behavior: Terminal status sends HANG_UP and disconnects the SDK call; Hang Up hides; contact info renders from nextRecipient which can advance/null out.
@@ -999,14 +1008,15 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 - Tracker: Close as duplicate of #1342; callback tracked there.
 
 ### [#1193](https://github.com/chester-hill-solutions/callcaster/issues/1193) Test a campaign with controlled recipients
-- Verdict: **Duplicate** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-08-08
-- Duplicate of: [#1157](https://github.com/chester-hill-solutions/callcaster/issues/1157) — epic(testing): controlled synthetic campaign audiences
+- Verdict: **Duplicates** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-08-08
+- Duplicate of: [#1157](https://github.com/chester-hill-solutions/callcaster/issues/1157)
 - Recommended title: **test(e2e): run one campaign against a controlled synthetic audience**
 - User story for the controlled-recipient campaign test. Near-duplicate of parent epic #1157; implement as the final acceptance journey after #1192/#1328.
 - Current behavior: Same gaps as #1157 (generic seed, no scenario selection, no server-side synthetic provider).
 - Root cause: Dependent on #1328; redundant with #1157.
 - Resolution: Close as duplicate of #1157, or keep as the manual acceptance test for #1157/#1192/#1328.
 - Look in: `e2e/fixtures/seed.ts`, `app/components/audience/AudienceUploader.tsx`
+- Blocked by: [#1328](https://github.com/chester-hill-solutions/callcaster/issues/1328), [#1192](https://github.com/chester-hill-solutions/callcaster/issues/1192)
 - Existing tests: none
 - Missing tests: controlled-campaign journey + metric assertions
 - Tracker: Close as duplicate of #1157.

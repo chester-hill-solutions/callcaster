@@ -1,0 +1,184 @@
+[
+  {
+    "issueNumber": 1193,
+    "verdict": "duplicate",
+    "duplicateOf": 1157,
+    "recommendedTitle": "test(e2e): run one campaign against a controlled synthetic audience",
+    "summary": "User story for the controlled-recipient campaign test. Near-duplicate of parent epic #1157; implement as the final acceptance journey after #1192/#1328.",
+    "currentBehavior": "Same gaps as #1157 (generic seed, no scenario selection, no server-side synthetic provider).",
+    "rootCause": "Dependent on #1328; redundant with #1157.",
+    "resolution": "Close as duplicate of #1157, or keep as the manual acceptance test for #1157/#1192/#1328.",
+    "lookIn": [
+      "e2e/fixtures/seed.ts",
+      "app/components/audience/AudienceUploader.tsx"
+    ],
+    "existingTests": [
+      "none"
+    ],
+    "missingTests": [
+      "controlled-campaign journey + metric assertions"
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Close as duplicate of #1157.",
+    "blockedBy": [
+      1328,
+      1192
+    ]
+  },
+  {
+    "issueNumber": 1292,
+    "verdict": "duplicate",
+    "duplicateOf": 1342,
+    "recommendedTitle": "Merge into #1342: verify remote hangup removes call-only controls and preserves disposition context",
+    "summary": "Recipient hangup -> 'call completed' but stale Hang Up option; contact info disappears. The stale Hang Up symptom is likely already fixed by terminal handling; the remaining ask is finished-contact retention + callback.",
+    "currentBehavior": "Terminal status sends HANG_UP and disconnects the SDK call; Hang Up hides; contact info renders from nextRecipient which can advance/null out.",
+    "rootCause": "Partially resolved; finished-contact retention and callback behavior remain under #1342.",
+    "resolution": "Merge remaining terminal-action work into #1342; optionally keep finished contact rendered from questionContact.",
+    "lookIn": [
+      "app/components/call/CallScreen.CallArea.tsx",
+      "app/hooks/call/useCallHandling.ts",
+      "app/hooks/call/useCampaignCallFlow.ts"
+    ],
+    "existingTests": [
+      "test/ui/campaign-call-flow-display-state.test.ts",
+      "test/ui/call-screen-callarea.test.tsx"
+    ],
+    "missingTests": [
+      "integrated remote-hangup asserts Hang Up gone",
+      "finished contact retained for disposition"
+    ],
+    "acceptanceCriteria": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close as duplicate of #1342; callback tracked there.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1309,
+    "verdict": "duplicate",
+    "duplicateOf": 1310,
+    "recommendedTitle": "Bound and scroll the workspace results list under #1310",
+    "summary": "Long workspace dropdown gets cut off by the screen. Strict subset of the #1310 combobox work.",
+    "currentBehavior": "Desktop DropdownMenuContent has no max-height/overflow; mobile already scrolls.",
+    "rootCause": "Same as #1310.",
+    "resolution": "Add the viewport-safe list requirement to #1310, then close.",
+    "lookIn": [
+      "app/components/layout/Navbar.tsx"
+    ],
+    "existingTests": [
+      "test/ui/navbar-workspace-picker.test.tsx"
+    ],
+    "missingTests": [
+      "many-workspace scroll test (under #1310)"
+    ],
+    "acceptanceCriteria": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close as duplicate of #1310.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1312,
+    "verdict": "duplicate",
+    "duplicateOf": 1335,
+    "recommendedTitle": "Replace remaining hand-built feedback boxes with semantic shared Alerts",
+    "summary": "Dark-mode error-box residue: the three confirmed hand-built red divs (CallScreen.Layout, workspaces+/$id, MessageSettings) and ChatOptOutBanner were converted to shared Alert variants under #1335 slice 2. Ready to verify and close.",
+    "currentBehavior": "Migrated: CallScreen ErrorBanner, workspace depleted/low-credit banners, MessageSettings media error/success, ChatOptOutBanner all use shared Alert variants with semantic contrast.",
+    "rootCause": "Standardization residue.",
+    "resolution": "Resolved under #1335 slice 2; verify the migrated surfaces in light/dark and close.",
+    "lookIn": [
+      "app/components/call/CallScreen.Layout.tsx",
+      "app/routes/workspaces+/$id.tsx",
+      "app/components/campaign/settings/MessageSettings.tsx",
+      "app/components/chats/ChatOptOutBanner.tsx",
+      "app/components/ui/alert.tsx"
+    ],
+    "existingTests": [
+      "workspace-skip-link, message-settings, components-chats-contact UI tests pass"
+    ],
+    "missingTests": [
+      "dark-theme contrast check"
+    ],
+    "acceptanceCriteria": [],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close as duplicate of #1335.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1314,
+    "verdict": "duplicate",
+    "duplicateOf": 1343,
+    "recommendedTitle": "Merge into #1343: constrain the call workbench to available width",
+    "summary": "Exact duplicate of #1343 (viewport overflow).",
+    "currentBehavior": "Forced 1172px 3-column min activated by viewport breakpoint inside sidebar layout.",
+    "rootCause": "Same as #1343.",
+    "resolution": "Merge into #1343 and implement one container-aware responsive layout.",
+    "lookIn": [
+      "app/components/call/CallScreen.Workbench.tsx"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-workbench.test.tsx"
+    ],
+    "missingTests": [
+      "real viewport overflow assertions"
+    ],
+    "acceptanceCriteria": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Close as duplicate of #1343.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1332,
+    "verdict": "duplicate",
+    "duplicateOf": 1335,
+    "recommendedTitle": "Use the shared warning Alert for the chat opt-out banner",
+    "summary": "ChatOptOutBanner converted to the shared warning Alert (role=status) under #1335 slice 2, resolving the dark-mode contrast concern. Ready to verify and close.",
+    "currentBehavior": "Migrated: banner uses Alert variant=warning with semantic tokens instead of raw amber classes.",
+    "rootCause": "Standardization residue, not a live contrast bug.",
+    "resolution": "Resolved under #1335 slice 2; verify the banner in light/dark and close.",
+    "lookIn": [
+      "app/components/chats/ChatOptOutBanner.tsx",
+      "app/components/ui/alert.tsx"
+    ],
+    "existingTests": [
+      "test/ui/components-chats-contact.test.tsx (passes)"
+    ],
+    "missingTests": [
+      "dark-theme contrast test"
+    ],
+    "acceptanceCriteria": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close as duplicate of #1335.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1352,
+    "verdict": "duplicate",
+    "duplicateOf": 1351,
+    "recommendedTitle": "fix(sms): align deferred dispatch and ETA to the next send-window opening",
+    "summary": "Same send-window scheduling contract as #1351 (delivery at 3:15 vs window at 3:05).",
+    "currentBehavior": "Fixed 15-min worker retry defers past the window opening.",
+    "rootCause": "Same root as #1351: no exact next-window scheduling; ETA ignores window.",
+    "resolution": "Fold into #1351 implementation.",
+    "lookIn": [
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/lib/campaign-send-window.ts"
+    ],
+    "existingTests": [
+      "test/campaign-dispatch-worker.test.ts"
+    ],
+    "missingTests": [
+      "exact 3:05 successor"
+    ],
+    "acceptanceCriteria": [],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Merge into #1351 (already parent).",
+    "blockedBy": []
+  }
+]

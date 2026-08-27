@@ -1,4 +1,0 @@
-{
-  "deno.enablePaths": ["./client/functions"],
-  "deno.importMap": "./client/functions/import_map.json"
-}

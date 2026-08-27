@@ -1,0 +1,151 @@
+[
+  {
+    "issueNumber": 1110,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Reproduce and split the onboarding number-step defects",
+    "summary": "Parent for number-step issues; the body has no current defect details and children #1111/#1112/#1114 are closed.",
+    "currentBehavior": "OnboardingFirstNumberStep is a large combined flow (service address, rental, verification, routing); no component UI test exists.",
+    "rootCause": "Cannot be determined from the open issue; needs reproduction.",
+    "resolution": "Record viewport/role/goal/browser/steps for each observed defect, split unrelated defects into separate issues, and add a regression test per confirmed behavior.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx"
+    ],
+    "existingTests": [
+      "wizard step ordering only"
+    ],
+    "missingTests": [
+      "component render for the step"
+    ],
+    "acceptanceCriteria": [
+      "Each defect recorded with steps",
+      "Unrelated defects split",
+      "Regression test per defect"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Reproduce and split; overlaps #1205/#1113/#1318.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1224,
+    "verdict": "needs-repro",
+    "recommendedTitle": "ops(voicemail): diagnose why CHS workspace voicemail email still fails while another workspace works",
+    "summary": "The SigV4 7-day presign fix is deployed, yet voicemail email works on Heino's workspace but not CHS. The app marks the call processed as soon as Resend accepts, so delivery failures are invisible.",
+    "currentBehavior": "email-vm route: global sender, checks only result.error, writes processed marker immediately, no Resend delivery/bounce/suppression tracking. Per-number inbound_action holds the recipient.",
+    "rootCause": "Likely Resend accepted but recipient suppressed/bounced/delayed/filtered; also possible: stale per-number inbound_action, conflicting higher-priority routing (queue/IVR/handset win over voicemail), wrong-environment Twilio callback, or workspace credential mismatch.",
+    "resolution": "Diagnostic: trace one fresh CallSid -> is voicemail visible in the app? (yes -> Resend delivery state; no -> routing/callback/credentials). Check inbound_action per CHS number, routing precedence, Twilio request inspector, and Resend events. Then persist the Resend email id + delivery state and reject invalid inbound_action at callback time.",
+    "lookIn": [
+      "app/routes/api+/email-vm.action.server.ts",
+      "app/lib/inbound-voicemail-twiml.server.ts",
+      "app/routes/workspaces+/$id/voicemails/setup.action.server.ts",
+      "app/routes/api+/inbound.action.server.ts",
+      "shared/inbound-routing-presets.ts"
+    ],
+    "existingTests": [
+      "test/email-vm.route.test.ts (acceptance/retry/SigV4)"
+    ],
+    "missingTests": [
+      "delivery vs accepted states",
+      "suppressed/bounced/delayed",
+      "invalid inbound_action rejected (currently allows to:'')",
+      "setup clears higher-priority routing"
+    ],
+    "acceptanceCriteria": [
+      "Fresh voicemail tracked end-to-end",
+      "Delivery state persisted",
+      "Invalid inbound_action rejected",
+      "Routing precedence visible"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Do not close; production incident with a defined diagnostic tree.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1321,
+    "verdict": "needs-repro",
+    "recommendedTitle": "test(numbers): reproduce and normalize malformed Twilio locality labels",
+    "summary": "City search showed 'Ajaxpickering'. CallCaster does not concatenate that: search passes Twilio friendlyName/region/locality through unchanged and joins locality + region with ', '.",
+    "currentBehavior": "numbers-search.server.ts passes provider fields through; Name column shows friendlyName; Location joins locality, region.",
+    "rootCause": "Provider data, not CallCaster concatenation.",
+    "resolution": "Capture the exact Twilio payload and confirm whether the screenshot shows friendlyName or locality; normalize narrowly, never alter valid locality names.",
+    "lookIn": [
+      "app/components/phone-numbers/NumberPurchase.columns.tsx",
+      "app/lib/numbers-search.server.ts",
+      "app/components/phone-numbers/NumberPurchase.constants.ts"
+    ],
+    "existingTests": [
+      "test/numbers-search.server.test.ts"
+    ],
+    "missingTests": [
+      "fixture reproducing the reported payload",
+      "location display test"
+    ],
+    "acceptanceCriteria": [
+      "Fixture reproduces the value",
+      "UI separates provider name from locality/region"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Reproduce with a captured payload before changing anything.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1341,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Keep dialing feedback active until the customer leg connects or ends",
+    "summary": "The tone heard while dialing cuts off early. DTMF code is unrelated — the likely source is the Twilio Voice SDK outgoing sound or customer-leg ringback, which can stop when the agent leg accepts while the customer still rings.",
+    "currentBehavior": "Agent leg connects first, then the customer child leg rings; SDK outgoing sound may stop at agent-leg accept. Suspicious: device.audio.outgoing(muted) is wired to microphone mute.",
+    "rootCause": "Unknown without browser/Twilio reproduction; plausible misuse of device.audio.outgoing.",
+    "resolution": "Identify the sound source with SDK event logging; remove any device.audio.outgoing misuse; if needed, add controlled ringback keyed to customer-leg dialing that stops on connect/terminal.",
+    "lookIn": [
+      "app/hooks/call/useCallHandling.ts",
+      "app/hooks/call/useCampaignCallFlow.ts",
+      "app/lib/dtmf.ts"
+    ],
+    "existingTests": [
+      "test/ui/campaign-call-flow-display-state.test.ts"
+    ],
+    "missingTests": [
+      "outgoing-feedback lifecycle",
+      "teardown on cancel/fail/connect/unmount"
+    ],
+    "acceptanceCriteria": [
+      "Feedback starts once per attempt",
+      "Continues while queued/ringing",
+      "Stops on connect/terminal",
+      "No nodes remain after teardown"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Reproduce with real Twilio audio before changing audio code; shares infra with #1339.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1344,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Verify call-panel border clipping in dark mode",
+    "summary": "Reported outline-curve mismatch in the call area, extra visible in dark mode. Static radius arithmetic is actually correct: outer 16px radius + 2px border matches a 14px inner radius.",
+    "currentBehavior": "call-panel-classes.ts rounded-2xl border-2; status bar rounded-[14px]; the math lines up.",
+    "rootCause": "Cannot confirm a defect from code; likely border color/anti-aliasing/seam or a stale screenshot.",
+    "resolution": "Reproduce in Chromium + Safari dark mode at 1x and 2x. If visible, adjust only callPanelShellClass or status-bar background clipping.",
+    "lookIn": [
+      "app/components/call/call-panel-classes.ts",
+      "app/components/call/CallScreen.CallArea.tsx"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-callarea.test.tsx"
+    ],
+    "missingTests": [
+      "dark-mode screenshot test"
+    ],
+    "acceptanceCriteria": [
+      "No visible corner seam",
+      "Light/dark at 1x and 2x checked"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Needs a screenshot reproduction before styling changes; coordinate with #1338/#1313.",
+    "blockedBy": []
+  }
+]
