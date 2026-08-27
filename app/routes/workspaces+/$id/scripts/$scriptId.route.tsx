@@ -100,14 +100,6 @@ export default function ScriptEditor() {
     setScript(initScript);
   };
 
-  type PageData = {
-    campaignDetails: { script: Script };
-  };
-
-  const handlePageDataChange = (newPageData: PageData) => {
-    setScript(newPageData.campaignDetails.script);
-  };
-
   return (
     <div className="relative flex h-full flex-col overflow-visible">
       <QueryParamBanner
@@ -153,14 +145,16 @@ export default function ScriptEditor() {
         </div>
       </div>
       <div className="h-full flex-grow p-4">
-        <CampaignSettingsScript
-          pageData={{ campaignDetails: { script } } as PageData}
-          onPageDataChange={(newData: PageData) => {
-            handlePageDataChange(newData);
-          }}
-          mediaNames={mediaNames}
-          onUploadAudio={handleUploadAudio}
-        />
+        {script ? (
+          <CampaignSettingsScript
+            script={script}
+            onChange={setScript}
+            mediaNames={mediaNames}
+            onUploadAudio={handleUploadAudio}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">No script selected.</p>
+        )}
       </div>
     </div>
   );

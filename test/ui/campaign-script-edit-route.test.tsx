@@ -23,13 +23,13 @@ vi.mock(
 // whether an upload handler is wired through, so #1346's regression is visible.
 vi.mock("@/components/campaign/settings/script/CampaignSettings.Script", () => ({
   default: ({
-    pageData,
-    onPageDataChange,
+    script,
+    onChange,
     readOnly,
     onUploadAudio,
   }: {
-    pageData: { campaignDetails: { script: { name: string; steps: unknown } } };
-    onPageDataChange: (next: unknown) => void;
+    script: { name: string; steps: unknown };
+    onChange: (next: unknown) => void;
     readOnly?: boolean;
     onUploadAudio?: (file: File) => Promise<string | null>;
   }) =>
@@ -44,13 +44,9 @@ vi.mock("@/components/campaign/settings/script/CampaignSettings.Script", () => (
         "button",
         {
           onClick: () =>
-            onPageDataChange({
-              campaignDetails: {
-                script: {
-                  ...pageData.campaignDetails.script,
-                  steps: { pages: { edited: true }, blocks: {} },
-                },
-              },
+            onChange({
+              ...script,
+              steps: { pages: { edited: true }, blocks: {} },
             }),
         },
         "dirty the script content",

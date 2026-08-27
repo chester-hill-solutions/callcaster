@@ -223,7 +223,8 @@ export default function ScriptEditor() {
   };
 
   const renderCampaignSettingsScript = (scriptMediaNames: string[] = []) => {
-    if (!pageData.campaignDetails.script) {
+    const script = pageData.campaignDetails.script;
+    if (!script) {
       return (
         <p className="text-sm text-muted-foreground">
           Select a script above to edit it here.
@@ -231,19 +232,12 @@ export default function ScriptEditor() {
       );
     }
 
-    const scriptPageData = {
-      campaignDetails: {
-        ...pageData.campaignDetails,
-        script: pageData.campaignDetails.script,
-      },
-    };
-
     return (
       <div className="space-y-2">
         {!isEditingScript && (
           <div className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-2">
             <p className="text-sm text-muted-foreground">
-              Previewing {pageData.campaignDetails.script.name}. The script is
+              Previewing {script.name}. The script is
               attached when you save — editing is optional.
             </p>
             <Button
@@ -257,13 +251,13 @@ export default function ScriptEditor() {
           </div>
         )}
         <CampaignSettingsScript
-          pageData={scriptPageData}
-          onPageDataChange={(newData) => {
+          script={script}
+          onChange={(nextScript) => {
             handlePageDataChange({
               ...pageData,
               campaignDetails: {
                 ...pageData.campaignDetails,
-                script: newData.campaignDetails.script,
+                script: nextScript,
               },
             });
           }}
