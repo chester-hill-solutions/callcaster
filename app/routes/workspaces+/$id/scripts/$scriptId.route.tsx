@@ -1,10 +1,11 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Link, useLoaderData } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { Button } from "@/components/ui/button";
 import { Heading, Text } from "@/components/ui/typography";
+import { useWorkspaceAudioUpload } from "@/hooks/media/useWorkspaceAudioUpload";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
 import { SaveBar } from "@/components/shared/SaveBar";
@@ -27,44 +28,14 @@ export default function ScriptEditor() {
   const [initScript, setInitScript] = useState(loaderScript);
   const [script, setScript] = useState(loaderScript);
   const [isSaving, setIsSaving] = useState(false);
-  const [mediaNames, setMediaNames] = useState(() =>
+  const { uploadAudio, mediaNames } = useWorkspaceAudioUpload(
+    workspace_id,
     (loaderMediaNames ?? []).map((media) =>
       typeof media === "string" ? media : media.name,
     ),
   );
   const isChanged = useHasChanges(script, initScript, normalizeScriptForComparison);
   useUnsavedChangesGuard(isChanged);
-
-  const handleUploadAudio = useCallback(
-    async (file: File): Promise<string | null> => {
-      try {
-        const formData = new FormData();
-        formData.set("workspaceId", workspace_id);
-        formData.set("media", file);
-        const response = await fetch("/api/audio-upload", {
-          method: "POST",
-          body: formData,
-        });
-        const result = await response.json().catch(() => null);
-        if (!response.ok || result?.error) {
-          throw new Error(result?.error ?? "Failed to upload audio.");
-        }
-        const name = result.name as string;
-        setMediaNames((current) =>
-          current.includes(name) ? current : [...current, name],
-        );
-        return name;
-      } catch (error) {
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Couldn't upload the audio file.",
-        );
-        return null;
-      }
-    },
-    [workspace_id],
-  );
 
   const handleSaveUpdate = async () => {
     setIsSaving(true);
@@ -150,7 +121,7 @@ export default function ScriptEditor() {
             script={script}
             onChange={setScript}
             mediaNames={mediaNames}
-            onUploadAudio={handleUploadAudio}
+            onUploadAudio={uploadAudio}
           />
         ) : (
           <p className="text-sm text-muted-foreground">No script selected.</p>

@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 
 // The route re-exports its loader/action from server-only modules; the
 // component under test never runs them, so stub them out to keep the DB out of
@@ -252,5 +252,10 @@ describe("campaign script edit route (#1124)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "upload audio" }));
 
     expect(await screen.findByText("Upload rejected.")).toBeInTheDocument();
+    // The app toaster adapter keeps sonner richColors on, so the typed error
+    // toast gets the shared semantic --error-bg surface (#1335 slice 1).
+    const toastEl = document.querySelector('[data-sonner-toast]');
+    expect(toastEl).not.toBeNull();
+    expect(toastEl?.getAttribute("data-rich-colors")).toBe("true");
   });
 });
