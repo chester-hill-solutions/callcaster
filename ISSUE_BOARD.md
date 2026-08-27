@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@f838c367` · Generated: 2026-08-27T00:39:05.446Z · 74 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@f838c367` · Generated: 2026-08-27T01:54:10.580Z · 74 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 35
+## Fix now — 34
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -103,8 +103,8 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Errors appear as plain red text in several places instead of the standard feedback components. Standardize, but do NOT turn every error into a toast.
 - Current behavior: FormField owns inline field errors (keep); hand-built page-level red boxes remain in CallScreen.Layout.tsx:45, workspaces+/$id.tsx:154, MessageSettings.tsx:292; root uses raw Sonner Toaster; account.security.tsx and two-factor.tsx use plain red text.
 - Root cause: No enforced 3-way feedback contract: field errors (FormField), persistent/blocking (Alert), transient action results (toast).
-- Resolution: Slice 1 landed in the working tree: app/components/ui/sonner.tsx adapts the shared CHS themed toaster and root.tsx now mounts it (semantic CSS-var styling instead of raw sonner + richColors). Remaining: migrate page-level hand-built boxes (Slides 2-5) and close #1332/#1312 duplicates.
-- Look in: `app/components/ui/sonner.tsx`, `app/root.tsx`, `app/components/ui/alert.tsx`, `app/components/call/CallScreen.Layout.tsx`, `app/components/campaign/settings/MessageSettings.tsx`
+- Resolution: Slices 1-2 landed in the working tree: shared themed toaster adopted in root.tsx; CallScreen error banners, the workspace depleted/low-credit banners, MessageSettings media feedback, and ChatOptOutBanner migrated to shared Alert variants (resolving #1312/#1332 surfaces). Remaining: Slice 3 (MFA feedback), Slice 4 (auth/creation forms), Slice 5 (loaders, campaign summaries, pseudo-toasts).
+- Look in: `app/components/ui/sonner.tsx`, `app/root.tsx`, `app/components/ui/alert.tsx`, `app/components/call/CallScreen.Layout.tsx`, `app/components/campaign/settings/MessageSettings.tsx`, `app/components/chats/ChatOptOutBanner.tsx`
 - Existing tests: test/ui/components-shared-smoke.test.tsx; test/ui/hooks-utils.test.tsx
 - Missing tests: Alert variant rendering light/dark; one-root-toaster contract; distinguishes field vs persistent vs transient
 - Done when: Page-level blocking errors use Alert variants; Transient results use single root toaster; Field errors stay in FormField; Readable contrast in both themes
@@ -357,19 +357,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: /account?enroll=1&next=/workspaces retains next; Success redirects to safe destination; Unsafe next rejected; No-next stays on Account
 - Tracker: Do not close with PR #1330 as-is; the failing E2E check on it is unrelated call-screen flake.
 
-### [#1327](https://github.com/chester-hill-solutions/callcaster/issues/1327) chore(scripts): collapse vestigial pageData.campaignDetails nesting
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-26
-- Recommended title: **refactor(script-editor): replace pageData wrapper with script/onChange props**
-- Collapse the vestigial { campaignDetails: { script } } wrapper on CampaignSettings.Script.tsx to flat props; delete the PageData type and casts.
-- Current behavior: Component requires {campaignDetails:{script}}; standalone route has a local duplicate type + cast; campaign edit route passes whole page data.
-- Root cause: Legacy prop wrapper with no consumer meaning.
-- Resolution: Flatten props to { script, onChange, mediaNames, ... }, update both call sites, drop casts, update the two route UI tests. No server changes.
-- Look in: `app/components/campaign/settings/script/CampaignSettings.Script.tsx`, `app/routes/workspaces+/$id/scripts/$scriptId.route.tsx`, `app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx`, `test/ui/script-editor-adapter.test.tsx`
-- Existing tests: test/ui/script-editor-adapter.test.tsx; test/ui/campaign-script-edit-route.test.tsx
-- Missing tests: none new; update existing
-- Done when: Component accepts script/onChange directly; No PageData casts on either route; Editor/save/read-only/media/audio tests pass
-- Tracker: Reduces friction for #1346.
-
 ### [#1318](https://github.com/chester-hill-solutions/callcaster/issues/1318) On-boarding width can be smaller
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-25
 - Recommended title: **design(onboarding): constrain onboarding steps while keeping the number flow wide**
@@ -476,7 +463,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 12
+## Verify and close — 13
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -544,6 +531,19 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: STOP/START bodies persisted unchanged; transcript/preview exact text
 - Done when: Opt-out text unchanged in history; Preview shows exact text; Hiding STOP-only stays explicit
 - Tracker: Close after verification; future #1268 consent work replaces the boolean authority.
+
+### [#1327](https://github.com/chester-hill-solutions/callcaster/issues/1327) chore(scripts): collapse vestigial pageData.campaignDetails nesting
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-26
+- Recommended title: **refactor(script-editor): replace pageData wrapper with script/onChange props**
+- Flattened CampaignSettings.Script to { script, onChange, mediaNames, onUploadAudio, readOnly }; deleted the PageData wrapper and both as-PageData casts.
+- Current behavior: Implemented in working tree: component takes script/onChange directly; standalone route passes onChange={setScript}; campaign edit route passes onChange updating pageData.campaignDetails.script; tests updated to the flat contract.
+- Root cause: Legacy prop wrapper with no consumer meaning.
+- Resolution: Implemented. Also pairs with the #1346 upload wiring (same component/route).
+- Look in: `app/components/campaign/settings/script/CampaignSettings.Script.tsx`, `app/routes/workspaces+/$id/scripts/$scriptId.route.tsx`, `app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx`
+- Existing tests: test/ui/script-editor-adapter.test.tsx; test/ui/script-editor-route.test.tsx; test/ui/campaign-script-edit-route.test.tsx (all updated and passing)
+- Missing tests: none
+- Done when: Component accepts script/onChange directly; No PageData casts on either route; Editor/save/read-only/media/audio tests pass
+- Tracker: Verify on dev and close.
 
 ### [#1286](https://github.com/chester-hill-solutions/callcaster/issues/1286) Call screen paints one stale frame (previous outcome / last disposition) on every new dial
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-17
@@ -937,27 +937,27 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 - Verdict: **Duplicate** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
 - Duplicate of: [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335) — design(feedback): standardize page-level feedback with shared Alert variants and one themed toaster
 - Recommended title: **Use the shared warning Alert for the chat opt-out banner**
-- Dark-mode opt-out box black text: the contrast symptom appears fixed (ChatOptOutBanner has explicit dark foreground); remaining work is converting the hand-built banner to shared Alert, which is #1335.
-- Current behavior: ChatOptOutBanner has dark foreground; still hand-built, not shared Alert; ChatInput already uses shared warning alerts.
+- ChatOptOutBanner converted to the shared warning Alert (role=status) under #1335 slice 2, resolving the dark-mode contrast concern. Ready to verify and close.
+- Current behavior: Migrated: banner uses Alert variant=warning with semantic tokens instead of raw amber classes.
 - Root cause: Standardization residue, not a live contrast bug.
-- Resolution: Fold into #1335; replace the banner with Alert variant=warning; require semantic contrast, not a forced light palette.
+- Resolution: Resolved under #1335 slice 2; verify the banner in light/dark and close.
 - Look in: `app/components/chats/ChatOptOutBanner.tsx`, `app/components/ui/alert.tsx`
-- Existing tests: test/ui/components-chats-contact.test.tsx
-- Missing tests: banner uses shared Alert; dark-theme contrast test
-- Tracker: Close as duplicate of #1335.
+- Existing tests: test/ui/components-chats-contact.test.tsx (passes)
+- Missing tests: dark-theme contrast test
+- Tracker: Verify and close as duplicate of #1335.
 
 ### [#1312](https://github.com/chester-hill-solutions/callcaster/issues/1312) dark mode red error box can be the default error box no need to change for dark mode (true for all error/info boxes)
 - Verdict: **Duplicate** · Size: S-M · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
 - Duplicate of: [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335) — design(feedback): standardize page-level feedback with shared Alert variants and one themed toaster
 - Recommended title: **Replace remaining hand-built feedback boxes with semantic shared Alerts**
-- Dark-mode error-box residue: three confirmed hand-built red divs (CallScreen.Layout.tsx:45, workspaces+/$id.tsx:154, MessageSettings.tsx:292) should become shared Alerts. Duplicate of #1335.
-- Current behavior: Shared Alert has no local dark override; theme tokens change in dark mode; three hand-built boxes remain.
+- Dark-mode error-box residue: the three confirmed hand-built red divs (CallScreen.Layout, workspaces+/$id, MessageSettings) and ChatOptOutBanner were converted to shared Alert variants under #1335 slice 2. Ready to verify and close.
+- Current behavior: Migrated: CallScreen ErrorBanner, workspace depleted/low-credit banners, MessageSettings media error/success, ChatOptOutBanner all use shared Alert variants with semantic contrast.
 - Root cause: Standardization residue.
-- Resolution: Fold into #1335; migrate the three boxes to semantic Alert variants with explicit type; validate contrast in both themes.
-- Look in: `app/components/call/CallScreen.Layout.tsx`, `app/routes/workspaces+/$id.tsx`, `app/components/campaign/settings/MessageSettings.tsx`, `app/components/ui/alert.tsx`
-- Existing tests: none for the three surfaces
-- Missing tests: component tests for migrated surfaces; theme contrast
-- Tracker: Close as duplicate of #1335.
+- Resolution: Resolved under #1335 slice 2; verify the migrated surfaces in light/dark and close.
+- Look in: `app/components/call/CallScreen.Layout.tsx`, `app/routes/workspaces+/$id.tsx`, `app/components/campaign/settings/MessageSettings.tsx`, `app/components/chats/ChatOptOutBanner.tsx`, `app/components/ui/alert.tsx`
+- Existing tests: workspace-skip-link, message-settings, components-chats-contact UI tests pass
+- Missing tests: dark-theme contrast check
+- Tracker: Verify and close as duplicate of #1335.
 
 ### [#1314](https://github.com/chester-hill-solutions/callcaster/issues/1314) Calling Screen pushes out of the VW
 - Verdict: **Duplicate** · Size: M · Risk: medium · Labels: design · Assignee: @wra-sol · Updated: 2026-08-19
