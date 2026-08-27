@@ -36,7 +36,7 @@ import {
   getScheduleValidation,
   resolveReadinessQueueCount,
 } from "@/lib/campaign-readiness";
-import { launchCampaign } from "@/lib/campaign-execution.server";
+import { launchCampaign, isMachineDispatchedVoiceCampaignType } from "@/lib/campaign-execution.server";
 import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -223,8 +223,38 @@ export const action = defineAction({
               listWorkspaceAudiosApi(user.id, workspace_id),
             ]);
 
-          // For message campaigns, use launchCampaign which enqueues dispatch.
-          if (campaignRecord.type === "message" && (status === "running" || status === "scheduled")) {
+          // Message and machine-dialled voice campaigns launch through
+          // launchCampaign, which validates readiness and enqueues durable
+          // dispatch work (#1348). live_call stays human-dialled.
+          const launchable =
+            campaignRecord.type === "message" ||
+            isMachineDispatchedVoiceCampaignType(campaignRecord.type);
+
+          // Full readiness (content + resource availability) for the voice
+          // paths; launchCampaign re-validates the campaign-agnostic subset.
+          const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as unknown as CampaignDetails, {
+            queueCount: resolveReadinessQueueCount({
+              totalCount: queueCounts.fullCount,
+              queuedCount: queueCounts.queuedCount,
+            }),
+            workspacePhoneNumbers: phoneNumbersResult.data ?? [],
+            workspaceScriptIds: scripts.map((script) => script.id),
+            workspaceAudioNames: audioList.ok
+              ? audioList.audios.map((audio) => audio.name)
+              : [],
+          });
+          const readinessError =
+            status === "scheduled" ? readiness.scheduleDisabledReason : readiness.startDisabledReason;
+
+          if (launchable && (status === "running" || status === "scheduled")) {
+            // Machine-dialled voice launches were previously gated on the full
+            // readiness check before any status change — keep that bar.
+            if (isMachineDispatchedVoiceCampaignType(campaignRecord.type) && readinessError) {
+              return routeData(
+                { success: false, error: readinessError, actionType: "status" as const },
+                { status: 400 },
+              );
+            }
             const mode = status === "running" ? "now" : "scheduled";
             const result = await launchCampaign({
               workspaceId: workspace_id,
@@ -247,21 +277,8 @@ export const action = defineAction({
             return routeData({ success: true, actionType: "status" as const, status });
           }
 
-          // For voice campaigns, use readiness check + status update.
-          const readiness = getCampaignReadiness(campaignRecord as Campaign, campaignDetails as unknown as CampaignDetails, {
-            queueCount: resolveReadinessQueueCount({
-              totalCount: queueCounts.fullCount,
-              queuedCount: queueCounts.queuedCount,
-            }),
-            workspacePhoneNumbers: phoneNumbersResult.data ?? [],
-            workspaceScriptIds: scripts.map((script) => script.id),
-            workspaceAudioNames: audioList.ok
-              ? audioList.audios.map((audio) => audio.name)
-              : [],
-          });
-          const readinessError =
-            status === "scheduled" ? readiness.scheduleDisabledReason : readiness.startDisabledReason;
-
+          // live_call, email, and waiting-status campaigns: readiness gate,
+          // then a simple status update.
           if (readinessError) {
             return routeData(
               { success: false, error: readinessError, actionType: "status" as const },
