@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@eafbd2d5` · 80 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@fb8a08fa` · 80 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -503,6 +503,30 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
+### [#1332](https://github.com/chester-hill-solutions/callcaster/issues/1332) dark mode opt out info box has black text
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-27
+- Dark-mode opt-out info box rendered black text on a dark surface. The hand-built box was migrated to the shared Alert with semantic tokens in #1353 (7f11a230, scoped #1332/#1312/#1335).
+- Current behavior: The migrated banner (shared warning Alert, semantic tokens; dark theme defines --warning-foreground) is on dev since 7f11a230. Sai's reopen screenshot was taken ~17 min after the merge, so it may predate the deploy finishing — visual-asset-review does run dev.
+- Root cause: Either a pre-deploy screenshot or a different unmigrated box; not yet re-verified on the current dev deploy.
+- Resolution: Re-verify the opt-out banner in dark mode on the current dev deploy. If black text still shows, identify the exact component (likely a different unmigrated box or a token gap) and split a fix-now.
+- Look in: `app/components/chats/ChatOptOutBanner.tsx`
+- Existing tests: test/ui/components-chats-contact.test.tsx
+- Missing tests: Dark-mode token assertion (visual; verify manually)
+- Done when: Opt-out box uses the shared info Alert tokens in dark mode on a deployed env
+- Tracker: Deploy-gated verification, not new code.
+
+### [#1325](https://github.com/chester-hill-solutions/callcaster/issues/1325) How do I add audio to an IVR script
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-08-27
+- Sai asks how to add audio to an IVR script. Both paths exist: the Audio page Add Audio form, and the per-block upload button on recorded blocks in the script editor.
+- Current behavior: Both audio paths are fixed on dev: the Add Audio zone (#1359) and the script-editor recorded-block upload (#1353). Sai's reopen may reflect a pre-deploy screenshot or findability.
+- Root cause: Support question; the Add Audio zone was genuinely broken on all envs until #1359.
+- Resolution: On the current dev deploy: confirm Add Audio upload works end-to-end and the recorded-block Upload audio button opens the picker; answer on the issue with both paths, then close.
+- Look in: `app/routes/workspaces+/$id/audios/new.route.tsx`, `app/components/campaign/settings/script/ScriptBlockEditor.tsx`
+- Blocked by: [#1346](https://github.com/chester-hill-solutions/callcaster/issues/1346)
+- Existing tests: test/ui/audios-new-upload.test.tsx (#1359)
+- Done when: Both audio paths verified working on a deployed env; Issue answered with the two paths
+- Tracker: Deploy-gated verification on latest dev; blocked by nothing once dev redeploys.
+
 ### [#1327](https://github.com/chester-hill-solutions/callcaster/issues/1327) chore(scripts): collapse vestigial pageData.campaignDetails nesting
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-27
 - Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.
@@ -524,30 +548,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: CI quality job (typecheck + guards) on dev
 - Done when: rg sweep clean on dev; CI green after merge; Closure comment links the proof
 - Tracker: Verification only; no new code.
-
-### [#1325](https://github.com/chester-hill-solutions/callcaster/issues/1325) How do I add audio to an IVR script
-- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-08-27
-- Sai asks how to add audio to an IVR script. Both paths exist: the Audio page Add Audio form, and the per-block upload button on recorded blocks in the script editor.
-- Current behavior: The Add Audio zone was inert (#1346) and the script-editor upload fix (#1353) plus #1359 are not deployed to the visual-asset-review env Sai tests on, so both paths look broken there.
-- Root cause: Support question masked by the #1346 zone bug and a stale deploy.
-- Resolution: After #1359 merges and the qa/dev env Sai uses is redeployed: confirm Add Audio upload works end-to-end and the script editor recorded-block Upload audio button opens the picker; then answer on the issue and close.
-- Look in: `app/routes/workspaces+/$id/audios/new.route.tsx`, `app/components/campaign/settings/script/ScriptBlockEditor.tsx`
-- Blocked by: [#1346](https://github.com/chester-hill-solutions/callcaster/issues/1346)
-- Existing tests: test/ui/audios-new-upload.test.tsx (#1359)
-- Done when: Both audio paths verified working on a deployed env; Issue answered with the two paths
-- Tracker: Blocked on the #1346 fix reaching a deployed env.
-
-### [#1332](https://github.com/chester-hill-solutions/callcaster/issues/1332) dark mode opt out info box has black text
-- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-27
-- Dark-mode opt-out info box rendered black text on a dark surface. The hand-built box was migrated to the shared Alert with semantic tokens in #1353 (7f11a230, scoped #1332/#1312/#1335).
-- Current behavior: Sai reopened with a screenshot from the visual-asset-review env, which does not run the #1353 deploy — the old markup is expected there.
-- Root cause: Fix landed on dev but the env Sai tests was not redeployed.
-- Resolution: Verify the opt-out banner on a deployed dev/qa env in dark mode shows semantic info colors; then close. If it still shows black text on dev, reopen as fix-now with the banner component named.
-- Look in: `app/components/chats/ChatOptOutBanner.tsx`
-- Existing tests: test/ui/components-chats-contact.test.tsx
-- Missing tests: Dark-mode token assertion (visual; verify manually)
-- Done when: Opt-out box uses the shared info Alert tokens in dark mode on a deployed env
-- Tracker: Deploy-gated verification, not new code.
 
 ### [#1278](https://github.com/chester-hill-solutions/callcaster/issues/1278) bug(queue): manual dequeue of another agent's assigned row returns success but silently no-ops
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-26
