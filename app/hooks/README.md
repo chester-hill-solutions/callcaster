@@ -45,7 +45,6 @@ import { useCallState, useTwilioDevice } from "@/hooks/call";
 
 - `useWorkspaceRealtime` - Main realtime data synchronization
 - `useWorkspaceRealtimeSubscription` - Reusable subscription hook
-- `useRealtimeData` - Workspace contacts realtime updates
 - `useChatRealtime` - Chat message realtime updates
 - `useConversationSummaryRealTime` - Conversation summary updates
 
