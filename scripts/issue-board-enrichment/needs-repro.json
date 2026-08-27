@@ -174,5 +174,31 @@
     "size": "S",
     "risk": "low",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 1362,
+    "verdict": "needs-repro",
+    "summary": "On the call screen, when the AGENT hangs up the contact name clears, but when the CONTACT hangs up it stays. Behavior should be identical for both hang-up directions, and the code paths should not be divergent enough to allow this.",
+    "currentBehavior": "Screenshot shows a terminated call still displaying the contact name after the contact hung up.",
+    "rootCause": "Unknown. Suspect the agent-initiated teardown path resets call/contact state while the contact-side webhook/session-end path does not (or vice versa: the name is keyed to a session object only cleared on one path).",
+    "resolution": "Trace both hang-up paths (device disconnect vs Twilio status webhook / SSE call-ended event) to where the contact name is derived; unify the teardown so both paths clear or preserve identically, per the agreed product behavior.",
+    "lookIn": [
+      "app/components/call/",
+      "app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts (SSE)",
+      "call status webhook handlers"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-dialogs.test.tsx"
+    ],
+    "missingTests": [
+      "Contact-hangup clears/preserves name identically to agent-hangup (UI test per decision)"
+    ],
+    "acceptanceCriteria": [
+      "Both hang-up directions produce the same contact-name behavior",
+      "Shared teardown path or documented reason for divergence"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "blockedBy": []
   }
 ]

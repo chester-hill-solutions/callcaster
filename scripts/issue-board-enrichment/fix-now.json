@@ -1143,5 +1143,27 @@
     "risk": "low",
     "trackerRecommendation": "One atomic PR; exclude FormField inline errors by design.",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 1360,
+    "verdict": "fix-now",
+    "recommendedTitle": "docs(agents): teach the github-issues skill closed-reason distinctions and atomic Task/Epic creation",
+    "summary": "The github-issues agent skill must distinguish closed-as-completed, closed-as-not-planned, and closed-as-duplicate (e.g. #1155 and its subissues), and create atomic issues with GitHub Type Task and Epic.",
+    "currentBehavior": "The skill treats \"closed\" as one state and gives no recipe for typed atomic issues.",
+    "rootCause": "The skill predates the team's closed-reason and issue-type conventions.",
+    "resolution": "Update .agents/skills/github-issues/SKILL.md: gh issue list --reason completed|not_planned, GraphQL for duplicate closures, and an atomic-issue recipe using gh api projectsV2/issue types (Task/Epic) with one concern per issue.",
+    "lookIn": [
+      ".agents/skills/github-issues/SKILL.md"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Skill documents all three closed reasons with exact gh commands",
+      "Atomic Task/Epic creation recipe present",
+      "Examples reference #1155-style subissue graphs"
+    ],
+    "size": "S",
+    "risk": "low",
+    "blockedBy": []
   }
 ]

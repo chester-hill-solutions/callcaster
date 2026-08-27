@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@6ed83493` · 77 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@eafbd2d5` · 80 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 36
+## Fix now — 37
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -319,6 +319,16 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Listed surfaces say Call list; Unnamed records use 'Call list <id>'; Internal/API names unchanged; UI tests updated
 - Tracker: Issue proposed 'Audience' as canonical; current UI standard is Call list.
 
+### [#1360](https://github.com/chester-hill-solutions/callcaster/issues/1360) Ensure agent skills properly use `gh cli`
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-08-27
+- Recommended title: **docs(agents): teach the github-issues skill closed-reason distinctions and atomic Task/Epic creation**
+- The github-issues agent skill must distinguish closed-as-completed, closed-as-not-planned, and closed-as-duplicate (e.g. #1155 and its subissues), and create atomic issues with GitHub Type Task and Epic.
+- Current behavior: The skill treats "closed" as one state and gives no recipe for typed atomic issues.
+- Root cause: The skill predates the team's closed-reason and issue-type conventions.
+- Resolution: Update .agents/skills/github-issues/SKILL.md: gh issue list --reason completed|not_planned, GraphQL for duplicate closures, and an atomic-issue recipe using gh api projectsV2/issue types (Task/Epic) with one concern per issue.
+- Look in: `.agents/skills/github-issues/SKILL.md`
+- Done when: Skill documents all three closed reasons with exact gh commands; Atomic Task/Epic creation recipe present; Examples reference #1155-style subissue graphs
+
 ### [#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347) need to verify consistency for Robocall vs IVR vs Automated Phone Menu
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
 - Recommended title: **refactor(copy): standardize customer-facing automated-phone-menu terminology**
@@ -493,17 +503,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
-### [#1231](https://github.com/chester-hill-solutions/callcaster/issues/1231) Delete dead Supabase-era app code (shims, stale types, PostgREST constants)
-- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-27
-- Delete dead Supabase-era app code (shims, stale types, PostgREST constants). Removed in #1353 (6c724292); Sai reopened asking wra-sol to double-check the closure.
-- Current behavior: Tree has no supabase client imports, PostgREST constants, or compatibility shims; the visual-asset-review env Sai tests still runs the pre-#1353 build, so old code is expected there.
-- Root cause: Closure was correct on dev but unverifiable from the env Sai uses.
-- Resolution: Verify: rg for supabase|postgrest|SUPABASE across app/ returns nothing, CI structural guards pass on dev, then close with the grep output linked.
-- Look in: `app/`, `.eslintrc.cjs`
-- Existing tests: CI quality job (typecheck + guards) on dev
-- Done when: rg sweep clean on dev; CI green after merge; Closure comment links the proof
-- Tracker: Verification only; no new code.
-
 ### [#1327](https://github.com/chester-hill-solutions/callcaster/issues/1327) chore(scripts): collapse vestigial pageData.campaignDetails nesting
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-27
 - Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.
@@ -513,6 +512,17 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx`, `app/routes/workspaces+/$id/scripts/`
 - Existing tests: test/ui/script-editor-route.test.tsx; test/ui/script-editor-adapter.test.tsx; test/ui/campaign-script-edit-route.test.tsx
 - Done when: No campaignDetails references in editor code on dev; Editor tests green on dev
+- Tracker: Verification only; no new code.
+
+### [#1231](https://github.com/chester-hill-solutions/callcaster/issues/1231) Delete dead Supabase-era app code (shims, stale types, PostgREST constants)
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-27
+- Delete dead Supabase-era app code (shims, stale types, PostgREST constants). Removed in #1353 (6c724292); Sai reopened asking wra-sol to double-check the closure.
+- Current behavior: Tree has no supabase client imports, PostgREST constants, or compatibility shims; the visual-asset-review env Sai tests still runs the pre-#1353 build, so old code is expected there.
+- Root cause: Closure was correct on dev but unverifiable from the env Sai uses.
+- Resolution: Verify: rg for supabase|postgrest|SUPABASE across app/ returns nothing, CI structural guards pass on dev, then close with the grep output linked.
+- Look in: `app/`, `.eslintrc.cjs`
+- Existing tests: CI quality job (typecheck + guards) on dev
+- Done when: rg sweep clean on dev; CI green after merge; Closure comment links the proof
 - Tracker: Verification only; no new code.
 
 ### [#1325](https://github.com/chester-hill-solutions/callcaster/issues/1325) How do I add audio to an IVR script
@@ -658,9 +668,20 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 6
+## Needs reproduction — 7
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
+
+### [#1362](https://github.com/chester-hill-solutions/callcaster/issues/1362) If the user hangs up, the contact name goes away but if the contact hangs up it stays. Latter should be true for both
+- Verdict: **Needs reproduction** · Size: M · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-27
+- On the call screen, when the AGENT hangs up the contact name clears, but when the CONTACT hangs up it stays. Behavior should be identical for both hang-up directions, and the code paths should not be divergent enough to allow this.
+- Current behavior: Screenshot shows a terminated call still displaying the contact name after the contact hung up.
+- Root cause: Unknown. Suspect the agent-initiated teardown path resets call/contact state while the contact-side webhook/session-end path does not (or vice versa: the name is keyed to a session object only cleared on one path).
+- Resolution: Trace both hang-up paths (device disconnect vs Twilio status webhook / SSE call-ended event) to where the contact name is derived; unify the teardown so both paths clear or preserve identically, per the agreed product behavior.
+- Look in: `app/components/call/`, `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts (SSE)`, `call status webhook handlers`
+- Existing tests: test/ui/call-screen-dialogs.test.tsx
+- Missing tests: Contact-hangup clears/preserves name identically to agent-hangup (UI test per decision)
+- Done when: Both hang-up directions produce the same contact-name behavior; Shared teardown path or documented reason for divergence
 
 ### [#1358](https://github.com/chester-hill-solutions/callcaster/issues/1358) Audience File upload hover loses focus
 - Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-08-27
@@ -740,9 +761,18 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 9
+## Needs decision — 10
 
 Product, security, or operations decision required before implementation can be scoped.
+
+### [#1363](https://github.com/chester-hill-solutions/callcaster/issues/1363) Hang up tone
+- Verdict: **Needs decision** · Size: XS · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-27
+- Hang up tone — issue has a title only. Decide what should play when a call ends (which side hears it, what audio, and whether it is configurable per campaign).
+- Current behavior: No hang-up tone behavior defined or implemented.
+- Root cause: Missing spec.
+- Resolution: Decide: agent-side and/or contact-side tone, audio asset source (workspace audio library vs fixed asset), and per-campaign configurability. Then scope as a fix-now task.
+- Look in: `app/components/call/`, `shared/pricing.ts (terminal status sets, for hang-up trigger points)`
+- Done when: Written one-paragraph spec agreed; Follow-up implementation issue created
 
 ### [#1128](https://github.com/chester-hill-solutions/callcaster/issues/1128) When you make a change on a campaign setup, you can't tell you have changes to save
 - **IN PROGRESS** · Verdict: **Needs decision** · Size: M · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-08-27
@@ -979,6 +1009,19 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 
 Same root cause as the linked canonical issue. Do not implement separately — fold scope in and close.
 
+### [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292) if the call recipient hangs up, I get call completed but still the option to hang up
+- Verdict: **Duplicates** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-08-27
+- Duplicate of: [#1342](https://github.com/chester-hill-solutions/callcaster/issues/1342)
+- Recommended title: **Merge into #1342: verify remote hangup removes call-only controls and preserves disposition context**
+- Recipient hangup -> 'call completed' but stale Hang Up option; contact info disappears. The stale Hang Up symptom is likely already fixed by terminal handling; the remaining ask is finished-contact retention + callback.
+- Current behavior: Terminal status sends HANG_UP and disconnects the SDK call; Hang Up hides; contact info renders from nextRecipient which can advance/null out.
+- Root cause: Partially resolved; finished-contact retention and callback behavior remain under #1342.
+- Resolution: Merge remaining terminal-action work into #1342; optionally keep finished contact rendered from questionContact.
+- Look in: `app/components/call/CallScreen.CallArea.tsx`, `app/hooks/call/useCallHandling.ts`, `app/hooks/call/useCampaignCallFlow.ts`
+- Existing tests: test/ui/campaign-call-flow-display-state.test.ts; test/ui/call-screen-callarea.test.tsx
+- Missing tests: integrated remote-hangup asserts Hang Up gone; finished contact retained for disposition
+- Tracker: Close as duplicate of #1342; callback tracked there.
+
 ### [#1352](https://github.com/chester-hill-solutions/callcaster/issues/1352) Campaign window opens at 3:05 yet the singular contact got the message at 3:15
 - Verdict: **Duplicates** · Size: S-M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-08-26
 - Duplicate of: [#1351](https://github.com/chester-hill-solutions/callcaster/issues/1351)
@@ -1017,19 +1060,6 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 - Existing tests: test/ui/navbar-workspace-picker.test.tsx
 - Missing tests: many-workspace scroll test (under #1310)
 - Tracker: Close as duplicate of #1310.
-
-### [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292) if the call recipient hangs up, I get call completed but still the option to hang up
-- Verdict: **Duplicates** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-08-17
-- Duplicate of: [#1342](https://github.com/chester-hill-solutions/callcaster/issues/1342)
-- Recommended title: **Merge into #1342: verify remote hangup removes call-only controls and preserves disposition context**
-- Recipient hangup -> 'call completed' but stale Hang Up option; contact info disappears. The stale Hang Up symptom is likely already fixed by terminal handling; the remaining ask is finished-contact retention + callback.
-- Current behavior: Terminal status sends HANG_UP and disconnects the SDK call; Hang Up hides; contact info renders from nextRecipient which can advance/null out.
-- Root cause: Partially resolved; finished-contact retention and callback behavior remain under #1342.
-- Resolution: Merge remaining terminal-action work into #1342; optionally keep finished contact rendered from questionContact.
-- Look in: `app/components/call/CallScreen.CallArea.tsx`, `app/hooks/call/useCallHandling.ts`, `app/hooks/call/useCampaignCallFlow.ts`
-- Existing tests: test/ui/campaign-call-flow-display-state.test.ts; test/ui/call-screen-callarea.test.tsx
-- Missing tests: integrated remote-hangup asserts Hang Up gone; finished contact retained for disposition
-- Tracker: Close as duplicate of #1342; callback tracked there.
 
 ### [#1193](https://github.com/chester-hill-solutions/callcaster/issues/1193) Test a campaign with controlled recipients
 - Verdict: **Duplicates** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-08-08

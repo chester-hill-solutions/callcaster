@@ -266,5 +266,26 @@
     "risk": "medium",
     "trackerRecommendation": "Product decision first: blocking Next vs warning dialog.",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 1363,
+    "verdict": "needs-decision",
+    "summary": "Hang up tone — issue has a title only. Decide what should play when a call ends (which side hears it, what audio, and whether it is configurable per campaign).",
+    "currentBehavior": "No hang-up tone behavior defined or implemented.",
+    "rootCause": "Missing spec.",
+    "resolution": "Decide: agent-side and/or contact-side tone, audio asset source (workspace audio library vs fixed asset), and per-campaign configurability. Then scope as a fix-now task.",
+    "lookIn": [
+      "app/components/call/",
+      "shared/pricing.ts (terminal status sets, for hang-up trigger points)"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Written one-paragraph spec agreed",
+      "Follow-up implementation issue created"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "blockedBy": []
   }
 ]
