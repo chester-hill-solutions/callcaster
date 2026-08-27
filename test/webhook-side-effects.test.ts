@@ -16,6 +16,11 @@ const mocks = vi.hoisted(() => ({
   findOutreachAttemptWithCampaignType: vi.fn(),
   updateOutreachAttemptForWorkspace: vi.fn(),
   emitPredictiveBroadcast: vi.fn(),
+  dequeueQueueEntry: vi.fn(),
+  tenantDb: {
+    campaign: { findFirst: vi.fn(async () => null) },
+    campaign_queue: { findFirst: vi.fn(async () => null) },
+  },
   findMessageBySid: vi.fn(),
   insertTransactionHistoryIdempotent: vi.fn(),
   alertSmsGeoPermissionBlocked: vi.fn(async () => undefined),
@@ -85,9 +90,11 @@ vi.mock("@/lib/database/workspace.server", () => ({
 }));
 
 vi.mock("@/server/tenant-db", () => ({
-  createTenantDb: vi.fn(() => ({
-    campaign: { findFirst: vi.fn(async () => null) },
-  })),
+  createTenantDb: vi.fn(() => mocks.tenantDb),
+}));
+
+vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
 }));
 
 vi.mock("@/lib/twilio-geo-permissions.server", () => ({
@@ -197,8 +204,69 @@ describe("webhook side-effect handlers", () => {
     );
   });
 
-  test("runCallStatusSideEffects never downgrades a terminal disposition (AMD voicemail)", async () => {
-    mocks.findOutreachAttemptWithCampaignType.mockResolvedValue({
+  // #1362: a callee hang-up must collapse the queue entry exactly like
+  // /api/hangup does, or the agent's nextRecipient keeps showing a finished
+  // contact. The assignee comes from the queue row because a webhook has no
+  // acting user, and the guarded RPC keeps a double hang-up idempotent.
+  test("terminal status dequeues the contact's queue row with the row assignee", async () => {
+    mocks.findCallBySid.mockResolvedValue({
+      sid: "CA1",
+      workspace: "w1",
+      status: "completed",
+      contact_id: 123,
+      campaign_id: 7,
+      outreach_attempt_id: 10,
+    });
+    mocks.tenantDb.campaign_queue.findFirst.mockResolvedValueOnce({
+      assigned_to_user_id: "user-1",
+    });
+    mocks.tenantDb.campaign.findFirst.mockResolvedValueOnce({
+      group_household_queue: false,
+    });
+    const { runCallStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runCallStatusSideEffects({
+      callSid: "CA1",
+      event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "completed" }),
+    });
+
+    expect(mocks.dequeueQueueEntry).toHaveBeenCalledTimes(1);
+    expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        by: { contactId: 123 },
+        workspaceId: "w1",
+        household: false,
+        userId: "user-1",
+        reason: "Call completed",
+        exec: mocks.tenantDb,
+      }),
+    );
+  });
+
+  test("non-terminal status does not dequeue the queue row", async () => {
+    mocks.findCallBySid.mockResolvedValue({
+      sid: "CA1",
+      workspace: "w1",
+      status: "in-progress",
+      contact_id: 123,
+      campaign_id: 7,
+      outreach_attempt_id: 10,
+    });
+    const { runCallStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runCallStatusSideEffects({
+      callSid: "CA1",
+      event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "in-progress" }),
+    });
+
+    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+  });
+
+  test("runCallStatusSideEffects never downgrades a terminal disposition (AMD voicemail)", async () => {    mocks.findOutreachAttemptWithCampaignType.mockResolvedValue({
       disposition: "voicemail",
       contact_id: 123,
       workspace: "w1",
