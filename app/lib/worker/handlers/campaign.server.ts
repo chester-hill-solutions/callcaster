@@ -161,7 +161,9 @@ export async function campaignExportHandler(
 
 /** Queue rows processed per dispatch job; remaining work rolls to a successor. */
 const DISPATCH_BATCH_SIZE = 50;
-/** Retry delay when the whole batch is deferred by the campaign send window. */
+/** Retry delay for deferrals without an exact next-open instant (schedule
+ *  sweep waiting flips, IVR calling-hours gate). The SMS send-window gate
+ *  instead schedules its successor at the exact window boundary (#1352). */
 const SEND_WINDOW_RETRY_MS = 15 * 60 * 1000;
 
 async function enqueueDispatchSuccessor(args: {
@@ -286,12 +288,15 @@ export async function campaignDispatchHandler(
       logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
       return { ok: true, campaignId, blocked: "caller_id_required" };
     case "deferred_send_window":
+      // Schedule the successor at the exact window boundary (#1352): the
+      // batch's outcome carries the next open instant, so dispatch resumes
+      // the moment sending is allowed instead of up to 15 minutes late.
       await enqueueDispatchSuccessor({
         workspaceId,
         campaignId,
         userId,
         completedJobId: job.id,
-        delayMs: SEND_WINDOW_RETRY_MS,
+        delayMs: Math.max(0, outcome.nextOpenAt.getTime() - Date.now()),
       });
       return { ok: true, campaignId, deferred: "send_window" };
     case "dispatched": {

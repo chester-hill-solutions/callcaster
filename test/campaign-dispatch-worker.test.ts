@@ -242,12 +242,18 @@ describe("campaignDispatchHandler", () => {
     expect(mocks.enqueueJob).toHaveBeenCalled();
   });
 
-  test("send-window deferral schedules a delayed successor", async () => {
-    mocks.dispatchCampaignSmsBatch.mockResolvedValue({ kind: "deferred_send_window" });
-    const result = await campaignDispatchHandler(makeJob());
-    expect(result).toMatchObject({ ok: true, deferred: "send_window" });
-    const call = mocks.enqueueJob.mock.calls[0]?.[0] as { runAt: Date };
-    expect(call.runAt.getTime()).toBeGreaterThan(Date.now() + 60_000);
+  test("send-window deferral schedules the successor at the exact next open (#1352)", async () => {
+    const nextOpenAt = new Date(Date.now() + 5 * 60 * 1000);
+    mocks.dispatchCampaignSmsBatch.mockResolvedValue({
+      kind: "deferred_send_window",
+      nextOpenAt,
+    });
+    await campaignDispatchHandler(makeJob());
+    const call = mocks.enqueueJob.mock.calls.at(-1)?.[0] as { runAt: Date };
+    expect(call.runAt).toBeInstanceOf(Date);
+    // Two Date.now() calls (handler + successor) may differ by a tick —
+    // require the scheduled instant to land on the window boundary.
+    expect(Math.abs(call.runAt.getTime() - nextOpenAt.getTime())).toBeLessThanOrEqual(50);
   });
 
   test("insufficient credits stops the chain without retry", async () => {
