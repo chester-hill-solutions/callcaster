@@ -194,6 +194,40 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
   });
 
+  test("shows an active drag state while a file is over the zone and clears it on leave/drop (#1203)", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    render(<AudienceUploader audienceName="A1" />);
+    const dropZone = screen.getByText("Drop or choose a CSV file").closest("label");
+    expect(dropZone).not.toBeNull();
+
+    // dragenter highlights the zone using semantic tokens.
+    fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.className).toContain("border-primary");
+    expect(dropZone!.className).toContain("bg-primary/10");
+
+    // Nested children emit their own dragleave; the active state must persist
+    // until the cursor truly leaves the zone.
+    fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [] } });
+    fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.className).toContain("border-primary");
+
+    // Leaving fully clears the highlight.
+    fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.className).not.toContain("border-primary");
+
+    // Re-entering then dropping clears it and still imports the file.
+    const file = new File(["Phone\n123"], "contacts.csv", { type: "text/csv" });
+    (file as any).text = async () => "Phone\n123";
+    fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [file] } });
+    expect(dropZone!.className).toContain("border-primary");
+    fireEvent.drop(dropZone!, { dataTransfer: { files: [file] } });
+    expect(dropZone!.className).not.toContain("border-primary");
+    await waitFor(() => {
+      expect(screen.getByText("Map CSV Headers")).toBeInTheDocument();
+    });
+  });
+
   test("hides step strip when embedded (onUploadComplete)", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
