@@ -2,7 +2,7 @@ export { loader } from "./edit.loader.server";
 export { action } from "./edit.action.server";
 
 import { useLoaderData } from "react-router";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
@@ -44,10 +44,14 @@ function isVoiceCampaignType(type: PageData["type"]): boolean {
 
 export default function ScriptEditor() {
   const {
-    mediaNames = [],
+    mediaNames: loaderMediaNames = [],
     data,
     scripts = [],
+    workspace_id,
   } = useLoaderData<LoaderData>();
+  const [mediaNames, setMediaNames] = useState<string[]>(
+    () => loaderMediaNames ?? [],
+  );
   const [initData, setInitData] = useState<PageData>(data);
   const [pageData, setPageData] = useState<PageData>(data);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -154,6 +158,41 @@ export default function ScriptEditor() {
     setIsEditingScript(false);
   };
 
+  // Mirrors the standalone scripts route: uploads the audio file to the
+  // workspace media library and returns the stored name so the recorded block
+  // can reference it. Without this, the campaign script editor has no upload
+  // affordance at all (#1346).
+  const handleUploadAudio = useCallback(
+    async (file: File): Promise<string | null> => {
+      try {
+        const formData = new FormData();
+        formData.set("workspaceId", workspace_id);
+        formData.set("media", file);
+        const response = await fetch("/api/audio-upload", {
+          method: "POST",
+          body: formData,
+        });
+        const result = await response.json().catch(() => null);
+        if (!response.ok || result?.error) {
+          throw new Error(result?.error ?? "Failed to upload audio.");
+        }
+        const name = result.name as string;
+        setMediaNames((current) =>
+          current.includes(name) ? current : [...current, name],
+        );
+        return name;
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Couldn't upload the audio file.",
+        );
+        return null;
+      }
+    },
+    [workspace_id],
+  );
+
   const handlePageDataChange = (newPageData: PageData) => {
     setPageData(newPageData);
   };
@@ -229,6 +268,7 @@ export default function ScriptEditor() {
             });
           }}
           mediaNames={scriptMediaNames}
+          onUploadAudio={handleUploadAudio}
           readOnly={!isEditingScript}
         />
       </div>
