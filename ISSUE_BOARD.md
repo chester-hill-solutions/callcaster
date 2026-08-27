@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@7bd39f86` · 78 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@117b57da` · 77 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,22 +15,9 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 34
+## Fix now — 33
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
-
-### [#1348](https://github.com/chester-hill-solutions/callcaster/issues/1348) IVR campaign is running yet no call to the recipient
-- Verdict: **Fix now** · Size: L · Risk: high · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-08-26
-- Recommended title: **fix(ivr): dispatch campaign calls when the campaign enters running state**
-- IVR campaign shows running yet no call reaches the recipient. Voice/IVR campaigns only get a status update on launch — no durable dispatch work is enqueued.
-- Current behavior: settings.action.server.ts updates status to running for voice/IVR but only message campaigns call launchCampaign; the campaign worker explicitly skips non-message campaigns; /api/initiate-ivr is not called by current UI.
-- Root cause: The IVR dispatch path is legacy/one-off; nothing durable drives IVR calls after the campaign enters running.
-- Resolution: Add a durable IVR dispatch job (or extend campaign dispatch with an IVR branch): claim queued contacts, rate-limit Twilio calls, keep out-of-window rows queued with a successor, and complete the campaign when its queue drains. Do not dispatch long-running work in the settings HTTP action.
-- Look in: `app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts`, `app/lib/campaign-execution.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/routes/api+/initiate-ivr.action.server.ts`, `app/lib/ivr-initiate.server.ts`
-- Existing tests: test/initiate-ivr.route.test.ts; test/ivr-initiate.server.test.ts; test/campaign-dispatch-worker.test.ts (skips non-message)
-- Missing tests: launching IVR enqueues work; worker claims queued contacts and calls Twilio; out-of-window rows retry with successor; campaign completes only after IVR queue drains
-- Done when: Starting an IVR campaign enqueues durable dispatch work; Eligible contacts produce rate-limited Twilio attempts; Deferred/failed rows stay retryable; Status becomes complete only after drain
-- Tracker: Highest-risk confirmed functional gap. Enrichment note: audio-upload hypothesis (#1346) is wrong — text-to-speech IVR works without recorded audio.
 
 ### [#1270](https://github.com/chester-hill-solutions/callcaster/issues/1270) A2: Consolidate campaign SMS dispatch into one coordinator
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-08-15
