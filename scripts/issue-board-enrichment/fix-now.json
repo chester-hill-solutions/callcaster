@@ -921,43 +921,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1348,
-    "verdict": "fix-now",
-    "recommendedTitle": "fix(ivr): dispatch campaign calls when the campaign enters running state",
-    "summary": "IVR campaign shows running yet no call reaches the recipient. Voice/IVR campaigns only get a status update on launch — no durable dispatch work is enqueued.",
-    "currentBehavior": "settings.action.server.ts updates status to running for voice/IVR but only message campaigns call launchCampaign; the campaign worker explicitly skips non-message campaigns; /api/initiate-ivr is not called by current UI.",
-    "rootCause": "The IVR dispatch path is legacy/one-off; nothing durable drives IVR calls after the campaign enters running.",
-    "resolution": "Add a durable IVR dispatch job (or extend campaign dispatch with an IVR branch): claim queued contacts, rate-limit Twilio calls, keep out-of-window rows queued with a successor, and complete the campaign when its queue drains. Do not dispatch long-running work in the settings HTTP action.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts",
-      "app/lib/campaign-execution.server.ts",
-      "app/lib/worker/handlers/campaign.server.ts",
-      "app/routes/api+/initiate-ivr.action.server.ts",
-      "app/lib/ivr-initiate.server.ts"
-    ],
-    "existingTests": [
-      "test/initiate-ivr.route.test.ts",
-      "test/ivr-initiate.server.test.ts",
-      "test/campaign-dispatch-worker.test.ts (skips non-message)"
-    ],
-    "missingTests": [
-      "launching IVR enqueues work",
-      "worker claims queued contacts and calls Twilio",
-      "out-of-window rows retry with successor",
-      "campaign completes only after IVR queue drains"
-    ],
-    "acceptanceCriteria": [
-      "Starting an IVR campaign enqueues durable dispatch work",
-      "Eligible contacts produce rate-limited Twilio attempts",
-      "Deferred/failed rows stay retryable",
-      "Status becomes complete only after drain"
-    ],
-    "size": "L",
-    "risk": "high",
-    "trackerRecommendation": "Highest-risk confirmed functional gap. Enrichment note: audio-upload hypothesis (#1346) is wrong — text-to-speech IVR works without recorded audio.",
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1351,
     "verdict": "fix-now",
     "recommendedTitle": "fix(sms): align deferred dispatch and ETA to the next send-window opening",
