@@ -31,6 +31,20 @@ export const AudienceUploadFileStep = forwardRef<
     }
   };
 
+  // dragover fires continuously while the cursor hovers, which makes it the
+  // self-heal point: the OS can steal key-window mid-drag (reproduced in
+  // Helium even on a bare page, #1358) and deliver an unpaired dragleave that
+  // latches the depth counter off. Re-asserting the active state here recovers
+  // the highlight within one event instead of staying dead until the cursor
+  // physically re-enters.
+  const handleDragOver = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    if (!isDragging) {
+      dragDepth.current = Math.max(dragDepth.current, 1);
+      setIsDragging(true);
+    }
+  };
+
   const handleDrop = (event: React.DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
     dragDepth.current = 0;
@@ -49,7 +63,7 @@ export const AudienceUploadFileStep = forwardRef<
       )}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
-      onDragOver={(event) => event.preventDefault()}
+      onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
       <span className="inline-flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
