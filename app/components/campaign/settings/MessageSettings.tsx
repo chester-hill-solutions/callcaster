@@ -5,7 +5,7 @@ import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { useFetcherOnIdle } from "@/hooks/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Alert } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Helper function to generate survey links
 // const generateSurveyLink = (contactId: number, surveyId: string, baseUrl: string = window.location.origin) => {
@@ -291,16 +291,20 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                         </div>
                         {getErrorMessage(mediaFetcher.data?.error) && (
                             <Alert variant="destructive">
-                                {getErrorMessage(mediaFetcher.data?.error)}
+                                <AlertDescription>
+                                    {getErrorMessage(mediaFetcher.data?.error)}
+                                </AlertDescription>
                             </Alert>
                         )}
                         {mediaFetcher.data?.success && mediaFetcher.state === "idle" && (
                             <Alert variant="success" role="status">
-                                {mediaFetcher.data.uploadedFileName
-                                    ? "Media uploaded."
-                                    : mediaFetcher.data.removedFileName
-                                        ? "Media removed."
-                                        : "Media updated."}
+                                <AlertDescription>
+                                    {mediaFetcher.data.uploadedFileName
+                                        ? "Media uploaded."
+                                        : mediaFetcher.data.removedFileName
+                                            ? "Media removed."
+                                            : "Media updated."}
+                                </AlertDescription>
                             </Alert>
                         )}
                         <div className="flex items-center justify-between">

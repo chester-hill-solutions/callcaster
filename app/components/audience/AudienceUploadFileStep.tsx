@@ -42,6 +42,7 @@ export const AudienceUploadFileStep = forwardRef<
   return (
     <label
       htmlFor="contacts"
+      data-drag-active={isDragging}
       className={cn(
         "flex min-h-[8rem] cursor-pointer flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border bg-muted/30 px-6 py-8 text-center transition-colors hover:border-border hover:bg-muted/50",
         isDragging && "border-primary bg-primary/10",

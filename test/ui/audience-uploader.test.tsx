@@ -201,28 +201,29 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     const dropZone = screen.getByText("Drop or choose a CSV file").closest("label");
     expect(dropZone).not.toBeNull();
 
-    // dragenter highlights the zone using semantic tokens.
+    // The drag-active contract is exposed as a stable data attribute; the
+    // exact highlight classes are a styling concern that may change.
+    expect(dropZone!.dataset.dragActive).toBe("false");
     fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [] } });
-    expect(dropZone!.className).toContain("border-primary");
-    expect(dropZone!.className).toContain("bg-primary/10");
+    expect(dropZone!.dataset.dragActive).toBe("true");
 
     // Nested children emit their own dragleave; the active state must persist
     // until the cursor truly leaves the zone.
     fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [] } });
     fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
-    expect(dropZone!.className).toContain("border-primary");
+    expect(dropZone!.dataset.dragActive).toBe("true");
 
     // Leaving fully clears the highlight.
     fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
-    expect(dropZone!.className).not.toContain("border-primary");
+    expect(dropZone!.dataset.dragActive).toBe("false");
 
     // Re-entering then dropping clears it and still imports the file.
     const file = new File(["Phone\n123"], "contacts.csv", { type: "text/csv" });
     (file as any).text = async () => "Phone\n123";
     fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [file] } });
-    expect(dropZone!.className).toContain("border-primary");
+    expect(dropZone!.dataset.dragActive).toBe("true");
     fireEvent.drop(dropZone!, { dataTransfer: { files: [file] } });
-    expect(dropZone!.className).not.toContain("border-primary");
+    expect(dropZone!.dataset.dragActive).toBe("false");
     await waitFor(() => {
       expect(screen.getByText("Map CSV Headers")).toBeInTheDocument();
     });

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
@@ -22,15 +22,8 @@ vi.mock("@/components/ui/button", () => ({
 }));
 
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ open, onOpenChange, children }: any) => {
-    useEffect(() => {
-      if (open && typeof onOpenChange === "function") {
-        onOpenChange(open);
-      }
-    }, [open, onOpenChange]);
-    if (!open) return null;
-    return <div data-testid="dialog">{children}</div>;
-  },
+  Dialog: ({ open, children }: any) =>
+    open ? <div data-testid="dialog">{children}</div> : null,
   DialogContent: ({ children, className }: any) => <div data-testid="dialog-content" className={className}>{children}</div>,
   DialogFooter: ({ children }: any) => <div>{children}</div>,
   DialogHeader: ({ children }: any) => <div>{children}</div>,
@@ -87,7 +80,11 @@ describe("app/components/call/CallScreen.Dialogs.tsx", () => {
     expect(content.className).toContain("sm:max-w-[450px]");
     expect(content.className).not.toContain("grid-cols-1");
 
+    // Nothing navigates until OK is pressed (the mock no longer auto-fires
+    // onOpenChange, so this assertion cannot pass from mount effects).
+    expect(mocks.navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    expect(mocks.navigate).toHaveBeenCalledTimes(1);
     expect(mocks.navigate).toHaveBeenCalledWith(-1);
   });
 
