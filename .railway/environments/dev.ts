@@ -74,7 +74,12 @@ export function devResources() {
     healthcheck: "/readyz",
     healthcheckTimeout: 30,
     replicas: { "us-east4-eqdc4a": 1 },
-    networking: { privateNetworkEndpoint: "callcaster-review" },
+    networking: {
+      privateNetworkEndpoint: "callcaster-review",
+      // Codifies the manually-attached dev.callcaster.ca (#1356). No port pin:
+      // the live domain routes to the service's default exposed port.
+      customDomains: { "dev.callcaster.ca": {} },
+    },
     env: preservedVariables(appVariables),
   });
   const worker = service("callcaster-worker", {
