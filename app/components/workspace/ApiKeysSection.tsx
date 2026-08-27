@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { useFetcherOnIdle } from "@/hooks/utils/useFetcherOnIdle";
 import { useApiKeys, type ApiKeyRecord } from "@/hooks/workspace/useApiKeys";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -130,7 +131,9 @@ export default function ApiKeysSection({
       />
       <div className="space-y-4">
         {listError ? (
-          <p className="text-sm text-destructive">{listError}</p>
+          <Alert variant="destructive">
+            <AlertDescription>{listError}</AlertDescription>
+          </Alert>
         ) : null}
         {isLoading && keys.length === 0 ? (
           <div className="space-y-2">

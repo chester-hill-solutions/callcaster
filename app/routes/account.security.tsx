@@ -2,6 +2,7 @@ export { loader, action } from "./account.security.loader.server";
 
 import { Form, Link, useActionData, useLoaderData } from "react-router";
 import { AuthCard } from "@/components/shared/AuthCard";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -42,7 +43,9 @@ export default function AccountSecurity() {
         id="account-security"
       >
         {actionData?.error ? (
-          <Text className="text-destructive">{actionData.error}</Text>
+          <Alert variant="destructive">
+            <AlertDescription>{actionData.error}</AlertDescription>
+          </Alert>
         ) : null}
         {actionData?.success ? (
           <Text className="text-green-600">{actionData.success}</Text>

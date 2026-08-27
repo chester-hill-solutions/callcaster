@@ -13,6 +13,7 @@ import type { MetaFunction } from "react-router";
 import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -92,7 +93,9 @@ const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
       headingAs="h2"
     >
       {error ? (
-        <Text className="block text-center text-destructive">{error}</Text>
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       ) : null}
       <Form method="POST" className="flex w-full flex-col gap-4" id="signup-form">
         <div className="flex w-full gap-4">
