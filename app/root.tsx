@@ -12,9 +12,9 @@ import {
 } from "react-router";
 import type { LinksFunction, MetaFunction } from "react-router";
 import { useCallback } from "react";
-import { Toaster } from "sonner";
 
 import Navbar from "@/components/layout/Navbar";
+import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import stylesheet from "@/tailwind.css?url";
 
@@ -118,7 +118,7 @@ export default function App() {
             params={params}
           />
           <Outlet context={{} satisfies Record<string, never>} />
-          <Toaster position="top-right" richColors visibleToasts={3} />
+          <Toaster position="top-right" visibleToasts={3} />
           <ScrollRestoration />
           <Scripts />
         </ThemeProvider>
