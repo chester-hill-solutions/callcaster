@@ -370,5 +370,97 @@
     "risk": "low",
     "trackerRecommendation": "Verification only; no new code.",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 1346,
+    "verdict": "verify-close",
+    "recommendedTitle": "fix(audios): Add Audio upload zone opens the file picker",
+    "summary": "The /audios/new upload zone is inert: clicking the + never opens a file picker, so no file can be attached and Upload Audio always fails with \"Uploaded audio file is empty\". (Corrects the earlier record, which misattributed this to the campaign script editor; Sai reopened with a /audios/new screenshot.)",
+    "currentBehavior": "new.route.tsx renders a bare div around a className=hidden file input — no label htmlFor, no click handler. It is the only upload surface in the app without a label/button activation path.",
+    "rootCause": "Zone is decoration only; the picker is unreachable by mouse or keyboard. E2E missed it because setInputFiles(#media) writes files directly to the hidden input, bypassing the click.",
+    "resolution": "Fixed by #1359 (merged to dev as 2627e498). Verify on a current dev deploy: clicking the + zone opens the picker, the chosen name shows, Upload completes end-to-end; then close.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/audios/new.route.tsx",
+      "test/ui/audios-new-upload.test.tsx",
+      "app/components/campaign/settings/AddAudioSheet.tsx (reference pattern)"
+    ],
+    "existingTests": [
+      "test/workspace-audios-new.route.test.ts (action only)"
+    ],
+    "missingTests": [
+      "UI test for zone activation (added in #1359)"
+    ],
+    "acceptanceCriteria": [
+      "Clicking the + zone opens the file picker",
+      "Chosen filename shows in the zone",
+      "Upload completes end-to-end on a deployed env"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1335,
+    "verdict": "verify-close",
+    "recommendedTitle": "fix(ui): render remaining page-level errors through the shared destructive Alert",
+    "summary": "Sai reopened with the Create campaign page showing the duplicate-name error as bare red text. The #1353 migration covered banners (credits, chats, call screen, message settings) but page/section-level form errors still render as <Text className=text-destructive> on ~12 surfaces.",
+    "currentBehavior": "campaigns/new, campaigns/:id/audiences/new, audios/:name/edit, audios/record, signup, two-factor, admin dead-letters, account.security, AgentDesktop, ApiKeysSection, OutboundDialer, WorkspaceOverview render action/fetch errors as plain red text.",
+    "rootCause": "The Alert migration was scoped to hand-built banner boxes; actionData error texts kept their legacy markup. Field-level errors inside FormField are the design system and stay.",
+    "resolution": "Remaining scope fixed by #1361 (merged to dev as eafbd2d5) - ten surfaces now render the shared destructive Alert. Verify the Create-campaign duplicate-name error (and dark mode) on a current dev deploy; then close.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/campaigns/new.route.tsx:79",
+      "app/routes/workspaces+/$id/campaigns/$campaign_id/audiences/new.route.tsx:36",
+      "app/routes/workspaces+/$id/audios/$fileName.edit.route.tsx:57",
+      "app/routes/workspaces+/$id/audios/record.route.tsx:40",
+      "app/routes/signup.tsx:95",
+      "app/routes/two-factor.tsx:26",
+      "app/routes/admin+/dead-letters.route.tsx:47",
+      "app/routes/account.security.tsx:45",
+      "app/components/agent/AgentDesktop.tsx:384",
+      "app/components/workspace/ApiKeysSection.tsx:133",
+      "app/components/calls/OutboundDialer.tsx:83",
+      "app/components/workspace/WorkspaceOverview.tsx:141"
+    ],
+    "existingTests": [
+      "test/ui/message-settings.test.tsx (Alert pattern reference)"
+    ],
+    "missingTests": [
+      "Per-surface error rendering assertions where suites exist"
+    ],
+    "acceptanceCriteria": [
+      "No page-level error renders as bare red text",
+      "Dark mode uses semantic destructive tokens",
+      "Copy unchanged"
+    ],
+    "size": "M",
+    "risk": "low",
+    "trackerRecommendation": "One atomic PR; exclude FormField inline errors by design.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1362,
+    "verdict": "verify-close",
+    "summary": "On the call screen, when the AGENT hangs up the contact name clears, but when the CONTACT hangs up it stays. Behavior should be identical for both hang-up directions, and the code paths should not be divergent enough to allow this.",
+    "currentBehavior": "Fix merged; awaiting deployed verification.",
+    "rootCause": "Confirmed by trace: runCallStatusSideEffects billed and stamped a disposition but never dequeued the campaign_queue row, while /api/hangup always did - so only the agent-side hang-up collapsed nextRecipient.",
+    "resolution": "Fixed by #1368 (merged to dev as f696b3fa) - the webhook path now dequeues with the queue-row assignee, idempotent under the guarded RPC. Verify both hang-up orders collapse the contact name on a current dev deploy; then close.",
+    "lookIn": [
+      "app/components/call/",
+      "app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts (SSE)",
+      "call status webhook handlers"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-dialogs.test.tsx"
+    ],
+    "missingTests": [
+      "Contact-hangup clears/preserves name identically to agent-hangup (UI test per decision)"
+    ],
+    "acceptanceCriteria": [
+      "Both hang-up directions produce the same contact-name behavior",
+      "Shared teardown path or documented reason for divergence"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "blockedBy": []
   }
 ]

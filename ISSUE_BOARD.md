@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@fb8a08fa` · 80 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@f696b3fa` · 80 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 37
+## Fix now — 35
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -293,19 +293,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Destructive button text meets AA in both themes; States remain distinct; Package-owned fix applies to Button/LinkButton/asChild
 - Tracker: Portfolio-level fix; do not hand-roll locally.
 
-### [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335) All errors should use the standard toast/warning alert not just red text
-- **IN PROGRESS** · Verdict: **Fix now** · Size: M · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-27
-- Recommended title: **fix(ui): render remaining page-level errors through the shared destructive Alert**
-- Sai reopened with the Create campaign page showing the duplicate-name error as bare red text. The #1353 migration covered banners (credits, chats, call screen, message settings) but page/section-level form errors still render as <Text className=text-destructive> on ~12 surfaces.
-- Current behavior: campaigns/new, campaigns/:id/audiences/new, audios/:name/edit, audios/record, signup, two-factor, admin dead-letters, account.security, AgentDesktop, ApiKeysSection, OutboundDialer, WorkspaceOverview render action/fetch errors as plain red text.
-- Root cause: The Alert migration was scoped to hand-built banner boxes; actionData error texts kept their legacy markup. Field-level errors inside FormField are the design system and stay.
-- Resolution: Replace page-level error Text/p with <Alert variant=destructive><AlertDescription> per the design system, one commit per surface group (auth pages, campaign forms, audio pages, workspace components), keeping copy identical.
-- Look in: `app/routes/workspaces+/$id/campaigns/new.route.tsx:79`, `app/routes/workspaces+/$id/campaigns/$campaign_id/audiences/new.route.tsx:36`, `app/routes/workspaces+/$id/audios/$fileName.edit.route.tsx:57`, `app/routes/workspaces+/$id/audios/record.route.tsx:40`, `app/routes/signup.tsx:95`, `app/routes/two-factor.tsx:26`, `app/routes/admin+/dead-letters.route.tsx:47`, `app/routes/account.security.tsx:45`, `app/components/agent/AgentDesktop.tsx:384`, `app/components/workspace/ApiKeysSection.tsx:133`, `app/components/calls/OutboundDialer.tsx:83`, `app/components/workspace/WorkspaceOverview.tsx:141`
-- Existing tests: test/ui/message-settings.test.tsx (Alert pattern reference)
-- Missing tests: Per-surface error rendering assertions where suites exist
-- Done when: No page-level error renders as bare red text; Dark mode uses semantic destructive tokens; Copy unchanged
-- Tracker: One atomic PR; exclude FormField inline errors by design.
-
 ### [#1067](https://github.com/chester-hill-solutions/callcaster/issues/1067) Same screen mixes 'Call list' and 'Audience' terminology
 - Verdict: **Fix now** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-26
 - Recommended title: **refactor(copy): finish the user-facing 'Call list' rename while preserving Audience API names**
@@ -448,18 +435,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: sai.com reports format example; blank reports required only when required; valid https URLs save; server matches browser
 - Tracker: Implement with #1311.
 
-### [#1346](https://github.com/chester-hill-solutions/callcaster/issues/1346) clicking the audio upload button does nothing
-- **IN PROGRESS** · Verdict: **Fix now** · Size: XS · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-27
-- Recommended title: **fix(audios): Add Audio upload zone opens the file picker**
-- The /audios/new upload zone is inert: clicking the + never opens a file picker, so no file can be attached and Upload Audio always fails with "Uploaded audio file is empty". (Corrects the earlier record, which misattributed this to the campaign script editor; Sai reopened with a /audios/new screenshot.)
-- Current behavior: new.route.tsx renders a bare div around a className=hidden file input — no label htmlFor, no click handler. It is the only upload surface in the app without a label/button activation path.
-- Root cause: Zone is decoration only; the picker is unreachable by mouse or keyboard. E2E missed it because setInputFiles(#media) writes files directly to the hidden input, bypassing the click.
-- Resolution: PR #1359: make the zone a <label htmlFor=media> exactly like AddAudioSheet.tsx, plus a UI test proving label->input activation and chosen-name display.
-- Look in: `app/routes/workspaces+/$id/audios/new.route.tsx`, `test/ui/audios-new-upload.test.tsx`, `app/components/campaign/settings/AddAudioSheet.tsx (reference pattern)`
-- Existing tests: test/workspace-audios-new.route.test.ts (action only)
-- Missing tests: UI test for zone activation (added in #1359)
-- Done when: Clicking the + zone opens the file picker; Chosen filename shows in the zone; Upload completes end-to-end on a deployed env
-
 ### [#1356](https://github.com/chester-hill-solutions/callcaster/issues/1356) make dev railway environment point to dev.callcaster.ca USING RAILWAY InfraAsCode
 - Verdict: **Fix now** · Size: XS · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-08-27
 - Recommended title: **chore(iac): codify dev.callcaster.ca on the dev app service**
@@ -499,9 +474,22 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 13
+## Verify and close — 16
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335) All errors should use the standard toast/warning alert not just red text
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: M · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-27
+- Recommended title: **fix(ui): render remaining page-level errors through the shared destructive Alert**
+- Sai reopened with the Create campaign page showing the duplicate-name error as bare red text. The #1353 migration covered banners (credits, chats, call screen, message settings) but page/section-level form errors still render as <Text className=text-destructive> on ~12 surfaces.
+- Current behavior: campaigns/new, campaigns/:id/audiences/new, audios/:name/edit, audios/record, signup, two-factor, admin dead-letters, account.security, AgentDesktop, ApiKeysSection, OutboundDialer, WorkspaceOverview render action/fetch errors as plain red text.
+- Root cause: The Alert migration was scoped to hand-built banner boxes; actionData error texts kept their legacy markup. Field-level errors inside FormField are the design system and stay.
+- Resolution: Remaining scope fixed by #1361 (merged to dev as eafbd2d5) - ten surfaces now render the shared destructive Alert. Verify the Create-campaign duplicate-name error (and dark mode) on a current dev deploy; then close.
+- Look in: `app/routes/workspaces+/$id/campaigns/new.route.tsx:79`, `app/routes/workspaces+/$id/campaigns/$campaign_id/audiences/new.route.tsx:36`, `app/routes/workspaces+/$id/audios/$fileName.edit.route.tsx:57`, `app/routes/workspaces+/$id/audios/record.route.tsx:40`, `app/routes/signup.tsx:95`, `app/routes/two-factor.tsx:26`, `app/routes/admin+/dead-letters.route.tsx:47`, `app/routes/account.security.tsx:45`, `app/components/agent/AgentDesktop.tsx:384`, `app/components/workspace/ApiKeysSection.tsx:133`, `app/components/calls/OutboundDialer.tsx:83`, `app/components/workspace/WorkspaceOverview.tsx:141`
+- Existing tests: test/ui/message-settings.test.tsx (Alert pattern reference)
+- Missing tests: Per-surface error rendering assertions where suites exist
+- Done when: No page-level error renders as bare red text; Dark mode uses semantic destructive tokens; Copy unchanged
+- Tracker: One atomic PR; exclude FormField inline errors by design.
 
 ### [#1332](https://github.com/chester-hill-solutions/callcaster/issues/1332) dark mode opt out info box has black text
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-27
@@ -527,6 +515,18 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: Both audio paths verified working on a deployed env; Issue answered with the two paths
 - Tracker: Deploy-gated verification on latest dev; blocked by nothing once dev redeploys.
 
+### [#1346](https://github.com/chester-hill-solutions/callcaster/issues/1346) clicking the audio upload button does nothing
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-27
+- Recommended title: **fix(audios): Add Audio upload zone opens the file picker**
+- The /audios/new upload zone is inert: clicking the + never opens a file picker, so no file can be attached and Upload Audio always fails with "Uploaded audio file is empty". (Corrects the earlier record, which misattributed this to the campaign script editor; Sai reopened with a /audios/new screenshot.)
+- Current behavior: new.route.tsx renders a bare div around a className=hidden file input — no label htmlFor, no click handler. It is the only upload surface in the app without a label/button activation path.
+- Root cause: Zone is decoration only; the picker is unreachable by mouse or keyboard. E2E missed it because setInputFiles(#media) writes files directly to the hidden input, bypassing the click.
+- Resolution: Fixed by #1359 (merged to dev as 2627e498). Verify on a current dev deploy: clicking the + zone opens the picker, the chosen name shows, Upload completes end-to-end; then close.
+- Look in: `app/routes/workspaces+/$id/audios/new.route.tsx`, `test/ui/audios-new-upload.test.tsx`, `app/components/campaign/settings/AddAudioSheet.tsx (reference pattern)`
+- Existing tests: test/workspace-audios-new.route.test.ts (action only)
+- Missing tests: UI test for zone activation (added in #1359)
+- Done when: Clicking the + zone opens the file picker; Chosen filename shows in the zone; Upload completes end-to-end on a deployed env
+
 ### [#1327](https://github.com/chester-hill-solutions/callcaster/issues/1327) chore(scripts): collapse vestigial pageData.campaignDetails nesting
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-27
 - Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.
@@ -548,6 +548,17 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: CI quality job (typecheck + guards) on dev
 - Done when: rg sweep clean on dev; CI green after merge; Closure comment links the proof
 - Tracker: Verification only; no new code.
+
+### [#1362](https://github.com/chester-hill-solutions/callcaster/issues/1362) If the user hangs up, the contact name goes away but if the contact hangs up it stays. Latter should be true for both
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-27
+- On the call screen, when the AGENT hangs up the contact name clears, but when the CONTACT hangs up it stays. Behavior should be identical for both hang-up directions, and the code paths should not be divergent enough to allow this.
+- Current behavior: Fix merged; awaiting deployed verification.
+- Root cause: Confirmed by trace: runCallStatusSideEffects billed and stamped a disposition but never dequeued the campaign_queue row, while /api/hangup always did - so only the agent-side hang-up collapsed nextRecipient.
+- Resolution: Fixed by #1368 (merged to dev as f696b3fa) - the webhook path now dequeues with the queue-row assignee, idempotent under the guarded RPC. Verify both hang-up orders collapse the contact name on a current dev deploy; then close.
+- Look in: `app/components/call/`, `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts (SSE)`, `call status webhook handlers`
+- Existing tests: test/ui/call-screen-dialogs.test.tsx
+- Missing tests: Contact-hangup clears/preserves name identically to agent-hangup (UI test per decision)
+- Done when: Both hang-up directions produce the same contact-name behavior; Shared teardown path or documented reason for divergence
 
 ### [#1278](https://github.com/chester-hill-solutions/callcaster/issues/1278) bug(queue): manual dequeue of another agent's assigned row returns success but silently no-ops
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-26
@@ -668,20 +679,9 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 7
+## Needs reproduction — 6
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
-
-### [#1362](https://github.com/chester-hill-solutions/callcaster/issues/1362) If the user hangs up, the contact name goes away but if the contact hangs up it stays. Latter should be true for both
-- Verdict: **Needs reproduction** · Size: M · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-27
-- On the call screen, when the AGENT hangs up the contact name clears, but when the CONTACT hangs up it stays. Behavior should be identical for both hang-up directions, and the code paths should not be divergent enough to allow this.
-- Current behavior: Screenshot shows a terminated call still displaying the contact name after the contact hung up.
-- Root cause: Unknown. Suspect the agent-initiated teardown path resets call/contact state while the contact-side webhook/session-end path does not (or vice versa: the name is keyed to a session object only cleared on one path).
-- Resolution: Trace both hang-up paths (device disconnect vs Twilio status webhook / SSE call-ended event) to where the contact name is derived; unify the teardown so both paths clear or preserve identically, per the agreed product behavior.
-- Look in: `app/components/call/`, `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts (SSE)`, `call status webhook handlers`
-- Existing tests: test/ui/call-screen-dialogs.test.tsx
-- Missing tests: Contact-hangup clears/preserves name identically to agent-hangup (UI test per decision)
-- Done when: Both hang-up directions produce the same contact-name behavior; Shared teardown path or documented reason for divergence
 
 ### [#1358](https://github.com/chester-hill-solutions/callcaster/issues/1358) Audience File upload hover loses focus
 - Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-08-27
