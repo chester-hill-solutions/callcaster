@@ -28,14 +28,34 @@ export type LaunchCampaignResult =
   | { ok: false; error: string; issue?: CampaignReadinessIssue };
 
 /**
- * Launch a campaign (message or voice).
+ * Campaign types the worker machine-dials. `live_call` stays human-dialler
+ * territory (the calling work area), and message campaigns have their own
+ * SMS dispatch — everything else dials itself off the queue.
+ */
+export const MACHINE_DISPATCHED_VOICE_CAMPAIGN_TYPES = [
+  "robocall",
+  "simple_ivr",
+  "complex_ivr",
+] as const;
+
+export function isMachineDispatchedVoiceCampaignType(
+  type: string | null | undefined,
+): boolean {
+  return (MACHINE_DISPATCHED_VOICE_CAMPAIGN_TYPES as readonly string[]).includes(
+    type ?? "",
+  );
+}
+
+/**
+ * Launch a campaign (message or machine-dialled voice).
  *
  * 1. Validates configuration readiness.
  * 2. Checks expired dates.
  * 3. Changes campaign status.
- * 4. For message campaigns, enqueues a dispatch job.
+ * 4. Enqueues a dispatch job — SMS batches for message campaigns, IVR call
+ *    batches for robocall/simple_ivr/complex_ivr.
  *
- * Voice/IVR campaigns just get the status change (dialer handles dispatch).
+ * `live_call` campaigns just get the status change (the dialler owns them).
  */
 export async function launchCampaign(args: {
   workspaceId: string;
@@ -78,9 +98,10 @@ export async function launchCampaign(args: {
   const status = mode === "now" ? "running" : "scheduled";
   await updateCampaignStatusInWorkspace(workspaceId, Number(campaignId), { status });
 
-  // For message campaigns, enqueue dispatch work.
-  // Voice campaigns will be dispatched by the dialer.
-  if (campaign.type === "message") {
+  // Enqueue dispatch work for message campaigns (SMS batches) and
+  // machine-dialled voice campaigns (IVR call batches). live_call campaigns
+  // are dialled by humans in the calling work area.
+  if (campaign.type === "message" || isMachineDispatchedVoiceCampaignType(campaign.type)) {
     // `campaignDispatchHandler` reads the campaign's own `status` column, not
     // a `mode` param — this call never passed one through the schema either
     // way (`campaign_dispatch`'s params are `campaignId`/`workspaceId`/`userId`
