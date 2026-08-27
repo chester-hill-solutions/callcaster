@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@ddd0ef9a` · 66 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@6ed83493` · 77 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 32
+## Fix now — 36
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -254,6 +254,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Contact progress never exceeds assigned queue total; Message totals count message rows only; Call-attempt totals clearly labelled without contact denominator
 - Tracker: Webhook-side-effects/dispatch files in old enrichment are secondary; root is campaign-stats + result presentation.
 
+### [#1357](https://github.com/chester-hill-solutions/callcaster/issues/1357) make qa railway env use qa.callcaster.ca USING RAILWAY InfraAsCode
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-08-27
+- Recommended title: **chore(iac): attach qa.callcaster.ca to the qa environment**
+- Once the qa environment exists (#1355), attach qa.callcaster.ca to its app service through IaC so the env has a stable public URL.
+- Current behavior: No qa environment/domain yet; #1355 creates the env and its qa branch tracking.
+- Root cause: Env rename is sequenced first; domain follows.
+- Resolution: After #1355: add the custom domain to the qa app service in the environment model; DNS CNAME + certificate via Railway; plan-verify no drift.
+- Look in: `.railway/environments/staging.ts (to be renamed qa)`, `.railway/railway.ts`
+- Blocked by: [#1355](https://github.com/chester-hill-solutions/callcaster/issues/1355)
+- Missing tests: Plan for qa shows the domain and no unexpected diffs
+- Done when: qa.callcaster.ca serves the qa env; Domain modelled in IaC; Plan for qa is clean
+- Tracker: Sequenced behind #1355; do not attach domains to an env that does not exist yet.
+
 ### [#1342](https://github.com/chester-hill-solutions/callcaster/issues/1342) once a user hangs up the button still says hang up
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-26
 - Recommended title: **feat(call): show a confirmed 'Call back' action after a completed call**
@@ -279,6 +292,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: package-level contrast/axe for default/hover/focus/disabled; CallCaster smoke keeps package variant
 - Done when: Destructive button text meets AA in both themes; States remain distinct; Package-owned fix applies to Button/LinkButton/asChild
 - Tracker: Portfolio-level fix; do not hand-roll locally.
+
+### [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335) All errors should use the standard toast/warning alert not just red text
+- **IN PROGRESS** · Verdict: **Fix now** · Size: M · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-27
+- Recommended title: **fix(ui): render remaining page-level errors through the shared destructive Alert**
+- Sai reopened with the Create campaign page showing the duplicate-name error as bare red text. The #1353 migration covered banners (credits, chats, call screen, message settings) but page/section-level form errors still render as <Text className=text-destructive> on ~12 surfaces.
+- Current behavior: campaigns/new, campaigns/:id/audiences/new, audios/:name/edit, audios/record, signup, two-factor, admin dead-letters, account.security, AgentDesktop, ApiKeysSection, OutboundDialer, WorkspaceOverview render action/fetch errors as plain red text.
+- Root cause: The Alert migration was scoped to hand-built banner boxes; actionData error texts kept their legacy markup. Field-level errors inside FormField are the design system and stay.
+- Resolution: Replace page-level error Text/p with <Alert variant=destructive><AlertDescription> per the design system, one commit per surface group (auth pages, campaign forms, audio pages, workspace components), keeping copy identical.
+- Look in: `app/routes/workspaces+/$id/campaigns/new.route.tsx:79`, `app/routes/workspaces+/$id/campaigns/$campaign_id/audiences/new.route.tsx:36`, `app/routes/workspaces+/$id/audios/$fileName.edit.route.tsx:57`, `app/routes/workspaces+/$id/audios/record.route.tsx:40`, `app/routes/signup.tsx:95`, `app/routes/two-factor.tsx:26`, `app/routes/admin+/dead-letters.route.tsx:47`, `app/routes/account.security.tsx:45`, `app/components/agent/AgentDesktop.tsx:384`, `app/components/workspace/ApiKeysSection.tsx:133`, `app/components/calls/OutboundDialer.tsx:83`, `app/components/workspace/WorkspaceOverview.tsx:141`
+- Existing tests: test/ui/message-settings.test.tsx (Alert pattern reference)
+- Missing tests: Per-surface error rendering assertions where suites exist
+- Done when: No page-level error renders as bare red text; Dark mode uses semantic destructive tokens; Copy unchanged
+- Tracker: One atomic PR; exclude FormField inline errors by design.
 
 ### [#1067](https://github.com/chester-hill-solutions/callcaster/issues/1067) Same screen mixes 'Call list' and 'Audience' terminology
 - Verdict: **Fix now** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-26
@@ -412,6 +438,29 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: sai.com reports format example; blank reports required only when required; valid https URLs save; server matches browser
 - Tracker: Implement with #1311.
 
+### [#1346](https://github.com/chester-hill-solutions/callcaster/issues/1346) clicking the audio upload button does nothing
+- **IN PROGRESS** · Verdict: **Fix now** · Size: XS · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-27
+- Recommended title: **fix(audios): Add Audio upload zone opens the file picker**
+- The /audios/new upload zone is inert: clicking the + never opens a file picker, so no file can be attached and Upload Audio always fails with "Uploaded audio file is empty". (Corrects the earlier record, which misattributed this to the campaign script editor; Sai reopened with a /audios/new screenshot.)
+- Current behavior: new.route.tsx renders a bare div around a className=hidden file input — no label htmlFor, no click handler. It is the only upload surface in the app without a label/button activation path.
+- Root cause: Zone is decoration only; the picker is unreachable by mouse or keyboard. E2E missed it because setInputFiles(#media) writes files directly to the hidden input, bypassing the click.
+- Resolution: PR #1359: make the zone a <label htmlFor=media> exactly like AddAudioSheet.tsx, plus a UI test proving label->input activation and chosen-name display.
+- Look in: `app/routes/workspaces+/$id/audios/new.route.tsx`, `test/ui/audios-new-upload.test.tsx`, `app/components/campaign/settings/AddAudioSheet.tsx (reference pattern)`
+- Existing tests: test/workspace-audios-new.route.test.ts (action only)
+- Missing tests: UI test for zone activation (added in #1359)
+- Done when: Clicking the + zone opens the file picker; Chosen filename shows in the zone; Upload completes end-to-end on a deployed env
+
+### [#1356](https://github.com/chester-hill-solutions/callcaster/issues/1356) make dev railway environment point to dev.callcaster.ca USING RAILWAY InfraAsCode
+- Verdict: **Fix now** · Size: XS · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-08-27
+- Recommended title: **chore(iac): codify dev.callcaster.ca on the dev app service**
+- dev.callcaster.ca was attached to the dev environment manually via CLI; .railway/environments/dev.ts models no custom domain, so IaC plans drift and an apply could detach the live domain.
+- Current behavior: Domain serves traffic but exists only in Railway state, not in the environment model.
+- Root cause: Out-of-band CLI change (bb53c8e3 era) never backported into devResources().
+- Resolution: Add the custom domain to the CallCaster service networking in dev.ts; run the IaC plan and require a clean (no-diff) result with the domain still attached.
+- Look in: `.railway/environments/dev.ts`, `.github/workflows/railway-iac.yml`
+- Missing tests: IaC drift check: plan for dev shows no changes after codifying
+- Done when: dev.callcaster.ca present in devResources() networking; Plan for dev is clean (no drift); Domain still resolves after any subsequent apply
+
 ### [#1113](https://github.com/chester-hill-solutions/callcaster/issues/1113) Onboarding Number | No space between action titles
 - **IN PROGRESS** · Verdict: **Fix now** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
 - Recommended title: **fix(onboarding): prevent Number-step section outlines from crossing action titles**
@@ -440,9 +489,55 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 9
+## Verify and close — 13
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#1231](https://github.com/chester-hill-solutions/callcaster/issues/1231) Delete dead Supabase-era app code (shims, stale types, PostgREST constants)
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-27
+- Delete dead Supabase-era app code (shims, stale types, PostgREST constants). Removed in #1353 (6c724292); Sai reopened asking wra-sol to double-check the closure.
+- Current behavior: Tree has no supabase client imports, PostgREST constants, or compatibility shims; the visual-asset-review env Sai tests still runs the pre-#1353 build, so old code is expected there.
+- Root cause: Closure was correct on dev but unverifiable from the env Sai uses.
+- Resolution: Verify: rg for supabase|postgrest|SUPABASE across app/ returns nothing, CI structural guards pass on dev, then close with the grep output linked.
+- Look in: `app/`, `.eslintrc.cjs`
+- Existing tests: CI quality job (typecheck + guards) on dev
+- Done when: rg sweep clean on dev; CI green after merge; Closure comment links the proof
+- Tracker: Verification only; no new code.
+
+### [#1327](https://github.com/chester-hill-solutions/callcaster/issues/1327) chore(scripts): collapse vestigial pageData.campaignDetails nesting
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-27
+- Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.
+- Current behavior: Script editor routes consume flattened campaign/script fields; no campaignDetails accessor remains. Sai cannot see this on the stale review env.
+- Root cause: Internal refactor, invisible without a redeploy.
+- Resolution: Verify on dev: rg campaignDetails in app/ has no editor hits, script editor routes render and save (covered by test/ui/script-editor-*.test.tsx), then close.
+- Look in: `app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx`, `app/routes/workspaces+/$id/scripts/`
+- Existing tests: test/ui/script-editor-route.test.tsx; test/ui/script-editor-adapter.test.tsx; test/ui/campaign-script-edit-route.test.tsx
+- Done when: No campaignDetails references in editor code on dev; Editor tests green on dev
+- Tracker: Verification only; no new code.
+
+### [#1325](https://github.com/chester-hill-solutions/callcaster/issues/1325) How do I add audio to an IVR script
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-08-27
+- Sai asks how to add audio to an IVR script. Both paths exist: the Audio page Add Audio form, and the per-block upload button on recorded blocks in the script editor.
+- Current behavior: The Add Audio zone was inert (#1346) and the script-editor upload fix (#1353) plus #1359 are not deployed to the visual-asset-review env Sai tests on, so both paths look broken there.
+- Root cause: Support question masked by the #1346 zone bug and a stale deploy.
+- Resolution: After #1359 merges and the qa/dev env Sai uses is redeployed: confirm Add Audio upload works end-to-end and the script editor recorded-block Upload audio button opens the picker; then answer on the issue and close.
+- Look in: `app/routes/workspaces+/$id/audios/new.route.tsx`, `app/components/campaign/settings/script/ScriptBlockEditor.tsx`
+- Blocked by: [#1346](https://github.com/chester-hill-solutions/callcaster/issues/1346)
+- Existing tests: test/ui/audios-new-upload.test.tsx (#1359)
+- Done when: Both audio paths verified working on a deployed env; Issue answered with the two paths
+- Tracker: Blocked on the #1346 fix reaching a deployed env.
+
+### [#1332](https://github.com/chester-hill-solutions/callcaster/issues/1332) dark mode opt out info box has black text
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-27
+- Dark-mode opt-out info box rendered black text on a dark surface. The hand-built box was migrated to the shared Alert with semantic tokens in #1353 (7f11a230, scoped #1332/#1312/#1335).
+- Current behavior: Sai reopened with a screenshot from the visual-asset-review env, which does not run the #1353 deploy — the old markup is expected there.
+- Root cause: Fix landed on dev but the env Sai tests was not redeployed.
+- Resolution: Verify the opt-out banner on a deployed dev/qa env in dark mode shows semantic info colors; then close. If it still shows black text on dev, reopen as fix-now with the banner component named.
+- Look in: `app/components/chats/ChatOptOutBanner.tsx`
+- Existing tests: test/ui/components-chats-contact.test.tsx
+- Missing tests: Dark-mode token assertion (visual; verify manually)
+- Done when: Opt-out box uses the shared info Alert tokens in dark mode on a deployed env
+- Tracker: Deploy-gated verification, not new code.
 
 ### [#1278](https://github.com/chester-hill-solutions/callcaster/issues/1278) bug(queue): manual dequeue of another agent's assigned row returns success but silently no-ops
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-26
@@ -563,9 +658,20 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 5
+## Needs reproduction — 6
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
+
+### [#1358](https://github.com/chester-hill-solutions/callcaster/issues/1358) Audience File upload hover loses focus
+- Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-08-27
+- While dragging a file over the audience upload zone on macOS, after ~1s the Finder window drops behind the browser and the zone loses its drag-active styling — yet the drop still succeeds. Something in the app grabs window focus mid-drag.
+- Current behavior: Zone lights up on dragenter, then the highlight drops while the cursor is still over it; drop continues to work; moving the file away and back restores the highlight.
+- Root cause: Unconfirmed. The zone's own dragDepth counter is not the suspect (a dragleave would not steal OS focus and the drop still lands). Suspects: React Router window-focus revalidation firing when the browser regains focus, the workspace SSE subscription reconnect/refresh, any window.focus() or periodic re-render that remounts the step and resets isDragging state.
+- Resolution: Instrument on macOS (or Safari/Chromium devtools): log focus/blur, RR revalidation, and zone mount/unmount during a drag. Fix the component that steals focus; do not band-aid the styling.
+- Look in: `app/components/audience/AudienceUploadFileStep.tsx`, `app/hooks/media (SSE subscription hooks)`, `app/routes/workspaces+/$id.tsx (revalidation surface)`
+- Existing tests: test/ui/audience-uploader.test.tsx (data-drag-active contract)
+- Missing tests: Focus-steal repro (manual, macOS)
+- Done when: Component grabbing focus identified with evidence; Drag styling persists for the whole hover; Drop still works
 
 ### [#1344](https://github.com/chester-hill-solutions/callcaster/issues/1344) call work area section outline curve doesn't match underlying element curve. extra visible on dark mode
 - Verdict: **Needs reproduction** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
@@ -634,12 +740,35 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 7
+## Needs decision — 9
 
 Product, security, or operations decision required before implementation can be scoped.
 
-### [#1162](https://github.com/chester-hill-solutions/callcaster/issues/1162) change default branch to dev for some DevExp improvements?
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-08-26
+### [#1128](https://github.com/chester-hill-solutions/callcaster/issues/1128) When you make a change on a campaign setup, you can't tell you have changes to save
+- **IN PROGRESS** · Verdict: **Needs decision** · Size: M · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-08-27
+- Campaign setup gives no unsaved-changes affordance: Sai wants Save at top and bottom, Discard/Save Changes at the bottom, and Next disabled while there are unsaved changes.
+- Current behavior: Campaign setup steps offer Next without indicating pending edits; changes can be lost silently by navigating away.
+- Root cause: No dirty-state model in the setup wizard; the earlier closure did not address the UX gap and Sai reopened it.
+- Resolution: Decide scope: single dirty flag per step vs form-level; whether Next is blocked or warns; where Save/Discard live. Then implement with a shared useDirtyCheck pattern.
+- Look in: `app/routes/workspaces+/$id/campaigns (setup wizard routes)`
+- Missing tests: Dirty-state unit tests per the chosen model
+- Done when: Unsaved changes are visible before navigating; Discard and Save are explicit at the bottom; Next behavior agreed and implemented
+- Tracker: Product decision first: blocking Next vs warning dialog.
+
+### [#1355](https://github.com/chester-hill-solutions/callcaster/issues/1355) Create/rename staging environment on Railway to be "qa" and point it at the qa branch
+- Verdict: **Needs decision** · Size: M · Risk: high · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-08-27
+- Recommended title: **chore(iac): rename the staging environment to qa tracking the qa branch**
+- Rename the Railway staging environment to "qa" and point its services at the qa branch, making qa the persistent pre-prod environment.
+- Current behavior: staging is modelled in .railway/environments/staging.ts tracking master during the v2 rehearsal, with a documented phase-3 flip to source(production); CI (railway-iac.yml) plans staging on PRs and scripts/railway/sync-staging-vars.sh populates its vars.
+- Root cause: Environment naming/branching strategy changed mid-#1300 rollout; the rename interacts with the staged staging-cutover plan (#1300/#1303) — rename before or after the phase-3 flip is undecided.
+- Resolution: Decide sequencing (rename now vs after cutover), then in one change: rename the env on Railway, rename/rehome the environment model, update railway.ts guards, CI env names, sync script, and docs. wra-sol owns env topology.
+- Look in: `.railway/environments/staging.ts`, `.railway/railway.ts`, `.github/workflows/railway-iac.yml`, `scripts/railway/sync-staging-vars.sh`
+- Missing tests: Plan for the renamed env shows the expected topology and nothing else
+- Done when: qa env exists tracking the qa branch; IaC models qa explicitly (no dev-clone fallback); CI plans qa; no environment can be applied as an accidental clone; Docs/ADR updated
+- Tracker: Coordinate with wra-sol; do not apply while the #1303 production cutover is mid-flight. #1357 waits on this.
+
+### [#1162](https://github.com/chester-hill-solutions/callcaster/issues/1162) change default branch to qa for some DevExp improvements?
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-08-27
 - Recommended title: **chore(repo): make a QA branch the protected default and align CI triggers**
 - Latest requirement: a lowercase 'qa' default branch with dev -> qa -> production promotion, so 'close #<n>' chains persist and gh defaults to the testing branch. Earlier threads debated dev/UAT.
 - Current behavior: Default branch is master; CI/E2E push triggers omit dev; Railway IaC models dev -> production; platform guide says master is default.

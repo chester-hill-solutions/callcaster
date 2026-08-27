@@ -269,5 +269,106 @@
     "risk": "low",
     "trackerRecommendation": "Close or document; removing the prefix is a security regression risk.",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 1325,
+    "verdict": "verify-close",
+    "summary": "Sai asks how to add audio to an IVR script. Both paths exist: the Audio page Add Audio form, and the per-block upload button on recorded blocks in the script editor.",
+    "currentBehavior": "The Add Audio zone was inert (#1346) and the script-editor upload fix (#1353) plus #1359 are not deployed to the visual-asset-review env Sai tests on, so both paths look broken there.",
+    "rootCause": "Support question masked by the #1346 zone bug and a stale deploy.",
+    "resolution": "After #1359 merges and the qa/dev env Sai uses is redeployed: confirm Add Audio upload works end-to-end and the script editor recorded-block Upload audio button opens the picker; then answer on the issue and close.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/audios/new.route.tsx",
+      "app/components/campaign/settings/script/ScriptBlockEditor.tsx"
+    ],
+    "existingTests": [
+      "test/ui/audios-new-upload.test.tsx (#1359)"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Both audio paths verified working on a deployed env",
+      "Issue answered with the two paths"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Blocked on the #1346 fix reaching a deployed env.",
+    "blockedBy": [
+      1346
+    ]
+  },
+  {
+    "issueNumber": 1332,
+    "verdict": "verify-close",
+    "summary": "Dark-mode opt-out info box rendered black text on a dark surface. The hand-built box was migrated to the shared Alert with semantic tokens in #1353 (7f11a230, scoped #1332/#1312/#1335).",
+    "currentBehavior": "Sai reopened with a screenshot from the visual-asset-review env, which does not run the #1353 deploy — the old markup is expected there.",
+    "rootCause": "Fix landed on dev but the env Sai tests was not redeployed.",
+    "resolution": "Verify the opt-out banner on a deployed dev/qa env in dark mode shows semantic info colors; then close. If it still shows black text on dev, reopen as fix-now with the banner component named.",
+    "lookIn": [
+      "app/components/chats/ChatOptOutBanner.tsx"
+    ],
+    "existingTests": [
+      "test/ui/components-chats-contact.test.tsx"
+    ],
+    "missingTests": [
+      "Dark-mode token assertion (visual; verify manually)"
+    ],
+    "acceptanceCriteria": [
+      "Opt-out box uses the shared info Alert tokens in dark mode on a deployed env"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Deploy-gated verification, not new code.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1231,
+    "verdict": "verify-close",
+    "summary": "Delete dead Supabase-era app code (shims, stale types, PostgREST constants). Removed in #1353 (6c724292); Sai reopened asking wra-sol to double-check the closure.",
+    "currentBehavior": "Tree has no supabase client imports, PostgREST constants, or compatibility shims; the visual-asset-review env Sai tests still runs the pre-#1353 build, so old code is expected there.",
+    "rootCause": "Closure was correct on dev but unverifiable from the env Sai uses.",
+    "resolution": "Verify: rg for supabase|postgrest|SUPABASE across app/ returns nothing, CI structural guards pass on dev, then close with the grep output linked.",
+    "lookIn": [
+      "app/",
+      ".eslintrc.cjs"
+    ],
+    "existingTests": [
+      "CI quality job (typecheck + guards) on dev"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "rg sweep clean on dev",
+      "CI green after merge",
+      "Closure comment links the proof"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verification only; no new code.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1327,
+    "verdict": "verify-close",
+    "summary": "Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.",
+    "currentBehavior": "Script editor routes consume flattened campaign/script fields; no campaignDetails accessor remains. Sai cannot see this on the stale review env.",
+    "rootCause": "Internal refactor, invisible without a redeploy.",
+    "resolution": "Verify on dev: rg campaignDetails in app/ has no editor hits, script editor routes render and save (covered by test/ui/script-editor-*.test.tsx), then close.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx",
+      "app/routes/workspaces+/$id/scripts/"
+    ],
+    "existingTests": [
+      "test/ui/script-editor-route.test.tsx",
+      "test/ui/script-editor-adapter.test.tsx",
+      "test/ui/campaign-script-edit-route.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "No campaignDetails references in editor code on dev",
+      "Editor tests green on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verification only; no new code.",
+    "blockedBy": []
   }
 ]
