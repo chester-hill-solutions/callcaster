@@ -5,6 +5,7 @@ import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { useFetcherOnIdle } from "@/hooks/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Helper function to generate survey links
 // const generateSurveyLink = (contactId: number, surveyId: string, baseUrl: string = window.location.origin) => {
@@ -289,18 +290,22 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                             </div>
                         </div>
                         {getErrorMessage(mediaFetcher.data?.error) && (
-                            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                                {getErrorMessage(mediaFetcher.data?.error)}
-                            </div>
+                            <Alert variant="destructive">
+                                <AlertDescription>
+                                    {getErrorMessage(mediaFetcher.data?.error)}
+                                </AlertDescription>
+                            </Alert>
                         )}
                         {mediaFetcher.data?.success && mediaFetcher.state === "idle" && (
-                            <div className="rounded-md border border-success/30 bg-success/5 px-3 py-2 text-sm text-success">
-                                {mediaFetcher.data.uploadedFileName
-                                    ? "Media uploaded."
-                                    : mediaFetcher.data.removedFileName
-                                        ? "Media removed."
-                                        : "Media updated."}
-                            </div>
+                            <Alert variant="success" role="status">
+                                <AlertDescription>
+                                    {mediaFetcher.data.uploadedFileName
+                                        ? "Media uploaded."
+                                        : mediaFetcher.data.removedFileName
+                                            ? "Media removed."
+                                            : "Media updated."}
+                                </AlertDescription>
+                            </Alert>
                         )}
                         <div className="flex items-center justify-between">
                             <div className="text-sm leading-snug text-muted-foreground">

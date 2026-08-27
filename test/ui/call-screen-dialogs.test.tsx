@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
@@ -22,19 +22,13 @@ vi.mock("@/components/ui/button", () => ({
 }));
 
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ open, onOpenChange, children }: any) => {
-    useEffect(() => {
-      if (open && typeof onOpenChange === "function") {
-        onOpenChange(open);
-      }
-    }, [open, onOpenChange]);
-    if (!open) return null;
-    return <div data-testid="dialog">{children}</div>;
-  },
-  DialogContent: ({ children, className }: any) => <div className={className}>{children}</div>,
+  Dialog: ({ open, children }: any) =>
+    open ? <div data-testid="dialog">{children}</div> : null,
+  DialogContent: ({ children, className }: any) => <div data-testid="dialog-content" className={className}>{children}</div>,
   DialogFooter: ({ children }: any) => <div>{children}</div>,
   DialogHeader: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <div>{children}</div>,
+  DialogTitle: ({ children }: any) => <div data-testid="dialog-title">{children}</div>,
+  DialogDescription: ({ children }: any) => <div data-testid="dialog-description">{children}</div>,
 }));
 
 vi.mock("react-router", () => ({
@@ -67,15 +61,30 @@ function baseProps(overrides: Partial<any> = {}) {
 }
 
 describe("app/components/call/CallScreen.Dialogs.tsx", () => {
-  test("inactive campaign dialog calls navigate(-1) via OK and onOpenChange", async () => {
+  test("inactive campaign dialog uses the standard header/description composition", async () => {
     const { CampaignDialogs } = await import("@/components/call/CallScreen.Dialogs");
     mocks.navigate.mockReset();
 
     render(<CampaignDialogs {...baseProps({ isActive: false })} />);
 
+    // Title lives in DialogTitle, the explanation in DialogDescription (#1126:
+    // previously a centered oversized title plus a hand-wrapped <p>).
     expect(screen.getByText("This campaign is currently inactive.")).toBeInTheDocument();
-    expect(screen.getByText("This campaign is currently inactive.").closest("div[class*='grid-cols-1']")).toBeInTheDocument();
+    expect(screen.getByTestId("dialog-title")).toHaveTextContent("This campaign is currently inactive.");
+    expect(screen.getByTestId("dialog-description")).toHaveTextContent(
+      /outside of the designated calling window/i,
+    );
+
+    // Standard width treatment; the old centered/grid artifacts are gone.
+    const content = screen.getByTestId("dialog-content");
+    expect(content.className).toContain("sm:max-w-[450px]");
+    expect(content.className).not.toContain("grid-cols-1");
+
+    // Nothing navigates until OK is pressed (the mock no longer auto-fires
+    // onOpenChange, so this assertion cannot pass from mount effects).
+    expect(mocks.navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    expect(mocks.navigate).toHaveBeenCalledTimes(1);
     expect(mocks.navigate).toHaveBeenCalledWith(-1);
   });
 

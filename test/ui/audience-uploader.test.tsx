@@ -194,6 +194,41 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
   });
 
+  test("shows an active drag state while a file is over the zone and clears it on leave/drop (#1203)", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    render(<AudienceUploader audienceName="A1" />);
+    const dropZone = screen.getByText("Drop or choose a CSV file").closest("label");
+    expect(dropZone).not.toBeNull();
+
+    // The drag-active contract is exposed as a stable data attribute; the
+    // exact highlight classes are a styling concern that may change.
+    expect(dropZone!.dataset.dragActive).toBe("false");
+    fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("true");
+
+    // Nested children emit their own dragleave; the active state must persist
+    // until the cursor truly leaves the zone.
+    fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [] } });
+    fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("true");
+
+    // Leaving fully clears the highlight.
+    fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("false");
+
+    // Re-entering then dropping clears it and still imports the file.
+    const file = new File(["Phone\n123"], "contacts.csv", { type: "text/csv" });
+    (file as any).text = async () => "Phone\n123";
+    fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [file] } });
+    expect(dropZone!.dataset.dragActive).toBe("true");
+    fireEvent.drop(dropZone!, { dataTransfer: { files: [file] } });
+    expect(dropZone!.dataset.dragActive).toBe("false");
+    await waitFor(() => {
+      expect(screen.getByText("Map CSV Headers")).toBeInTheDocument();
+    });
+  });
+
   test("hides step strip when embedded (onUploadComplete)", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");

@@ -1,0 +1,275 @@
+[
+  {
+    "issueNumber": 1157,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "epic(testing): controlled synthetic campaign audiences",
+    "summary": "Let testers upload controlled test audiences for voice/SMS/AI scenarios; in simulator mode data stays synthetic and never contacts real recipients; measure setup time, callback delay, completion, throughput. Parent of #1191/#1192/#1193.",
+    "currentBehavior": "Seed has one generic audience; upload maps contact fields only; no scenario registry; mock returns fixed successes.",
+    "rootCause": "Dependent on the synthetic provider (#1328).",
+    "resolution": "Keep as parent epic; implement #1192 (server-owned scenario profiles) only after the synthetic provider model exists; #1193 is the final acceptance journey.",
+    "lookIn": [
+      "e2e/fixtures/seed.ts",
+      "app/components/audience/AudienceUploader.tsx",
+      "app/components/audience/AudienceUploadMapStep.tsx"
+    ],
+    "existingTests": [
+      "seed fixture only"
+    ],
+    "missingTests": [
+      "scenario safety and telemetry"
+    ],
+    "acceptanceCriteria": [
+      "Test audiences reference server-owned scenario ids",
+      "Simulator rejects real recipient numbers",
+      "Runs report timing metrics",
+      "No billable traffic"
+    ],
+    "size": "L-XL",
+    "risk": "high",
+    "trackerRecommendation": "Parent epic; blocked by #1328.",
+    "blockedBy": [
+      1328
+    ]
+  },
+  {
+    "issueNumber": 1192,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "feat(test-audiences): select trusted server-owned scenario profiles",
+    "summary": "Test-audience uploads should select server-owned scenario profiles (voice result, callback timing, voicemail greeting, SMS result, optional reply, media fixture) — never accept arbitrary simulation behavior from CSV rows.",
+    "currentBehavior": "Header mapping supports contact fields only; upload submits file + mapping only; no profile registry.",
+    "rootCause": "Blocked by the synthetic provider (#1328).",
+    "resolution": "Add a server-owned profile registry and an audience-level profile reference; reject unknown/unauthorized profiles and CSV behavior fields.",
+    "lookIn": [
+      "app/components/audience/AudienceUploadMapStep.tsx",
+      "app/components/audience/AudienceUploader.tsx",
+      "scripts/e2e/seed-data.mjs"
+    ],
+    "existingTests": [
+      "none"
+    ],
+    "missingTests": [
+      "unknown profile rejection",
+      "CSV behavior-field rejection",
+      "profile-to-provider contract"
+    ],
+    "acceptanceCriteria": [
+      "Clients submit only a profile id",
+      "Unknown/unauthorized rejected server-side",
+      "CSV cannot define outcomes",
+      "Profile reaches provider unchanged"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Child of #1157; blocked by #1328.",
+    "blockedBy": [
+      1328
+    ]
+  },
+  {
+    "issueNumber": 1268,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "epic(interactive-sms): ship release-one audited SMS/MMS interactions",
+    "summary": "Parent epic for interactive SMS/MMS. Milestone A (domain id, single dispatch coordinator, credit reservation, policy) and B (vertical slice). Sub-issues #1269-1272.",
+    "currentBehavior": "A2 consolidation mostly landed; A1, A3, B1 absent; consent/disclosure tables, flags, and observability have no dedicated child issue; tracking docs stale.",
+    "rootCause": "Epic; not single-agent work.",
+    "resolution": "Refresh milestone status in docs/interactive-sms-build-tracking.md; create missing child issues (consent, flags/observability, correlation); keep #1272 blocked until Phase A integrity gates pass.",
+    "lookIn": [
+      "docs/interactive-sms-delivery-plan.md",
+      "docs/interactive-sms-build-tracking.md",
+      "#1269",
+      "#1270",
+      "#1271",
+      "#1272"
+    ],
+    "existingTests": [
+      "n/a"
+    ],
+    "missingTests": [
+      "release-level suite once implemented"
+    ],
+    "acceptanceCriteria": [
+      "Every milestone has owned child issue + dependency",
+      "A1-A3 exit gates pass before B1",
+      "One flagged workspace completes the slice without duplicate effects/billing"
+    ],
+    "size": "XL",
+    "risk": "high",
+    "trackerRecommendation": "Keep as epic; split before assignment.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1269,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "feat(scriptkit): add provider-neutral interaction document v2 and deterministic reducer",
+    "summary": "Create vendored @chester-hill-solutions/scriptkit-interaction-core: ScriptDocument v2 schemas (send/collect/action/wait/handoff/complete), typed transitions, strict publish validator, deterministic reducer/effects, exact classifier, explicit convertV1ToV2. Provider/framework neutral.",
+    "currentBehavior": "Only v1 call-script packages exist under vendor/scriptkit; v2 exists only in ADR-0032.",
+    "rootCause": "Not implemented.",
+    "resolution": "Build the package only (no persistence/Twilio/React/billing); ship golden fixtures, publish-validation positive/negative, reducer determinism, effect-ID stability, simulator parity.",
+    "lookIn": [
+      "vendor/scriptkit/",
+      "docs/adr/0032-interactive-sms-script-document-v2.md",
+      "docs/interactive-sms-delivery-plan.md"
+    ],
+    "existingTests": [
+      "none"
+    ],
+    "missingTests": [
+      "v1->v2 golden",
+      "publish validation",
+      "reducer determinism",
+      "effect ID stability",
+      "simulator parity"
+    ],
+    "acceptanceCriteria": [
+      "All six ops + transitions exported",
+      "convertV1ToV2 explicit with stable warnings",
+      "Stable error codes",
+      "Deterministic reducer for fixtures"
+    ],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Blocks #1272; independent of #1271; can start.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1271,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "feat(billing): add local message identity and atomic SMS credit reservations",
+    "summary": "Give message a local domain-id PK with nullable indexed twilio_sid (rows before provider dispatch) and an atomic PL/pgSQL credit-reservation RPC with settle/reconcile.",
+    "currentBehavior": "message.sid is the required PK; campaign messages created at Twilio before local persistence; no reservation schema/RPC; billing supports idempotent writes but not holds.",
+    "rootCause": "Not implemented.",
+    "resolution": "Additive identity migration first, then reservation/settlement migration + service. Reuse apply_ledger_entry_and_sync_credits, shared/pricing.ts, shared/billing-keys.ts.",
+    "lookIn": [
+      "app/db/schema.ts",
+      "app/lib/sms-send.server.ts",
+      "app/lib/transaction-history.server.ts",
+      "shared/pricing.ts",
+      "shared/billing-keys.ts",
+      "client/migrations/"
+    ],
+    "existingTests": [
+      "none"
+    ],
+    "missingTests": [
+      "message before SID",
+      "nullable unique SID",
+      "concurrent reservation affordability",
+      "idempotent settle/release/reconcile"
+    ],
+    "acceptanceCriteria": [
+      "Message row exists before SID",
+      "SID nullable + unique when present",
+      "Concurrent reservations cannot overspend",
+      "Settle/release/reconcile idempotent"
+    ],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Blocks #1272; independent of the v2 editor.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1272,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "feat(interactive-sms): deliver a flagged exact-match opener-to-follow-up run slice",
+    "summary": "B1 vertical slice: publish immutable Revision, create immutable Run, Run-owned queue, claim + Interaction, dispatch coordinator, inbound reply correlation, exact classification, follow-up within windows, typed outcome.",
+    "currentBehavior": "No script_revision/campaign_run/interaction/interaction_event/interaction_effect schema exists; message has no interaction references.",
+    "rootCause": "Not implemented; hard-blocked by A1/A2/A3.",
+    "resolution": "Split into: revision/run schema; interaction persistence; opener dispatch + endpoint correlation; exact classification + follow-up; flagged API/editor/simulator/funnel. Do not assign as one task.",
+    "lookIn": [
+      "docs/adr/0033-immutable-revision-run-and-audited-interaction-state.md",
+      "app/db/schema.ts",
+      "docs/interactive-sms-delivery-plan.md"
+    ],
+    "existingTests": [
+      "none"
+    ],
+    "missingTests": [
+      "flagged end-to-end slice",
+      "no duplicate effects/billing on retries",
+      "simulator parity"
+    ],
+    "acceptanceCriteria": [
+      "Flagged workspace publishes + launches one run",
+      "One queue entry -> one interaction + idempotent opener",
+      "Exact reply advances reducer + one follow-up"
+    ],
+    "size": "XL",
+    "risk": "high",
+    "trackerRecommendation": "Keep blocked until all Phase A gates pass.",
+    "blockedBy": [
+      1269,
+      1270,
+      1271
+    ]
+  },
+  {
+    "issueNumber": 1328,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "feat(telephony): add provider factory and synthetic SMS transport (split further)",
+    "summary": "Build a gateway seam between CallCaster call/SMS paths and the provider, with a synthetic provider for local dev/tests (no Twilio credentials). Consolidates #1156/#1194/#1161.",
+    "currentBehavior": "Workspace Twilio client hard-wired; IVR/number-rental call Twilio directly; SMS has a client-like seam; E2E mocks intercept browser HTTP only; Compose uses placeholder creds + disabled webhook validation.",
+    "rootCause": "No server-side provider abstraction.",
+    "resolution": "Introduce a provider factory + synthetic SMS transport first; add voice and number rental as later slices. Provider selection explicit and fail-closed by environment.",
+    "lookIn": [
+      "app/lib/database/workspace.server.ts",
+      "app/lib/ivr-initiate.server.ts",
+      "app/lib/platform-workspace-numbers.server.ts",
+      "app/lib/sms-send.server.ts",
+      "e2e/fixtures/twilio-mocks.ts"
+    ],
+    "existingTests": [
+      "e2e mocks (browser-level only)"
+    ],
+    "missingTests": [
+      "server-side synthetic contract",
+      "status callback delivery",
+      "no external Twilio request assertion",
+      "synthetic number lifecycle"
+    ],
+    "acceptanceCriteria": [
+      "Provider selection explicit and fail-closed",
+      "Synthetic sends create deterministic events without creds",
+      "Tests prove no Twilio network call",
+      "Real Twilio unchanged"
+    ],
+    "size": "XL",
+    "risk": "high",
+    "trackerRecommendation": "Split: factory+SMS, voice, rental. Dependencies #1157/#1192/#1193.",
+    "blockedBy": [
+      1270
+    ]
+  },
+  {
+    "issueNumber": 1329,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "feat(twilio-iac): add ownership manifest and read-only environment plan",
+    "summary": "Roadmap for the Twilio environment program (IaC controller, accounts, cost, testing). Railway IaC is separate and done; no Twilio controller exists. Sub-issues were folded into this issue and are not implemented.",
+    "currentBehavior": "Twilio operations are imperative workspace actions; workspace provisioning owns dynamic resources; no ownership manifest, plan artifact, or drift workflow.",
+    "rootCause": "Roadmap not started; too large for one agent.",
+    "resolution": "First slice only: ownership manifest + read-only 'plan' command (no apply/delete/rental/prune). Later: account separation, state import, drift guardrails, cost inventory, Test Credentials + smoke tests.",
+    "lookIn": [
+      "app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts",
+      "app/lib/platform-workspace-numbers.server.ts",
+      "scripts/railway/",
+      ".railway/README.md"
+    ],
+    "existingTests": [
+      "none"
+    ],
+    "missingTests": [
+      "plan fixtures",
+      "destructive-change rejection",
+      "read-back verification"
+    ],
+    "acceptanceCriteria": [
+      "Every managed resource has one env/owner/cleanup rule",
+      "Read-only plan compares declared vs actual",
+      "Plan cannot create/delete/rent",
+      "Secrets outside source and output"
+    ],
+    "size": "XL",
+    "risk": "high",
+    "trackerRecommendation": "Split; first slice is M/medium. #1195 overlaps its testing section.",
+    "blockedBy": []
+  }
+]

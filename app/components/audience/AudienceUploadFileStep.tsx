@@ -1,5 +1,6 @@
-import { forwardRef } from "react";
+import { forwardRef, useRef, useState } from "react";
 import { MdUploadFile } from "react-icons/md";
+import { cn } from "@/lib/utils";
 
 export type AudienceUploadFileStepProps = {
   onFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -10,16 +11,46 @@ export const AudienceUploadFileStep = forwardRef<
   HTMLInputElement,
   AudienceUploadFileStepProps
 >(function AudienceUploadFileStep({ onFileChange, onFileDrop }, ref) {
+  const [isDragging, setIsDragging] = useState(false);
+  // dragenter/dragleave fire per nested child; a depth counter keeps the
+  // active state consistent until the cursor actually leaves the zone.
+  const dragDepth = useRef(0);
+
+  const handleDragEnter = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    dragDepth.current += 1;
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    dragDepth.current -= 1;
+    if (dragDepth.current <= 0) {
+      dragDepth.current = 0;
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLLabelElement>) => {
+    event.preventDefault();
+    dragDepth.current = 0;
+    setIsDragging(false);
+    const file = event.dataTransfer.files[0];
+    if (file) onFileDrop(file);
+  };
+
   return (
     <label
       htmlFor="contacts"
-      className="flex min-h-[8rem] cursor-pointer flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border bg-muted/30 px-6 py-8 text-center transition-colors hover:border-border hover:bg-muted/50"
+      data-drag-active={isDragging}
+      className={cn(
+        "flex min-h-[8rem] cursor-pointer flex-col items-center justify-center gap-3 rounded-md border border-dashed border-border bg-muted/30 px-6 py-8 text-center transition-colors hover:border-border hover:bg-muted/50",
+        isDragging && "border-primary bg-primary/10",
+      )}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
       onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault();
-        const file = event.dataTransfer.files[0];
-        if (file) onFileDrop(file);
-      }}
+      onDrop={handleDrop}
     >
       <span className="inline-flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
         <MdUploadFile className="size-5" aria-hidden />

@@ -16,6 +16,7 @@ import type { OnboardingLoaderData } from "./$id/onboarding.loader.server";
 import { workspacePanelHeightLgClass } from "@/components/workspace/workspace-panel-classes";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useWorkspaceEventSubscription } from "@/hooks/realtime/useWorkspaceEventSubscription";
 import type { CampaignQueueProgressCounts } from "@/components/campaign/CampaignQueueProgress";
 import WorkspaceToday from "@/components/workspace/WorkspaceToday";
@@ -151,11 +152,11 @@ function WorkspaceResolvedView({
         className="flex min-w-0 flex-1 flex-col gap-4 focus:outline-none"
       >
         {showLowCreditBanner && liveCredits <= 0 ? (
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
-            <div className="font-medium">
+          <Alert variant="destructive">
+            <AlertDescription>
               Credit balance is depleted. Add credits to resume campaigns and
               calls.
-            </div>
+            </AlertDescription>
             {canManageBilling && outlet ? (
               <Button asChild variant="destructive" className="mt-3">
                 <a href={`/workspaces/${workspace.id}/billing`}>
@@ -163,13 +164,13 @@ function WorkspaceResolvedView({
                 </a>
               </Button>
             ) : null}
-          </div>
+          </Alert>
         ) : showLowCreditBanner ? (
-          <div className="rounded-lg border border-warning/50 bg-warning/10 p-4 text-sm text-foreground">
-            <div className="font-medium">
+          <Alert variant="warning" role="status">
+            <AlertDescription>
               Credits are running low ({liveCredits} left). Add credits to keep
               campaigns active.
-            </div>
+            </AlertDescription>
             {canManageBilling && outlet ? (
               <Button asChild className="mt-3">
                 <a href={`/workspaces/${workspace.id}/billing`}>
@@ -177,7 +178,7 @@ function WorkspaceResolvedView({
                 </a>
               </Button>
             ) : null}
-          </div>
+          </Alert>
         ) : null}
         <div
           className={`min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ${workspacePanelHeightLgClass} lg:overflow-y-auto`}

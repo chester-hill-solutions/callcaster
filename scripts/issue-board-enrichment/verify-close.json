@@ -1,0 +1,388 @@
+[
+  {
+    "issueNumber": 1069,
+    "verdict": "verify-close",
+    "recommendedTitle": "Rename the numbered E2E 'Empty Workspace' fixture and close the superseded redirect gap",
+    "summary": "The claimed coverage gap no longer exists: a separate onboarding fixture seeds a truly empty workspace and rbac.spec.ts covers the owner/admin redirect. The numbered 'Empty Workspace' is intentionally used by voicemail E2E.",
+    "currentBehavior": "seed-data.mjs has a fresh onboarding fixture; rbac.spec.ts asserts the redirect; the numbered empty fixture is used by voicemail tests.",
+    "rootCause": "Superseded; misleading fixture name remains.",
+    "resolution": "Close the redirect gap; optionally rename empty -> numberedEmpty/zeroCampaign to remove the misleading name.",
+    "lookIn": [
+      "scripts/e2e/seed-data.mjs",
+      "scripts/e2e/seed-database.mjs",
+      "e2e/specs/rbac.spec.ts"
+    ],
+    "existingTests": [
+      "e2e/specs/rbac.spec.ts (redirect coverage)"
+    ],
+    "missingTests": [
+      "fixture-contract test for accurate names"
+    ],
+    "acceptanceCriteria": [
+      "Redirect tests remain",
+      "Fixture renamed accurately",
+      "Voicemail tests keep using it"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close; old enrichment pointed at the wrong middleware.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1126,
+    "verdict": "verify-close",
+    "recommendedTitle": "fix(call): clean up the inactive-campaign dialog layout",
+    "summary": "Inactive-campaign modal: title centered while message left-aligned, and the dialog is too tall.",
+    "currentBehavior": "Fixed in working tree: CallScreen.Dialogs.tsx now uses the standard DialogHeader/DialogTitle/DialogDescription composition with sm:max-w-[450px]; text-center, text-2xl, my-4 and mb-2 removed.",
+    "rootCause": "Custom dialog classes overrode the standard composition and added excess spacing.",
+    "resolution": "Implemented: standard composition per the design system; test updated to assert title in DialogTitle, message in DialogDescription, and no grid-cols-1 artifact.",
+    "lookIn": [
+      "app/components/call/CallScreen.Dialogs.tsx"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-dialogs.test.tsx (standard composition assertions)"
+    ],
+    "missingTests": [
+      "mobile screenshot"
+    ],
+    "acceptanceCriteria": [
+      "Title and message share a left edge",
+      "Max width 450px desktop",
+      "Height follows content",
+      "OK right-aligned desktop"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify on dev and close.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1150,
+    "verdict": "verify-close",
+    "recommendedTitle": "chore(security): verify and close completed call-screen tenant-isolation audit",
+    "summary": "Both gap classes are fixed by PR #1151: webhook routes now fail closed on missing CallSid, and dequeue_contact / create_outreach_attempt gained workspace predicates (migration 20260807120000). Audio-drop lookup is workspace-scoped.",
+    "currentBehavior": "acd-router routes reject missing CallSid; RPCs require workspace; audiodrop scoped.",
+    "rootCause": "Resolved; issue left open because Closes # did not fire on dev merge.",
+    "resolution": "Link PR #1151 and close. No code change.",
+    "lookIn": [
+      "app/routes/api+/acd-router.action.server.ts",
+      "client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql",
+      "app/routes/api+/audiodrop.action.server.ts"
+    ],
+    "existingTests": [
+      "test/scope-dequeue-and-outreach-attempt.integration.test.ts",
+      "test/audiodrop.test.ts"
+    ],
+    "missingTests": [
+      "none"
+    ],
+    "acceptanceCriteria": [
+      "Security/DB regression tests pass",
+      "Issue closed with PR linked"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1168,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify and close campaign Running/Waiting state clarity",
+    "summary": "The 'waiting' status and automatic running<->waiting transitions around calling hours are implemented (PR #1236 / commit fca7f872). UI shows amber Waiting; scheduler flips voice campaigns in/out of window.",
+    "currentBehavior": "campaign-status-rail + status-badge show waiting; campaign-schedule-sync.server.ts runs every minute and transitions running<->waiting; tests cover transitions.",
+    "rootCause": "Implemented; uses 'Archived' instead of proposed 'Stopped'.",
+    "resolution": "Visual/product QA; close if 'Archived' is accepted, else file a naming-only decision.",
+    "lookIn": [
+      "app/lib/campaign-status-rail.ts",
+      "app/components/ui/status-badge.tsx",
+      "app/lib/campaign-schedule-sync.server.ts",
+      "app/lib/worker/handlers/cron.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-schedule-sync.server.test.ts"
+    ],
+    "missingTests": [
+      "integrated UI test shows Waiting after transition"
+    ],
+    "acceptanceCriteria": [
+      "Outside-hours voice shows Waiting",
+      "Returns to Running in window",
+      "Product approves Archived vs Stopped"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close after QA; stale enrichment described a proposal.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1185,
+    "verdict": "verify-close",
+    "recommendedTitle": "docs: close billing analytics issue and update reconciliation runbook",
+    "summary": "Platform-side billing analytics already exists: billing-reconciliation.server.ts compares billable entities with ledger debits and the admin Twilio portal has a BillingReconciliationPanel with a run action.",
+    "currentBehavior": "Reconciliation service + admin panel + core/server tests present.",
+    "rootCause": "Implemented; open state is bookkeeping.",
+    "resolution": "Close and open a small docs cleanup (docs/production-billing-verification.md still references obsolete pg_cron/Supabase Edge execution).",
+    "lookIn": [
+      "app/lib/billing-reconciliation.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.BillingReconciliationPanel.tsx",
+      "docs/production-billing-verification.md"
+    ],
+    "existingTests": [
+      "test/billing-reconciliation.test.ts",
+      "test/billing-reconcile-workspace.server.test.ts"
+    ],
+    "missingTests": [
+      "focused UI test for panel controls"
+    ],
+    "acceptanceCriteria": [
+      "Implementation linked in close comment",
+      "Runbook names Bun worker, not Supabase Edge"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close; stale enrichment.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1203,
+    "verdict": "verify-close",
+    "recommendedTitle": "design(audience): show an active visual state while a CSV is dragged over the upload zone",
+    "summary": "The audience drop zone has pointer-hover styles but no drag-active state.",
+    "currentBehavior": "Fixed in working tree: AudienceUploadFileStep tracks dragenter/dragleave via a depth counter and applies a border-primary/bg-primary/10 highlight while a file is over the zone.",
+    "rootCause": "dragenter/dragleave not tracked.",
+    "resolution": "Implemented: drag-active state with semantic tokens; clears on leave and drop; drop still imports the file. Regression test covers enter/persist/leave/drop.",
+    "lookIn": [
+      "app/components/audience/AudienceUploadFileStep.tsx"
+    ],
+    "existingTests": [
+      "test/ui/audience-uploader.test.tsx (drag-active lifecycle + existing drop)"
+    ],
+    "missingTests": [
+      "none — new test landed with the fix"
+    ],
+    "acceptanceCriteria": [
+      "Dragging shows clear highlight",
+      "Leaving/dropping removes highlight",
+      "Keyboard/picker unchanged"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify on dev and close.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1222,
+    "verdict": "verify-close",
+    "recommendedTitle": "Prove manual dial persists the campaign queue ID",
+    "summary": "call.queue_id is now persisted on the manual dial path: startCall appends the queue row id, /api/dial requires and writes it into both the outreach attempt and the call row.",
+    "currentBehavior": "Client requires nextRecipient.contact; dial route requires queue_id and persists it.",
+    "rootCause": "Resolved during #1218/#1223 work.",
+    "resolution": "Optionally add direct assertions for submitted and persisted queue_id, then close.",
+    "lookIn": [
+      "app/lib/callscreenActions.ts",
+      "app/routes/api+/dial.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ui/callscreenActions.test.ts",
+      "test/dial.route.test.ts"
+    ],
+    "missingTests": [
+      "FormData carries queue_id",
+      "saveCallToDatabase receives queue_id",
+      "outreach attempt receives queue_id"
+    ],
+    "acceptanceCriteria": [
+      "Client submits queue id",
+      "Both writes receive same id",
+      "Missing id stays 400"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close; enrichment was stale.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1278,
+    "verdict": "verify-close",
+    "recommendedTitle": "Close #1278: surfaced guarded dequeue no-op is complete; new flash is a separate symptom",
+    "summary": "The silent no-op is fixed by PR #1279 (merge 66f1446c): dequeue_contact reports rows affected, the wrapper explains the no-op (assigned_elsewhere 409 vs already_dequeued 200), and PostgreSQL tests preserve the race guard.",
+    "currentBehavior": "Cross-agent dequeue returns 409 and leaves the row; already-dequeued is idempotent 200. Latest reporter comment 'still get the flash once dialing' is NOT this issue — dequeue is triggered by Save and Next, not Dial.",
+    "rootCause": "Original defect resolved. The new flash is ambiguous: stale outcome (#1286), dial claim refusal (409 from /api/dial), or delayed dequeue toast.",
+    "resolution": "Close #1278. For the flash, identify exact text/area: top-bar stale status -> #1286 (needs repro); toast 'assigned to another agent' after Save and Next -> delayed #1278 feedback; other toasts -> dial claim refusal. Use flash telemetry.",
+    "lookIn": [
+      "app/routes/api+/queues.action.server.ts",
+      "app/lib/campaign-queue-db.server.ts",
+      "client/migrations/20260815130000_dequeue_contact_returns_rows_affected.sql",
+      "app/lib/flash-telemetry.client.ts"
+    ],
+    "existingTests": [
+      "test/queues.route.test.ts (409/idempotent)",
+      "test/integration-db/dequeue-contact-assigned.test.ts"
+    ],
+    "missingTests": [
+      "integrated remote-hangup asserts Hang Up disappears",
+      "flash classification test"
+    ],
+    "acceptanceCriteria": [
+      "Cross-agent dequeue 409 leaves row",
+      "Retries idempotent 200",
+      "Race guard preserved in real PG"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close original; file a new issue for the flash once reproduced with text/area.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1286,
+    "verdict": "verify-close",
+    "recommendedTitle": "Close #1286: synchronous dial lifecycle reset is covered",
+    "summary": "The stale-frame defect is fixed by PR #1288 (merge a1fb10f3): beginDial resets the lifecycle in the same batch as START_DIALING and the live FSM outranks the previous disposition. Render-by-render regression tests exist.",
+    "currentBehavior": "beginDial() resets provider state and lifecycle synchronously; dial click calls FSM action + beginDial in one batch; live FSM outranks old disposition.",
+    "rootCause": "Resolved; open state is project/default-branch bookkeeping (Closes # does not fire on dev merges).",
+    "resolution": "Verify CI is green and close. No production change indicated.",
+    "lookIn": [
+      "app/hooks/call/useCampaignCallFlow.ts",
+      "app/hooks/call/useCampaignDialActions.ts",
+      "test/ui/use-campaign-call-flow.test.tsx",
+      "test/ui/campaign-call-flow-display-state.test.ts"
+    ],
+    "existingTests": [
+      "use-campaign-call-flow render-history tests",
+      "campaign-call-flow-display-state terminal tests"
+    ],
+    "missingTests": [
+      "none required; optional Playwright frame test"
+    ],
+    "acceptanceCriteria": [
+      "No-stale-frame tests pass",
+      "New dial never renders prior outcome",
+      "No extra production change"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close after verification; do not reopen on the #1278 flash without a confirmed stale frame.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1327,
+    "verdict": "verify-close",
+    "recommendedTitle": "refactor(script-editor): replace pageData wrapper with script/onChange props",
+    "summary": "Flattened CampaignSettings.Script to { script, onChange, mediaNames, onUploadAudio, readOnly }; deleted the PageData wrapper and both as-PageData casts.",
+    "currentBehavior": "Implemented in working tree: component takes script/onChange directly; standalone route passes onChange={setScript}; campaign edit route passes onChange updating pageData.campaignDetails.script; tests updated to the flat contract.",
+    "rootCause": "Legacy prop wrapper with no consumer meaning.",
+    "resolution": "Implemented. Also pairs with the #1346 upload wiring (same component/route).",
+    "lookIn": [
+      "app/components/campaign/settings/script/CampaignSettings.Script.tsx",
+      "app/routes/workspaces+/$id/scripts/$scriptId.route.tsx",
+      "app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx"
+    ],
+    "existingTests": [
+      "test/ui/script-editor-adapter.test.tsx",
+      "test/ui/script-editor-route.test.tsx",
+      "test/ui/campaign-script-edit-route.test.tsx (all updated and passing)"
+    ],
+    "missingTests": [
+      "none"
+    ],
+    "acceptanceCriteria": [
+      "Component accepts script/onChange directly",
+      "No PageData casts on either route",
+      "Editor/save/read-only/media/audio tests pass"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify on dev and close.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1333,
+    "verdict": "verify-close",
+    "recommendedTitle": "test(chats): prove STOP and START text remains visible to operators",
+    "summary": "STOP/START bodies are stored unchanged and rendered verbatim in the transcript and conversation preview. The only remaining obfuscation is generic opt-out-banner copy ('replied with an opt-out keyword').",
+    "currentBehavior": "inbound-sms persists the raw body before opt-out processing; ChatMessages renders message.body; ConversationList preview shows it; STOP-only hiding is explicit.",
+    "rootCause": "Already implemented; the ask likely refers to banner copy.",
+    "resolution": "Verify the transcript shows the exact text; if the banner is the concern, include the exact matched keyword in ChatOptOutBanner copy. Add tests pinning unchanged persistence.",
+    "lookIn": [
+      "app/routes/api+/inbound-sms.action.server.ts",
+      "app/components/sms-ui/ChatMessages.tsx",
+      "app/components/chats/ChatOptOutBanner.tsx",
+      "app/lib/chat-opt-out.ts"
+    ],
+    "existingTests": [
+      "test/inbound-sms.route.test.ts (keyword state changes)"
+    ],
+    "missingTests": [
+      "STOP/START bodies persisted unchanged",
+      "transcript/preview exact text"
+    ],
+    "acceptanceCriteria": [
+      "Opt-out text unchanged in history",
+      "Preview shows exact text",
+      "Hiding STOP-only stays explicit"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close after verification; future #1268 consent work replaces the boolean authority.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1336,
+    "verdict": "verify-close",
+    "recommendedTitle": "docs(csv): explain spreadsheet-safety prefix on exported phone numbers",
+    "summary": "The leading apostrophe on +phone numbers is intentional CSV-injection protection (sanitizeCsvInjection). Not a bug unless a strictly validated E.164-only export strategy is approved.",
+    "currentBehavior": "Strings starting with + are prefixed with '; campaign exports enable protection for every row; contract tests require neutralization.",
+    "rootCause": "Working as designed.",
+    "resolution": "Close as working-as-designed, or add help text explaining the prefix. Only exempt phone cells if E.164 normalization is proven and a malicious-value regression test is added.",
+    "lookIn": [
+      "app/lib/csv.ts",
+      "app/lib/campaign-export.server.ts",
+      "test/csv.test.ts"
+    ],
+    "existingTests": [
+      "test/csv.test.ts",
+      "test/campaign-export-contract.test.ts"
+    ],
+    "missingTests": [
+      "E.164 round-trip/import test if exempting phones"
+    ],
+    "acceptanceCriteria": [
+      "Protection remains for untrusted strings",
+      "Help text explains the apostrophe"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close or document; removing the prefix is a security regression risk.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1346,
+    "verdict": "verify-close",
+    "recommendedTitle": "fix(scripts): enable inline audio upload in the campaign script editor",
+    "summary": "Audio upload in the campaign-settings script editor does nothing — the route renders CampaignSettingsScript without onUploadAudio, so the upload control is not even rendered (standalone scripts route works).",
+    "currentBehavior": "Fixed in working tree: edit.route.tsx now threads workspace_id + a handleUploadAudio callback (POST /api/audio-upload, adds the returned media name to local mediaNames) into CampaignSettingsScript.",
+    "rootCause": "Threading gap: standalone route passes handleUploadAudio, campaign edit route did not.",
+    "resolution": "Implemented: onUploadAudio is now passed for all campaign script branches; mediaNames is local state so uploaded names are available to recorded blocks. Regression tests cover the wiring and the failure toast.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx",
+      "app/components/campaign/settings/script/ScriptBlockEditor.tsx",
+      "app/routes/api+/audio-upload.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ui/campaign-script-edit-route.test.tsx (onUploadAudio wiring + failure toast)"
+    ],
+    "missingTests": [
+      "none — new tests landed with the fix"
+    ],
+    "acceptanceCriteria": [
+      "Recorded IVR blocks show Upload audio while editable",
+      "Successful upload selects returned media name",
+      "Failed upload toasts and leaves block unchanged"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify on dev and close. Coordinate with #1327 if the props refactor starts.",
+    "blockedBy": []
+  }
+]

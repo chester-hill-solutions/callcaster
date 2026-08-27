@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -72,24 +73,22 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   return (
     <>
       <Dialog onOpenChange={() => { navigate(-1) }} open={!isActive}>
-        <DialogContent className="w-full max-w-[450px] grid-cols-1 bg-card">
+        <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
-            <DialogTitle className="text-center font-Zilla-Slab text-2xl">
+            <DialogTitle>
               {campaign.status === "draft" || campaign.status === "pending"
                 ? "This campaign is not live yet."
                 : campaign.status === "paused"
                   ? "This campaign is paused."
                   : "This campaign is currently inactive."}
             </DialogTitle>
-            <div className="my-4 w-full">
-              <p className="mb-2">
-                {campaign.status === "draft" || campaign.status === "pending"
-                  ? "Go to the Launch page and click \"Start calling\" to activate this campaign."
-                  : campaign.status === "paused"
-                    ? "Resume the campaign from the Launch page to start calling."
-                    : "It is currently outside of the designated calling window for this campaign. Please check with your team for calling times."}
-              </p>
-            </div>
+            <DialogDescription>
+              {campaign.status === "draft" || campaign.status === "pending"
+                ? "Go to the Launch page and click \"Start calling\" to activate this campaign."
+                : campaign.status === "paused"
+                  ? "Resume the campaign from the Launch page to start calling."
+                  : "It is currently outside of the designated calling window for this campaign. Please check with your team for calling times."}
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button onClick={() => { navigate(-1) }}>
