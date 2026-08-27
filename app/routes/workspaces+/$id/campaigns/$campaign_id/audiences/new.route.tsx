@@ -5,11 +5,11 @@ import { Form, useActionData, useLoaderData } from "react-router";
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import { Section } from "@/components/shared/Section";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { PageShell } from "@/components/ui/page-shell";
-import { Text } from "@/components/ui/typography";
 
 export default function NewAudience() {
   useLoaderData();
@@ -33,9 +33,9 @@ export default function NewAudience() {
     <section id="form">
       <PageShell title="Add an Audience" maxWidth="narrow">
         {actionData?.error != null ? (
-          <Text className="text-center text-destructive">
-            Error: {String(actionData.error)}
-          </Text>
+          <Alert variant="destructive">
+            <AlertDescription>Error: {String(actionData.error)}</AlertDescription>
+          </Alert>
         ) : null}
         <Section variant="flat" className="space-y-6">
           <Form

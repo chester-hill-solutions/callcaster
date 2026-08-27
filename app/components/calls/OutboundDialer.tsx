@@ -1,5 +1,6 @@
 import { Phone } from "lucide-react";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -80,7 +81,11 @@ export function OutboundDialer({
           {disabledReason}
         </p>
       ) : null}
-      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+      {error && (
+        <Alert variant="destructive" className="mt-2">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
