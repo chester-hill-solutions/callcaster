@@ -29,34 +29,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1126,
-    "verdict": "verify-close",
-    "recommendedTitle": "fix(call): clean up the inactive-campaign dialog layout",
-    "summary": "Inactive-campaign modal: title centered while message left-aligned, and the dialog is too tall.",
-    "currentBehavior": "Fixed in working tree: CallScreen.Dialogs.tsx now uses the standard DialogHeader/DialogTitle/DialogDescription composition with sm:max-w-[450px]; text-center, text-2xl, my-4 and mb-2 removed.",
-    "rootCause": "Custom dialog classes overrode the standard composition and added excess spacing.",
-    "resolution": "Implemented: standard composition per the design system; test updated to assert title in DialogTitle, message in DialogDescription, and no grid-cols-1 artifact.",
-    "lookIn": [
-      "app/components/call/CallScreen.Dialogs.tsx"
-    ],
-    "existingTests": [
-      "test/ui/call-screen-dialogs.test.tsx (standard composition assertions)"
-    ],
-    "missingTests": [
-      "mobile screenshot"
-    ],
-    "acceptanceCriteria": [
-      "Title and message share a left edge",
-      "Max width 450px desktop",
-      "Height follows content",
-      "OK right-aligned desktop"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Verify on dev and close.",
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1150,
     "verdict": "verify-close",
     "recommendedTitle": "chore(security): verify and close completed call-screen tenant-isolation audit",
@@ -142,33 +114,6 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Close; stale enrichment.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1203,
-    "verdict": "verify-close",
-    "recommendedTitle": "design(audience): show an active visual state while a CSV is dragged over the upload zone",
-    "summary": "The audience drop zone has pointer-hover styles but no drag-active state.",
-    "currentBehavior": "Fixed in working tree: AudienceUploadFileStep tracks dragenter/dragleave via a depth counter and applies a border-primary/bg-primary/10 highlight while a file is over the zone.",
-    "rootCause": "dragenter/dragleave not tracked.",
-    "resolution": "Implemented: drag-active state with semantic tokens; clears on leave and drop; drop still imports the file. Regression test covers enter/persist/leave/drop.",
-    "lookIn": [
-      "app/components/audience/AudienceUploadFileStep.tsx"
-    ],
-    "existingTests": [
-      "test/ui/audience-uploader.test.tsx (drag-active lifecycle + existing drop)"
-    ],
-    "missingTests": [
-      "none — new test landed with the fix"
-    ],
-    "acceptanceCriteria": [
-      "Dragging shows clear highlight",
-      "Leaving/dropping removes highlight",
-      "Keyboard/picker unchanged"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Verify on dev and close.",
     "blockedBy": []
   },
   {
@@ -266,37 +211,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1327,
-    "verdict": "verify-close",
-    "recommendedTitle": "refactor(script-editor): replace pageData wrapper with script/onChange props",
-    "summary": "Flattened CampaignSettings.Script to { script, onChange, mediaNames, onUploadAudio, readOnly }; deleted the PageData wrapper and both as-PageData casts.",
-    "currentBehavior": "Implemented in working tree: component takes script/onChange directly; standalone route passes onChange={setScript}; campaign edit route passes onChange updating pageData.campaignDetails.script; tests updated to the flat contract.",
-    "rootCause": "Legacy prop wrapper with no consumer meaning.",
-    "resolution": "Implemented. Also pairs with the #1346 upload wiring (same component/route).",
-    "lookIn": [
-      "app/components/campaign/settings/script/CampaignSettings.Script.tsx",
-      "app/routes/workspaces+/$id/scripts/$scriptId.route.tsx",
-      "app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx"
-    ],
-    "existingTests": [
-      "test/ui/script-editor-adapter.test.tsx",
-      "test/ui/script-editor-route.test.tsx",
-      "test/ui/campaign-script-edit-route.test.tsx (all updated and passing)"
-    ],
-    "missingTests": [
-      "none"
-    ],
-    "acceptanceCriteria": [
-      "Component accepts script/onChange directly",
-      "No PageData casts on either route",
-      "Editor/save/read-only/media/audio tests pass"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Verify on dev and close.",
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1333,
     "verdict": "verify-close",
     "recommendedTitle": "test(chats): prove STOP and START text remains visible to operators",
@@ -354,35 +268,6 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Close or document; removing the prefix is a security regression risk.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1346,
-    "verdict": "verify-close",
-    "recommendedTitle": "fix(scripts): enable inline audio upload in the campaign script editor",
-    "summary": "Audio upload in the campaign-settings script editor does nothing — the route renders CampaignSettingsScript without onUploadAudio, so the upload control is not even rendered (standalone scripts route works).",
-    "currentBehavior": "Fixed in working tree: edit.route.tsx now threads workspace_id + a handleUploadAudio callback (POST /api/audio-upload, adds the returned media name to local mediaNames) into CampaignSettingsScript.",
-    "rootCause": "Threading gap: standalone route passes handleUploadAudio, campaign edit route did not.",
-    "resolution": "Implemented: onUploadAudio is now passed for all campaign script branches; mediaNames is local state so uploaded names are available to recorded blocks. Regression tests cover the wiring and the failure toast.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx",
-      "app/components/campaign/settings/script/ScriptBlockEditor.tsx",
-      "app/routes/api+/audio-upload.action.server.ts"
-    ],
-    "existingTests": [
-      "test/ui/campaign-script-edit-route.test.tsx (onUploadAudio wiring + failure toast)"
-    ],
-    "missingTests": [
-      "none — new tests landed with the fix"
-    ],
-    "acceptanceCriteria": [
-      "Recorded IVR blocks show Upload audio while editable",
-      "Successful upload selects returned media name",
-      "Failed upload toasts and leaves block unchanged"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Verify on dev and close. Coordinate with #1327 if the props refactor starts.",
     "blockedBy": []
   }
 ]

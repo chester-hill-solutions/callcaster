@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@30865a6d` · 74 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@ddd0ef9a` · 66 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 34
+## Fix now — 32
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -97,19 +97,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: No document horizontal scroll at laptop widths; Script and controls usable; Queue moves to sheet when needed
 - Tracker: Merge #1314 (exact duplicate) into this issue.
 
-### [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335) All errors should use the standard toast/warning alert not just red text
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: design · Assignee: none · Updated: 2026-08-26
-- Recommended title: **design(feedback): standardize page-level feedback with shared Alert variants and one themed toaster**
-- Errors appear as plain red text in several places instead of the standard feedback components. Standardize, but do NOT turn every error into a toast.
-- Current behavior: FormField owns inline field errors (keep); hand-built page-level red boxes remain in CallScreen.Layout.tsx:45, workspaces+/$id.tsx:154, MessageSettings.tsx:292; root uses raw Sonner Toaster; account.security.tsx and two-factor.tsx use plain red text.
-- Root cause: No enforced 3-way feedback contract: field errors (FormField), persistent/blocking (Alert), transient action results (toast).
-- Resolution: Slices 1-2 landed in the working tree: shared themed toaster adopted in root.tsx; CallScreen error banners, the workspace depleted/low-credit banners, MessageSettings media feedback, and ChatOptOutBanner migrated to shared Alert variants (resolving #1312/#1332 surfaces). Remaining: Slice 3 (MFA feedback), Slice 4 (auth/creation forms), Slice 5 (loaders, campaign summaries, pseudo-toasts).
-- Look in: `app/components/ui/sonner.tsx`, `app/root.tsx`, `app/components/ui/alert.tsx`, `app/components/call/CallScreen.Layout.tsx`, `app/components/campaign/settings/MessageSettings.tsx`, `app/components/chats/ChatOptOutBanner.tsx`
-- Existing tests: test/ui/components-shared-smoke.test.tsx; test/ui/hooks-utils.test.tsx
-- Missing tests: Alert variant rendering light/dark; one-root-toaster contract; distinguishes field vs persistent vs transient
-- Done when: Page-level blocking errors use Alert variants; Transient results use single root toaster; Field errors stay in FormField; Readable contrast in both themes
-- Tracker: Parent for #1332 and #1312 (duplicates).
-
 ### [#1323](https://github.com/chester-hill-solutions/callcaster/issues/1323) Sample Campaign should be based on the goal you chose:L IVR vs Live calls vs SMS
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-26
 - Recommended title: **feat(onboarding): generate marked sample content from the selected goal**
@@ -158,7 +145,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Root cause: Unpolished enrollment UI; some generic feedback overlaps #1335.
 - Resolution: Scope to /account and /account/security: rename Save->Next, add accessible icon copy buttons with temporary check states, add backup-code copy + secure-storage guidance, move generic feedback conversion to #1335. Do not change session/logout behavior.
 - Look in: `app/routes/account.tsx`, `app/routes/account.security.tsx`, `app/routes/two-factor.tsx`
-- Blocked by: [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335)
 - Existing tests: test/two-factor.server.test.ts (server gates only)
 - Missing tests: button labels; clipboard success/failure; enrollment keeps session
 - Done when: Password step says Next; Copy buttons accessible with check states; Backup codes have secure-storage prompt; Session behavior unchanged
@@ -267,19 +253,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: 1 sent + 1 dequeued shows 1 of 1 not 2 of 1; multiple messages to one contact unchanged progress; multiple call attempts produce no invalid fraction
 - Done when: Contact progress never exceeds assigned queue total; Message totals count message rows only; Call-attempt totals clearly labelled without contact denominator
 - Tracker: Webhook-side-effects/dispatch files in old enrichment are secondary; root is campaign-stats + result presentation.
-
-### [#1231](https://github.com/chester-hill-solutions/callcaster/issues/1231) Delete dead Supabase-era app code (shims, stale types, PostgREST constants)
-- Verdict: **Fix now** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-08-26
-- Recommended title: **chore: remove verified zero-consumer Supabase and Deno compatibility residue**
-- Delete dead Supabase-era code — but only what has zero production importers. Several items in the original list are actually live.
-- Current behavior: queue-status.ts constants are live UI contracts (do not delete); type-safety-utils Supabase wrapper is dead outside tests but the file is widely imported; supabase.types.ts is a 7-line stub; shared/ivr-status-logic.ts is already deleted; Deno devDependency remains; useRealtimeData stub has no production caller; get_conversation_summary type is still used by chat realtime.
-- Root cause: Original issue list was written pre-cleanup and is partly stale.
-- Resolution: Partially implemented in the working tree: supabase.types.ts deleted, dead useRealtimeData stub + barrel exports + README entry removed, deno.lock deleted and the deno devDependency removed from package.json + both lockfiles. Remaining: prune the 16 dead type-safety-utils exports and switch useChatRealtime to the canonical ConversationSummary type.
-- Look in: `app/lib/type-safety-utils.ts`, `app/hooks/realtime/useChatRealtime.ts`, `app/lib/chat-conversation-sort.ts`
-- Existing tests: test/queue-status.test.ts
-- Missing tests: structural zero-import check for deprecated exports
-- Done when: Every deleted symbol has zero production importers; Live queue/campaign/chat types intact; Deno removed only if no active command imports it
-- Tracker: Retitle from the original list; comment on issue already corrects it.
 
 ### [#1342](https://github.com/chester-hill-solutions/callcaster/issues/1342) once a user hangs up the button still says hang up
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-26
@@ -467,35 +440,9 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 13
+## Verify and close — 9
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
-
-### [#1346](https://github.com/chester-hill-solutions/callcaster/issues/1346) clicking the audio upload button does nothing
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-26
-- Recommended title: **fix(scripts): enable inline audio upload in the campaign script editor**
-- Audio upload in the campaign-settings script editor does nothing — the route renders CampaignSettingsScript without onUploadAudio, so the upload control is not even rendered (standalone scripts route works).
-- Current behavior: Fixed in working tree: edit.route.tsx now threads workspace_id + a handleUploadAudio callback (POST /api/audio-upload, adds the returned media name to local mediaNames) into CampaignSettingsScript.
-- Root cause: Threading gap: standalone route passes handleUploadAudio, campaign edit route did not.
-- Resolution: Implemented: onUploadAudio is now passed for all campaign script branches; mediaNames is local state so uploaded names are available to recorded blocks. Regression tests cover the wiring and the failure toast.
-- Look in: `app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx`, `app/components/campaign/settings/script/ScriptBlockEditor.tsx`, `app/routes/api+/audio-upload.action.server.ts`
-- Existing tests: test/ui/campaign-script-edit-route.test.tsx (onUploadAudio wiring + failure toast)
-- Missing tests: none — new tests landed with the fix
-- Done when: Recorded IVR blocks show Upload audio while editable; Successful upload selects returned media name; Failed upload toasts and leaves block unchanged
-- Tracker: Verify on dev and close. Coordinate with #1327 if the props refactor starts.
-
-### [#1126](https://github.com/chester-hill-solutions/callcaster/issues/1126) This campaign is currently inactive modal is all over the place
-- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-08-26
-- Recommended title: **fix(call): clean up the inactive-campaign dialog layout**
-- Inactive-campaign modal: title centered while message left-aligned, and the dialog is too tall.
-- Current behavior: Fixed in working tree: CallScreen.Dialogs.tsx now uses the standard DialogHeader/DialogTitle/DialogDescription composition with sm:max-w-[450px]; text-center, text-2xl, my-4 and mb-2 removed.
-- Root cause: Custom dialog classes overrode the standard composition and added excess spacing.
-- Resolution: Implemented: standard composition per the design system; test updated to assert title in DialogTitle, message in DialogDescription, and no grid-cols-1 artifact.
-- Look in: `app/components/call/CallScreen.Dialogs.tsx`
-- Existing tests: test/ui/call-screen-dialogs.test.tsx (standard composition assertions)
-- Missing tests: mobile screenshot
-- Done when: Title and message share a left edge; Max width 450px desktop; Height follows content; OK right-aligned desktop
-- Tracker: Verify on dev and close.
 
 ### [#1278](https://github.com/chester-hill-solutions/callcaster/issues/1278) bug(queue): manual dequeue of another agent's assigned row returns success but silently no-ops
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-26
@@ -536,19 +483,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: Opt-out text unchanged in history; Preview shows exact text; Hiding STOP-only stays explicit
 - Tracker: Close after verification; future #1268 consent work replaces the boolean authority.
 
-### [#1327](https://github.com/chester-hill-solutions/callcaster/issues/1327) chore(scripts): collapse vestigial pageData.campaignDetails nesting
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-26
-- Recommended title: **refactor(script-editor): replace pageData wrapper with script/onChange props**
-- Flattened CampaignSettings.Script to { script, onChange, mediaNames, onUploadAudio, readOnly }; deleted the PageData wrapper and both as-PageData casts.
-- Current behavior: Implemented in working tree: component takes script/onChange directly; standalone route passes onChange={setScript}; campaign edit route passes onChange updating pageData.campaignDetails.script; tests updated to the flat contract.
-- Root cause: Legacy prop wrapper with no consumer meaning.
-- Resolution: Implemented. Also pairs with the #1346 upload wiring (same component/route).
-- Look in: `app/components/campaign/settings/script/CampaignSettings.Script.tsx`, `app/routes/workspaces+/$id/scripts/$scriptId.route.tsx`, `app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx`
-- Existing tests: test/ui/script-editor-adapter.test.tsx; test/ui/script-editor-route.test.tsx; test/ui/campaign-script-edit-route.test.tsx (all updated and passing)
-- Missing tests: none
-- Done when: Component accepts script/onChange directly; No PageData casts on either route; Editor/save/read-only/media/audio tests pass
-- Tracker: Verify on dev and close.
-
 ### [#1286](https://github.com/chester-hill-solutions/callcaster/issues/1286) Call screen paints one stale frame (previous outcome / last disposition) on every new dial
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-17
 - Recommended title: **Close #1286: synchronous dial lifecycle reset is covered**
@@ -587,19 +521,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: integrated UI test shows Waiting after transition
 - Done when: Outside-hours voice shows Waiting; Returns to Running in window; Product approves Archived vs Stopped
 - Tracker: Close after QA; stale enrichment described a proposal.
-
-### [#1203](https://github.com/chester-hill-solutions/callcaster/issues/1203) audience file upload should have some on file hover UI change when dragging a file
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-10
-- Recommended title: **design(audience): show an active visual state while a CSV is dragged over the upload zone**
-- The audience drop zone has pointer-hover styles but no drag-active state.
-- Current behavior: Fixed in working tree: AudienceUploadFileStep tracks dragenter/dragleave via a depth counter and applies a border-primary/bg-primary/10 highlight while a file is over the zone.
-- Root cause: dragenter/dragleave not tracked.
-- Resolution: Implemented: drag-active state with semantic tokens; clears on leave and drop; drop still imports the file. Regression test covers enter/persist/leave/drop.
-- Look in: `app/components/audience/AudienceUploadFileStep.tsx`
-- Existing tests: test/ui/audience-uploader.test.tsx (drag-active lifecycle + existing drop)
-- Missing tests: none — new test landed with the fix
-- Done when: Dragging shows clear highlight; Leaving/dropping removes highlight; Keyboard/picker unchanged
-- Tracker: Verify on dev and close.
 
 ### [#1185](https://github.com/chester-hill-solutions/callcaster/issues/1185) Platform side analytics
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-08-07
@@ -925,7 +846,7 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 
 ---
 
-## Duplicates — 7
+## Duplicates — 5
 
 Same root cause as the linked canonical issue. Do not implement separately — fold scope in and close.
 
@@ -941,32 +862,6 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 - Existing tests: test/campaign-dispatch-worker.test.ts
 - Missing tests: exact 3:05 successor
 - Tracker: Merge into #1351 (already parent).
-
-### [#1332](https://github.com/chester-hill-solutions/callcaster/issues/1332) dark mode opt out info box has black text
-- Verdict: **Duplicates** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
-- Duplicate of: [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335)
-- Recommended title: **Use the shared warning Alert for the chat opt-out banner**
-- ChatOptOutBanner converted to the shared warning Alert (role=status) under #1335 slice 2, resolving the dark-mode contrast concern. Ready to verify and close.
-- Current behavior: Migrated: banner uses Alert variant=warning with semantic tokens instead of raw amber classes.
-- Root cause: Standardization residue, not a live contrast bug.
-- Resolution: Resolved under #1335 slice 2; verify the banner in light/dark and close.
-- Look in: `app/components/chats/ChatOptOutBanner.tsx`, `app/components/ui/alert.tsx`
-- Existing tests: test/ui/components-chats-contact.test.tsx (passes)
-- Missing tests: dark-theme contrast test
-- Tracker: Verify and close as duplicate of #1335.
-
-### [#1312](https://github.com/chester-hill-solutions/callcaster/issues/1312) dark mode red error box can be the default error box no need to change for dark mode (true for all error/info boxes)
-- Verdict: **Duplicates** · Size: S-M · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26
-- Duplicate of: [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335)
-- Recommended title: **Replace remaining hand-built feedback boxes with semantic shared Alerts**
-- Dark-mode error-box residue: the three confirmed hand-built red divs (CallScreen.Layout, workspaces+/$id, MessageSettings) and ChatOptOutBanner were converted to shared Alert variants under #1335 slice 2. Ready to verify and close.
-- Current behavior: Migrated: CallScreen ErrorBanner, workspace depleted/low-credit banners, MessageSettings media error/success, ChatOptOutBanner all use shared Alert variants with semantic contrast.
-- Root cause: Standardization residue.
-- Resolution: Resolved under #1335 slice 2; verify the migrated surfaces in light/dark and close.
-- Look in: `app/components/call/CallScreen.Layout.tsx`, `app/routes/workspaces+/$id.tsx`, `app/components/campaign/settings/MessageSettings.tsx`, `app/components/chats/ChatOptOutBanner.tsx`, `app/components/ui/alert.tsx`
-- Existing tests: workspace-skip-link, message-settings, components-chats-contact UI tests pass
-- Missing tests: dark-theme contrast check
-- Tracker: Verify and close as duplicate of #1335.
 
 ### [#1314](https://github.com/chester-hill-solutions/callcaster/issues/1314) Calling Screen pushes out of the VW
 - Verdict: **Duplicates** · Size: M · Risk: medium · Labels: design · Assignee: @wra-sol · Updated: 2026-08-19

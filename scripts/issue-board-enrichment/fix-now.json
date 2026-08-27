@@ -469,35 +469,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1231,
-    "verdict": "fix-now",
-    "recommendedTitle": "chore: remove verified zero-consumer Supabase and Deno compatibility residue",
-    "summary": "Delete dead Supabase-era code — but only what has zero production importers. Several items in the original list are actually live.",
-    "currentBehavior": "queue-status.ts constants are live UI contracts (do not delete); type-safety-utils Supabase wrapper is dead outside tests but the file is widely imported; supabase.types.ts is a 7-line stub; shared/ivr-status-logic.ts is already deleted; Deno devDependency remains; useRealtimeData stub has no production caller; get_conversation_summary type is still used by chat realtime.",
-    "rootCause": "Original issue list was written pre-cleanup and is partly stale.",
-    "resolution": "Partially implemented in the working tree: supabase.types.ts deleted, dead useRealtimeData stub + barrel exports + README entry removed, deno.lock deleted and the deno devDependency removed from package.json + both lockfiles. Remaining: prune the 16 dead type-safety-utils exports and switch useChatRealtime to the canonical ConversationSummary type.",
-    "lookIn": [
-      "app/lib/type-safety-utils.ts",
-      "app/hooks/realtime/useChatRealtime.ts",
-      "app/lib/chat-conversation-sort.ts"
-    ],
-    "existingTests": [
-      "test/queue-status.test.ts"
-    ],
-    "missingTests": [
-      "structural zero-import check for deprecated exports"
-    ],
-    "acceptanceCriteria": [
-      "Every deleted symbol has zero production importers",
-      "Live queue/campaign/chat types intact",
-      "Deno removed only if no active command imports it"
-    ],
-    "size": "S-M",
-    "risk": "medium",
-    "trackerRecommendation": "Retitle from the original list; comment on issue already corrects it.",
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1270,
     "verdict": "fix-now",
     "recommendedTitle": "fix(sms): finish and contract-test the unified campaign dispatch coordinator",
@@ -662,9 +633,7 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Redirect work stays under #1317, not here.",
-    "blockedBy": [
-      1335
-    ]
+    "blockedBy": []
   },
   {
     "issueNumber": 1317,
@@ -857,42 +826,6 @@
     "size": "S-M",
     "risk": "medium",
     "trackerRecommendation": "Webhook-side-effects/dispatch files in old enrichment are secondary; root is campaign-stats + result presentation.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1335,
-    "verdict": "fix-now",
-    "recommendedTitle": "design(feedback): standardize page-level feedback with shared Alert variants and one themed toaster",
-    "summary": "Errors appear as plain red text in several places instead of the standard feedback components. Standardize, but do NOT turn every error into a toast.",
-    "currentBehavior": "FormField owns inline field errors (keep); hand-built page-level red boxes remain in CallScreen.Layout.tsx:45, workspaces+/$id.tsx:154, MessageSettings.tsx:292; root uses raw Sonner Toaster; account.security.tsx and two-factor.tsx use plain red text.",
-    "rootCause": "No enforced 3-way feedback contract: field errors (FormField), persistent/blocking (Alert), transient action results (toast).",
-    "resolution": "Slices 1-2 landed in the working tree: shared themed toaster adopted in root.tsx; CallScreen error banners, the workspace depleted/low-credit banners, MessageSettings media feedback, and ChatOptOutBanner migrated to shared Alert variants (resolving #1312/#1332 surfaces). Remaining: Slice 3 (MFA feedback), Slice 4 (auth/creation forms), Slice 5 (loaders, campaign summaries, pseudo-toasts).",
-    "lookIn": [
-      "app/components/ui/sonner.tsx",
-      "app/root.tsx",
-      "app/components/ui/alert.tsx",
-      "app/components/call/CallScreen.Layout.tsx",
-      "app/components/campaign/settings/MessageSettings.tsx",
-      "app/components/chats/ChatOptOutBanner.tsx"
-    ],
-    "existingTests": [
-      "test/ui/components-shared-smoke.test.tsx",
-      "test/ui/hooks-utils.test.tsx"
-    ],
-    "missingTests": [
-      "Alert variant rendering light/dark",
-      "one-root-toaster contract",
-      "distinguishes field vs persistent vs transient"
-    ],
-    "acceptanceCriteria": [
-      "Page-level blocking errors use Alert variants",
-      "Transient results use single root toaster",
-      "Field errors stay in FormField",
-      "Readable contrast in both themes"
-    ],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Parent for #1332 and #1312 (duplicates).",
     "blockedBy": []
   },
   {
