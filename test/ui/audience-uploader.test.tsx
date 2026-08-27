@@ -229,6 +229,38 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     });
   });
 
+  test("recovers the highlight after an OS-interrupted drag delivers an unpaired dragleave (#1358)", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    render(<AudienceUploader audienceName="A1" />);
+    const dropZone = screen.getByText("Drop or choose a CSV file").closest("label");
+    expect(dropZone).not.toBeNull();
+
+    // Hovering normally lights the zone.
+    fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("true");
+
+    // The OS can steal key-window mid-drag (Helium repro, even on a bare
+    // page) and deliver a dragleave with no matching dragenter. The highlight
+    // must not stay dead: the next continuous dragover re-asserts it.
+    fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("false");
+    fireEvent.dragOver(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("true");
+
+    // A genuine leave afterwards still clears it, and drop still works.
+    fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("false");
+
+    const file = new File(["Phone\n123"], "contacts.csv", { type: "text/csv" });
+    (file as any).text = async () => "Phone\n123";
+    fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [file] } });
+    fireEvent.drop(dropZone!, { dataTransfer: { files: [file] } });
+    await waitFor(() => {
+      expect(screen.getByText("Map CSV Headers")).toBeInTheDocument();
+    });
+  });
+
   test("hides step strip when embedded (onUploadComplete)", async () => {
     const { default: AudienceUploader } =
       await import("@/components/audience/AudienceUploader");
