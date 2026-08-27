@@ -6,8 +6,8 @@ import { Link, useActionData, useNavigate, useNavigation, useSubmit } from "reac
 
 import { AudioRecorder } from "@/components/file-assets/AudioRecorder";
 import { PageShell } from "@/components/ui/page-shell";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Text } from "@/components/ui/typography";
 
 export const meta = () => [{ title: "Record audio — CallCaster" }];
 
@@ -37,7 +37,9 @@ export default function RecordAudioPage() {
       description="Record a greeting or prompt, then trim it before saving."
     >
       {actionData?.error != null ? (
-        <Text className="mb-4 text-destructive">{actionData.error}</Text>
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{actionData.error}</AlertDescription>
+        </Alert>
       ) : null}
 
       <AudioRecorder

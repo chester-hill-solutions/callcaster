@@ -3,6 +3,7 @@ export { action } from "./two-factor.action.server";
 
 import { Form, useLoaderData, useActionData } from "react-router";
 import { AuthCard } from "@/components/shared/AuthCard";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -23,7 +24,9 @@ export default function TwoFactorVerify() {
         id="two-factor-hero"
       >
         {actionData?.error ? (
-          <Text className="block text-center text-destructive">{actionData.error}</Text>
+          <Alert variant="destructive">
+            <AlertDescription>{actionData.error}</AlertDescription>
+          </Alert>
         ) : null}
         <Form method="POST" className="flex w-full flex-col gap-4">
           <input type="hidden" name="next" value={next ?? ""} />

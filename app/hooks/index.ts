@@ -14,7 +14,6 @@ export { useQueue, useAttempts, useCalls } from "./queue";
 export {
   useWorkspaceRealtime,
   useWorkspaceEventSubscription,
-  useRealtimeData,
   useChatRealTime,
   useConversationSummaryRealTime,
   phoneNumbersMatch,

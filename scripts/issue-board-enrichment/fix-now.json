@@ -1,0 +1,1103 @@
+[
+  {
+    "issueNumber": 969,
+    "verdict": "fix-now",
+    "recommendedTitle": "ux(time): show the active browser timezone on campaign, scheduled-SMS, and billing time surfaces",
+    "summary": "Every time selector should say which timezone it is working in. A campaign helper label already exists; start/end pickers, weekly schedule, scheduled SMS, and billing timestamps do not.",
+    "currentBehavior": "CampaignBasicInfo.Dates shows one timezone helper below the schedule (always browser TZ); DateTimePicker is timezone-neutral; weekly schedule and scheduled SMS and billing table show no timezone.",
+    "rootCause": "Timezone disclosure not applied to every time surface.",
+    "resolution": "Use browser timezone now (no workspace TZ storage in this issue); add a small shared timezone-label composition applied to campaign dates/schedule, scheduled SMS, and billing timestamps.",
+    "lookIn": [
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx",
+      "app/components/sms-ui/ChatInput.tsx",
+      "app/components/workspace/BillingActivityTable.tsx",
+      "app/lib/schedule-timezone.ts"
+    ],
+    "existingTests": [
+      "test/schedule-timezone.test.ts (conversion strong)"
+    ],
+    "missingTests": [
+      "visible IANA timezone on campaign/SMS/billing surfaces",
+      "scheduled SMS still submits correct UTC"
+    ],
+    "acceptanceCriteria": [
+      "Campaign schedule controls show IANA timezone",
+      "Scheduled SMS shows timezone + correct UTC",
+      "Billing timestamps identify timezone"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Coordinate with #1127 (defaults) and #1207 (enforcement) but keep separate.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1067,
+    "verdict": "fix-now",
+    "recommendedTitle": "refactor(copy): finish the user-facing 'Call list' rename while preserving Audience API names",
+    "summary": "Most UI now says 'Call list', but contact detail, queue header/table, campaign-context creation, wizard step, and launch badge still say 'Audience'. Canonical UI term is now Call list.",
+    "currentBehavior": "Residue: ContactDetails heading + fallback names, QueueHeader/QueueTable labels, campaigns/$campaign_id/audiences/new.route.tsx title/button, OnboardingWizard step title, OnboardingLaunchStep badge; a test preserves stale queue copy.",
+    "rootCause": "Partial rename; several surfaces never converted.",
+    "resolution": "Rename user-visible copy to 'Call list(s)' only. Keep Audience in types, routes, DB columns, API fields, and code identifiers.",
+    "lookIn": [
+      "app/components/contact/ContactDetails.tsx",
+      "app/components/queue/QueueHeader.tsx",
+      "app/components/queue/QueueTable.tsx",
+      "app/routes/workspaces+/$id/campaigns/$campaign_id/audiences/new.route.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx"
+    ],
+    "existingTests": [
+      "test/ui/components-queue.test.tsx (preserves stale term)"
+    ],
+    "missingTests": [
+      "copy guard for user-visible 'Audience' with documented exceptions"
+    ],
+    "acceptanceCriteria": [
+      "Listed surfaces say Call list",
+      "Unnamed records use 'Call list <id>'",
+      "Internal/API names unchanged",
+      "UI tests updated"
+    ],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Issue proposed 'Audience' as canonical; current UI standard is Call list.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1070,
+    "verdict": "fix-now",
+    "recommendedTitle": "feat(onboarding): exclude marked sample scripts and campaigns from onboarding completion",
+    "summary": "Auto-seeded sample script/campaign silently completes wizard and launch-checklist steps for new workspaces. Samples are ordinary rows with no durable marker.",
+    "currentBehavior": "campaign/script schema has no is_sample; seeder inserts ordinary rows; onboarding and checklist count any row > 0.",
+    "rootCause": "No durable sample marker; count-based completion.",
+    "resolution": "Add is_sample boolean not null default false to campaign and script (migration + Drizzle), mark seeded rows, backfill existing sample rows safely (no title matching), and exclude samples from readiness/checklist counts.",
+    "lookIn": [
+      "app/db/schema.ts",
+      "app/lib/seed/seed-workspace-sample-data.server.ts",
+      "app/lib/platform-onboarding-helpers.server.ts",
+      "app/lib/workspace-launch-checklist.ts"
+    ],
+    "existingTests": [
+      "test/seed-workspace-sample-data.server.test.ts"
+    ],
+    "missingTests": [
+      "fresh-workspace integration: samples do not complete steps"
+    ],
+    "acceptanceCriteria": [
+      "Seeded rows carry is_sample",
+      "Sample-only workspaces show Script/Campaign incomplete",
+      "User rows complete steps",
+      "Safe backfill for existing samples"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Prerequisite for #1323 and the #1167 onboarding assertion.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1113,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(onboarding): prevent Number-step section outlines from crossing action titles",
+    "summary": "Spacing between 'Rent a Canadian Number' and 'Verify your own number' is fixed; the current defect is the fieldset/legend outline crossing the title.",
+    "currentBehavior": "OnboardingFirstNumberStep uses two fieldsets with overflow-hidden; latest screenshot shows the outline struck through the section title.",
+    "rootCause": "fieldset/legend border treatment with overflow-hidden clips/draws through the legend.",
+    "resolution": "Fix the fieldset/legend border handling; keep the vertical gap. Update the issue title to the current symptom.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx"
+    ],
+    "existingTests": [
+      "none for the sections"
+    ],
+    "missingTests": [
+      "outline not crossing title",
+      "light/dark rendering"
+    ],
+    "acceptanceCriteria": [
+      "No border crosses either title",
+      "Two actions keep vertical separation",
+      "Accessible grouping retained",
+      "Light + dark correct"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Retitle from the fixed spacing problem to the outline problem.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1122,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(onboarding): validate Website URL format with an accurate error",
+    "summary": "Entering 'sai.com' shows 'Website URL is required.' when the actual error is format. Blank and malformed both trigger onInvalid and map to 'required'.",
+    "currentBehavior": "The hook treats every invalid event as missing; server does not validate URL format at all (saves sai.com).",
+    "rootCause": "valueMissing and typeMismatch conflated; no server-side URL validation.",
+    "resolution": "Distinguish valueMissing from typeMismatch and add server-side URL parsing; error copy: 'Please enter a valid url e.g. https://example.com'.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/useRequiredBusinessProfileFields.ts",
+      "app/lib/messaging-onboarding/predicates.ts",
+      "app/lib/platform-onboarding-handlers.server.ts"
+    ],
+    "existingTests": [
+      "blank/valid only"
+    ],
+    "missingTests": [
+      "malformed format",
+      "server/API validation parity"
+    ],
+    "acceptanceCriteria": [
+      "sai.com reports format example",
+      "blank reports required only when required",
+      "valid https URLs save",
+      "server matches browser"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Implement with #1311.",
+    "blockedBy": [
+      1311
+    ]
+  },
+  {
+    "issueNumber": 1127,
+    "verdict": "fix-now",
+    "recommendedTitle": "feat(campaign): change default voice calling hours to 09:00-21:00",
+    "summary": "Default calling hours are 09:00-17:00; change to 09:00-21:00 since calling happens in the evenings.",
+    "currentBehavior": "campaign-setup-steps.ts and Dates.tsx default to 09:00-17:00; presets and E2E seed lock it.",
+    "rootCause": "Hard-coded default duplicated in several places.",
+    "resolution": "Create one shared default-hours constant used by creation, day-enabling, presets, and E2E seed.",
+    "lookIn": [
+      "app/lib/campaign-setup-steps.ts",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx",
+      "scripts/e2e/seed-data.mjs"
+    ],
+    "existingTests": [
+      "test/campaign-setup-steps.test.ts",
+      "test/ui/components-campaign.test.tsx (both lock 17:00)"
+    ],
+    "missingTests": [
+      "preset label/value agreement"
+    ],
+    "acceptanceCriteria": [
+      "New voice campaigns default 09:00-21:00",
+      "Enabling a day uses same default",
+      "Existing saved schedules unchanged"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Recipient window already ends at 21:00 so the value is legal.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1148,
+    "verdict": "fix-now",
+    "recommendedTitle": "ux(onboarding): move SMS compliance identity fields out of Goal and bound help popovers",
+    "summary": "Goal page repeats SMS text in an InfoPopover, toll-free compliance fields live on Goal, and InfoPopover has no max-width/height/scroll.",
+    "currentBehavior": "OnboardingGoalStep shows long SMS copy + tooltip; SMS toll-free fields on Goal; InfoPopover unbounded.",
+    "rootCause": "Content layout on Goal + unbounded popover primitive.",
+    "resolution": "Extend InfoPopover with bounded wrap/scroll props (reusable), shorten Goal copy, move SMS compliance fields to Identity/Program shown only for SMS goal.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx",
+      "app/components/shared/InfoPopover.tsx"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-goal-step.test.tsx (expects toll-free on Goal — must move)"
+    ],
+    "missingTests": [
+      "popover bounds",
+      "SMS-only identity fields"
+    ],
+    "acceptanceCriteria": [
+      "Goal has short non-duplicated guidance",
+      "Help content wraps/scrolls within bounds",
+      "SMS compliance fields only for SMS goal",
+      "Saved data unchanged"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Coordinate with #1345/#1311/#1122.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1159,
+    "verdict": "fix-now",
+    "recommendedTitle": "chore(dev): add local up/down/logs commands and an agent workflow skill",
+    "summary": "Local dev is mostly solved (one-command setup, Compose stack, quickstart README). Residual: no simple stop/logs commands and no agent skill for the local workflow.",
+    "currentBehavior": "npm run setup starts services; docs/local-development.md is a second, longer boot procedure; no Makefile; no skill.",
+    "rootCause": "Setup exists; ergonomics around stopping/tailing and agent guidance are missing.",
+    "resolution": "Add local:up / local:down / local:logs commands, make the guide delegate to them, and add a small agent skill (setup, doctor, logs, calling-sync). Never overwrite .env.",
+    "lookIn": [
+      "scripts/local/setup.mjs",
+      "docs/local-development.md",
+      "README.md",
+      "docker-compose.dev.yml"
+    ],
+    "existingTests": [
+      "none for commands"
+    ],
+    "missingTests": [
+      "command smoke/help tests"
+    ],
+    "acceptanceCriteria": [
+      "One documented command starts/stops/tails stack",
+      "README delegates to one canonical guide",
+      "Small agent skill exists",
+      ".env never overwritten"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Do not rebuild setup; #1328 later removes real Twilio creds from local dev.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1167,
+    "verdict": "fix-now",
+    "recommendedTitle": "test(e2e): complete signup, session, and first-login redirect",
+    "summary": "Add a full sign-up flow E2E: unique user registers through the browser, gets an authenticated session, and lands on the expected workspace/onboarding route. Headed and headless.",
+    "currentBehavior": "Current auth.spec.ts only checks the signup form opens.",
+    "rootCause": "No browser test exercises registration -> session -> first navigation.",
+    "resolution": "Add one unique-user test; sequence the onboarding-state assertion behind #1070 (seeded samples must not count as complete).",
+    "lookIn": [
+      "e2e/specs/auth.spec.ts",
+      "e2e/fixtures/seed.ts",
+      "app/routes/signup.action.server.ts"
+    ],
+    "existingTests": [
+      "e2e/specs/auth.spec.ts (form opens only)"
+    ],
+    "missingTests": [
+      "successful submit",
+      "duplicate email",
+      "new-session verification",
+      "post-#1070 fresh-workspace assertion"
+    ],
+    "acceptanceCriteria": [
+      "Unique user signs up with session",
+      "Reaches expected workspace/onboarding route",
+      "Runs headless and headed"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "One assertion depends on #1070; not a formal blocker.",
+    "blockedBy": [
+      1070
+    ]
+  },
+  {
+    "issueNumber": 1190,
+    "verdict": "fix-now",
+    "recommendedTitle": "test(e2e): sign Compose Twilio callbacks and reject invalid signatures",
+    "summary": "Compose E2E globally disables webhook validation and fixtures send no signature. Enable validation and sign fixtures with the seeded token; add invalid cases.",
+    "currentBehavior": "run-compose-e2e.mjs sets TWILIO_VALIDATE_WEBHOOKS=false; webhooks.ts posts unsigned bodies.",
+    "rootCause": "E2E bypasses the real security boundary.",
+    "resolution": "Enable validation in Compose; make fixture helpers compute signatures for the exact URL + body with the fixed seeded workspace token; add missing/invalid/tamper cases.",
+    "lookIn": [
+      "scripts/e2e/run-compose-e2e.mjs",
+      "e2e/fixtures/webhooks.ts",
+      "app/twilio.server.ts",
+      "app/lib/twilio-webhook.server.ts"
+    ],
+    "existingTests": [
+      "test/twilio-webhook-validation.test.ts (mocked validator)"
+    ],
+    "missingTests": [
+      "valid/missing/invalid/tampered signature E2E"
+    ],
+    "acceptanceCriteria": [
+      "Normal callback E2E runs with validation on",
+      "Fixtures sign exact URL+body",
+      "Invalid cases fail",
+      "No normal spec relies on bypass"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Security-boundary work; independent of #1328.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1195,
+    "verdict": "fix-now",
+    "recommendedTitle": "test(twilio): verify Call and Message API contracts with Test Credentials",
+    "summary": "Add an opt-in suite using Twilio Test Credentials and magic numbers for no-cost Call/Message request-shape and error-code coverage. Never runs against live credentials; not for webhook/TwiML/delivery.",
+    "currentBehavior": "Existing Twilio tests mock the client; no Test-Credential suite exists.",
+    "rootCause": "Coverage gap.",
+    "resolution": "Build the suite against explicit Test Credentials only (secret-gated, opt-in); the sms-send client-like seam already accepts a dependency.",
+    "lookIn": [
+      "test/twilio-client.server.test.ts",
+      "test/twilio-errors.test.ts",
+      "app/lib/sms-send.server.ts"
+    ],
+    "existingTests": [
+      "test/twilio-client.server.test.ts",
+      "test/twilio-errors.test.ts (constructed errors)"
+    ],
+    "missingTests": [
+      "success/request-shape",
+      "documented error mappings via magic inputs"
+    ],
+    "acceptanceCriteria": [
+      "Only Test Credentials + magic inputs",
+      "Success and error mappings asserted",
+      "Cannot use live credentials or test delivery"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Overlaps the testing section of #1329; keep separate and opt-in.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1204,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(onboarding): align Identity progress completion with Identity validation",
+    "summary": "The Identity breadcrumb stays marked incomplete after the form is filled — progress counts hidden A2P fields that validation does not require.",
+    "currentBehavior": "readiness.server.ts isBusinessBasicsComplete uses all A2P fields (website, use-case, samples) while Identity validation only requires legal business name; server accepts the one-field profile but progress stays incomplete.",
+    "rootCause": "Two different required-field sets for the same step.",
+    "resolution": "Make isBusinessBasicsComplete use BUSINESS_IDENTITY_REQUIRED_FIELDS (or the shared missing-field helper) so a saved legal business name completes Identity.",
+    "lookIn": [
+      "app/lib/messaging-onboarding/readiness.server.ts",
+      "app/lib/messaging-onboarding/predicates.ts",
+      "app/routes/workspaces+/$id/onboarding/OnboardingProgressStrip.tsx"
+    ],
+    "existingTests": [
+      "test/onboarding-business-profile-validation.test.ts (one-field baseline)"
+    ],
+    "missingTests": [
+      "progress-step test for the same profile"
+    ],
+    "acceptanceCriteria": [
+      "Saved legal business name completes Identity",
+      "Program/SMS fields do not control Identity",
+      "Missing name keeps step incomplete"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Confirmed; small one-liner alignment.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1205,
+    "verdict": "fix-now",
+    "recommendedTitle": "ux(onboarding): split Number into guided rent-or-verify substeps",
+    "summary": "The Number onboarding step is one long page (service address, rent/verify, inbound routing) with no internal navigation.",
+    "currentBehavior": "OnboardingFirstNumberStep renders all sections on one page; outer wizard treats it as one first_number step.",
+    "rootCause": "No internal state machine or substeps.",
+    "resolution": "Add substeps: choose Rent vs Verify -> service address (rent path) -> purchase/verify -> inbound routing. Preserve server actions and billing return URL.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx",
+      "app/routes/workspaces+/$id/onboarding/wizard-step-resolution.ts"
+    ],
+    "existingTests": [
+      "none for the step UI"
+    ],
+    "missingTests": [
+      "both branches",
+      "back navigation",
+      "billing return",
+      "completed-number resume"
+    ],
+    "acceptanceCriteria": [
+      "Choose method first",
+      "Rent requires address before search",
+      "Verify bypasses rental",
+      "Routing appears only after a number exists"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Overlaps #1110/#1113/#1318; keep as its own issue.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1207,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(calling): enforce recipient-local hours on manual campaign dials",
+    "summary": "The send-window copy claims contacts are only dialed 8am-9pm in their own timezone, but manual campaign dials are not gated at all — the reporter dialed themselves at 4am.",
+    "currentBehavior": "Automated dial, IVR, and campaign SMS enforce recipientCallingWindowStatus(); the manual /api/dial path claims the queue row and creates the call without that gate.",
+    "rootCause": "app/routes/api+/dial.action.server.ts never calls the recipient-window helper before claiming.",
+    "resolution": "Validate the canonical queued contact number against the recipient-local window before the claim (or have the claim RPC return the window verdict); a blocked dial must leave the queue row available.",
+    "lookIn": [
+      "app/routes/api+/dial.action.server.ts",
+      "app/lib/recipient-calling-window.ts",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx"
+    ],
+    "existingTests": [
+      "test/recipient-calling-window.test.ts"
+    ],
+    "missingTests": [
+      "manual dial blocked before 8:00 and at 21:00",
+      "blocked dial leaves row queued",
+      "to_number cannot bypass queued contact"
+    ],
+    "acceptanceCriteria": [
+      "All four dial paths share the same recipient-window policy",
+      "Blocked manual dial contacts nobody",
+      "Queue row remains for a valid time"
+    ],
+    "size": "S-M",
+    "risk": "high",
+    "trackerRecommendation": "Compliance-relevant; do before feature work in #969/#1127.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1230,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(schema): model bigint IDs correctly and normalize raw SQL numeric rows",
+    "summary": "Drizzle declares serial()/integer() for columns that are bigint in the real DDL (contact.id, message.contact_id, campaign_queue, call, outreach_attempt), so raw db.execute results that return int8 strings look type-safe when they are not.",
+    "currentBehavior": "coercion helpers exist (coerceRowNumbers, queryScalarNumber) but some raw reads still cast without coercion (e.g. campaign-queue-db.server.ts:114).",
+    "rootCause": "Schema lie: serial() vs bigint DDL; int8 comes back from Postgres as a string.",
+    "resolution": "Correct known columns to bigint({ mode: 'number' }) (TypeScript schema only — no DDL migration), then audit every raw SQL site that consumes numeric fields and route them through coercion.",
+    "lookIn": [
+      "app/db/schema.ts",
+      "app/lib/db-rpc.server.ts",
+      "app/lib/campaign-queue-db.server.ts",
+      "app/lib/acd/acd-router.server.ts"
+    ],
+    "existingTests": [
+      "coercion helper tests (partial)"
+    ],
+    "missingTests": [
+      "schema contract test vs baseline bigint columns",
+      "raw row coercion tests for queue/RPC IDs"
+    ],
+    "acceptanceCriteria": [
+      "Known bigint columns use bigint mode-number",
+      "Raw SQL bigint fields explicitly converted and checked",
+      "Regression test fails if columns return to serial/integer"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "No DB migration — fixes TypeScript declaration only.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1270,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(sms): finish and contract-test the unified campaign dispatch coordinator",
+    "summary": "The single SMS dispatch coordinator now exists and both /api/sms and the worker use it. Remaining: in-batch duplicate protection, real MPS pacing, exact next-window scheduling, and one shared contract suite.",
+    "currentBehavior": "campaign-sms-dispatch.server.ts applies windows, opt-out, line-type, duplicate, template, media, sender gates; Promise.all batch can race duplicate checks; no delay between batches; fixed 15-min send-window retry (#1352).",
+    "rootCause": "Consolidation landed but contract/pacing/dedup was never finished.",
+    "resolution": "Add in-batch normalized-number reservation, real pacing (dispatch start rate <= configured MPS), exact next-window scheduling (with #1351/#1352), and one fixture suite run through both adapters.",
+    "lookIn": [
+      "app/lib/campaign-sms-dispatch.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/routes/api+/sms.action.server.ts",
+      "app/lib/throughput-config.ts"
+    ],
+    "existingTests": [
+      "test/sms-action.route.test.ts",
+      "test/campaign-dispatch-worker.test.ts (mocks coordinator)"
+    ],
+    "missingTests": [
+      "same fixture suite through both adapters",
+      "duplicate numbers in one batch",
+      "rate over elapsed time",
+      "worker media/template/sender without mocking"
+    ],
+    "acceptanceCriteria": [
+      "HTTP and worker adapters pass same policy fixtures",
+      "Two rows with same normalized number produce at most one send",
+      "Starts do not exceed configured MPS",
+      "Deferral schedules exact next eligible time"
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Blocks #1272. Old enrichment claiming two divergent paths is stale.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1280,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(export): export question columns and answers for production block types and flat live-call results",
+    "summary": "The header-label fix landed, but exports still show only full_result JSON with block_1 keys. Production live-call blocks use textarea/radio/select/etc, which extractScriptQuestions filters out, and live-call results are flat block-ID maps while the exporter expects nested IVR page/title objects.",
+    "currentBehavior": "extractScriptQuestions accepts only question/recorded/dtmf; production uses textarea/radio/boolean/dropdown/select/multi/checkbox. Live-call results are {block_1:'...'} while exporter treats each top-level key as a page id.",
+    "rootCause": "Exporter vocabulary and result shape disagree with the live-call runtime.",
+    "resolution": "Branch response handling by campaign/result shape (live_call flat vs robocall nested), accept production input types, use block ID as the stable lookup key, build the header before the attempt loop, and add real-data CSV tests. Do not close the issue.",
+    "lookIn": [
+      "app/lib/campaign-export-helpers.server.ts",
+      "app/lib/campaign-export.server.ts",
+      "app/routes/api+/campaign-export.action.server.ts",
+      "app/hooks/call/useCallScreen.ts"
+    ],
+    "existingTests": [
+      "test/campaign-export.route.test.ts (uses artificial question type + nested result)"
+    ],
+    "missingTests": [
+      "production live-call shape",
+      "documented types (select/checkbox/dropdown/multi/boolean)",
+      "nested IVR shape",
+      "blank/renamed IVR titles",
+      "zero attempts still get header"
+    ],
+    "acceptanceCriteria": [
+      "textareas/radios export with content headers",
+      "flat live-call answers populate cells",
+      "no block_1 headers",
+      "IVR history preserved under stale titles"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Keep open; retitle to the residual defect.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1310,
+    "verdict": "fix-now",
+    "recommendedTitle": "design(nav): replace the desktop workspace dropdown with an accessible searchable combobox",
+    "summary": "Workspace dropdown grows long and is not searchable. Replace with a searchable popover/command composition with a viewport-safe max height (absorbs #1309).",
+    "currentBehavior": "Navbar WorkspacePicker renders a plain dropdown with no max-height, no search; shared Command primitive already has a scroll limit.",
+    "rootCause": "Primitive not used; dropdown has no height/scroll contract.",
+    "resolution": "Replace desktop picker with Command + Popover + Button composition; keep active-workspace check and All-workspaces destination; keep mobile sheet.",
+    "lookIn": [
+      "app/components/layout/Navbar.tsx",
+      "app/components/ui/command.tsx",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/command.tsx"
+    ],
+    "existingTests": [
+      "test/ui/navbar-workspace-picker.test.tsx (mocks dropdown)"
+    ],
+    "missingTests": [
+      "case-insensitive filter",
+      "empty result",
+      "keyboard + Escape",
+      "bounded height with many workspaces"
+    ],
+    "acceptanceCriteria": [
+      "Filter by name",
+      "List viewport-safe and scrolls",
+      "Keyboard nav works",
+      "Active + All workspaces remain"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Absorbs #1309 (close as duplicate when landed).",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1311,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(onboarding): make Website URL requirement depend on the SMS goal",
+    "summary": "Website URL shows 'required' styling plus an 'Optional' label; it should be optional unless the goal is SMS (then required, no 'optional' hint, dynamic asterisk).",
+    "currentBehavior": "useRequiredBusinessProfileFields sets required:true for every field; server treats website as optional for every goal including SMS — both client and server are wrong in different directions.",
+    "rootCause": "Requiredness not derived from goal; client and server disagree.",
+    "resolution": "Derive websiteRequired from selectedGoal === sms; apply the same rule in client validation, server validation, label, description, and progress. Implement with #1122.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx",
+      "app/routes/workspaces+/$id/onboarding/useRequiredBusinessProfileFields.ts",
+      "app/lib/messaging-onboarding/predicates.ts",
+      "app/lib/platform-onboarding-handlers.server.ts"
+    ],
+    "existingTests": [
+      "test/onboarding-business-profile-validation.test.ts (website optional)"
+    ],
+    "missingTests": [
+      "goal-specific requiredness",
+      "asterisk/optional copy per goal"
+    ],
+    "acceptanceCriteria": [
+      "Website optional for live/IVR/rent goals",
+      "Required for SMS",
+      "Client and server agree",
+      "Copy and asterisk follow goal"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Implement together with #1122.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1316,
+    "verdict": "fix-now",
+    "recommendedTitle": "design(mfa): polish enrollment steps, status layout, and secure code-copy controls",
+    "summary": "MFA change-log polish: cramped sublines (move status top-right), password-step action should be 'Next', icon copy controls with checkmark success, backup-code copy + secure-storage prompt, error-toast consistency.",
+    "currentBehavior": "account.tsx renders SectionHeader with 'Save' button for the password step, status below header, plain text copy control, no backup-code copy/guidance; account.security.tsx + two-factor.tsx use plain red text.",
+    "rootCause": "Unpolished enrollment UI; some generic feedback overlaps #1335.",
+    "resolution": "Scope to /account and /account/security: rename Save->Next, add accessible icon copy buttons with temporary check states, add backup-code copy + secure-storage guidance, move generic feedback conversion to #1335. Do not change session/logout behavior.",
+    "lookIn": [
+      "app/routes/account.tsx",
+      "app/routes/account.security.tsx",
+      "app/routes/two-factor.tsx"
+    ],
+    "existingTests": [
+      "test/two-factor.server.test.ts (server gates only)"
+    ],
+    "missingTests": [
+      "button labels",
+      "clipboard success/failure",
+      "enrollment keeps session"
+    ],
+    "acceptanceCriteria": [
+      "Password step says Next",
+      "Copy buttons accessible with check states",
+      "Backup codes have secure-storage prompt",
+      "Session behavior unchanged"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Redirect work stays under #1317, not here.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1317,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(auth): preserve and follow the workspace destination after inline MFA enrollment",
+    "summary": "Logging in after setting up MFA lands on /account instead of /workspaces. PR #1330 fixes the unauthenticated /account bounce but not authenticated inline enrollment, which loses the next param.",
+    "currentBehavior": "two-factor.server.ts gates with /account?enroll=1&next=<path>; account loader reads only enroll; inline verification form has no next field; security action redirects only when next is present. verifyTOTP response headers are discarded on the account path.",
+    "rootCause": "next is dropped through the inline enrollment flow; verifyTOTP Set-Cookie headers not merged.",
+    "resolution": "Amend PR #1330: return safe next from the account loader, submit it in the inline verify form, merge verifyTOTP headers into the response, redirect after enrollment, and add focused tests.",
+    "lookIn": [
+      "app/routes/account.loader.server.ts",
+      "app/routes/account.tsx",
+      "app/lib/two-factor.server.ts",
+      "app/routes/account.security.loader.server.ts",
+      "app/routes/signin.action.server.ts"
+    ],
+    "existingTests": [
+      "test/account.route.test.ts (mocks auth)"
+    ],
+    "missingTests": [
+      "enroll=1&next preserved",
+      "inline form submits next",
+      "redirect after verify",
+      "Set-Cookie headers reach response",
+      "external next rejected"
+    ],
+    "acceptanceCriteria": [
+      "/account?enroll=1&next=/workspaces retains next",
+      "Success redirects to safe destination",
+      "Unsafe next rejected",
+      "No-next stays on Account"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Do not close with PR #1330 as-is; the failing E2E check on it is unrelated call-screen flake.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1318,
+    "verdict": "fix-now",
+    "recommendedTitle": "design(onboarding): constrain onboarding steps while keeping the number flow wide",
+    "summary": "Onboarding pages can use a narrower centered max width; the first-number step must stay wide.",
+    "currentBehavior": "Focused onboarding layout still uses full workspace width ($id.tsx); OnboardingWizard adds spacing but no width constraint; individual forms are narrow but headers/checklist/launch are full width.",
+    "rootCause": "No centered width constraint around ordinary wizard steps.",
+    "resolution": "Add a centered readable max-width wrapper for standard steps; keep first_number wide; mobile stays full width.",
+    "lookIn": [
+      "app/routes/workspaces+/$id.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx"
+    ],
+    "existingTests": [
+      "none"
+    ],
+    "missingTests": [
+      "responsive/width component test",
+      "visual checks at laptop widths"
+    ],
+    "acceptanceCriteria": [
+      "Standard steps centered with max width",
+      "Number step stays wide",
+      "Mobile no horizontal scroll",
+      "Footer aligns with step content"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Coordinate with #1110/#1205 number flow.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1319,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(ui-kit): destructive button text contrast across default and hover states in shad-cc",
+    "summary": "Red/destructive buttons keep white text on hover (bg opacity change only). Fix belongs upstream in @chester-hill-solutions/shad-cc, not per-screen.",
+    "currentBehavior": "shad-cc button.tsx destructive variant: white text base + hover:bg-destructive/90; foreground/background tokens are package-owned.",
+    "rootCause": "Contrast requirement; 'black or red text' was the reporter's framing, contrast is the real requirement.",
+    "resolution": "Measure WCAG AA contrast in both themes and states, fix the package token/variant, update the vendored copy through the package workflow. No per-screen overrides.",
+    "lookIn": [
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/button.tsx",
+      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css",
+      "app/components/ui/button.tsx"
+    ],
+    "existingTests": [
+      "none for contrast"
+    ],
+    "missingTests": [
+      "package-level contrast/axe for default/hover/focus/disabled",
+      "CallCaster smoke keeps package variant"
+    ],
+    "acceptanceCriteria": [
+      "Destructive button text meets AA in both themes",
+      "States remain distinct",
+      "Package-owned fix applies to Button/LinkButton/asChild"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Portfolio-level fix; do not hand-roll locally.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1322,
+    "verdict": "fix-now",
+    "recommendedTitle": "feat(billing): separate credit purchases and expose Stripe receipts",
+    "summary": "Billing activity needs to separate purchases from usage once the ledger fills, and users need downloadable receipts/invoices.",
+    "currentBehavior": "Purchases are already classified as 'Credit purchase' in billing-activity-projection but rendered in one unfiltered table; checkout does not request or store receipt data.",
+    "rootCause": "Flat activity table plus no receipt retrieval.",
+    "resolution": "Add a Purchases filter/tab first; treat downloadable invoices as a separate Stripe-backed slice with workspace-authorized receipt lookup and safe fallback.",
+    "lookIn": [
+      "app/components/workspace/BillingActivityTable.tsx",
+      "app/lib/billing-activity-projection.ts",
+      "app/routes/workspaces+/$id/billing.route.tsx",
+      "app/lib/platform-billing.server.ts"
+    ],
+    "existingTests": [
+      "test/billing-activity-projection.test.ts",
+      "test/ui/billing-activity-table.test.tsx"
+    ],
+    "missingTests": [
+      "purchase filtering/pagination",
+      "receipt authorization",
+      "missing document fallback"
+    ],
+    "acceptanceCriteria": [
+      "Purchases viewable separately",
+      "Eligible purchases have authorized receipt action",
+      "No Stripe secret/unrestricted object serialized to client"
+    ],
+    "size": "M-L",
+    "risk": "medium",
+    "trackerRecommendation": "Two slices: purchases view, then receipts.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1323,
+    "verdict": "fix-now",
+    "recommendedTitle": "feat(onboarding): generate marked sample content from the selected goal",
+    "summary": "The auto-seeded Sample Campaign is always live_call; it should match the chosen goal (IVR / Live calls / SMS). Seeding currently happens before the goal is known.",
+    "currentBehavior": "createNewWorkspace seeds a fixed live_call sample; the goal is saved later; sample rows carry no marker.",
+    "rootCause": "Seed-before-goal timing plus no durable sample marker.",
+    "resolution": "Implement #1070 first (durable is_sample marker), then create or replace marked sample content when the goal is first saved. Only marked rows may be replaced.",
+    "lookIn": [
+      "app/lib/seed/seed-workspace-sample-data.server.ts",
+      "app/lib/seed/sample-script.server.ts",
+      "app/lib/database/workspace-provisioning.server.ts",
+      "app/lib/platform-onboarding-handlers.server.ts"
+    ],
+    "existingTests": [
+      "test/seed-workspace-sample-data.server.test.ts (expects live_call)"
+    ],
+    "missingTests": [
+      "SMS/IVR goal samples",
+      "repeated goal save"
+    ],
+    "acceptanceCriteria": [
+      "Live/SMS/menu goals get suitable samples",
+      "Only marked sample rows replaced",
+      "User content never touched"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Depends on #1070; pairing note on the issue agrees.",
+    "blockedBy": [
+      1070
+    ]
+  },
+  {
+    "issueNumber": 1334,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(results): separate contact progress from message and call attempt totals",
+    "summary": "SMS results show 'Total messages: 2 of 1' with a one-contact queue and 3+ messages each. The UI sums message-status rows AND dequeued queue rows for one contact.",
+    "currentBehavior": "CampaignResultDisplay sums visible disposition/status buckets; MessageResultsScreen divides by total queue contacts; campaign-stats.server.ts adds a dequeued count after counting message statuses. One sent message produces one message-status row plus one completed queue row -> '2 of 1'.",
+    "rootCause": "Contact progress and provider-message totals are conflated: queue lifecycle and message statuses are summed into one denominator.",
+    "resolution": "Define separate metrics: contact progress = unique completed queue rows / total queue rows; messages sent = message-row count (no contact denominator); call attempts = attempt count (no contact denominator).",
+    "lookIn": [
+      "app/lib/database/campaign-stats.server.ts",
+      "app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.tsx",
+      "app/components/campaign/home/CampaignHomeScreen/MessageResultsScreen.tsx"
+    ],
+    "existingTests": [
+      "test/ui/campaign-result-display.test.tsx (empty-state only)"
+    ],
+    "missingTests": [
+      "1 sent + 1 dequeued shows 1 of 1 not 2 of 1",
+      "multiple messages to one contact unchanged progress",
+      "multiple call attempts produce no invalid fraction"
+    ],
+    "acceptanceCriteria": [
+      "Contact progress never exceeds assigned queue total",
+      "Message totals count message rows only",
+      "Call-attempt totals clearly labelled without contact denominator"
+    ],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Webhook-side-effects/dispatch files in old enrichment are secondary; root is campaign-stats + result presentation.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1338,
+    "verdict": "fix-now",
+    "recommendedTitle": "design(call): organize Call Settings into consistent audio and calling-device sections",
+    "summary": "Call Settings buttons/controls are scattered with inconsistent alignment and padding.",
+    "currentBehavior": "Header sheet mixes a 3-column mic/speaker/mute grid with a separate wrapping row for calling device and Add Phone Number, plus an inline number form.",
+    "rootCause": "Two layout systems inside one sheet; no shared section/alignment.",
+    "resolution": "Define sections (Audio input, Audio output, Calling device, Verified numbers), use one FormField grid and one action alignment, keep everything in the existing sheet.",
+    "lookIn": [
+      "app/components/call/CallScreen.Header.tsx",
+      "app/components/call/CallScreen.Layout.tsx"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-header.test.tsx"
+    ],
+    "missingTests": [
+      "desktop/mobile sheet screenshots",
+      "keyboard order",
+      "long device-label wrapping"
+    ],
+    "acceptanceCriteria": [
+      "One alignment system",
+      "Usable with long device labels",
+      "Consistent padding mobile/desktop",
+      "Keyboard order matches visual order"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Combine with #1339 if audio test controls are approved.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1342,
+    "verdict": "fix-now",
+    "recommendedTitle": "feat(call): show a confirmed 'Call back' action after a completed call",
+    "summary": "After a hangup the button should become 'Call back' (with confirmation) for the same contact; today terminal state falls back to the generic Dial. The stale 'Hang Up' symptom itself is already fixed by terminal-state handling.",
+    "currentBehavior": "Hang Up shows only while dialing/connected; terminal provider status sends HANG_UP and disconnects the SDK call; a completed call falls back to ordinary Dial with no callback label or confirmation.",
+    "rootCause": "No isRedial/terminal-contact state in the display derivation.",
+    "resolution": "Add an explicit terminal-contact state, label the action 'Call back', add a confirmation dialog before redialing the same contact, keep normal Dial for a new queue recipient. Merge #1292 into this.",
+    "lookIn": [
+      "app/components/call/CallScreen.CallArea.tsx",
+      "app/hooks/call/useCampaignDialActions.ts",
+      "app/hooks/call/useCallHandling.ts",
+      "app/hooks/call/useCampaignCallFlow.ts"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-callarea.test.tsx",
+      "test/ui/campaign-call-flow-display-state.test.ts"
+    ],
+    "missingTests": [
+      "completed same-contact shows Call back",
+      "callback requires confirmation",
+      "cancel does not dial"
+    ],
+    "acceptanceCriteria": [
+      "Terminal state never shows Hang Up",
+      "Same contact shows Call back",
+      "Callback confirmed before dial",
+      "Cancel creates no attempt"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Merge #1292 into this issue.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1343,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(call): prevent call workbench overflow inside the workspace sidebar layout",
+    "summary": "The calling work area overflows horizontally on MacBook widths: the xl breakpoint activates a 3-column grid (min ~1172px) while the real container is far narrower inside the sidebar + padding.",
+    "currentBehavior": "CallScreen.Workbench.tsx:35-40 forces queue 340 + script 420 + controls 380 + gaps; breakpoint uses viewport width, not container width.",
+    "rootCause": "Viewport-based breakpoint vs nested sidebar container.",
+    "resolution": "Make the layout respond to available container width; at narrower widths move the queue into a sheet. Do not hide overflow. Merge #1314 into this.",
+    "lookIn": [
+      "app/components/call/CallScreen.Workbench.tsx",
+      "app/components/call/CallScreen.Layout.tsx",
+      "app/routes/workspaces+/$id.tsx"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-workbench.test.tsx"
+    ],
+    "missingTests": [
+      "no horizontal scroll at 1280/1366/1440 with sidebar",
+      "queue collapses to sheet"
+    ],
+    "acceptanceCriteria": [
+      "No document horizontal scroll at laptop widths",
+      "Script and controls usable",
+      "Queue moves to sheet when needed"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Merge #1314 (exact duplicate) into this issue.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1347,
+    "verdict": "fix-now",
+    "recommendedTitle": "refactor(copy): standardize customer-facing automated-phone-menu terminology",
+    "summary": "'Automated phone menu', 'IVR', and 'Robocall' are used inconsistently for the same product goal across UI and docs.",
+    "currentBehavior": "campaign-goals.ts says 'Automated phone menu'; messaging-onboarding/goals.ts says 'IVR'; services.tsx says 'Robocalls'; utils.ts legacy helper returns 'Robocall'. Internal enums remain robocall/simple_ivr/complex_ivr.",
+    "rootCause": "No canonical customer-facing label; three sources of truth.",
+    "resolution": "Pick one customer-facing name for the goal (keep internal/API enum values unchanged), keep 'Advanced IVR' technically distinct, add a shared terminology contract test.",
+    "lookIn": [
+      "app/lib/campaign-goals.ts",
+      "app/lib/messaging-onboarding/goals.ts",
+      "app/routes/services.tsx",
+      "app/lib/utils.ts",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx"
+    ],
+    "existingTests": [
+      "test/ui/campaign-new-goals.test.tsx",
+      "test/ui/onboarding-goal-step.test.tsx",
+      "test/utils.test.ts (all preserve inconsistency)"
+    ],
+    "missingTests": [
+      "shared canonical-label contract test"
+    ],
+    "acceptanceCriteria": [
+      "Goal selection and campaign setup use one customer-facing name",
+      "Internal enums and API values unchanged",
+      "Advanced IVR stays separate"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Coordinate with #1323 onboarding copy.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1348,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(ivr): dispatch campaign calls when the campaign enters running state",
+    "summary": "IVR campaign shows running yet no call reaches the recipient. Voice/IVR campaigns only get a status update on launch — no durable dispatch work is enqueued.",
+    "currentBehavior": "settings.action.server.ts updates status to running for voice/IVR but only message campaigns call launchCampaign; the campaign worker explicitly skips non-message campaigns; /api/initiate-ivr is not called by current UI.",
+    "rootCause": "The IVR dispatch path is legacy/one-off; nothing durable drives IVR calls after the campaign enters running.",
+    "resolution": "Add a durable IVR dispatch job (or extend campaign dispatch with an IVR branch): claim queued contacts, rate-limit Twilio calls, keep out-of-window rows queued with a successor, and complete the campaign when its queue drains. Do not dispatch long-running work in the settings HTTP action.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts",
+      "app/lib/campaign-execution.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/routes/api+/initiate-ivr.action.server.ts",
+      "app/lib/ivr-initiate.server.ts"
+    ],
+    "existingTests": [
+      "test/initiate-ivr.route.test.ts",
+      "test/ivr-initiate.server.test.ts",
+      "test/campaign-dispatch-worker.test.ts (skips non-message)"
+    ],
+    "missingTests": [
+      "launching IVR enqueues work",
+      "worker claims queued contacts and calls Twilio",
+      "out-of-window rows retry with successor",
+      "campaign completes only after IVR queue drains"
+    ],
+    "acceptanceCriteria": [
+      "Starting an IVR campaign enqueues durable dispatch work",
+      "Eligible contacts produce rate-limited Twilio attempts",
+      "Deferred/failed rows stay retryable",
+      "Status becomes complete only after drain"
+    ],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Highest-risk confirmed functional gap. Enrichment note: audio-upload hypothesis (#1346) is wrong — text-to-speech IVR works without recorded audio.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1351,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(sms): align deferred dispatch and ETA to the next send-window opening",
+    "summary": "SMS send window is 3:05PM yet the completion estimate says done by 3PM. The live ETA (getEtaRange) is a naive Date.now() + queue/rate calc that ignores the send window and the worker's 15-min deferral.",
+    "currentBehavior": "CampaignLaunchExtras renders an ETA from getEtaRange and never passes sms_send_window to any projection.",
+    "rootCause": "estimateOutboundCompletion() in app/lib/campaign-outbound-estimate.ts is window-aware but has zero callers; the UI uses a local naive estimator.",
+    "resolution": "Delete local getEtaRange, call estimateOutboundCompletion with the campaign send window, and share the scheduler calculation with the worker (see #1352).",
+    "lookIn": [
+      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx",
+      "app/lib/campaign-outbound-estimate.ts",
+      "app/lib/campaign-send-window.ts"
+    ],
+    "existingTests": [
+      "test/campaign-outbound-estimate.test.ts (throughput only)"
+    ],
+    "missingTests": [
+      "ETA cannot finish before window opens",
+      "work spanning two windows",
+      "fast/slow bounds across closed period",
+      "UI range test with fixed clock"
+    ],
+    "acceptanceCriteria": [
+      "ETA is never earlier than the first eligible send time",
+      "Closed periods do not consume projected throughput",
+      "Rendered estimate uses estimateOutboundCompletion"
+    ],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Merge with #1352 (it is already its parent).",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1356,
+    "verdict": "fix-now",
+    "recommendedTitle": "chore(iac): codify dev.callcaster.ca on the dev app service",
+    "summary": "dev.callcaster.ca was attached to the dev environment manually via CLI; .railway/environments/dev.ts models no custom domain, so IaC plans drift and an apply could detach the live domain.",
+    "currentBehavior": "Domain serves traffic but exists only in Railway state, not in the environment model.",
+    "rootCause": "Out-of-band CLI change (bb53c8e3 era) never backported into devResources().",
+    "resolution": "Add the custom domain to the CallCaster service networking in dev.ts; run the IaC plan and require a clean (no-diff) result with the domain still attached.",
+    "lookIn": [
+      ".railway/environments/dev.ts",
+      ".github/workflows/railway-iac.yml"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "IaC drift check: plan for dev shows no changes after codifying"
+    ],
+    "acceptanceCriteria": [
+      "dev.callcaster.ca present in devResources() networking",
+      "Plan for dev is clean (no drift)",
+      "Domain still resolves after any subsequent apply"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1357,
+    "verdict": "fix-now",
+    "recommendedTitle": "chore(iac): attach qa.callcaster.ca to the qa environment",
+    "summary": "Once the qa environment exists (#1355), attach qa.callcaster.ca to its app service through IaC so the env has a stable public URL.",
+    "currentBehavior": "No qa environment/domain yet; #1355 creates the env and its qa branch tracking.",
+    "rootCause": "Env rename is sequenced first; domain follows.",
+    "resolution": "After #1355: add the custom domain to the qa app service in the environment model; DNS CNAME + certificate via Railway; plan-verify no drift.",
+    "lookIn": [
+      ".railway/environments/staging.ts (to be renamed qa)",
+      ".railway/railway.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Plan for qa shows the domain and no unexpected diffs"
+    ],
+    "acceptanceCriteria": [
+      "qa.callcaster.ca serves the qa env",
+      "Domain modelled in IaC",
+      "Plan for qa is clean"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Sequenced behind #1355; do not attach domains to an env that does not exist yet.",
+    "blockedBy": [
+      1355
+    ]
+  },
+  {
+    "issueNumber": 1360,
+    "verdict": "fix-now",
+    "recommendedTitle": "docs(agents): teach the github-issues skill closed-reason distinctions and atomic Task/Epic creation",
+    "summary": "The github-issues agent skill must distinguish closed-as-completed, closed-as-not-planned, and closed-as-duplicate (e.g. #1155 and its subissues), and create atomic issues with GitHub Type Task and Epic.",
+    "currentBehavior": "The skill treats \"closed\" as one state and gives no recipe for typed atomic issues.",
+    "rootCause": "The skill predates the team's closed-reason and issue-type conventions.",
+    "resolution": "Update .agents/skills/github-issues/SKILL.md: gh issue list --reason completed|not_planned, GraphQL for duplicate closures, and an atomic-issue recipe using gh api projectsV2/issue types (Task/Epic) with one concern per issue.",
+    "lookIn": [
+      ".agents/skills/github-issues/SKILL.md"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Skill documents all three closed reasons with exact gh commands",
+      "Atomic Task/Epic creation recipe present",
+      "Examples reference #1155-style subissue graphs"
+    ],
+    "size": "S",
+    "risk": "low",
+    "blockedBy": []
+  }
+]

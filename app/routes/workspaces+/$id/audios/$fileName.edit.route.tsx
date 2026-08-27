@@ -9,6 +9,7 @@ import {
   type ClipRange,
 } from "@/components/file-assets/AudioClipEditor";
 import { PageShell } from "@/components/ui/page-shell";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/typography";
 import type { AudioUsage } from "@/lib/database/audio-usage.server";
@@ -54,7 +55,9 @@ export default function EditAudioPage() {
   if (error != null || fileName == null || src == null) {
     return (
       <PageShell title="Edit audio">
-        <Text className="text-destructive">{error ?? "Audio not found."}</Text>
+        <Alert variant="destructive">
+          <AlertDescription>{error ?? "Audio not found."}</AlertDescription>
+        </Alert>
         <Button asChild variant="outline" className="mt-4">
           <Link to="../../audios" relative="path">
             Back to audio library
@@ -67,7 +70,9 @@ export default function EditAudioPage() {
   return (
     <PageShell title={`Edit ${fileName}`}>
       {actionData?.error != null ? (
-        <Text className="mb-4 text-destructive">{actionData.error}</Text>
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{actionData.error}</AlertDescription>
+        </Alert>
       ) : null}
 
       <div className="mb-4 space-y-2">

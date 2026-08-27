@@ -6,6 +6,7 @@ Always talk to me like I have ADHD.
 > **Platform context:** Read [docs/AGENT-PLATFORM-GUIDE.md](docs/AGENT-PLATFORM-GUIDE.md) for CHS portfolio role, shared `@chester-hill-solutions/*` packages, and migration-branch boundaries before cross-cutting work.
 
 - When the user says `do the needful`, continue with the most obvious next implementation, cleanup, or verification steps without waiting for repeated confirmation unless blocked.
+- Open-issue job board: [`ISSUE_BOARD.md`](ISSUE_BOARD.md) at repo root lists every open CallCaster issue in verdict lanes. Pick from **Fix now** first (confirmed, exact resolution path). Other lanes: **Verify and close**, **Needs reproduction**, **Needs decision**, **Blocked / split first**, **Duplicates**. Refresh it any time with `npm run tools:issues:board`; it reads live from GitHub via `gh`. Verdicts, root causes, resolution paths, and test gaps come from the audit in [`scripts/issue-board-enrichment/`](scripts/issue-board-enrichment/) (per-lane files, validated on load) — update them when evidence changes (new PR, comment, or reproduction).
 - For broad bug, typecheck, test, or coverage sweeps, keep iterating until the issue list is exhausted or a real blocker is reached.
 - When implementing from an attached plan whose todos already exist, update the existing todos instead of recreating them and work through the full list before stopping.
 - Do not modify, overwrite, or reset the user's existing `.env` or environment variables during setup work.

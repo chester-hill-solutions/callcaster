@@ -11,6 +11,7 @@ import {
 import type { MetaFunction } from "react-router";
 import { useState } from "react";
 import { Section } from "@/components/shared/Section";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -76,13 +77,15 @@ export default function CampaignsNew() {
     <section id="form">
       <PageShell title="Create campaign" maxWidth="narrow">
         {actionData?.error != null ? (
-          <Text className="text-center text-destructive">
-            {typeof actionData.error === "object" &&
-            actionData.error !== null &&
-            "message" in actionData.error
-              ? String(actionData.error.message)
-              : String(actionData.error)}
-          </Text>
+          <Alert variant="destructive">
+            <AlertDescription>
+              {typeof actionData.error === "object" &&
+              actionData.error !== null &&
+              "message" in actionData.error
+                ? String(actionData.error.message)
+                : String(actionData.error)}
+            </AlertDescription>
+          </Alert>
         ) : null}
         <Form method="POST" className="space-y-6">
           <Section variant="flat" className="space-y-6">
