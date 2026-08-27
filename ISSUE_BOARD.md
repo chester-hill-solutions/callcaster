@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@f696b3fa` · 80 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@7bd39f86` · 78 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 35
+## Fix now — 34
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -342,19 +342,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: One alignment system; Usable with long device labels; Consistent padding mobile/desktop; Keyboard order matches visual order
 - Tracker: Combine with #1339 if audio test controls are approved.
 
-### [#1317](https://github.com/chester-hill-solutions/callcaster/issues/1317) Logging in after setting MFA sends me to /account instead of /workspaces
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-08-26
-- Recommended title: **fix(auth): preserve and follow the workspace destination after inline MFA enrollment**
-- Logging in after setting up MFA lands on /account instead of /workspaces. PR #1330 fixes the unauthenticated /account bounce but not authenticated inline enrollment, which loses the next param.
-- Current behavior: two-factor.server.ts gates with /account?enroll=1&next=<path>; account loader reads only enroll; inline verification form has no next field; security action redirects only when next is present. verifyTOTP response headers are discarded on the account path.
-- Root cause: next is dropped through the inline enrollment flow; verifyTOTP Set-Cookie headers not merged.
-- Resolution: Amend PR #1330: return safe next from the account loader, submit it in the inline verify form, merge verifyTOTP headers into the response, redirect after enrollment, and add focused tests.
-- Look in: `app/routes/account.loader.server.ts`, `app/routes/account.tsx`, `app/lib/two-factor.server.ts`, `app/routes/account.security.loader.server.ts`, `app/routes/signin.action.server.ts`
-- Existing tests: test/account.route.test.ts (mocks auth)
-- Missing tests: enroll=1&next preserved; inline form submits next; redirect after verify; Set-Cookie headers reach response; external next rejected
-- Done when: /account?enroll=1&next=/workspaces retains next; Success redirects to safe destination; Unsafe next rejected; No-next stays on Account
-- Tracker: Do not close with PR #1330 as-is; the failing E2E check on it is unrelated call-screen flake.
-
 ### [#1318](https://github.com/chester-hill-solutions/callcaster/issues/1318) On-boarding width can be smaller
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-25
 - Recommended title: **design(onboarding): constrain onboarding steps while keeping the number flow wide**
@@ -478,6 +465,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
+### [#1362](https://github.com/chester-hill-solutions/callcaster/issues/1362) If the user hangs up, the contact name goes away but if the contact hangs up it stays. Latter should be true for both
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-27
+- On the call screen, when the AGENT hangs up the contact name clears, but when the CONTACT hangs up it stays. Behavior should be identical for both hang-up directions, and the code paths should not be divergent enough to allow this.
+- Current behavior: Fix merged; awaiting deployed verification.
+- Root cause: Confirmed by trace: runCallStatusSideEffects billed and stamped a disposition but never dequeued the campaign_queue row, while /api/hangup always did - so only the agent-side hang-up collapsed nextRecipient.
+- Resolution: Fixed by #1368 (merged to dev as f696b3fa) - the webhook path now dequeues with the queue-row assignee, idempotent under the guarded RPC. Verify both hang-up orders collapse the contact name on a current dev deploy; then close.
+- Look in: `app/components/call/`, `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts (SSE)`, `call status webhook handlers`
+- Existing tests: test/ui/call-screen-dialogs.test.tsx
+- Missing tests: Contact-hangup clears/preserves name identically to agent-hangup (UI test per decision)
+- Done when: Both hang-up directions produce the same contact-name behavior; Shared teardown path or documented reason for divergence
+
 ### [#1335](https://github.com/chester-hill-solutions/callcaster/issues/1335) All errors should use the standard toast/warning alert not just red text
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: M · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-27
 - Recommended title: **fix(ui): render remaining page-level errors through the shared destructive Alert**
@@ -548,17 +546,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: CI quality job (typecheck + guards) on dev
 - Done when: rg sweep clean on dev; CI green after merge; Closure comment links the proof
 - Tracker: Verification only; no new code.
-
-### [#1362](https://github.com/chester-hill-solutions/callcaster/issues/1362) If the user hangs up, the contact name goes away but if the contact hangs up it stays. Latter should be true for both
-- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-08-27
-- On the call screen, when the AGENT hangs up the contact name clears, but when the CONTACT hangs up it stays. Behavior should be identical for both hang-up directions, and the code paths should not be divergent enough to allow this.
-- Current behavior: Fix merged; awaiting deployed verification.
-- Root cause: Confirmed by trace: runCallStatusSideEffects billed and stamped a disposition but never dequeued the campaign_queue row, while /api/hangup always did - so only the agent-side hang-up collapsed nextRecipient.
-- Resolution: Fixed by #1368 (merged to dev as f696b3fa) - the webhook path now dequeues with the queue-row assignee, idempotent under the guarded RPC. Verify both hang-up orders collapse the contact name on a current dev deploy; then close.
-- Look in: `app/components/call/`, `app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts (SSE)`, `call status webhook handlers`
-- Existing tests: test/ui/call-screen-dialogs.test.tsx
-- Missing tests: Contact-hangup clears/preserves name identically to agent-hangup (UI test per decision)
-- Done when: Both hang-up directions produce the same contact-name behavior; Shared teardown path or documented reason for divergence
 
 ### [#1278](https://github.com/chester-hill-solutions/callcaster/issues/1278) bug(queue): manual dequeue of another agent's assigned row returns success but silently no-ops
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-26
@@ -679,20 +666,9 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 6
+## Needs reproduction — 5
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
-
-### [#1358](https://github.com/chester-hill-solutions/callcaster/issues/1358) Audience File upload hover loses focus
-- Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-08-27
-- While dragging a file over the audience upload zone on macOS, after ~1s the Finder window drops behind the browser and the zone loses its drag-active styling — yet the drop still succeeds. Something in the app grabs window focus mid-drag.
-- Current behavior: Zone lights up on dragenter, then the highlight drops while the cursor is still over it; drop continues to work; moving the file away and back restores the highlight.
-- Root cause: Unconfirmed. The zone's own dragDepth counter is not the suspect (a dragleave would not steal OS focus and the drop still lands). Suspects: React Router window-focus revalidation firing when the browser regains focus, the workspace SSE subscription reconnect/refresh, any window.focus() or periodic re-render that remounts the step and resets isDragging state.
-- Resolution: Instrument on macOS (or Safari/Chromium devtools): log focus/blur, RR revalidation, and zone mount/unmount during a drag. Fix the component that steals focus; do not band-aid the styling.
-- Look in: `app/components/audience/AudienceUploadFileStep.tsx`, `app/hooks/media (SSE subscription hooks)`, `app/routes/workspaces+/$id.tsx (revalidation surface)`
-- Existing tests: test/ui/audience-uploader.test.tsx (data-drag-active contract)
-- Missing tests: Focus-steal repro (manual, macOS)
-- Done when: Component grabbing focus identified with evidence; Drag styling persists for the whole hover; Drop still works
 
 ### [#1344](https://github.com/chester-hill-solutions/callcaster/issues/1344) call work area section outline curve doesn't match underlying element curve. extra visible on dark mode
 - Verdict: **Needs reproduction** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-08-26

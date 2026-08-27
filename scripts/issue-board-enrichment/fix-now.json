@@ -636,42 +636,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1317,
-    "verdict": "fix-now",
-    "recommendedTitle": "fix(auth): preserve and follow the workspace destination after inline MFA enrollment",
-    "summary": "Logging in after setting up MFA lands on /account instead of /workspaces. PR #1330 fixes the unauthenticated /account bounce but not authenticated inline enrollment, which loses the next param.",
-    "currentBehavior": "two-factor.server.ts gates with /account?enroll=1&next=<path>; account loader reads only enroll; inline verification form has no next field; security action redirects only when next is present. verifyTOTP response headers are discarded on the account path.",
-    "rootCause": "next is dropped through the inline enrollment flow; verifyTOTP Set-Cookie headers not merged.",
-    "resolution": "Amend PR #1330: return safe next from the account loader, submit it in the inline verify form, merge verifyTOTP headers into the response, redirect after enrollment, and add focused tests.",
-    "lookIn": [
-      "app/routes/account.loader.server.ts",
-      "app/routes/account.tsx",
-      "app/lib/two-factor.server.ts",
-      "app/routes/account.security.loader.server.ts",
-      "app/routes/signin.action.server.ts"
-    ],
-    "existingTests": [
-      "test/account.route.test.ts (mocks auth)"
-    ],
-    "missingTests": [
-      "enroll=1&next preserved",
-      "inline form submits next",
-      "redirect after verify",
-      "Set-Cookie headers reach response",
-      "external next rejected"
-    ],
-    "acceptanceCriteria": [
-      "/account?enroll=1&next=/workspaces retains next",
-      "Success redirects to safe destination",
-      "Unsafe next rejected",
-      "No-next stays on Account"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Do not close with PR #1330 as-is; the failing E2E check on it is unrelated call-screen flake.",
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1318,
     "verdict": "fix-now",
     "recommendedTitle": "design(onboarding): constrain onboarding steps while keeping the number flow wide",
