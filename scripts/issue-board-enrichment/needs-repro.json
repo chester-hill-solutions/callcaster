@@ -147,5 +147,32 @@
     "risk": "low",
     "trackerRecommendation": "Needs a screenshot reproduction before styling changes; coordinate with #1338/#1313.",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 1358,
+    "verdict": "needs-repro",
+    "summary": "While dragging a file over the audience upload zone on macOS, after ~1s the Finder window drops behind the browser and the zone loses its drag-active styling — yet the drop still succeeds. Something in the app grabs window focus mid-drag.",
+    "currentBehavior": "Zone lights up on dragenter, then the highlight drops while the cursor is still over it; drop continues to work; moving the file away and back restores the highlight.",
+    "rootCause": "Unconfirmed. The zone's own dragDepth counter is not the suspect (a dragleave would not steal OS focus and the drop still lands). Suspects: React Router window-focus revalidation firing when the browser regains focus, the workspace SSE subscription reconnect/refresh, any window.focus() or periodic re-render that remounts the step and resets isDragging state.",
+    "resolution": "Instrument on macOS (or Safari/Chromium devtools): log focus/blur, RR revalidation, and zone mount/unmount during a drag. Fix the component that steals focus; do not band-aid the styling.",
+    "lookIn": [
+      "app/components/audience/AudienceUploadFileStep.tsx",
+      "app/hooks/media (SSE subscription hooks)",
+      "app/routes/workspaces+/$id.tsx (revalidation surface)"
+    ],
+    "existingTests": [
+      "test/ui/audience-uploader.test.tsx (data-drag-active contract)"
+    ],
+    "missingTests": [
+      "Focus-steal repro (manual, macOS)"
+    ],
+    "acceptanceCriteria": [
+      "Component grabbing focus identified with evidence",
+      "Drag styling persists for the whole hover",
+      "Drop still works"
+    ],
+    "size": "S",
+    "risk": "low",
+    "blockedBy": []
   }
 ]

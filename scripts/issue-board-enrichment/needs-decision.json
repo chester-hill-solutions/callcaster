@@ -213,5 +213,58 @@
     "risk": "high",
     "trackerRecommendation": "Blocked on product/compliance decision; issue title says 'calls' but scope is SMS.",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 1355,
+    "verdict": "needs-decision",
+    "recommendedTitle": "chore(iac): rename the staging environment to qa tracking the qa branch",
+    "summary": "Rename the Railway staging environment to \"qa\" and point its services at the qa branch, making qa the persistent pre-prod environment.",
+    "currentBehavior": "staging is modelled in .railway/environments/staging.ts tracking master during the v2 rehearsal, with a documented phase-3 flip to source(production); CI (railway-iac.yml) plans staging on PRs and scripts/railway/sync-staging-vars.sh populates its vars.",
+    "rootCause": "Environment naming/branching strategy changed mid-#1300 rollout; the rename interacts with the staged staging-cutover plan (#1300/#1303) — rename before or after the phase-3 flip is undecided.",
+    "resolution": "Decide sequencing (rename now vs after cutover), then in one change: rename the env on Railway, rename/rehome the environment model, update railway.ts guards, CI env names, sync script, and docs. wra-sol owns env topology.",
+    "lookIn": [
+      ".railway/environments/staging.ts",
+      ".railway/railway.ts",
+      ".github/workflows/railway-iac.yml",
+      "scripts/railway/sync-staging-vars.sh"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Plan for the renamed env shows the expected topology and nothing else"
+    ],
+    "acceptanceCriteria": [
+      "qa env exists tracking the qa branch",
+      "IaC models qa explicitly (no dev-clone fallback)",
+      "CI plans qa; no environment can be applied as an accidental clone",
+      "Docs/ADR updated"
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Coordinate with wra-sol; do not apply while the #1303 production cutover is mid-flight. #1357 waits on this.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1128,
+    "verdict": "needs-decision",
+    "summary": "Campaign setup gives no unsaved-changes affordance: Sai wants Save at top and bottom, Discard/Save Changes at the bottom, and Next disabled while there are unsaved changes.",
+    "currentBehavior": "Campaign setup steps offer Next without indicating pending edits; changes can be lost silently by navigating away.",
+    "rootCause": "No dirty-state model in the setup wizard; the earlier closure did not address the UX gap and Sai reopened it.",
+    "resolution": "Decide scope: single dirty flag per step vs form-level; whether Next is blocked or warns; where Save/Discard live. Then implement with a shared useDirtyCheck pattern.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/campaigns (setup wizard routes)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Dirty-state unit tests per the chosen model"
+    ],
+    "acceptanceCriteria": [
+      "Unsaved changes are visible before navigating",
+      "Discard and Save are explicit at the bottom",
+      "Next behavior agreed and implemented"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Product decision first: blocking Next vs warning dialog.",
+    "blockedBy": []
   }
 ]

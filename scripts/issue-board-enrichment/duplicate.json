@@ -80,34 +80,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1312,
-    "verdict": "duplicate",
-    "duplicateOf": 1335,
-    "recommendedTitle": "Replace remaining hand-built feedback boxes with semantic shared Alerts",
-    "summary": "Dark-mode error-box residue: the three confirmed hand-built red divs (CallScreen.Layout, workspaces+/$id, MessageSettings) and ChatOptOutBanner were converted to shared Alert variants under #1335 slice 2. Ready to verify and close.",
-    "currentBehavior": "Migrated: CallScreen ErrorBanner, workspace depleted/low-credit banners, MessageSettings media error/success, ChatOptOutBanner all use shared Alert variants with semantic contrast.",
-    "rootCause": "Standardization residue.",
-    "resolution": "Resolved under #1335 slice 2; verify the migrated surfaces in light/dark and close.",
-    "lookIn": [
-      "app/components/call/CallScreen.Layout.tsx",
-      "app/routes/workspaces+/$id.tsx",
-      "app/components/campaign/settings/MessageSettings.tsx",
-      "app/components/chats/ChatOptOutBanner.tsx",
-      "app/components/ui/alert.tsx"
-    ],
-    "existingTests": [
-      "workspace-skip-link, message-settings, components-chats-contact UI tests pass"
-    ],
-    "missingTests": [
-      "dark-theme contrast check"
-    ],
-    "acceptanceCriteria": [],
-    "size": "S-M",
-    "risk": "low",
-    "trackerRecommendation": "Verify and close as duplicate of #1335.",
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1314,
     "verdict": "duplicate",
     "duplicateOf": 1343,
@@ -129,31 +101,6 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Close as duplicate of #1343.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1332,
-    "verdict": "duplicate",
-    "duplicateOf": 1335,
-    "recommendedTitle": "Use the shared warning Alert for the chat opt-out banner",
-    "summary": "ChatOptOutBanner converted to the shared warning Alert (role=status) under #1335 slice 2, resolving the dark-mode contrast concern. Ready to verify and close.",
-    "currentBehavior": "Migrated: banner uses Alert variant=warning with semantic tokens instead of raw amber classes.",
-    "rootCause": "Standardization residue, not a live contrast bug.",
-    "resolution": "Resolved under #1335 slice 2; verify the banner in light/dark and close.",
-    "lookIn": [
-      "app/components/chats/ChatOptOutBanner.tsx",
-      "app/components/ui/alert.tsx"
-    ],
-    "existingTests": [
-      "test/ui/components-chats-contact.test.tsx (passes)"
-    ],
-    "missingTests": [
-      "dark-theme contrast test"
-    ],
-    "acceptanceCriteria": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Verify and close as duplicate of #1335.",
     "blockedBy": []
   },
   {
