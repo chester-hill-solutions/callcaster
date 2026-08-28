@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@1358c941` · 77 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@e49ce7a1` · 75 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 33
+## Fix now — 32
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -214,19 +214,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: popover bounds; SMS-only identity fields
 - Done when: Goal has short non-duplicated guidance; Help content wraps/scrolls within bounds; SMS compliance fields only for SMS goal; Saved data unchanged
 - Tracker: Coordinate with #1345/#1311/#1122.
-
-### [#1351](https://github.com/chester-hill-solutions/callcaster/issues/1351) SMS Window set to 3:05PM yet estimate says 3pm it'll be done
-- Verdict: **Fix now** · Size: S-M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-08-26
-- Recommended title: **fix(sms): align deferred dispatch and ETA to the next send-window opening**
-- SMS send window is 3:05PM yet the completion estimate says done by 3PM. The live ETA (getEtaRange) is a naive Date.now() + queue/rate calc that ignores the send window and the worker's 15-min deferral.
-- Current behavior: CampaignLaunchExtras renders an ETA from getEtaRange and never passes sms_send_window to any projection.
-- Root cause: estimateOutboundCompletion() in app/lib/campaign-outbound-estimate.ts is window-aware but has zero callers; the UI uses a local naive estimator.
-- Resolution: Delete local getEtaRange, call estimateOutboundCompletion with the campaign send window, and share the scheduler calculation with the worker (see #1352).
-- Look in: `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`, `app/lib/campaign-outbound-estimate.ts`, `app/lib/campaign-send-window.ts`
-- Existing tests: test/campaign-outbound-estimate.test.ts (throughput only)
-- Missing tests: ETA cannot finish before window opens; work spanning two windows; fast/slow bounds across closed period; UI range test with fixed clock
-- Done when: ETA is never earlier than the first eligible send time; Closed periods do not consume projected throughput; Rendered estimate uses estimateOutboundCompletion
-- Tracker: Merge with #1352 (it is already its parent).
 
 ### [#1334](https://github.com/chester-hill-solutions/callcaster/issues/1334) Results numbers are off?
 - Verdict: **Fix now** · Size: S-M · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-08-26
@@ -968,7 +955,7 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 
 ---
 
-## Duplicates — 5
+## Duplicates — 4
 
 Same root cause as the linked canonical issue. Do not implement separately — fold scope in and close.
 
@@ -984,19 +971,6 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 - Existing tests: test/ui/campaign-call-flow-display-state.test.ts; test/ui/call-screen-callarea.test.tsx
 - Missing tests: integrated remote-hangup asserts Hang Up gone; finished contact retained for disposition
 - Tracker: Close as duplicate of #1342; callback tracked there.
-
-### [#1352](https://github.com/chester-hill-solutions/callcaster/issues/1352) Campaign window opens at 3:05 yet the singular contact got the message at 3:15
-- Verdict: **Duplicates** · Size: S-M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-08-26
-- Duplicate of: [#1351](https://github.com/chester-hill-solutions/callcaster/issues/1351)
-- Recommended title: **fix(sms): align deferred dispatch and ETA to the next send-window opening**
-- Same send-window scheduling contract as #1351 (delivery at 3:15 vs window at 3:05).
-- Current behavior: Fixed 15-min worker retry defers past the window opening.
-- Root cause: Same root as #1351: no exact next-window scheduling; ETA ignores window.
-- Resolution: Fold into #1351 implementation.
-- Look in: `app/lib/worker/handlers/campaign.server.ts`, `app/lib/campaign-send-window.ts`
-- Existing tests: test/campaign-dispatch-worker.test.ts
-- Missing tests: exact 3:05 successor
-- Tracker: Merge into #1351 (already parent).
 
 ### [#1314](https://github.com/chester-hill-solutions/callcaster/issues/1314) Calling Screen pushes out of the VW
 - Verdict: **Duplicates** · Size: M · Risk: medium · Labels: design · Assignee: @wra-sol · Updated: 2026-08-19
