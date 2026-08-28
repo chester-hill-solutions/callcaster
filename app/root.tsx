@@ -149,6 +149,18 @@ function ErrorShell({
             Buffer polyfill installed before <Scripts /> too — see the
             comment in App's <head>. */}
         <script src="/buffer-polyfill.mjs" />
+        {/*
+          Error boundary renders a whole separate <html>, so the theme init
+          from App doesn't run here — leaving the page in light-mode tokens
+          during the FOUC ("flash bang" per #1397). Duplicate the same theme
+          bootstrap so the error page respects the user's dark preference
+          synchronously.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem("callcaster-theme");if(t==="dark")document.documentElement.classList.add("dark");else if(t==="light")document.documentElement.classList.remove("dark");else if(window.matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark");else document.documentElement.classList.remove("dark");})();`,
+          }}
+        />
         <Links />
       </head>
       <body className="min-h-screen bg-background">
