@@ -30,14 +30,14 @@ const BLOCKED_HOSTNAMES = new Set([
 const DNS_RESOLVE_TIMEOUT_MS = 5_000;
 
 async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout>;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
   });
   try {
     return await Promise.race([p, timeout]);
   } finally {
-    clearTimeout(timer!);
+    if (timer) clearTimeout(timer);
   }
 }
 

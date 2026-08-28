@@ -80,7 +80,10 @@ export async function getCallScreenData(
     throw new Error("Error fetching campaign data");
   }
 
-  const campaign = campaignWithScript!;
+  if (!campaignWithScript) {
+    throw new Error("Error fetching campaign data");
+  }
+  const campaign = campaignWithScript;
   return {
     workspaceData: workspaceData.data,
     campaign,

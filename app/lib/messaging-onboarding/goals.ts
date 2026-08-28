@@ -108,7 +108,7 @@ export function nextWizardStep(
   const steps = wizardStepsForGoal(goal);
   const index = steps.indexOf(current);
   if (index < 0 || index >= steps.length - 1) return null;
-  return steps[index + 1]!;
+  return steps[index + 1] ?? null;
 }
 
 export function previousWizardStep(
@@ -118,7 +118,7 @@ export function previousWizardStep(
   const steps = wizardStepsForGoal(goal);
   const index = steps.indexOf(current);
   if (index <= 0) return null;
-  return steps[index - 1]!;
+  return steps[index - 1] ?? null;
 }
 
 /** Whether the goal checklist includes a given post-goal step. */

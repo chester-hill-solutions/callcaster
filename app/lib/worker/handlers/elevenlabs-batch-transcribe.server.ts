@@ -105,7 +105,10 @@ export async function elevenlabsBatchTranscribeHandler(
 
   const audio = await downloadObject("workspaceAudio", callRow.audio_url);
   const result = await transcribeWithElevenLabs(audio);
-  const text = result.text!.trim();
+  if (!result.text) {
+    throw new Error("elevenlabs_batch_transcribe: transcription returned no text");
+  }
+  const text = result.text.trim();
 
   const [transcript] = await adminDb
     .insert(call_transcript)
