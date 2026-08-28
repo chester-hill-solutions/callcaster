@@ -92,6 +92,7 @@ function buildCallRow(callData: Partial<Call>) {
     campaign_id: callData.campaign_id || null,
     contact_id: callData.contact_id || null,
     outreach_attempt_id: callData.outreach_attempt_id || null,
+    queue_id: callData.queue_id || null,
     conference_id: callData.conference_id || null,
     phone_number_sid: callData.phone_number_sid || null,
     parent_call_sid: callData.parent_call_sid || null,
