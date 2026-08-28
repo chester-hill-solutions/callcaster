@@ -46,7 +46,12 @@ export const action = defineAction({
         return routeData({ success: false, error: uploadError?.message || "Upload failed" }, { headers });
       }
 
-      return redirect(`../audios?uploaded=1`, { headers });
+      // Absolute path — the previous `../audios` was resolved by React
+      // Router relative to the current route (`/workspaces/$id/audios/new`)
+      // and landed the user on a route that doesn't exist, so the
+      // "successful upload → 404" flash Sai reported in #1396 was a
+      // wrong-path redirect, not a routing bug in the audios index.
+      return redirect(`/workspaces/${workspaceId}/audios?uploaded=1`, { headers });
     } catch (error) {
       logger.error("Workspace audio upload failed", error);
       const message =

@@ -85,7 +85,10 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     })));
 
     expect(response.status).toBe(302);
-    expect(response.headers.get("Location")).toBe("../audios?uploaded=1");
+    // Absolute path — the previous `../audios` resolved through React Router
+    // to /workspaces/w1/audios/audios and dropped the user on the 404
+    // (#1396). The route now emits the fully-qualified destination.
+    expect(response.headers.get("Location")).toBe("/workspaces/w1/audios?uploaded=1");
     expect(mocks.normalizeUploadedAudio).toHaveBeenCalledTimes(1);
     expect(mocks.getSafeMediaBaseName).toHaveBeenCalledWith(" Greeting ");
     expect(vi.mocked(uploadObject)).toHaveBeenCalledWith(
