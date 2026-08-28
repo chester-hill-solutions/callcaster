@@ -221,20 +221,17 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
   });
 
   test("call/sms/recording side-effect job types share one schema factory and reject the same shapes requireSidAndTwilioParams did", () => {
-    const callStatus = jobRegistry.find((r) => r.type === "call_status_side_effects");
-    const smsStatus = jobRegistry.find((r) => r.type === "sms_status_side_effects");
-    const recording = jobRegistry.find((r) => r.type === "recording_side_effects");
-    expect(callStatus).toBeDefined();
-    expect(smsStatus).toBeDefined();
-    expect(recording).toBeDefined();
+    const callStatus = requireRegistration("call_status_side_effects");
+    const smsStatus = requireRegistration("sms_status_side_effects");
+    const recording = requireRegistration("recording_side_effects");
 
-    expect(() => callStatus!.params.parse({})).toThrowError(
+    expect(() => callStatus.params.parse({})).toThrowError(
       "call_status_side_effects: missing callSid or twilioParams",
     );
-    expect(() => smsStatus!.params.parse({ messageSid: "SM1" })).toThrowError(
+    expect(() => smsStatus.params.parse({ messageSid: "SM1" })).toThrowError(
       "sms_status_side_effects: missing messageSid or twilioParams",
     );
-    expect(() => recording!.params.parse({ callSid: "CA1", twilioParams: "not-an-object" })).toThrowError(
+    expect(() => recording.params.parse({ callSid: "CA1", twilioParams: "not-an-object" })).toThrowError(
       "recording_side_effects: missing callSid or twilioParams",
     );
 
@@ -242,7 +239,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
     // a stray `messageSid` from an unrelated job shape must be ignored, same
     // as the old code reading only `params[sidKey]`.
     expect(
-      callStatus!.params.parse({
+      callStatus.params.parse({
         callSid: "CA1",
         messageSid: "SM_should_be_ignored",
         twilioParams: { CallStatus: "completed" },
@@ -257,10 +254,10 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
    * failing validation and dead-lettering a job that would have billed.
    */
   test("voice side-effect rows queued under the pre-E1 shape still parse, with the event re-derived", () => {
-    const callStatus = jobRegistry.find((r) => r.type === "call_status_side_effects");
-    const recording = jobRegistry.find((r) => r.type === "recording_side_effects");
+    const callStatus = requireRegistration("call_status_side_effects");
+    const recording = requireRegistration("recording_side_effects");
 
-    const oldShape = callStatus!.params.parse({
+    const oldShape = callStatus.params.parse({
       callSid: "CA1",
       twilioParams: { CallSid: "CA1", CallStatus: "completed", Duration: "61" },
     });
@@ -269,7 +266,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
       event: { kind: "call-status", callSid: "CA1", callStatus: "completed", durationSeconds: 61 },
     });
 
-    const oldRecordingShape = recording!.params.parse({
+    const oldRecordingShape = recording.params.parse({
       callSid: "CA1",
       twilioParams: { CallSid: "CA1", RecordingSid: "RE1", RecordingDuration: "12" },
     });
@@ -279,7 +276,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
     });
 
     // A payload written by the new enqueue sites is taken as-is.
-    const newShape = callStatus!.params.parse({
+    const newShape = callStatus.params.parse({
       sid: "CA1",
       twilioParams: { CallSid: "CA1", CallStatus: "busy" },
       event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "busy" }),
@@ -290,7 +287,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
 
     // A malformed `event` is not trusted: fall back to the raw params rather
     // than handing a half-typed object to a handler.
-    const junkEvent = callStatus!.params.parse({
+    const junkEvent = callStatus.params.parse({
       callSid: "CA1",
       twilioParams: { CallSid: "CA1", CallStatus: "completed" },
       event: { kind: "not-a-kind" },
@@ -299,32 +296,30 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
 
     // sms_status_side_effects is NOT a voice callback and keeps the plain shape.
     expect(
-      jobRegistry
-        .find((r) => r.type === "sms_status_side_effects")!
+      requireRegistration("sms_status_side_effects")
         .params.parse({ messageSid: "SM1", twilioParams: { SmsStatus: "delivered" } }),
     ).toEqual({ sid: "SM1", twilioParams: { SmsStatus: "delivered" } });
   });
 
   test("webhook_delivery requires a valid eventType and rejects the same falsy payload/eventCategory the old bundled check did", () => {
-    const registration = jobRegistry.find((r) => r.type === "webhook_delivery");
-    expect(registration).toBeDefined();
+    const registration = requireRegistration("webhook_delivery");
 
     expect(() =>
-      registration!.params.parse({
+      registration.params.parse({
         eventCategory: "call",
         eventType: "DELETE",
         payload: { a: 1 },
       }),
     ).toThrow();
     expect(() =>
-      registration!.params.parse({ eventCategory: "call", eventType: "INSERT" }),
+      registration.params.parse({ eventCategory: "call", eventType: "INSERT" }),
     ).toThrowError("webhook_delivery: missing payload");
     expect(() =>
-      registration!.params.parse({ eventType: "INSERT", payload: { a: 1 } }),
+      registration.params.parse({ eventType: "INSERT", payload: { a: 1 } }),
     ).toThrowError("webhook_delivery: missing eventCategory");
 
     expect(
-      registration!.params.parse({
+      registration.params.parse({
         eventCategory: "call",
         eventType: "UPDATE",
         payload: { a: 1 },
@@ -373,9 +368,8 @@ describe("job registry — enqueue-side/dequeue-side registry parity (#1239 A3)"
 
   test("jobParamsRegistry and jobRegistry validate each type against the exact same schema instance", () => {
     for (const entry of jobParamsRegistry) {
-      const registration = jobRegistry.find((r) => r.type === entry.type);
-      expect(registration).toBeDefined();
-      expect(registration!.params).toBe(entry.params);
+      const registration = requireRegistration(entry.type);
+      expect(registration.params).toBe(entry.params);
     }
   });
 });
