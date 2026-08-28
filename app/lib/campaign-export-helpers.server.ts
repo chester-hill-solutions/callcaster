@@ -187,18 +187,30 @@ export function extractScriptQuestions(script: ExportScript | null | undefined):
     }
     for (const blockId of page.blocks) {
       const block = blocks[blockId];
-      if (
-        block &&
-        (block.type === "question" || block.type === "recorded" || block.type === "dtmf")
-      ) {
-        scriptQuestions.push({
-          // Must match the key the IVR webhook stores responses under (see ivr-results.ts).
-          id: block.title || block.id,
-          // Displayed label: block.content holds the actual question text authors write;
-          // block.title is a short, often-blank internal label — fall back to it, then the id.
-          title: block.content || block.title || block.id,
-        });
-      }
+      if (!block) continue;
+      // Include every block that could collect a response. Scriptkit doc types
+      // are `instruction | yes_no | choice | text | support | textarea | select
+      // | radio | checkbox` — only `instruction` is display-only. `callcasterType`
+      // (`"recorded" | "synthetic" | "say"`) is the on-wire IVR class, orthogonal
+      // to the doc type. The previous filter checked `block.type === "question"
+      // | "recorded" | "dtmf"` — literals that don't exist in the current
+      // scriptkit schema at all, so `scriptQuestions` came out empty for every
+      // real script and no per-question columns were emitted (#1280).
+      const collectsResponse =
+        block.type !== "instruction" ||
+        block.callcasterType === "recorded" ||
+        block.callcasterType === "synthetic";
+      if (!collectsResponse) continue;
+      scriptQuestions.push({
+        // Must match the key the IVR webhook stores responses under: the IVR
+        // response action writes `[currentBlock.title || blockId]: userInput`
+        // (see app/routes/api+/ivr/.../response.action.server.ts).
+        id: block.title || block.id,
+        // Displayed label: block.content holds the actual question text authors
+        // write; block.title is a short, often-blank internal label — fall back
+        // to it, then the id.
+        title: block.content || block.title || block.id,
+      });
     }
   }
 
