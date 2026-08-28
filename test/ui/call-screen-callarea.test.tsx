@@ -252,6 +252,103 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
     expect(onLoadQueue).toHaveBeenCalledTimes(1);
   });
 
+  test("dial button requires a confirmation click after a call ends in manual mode (#1292)", async () => {
+    // Scenario: the recipient hangs up first, so the button flips from
+    // Hang Up to Dial under an agent's still-in-flight click. Without the
+    // guard, that click would immediately dial the next contact. The guard
+    // consumes the first click as a "wake up" and only dials on the second.
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const handleDialNext = vi.fn();
+
+    // Start in an in-call state so `showInCall` is true.
+    const { rerender } = render(
+      <CallArea
+        {...baseProps({
+          callState: "connected",
+          displayState: "connected",
+          handleDialNext,
+        })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hang Up" })).toBeInTheDocument();
+
+    // Recipient hangs up: callState transitions to completed. The Dial
+    // button appears, but armed — its label is the confirm prompt.
+    rerender(
+      <CallArea
+        {...baseProps({
+          callState: "idle",
+          displayState: "completed",
+          handleDialNext,
+        })}
+      />,
+    );
+    const armed = screen.getByRole("button", { name: "Click again to dial" });
+    expect(armed).toBeInTheDocument();
+
+    // The armed click MUST NOT dial.
+    fireEvent.click(armed);
+    expect(handleDialNext).not.toHaveBeenCalled();
+
+    // After disarming, the button flips back to the normal Dial label and
+    // clicking it dials for real.
+    const dial = screen.getByRole("button", { name: "Dial" });
+    fireEvent.click(dial);
+    expect(handleDialNext).toHaveBeenCalledTimes(1);
+  });
+
+  test("dial button does NOT require confirmation when arriving from idle (no prior call to confuse the click)", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const handleDialNext = vi.fn();
+
+    render(
+      <CallArea
+        {...baseProps({
+          callState: "idle",
+          displayState: "idle",
+          handleDialNext,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Dial" }));
+    expect(handleDialNext).toHaveBeenCalledTimes(1);
+  });
+
+  test("predictive Start Dialing does NOT require confirmation after a call ends (only replacing-the-hangup manual dial does)", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const handleDialNext = vi.fn();
+
+    const { rerender } = render(
+      <CallArea
+        {...baseProps({
+          predictive: true,
+          conference: { parameters: { Sid: "CF1" } },
+          callState: "connected",
+          displayState: "connected",
+          handleDialNext,
+        })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hang Up" })).toBeInTheDocument();
+
+    rerender(
+      <CallArea
+        {...baseProps({
+          predictive: true,
+          // conference cleared → back to Start Dialing
+          conference: null,
+          callState: "idle",
+          displayState: "completed",
+          handleDialNext,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Start Dialing" }));
+    expect(handleDialNext).toHaveBeenCalledTimes(1);
+  });
+
   test("dial button is the idle primary action; hidden while dialing/connected", async () => {
     const { CallArea } = await import("@/components/call/CallScreen.CallArea");
 
