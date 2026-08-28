@@ -86,7 +86,16 @@ export function ScriptBlockEditor({
     setIsUploadingAudio(true);
     try {
       const name = await onUploadAudio(file);
-      if (name) onChange({ audioFile: name } as Partial<ScriptBlock>);
+      if (!name) return;
+      // Flip the block to "recorded" alongside setting the file so an upload
+      // from a "say" or "synthetic" block actually plays the uploaded audio.
+      // Without this, IVR playback keeps using TTS and the upload silently
+      // does nothing at runtime (the #1325 discoverability bug).
+      const patch: Partial<ScriptBlock> =
+        block.callcasterType === "recorded"
+          ? ({ audioFile: name } as Partial<ScriptBlock>)
+          : ({ audioFile: name, callcasterType: "recorded" } as Partial<ScriptBlock>);
+      onChange(patch);
     } finally {
       setIsUploadingAudio(false);
     }
@@ -226,7 +235,7 @@ export function ScriptBlockEditor({
               />
             )}
           </Label>
-          {!readOnly && onUploadAudio && block.callcasterType === "recorded" && (
+          {!readOnly && onUploadAudio && (
             <>
               <input
                 ref={audioInputRef}
@@ -245,6 +254,11 @@ export function ScriptBlockEditor({
               >
                 {isUploadingAudio ? "Uploading…" : "Upload audio"}
               </Button>
+              {block.callcasterType !== "recorded" && (
+                <p className="text-xs text-muted-foreground">
+                  Uploading switches this block to Recorded audio.
+                </p>
+              )}
             </>
           )}
         </>
