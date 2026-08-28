@@ -567,31 +567,30 @@ export async function patchCampaignQueueApi(
   try {
     switch (body.action) {
       case "update_status": {
+        if (!body.status) return { ok: false as const, error: "status is required for update_status", status: 400 };
         if (body.all) {
-          const ids = await searchCampaignQueueIds({
-            campaignId: campaignIdNum,
-            filters,
-            workspaceId,
-          });
-          await updateCampaignQueueStatusByIds(ids, body.status!, workspaceId);
+          const ids = await searchCampaignQueueIds({ campaignId: campaignIdNum, filters, workspaceId });
+          await updateCampaignQueueStatusByIds(ids, body.status, workspaceId);
         } else if (body.ids?.length) {
-          await updateCampaignQueueStatusByIds(body.ids, body.status!, workspaceId);
+          await updateCampaignQueueStatusByIds(body.ids, body.status, workspaceId);
         }
         return { ok: true as const, success: true };
       }
       case "add_contact_ids": {
+        if (!body.contact_ids?.length) return { ok: false as const, error: "contact_ids is required for add_contact_ids", status: 400 };
         await enqueueContactsForCampaign(
           campaignIdNum,
-          body.contact_ids!,
+          body.contact_ids,
           { requeue: false },
         );
         return { ok: true as const, success: true };
       }
       case "add_audience": {
+        if (body.audience_id == null) return { ok: false as const, error: "audience_id is required for add_audience", status: 400 };
         const contacts = await db
           .select({ contact_id: contactAudienceTable.contact_id })
           .from(contactAudienceTable)
-          .where(eq(contactAudienceTable.audience_id, body.audience_id!));
+          .where(eq(contactAudienceTable.audience_id, body.audience_id));
         await enqueueContactsForCampaign(
           campaignIdNum,
           contacts.map((row) => row.contact_id),
