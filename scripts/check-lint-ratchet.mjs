@@ -23,11 +23,22 @@ const ROOT = join(import.meta.dirname, "..");
 const BASELINE = join(import.meta.dirname, "baselines", "lint-ratchet.json");
 
 function main() {
-  // --no-cache: a warning-count gate must see the whole tree, and the shared
-  // cache belongs to the plain `lint` run.
+  // Same cache location as the `lint` run: after `npm run lint` the cache is
+  // warm, so this pass only lints changed files and reports every file's
+  // stored messages (warnings included) — the whole tree, without a second
+  // full ESLint sweep. A cold/stale cache is still correct: ESLint then
+  // simply lints everything.
   const result = spawnSync(
     "npx",
-    ["eslint", ".", "--format", "json", "--no-cache"],
+    [
+      "eslint",
+      ".",
+      "--format",
+      "json",
+      "--cache",
+      "--cache-location",
+      "./node_modules/.cache/eslint",
+    ],
     { cwd: ROOT, encoding: "utf8", maxBuffer: 1024 * 1024 * 64 },
   );
 
