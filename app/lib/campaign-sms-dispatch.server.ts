@@ -176,128 +176,48 @@ export async function dispatchCampaignSmsBatch(args: {
   const responses: ContactDispatchResult[] = [];
   const counts = { sent: 0, failed: 0, dequeued: 0, deferred: 0 };
 
+  // Start-rate cap: keep dispatch-loop starts under `configuredDispatcherSmsMps`.
+  // We pace *starts*, not completions — Twilio's throttle is on new sends per
+  // second, not on in-flight requests. Legacy pipelines default to 2 MPS
+  // (500ms between starts); parallel-on portals use their configured target.
+  const startRateMps = configuredDispatcherSmsMps(portalConfig);
+  const minStartIntervalMs = 1000 / Math.max(startRateMps, 0.1);
+
+  // In-batch normalized-number reservation. `hasDuplicateCampaignSms` reads
+  // persisted history and cannot see other rows still executing in this same
+  // Promise.all batch — two queue entries for the same phone would both pass
+  // its check and both send. Reserve the number synchronously before the
+  // first `await` so the second occurrence sees the reservation and dequeues
+  // as a duplicate. Reservation lives for the whole dispatch call so pacing
+  // gaps within one call still deduplicate.
+  const claimedNumbers = new Set<string>();
+
+  const ctx: HandleMemberCtx = {
+    workspaceId,
+    campaignId,
+    userId,
+    media: media.filter(Boolean) as string[],
+    effectiveCallerId,
+    portalConfig,
+    messageIntent,
+    messagingServiceSidFromRequest,
+    campaign,
+    counts,
+    claimedNumbers,
+  };
+
   for (let i = 0; i < queueMembers.length; i += BATCH_SIZE) {
     const batch = queueMembers.slice(i, i + BATCH_SIZE);
-    const batchResults = await Promise.all(
-      batch.map(async (member): Promise<ContactDispatchResult> => {
-        const normalizedPhone = normalizePhoneNumber(member.contact?.phone || "");
-
-        // Recipient-local quiet hours (CASL/TCPA — 8am–9pm recipient
-        // time). Unlike opt-out/landline/duplicate below, this is
-        // temporary: leave the row queued (no dequeue) so a later
-        // in-window dispatch picks it up.
-        const windowStatus = recipientCallingWindowStatus(normalizedPhone);
-        if (!windowStatus.allowed) {
-          counts.deferred += 1;
-          return {
-            [member.contact_id]: {
-              success: true,
-              skipped: true,
-              deferred: true,
-              reason: "Outside recipient quiet-hours window",
-            },
-          };
-        }
-
-        if (member.contact?.opt_out) {
-          await dequeueQueueEntry({
-            by: { id: member.id },
-            userId,
-            reason: OPTED_OUT_SMS_DEQUEUED_REASON,
-          });
-          counts.dequeued += 1;
-          return {
-            [member.contact_id]: {
-              success: true,
-              skipped: true,
-              reason: OPTED_OUT_SMS_DEQUEUED_REASON,
-            },
-          };
-        }
-
-        const lineType = member.contact
-          ? await getOrLookupLineType({
-              workspaceId,
-              contactId: member.contact_id,
-              phone: normalizedPhone,
-            })
-          : null;
-
-        if (isSmsIncapableLineType(lineType)) {
-          await dequeueQueueEntry({
-            by: { id: member.id },
-            userId,
-            reason: LANDLINE_SMS_DEQUEUED_REASON,
-          });
-          counts.dequeued += 1;
-          return {
-            [member.contact_id]: {
-              success: true,
-              skipped: true,
-              reason: LANDLINE_SMS_DEQUEUED_REASON,
-            },
-          };
-        }
-
-        const duplicateExists = await hasDuplicateCampaignSms({
-          workspaceId,
-          campaignId,
-          to: normalizedPhone,
-        });
-
-        if (duplicateExists) {
-          await dequeueQueueEntry({
-            by: { id: member.id },
-            userId,
-            reason: DUPLICATE_SMS_DEQUEUED_REASON,
-          });
-          counts.dequeued += 1;
-          return {
-            [member.contact_id]: {
-              success: true,
-              skipped: true,
-              reason: DUPLICATE_SMS_DEQUEUED_REASON,
-            },
-          };
-        }
-
-        // Process template tags for this specific contact
-        let processedBody = campaign.body_text;
-        if (member.contact && campaign.body_text) {
-          processedBody = processTemplateTags(campaign.body_text, member.contact);
-        }
-
-        return sendSingleCampaignSms({
-          body: processedBody,
-          media: media.filter(Boolean) as string[],
-          to: normalizedPhone,
-          from: effectiveCallerId,
-          campaign_id: campaignId,
-          workspace: workspaceId,
-          contact_id: member.contact_id,
-          queue_id: member.id,
-          user_id: userId,
-          portalConfig,
-          messageIntent,
-          messagingServiceSidFromRequest,
-          campaignSmsRow: campaign.campaign,
-        }).then(
-          result => {
-            counts.sent += 1;
-            return { [member.contact_id]: { success: true, ...result } };
-          },
-          error => {
-            counts.failed += 1;
-            return {
-              [member.contact_id]: {
-                success: false,
-                error: error instanceof Error ? error.message : String(error),
-              },
-            };
-          }
-        );
-      })
-    );
+    const startingPromises: Promise<ContactDispatchResult>[] = [];
+    for (const [j, member] of batch.entries()) {
+      startingPromises.push(handleMember(member, ctx));
+      // Pause between starts but not after the final one: no reason to
+      // waste a full interval waiting for nothing.
+      if (j < batch.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, minStartIntervalMs));
+      }
+    }
+    const batchResults = await Promise.all(startingPromises);
     responses.push(...batchResults);
   }
 
@@ -308,4 +228,175 @@ export async function dispatchCampaignSmsBatch(args: {
     counts,
     queuedRemaining: truncated + counts.deferred + counts.failed,
   };
+}
+
+type DispatchCounts = {
+  sent: number;
+  failed: number;
+  dequeued: number;
+  deferred: number;
+};
+
+type QueueMember = NonNullable<
+  Awaited<ReturnType<typeof getCampaignQueueById>>
+>[number];
+
+type CampaignData = Awaited<ReturnType<typeof loadCampaignSmsDispatchData>>;
+
+type HandleMemberCtx = {
+  workspaceId: string;
+  campaignId: string;
+  userId: string;
+  media: string[];
+  effectiveCallerId: string;
+  portalConfig: Awaited<ReturnType<typeof getWorkspaceTwilioPortalConfig>>;
+  messageIntent: TwilioMessageIntent | null;
+  messagingServiceSidFromRequest: string | null;
+  campaign: CampaignData;
+  counts: DispatchCounts;
+  claimedNumbers: Set<string>;
+};
+
+async function handleMember(
+  member: QueueMember,
+  ctx: HandleMemberCtx,
+): Promise<ContactDispatchResult> {
+  const { counts, claimedNumbers, workspaceId, campaignId, userId } = ctx;
+  const normalizedPhone = normalizePhoneNumber(member.contact?.phone || "");
+
+  // Recipient-local quiet hours (CASL/TCPA — 8am–9pm recipient time).
+  // Unlike opt-out/landline/duplicate below, this is temporary: leave the
+  // row queued (no dequeue) so a later in-window dispatch picks it up.
+  const windowStatus = recipientCallingWindowStatus(normalizedPhone);
+  if (!windowStatus.allowed) {
+    counts.deferred += 1;
+    return {
+      [member.contact_id]: {
+        success: true,
+        skipped: true,
+        deferred: true,
+        reason: "Outside recipient quiet-hours window",
+      },
+    };
+  }
+
+  if (member.contact?.opt_out) {
+    await dequeueQueueEntry({
+      by: { id: member.id },
+      userId,
+      reason: OPTED_OUT_SMS_DEQUEUED_REASON,
+    });
+    counts.dequeued += 1;
+    return {
+      [member.contact_id]: {
+        success: true,
+        skipped: true,
+        reason: OPTED_OUT_SMS_DEQUEUED_REASON,
+      },
+    };
+  }
+
+  // In-batch dedup — check + reserve BEFORE the first async gate so a
+  // sibling row starting later in the same dispatch call sees the
+  // reservation. Placed after opt_out so a persistent opt-out reason wins
+  // over a transient in-batch reason on the same contact.
+  if (normalizedPhone && claimedNumbers.has(normalizedPhone)) {
+    await dequeueQueueEntry({
+      by: { id: member.id },
+      userId,
+      reason: DUPLICATE_SMS_DEQUEUED_REASON,
+    });
+    counts.dequeued += 1;
+    return {
+      [member.contact_id]: {
+        success: true,
+        skipped: true,
+        reason: DUPLICATE_SMS_DEQUEUED_REASON,
+      },
+    };
+  }
+  if (normalizedPhone) {
+    claimedNumbers.add(normalizedPhone);
+  }
+
+  const lineType = member.contact
+    ? await getOrLookupLineType({
+        workspaceId,
+        contactId: member.contact_id,
+        phone: normalizedPhone,
+      })
+    : null;
+
+  if (isSmsIncapableLineType(lineType)) {
+    await dequeueQueueEntry({
+      by: { id: member.id },
+      userId,
+      reason: LANDLINE_SMS_DEQUEUED_REASON,
+    });
+    counts.dequeued += 1;
+    return {
+      [member.contact_id]: {
+        success: true,
+        skipped: true,
+        reason: LANDLINE_SMS_DEQUEUED_REASON,
+      },
+    };
+  }
+
+  const duplicateExists = await hasDuplicateCampaignSms({
+    workspaceId,
+    campaignId,
+    to: normalizedPhone,
+  });
+
+  if (duplicateExists) {
+    await dequeueQueueEntry({
+      by: { id: member.id },
+      userId,
+      reason: DUPLICATE_SMS_DEQUEUED_REASON,
+    });
+    counts.dequeued += 1;
+    return {
+      [member.contact_id]: {
+        success: true,
+        skipped: true,
+        reason: DUPLICATE_SMS_DEQUEUED_REASON,
+      },
+    };
+  }
+
+  let processedBody = ctx.campaign.body_text;
+  if (member.contact && ctx.campaign.body_text) {
+    processedBody = processTemplateTags(ctx.campaign.body_text, member.contact);
+  }
+
+  return sendSingleCampaignSms({
+    body: processedBody,
+    media: ctx.media,
+    to: normalizedPhone,
+    from: ctx.effectiveCallerId,
+    campaign_id: campaignId,
+    workspace: workspaceId,
+    contact_id: member.contact_id,
+    queue_id: member.id,
+    user_id: userId,
+    portalConfig: ctx.portalConfig,
+    messageIntent: ctx.messageIntent,
+    messagingServiceSidFromRequest: ctx.messagingServiceSidFromRequest,
+    campaignSmsRow: ctx.campaign.campaign,
+  }).then(
+    (result) => {
+      counts.sent += 1;
+      return { [member.contact_id]: { success: true, ...result } };
+    },
+    (error) => {
+      counts.failed += 1;
+      return {
+        [member.contact_id]: {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
+    },
+  );
 }
