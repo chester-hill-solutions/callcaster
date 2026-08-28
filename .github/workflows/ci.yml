@@ -45,6 +45,10 @@ jobs:
       # rebuild silently ships stale code. Build here; the `git diff
       # --exit-code` at the end of this job then fails on a stale dist/.
       - run: npm run vendor:build
+      # npm (package-lock.json) and bun (bun.lock, Railway Docker build) must
+      # move together — a dep added with npm alone fails the Railway image
+      # build minutes after push, far from the cause.
+      - run: npm run check:bun-lock
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run test:node
