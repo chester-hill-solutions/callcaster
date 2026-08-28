@@ -7,9 +7,7 @@ import {
   MMS_CREDITS,
   NUMBER_RENTAL_MONTHLY_CREDITS,
   SMS_SEGMENT_CREDITS,
-  STAFFED_ADDITIONAL_MINUTE_CREDITS,
-  STAFFED_FIRST_MINUTE_CREDITS,
-  formatCadFromCredits,
+  formatCreditLabel,
 } from "../../shared/pricing";
 
 export type PublicPricingRate = {
@@ -24,77 +22,96 @@ export type PublicPricingRow = {
   rates: PublicPricingRate[];
 };
 
-export function buildPublicPricingRows(): PublicPricingRow[] {
-  const segmentPrice = formatCadFromCredits(SMS_SEGMENT_CREDITS);
-  const mmsPrice = formatCadFromCredits(MMS_CREDITS);
-  const ivrDial = formatCadFromCredits(IVR_FIRST_MINUTE_CREDITS);
-  const ivrMinute = formatCadFromCredits(IVR_ADDITIONAL_MINUTE_CREDITS);
-  const staffedDial = formatCadFromCredits(STAFFED_FIRST_MINUTE_CREDITS);
-  const staffedMinute = formatCadFromCredits(STAFFED_ADDITIONAL_MINUTE_CREDITS);
-  const numberRental = formatCadFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS);
+export type PublicPricingContent = {
+  /** Three main service cards laid out side-by-side (#1392). */
+  services: PublicPricingRow[];
+  /** Underlying account costs — the price of credits and phone rental. */
+  account: PublicPricingRow[];
+  /**
+   * Staffed live calls no longer list a rate on the public page; users are
+   * invited to reach out so we can scope the engagement. #1392.
+   */
+  staffedCallout: {
+    heading: string;
+    body: string;
+    contactEmail: string;
+  };
+};
+
+export function buildPublicPricingContent(): PublicPricingContent {
+  const segmentCredits = formatCreditLabel(SMS_SEGMENT_CREDITS);
+  const mmsCredits = formatCreditLabel(MMS_CREDITS);
+  const ivrFirstCredits = formatCreditLabel(IVR_FIRST_MINUTE_CREDITS);
+  // The additional-minute rate is often referenced as e.g. "3 credits" — the
+  // label helper adds the noun so the display line reads naturally.
+  const ivrPerMinuteCredits = formatCreditLabel(IVR_ADDITIONAL_MINUTE_CREDITS);
+  const numberRentalCredits = formatCreditLabel(NUMBER_RENTAL_MONTHLY_CREDITS);
   const minPurchase = new Intl.NumberFormat("en-CA", {
     style: "currency",
     currency: "CAD",
   }).format(MIN_PURCHASE_CAD);
 
-  return [
-    {
-      service: "Credits",
-      type: "Prepaid balance",
-      rates: [
-        {
-          name: "Credit price",
-          price: `${formatCadFromCredits(1)} / credit`,
-          description: `All usage is billed in credits at $${CREDIT_PRICE_CAD.toFixed(2)} CAD each. Minimum purchase is ${MIN_CREDITS.toLocaleString()} credits (${minPurchase}).`,
-        },
-      ],
-    },
+  const services: PublicPricingRow[] = [
     {
       service: "Texting",
       type: "SMS & MMS",
       rates: [
         {
           name: "SMS segment",
-          price: `${segmentPrice} / segment`,
+          price: `${segmentCredits} / segment`,
           description:
-            "Outbound SMS is billed per segment. Long messages that span multiple segments are charged accordingly.",
+            "Outbound SMS is billed per segment. Long messages spanning multiple segments are billed for each.",
         },
         {
           name: "MMS",
-          price: `${mmsPrice} / message`,
+          price: `${mmsCredits} / message`,
           description: "Media messages (MMS) are billed at the MMS rate.",
         },
       ],
     },
     {
       service: "Calling",
-      type: "IVR & auto-dial",
+      type: "Agent-driven auto-dial",
       rates: [
         {
           name: "First minute",
-          price: `${ivrDial} / dial`,
-          description: "Covers the first minute of each outbound IVR or auto-dial attempt.",
+          price: `${ivrFirstCredits} / dial`,
+          description: "Covers the first minute of each outbound auto-dial attempt.",
         },
         {
           name: "Additional minutes",
-          price: `${ivrMinute} / minute`,
+          price: `${ivrPerMinuteCredits} / minute`,
           description: "Applies to each additional minute after the first.",
         },
       ],
     },
     {
-      service: "Staffed live calls",
-      type: "Agent-connected dialing",
+      service: "IVRs",
+      type: "Interactive voice response",
       rates: [
         {
           name: "First minute",
-          price: `${staffedDial} / dial`,
-          description: "Covers the first minute of each staffed live call attempt.",
+          price: `${ivrFirstCredits} / dial`,
+          description: "Covers the first minute of each outbound IVR call.",
         },
         {
           name: "Additional minutes",
-          price: `${staffedMinute} / minute`,
+          price: `${ivrPerMinuteCredits} / minute`,
           description: "Applies to each additional minute after the first.",
+        },
+      ],
+    },
+  ];
+
+  const account: PublicPricingRow[] = [
+    {
+      service: "Credits",
+      type: "Prepaid balance",
+      rates: [
+        {
+          name: "Credit price",
+          price: `$${CREDIT_PRICE_CAD.toFixed(2)} CAD / credit`,
+          description: `All usage above is billed in credits. Minimum purchase is ${MIN_CREDITS.toLocaleString()} credits (${minPurchase}).`,
         },
       ],
     },
@@ -104,10 +121,31 @@ export function buildPublicPricingRows(): PublicPricingRow[] {
       rates: [
         {
           name: "Rented number",
-          price: `${numberRental} / month`,
+          price: `${numberRentalCredits} / month`,
           description: "Each rented phone number renews monthly from the rental anchor date.",
         },
       ],
     },
   ];
+
+  return {
+    services,
+    account,
+    staffedCallout: {
+      heading: "Staffed live calls",
+      body:
+        "Need our team to place the calls for you? Staffed engagements are quoted per project so we can match agent count, hours, and script complexity to what you need.",
+      contactEmail: "info@callcaster.ca",
+    },
+  };
+}
+
+/**
+ * @deprecated Kept for compatibility; new callers should use
+ * {@link buildPublicPricingContent} which returns the three-lane layout
+ * (services, account, staffedCallout) the pricing page renders after #1392.
+ */
+export function buildPublicPricingRows(): PublicPricingRow[] {
+  const { services, account } = buildPublicPricingContent();
+  return [...services, ...account];
 }
