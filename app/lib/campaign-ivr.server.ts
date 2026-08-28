@@ -11,12 +11,6 @@ import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
 import { emitCampaignStatusEvent } from "@/lib/workspace-events.server";
 
-/** PostgREST select for unified campaign + joined script row. */
-export const CAMPAIGN_WITH_SCRIPT_SELECT = "*, script:script(*)";
-
-export const CALL_WITH_CAMPAIGN_SCRIPT_SELECT =
-  "*, campaign(*, script:script(*))";
-
 export type CampaignWithScript = {
   script?: Script | Script[] | null;
   workspace?: string | null;
