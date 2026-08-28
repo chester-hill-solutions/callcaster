@@ -13,7 +13,7 @@
  *   BOARD_REVIEWED_COMMIT=<sha> npm run tools:issues:board   # override git HEAD
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { buildBoard, loadEnrichment } from "./issue-board-lib.mjs";
@@ -115,8 +115,47 @@ function reviewedAt() {
   return `dev@${result.stdout.trim()}`;
 }
 
+/**
+ * Drop enrichment records for issues that are no longer open, rewriting the
+ * affected lane files in place. Agents used to have to prune these by hand
+ * after every closure before the generator would run again — the generator
+ * failing on stale records was the reminder. Records still referenced via
+ * blockedBy by a surviving record stay behind on purpose: loadEnrichment's
+ * dependency validation then surfaces the dangling edge as an actionable
+ * error instead of silently severing it.
+ */
+function pruneClosedEnrichment(openNumbers) {
+  const pruned = [];
+  for (const file of readdirSync(ENRICHMENT_DIR)) {
+    if (!file.endsWith(".json")) continue;
+    const path = join(ENRICHMENT_DIR, file);
+    let records;
+    try {
+      records = JSON.parse(readFileSync(path, "utf8"));
+    } catch {
+      continue; // leave malformed files for loadEnrichment to report
+    }
+    if (!Array.isArray(records)) continue;
+    const kept = records.filter((record) => {
+      if (openNumbers.has(record.issueNumber)) return true;
+      pruned.push(record.issueNumber);
+      return false;
+    });
+    if (kept.length !== records.length) {
+      writeFileSync(path, `${JSON.stringify(kept, null, 2)}\n`, "utf8");
+    }
+  }
+  return pruned.sort((a, b) => a - b);
+}
+
 function main() {
   const issues = fetchOpenIssues();
+  const pruned = pruneClosedEnrichment(new Set(issues.map((issue) => issue.number)));
+  if (pruned.length) {
+    console.log(
+      `[issues-board] pruned records for closed issues: ${pruned.join(", ")}`,
+    );
+  }
   const records = loadEnrichment(ENRICHMENT_DIR);
   const { md, counts } = buildBoard({
     issues,
