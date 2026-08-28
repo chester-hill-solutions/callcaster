@@ -232,25 +232,18 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
     expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
   });
 
-  test("covers webhook events fallback, to:'' fallback, and duration undefined branch", async () => {
-    setupEmailVmMocks({
-      workspace: {
-        id: "w1",
-        name: "W",
-        twilio_data: { sid: "tsid", authToken: "ttok" },
-        webhook: [
-          { events: undefined }, // non-array events is skipped by the filter
-          { events: ["voicemail"] },
-        ],
-      },
-      numberRow: { inbound_action: null },
-    });
+  test("acks (does NOT send) when inbound_action is null — Twilio retries are drained via the recording_url guard (#1224)", async () => {
+    // Previously the route called Resend with `to: [""]` — either the message
+    // was rejected client-side or an unverified sender was used, and Twilio
+    // then retried the callback indefinitely. The fix marks the recording as
+    // processed with a distinct reason so support can see WHY no email
+    // arrived without a burning retry loop.
+    setupEmailVmMocks({ numberRow: { inbound_action: null } });
     mocks.fetch.mockResolvedValueOnce({
       ok: true,
       statusText: "OK",
       blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
     } as any);
-    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
 
     const mod = await import("../app/routes/api+/email-vm");
     const res = await asRouteResponse(mod.action({
@@ -259,19 +252,53 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
         CallSid: "CA1",
         AccountSid: "AC1",
         RecordingSid: "RE1",
-        // omit RecordingDuration => duration undefined in webhook payload
       }),
       params: {},
     } as any));
     expect(res.status).toBe(200);
-    expect(mocks.sendEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ to: [""] }),
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      resolved: false,
+      reason: "no_email_recipient",
+    });
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+    expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
+    // The recording_url is stamped so subsequent Twilio retries are swallowed
+    // by the "Already processed" guard rather than reaching this branch again.
+    expect(telephonyDbMocks.updateCallRecordingUrlBySid).toHaveBeenCalledWith(
+      "CA1",
+      "https://tw/rec",
     );
-    expect(mocks.sendWebhookNotification).toHaveBeenCalledWith(
-      expect.objectContaining({
-        payload: expect.objectContaining({ duration: undefined }),
+  });
+
+  test("acks (does NOT send) when inbound_action is a phone number, not an email (#1224)", async () => {
+    // inbound_action doubles as forward-to / inbound-flow routing target for
+    // some workspaces; when a number's inbound flow ends in voicemail but the
+    // action was configured as a phone number, treating it as an email
+    // recipient silently failed the same way as null.
+    setupEmailVmMocks({ numberRow: { inbound_action: "+15555550100" } });
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
+    } as any);
+
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({
+        RecordingUrl: "https://tw/rec2",
+        CallSid: "CA2",
+        AccountSid: "AC1",
+        RecordingSid: "RE2",
       }),
-    );
+      params: {},
+    } as any));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      reason: "no_email_recipient",
+    });
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
   });
 
   test("validates required fields: malformed payloads 4xx, downstream faults 5xx", async () => {
