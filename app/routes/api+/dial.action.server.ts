@@ -22,6 +22,7 @@ import { createVoiceResponse } from "@/lib/twilio-twiml.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineAction } from "@/lib/handler.server";
 import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
+import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 
 interface DialRequest {
   to_number: string;
@@ -70,6 +71,35 @@ export const action = defineAction({
         if (!verifiedNumbers?.includes(selected_device)) {
             throw new Response("Selected device is not a verified phone number", { status: 400 });
         }
+    }
+
+    // Recipient-local calling window (TCPA/CRTC 8:00 a.m.–9:00 p.m. in the
+    // recipient's own time zone). Auto-dial, IVR dispatch, and campaign SMS
+    // already gate on this; the manual dial path was the last outbound
+    // campaign-triggered call that could originate outside the window
+    // (issue #1207 — the campaign scheduler UI promises the floor holds
+    // "regardless of the hours set here"). Refuse before claiming the queue
+    // row so a refused dial does not have to be released back.
+    const windowStatus = recipientCallingWindowStatus(to_number);
+    if (!windowStatus.allowed) {
+        logger.warn("dial.recipient_window_closed", {
+            campaignId: Number(campaign_id),
+            contactId: Number(contact_id),
+            queueId: Number(queue_id),
+            workspaceId: workspace_id,
+            userId: user.id,
+            timezone: windowStatus.timezone,
+            reason: windowStatus.reason,
+        });
+        return routeData(
+            {
+                error:
+                    "Outside recipient's local calling window (8:00 a.m.–9:00 p.m.). Try again during their local daytime.",
+                reason: "recipient_window_closed",
+                timezone: windowStatus.timezone,
+            },
+            { status: 409 },
+        );
     }
 
     const credits = await requireOutboundCredits(workspace_id);

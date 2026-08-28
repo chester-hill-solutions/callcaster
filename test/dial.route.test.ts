@@ -85,6 +85,26 @@ vi.mock("@/lib/db-rpc.server", () => ({
   rpcClaimQueueEntryForDial: (...args: any[]) => dbRpcState.claimQueueEntryForDial(...args),
 }));
 
+// The recipient calling window is wall-clock dependent; pin it open by default
+// so these tests are not time-of-day sensitive. One test below flips it closed
+// to exercise the #1207 gate. Window logic itself is covered in
+// test/recipient-calling-window.test.ts.
+const windowState = vi.hoisted(() => ({
+  status: {
+    allowed: true,
+    timezone: "America/Toronto",
+    reason: "in_window",
+  } as {
+    allowed: boolean;
+    timezone: string | null;
+    reason: string;
+  },
+}));
+vi.mock("@/lib/recipient-calling-window", () => ({
+  recipientCallingWindowStatus: () => windowState.status,
+  isWithinRecipientCallingWindow: () => windowState.status.allowed,
+}));
+
 describe("app/routes/api+/dial/tsx.route", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -104,6 +124,11 @@ describe("app/routes/api+/dial/tsx.route", () => {
     creditsState.credits = 10;
     creditsState.throwError = null;
     tenantDbState.callerIdRecord = { type: "rented", phone_number: "+1555" };
+    windowState.status = {
+      allowed: true,
+      timezone: "America/Toronto",
+      reason: "in_window",
+    };
     mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue({
       emergencyVoice: {
         enabled: false,
@@ -317,6 +342,44 @@ describe("app/routes/api+/dial/tsx.route", () => {
 
     expect(res.status).toBe(409);
     await expect(res.json()).resolves.toMatchObject({ error: message, claim });
+    expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
+  });
+
+  test("refuses to dial with 409 when the recipient-local calling window is closed (#1207)", async () => {
+    windowState.status = {
+      allowed: false,
+      timezone: "America/Denver",
+      reason: "outside_window",
+    };
+    mocks.getSession.mockReturnValueOnce({ headers: new Headers() });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      to_number: "+13035550100",
+      user_id: "u1",
+      campaign_id: "1",
+      contact_id: "2",
+      workspace_id: "w1",
+      queue_id: "3",
+      caller_id: "+1555",
+    });
+    queueJsonAuthSession({ user: { id: "u1" } });
+
+    const mod = await import("../app/routes/api+/dial");
+    const res = await asRouteResponse(
+      mod.action({
+        request: new Request("http://localhost/api/dial", { method: "POST" }),
+      } as any),
+    );
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({
+      reason: "recipient_window_closed",
+      timezone: "America/Denver",
+      error: expect.stringContaining("calling window"),
+    });
+    // The refusal must not claim the row nor talk to Twilio — otherwise a
+    // refused dial would still lock the contact out for another agent, and
+    // (worse) the wall-clock check would happen after we already dialled.
+    expect(dbRpcState.claimQueueEntryForDial).not.toHaveBeenCalled();
     expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
   });
 
