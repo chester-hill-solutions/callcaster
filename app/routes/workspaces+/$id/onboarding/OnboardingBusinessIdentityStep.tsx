@@ -2,6 +2,7 @@ import { Form } from "react-router";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Section, SectionHeader } from "@/components/shared/Section";
+import { goalNeedsSmsCompliance } from "@/lib/messaging-onboarding/goals";
 import { OPERATING_COUNTRY_OPTIONS } from "./constants";
 import type { OnboardingStepProps } from "./types";
 import { useRequiredBusinessProfileFields } from "./useRequiredBusinessProfileFields";
@@ -21,6 +22,11 @@ export function OnboardingBusinessIdentityStep({
 }: Props) {
   const { requiredFieldProps, requiredFieldError } =
     useRequiredBusinessProfileFields();
+  // Website URL is only required when the goal will send SMS — carriers ask
+  // for it during 10DLC / toll-free registration. All other goals (voice
+  // dialers, IVR) don't need it, so it's optional there and the label
+  // shouldn't render a red asterisk (#1311).
+  const websiteRequired = goalNeedsSmsCompliance(onboarding.selectedGoal);
 
   return (
     <Section variant="flat">
@@ -51,8 +57,13 @@ export function OnboardingBusinessIdentityStep({
           <FormField
             htmlFor="websiteUrl"
             label="Website URL"
-            description="Optional. Required later if you send SMS — carriers ask for it during registration."
-            error={requiredFieldError("websiteUrl")}
+            required={websiteRequired}
+            description={
+              websiteRequired
+                ? "Required — carriers ask for it during SMS registration."
+                : "Optional. Only required later if you switch to a goal that sends SMS."
+            }
+            error={requiredFieldError("websiteUrl", { required: websiteRequired })}
           >
             <Input
               id="websiteUrl"
@@ -61,7 +72,9 @@ export function OnboardingBusinessIdentityStep({
               placeholder="https://www.acmehealth.com"
               defaultValue={onboarding.businessProfile.websiteUrl}
               disabled={isReadOnly}
-              {...requiredFieldProps<HTMLInputElement>("websiteUrl")}
+              {...requiredFieldProps<HTMLInputElement>("websiteUrl", {
+                required: websiteRequired,
+              })}
             />
           </FormField>
           <FormField htmlFor="operatingCountry" label="Operating country">
