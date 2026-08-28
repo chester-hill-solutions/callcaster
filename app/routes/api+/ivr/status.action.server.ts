@@ -136,6 +136,7 @@ export const action = defineAction({
         const dbCall = await findCallBySid(callSid);
         if (!dbCall) throw new Error("Call not found");
         if (!dbCall.workspace) throw new Error("Call missing workspace");
+        if (dbCall.campaign_id == null) throw new Error("Call missing campaign_id");
         const campaignData = await fetchCampaignWithScript(dbCall.campaign_id);
 
         const twilio = await createWorkspaceTwilioInstance({ workspace_id: dbCall.workspace });
