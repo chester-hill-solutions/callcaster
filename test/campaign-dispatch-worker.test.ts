@@ -256,6 +256,22 @@ describe("campaignDispatchHandler", () => {
     expect(Math.abs(call.runAt.getTime() - nextOpenAt.getTime())).toBeLessThanOrEqual(50);
   });
 
+  test("a far-future window boundary is capped so a stale schedule cannot pin the chain", async () => {
+    // Window opens in 3 days; if the operator edits or removes the window
+    // meanwhile, the next wake must re-read the campaign well before then.
+    const maxDeferMs = 60 * 60 * 1000;
+    const nextOpenAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    mocks.dispatchCampaignSmsBatch.mockResolvedValue({
+      kind: "deferred_send_window",
+      nextOpenAt,
+    });
+    await campaignDispatchHandler(makeJob());
+    const call = mocks.enqueueJob.mock.calls.at(-1)?.[0] as { runAt: Date };
+    expect(call.runAt.getTime()).toBeLessThan(nextOpenAt.getTime());
+    const expectedWake = Date.now() + maxDeferMs;
+    expect(Math.abs(call.runAt.getTime() - expectedWake)).toBeLessThanOrEqual(100);
+  });
+
   test("insufficient credits stops the chain without retry", async () => {
     mocks.dispatchCampaignSmsBatch.mockResolvedValue({ kind: "insufficient_credits" });
     const result = await campaignDispatchHandler(makeJob());

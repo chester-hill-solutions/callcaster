@@ -165,6 +165,13 @@ const DISPATCH_BATCH_SIZE = 50;
  *  sweep waiting flips, IVR calling-hours gate). The SMS send-window gate
  *  instead schedules its successor at the exact window boundary (#1352). */
 const SEND_WINDOW_RETRY_MS = 15 * 60 * 1000;
+/** Upper bound on one send-window deferral. The successor wakes at
+ *  min(nextOpenAt, now + this): exact for boundaries within reach (#1352),
+ *  but a boundary days away cannot pin the chain to window config that may
+ *  change first. Every wake re-reads the campaign, so a window edited or
+ *  removed while deferred takes effect within one bounded hop, and the hop
+ *  that lands inside the cap still resumes exactly at the true boundary. */
+const SEND_WINDOW_MAX_DEFER_MS = 60 * 60 * 1000;
 
 async function enqueueDispatchSuccessor(args: {
   workspaceId: string;
@@ -287,18 +294,22 @@ export async function campaignDispatchHandler(
       // Config error — retrying cannot fix it; surface loudly and stop.
       logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
       return { ok: true, campaignId, blocked: "caller_id_required" };
-    case "deferred_send_window":
+    case "deferred_send_window": {
       // Schedule the successor at the exact window boundary (#1352): the
       // batch's outcome carries the next open instant, so dispatch resumes
-      // the moment sending is allowed instead of up to 15 minutes late.
+      // the moment sending is allowed. Cap the sleep (see
+      // SEND_WINDOW_MAX_DEFER_MS) so a far-future boundary cannot pin the
+      // chain to config that may change before then.
+      const exactDelayMs = Math.max(0, outcome.nextOpenAt.getTime() - Date.now());
       await enqueueDispatchSuccessor({
         workspaceId,
         campaignId,
         userId,
         completedJobId: job.id,
-        delayMs: Math.max(0, outcome.nextOpenAt.getTime() - Date.now()),
+        delayMs: Math.min(exactDelayMs, SEND_WINDOW_MAX_DEFER_MS),
       });
       return { ok: true, campaignId, deferred: "send_window" };
+    }
     case "dispatched": {
       const { counts, queuedRemaining } = outcome;
 
