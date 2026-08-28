@@ -13,6 +13,22 @@ import { jobParamsRegistry } from "@/lib/worker/job-params.server";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
 /**
+ * Look up a job registration by type, asserting the invariant these
+ * drift-guard tests depend on: every job type under test must be registered
+ * in `jobRegistry`. Throws with the missing type named instead of returning
+ * undefined — a missing registration is test-setup drift, not a case to skip.
+ */
+function requireRegistration(type: string): (typeof jobRegistry)[number] {
+  const registration = jobRegistry.find((r) => r.type === type);
+  if (!registration) {
+    throw new Error(
+      `jobRegistry has no registration for job type "${type}" — the registry and the drift-guard expectations have diverged`,
+    );
+  }
+  return registration;
+}
+
+/**
  * Drift guard for #1239 A1: `jobHandlers`, `PAGING_JOB_TYPES`, and
  * `SELF_SCHEDULING_JOB_TYPES` are now DERIVED from the `jobRegistry` list in
  * handlers.server.ts instead of being hand-maintained independently. These
@@ -116,11 +132,10 @@ describe("job registry — derived-set equality guard (#1239 A1)", () => {
 
 describe("job registry — defineJob params validation (proof migrations)", () => {
   test("twilio_open_sync defaults missing/invalid numeric params exactly like the old requireNumberParam helper", async () => {
-    const registration = jobRegistry.find((r) => r.type === "twilio_open_sync");
-    expect(registration).toBeDefined();
+    const registration = requireRegistration("twilio_open_sync");
 
     // Missing params -> defaults (50, 50, 120), matching the old `?? 50` etc.
-    expect(registration!.params.parse({})).toEqual({
+    expect(registration.params.parse({})).toEqual({
       callLimit: 50,
       messageLimit: 50,
       maxAgeMinutes: 120,
@@ -129,12 +144,12 @@ describe("job registry — defineJob params validation (proof migrations)", () =
     // Numeric-string params coerce, matching requireNumberParam's tenant-db
     // bigint-as-string handling (#1078).
     expect(
-      registration!.params.parse({ callLimit: "10", messageLimit: "20", maxAgeMinutes: "30" }),
+      registration.params.parse({ callLimit: "10", messageLimit: "20", maxAgeMinutes: "30" }),
     ).toEqual({ callLimit: 10, messageLimit: 20, maxAgeMinutes: 30 });
 
     // Garbage falls back to default rather than throwing, matching the old
     // `requireNumberParam(...) ?? default` behaviour.
-    expect(registration!.params.parse({ callLimit: "not-a-number" })).toEqual({
+    expect(registration.params.parse({ callLimit: "not-a-number" })).toEqual({
       callLimit: 50,
       messageLimit: 50,
       maxAgeMinutes: 120,
@@ -142,46 +157,41 @@ describe("job registry — defineJob params validation (proof migrations)", () =
   });
 
   test("elevenlabs_batch_transcribe rejects a missing callSid with the original error message", () => {
-    const registration = jobRegistry.find(
-      (r) => r.type === "elevenlabs_batch_transcribe",
-    );
-    expect(registration).toBeDefined();
-    expect(() => registration!.params.parse({})).toThrowError(
+    const registration = requireRegistration("elevenlabs_batch_transcribe");
+    expect(() => registration.params.parse({})).toThrowError(
       "elevenlabs_batch_transcribe: missing callSid",
     );
-    expect(registration!.params.parse({ callSid: "CA123" })).toEqual({
+    expect(registration.params.parse({ callSid: "CA123" })).toEqual({
       callSid: "CA123",
     });
   });
 
   test("billing_reconcile accepts an optional workspaceId and ignores unknown keys", () => {
-    const registration = jobRegistry.find((r) => r.type === "billing_reconcile");
-    expect(registration).toBeDefined();
-    expect(registration!.params.parse({})).toEqual({});
+    const registration = requireRegistration("billing_reconcile");
+    expect(registration.params.parse({})).toEqual({});
     expect(
-      registration!.params.parse({ workspaceId: "ws_1", requestId: "req_1" }),
+      registration.params.parse({ workspaceId: "ws_1", requestId: "req_1" }),
     ).toEqual({ workspaceId: "ws_1" });
   });
 });
 
 describe("job registry — defineJob params validation (#1239 A2 migrations)", () => {
   test("audience_upload rejects a coerced-zero uploadId/audienceId like the old bundled falsy check", () => {
-    const registration = jobRegistry.find((r) => r.type === "audience_upload");
-    expect(registration).toBeDefined();
+    const registration = requireRegistration("audience_upload");
 
     // 0 is falsy in JS — the old `if (!uploadId || !audienceId || ...) throw`
     // treated a coerced 0 as "missing", same as an absent field.
-    expect(() => registration!.params.parse({ uploadId: 0, audienceId: 5 })).toThrowError(
+    expect(() => registration.params.parse({ uploadId: 0, audienceId: 5 })).toThrowError(
       "audience_upload: missing or invalid uploadId",
     );
-    expect(() => registration!.params.parse({ uploadId: 5, audienceId: "not-a-number" })).toThrowError(
+    expect(() => registration.params.parse({ uploadId: 5, audienceId: "not-a-number" })).toThrowError(
       "audience_upload: missing or invalid audienceId",
     );
 
     // Numeric-string ids coerce (tenant-db bigint-as-string, #1078); optional
     // fields fall back exactly like the old `typeof` narrowing.
     expect(
-      registration!.params.parse({ uploadId: "12", audienceId: "34" }),
+      registration.params.parse({ uploadId: "12", audienceId: "34" }),
     ).toEqual({
       uploadId: 12,
       audienceId: 34,
@@ -197,7 +207,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
     // legacyNullableStringParam's doc comment): an out-of-enum string that
     // the old blind cast would have accepted must still pass.
     expect(
-      registration!.params.parse({
+      registration.params.parse({
         uploadId: 1,
         audienceId: 2,
         voterListSource: "not_a_real_source",
@@ -205,7 +215,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
       }).voterListSource,
     ).toBe("not_a_real_source");
     expect(
-      registration!.params.parse({ uploadId: 1, audienceId: 2, headerMapping: ["a", "b"] })
+      registration.params.parse({ uploadId: 1, audienceId: 2, headerMapping: ["a", "b"] })
         .headerMapping,
     ).toEqual(["a", "b"]);
   });
@@ -329,21 +339,19 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
   });
 
   test("campaign_export and campaign_dispatch reject a coerced-zero campaignId like the old falsy check, but accept negative ids", () => {
-    const exportReg = jobRegistry.find((r) => r.type === "campaign_export");
-    const dispatchReg = jobRegistry.find((r) => r.type === "campaign_dispatch");
-    expect(exportReg).toBeDefined();
-    expect(dispatchReg).toBeDefined();
+    const exportReg = requireRegistration("campaign_export");
+    const dispatchReg = requireRegistration("campaign_dispatch");
 
     expect(() =>
-      exportReg!.params.parse({ campaignId: 0, exportId: "exp_1", campaignType: "message" }),
+      exportReg.params.parse({ campaignId: 0, exportId: "exp_1", campaignType: "message" }),
     ).toThrowError("campaign_export: missing or invalid campaignId");
-    expect(() => dispatchReg!.params.parse({ campaignId: 0 })).toThrowError(
+    expect(() => dispatchReg.params.parse({ campaignId: 0 })).toThrowError(
       "campaign_dispatch: missing or invalid campaignId",
     );
 
     // Negative numbers are truthy in JS, so the old `!campaignId` check never
     // rejected them — only an exact falsy 0 (or a non-numeric value).
-    expect(dispatchReg!.params.parse({ campaignId: -5 }).campaignId).toBe(-5);
+    expect(dispatchReg.params.parse({ campaignId: -5 }).campaignId).toBe(-5);
   });
 });
 
