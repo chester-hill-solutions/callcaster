@@ -245,6 +245,66 @@ module.exports = {
       },
     },
 
+    // Lint-quality ratchet (enforced by check:lint-ratchet against
+    // scripts/baselines/lint-ratchet.json): strictness rules as `warn` —
+    // editors surface them, the ratchet fails CI on GROWTH. Tone: warn in
+    // the editor is an invitation to whittle the baseline down, never a
+    // licence to add.
+    {
+      files: ["**/*.{js,jsx,ts,tsx}"],
+      rules: {
+        "complexity": ["warn", { max: 20 }],
+        "max-depth": ["warn", { max: 4 }],
+        "max-params": ["warn", { max: 5 }],
+        "max-lines-per-function": ["warn", { max: 200, skipBlankLines: true, skipComments: true }],
+        "no-console": "warn",
+        "no-return-await": "warn",
+        // maxDepth 4 keeps the cycle search fast; deep cycles are the
+        // painful kind anyway.
+        "import/no-cycle": ["warn", { maxDepth: 4 }],
+        "@typescript-eslint/no-non-null-assertion": "warn",
+      },
+    },
+    // Scoped exemptions from the ratchet — each with a reason. These stay
+    // out of the baseline counts (see check-lint-ratchet.mjs).
+    {
+      // Deprecated code is frozen in time; it is not held to new standards.
+      files: ["archive/**"],
+      rules: {
+        "complexity": "off",
+        "max-depth": "off",
+        "max-params": "off",
+        "max-lines-per-function": "off",
+        "no-console": "off",
+        "no-return-await": "off",
+        "@typescript-eslint/no-non-null-assertion": "off",
+      },
+    },
+    {
+      files: [
+        "test/**/*.{ts,tsx}",
+        "e2e/**/*.{ts,tsx}",
+        // CLI/bootstrap surfaces where the logger may not exist yet.
+        "scripts/**",
+        "worker/**",
+        "server/**",
+        "app/lib/logger*",
+        "app/lib/env.server.ts",
+        "app/server/boot-checks*",
+      ],
+      rules: {
+        "no-console": "off",
+      },
+    },
+    {
+      // Long test functions are normal; app code is where the 200-line cap
+      // bites (and 71 test offenders would just be baseline noise).
+      files: ["test/**/*.{ts,tsx}", "e2e/**/*.{ts,tsx}"],
+      rules: {
+        "max-lines-per-function": "off",
+      },
+    },
+
     // Node
     {
       files: [".eslintrc.js"],
