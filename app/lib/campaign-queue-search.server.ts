@@ -39,32 +39,60 @@ export type QueueSearchFilters = {
   queueStatus: string;
 };
 
+function andConditions(conditions: SQL[], context: string): SQL {
+  const joined = and(...conditions);
+  if (!joined) {
+    throw new Error(`${context} requires at least one SQL condition`);
+  }
+  return joined;
+}
+
+function orConditions(conditions: SQL[], context: string): SQL {
+  const joined = or(...conditions);
+  if (!joined) {
+    throw new Error(`${context} requires at least one SQL condition`);
+  }
+  return joined;
+}
+
 function queueStatusWhere(queueStatus: QueueStatusFilter): SQL {
   if (queueStatus === "queued") {
-    return and(
-      eq(campaignQueueTable.queue_state, QUEUE_STATUS_QUEUED),
-      isNull(campaignQueueTable.dequeued_at),
-    )!;
+    return andConditions(
+      [
+        eq(campaignQueueTable.queue_state, QUEUE_STATUS_QUEUED),
+        isNull(campaignQueueTable.dequeued_at),
+      ],
+      "queueStatusWhere queued branch",
+    );
   }
 
   if (queueStatus === "completed") {
-    return or(
-      eq(campaignQueueTable.queue_state, QUEUE_STATUS_DEQUEUED),
-      isNotNull(campaignQueueTable.dequeued_at),
-    )!;
+    return orConditions(
+      [
+        eq(campaignQueueTable.queue_state, QUEUE_STATUS_DEQUEUED),
+        isNotNull(campaignQueueTable.dequeued_at),
+      ],
+      "queueStatusWhere completed branch",
+    );
   }
 
   if (queueStatus === "assigned") {
-    return and(
-      eq(campaignQueueTable.queue_state, QUEUE_LIFECYCLE_ASSIGNED),
-      isNull(campaignQueueTable.dequeued_at),
-    )!;
+    return andConditions(
+      [
+        eq(campaignQueueTable.queue_state, QUEUE_LIFECYCLE_ASSIGNED),
+        isNull(campaignQueueTable.dequeued_at),
+      ],
+      "queueStatusWhere assigned branch",
+    );
   }
 
-  return and(
-    isNotNull(campaignQueueTable.provider_status),
-    isNull(campaignQueueTable.dequeued_at),
-  )!;
+  return andConditions(
+    [
+      isNotNull(campaignQueueTable.provider_status),
+      isNull(campaignQueueTable.dequeued_at),
+    ],
+    "queueStatusWhere default branch",
+  );
 }
 
 export function buildCampaignQueueSearchWhere(
@@ -205,7 +233,10 @@ export function buildCampaignQueueSearchWhere(
     }
   }
 
-  return and(...conditions)!;
+  return andConditions(
+    conditions,
+    "buildCampaignQueueSearchWhere (campaign_id condition is always present)",
+  );
 }
 
 /** Rows with a non-empty contact phone (matches legacy `contact!inner` queue counts). */
@@ -235,7 +266,10 @@ export function buildDialableCampaignQueueWhere(
     conditions.push(extra);
   }
 
-  return and(...conditions)!;
+  return andConditions(
+    conditions,
+    "buildDialableCampaignQueueWhere (campaign_id and dialable-contact conditions are always present)",
+  );
 }
 
 export function buildCompletedCampaignQueueWhere(campaignId: number): SQL {
