@@ -16,6 +16,11 @@ on:
       - .agents/**
       - .opencode/**
       - .gitignore
+  # Nightly full-signal run (the coverage job only runs here now — per-PR
+  # coverage duplicated both test suites on every push for marginal signal).
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch:
 
 # packages:read lets GITHUB_TOKEN fetch @chester-hill-solutions/* from GitHub
 # Packages when the workflow token is permitted. Prefer repository secret
@@ -24,8 +29,33 @@ permissions:
   contents: read
   packages: read
 
+# Superseded runs die instead of queueing: on a PR, a new push cancels the
+# previous run for the same ref. Scheduled/dispatch runs (and pushes to the
+# default branch, which ride deploys) never cancel.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Path scoping for the jobs that can be safely skipped (see
+  # scripts/lib/ci-changes-lib.mjs, unit-tested in test/ci-changes.test.ts).
+  # An unresolvable base degrades to "run everything" inside the script.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.changes.outputs.app }}
+      e2e: ${{ steps.changes.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Three-dot merge-base diff needs real history.
+          fetch-depth: 0
+      - name: Resolve changed-file scope
+        id: changes
+        run: node scripts/ci-changes.mjs --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+
   quality:
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -118,6 +148,10 @@ jobs:
       - run: npm run ci:codegen:verify
 
   bundle-guard:
+    needs: changes
+    # Only the production build + forbidden-server-string scan: pointless
+    # when the client bundle cannot have changed (docs/tooling/baseline PRs).
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -132,6 +166,9 @@ jobs:
       - run: npm run check:client-bundle
 
   coverage:
+    # Nightly + manual only: per-PR coverage re-ran both test suites with
+    # instrumentation on every push. Coverage trends do not need PR latency.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
