@@ -283,7 +283,10 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
         })}
       />,
     );
-    const armed = screen.getByRole("button", { name: "Click again to dial" });
+    // Label reads "Click again to call back" while armed — Sai's #1342
+    // point 1: the button that just replaced Hang Up should evoke
+    // "back to calling" so the agent knows why the label changed.
+    const armed = screen.getByRole("button", { name: "Click again to call back" });
     expect(armed).toBeInTheDocument();
 
     // The armed click MUST NOT dial.
