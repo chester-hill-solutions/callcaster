@@ -51,6 +51,9 @@ jobs:
       - run: npm run check:bun-lock
       - run: npm run typecheck
       - run: npm run lint
+      # Strictness rules (complexity, depth, function size, console, cycles,
+      # non-null assertions) as a ratchet: growth over the baseline fails.
+      - run: npm run check:lint-ratchet
       - run: npm run test:node
         env:
           # The bun-test step imports server/bun.ts, which eagerly constructs
