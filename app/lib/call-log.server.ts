@@ -56,6 +56,14 @@ export type CallLogLoaderResult = {
   };
 };
 
+function andConditions(conditions: SQL[], context: string): SQL {
+  const joined = and(...conditions);
+  if (!joined) {
+    throw new Error(`${context} requires at least one SQL condition`);
+  }
+  return joined;
+}
+
 function escapeLikePattern(value: string): string {
   return `%${value.replace(/[%_\\]/g, "\\$&")}%`;
 }
@@ -96,7 +104,10 @@ function buildCallLogWhere(workspaceId: string, filters: CallLogSearchState): SQ
     conditions.push(eq(outreachAttemptTable.user_id, agentUserId));
   }
 
-  return and(...conditions)!;
+  return andConditions(
+    conditions,
+    "buildCallLogWhere (workspace condition is always present)",
+  );
 }
 
 function buildCallLogOrderBy(sortKey: CallLogSortKey, sortDirection: "asc" | "desc") {
@@ -151,10 +162,13 @@ function mapCallLogRow(
   };
 }
 
-const outreachAttemptJoin = and(
-  eq(callTable.outreach_attempt_id, outreachAttemptTable.id),
-  eq(outreachAttemptTable.workspace, callTable.workspace),
-)!;
+const outreachAttemptJoin = andConditions(
+  [
+    eq(callTable.outreach_attempt_id, outreachAttemptTable.id),
+    eq(outreachAttemptTable.workspace, callTable.workspace),
+  ],
+  "outreachAttemptJoin (both join conditions are statically defined)",
+);
 
 export async function loadCallLogPage(args: {
   workspaceId: string;

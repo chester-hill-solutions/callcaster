@@ -64,12 +64,15 @@ export async function verifyRespondentToken(
     return null;
   }
   const [headerB64, payloadB64, sigB64] = parts;
+  if (!headerB64 || !payloadB64 || !sigB64) {
+    return null;
+  }
   try {
-    const header = JSON.parse(base64urlDecode(headerB64!)) as { alg: string; typ: string };
+    const header = JSON.parse(base64urlDecode(headerB64)) as { alg: string; typ: string };
     if (header.alg !== "HS256" || header.typ !== "JWT") {
       return null;
     }
-    const payload = JSON.parse(base64urlDecode(payloadB64!)) as RespondentTokenPayload;
+    const payload = JSON.parse(base64urlDecode(payloadB64)) as RespondentTokenPayload;
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
       return null;
     }
@@ -78,7 +81,7 @@ export async function verifyRespondentToken(
     const valid = await crypto.subtle.verify(
       "HMAC",
       key,
-      Buffer.from(sigB64!, "base64url"),
+      Buffer.from(sigB64, "base64url"),
       Buffer.from(signed, "utf8"),
     );
     if (!valid) {
