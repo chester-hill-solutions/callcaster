@@ -216,6 +216,43 @@ export function isWithinSendWindow(
 }
 
 /**
+ * The exact next instant the window allows sending, for scheduling a deferred
+ * dispatch instead of a fixed polling interval. Returns `null` when the window
+ * is unrestricted (nothing to wait for). Returns `now` when already inside.
+ * Evaluated in UTC to match {@link isWithinSendWindow}.
+ */
+export function nextSendWindowOpenAt(
+  schedule: Schedule | null | undefined,
+  now: Date = new Date(),
+): Date | null {
+  const parsed = schedule ? parseSendWindow(schedule) : null;
+  if (!parsed) return null;
+  if (isWithinSendWindow(parsed, now)) return new Date(now);
+
+  // Earliest interval-open instant within the next 8 days — a week plus
+  // today's tail covers any weekly schedule.
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const baseMidnightMs = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  let bestMs: number | null = null;
+  for (let offset = 0; offset < 8; offset++) {
+    const dayStartMs = baseMidnightMs + offset * MS_PER_DAY;
+    const dayKey = DAY_KEYS[new Date(dayStartMs).getUTCDay()];
+    if (!dayKey) continue;
+    for (const { start } of sendWindowActiveIntervals(parsed, dayKey)) {
+      const openMs = dayStartMs + start * 60 * 1000;
+      if (openMs > now.getTime() && (bestMs === null || openMs < bestMs)) {
+        bestMs = openMs;
+      }
+    }
+  }
+  return bestMs === null ? null : new Date(bestMs);
+}
+
+/**
  * CASL soft check: does any active interval overlap the 9pm–8am quiet window?
  * Returns the offending day keys so the UI can explain the warning.
  */

@@ -23,7 +23,7 @@ import {
   claimBatchSizeForRate,
   configuredDispatcherSmsMps,
 } from "@/lib/throughput-config.server";
-import { isWithinSendWindow, parseSendWindow } from "@/lib/campaign-send-window";
+import { isWithinSendWindow, nextSendWindowOpenAt, parseSendWindow } from "@/lib/campaign-send-window";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
@@ -52,7 +52,7 @@ export type ContactDispatchResult = Record<
 export type CampaignSmsBatchOutcome =
   | { kind: "insufficient_credits" }
   | { kind: "caller_id_required" }
-  | { kind: "deferred_send_window" }
+  | { kind: "deferred_send_window"; nextOpenAt: Date }
   | {
       kind: "dispatched";
       responses: ContactDispatchResult[];
@@ -133,9 +133,19 @@ export async function dispatchCampaignSmsBatch(args: {
   // route (chat_sms) and are never gated here. When the current tick falls
   // outside the campaign's send window we DEFER the whole batch: nothing is
   // dispatched and nothing is dequeued, so contacts remain queued for a
-  // later in-window tick. A `null` window is unrestricted.
-  if (!isWithinSendWindow(parseSendWindow(campaign.campaign?.sms_send_window ?? null))) {
-    return { kind: "deferred_send_window" };
+  // later in-window tick. A `null` window is unrestricted. The outcome
+  // carries the exact next open so the durable adapter can schedule its
+  // successor at the window boundary instead of a fixed poll interval.
+  const sendWindow = parseSendWindow(campaign.campaign?.sms_send_window ?? null);
+  if (!isWithinSendWindow(sendWindow)) {
+    return {
+      kind: "deferred_send_window",
+      // Defensive fallback: a parsed window with active intervals always has
+      // an open instant within the week, but never hot-loop if that invariant
+      // is somehow violated.
+      nextOpenAt:
+        nextSendWindowOpenAt(sendWindow) ?? new Date(Date.now() + 15 * 60 * 1000),
+    };
   }
 
   const media = campaign.message_media?.length
