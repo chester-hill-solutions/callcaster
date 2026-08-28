@@ -182,6 +182,21 @@ function ErrorShell({
               >
                 Go home
               </a>
+              {/*
+                Go back — the common landing case here is a stale link or a
+                mistyped URL where the user just wants to step back one entry
+                (#1398). window.history.back() is safe from inside the root
+                ErrorBoundary; useNavigate() would require this tree to be
+                inside the RouterProvider, which the ErrorShell intentionally
+                is not.
+              */}
+              <button
+                type="button"
+                onClick={() => window.history.back()}
+                className="inline-flex items-center rounded-md border border-input px-4 py-2 text-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                Go back
+              </button>
               <button
                 type="button"
                 onClick={() => window.location.reload()}
