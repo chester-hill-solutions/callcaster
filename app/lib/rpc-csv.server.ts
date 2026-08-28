@@ -1,6 +1,6 @@
 import { escapeCsvCell } from "@/lib/csv";
 
-/** Convert RPC row objects to CSV (PostgREST `.csv()` replacement). */
+/** Convert RPC row objects to CSV. */
 export function rowsToCsv(rows: Record<string, unknown>[]): string {
   const first = rows[0];
   if (!first) return "";

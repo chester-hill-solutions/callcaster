@@ -13,41 +13,7 @@ export function escapeIlikeTerm(raw: string): string {
     .trim();
 }
 
-/** PostgREST `.or()` filter string for legacy Postgres queries. */
-export function buildContactSearchFilter(rawSearchQuery: string): string {
-  const escapedQuery = escapeIlikeTerm(rawSearchQuery);
-  if (!escapedQuery) {
-    return "";
-  }
-
-  const isShortQuery = escapedQuery.length <= SHORT_QUERY_MAX_LENGTH;
-  const textSearchPattern = isShortQuery
-    ? `${escapedQuery}%`
-    : `%${escapedQuery}%`;
-  const normalizedDigits = stripPhoneNumber(rawSearchQuery);
-  const escapedDigits = escapeIlikeTerm(normalizedDigits);
-  const filters = [
-    `firstname.ilike.${textSearchPattern}`,
-    `surname.ilike.${textSearchPattern}`,
-    `email.ilike.${textSearchPattern}`,
-    `address.ilike.${textSearchPattern}`,
-    `city.ilike.${textSearchPattern}`,
-  ];
-
-  if (normalizedDigits.length >= PHONE_SUBSTRING_MIN_LENGTH && escapedDigits) {
-    filters.push(
-      `phone.eq.${escapedDigits}`,
-      `phone.ilike.${escapedDigits}%`,
-      `phone.ilike.%${escapedDigits}%`,
-    );
-  } else {
-    filters.push(`phone.ilike.${textSearchPattern}`);
-  }
-
-  return filters.join(",");
-}
-
-/** Drizzle `where` clause matching {@link buildContactSearchFilter} semantics. */
+/** Drizzle `where` clause for a contact free-text search. */
 export function buildContactSearchWhere(rawSearchQuery: string): SQL | undefined {
   const escapedQuery = escapeIlikeTerm(rawSearchQuery);
   if (!escapedQuery) {
