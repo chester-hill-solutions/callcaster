@@ -133,6 +133,7 @@ conversations
 create-with-script
 credits
 dead-letters
+design
 docs
 edit
 events

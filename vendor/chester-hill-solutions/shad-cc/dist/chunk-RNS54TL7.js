@@ -22,17 +22,20 @@ var Toaster = ({ ...props }) => {
         "--normal-bg": "var(--card)",
         "--normal-text": "var(--card-foreground)",
         "--normal-border": "var(--border)",
+        // Toast bodies stay foreground-based: tone-colored text on a tone
+        // wash fails contrast in dark themes (same rule as the Alert
+        // variants — tone signals via wash, border, and the tone icon).
         "--success-bg": "color-mix(in oklab, var(--success) 14%, var(--card))",
-        "--success-text": "var(--success)",
+        "--success-text": "var(--foreground)",
         "--success-border": "color-mix(in oklab, var(--success) 40%, var(--border))",
         "--info-bg": "color-mix(in oklab, var(--brand-secondary) 70%, var(--card))",
-        "--info-text": "var(--info)",
+        "--info-text": "var(--foreground)",
         "--info-border": "color-mix(in oklab, var(--info) 40%, var(--border))",
         "--warning-bg": "color-mix(in oklab, var(--warning) 16%, var(--card))",
-        "--warning-text": "var(--warning-foreground)",
+        "--warning-text": "var(--foreground)",
         "--warning-border": "color-mix(in oklab, var(--warning) 45%, var(--border))",
         "--error-bg": "color-mix(in oklab, var(--destructive) 14%, var(--card))",
-        "--error-text": "var(--destructive)",
+        "--error-text": "var(--foreground)",
         "--error-border": "color-mix(in oklab, var(--destructive) 40%, var(--border))",
         "--border-radius": "var(--radius)"
       },
@@ -47,5 +50,5 @@ var Toaster = ({ ...props }) => {
 };
 
 export { Toaster };
-//# sourceMappingURL=chunk-BCGWSUQT.js.map
-//# sourceMappingURL=chunk-BCGWSUQT.js.map
+//# sourceMappingURL=chunk-RNS54TL7.js.map
+//# sourceMappingURL=chunk-RNS54TL7.js.map

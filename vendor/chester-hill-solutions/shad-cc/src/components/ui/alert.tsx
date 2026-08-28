@@ -8,15 +8,23 @@ const alertVariants = cva(
   {
     variants: {
       variant: {
+        // Tone colors carry the border, the wash, and the icon — never the
+        // body text. Tone-on-wash text (e.g. text-destructive on
+        // bg-destructive/12) fails WCAG contrast in dark themes, so the body
+        // stays foreground-based like the `default` variant while the icon
+        // and surfaces signal the tone.
         default:
           "border-brand-tertiary bg-brand-wash text-foreground *:data-[slot=alert-description]:text-muted-foreground",
         destructive:
-          "border-destructive/40 bg-destructive/12 text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current",
+          "border-destructive/40 bg-destructive/12 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-destructive",
         success:
-          "border-success/40 bg-success/12 text-success *:data-[slot=alert-description]:text-success/90 *:[svg]:text-current",
+          "border-success/40 bg-success/12 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-success",
         warning:
-          "border-warning/45 bg-warning/15 text-warning-foreground *:data-[slot=alert-description]:text-warning-foreground/90 *:[svg]:text-current",
-        info: "border-info/40 bg-secondary/70 text-info *:data-[slot=alert-description]:text-info/90 *:[svg]:text-current",
+          "border-warning/45 bg-warning/15 text-foreground *:data-[slot=alert-description]:text-foreground/85 *:[svg]:text-warning",
+        // Info's sky wash (`bg-secondary/70`) stays light in dark themes —
+        // brand-secondary is not overridden by `.dark` — so its body pairs
+        // with `secondary-foreground` (dark text) in both themes.
+        info: "border-info/40 bg-secondary/70 text-secondary-foreground *:data-[slot=alert-description]:text-secondary-foreground/85 *:[svg]:text-info",
       },
     },
     defaultVariants: {
