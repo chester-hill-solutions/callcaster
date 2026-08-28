@@ -116,6 +116,11 @@ export interface ExportScriptSteps {
       }>;
       audioFile?: string;
       responseType?: string;
+      /**
+       * Present on IVR-authored blocks. `"recorded" | "synthetic" | "say"` in
+       * practice; typed as `string` because on-wire scripts predate the enum.
+       */
+      callcasterType?: string;
     }
   >;
 }
