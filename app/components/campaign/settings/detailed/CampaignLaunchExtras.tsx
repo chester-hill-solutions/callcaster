@@ -23,7 +23,9 @@ import {
 import {
   estimateIvrCampaignOutbound,
   estimateMessageCampaignOutbound,
+  estimateOutboundCompletion,
 } from "@/lib/campaign-outbound-estimate";
+import type { Schedule } from "@/lib/types";
 
 type CampaignDetails = NonNullable<LiveCampaign | MessageCampaign | IVRCampaign>;
 
@@ -75,14 +77,25 @@ function formatCompletionTime(date: Date): string {
   }).format(date);
 }
 
-function getEtaRange(queueCount: number, ratePerSecond: number) {
-  if (queueCount <= 0 || ratePerSecond <= 0) {
+function getEtaRange(input: {
+  queueCount: number;
+  ratePerSecond: number;
+  /**
+   * Raw stored dispatch-time restriction (SMS send window or calling-hours
+   * schedule). Projected through so the ETA starts consuming time at the
+   * next in-window moment instead of assuming continuous sending (#1351).
+   */
+  dispatchWindow?: Schedule | null;
+}) {
+  const estimate = estimateOutboundCompletion({
+    queueCount: input.queueCount,
+    ratePerSecond: input.ratePerSecond,
+    sendWindow: input.dispatchWindow ?? null,
+  });
+  if (!estimate) {
     return null;
   }
-  const averageSeconds = queueCount / ratePerSecond;
-  const fastFinish = new Date(Date.now() + averageSeconds * 0.8 * 1000);
-  const slowFinish = new Date(Date.now() + averageSeconds * 1.2 * 1000);
-  return `${formatCompletionTime(fastFinish)} - ${formatCompletionTime(slowFinish)}`;
+  return `${formatCompletionTime(estimate.fastFinish)} - ${formatCompletionTime(estimate.slowFinish)}`;
 }
 
 function OutboundEstimateAlert({
@@ -172,12 +185,17 @@ export function CampaignLaunchExtras({
     selectedCallerId: campaignData.caller_id,
     selectedCallerIdVoiceCapable: selectedCallerVoiceCapable,
   });
-  const smsEtaRange = getEtaRange(
+  const smsEtaRange = getEtaRange({
     queueCount,
-    messageEstimate.effectiveMessagesPerSecond,
-  );
+    ratePerSecond: messageEstimate.effectiveMessagesPerSecond,
+    dispatchWindow: (campaignData.sms_send_window ?? null) as Schedule | null,
+  });
   const ivrEtaRange = isIvrCampaign
-    ? getEtaRange(queueCount, ivrEstimate.effectiveDialAttemptsPerSecond)
+    ? getEtaRange({
+        queueCount,
+        ratePerSecond: ivrEstimate.effectiveDialAttemptsPerSecond,
+        dispatchWindow: (campaignData.schedule ?? null) as Schedule | null,
+      })
     : null;
 
   const messageTooltipLines = [
