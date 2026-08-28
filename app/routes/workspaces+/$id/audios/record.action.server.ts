@@ -98,9 +98,14 @@ export const action = defineAction({
       });
 
       // Straight into the editor: record -> trim -> save is one flow.
-      return redirect(`../audios/${encodeURIComponent(fileName)}/edit`, {
-        headers,
-      });
+      // Absolute path — the `../audios/...` relative form used to resolve
+      // to `/workspaces/$id/audios/audios/$fileName/edit` in React Router's
+      // route-relative resolution, dropping the user on a 404 after a
+      // successful recording (same root cause as #1396's upload flow).
+      return redirect(
+        `/workspaces/${workspaceId}/audios/${encodeURIComponent(fileName)}/edit`,
+        { headers },
+      );
     } catch (error) {
       logger.error("Workspace audio recording failed", error);
 
