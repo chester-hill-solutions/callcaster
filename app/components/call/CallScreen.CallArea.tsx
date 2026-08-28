@@ -170,17 +170,21 @@ export function CallControls({
   onResetCall,
 }: CallControlsProps) {
   const [confirmingHangUp, setConfirmingHangUp] = useState(false);
+  const [dialArmed, setDialArmed] = useState(false);
   const confirmTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const dialArmTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevShowInCallRef = useRef(false);
 
   /**
-   * @effect Clean up the hang-up confirmation timer on unmount to prevent
-   * a stale timeout callback from firing after the component is gone.
+   * @effect Clean up the hang-up and dial-arm confirmation timers on unmount
+   * so a stale timeout callback can't fire after the component is gone.
    * @effect-deps [] — fire-once cleanup, no external state to track
    * @effect-side-effects timer (clearTimeout on unmount)
    * @effect-why-not-loader Component lifecycle cleanup, not data fetching.
    */
   useEffect(() => () => {
     if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+    if (dialArmTimerRef.current) clearTimeout(dialArmTimerRef.current);
   }, []);
 
   const handleHangUpClick = () => {
@@ -198,6 +202,40 @@ export function CallControls({
 
   const inCall = callState === "connected" || callState === "dialing";
   const showInCall = inCall && (!predictive || !!conference);
+
+  /**
+   * @effect Arm a "click again to dial" guard on the Dial button whenever it
+   * replaces the Hang Up button (manual mode only). Prevents an agent's
+   * in-flight click on Hang Up from becoming an accidental dial when the
+   * recipient hangs up first and the button flips in the same spot
+   * (see #1292). Predictive Start/Start Dialing is not click-replacing
+   * anything, so it stays no-confirm.
+   * @effect-deps [showInCall, predictive] — flip is only meaningful when
+   * these two derived values change.
+   * @effect-side-effects timer (arms + 3s auto-disarm)
+   * @effect-why-not-loader Pure UI state, no data fetch.
+   */
+  useEffect(() => {
+    if (prevShowInCallRef.current && !showInCall && !predictive) {
+      if (dialArmTimerRef.current) clearTimeout(dialArmTimerRef.current);
+      setDialArmed(true);
+      dialArmTimerRef.current = setTimeout(() => {
+        setDialArmed(false);
+      }, 3000);
+    }
+    prevShowInCallRef.current = showInCall;
+  }, [showInCall, predictive]);
+
+  const handleDialClick = () => {
+    if (dialArmed) {
+      // First click after a just-ended call: consume as a "wake up" click and
+      // disarm. The agent must click again — deliberately — to actually dial.
+      if (dialArmTimerRef.current) clearTimeout(dialArmTimerRef.current);
+      setDialArmed(false);
+      return;
+    }
+    handleDialNext();
+  };
 
   if (showInCall) {
     return (
@@ -270,10 +308,18 @@ export function CallControls({
     );
   }
 
+  const dialLabel = dialArmed
+    ? "Click again to dial"
+    : !predictive
+      ? "Dial"
+      : conference
+        ? "Start"
+        : "Start Dialing";
+
   return (
     <div className="flex flex-col gap-3 px-4 py-3">
       <Button
-        onClick={handleDialNext}
+        onClick={handleDialClick}
         disabled={isBusy}
         data-testid="call-screen-dial"
         className="w-full rounded-full bg-success text-success-foreground hover:bg-success/80"
@@ -283,7 +329,7 @@ export function CallControls({
             : undefined
         }
       >
-        {!predictive ? "Dial" : conference ? "Start" : "Start Dialing"}
+        {dialLabel}
       </Button>
     </div>
   );
