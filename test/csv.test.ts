@@ -38,6 +38,21 @@ describe("csv utilities", () => {
   test("neutralizes CSV injection when enabled", () => {
     expect(sanitizeCsvInjection("=1+1")).toBe("'=1+1");
     expect(sanitizeCsvInjection(" @SUM(A1:A2)")).toBe("' @SUM(A1:A2)");
+    // `+SUM(...)`, `-cmd(...)`, `@name` — first char is a trigger AND the
+    // second is non-digit, so this is a formula.
+    expect(sanitizeCsvInjection("+SUM(A1:A10)")).toBe("'+SUM(A1:A10)");
+    expect(sanitizeCsvInjection("-cmd|calc")).toBe("'-cmd|calc");
+    expect(sanitizeCsvInjection("@name")).toBe("'@name");
+  });
+
+  test("does NOT neutralize E.164 phone numbers or signed numerics (#1336)", () => {
+    // Sai's report: exported phone rows came out as `'+16478657844`. Formula
+    // triggers followed by a digit are never a formula — spreadsheets treat
+    // them as signed numbers or phone strings.
+    expect(sanitizeCsvInjection("+16478657844")).toBe("+16478657844");
+    expect(sanitizeCsvInjection("+1234567")).toBe("+1234567");
+    expect(sanitizeCsvInjection("-42")).toBe("-42");
+    expect(sanitizeCsvInjection("-1.5")).toBe("-1.5");
   });
 
   test("sanitizeCsvInjection returns input when empty or not a formula prefix", () => {
@@ -74,12 +89,16 @@ describe("csv utilities", () => {
     expect(csv).toContain("\r\n'\t=1+1\r\n");
   });
 
-  test("protects string '-1' but not numeric -1", () => {
+  test("leaves signed-numeric strings alone: `-1` is data, not a formula (#1336)", () => {
+    // The formula-injection guard used to prefix any string starting with a
+    // trigger character (=, +, -, @); this was mangling every phone number
+    // and every negative-numeric string. Now the guard requires a non-digit
+    // second character before treating +/-/@ as formula prefixes.
     const csv = toCsvString({
       headers: ["n1", "n2"],
       rows: [{ n1: "-1", n2: -1 }],
     });
-    expect(csv).toContain("\r\n'-1,-1\r\n");
+    expect(csv).toContain("\r\n-1,-1\r\n");
   });
 
   test("stringifies Date values as ISO", () => {
