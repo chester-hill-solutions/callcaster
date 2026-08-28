@@ -48,6 +48,11 @@ function main() {
   const baseline = JSON.parse(readFileSync(BASELINE, "utf8")).counts;
   const counts = {};
   const hardErrors = [];
+  // Inline `eslint-disable` comments for a ratcheted rule count as violations
+  // of that rule — otherwise an unattended session (or a lazy fix) could zero
+  // its count by silencing the warning instead of guarding the code.
+  const DISABLE_RE =
+    /eslint-disable(?:-next-line)?\b[^\n]*?(@typescript-eslint\/no-non-null-assertion|complexity|max-depth|max-params|max-lines-per-function|no-console|no-return-await|import\/no-cycle)\b/g;
   for (const file of reports) {
     const rel = file.filePath.replace(`${ROOT}/`, "");
     for (const message of file.messages) {
@@ -57,6 +62,10 @@ function main() {
       }
       const rid = message.ruleId;
       if (rid && rid in baseline) counts[rid] = (counts[rid] ?? 0) + 1;
+    }
+    for (const match of (readFileSync(file.filePath, "utf8").matchAll(DISABLE_RE))) {
+      const rid = match[1];
+      counts[rid] = (counts[rid] ?? 0) + 1;
     }
   }
 
