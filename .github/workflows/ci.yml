@@ -84,6 +84,11 @@ jobs:
       - run: npm run check:pg-errors
       - run: npm run check:dry
       - run: npm run check:handlers
+      # A replacing vi.mock factory hard-codes a shared server module's export
+      # surface; when the module gains an export, route tests fail with the
+      # route's catch-all error and nobody connects the two. New factories
+      # must spread importOriginal (ratchet baseline keeps existing ones).
+      - run: npm run check:test-mocks
       - run: npm run check:db-rpcs
       # check:db-rpcs only asks whether a function EXISTS — its header says it
       # cannot see inside one. This reads the body: the queue RPCs must write
