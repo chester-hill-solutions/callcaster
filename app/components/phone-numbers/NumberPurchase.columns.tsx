@@ -52,9 +52,15 @@ export function buildNumberPurchaseColumns(
       id: "location",
       header: "Location",
       cell: ({ row }) => {
-        const parts = [row.original.locality, row.original.region].filter(
-          Boolean,
-        );
+        // Twilio returns combined-city rate-center names concatenated in
+        // CamelCase (e.g. "AjaxPickering" for the Ajax/Pickering ON rate
+        // centre). Insert a space at every lower→upper boundary so the
+        // UI reads "Ajax Pickering" instead of the unpunctuated blob
+        // Sai flagged in #1321.
+        const locality = row.original.locality
+          ? row.original.locality.replace(/([a-z])([A-Z])/g, "$1 $2")
+          : row.original.locality;
+        const parts = [locality, row.original.region].filter(Boolean);
         return (
           <span className="text-sm text-muted-foreground">
             {parts.length > 0 ? parts.join(", ") : "—"}
