@@ -75,7 +75,7 @@ export async function runCallStatusSideEffects(args: {
       : null;
 
   const billingWorkspace = currentAttempt?.workspace ?? workspaceId;
-  if (currentAttempt && billingWorkspace) {
+  if (currentAttempt && billingWorkspace && outreachAttemptId != null) {
     await emitPredictiveBroadcast(billingWorkspace, {
       contact_id: currentAttempt.contact_id,
       status: callStatus,
@@ -95,7 +95,7 @@ export async function runCallStatusSideEffects(args: {
         nextDisposition: terminalDisposition,
       })
     ) {
-      await updateOutreachAttemptForWorkspace(billingWorkspace, outreachAttemptId!, {
+      await updateOutreachAttemptForWorkspace(billingWorkspace, outreachAttemptId, {
         disposition: terminalDisposition,
         ended_at: new Date().toISOString(),
       });

@@ -160,13 +160,20 @@ export function buildOnboardingStepsForState(
     }
   };
 
+  const businessProfileTemplate = stepById.business_profile;
+  const pathSelectionTemplate = stepById.path_selection;
+  if (!businessProfileTemplate || !pathSelectionTemplate) {
+    throw new Error(
+      "DEFAULT_WORKSPACE_ONBOARDING_STEPS must define business_profile and path_selection templates",
+    );
+  }
   const steps: WorkspaceOnboardingStepState[] = [
     {
-      ...stepById.business_profile!,
+      ...businessProfileTemplate,
       status: businessBasicsComplete ? "complete" : "in_progress",
     },
     {
-      ...stepById.path_selection!,
+      ...pathSelectionTemplate,
       status: pathSelected ? "complete" : "in_progress",
     },
   ];

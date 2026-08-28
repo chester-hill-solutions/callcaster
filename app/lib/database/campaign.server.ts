@@ -447,7 +447,13 @@ export async function splitMessageCampaign({
     () => [],
   );
   members.forEach((member, index) => {
-    buckets[index % normalizedSegments]!.push(Number(member.contact_id));
+    const bucket = buckets[index % normalizedSegments];
+    if (!bucket) {
+      throw new Error(
+        "Campaign split bucket missing: member index must map into a normalizedSegments bucket",
+      );
+    }
+    bucket.push(Number(member.contact_id));
   });
 
   const {

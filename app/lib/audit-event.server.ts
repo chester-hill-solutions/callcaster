@@ -145,15 +145,19 @@ export async function listWorkspaceAuditEvents(args: {
 }): Promise<{ events: WorkspaceAuditEventRow[]; nextCursor: string | null }> {
   const conditions = [eq(workspace_audit_event.workspace_id, args.workspaceId)];
   if (args.cursor) {
-    conditions.push(
-      or(
-        lt(workspace_audit_event.created_at, args.cursor.createdAt),
-        and(
-          eq(workspace_audit_event.created_at, args.cursor.createdAt),
-          lt(workspace_audit_event.id, args.cursor.id),
-        ),
-      )!,
+    const cursorFilter = or(
+      lt(workspace_audit_event.created_at, args.cursor.createdAt),
+      and(
+        eq(workspace_audit_event.created_at, args.cursor.createdAt),
+        lt(workspace_audit_event.id, args.cursor.id),
+      ),
     );
+    if (!cursorFilter) {
+      throw new Error(
+        "drizzle or() must yield a cursor filter for audit event pagination",
+      );
+    }
+    conditions.push(cursorFilter);
   }
 
   const rows = await db

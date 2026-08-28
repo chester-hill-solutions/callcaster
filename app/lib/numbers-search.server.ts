@@ -44,17 +44,18 @@ export function mapTwilioAvailableNumbers(
     capabilities?: Record<string, boolean>;
   }>,
 ): AvailableNumberRecord[] {
-  return locals
-    .filter((n) => n.phoneNumber && n.friendlyName)
-    .map((n) => ({
-      phoneNumber: n.phoneNumber!,
-      friendlyName: n.friendlyName!,
+  return locals.flatMap((n) => {
+    if (!n.phoneNumber || !n.friendlyName) return [];
+    return [{
+      phoneNumber: n.phoneNumber,
+      friendlyName: n.friendlyName,
       region: n.region,
       locality: n.locality,
       isoCountry: n.isoCountry,
       addressRequirements: normalizeAddressRequirement(n.addressRequirements),
       capabilities: n.capabilities ?? {},
-    }));
+    }];
+  });
 }
 
 export function jsonNumbersSearchResponse(

@@ -66,8 +66,13 @@ export async function createTwilioCall(
 }
 
 function buildCallRow(callData: Partial<Call>) {
+  if (!callData.sid) {
+    throw new Error(
+      "buildCallRow requires callData.sid; Twilio call data must include the Call SID",
+    );
+  }
   return {
-    sid: callData.sid!,
+    sid: callData.sid,
     account_sid: callData.account_sid || null,
     to: callData.to || null,
     from: callData.from || null,
