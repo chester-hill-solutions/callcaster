@@ -198,9 +198,16 @@ export function isWithinSendWindow(
   const minutesNow = now.getUTCHours() * 60 + now.getUTCMinutes();
 
   const intervals = sendWindowActiveIntervals(parsed, dayKey);
+  const yesterdayIndex = (now.getUTCDay() + 6) % 7;
+  const yesterdayKey = DAY_KEYS[yesterdayIndex];
+  if (!yesterdayKey) {
+    throw new Error(
+      `DAY_KEYS must cover every weekday index 0-6; missing index ${yesterdayIndex}`,
+    );
+  }
   const overnightFromYesterday = sendWindowActiveIntervals(
     parsed,
-    DAY_KEYS[(now.getUTCDay() + 6) % 7]!,
+    yesterdayKey,
   );
 
   const inToday = intervals.some(({ start, end }) =>
@@ -293,7 +300,17 @@ function schedulesEqual(a: Schedule, b: Schedule): boolean {
     const right = sendWindowActiveIntervals(b, day);
     if (left.length !== right.length) return false;
     for (let i = 0; i < left.length; i++) {
-      if (left[i]!.start !== right[i]!.start || left[i]!.end !== right[i]!.end) {
+      const leftInterval = left[i];
+      const rightInterval = right[i];
+      if (!leftInterval || !rightInterval) {
+        throw new Error(
+          "schedulesEqual: interval index out of range despite equal-length check",
+        );
+      }
+      if (
+        leftInterval.start !== rightInterval.start ||
+        leftInterval.end !== rightInterval.end
+      ) {
         return false;
       }
     }
