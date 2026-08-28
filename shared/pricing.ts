@@ -146,3 +146,17 @@ export function formatCadFromCredits(credits: number): string {
     currency: "CAD",
   }).format(credits * CREDIT_PRICE_CAD);
 }
+
+/**
+ * Human-readable "N credit" / "N credits" — used on the public pricing page
+ * so all rates read in the same unit customers actually pay in
+ * (the CAD equivalent stays available via `formatCadFromCredits`). #1392.
+ *
+ * Named to avoid a collision with `app/lib/billing-format.ts::formatCredits`,
+ * which just returns `n.toLocaleString()` (its callers append " credits"
+ * themselves).
+ */
+export function formatCreditLabel(credits: number): string {
+  const rounded = Number.isInteger(credits) ? credits : Math.round(credits * 100) / 100;
+  return `${rounded} ${rounded === 1 ? "credit" : "credits"}`;
+}
