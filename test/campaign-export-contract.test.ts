@@ -283,7 +283,7 @@ describe("api.campaign-export CSV contract checks", () => {
     expect(csvUpload).toBeTruthy();
     const csvText = csvUpload!.text;
 
-    const headerLine = csvText.split("\r\n")[0].replace(/^﻿/, "");
+    const headerLine = csvText.split("\r\n")[0].replace(/^\uFEFF/, "");
     // Header names AND relative order matter — downstream consumers key by column index.
     expect(headerLine).toContain("status,error_code,error_message,line_type,message_date");
 
