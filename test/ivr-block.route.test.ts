@@ -157,6 +157,81 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     );
   });
 
+  test("synthetic-speech block emits <Say voice='...'> using the block's roster voice (#1401)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: {
+        b1: {
+          id: "b1",
+          type: "say",
+          audioFile: "Please press one for support.",
+          wireExtras: { voice: "Polly.Matthew-Neural" },
+        },
+      },
+    };
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({
+      workspace: "w1",
+      script: { steps: script },
+    } as any);
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: ivrBlockRequest(),
+    } as any);
+    const xml = await res.text();
+    // The voice attribute is what actually reaches Twilio's <Say>; previously
+    // every synthetic block silently used the account default (Salli),
+    // making per-block voice control impossible.
+    expect(xml).toContain('<Say voice="Polly.Matthew-Neural">Please press one for support.</Say>');
+  });
+
+  test("synthetic-speech block with no wireExtras.voice falls back to the roster default (#1401)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: {
+        b1: { id: "b1", type: "say", audioFile: "Thanks for calling." },
+      },
+    };
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({
+      workspace: "w1",
+      script: { steps: script },
+    } as any);
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: ivrBlockRequest(),
+    } as any);
+    // DEFAULT_VOICE_ID matches the historical Twilio account default so
+    // workspaces that never touched voice keep hearing the same one.
+    expect(await res.text()).toContain('<Say voice="Polly.Salli-Neural">Thanks for calling.</Say>');
+  });
+
+  test("synthetic-speech block with an unknown wireExtras.voice falls back rather than passing an arbitrary string through to Twilio (#1401)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: {
+        b1: {
+          id: "b1",
+          type: "say",
+          audioFile: "Hello.",
+          wireExtras: { voice: "attacker.injection-Neural" },
+        },
+      },
+    };
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({
+      workspace: "w1",
+      script: { steps: script },
+    } as any);
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: ivrBlockRequest(),
+    } as any);
+    // The roster IS the allowlist: an arbitrary string is dropped rather
+    // than reaching Twilio and 500-ing the entire IVR response.
+    expect(await res.text()).toContain('<Say voice="Polly.Salli-Neural">Hello.</Say>');
+  });
+
   test("no options redirects to next block/page or hangs up; missing block says error", async () => {
     const script = {
       pages: { page_1: { blocks: ["b1", "b2"] }, page_2: { blocks: ["b3"] } },
