@@ -62,9 +62,11 @@ function readTfvInputs(onboarding: WorkspaceMessagingOnboardingState): {
   optInType: TollFreeVerificationCreateInput["optInType"];
   additionalInformation: string | undefined;
 } {
+  // type-cast justified: tollFreeVerification is added by onboarding agent, not in base type
   const tfv =
     (onboarding as unknown as { tollFreeVerification?: Record<string, unknown> })
       .tollFreeVerification ?? {};
+  // type-cast justified: defensive read for dynamic properties added to businessProfile
   const bp = onboarding.businessProfile as unknown as Record<string, unknown>;
 
   const optInImageUrls = Array.isArray(tfv.optInImageUrls)
@@ -144,6 +146,7 @@ export async function provisionTollFreeVerification(
 ): Promise<ComplianceStepResult> {
   const { workspaceId, customerProfileBundleSid, reason } = args;
 
+  // type-cast justified: loadWorkspaceTwilioData returns Record<string, unknown>, but always contains TwilioAccountData
   const twilioData = (await loadWorkspaceTwilioData(
     workspaceId,
   )) as unknown as TwilioAccountData;
