@@ -26,6 +26,13 @@ import type {
 import type { z } from "zod";
 import { getSession } from "@/lib/auth.server";
 
+// Types for better-auth API responses (library doesn't export these)
+type BetterAuthApiUser = { id: string; email?: string | null; name?: string | null };
+type BetterAuthApiResponse<T> = {
+  response?: T;
+  headers?: Record<string, string>;
+};
+
 type RegisterBody = z.infer<typeof registerBodySchema>;
 type TokenBody = z.infer<typeof tokenBodySchema>;
 type RefreshBody = z.infer<typeof refreshBodySchema>;
@@ -229,11 +236,12 @@ export async function refreshTokens(
   | { ok: false; error: string; status: number }
 > {
   try {
+    // type-cast justified: better-auth does not export refreshToken method type
     const result = await (auth.api.refreshToken as any)({
       body: { refreshToken: body.refresh_token },
       headers: request.headers,
     });
-    const payload = (result as any)?.response ?? result as any;
+    const payload = (result?.response ?? result) as { accessToken?: string; user?: BetterAuthApiUser };
     if (!payload?.accessToken || !payload?.user) {
       return { ok: false, error: "Invalid refresh token", status: 401 };
     }
@@ -294,6 +302,7 @@ export async function resetPassword(
   }
 
   try {
+    // type-cast justified: token comes from URL query string/headers, not request body schema
     await auth.api.resetPassword({
       body: {
         newPassword: body.password,
@@ -324,7 +333,7 @@ export async function verifyEmailOtp(
       headers: request.headers,
       returnHeaders: true,
     });
-    const payload = (result?.response ?? result) as any;
+    const payload = (result?.response ?? result) as { user?: BetterAuthApiUser };
     if (!payload?.user) {
       return { ok: false, error: "Verification failed", status: 400 };
     }
@@ -402,7 +411,7 @@ export async function updateMeProfile(
       headers: request.headers,
       returnHeaders: true,
     });
-    const payload = (result?.response ?? result) as any;
+    const payload = (result?.response ?? result) as { user?: BetterAuthApiUser; status?: boolean };
     const user =
       payload?.user ??
       (payload?.status === true
