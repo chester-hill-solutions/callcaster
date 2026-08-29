@@ -17,6 +17,7 @@ export interface ExportContact {
   country?: string | null;
   created_by?: string | null;
   date_updated?: string | null;
+  line_type?: string | null;
   other_data?: unknown;
 }
 
@@ -34,6 +35,8 @@ export interface ExportMessage {
   to?: string;
   direction?: string;
   status?: string;
+  error_code?: number | null;
+  error_message?: string | null;
   date_sent?: string;
   date_created?: string;
   workspace?: string;
