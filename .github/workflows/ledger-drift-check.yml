@@ -1,0 +1,137 @@
+name: Ledger drift check
+
+# The repo's `db:ledger:check` compares in-repo migration versions against the
+# `AUTH_migrations.schema_migrations` table on the target DB, but CI's copy
+# runs without `DATABASE_URL` (and without `--require-db`), so it only prints
+# a repo inventory and NEVER catches a deployed database that missed a
+# migration. #1394's sibling gap: a review DB missing the ledger
+# enum-cast migrations quietly broke every credit purchase before anyone
+# noticed. This workflow is the actual gate — one job per deployed
+# environment, each opening a DB connection with the environment's own
+# secret and running the check with `--require-db`.
+#
+# Failure modes surfaced (all hard-fail this workflow, which alerts the
+# usual GitHub-actions notification channels):
+#
+#   * repo has migrations not present in the deployed ledger
+#     (someone shipped a migration file but the deploy didn't apply it)
+#   * deployed ledger has versions not in the repo
+#     (a migration file was renamed or deleted without a matching db op)
+#   * DATABASE_URL missing for the environment
+#     (the check has to fail loudly so the operator wires the secret up
+#      rather than a silent no-op passing forever)
+#
+# Environment secrets required (per environment: dev / staging / production):
+#
+#   DATABASE_URL   — read-only creds are enough; the check only SELECTs
+#                    from AUTH_migrations.schema_migrations
+#
+# The workflow will fail LOUDLY on any environment whose DATABASE_URL is
+# not configured. That is the intended alert to add the secret; a silent
+# skip would be exactly the drift-invisibility problem this workflow
+# exists to fix.
+
+on:
+  # Nightly heartbeat so drift surfaces on quiet weeks too.
+  schedule:
+    - cron: "0 8 * * *" # 08:00 UTC — before EST business hours.
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Which deployed environment to check
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+  # Re-verify right after a migration lands on the trunk of a deployed env.
+  push:
+    branches:
+      - dev
+      - production
+    paths:
+      - client/migrations/**
+      - scripts/db/check-migration-ledger.mjs
+      - .github/workflows/ledger-drift-check.yml
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ledger-drift-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dev:
+    # Runs on: nightly schedule, dispatch-with-input=dev, and push-to-dev.
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'dev') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/dev')
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+      - name: Ledger drift check (dev)
+        # --require-db forces a hard failure if DATABASE_URL isn't set;
+        # otherwise the script exits 0 with a warning and nothing gates.
+        run: node scripts/db/check-migration-ledger.mjs --require-db
+
+  staging:
+    # Runs on: nightly schedule, dispatch-with-input=staging, and push-to-production
+    # (staging tracks the production trunk in the current promotion flow).
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/production')
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+      - name: Ledger drift check (staging)
+        run: node scripts/db/check-migration-ledger.mjs --require-db
+
+  production:
+    # Runs on: nightly schedule, dispatch-with-input=production, and push-to-production.
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'production') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/production')
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+      - name: Ledger drift check (production)
+        run: node scripts/db/check-migration-ledger.mjs --require-db
