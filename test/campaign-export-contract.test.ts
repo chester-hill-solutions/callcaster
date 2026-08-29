@@ -344,7 +344,7 @@ describe("api.campaign-export CSV contract checks", () => {
     const csvText = csvUpload!.text;
 
     // Header ends in dequeued_reason so downstream consumers can key on it.
-    const headerLine = csvText.split("\r\n")[0].replace(/^﻿/, "");
+    const headerLine = csvText.split("\r\n")[0].replace(/^\uFEFF/, "");
     expect(headerLine.endsWith(",dequeued_reason")).toBe(true);
 
     // Delivered row: dequeued_reason is empty (never dequeued).
