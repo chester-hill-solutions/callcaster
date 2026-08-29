@@ -1,6 +1,7 @@
-import { sql } from "drizzle-orm";
+import { and, eq, gt, inArray } from "drizzle-orm";
 import type { TenantDb } from "@/server/tenant-db";
 import { expandPhoneMatchVariants } from "@/lib/message-db.server";
+import { message as messageTable } from "@/db/schema";
 
 /**
  * Inbound-SMS billing-attack guard (issue #1394).
@@ -57,9 +58,9 @@ export type InboundSmsRateVerdict =
 
 /**
  * Check whether an inbound SMS from `fromNumber` to `workspaceId` should
- * be processed. Both windows are checked in ONE round trip via `count(*)
- * FILTER (…)`; the outer WHERE covers the longer window so the query
- * plan can use `idx_message_workspace_date` for both.
+ * be processed. Runs two `count` queries (burst first — if that trips we
+ * skip the wider query) against the tenant-scoped message table, both
+ * covered by `idx_message_workspace_date`.
  *
  * The `now` parameter is only for tests — production always passes `new
  * Date()` implicitly.
@@ -76,28 +77,26 @@ export async function inboundSmsRateVerdict(
     return { allowed: true };
   }
   const now = args.now ?? new Date();
-  const burstSince = new Date(now.getTime() - INBOUND_SMS_BURST_WINDOW_MS);
-  const hourSince = new Date(now.getTime() - INBOUND_SMS_HOUR_WINDOW_MS);
+  const burstSinceIso = new Date(now.getTime() - INBOUND_SMS_BURST_WINDOW_MS).toISOString();
+  const hourSinceIso = new Date(now.getTime() - INBOUND_SMS_HOUR_WINDOW_MS).toISOString();
   const variants = expandPhoneMatchVariants(trimmed);
 
-  const rows = (await tdb.execute(sql`
-    SELECT
-      count(*) FILTER (WHERE date_created > ${burstSince.toISOString()}) AS burst_count,
-      count(*) FILTER (WHERE date_created > ${hourSince.toISOString()}) AS hour_count
-    FROM public.message
-    WHERE workspace = ${args.workspaceId}
-      AND direction = 'inbound'
-      AND date_created > ${hourSince.toISOString()}
-      AND "from" = ANY(${variants})
-  `)) as unknown as Array<{ burst_count: number | string; hour_count: number | string }>;
+  const baseWhere = and(
+    eq(messageTable.workspace, args.workspaceId),
+    eq(messageTable.direction, "inbound"),
+    inArray(messageTable.from, variants),
+  );
 
-  const row = rows[0];
-  const burst = Number(row?.burst_count ?? 0);
-  const hour = Number(row?.hour_count ?? 0);
-
+  const burst = await tdb.message.count({
+    where: and(baseWhere, gt(messageTable.date_created, burstSinceIso)),
+  });
   if (burst >= INBOUND_SMS_BURST_MAX) {
     return { allowed: false, window: "burst", count: burst, limit: INBOUND_SMS_BURST_MAX };
   }
+
+  const hour = await tdb.message.count({
+    where: and(baseWhere, gt(messageTable.date_created, hourSinceIso)),
+  });
   if (hour >= INBOUND_SMS_HOUR_MAX) {
     return { allowed: false, window: "hour", count: hour, limit: INBOUND_SMS_HOUR_MAX };
   }

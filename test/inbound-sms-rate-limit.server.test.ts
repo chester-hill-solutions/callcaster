@@ -12,11 +12,25 @@ import {
   INBOUND_SMS_HOUR_MAX,
   INBOUND_SMS_HOUR_WINDOW_MS,
 } from "@/lib/inbound-sms-rate-limit.server";
+import { expandPhoneMatchVariants } from "@/lib/message-db.server";
 
-function makeTdb(rows: Array<{ burst_count: number; hour_count: number }>) {
+/**
+ * The implementation issues burst first, then (only when burst is under
+ * cap) the hour query. Tests feed the counts as a two-element queue so
+ * we can assert the short-circuit path too.
+ */
+function makeTdb(counts: number[]) {
+  const queue = [...counts];
+  const count = vi.fn(async () => {
+    if (!queue.length) throw new Error("unexpected extra count() call");
+    return queue.shift() as number;
+  });
   return {
-    execute: vi.fn(async () => rows),
-  } as any;
+    tdb: {
+      message: { count },
+    } as any,
+    count,
+  };
 }
 
 describe("inboundSmsRateVerdict (#1394)", () => {
@@ -24,17 +38,15 @@ describe("inboundSmsRateVerdict (#1394)", () => {
   const fromNumber = "+15550001111";
 
   test("allows when both windows are under their caps", async () => {
-    const tdb = makeTdb([{ burst_count: 3, hour_count: 12 }]);
+    const { tdb, count } = makeTdb([3, 12]);
     await expect(
       inboundSmsRateVerdict(tdb, { workspaceId, fromNumber }),
     ).resolves.toEqual({ allowed: true });
-    expect(tdb.execute).toHaveBeenCalledTimes(1);
+    expect(count).toHaveBeenCalledTimes(2);
   });
 
-  test("refuses on the burst window when it trips first", async () => {
-    const tdb = makeTdb([
-      { burst_count: INBOUND_SMS_BURST_MAX, hour_count: 30 },
-    ]);
+  test("refuses on the burst window when it trips first and short-circuits the hour query", async () => {
+    const { tdb, count } = makeTdb([INBOUND_SMS_BURST_MAX]);
     await expect(
       inboundSmsRateVerdict(tdb, { workspaceId, fromNumber }),
     ).resolves.toEqual({
@@ -43,12 +55,11 @@ describe("inboundSmsRateVerdict (#1394)", () => {
       count: INBOUND_SMS_BURST_MAX,
       limit: INBOUND_SMS_BURST_MAX,
     });
+    expect(count).toHaveBeenCalledTimes(1);
   });
 
   test("refuses on the hour window when it trips without the burst window tripping", async () => {
-    const tdb = makeTdb([
-      { burst_count: 0, hour_count: INBOUND_SMS_HOUR_MAX },
-    ]);
+    const { tdb, count } = makeTdb([0, INBOUND_SMS_HOUR_MAX]);
     await expect(
       inboundSmsRateVerdict(tdb, { workspaceId, fromNumber }),
     ).resolves.toEqual({
@@ -57,19 +68,14 @@ describe("inboundSmsRateVerdict (#1394)", () => {
       count: INBOUND_SMS_HOUR_MAX,
       limit: INBOUND_SMS_HOUR_MAX,
     });
+    expect(count).toHaveBeenCalledTimes(2);
   });
 
-  test("burst refusal takes precedence when both windows are tripped simultaneously", async () => {
-    const tdb = makeTdb([
-      {
-        burst_count: INBOUND_SMS_BURST_MAX + 5,
-        hour_count: INBOUND_SMS_HOUR_MAX + 5,
-      },
-    ]);
+  test("burst refusal takes precedence when the burst window itself trips (hour query never runs)", async () => {
+    const { tdb } = makeTdb([INBOUND_SMS_BURST_MAX + 5]);
     const result = await inboundSmsRateVerdict(tdb, { workspaceId, fromNumber });
     if (result.allowed) throw new Error("expected refusal");
     expect(result.window).toBe("burst");
-    // The count/limit reported matches the burst side, not the hour side.
     expect(result.count).toBe(INBOUND_SMS_BURST_MAX + 5);
     expect(result.limit).toBe(INBOUND_SMS_BURST_MAX);
   });
@@ -78,35 +84,40 @@ describe("inboundSmsRateVerdict (#1394)", () => {
     // No bucket to key against; the route path treats blank-from as "no
     // attribution" too, so refusing here would drop legitimate carrier
     // messages that lack a From header.
-    const tdb = makeTdb([]);
+    const { tdb, count } = makeTdb([]);
     await expect(
       inboundSmsRateVerdict(tdb, { workspaceId, fromNumber: "   " }),
     ).resolves.toEqual({ allowed: true });
-    expect(tdb.execute).not.toHaveBeenCalled();
+    expect(count).not.toHaveBeenCalled();
   });
 
-  test("db returning no rows is treated as zero events (allow)", async () => {
-    const tdb = makeTdb([]);
+  test("zero counts allow the message through", async () => {
+    const { tdb, count } = makeTdb([0, 0]);
     await expect(
       inboundSmsRateVerdict(tdb, { workspaceId, fromNumber }),
     ).resolves.toEqual({ allowed: true });
-    expect(tdb.execute).toHaveBeenCalled();
+    expect(count).toHaveBeenCalledTimes(2);
   });
 
   test("expands the from-number into E.164 / bare / leading-1 variants so an attacker can't sidestep the guard by re-encoding", async () => {
-    const tdb = makeTdb([{ burst_count: 0, hour_count: 0 }]);
+    // Contract check: whatever the guard passes to `inArray(from, …)` must
+    // include every plausible on-wire encoding — otherwise an attacker
+    // swapping "+15551234567" for "15551234567" mid-stream would reset
+    // both counters. Assert against expandPhoneMatchVariants directly
+    // (walking the drizzle where AST hits circular refs on PgTable).
+    const variants = expandPhoneMatchVariants("+15551234567");
+    expect(variants).toEqual(expect.arrayContaining([
+      "+15551234567",
+      "15551234567",
+      "5551234567",
+    ]));
+
+    const { tdb, count } = makeTdb([0, 0]);
     await inboundSmsRateVerdict(tdb, {
       workspaceId,
       fromNumber: "+15551234567",
     });
-    // The variants list flows into the sql tagged template as an ANY(...)
-    // parameter. Capture the drizzle SQL object and inspect the parameter
-    // array to confirm every plausible on-wire encoding is included.
-    const sqlArg = tdb.execute.mock.calls[0][0];
-    const flat = JSON.stringify(sqlArg);
-    expect(flat).toContain("+15551234567");
-    expect(flat).toContain("15551234567");
-    expect(flat).toContain("5551234567");
+    expect(count).toHaveBeenCalled();
   });
 
   test("thresholds are exported so the route + tests reference the same constants", () => {
