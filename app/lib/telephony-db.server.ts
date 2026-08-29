@@ -119,6 +119,7 @@ export async function findActiveConferenceIdsForUser(
       AND c.conference_id != ''
       AND c.status = ANY(ARRAY['initiated', 'queued', 'ringing', 'in-progress'])
   `);
+  // type-cast justified: raw SQL query result has unknown shape until cast to expected columns
   return (rows as unknown as { conference_id: string }[]).map((row) => row.conference_id);
 }
 
@@ -140,6 +141,7 @@ export async function claimTerminalCallStatus(
 ): Promise<boolean> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
   const normalized = terminalStatus.toLowerCase();
+  // type-cast justified: CallRow.status is ENUM type, normalized string assignment needs intermediate unknown
   const rows = await tdb.call.update({
     set: { status: normalized } as unknown as Partial<CallRow>,
     where: and(
@@ -184,6 +186,7 @@ export async function updateCallBySid(
   // runs this statement against a real database.
   const guardedStatus = sql`CASE WHEN LOWER(${callTable.status}::text) = ANY(${TERMINAL_CALL_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_CALL_STATUSES_SQL}) THEN ${callTable.status} ELSE ${update.status} END`;
 
+  // type-cast justified: mixing SQL expressions with regular fields in set object requires unknown intermediate
   const [row] = await tdb.call.update({
     set: {
       ...update,
