@@ -9,7 +9,10 @@ import {
   listExportCampaignMessages,
   listExportOutreachAttempts,
 } from "@/lib/campaign-export-db.server";
-import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
+import {
+  findDequeuedQueueRowsForCampaign,
+  getCampaignQueueContactIds,
+} from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
 import {
   castExportScript,
@@ -76,7 +79,7 @@ export async function processMessageCampaignExport(
     // Initialize CSV lines with headers (store as lines to avoid O(n^2) string concatenation).
     const csvLines: string[] = [];
     csvLines.push(
-      "body,direction,status,error_code,error_message,line_type,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date",
+      "body,direction,status,error_code,error_message,line_type,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date,dequeued_reason",
     );
 
     // Get contact details in batches
@@ -212,6 +215,7 @@ export async function processMessageCampaignExport(
                 campaign.title,
                 campaign.start_date,
                 campaign.end_date,
+                "", // dequeued_reason — never populated for real messages
               ],
               { protectFromInjection: true },
             ),
@@ -233,6 +237,56 @@ export async function processMessageCampaignExport(
 
       // Small delay to prevent overwhelming the database
       await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    // #1417: append synthesized rows for queue entries that were
+    // dequeued before ever producing a `message` — landline pre-check,
+    // opt-out, duplicate suppression. Without this, dequeued contacts
+    // silently vanish from the CSV (indistinguishable from a bug).
+    const contactById = new Map<string, ExportContact>();
+    for (const c of contactDetails) {
+      contactById.set(String(c.id), c);
+    }
+    const dequeuedRows = await findDequeuedQueueRowsForCampaign(campaignId, workspaceId);
+    for (const dequeuedRow of dequeuedRows) {
+      const contact = contactById.get(String(dequeuedRow.contact_id));
+      if (!contact) continue;
+      const cleanPhone = (contact.phone ?? "").replace(/[^0-9]/g, "");
+      csvLines.push(
+        csvRow(
+          [
+            "", // body — never sent
+            "", // direction
+            "skipped",
+            "", // error_code
+            "", // error_message
+            contact.line_type ?? "",
+            "", // message_date
+            contact.id,
+            contact.firstname,
+            contact.surname,
+            contact.phone,
+            contact.email,
+            contact.address,
+            contact.city,
+            contact.opt_out ? "true" : "false",
+            contact.created_at,
+            contact.workspace,
+            contact.external_id,
+            contact.address_id,
+            contact.postal,
+            contact.carrier,
+            contact.province,
+            contact.country,
+            cleanPhone,
+            campaign.title,
+            campaign.start_date,
+            campaign.end_date,
+            dequeuedRow.dequeued_reason ?? "",
+          ],
+          { protectFromInjection: true },
+        ),
+      );
     }
 
     await finalizeCsvExport(workspaceId, exportId, statusData, csvLines, {
