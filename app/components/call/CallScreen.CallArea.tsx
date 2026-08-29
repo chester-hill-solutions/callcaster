@@ -308,8 +308,14 @@ export function CallControls({
     );
   }
 
+  // When the Dial button first appears after a call ends (`dialArmed`), it
+  // reads as "Click again to call back" — Sai's #1342 point 1: the button
+  // that lands in the same spot the Hang Up used to occupy should evoke
+  // "back to calling" so the agent knows *why* the label just changed.
+  // Once the guard window elapses (see the arm effect above) the label
+  // reverts to plain "Dial" for the next-contact flow, unchanged.
   const dialLabel = dialArmed
-    ? "Click again to dial"
+    ? "Click again to call back"
     : !predictive
       ? "Dial"
       : conference
