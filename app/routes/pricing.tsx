@@ -9,6 +9,7 @@ import {
   buildPublicPricingContent,
   type PublicPricingRow,
 } from "@/lib/public-pricing";
+import { PricingCalculator } from "@/components/pricing/PricingCalculator";
 
 export { loader, action } from "./pricing.loader.server";
 
@@ -87,6 +88,14 @@ export default function Pricing() {
           <PricingCard key={`${row.service}-${row.type}`} row={row} />
         ))}
       </div>
+
+      {/*
+        Progressive-disclosure calculator (#1393). Sits between the
+        pricing cards and the staffed-callout so the primary rate
+        comparison stays easy to scan and the calculator is discoverable
+        without demanding attention up front.
+      */}
+      <PricingCalculator />
 
       <SubsectionTitle>{staffedCallout.heading}</SubsectionTitle>
       <section className="overflow-hidden rounded-xl border border-border bg-card">
