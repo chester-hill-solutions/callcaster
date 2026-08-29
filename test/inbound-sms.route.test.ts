@@ -64,6 +64,17 @@ vi.mock("@/lib/messaging-onboarding.server", () => ({
     onboardingMocks.getWorkspaceMessagingOnboardingState(...args),
 }));
 
+// #1394 rate-limit guard: default allow. Individual tests override to
+// exercise the drop path. Real query logic is covered by the module's own
+// unit tests in test/inbound-sms-rate-limit.server.test.ts.
+const rateLimitMocks = vi.hoisted(() => ({
+  inboundSmsRateVerdict: vi.fn(async () => ({ allowed: true }) as const),
+}));
+vi.mock("@/lib/inbound-sms-rate-limit.server", () => ({
+  inboundSmsRateVerdict: (...args: unknown[]) =>
+    rateLimitMocks.inboundSmsRateVerdict(...args),
+}));
+
 const inboundContextMocks = vi.hoisted(() => ({
   contacts: [] as Array<{ id: number }>,
   contactError: null as Error | null,
@@ -284,10 +295,98 @@ describe("app/routes/api+/inbound-sms", () => {
     mocks.fetch.mockReset();
     queueDbMocks.dequeueQueueEntry.mockReset();
     queueDbMocks.dequeueQueueEntry.mockResolvedValue(undefined);
+    rateLimitMocks.inboundSmsRateVerdict.mockReset();
+    rateLimitMocks.inboundSmsRateVerdict.mockResolvedValue({ allowed: true });
     vi.stubGlobal("fetch", mocks.fetch);
     onboardingMocks.getWorkspaceMessagingOnboardingState.mockReset();
     onboardingMocks.getWorkspaceMessagingOnboardingState.mockResolvedValue({
       businessProfile: { optOutKeywords: "" },
+    });
+  });
+
+  describe("inbound-SMS rate limit (#1394)", () => {
+    test("drops the message with 200 when the rate-limit guard says the from-number is over the burst cap", async () => {
+      rateLimitMocks.inboundSmsRateVerdict.mockResolvedValueOnce({
+        allowed: false,
+        window: "burst",
+        count: 25,
+        limit: 20,
+      });
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "inbound_sms" }] }] };
+      mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contacts: [{ id: 9 }] }));
+
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+        request: makeInboundSmsRequest({ Body: "hello", NumMedia: "0" }),
+      } as any));
+
+      // 200 (NOT 5xx): Twilio would retry a 5xx and re-run the attack.
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        dropped: true,
+        reason: "rate_limited",
+        window: "burst",
+      });
+      // Not a single billable side effect must have fired.
+      expect(tenantDbStubState.messageInsertCalls).toEqual([]);
+      expect(mocks.sendWebhookNotification).not.toHaveBeenCalled();
+      expect(tenantDbStubState.contactUpdateCalls).toEqual([]);
+      expect(queueDbMocks.dequeueQueueEntry).not.toHaveBeenCalled();
+      // The refusal is logged with the tripped-window shape for observability.
+      expect(mocks.logger.warn).toHaveBeenCalledWith(
+        "inbound_sms.rate_limited",
+        expect.objectContaining({
+          workspace: "w1",
+          from: "+1666",
+          window: "burst",
+          count: 25,
+          limit: 20,
+        }),
+      );
+    });
+
+    test("hour-window trip is reported through the same drop path", async () => {
+      rateLimitMocks.inboundSmsRateVerdict.mockResolvedValueOnce({
+        allowed: false,
+        window: "hour",
+        count: 101,
+        limit: 100,
+      });
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contacts: [] }));
+
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+        request: makeInboundSmsRequest({ Body: "hello", NumMedia: "0" }),
+      } as any));
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        dropped: true,
+        reason: "rate_limited",
+        window: "hour",
+      });
+      expect(tenantDbStubState.messageInsertCalls).toEqual([]);
+    });
+
+    test("allowed verdict lets the message through to the normal insert path", async () => {
+      // Sanity check: the guard is called and the pass-through still records
+      // the row. Prevents an accidental default of allowed→false regressing
+      // every workspace's inbound path.
+      const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [] };
+      mocks.createClient.mockReturnValueOnce(makeDbClient({ number, contacts: [] }));
+
+      const mod = await import("../app/routes/api+/inbound-sms");
+      const res = await asRouteResponse(mod.action({
+        request: makeInboundSmsRequest({ Body: "hello", NumMedia: "0" }),
+      } as any));
+
+      expect(res.status).toBe(201);
+      expect(rateLimitMocks.inboundSmsRateVerdict).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ workspaceId: "w1", fromNumber: "+1666" }),
+      );
+      expect(tenantDbStubState.messageInsertCalls.length).toBe(1);
     });
   });
 

@@ -448,6 +448,7 @@ test/inbound-queue.test.ts::@/lib/env.server
 test/inbound-sms.route.test.ts::@/lib/campaign-queue-db.server
 test/inbound-sms.route.test.ts::@/lib/env.server
 test/inbound-sms.route.test.ts::@/lib/inbound-sms-context.server
+test/inbound-sms.route.test.ts::@/lib/inbound-sms-rate-limit.server
 test/inbound-sms.route.test.ts::@/lib/logger.server
 test/inbound-sms.route.test.ts::@/lib/messaging-onboarding.server
 test/inbound-sms.route.test.ts::@/lib/object-storage.server
