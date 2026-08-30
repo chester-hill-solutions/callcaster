@@ -280,8 +280,8 @@ describe("api.campaign-export CSV contract checks", () => {
     await flushMicrotasks();
 
     const csvUpload = objectStorageUploads.find((u) => u.path.endsWith(".csv"));
-    expect(csvUpload).toBeTruthy();
-    const csvText = csvUpload!.text;
+    if (!csvUpload) throw new Error("expected a .csv upload from the export");
+    const csvText = csvUpload.text;
 
     const headerLine = csvText.split("\r\n")[0].replace(/^\uFEFF/, "");
     // Header names AND relative order matter — downstream consumers key by column index.
