@@ -40,6 +40,61 @@ export function generateCampaignExportId() {
   return `${timestamp}-${randomStr}`;
 }
 
+async function appendDequeuedRowsToCsv(args: {
+  campaignId: number;
+  workspaceId: string;
+  campaign: ExportCampaign;
+  contactDetails: ExportContact[];
+  csvLines: string[];
+}) {
+  const { campaignId, workspaceId, campaign, contactDetails, csvLines } = args;
+  const contactById = new Map<string, ExportContact>();
+  for (const c of contactDetails) {
+    contactById.set(String(c.id), c);
+  }
+  const dequeuedRows = await findDequeuedQueueRowsForCampaign(campaignId, workspaceId);
+  for (const dequeuedRow of dequeuedRows) {
+    const contact = contactById.get(String(dequeuedRow.contact_id));
+    if (!contact) continue;
+    const cleanPhone = (contact.phone ?? "").replace(/[^0-9]/g, "");
+    csvLines.push(
+      csvRow(
+        [
+          "", // body — never sent
+          "", // direction
+          "skipped",
+          "", // error_code
+          "", // error_message
+          contact.line_type ?? "",
+          "", // message_date
+          contact.id,
+          contact.firstname,
+          contact.surname,
+          contact.phone,
+          contact.email,
+          contact.address,
+          contact.city,
+          contact.opt_out ? "true" : "false",
+          contact.created_at,
+          contact.workspace,
+          contact.external_id,
+          contact.address_id,
+          contact.postal,
+          contact.carrier,
+          contact.province,
+          contact.country,
+          cleanPhone,
+          campaign.title,
+          campaign.start_date,
+          campaign.end_date,
+          dequeuedRow.dequeued_reason ?? "",
+        ],
+        { protectFromInjection: true },
+      ),
+    );
+  }
+}
+
 export async function processMessageCampaignExport(
   campaignId: number,
   workspaceId: string,
@@ -243,51 +298,13 @@ export async function processMessageCampaignExport(
     // dequeued before ever producing a `message` — landline pre-check,
     // opt-out, duplicate suppression. Without this, dequeued contacts
     // silently vanish from the CSV (indistinguishable from a bug).
-    const contactById = new Map<string, ExportContact>();
-    for (const c of contactDetails) {
-      contactById.set(String(c.id), c);
-    }
-    const dequeuedRows = await findDequeuedQueueRowsForCampaign(campaignId, workspaceId);
-    for (const dequeuedRow of dequeuedRows) {
-      const contact = contactById.get(String(dequeuedRow.contact_id));
-      if (!contact) continue;
-      const cleanPhone = (contact.phone ?? "").replace(/[^0-9]/g, "");
-      csvLines.push(
-        csvRow(
-          [
-            "", // body — never sent
-            "", // direction
-            "skipped",
-            "", // error_code
-            "", // error_message
-            contact.line_type ?? "",
-            "", // message_date
-            contact.id,
-            contact.firstname,
-            contact.surname,
-            contact.phone,
-            contact.email,
-            contact.address,
-            contact.city,
-            contact.opt_out ? "true" : "false",
-            contact.created_at,
-            contact.workspace,
-            contact.external_id,
-            contact.address_id,
-            contact.postal,
-            contact.carrier,
-            contact.province,
-            contact.country,
-            cleanPhone,
-            campaign.title,
-            campaign.start_date,
-            campaign.end_date,
-            dequeuedRow.dequeued_reason ?? "",
-          ],
-          { protectFromInjection: true },
-        ),
-      );
-    }
+    await appendDequeuedRowsToCsv({
+      campaignId,
+      workspaceId,
+      campaign,
+      contactDetails,
+      csvLines,
+    });
 
     await finalizeCsvExport(workspaceId, exportId, statusData, csvLines, {
       campaignId,
