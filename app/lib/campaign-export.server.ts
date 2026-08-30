@@ -76,7 +76,7 @@ export async function processMessageCampaignExport(
     // Initialize CSV lines with headers (store as lines to avoid O(n^2) string concatenation).
     const csvLines: string[] = [];
     csvLines.push(
-      "body,direction,status,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date",
+      "body,direction,status,error_code,error_message,line_type,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date",
     );
 
     // Get contact details in batches
@@ -188,6 +188,9 @@ export async function processMessageCampaignExport(
                 item.body,
                 item.direction,
                 item.status,
+                item.error_code != null ? String(item.error_code) : "",
+                item.error_message ?? "",
+                item.contact.line_type ?? "",
                 item.message_date,
                 item.contact.id,
                 item.contact.firstname,
