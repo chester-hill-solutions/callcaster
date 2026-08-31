@@ -17,6 +17,7 @@ import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
 import useCallRoom from "@/hooks/call/useCallRoom";
 import { useTwilioDevice } from "@/hooks/call/useTwilioDevice";
 import { useDialRingback } from "@/hooks/call/useDialRingback";
+import { useCallEndTone } from "@/hooks/call/useCallEndTone";
 import { useStartConferenceAndDial } from "@/hooks/call/useStartConferenceAndDial";
 import { useCallState } from "@/hooks/call/useCallState";
 import { useCallScreenDialogs } from "@/hooks/call/useCallScreenDialogs";
@@ -251,6 +252,13 @@ export function useCallScreen() {
   // the system dials there and the agent isn't waiting on a ring.
   useDialRingback({
     active: displayState === "dialing" && campaign?.dial_type !== "predictive",
+    outputDeviceId: audioControls.output,
+  });
+
+  // Two short busy-style bursts when the call ends — either side hanging up —
+  // so the agent gets audible confirmation, not just the status text (#1363).
+  useCallEndTone({
+    displayState,
     outputDeviceId: audioControls.output,
   });
 
