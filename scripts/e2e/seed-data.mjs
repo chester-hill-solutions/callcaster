@@ -115,6 +115,29 @@ function buildWeekdayCallingSchedule(timeZone = "America/Toronto") {
 
 export const BUSINESS_HOURS_SCHEDULE = buildWeekdayCallingSchedule();
 
+/**
+ * Seeded campaigns use an always-open window so E2E behavior does not depend
+ * on the wall-clock time of the CI run. The weekday schedule above made the
+ * five call-screen tests pass 13:00–21:00 UTC Mon–Fri and rendered the
+ * inactive-campaign dialog on nightly/weekend runs — the time-of-day half of
+ * the #1435 flake. Keep BUSINESS_HOURS_SCHEDULE for tests that exercise the
+ * schedule UI itself.
+ */
+export const ALWAYS_OPEN_SCHEDULE = Object.fromEntries(
+  [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+  ].map((day) => [
+    day,
+    { active: true, intervals: [{ start: "00:00", end: "23:59" }] },
+  ]),
+);
+
 export function readyTwilioData() {
   return {
     sid: "AC_e2e_test",

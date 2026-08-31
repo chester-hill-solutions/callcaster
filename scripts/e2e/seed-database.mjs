@@ -3,7 +3,7 @@
 import "dotenv/config";
 import postgres from "postgres";
 import {
-  BUSINESS_HOURS_SCHEDULE,
+  ALWAYS_OPEN_SCHEDULE,
   API_KEY,
   AUDIENCE_ID,
   CAMPAIGNS,
@@ -44,7 +44,7 @@ function campaignBase(id, workspaceId, title, type, extra = {}) {
     caller_id: "+15555501001",
     start_date: start,
     end_date: end,
-    schedule: BUSINESS_HOURS_SCHEDULE,
+    schedule: ALWAYS_OPEN_SCHEDULE,
     dial_type: extra.dial_type ?? "call",
     dial_ratio: 1,
     group_household_queue: false,
