@@ -115,6 +115,11 @@ jobs:
       - run: npm run check:workspace-projection
       - run: npm run check:effects
       - run: npm run check:type-safety
+      # A relative `redirect("../…")` in a loader/action resolves against
+      # `request.url` per RFC 3986. Refactors that move a file up or down
+      # the URL tree silently reroute it — the "successful upload → 404"
+      # flow in #1396. Ratchet the current allowlist so no new one lands.
+      - run: npm run check:relative-redirects
       # Drizzle nests the Postgres SQLSTATE on error.cause; inline
       # `.code === "23505"` checks miss it, which is how duplicate campaign
       # names shipped a generic "Unexpected Server Error" behind green CI.
