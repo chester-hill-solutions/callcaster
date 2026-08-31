@@ -299,5 +299,108 @@ describe("app/components/call/CallScreen.Header.tsx", () => {
     expect(screen.getByText("Calling device")).toBeInTheDocument();
     expect(screen.getByText("Add device")).toBeInTheDocument();
   });
+
+  // #1339: settings-sheet gets a Test microphone / Test speaker row so
+  // operators can confirm their pick works before joining a call. The
+  // row hides entirely when the layer above doesn't wire the callbacks
+  // (backwards compat with older mocks).
+  test("#1339: test-mic / test-speaker buttons wire callbacks and hide without them", async () => {
+    const { CampaignHeader } = await import("@/components/call/CallScreen.Header");
+
+    // Without callbacks: no row rendered.
+    const { rerender } = render(<CampaignHeader {...baseProps({ settingsOnly: true })} />);
+    expect(screen.queryByRole("button", { name: /Test microphone/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Test speaker/i })).toBeNull();
+
+    const onTestSpeaker = vi.fn();
+    const onToggleMicMonitor = vi.fn();
+
+    rerender(
+      <CampaignHeader
+        {...baseProps({
+          settingsOnly: true,
+          onTestSpeaker,
+          onToggleMicMonitor,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Test speaker/i }));
+    expect(onTestSpeaker).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /Test microphone/i }));
+    expect(onToggleMicMonitor).toHaveBeenCalledTimes(1);
+  });
+
+  test("#1339: mic-level meter renders with aria-valuenow only while monitoring", async () => {
+    const { CampaignHeader } = await import("@/components/call/CallScreen.Header");
+    const onToggleMicMonitor = vi.fn();
+
+    const { rerender } = render(
+      <CampaignHeader
+        {...baseProps({
+          settingsOnly: true,
+          onToggleMicMonitor,
+          isMicMonitoring: false,
+          micLevel: 0.42,
+        })}
+      />,
+    );
+    // Not monitoring → no meter, and the meter's absence is what the
+    // aria-pressed=false button state communicates to screen readers.
+    expect(screen.queryByRole("meter")).toBeNull();
+    const btn = screen.getByRole("button", { name: /Test microphone/i });
+    expect(btn).toHaveAttribute("aria-pressed", "false");
+
+    rerender(
+      <CampaignHeader
+        {...baseProps({
+          settingsOnly: true,
+          onToggleMicMonitor,
+          isMicMonitoring: true,
+          micLevel: 0.42,
+        })}
+      />,
+    );
+    // Monitoring → meter appears, level scaled to percent, button flips
+    // to "Stop test" with aria-pressed=true.
+    const meter = screen.getByRole("meter", { name: /Microphone input level/i });
+    expect(meter).toHaveAttribute("aria-valuenow", "42");
+    expect(screen.getByRole("button", { name: /Stop test/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("mic-level-fill").getAttribute("style")).toContain("width: 42%");
+  });
+
+  test("#1339: test-speaker button disables while a tone is playing and error surfaces", async () => {
+    const { CampaignHeader } = await import("@/components/call/CallScreen.Header");
+    const onTestSpeaker = vi.fn();
+
+    const { rerender } = render(
+      <CampaignHeader
+        {...baseProps({
+          settingsOnly: true,
+          onTestSpeaker,
+          isSpeakerPlaying: true,
+        })}
+      />,
+    );
+    const btn = screen.getByRole("button", { name: /Playing tone/i });
+    expect(btn).toBeDisabled();
+
+    rerender(
+      <CampaignHeader
+        {...baseProps({
+          settingsOnly: true,
+          onTestSpeaker,
+          audioTestError: "Could not play the test tone.",
+        })}
+      />,
+    );
+    expect(screen.getByTestId("audio-test-error")).toHaveTextContent(
+      "Could not play the test tone.",
+    );
+  });
 });
 

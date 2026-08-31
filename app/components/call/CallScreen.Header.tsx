@@ -68,6 +68,15 @@ interface CampaignHeaderProps {
   onNewPhoneNumberChange: (value: string) => void;
   onVerifyNewNumber: () => void;
   verificationPhoneNumber: string;
+  // #1339: audio device test controls. Optional so route-level renders
+  // that don't wire them (e.g. legacy Storybook or partial mocks) still
+  // work — the buttons simply hide when the callbacks aren't provided.
+  onTestSpeaker?: () => void;
+  onToggleMicMonitor?: () => void;
+  micLevel?: number;
+  isMicMonitoring?: boolean;
+  isSpeakerPlaying?: boolean;
+  audioTestError?: string | null;
 }
 
 const creditBadgeClass: Record<CampaignHeaderProps["creditState"], string> = {
@@ -84,6 +93,118 @@ const creditLabel: Record<CampaignHeaderProps["creditState"], string> = {
 
 const deviceSelectClass =
   "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+
+/**
+ * #1339 test-mic / test-speaker row for the settings sheet. Own component
+ * so its state-driven ternaries stay out of CampaignHeader's cyclomatic
+ * budget (lint-ratchet caps that at 20). Rendered inline right under the
+ * audio-device selects so the settings sheet reads as one grouped audio
+ * block.
+ */
+function AudioDeviceTestRow({
+  onTestSpeaker,
+  onToggleMicMonitor,
+  micLevel = 0,
+  isMicMonitoring = false,
+  isSpeakerPlaying = false,
+  audioTestError = null,
+}: {
+  onTestSpeaker?: () => void;
+  onToggleMicMonitor?: () => void;
+  micLevel?: number;
+  isMicMonitoring?: boolean;
+  isSpeakerPlaying?: boolean;
+  audioTestError?: string | null;
+}) {
+  const hasAnyTest = Boolean(onTestSpeaker || onToggleMicMonitor);
+  if (!hasAnyTest && !audioTestError) return null;
+
+  const micDescription = isMicMonitoring
+    ? "Speak — the meter reflects your input level."
+    : "Click to sample your mic for a few seconds.";
+  const micButtonLabel = isMicMonitoring ? "Stop test" : "Test microphone";
+  const micButtonVariant = isMicMonitoring ? "destructive" : "outline";
+  const meterPercent = Math.min(100, Math.round(micLevel * 100));
+
+  const speakerDescription = isSpeakerPlaying
+    ? "Playing a short tone through the selected speaker."
+    : "Plays a short tone so you can confirm your speaker.";
+  const speakerButtonLabel = isSpeakerPlaying ? "Playing tone…" : "Test speaker";
+
+  return (
+    <>
+      {hasAnyTest ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {onToggleMicMonitor ? (
+            <FormField label="Test microphone" description={micDescription}>
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant={micButtonVariant}
+                  onClick={onToggleMicMonitor}
+                  className="flex w-full items-center justify-center gap-2"
+                  aria-pressed={isMicMonitoring}
+                >
+                  <Mic size={16} />
+                  {micButtonLabel}
+                </Button>
+                {isMicMonitoring ? (
+                  <div
+                    className="h-2 w-full overflow-hidden rounded-full bg-muted"
+                    role="meter"
+                    aria-label="Microphone input level"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={meterPercent}
+                  >
+                    <div
+                      data-testid="mic-level-fill"
+                      className="h-full rounded-full bg-success transition-[width] duration-75"
+                      style={{ width: `${meterPercent}%` }}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </FormField>
+          ) : (
+            <div />
+          )}
+
+          {onTestSpeaker ? (
+            <FormField label="Test speaker" description={speakerDescription}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onTestSpeaker}
+                disabled={isSpeakerPlaying}
+                className="flex w-full items-center justify-center gap-2"
+              >
+                <Headphones size={16} />
+                {speakerButtonLabel}
+              </Button>
+            </FormField>
+          ) : (
+            <div />
+          )}
+
+          {/* Third column intentionally empty to align with the mute
+              button on the row above (3-col grid). */}
+          <div />
+        </div>
+      ) : null}
+
+      {audioTestError ? (
+        <p
+          role="alert"
+          className="text-sm text-destructive"
+          data-testid="audio-test-error"
+        >
+          {audioTestError}
+        </p>
+      ) : null}
+    </>
+  );
+}
 
 export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   className,
@@ -116,6 +237,12 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   onNewPhoneNumberChange,
   onVerifyNewNumber,
   verificationPhoneNumber,
+  onTestSpeaker,
+  onToggleMicMonitor,
+  micLevel = 0,
+  isMicMonitoring = false,
+  isSpeakerPlaying = false,
+  audioTestError = null,
 }) => {
   const microphoneSelectId = "campaign-microphone-select";
   const speakerSelectId = "campaign-speaker-select";
@@ -290,6 +417,15 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                 </Button>
               </FormField>
             </div>
+
+            <AudioDeviceTestRow
+              onTestSpeaker={onTestSpeaker}
+              onToggleMicMonitor={onToggleMicMonitor}
+              micLevel={micLevel}
+              isMicMonitoring={isMicMonitoring}
+              isSpeakerPlaying={isSpeakerPlaying}
+              audioTestError={audioTestError}
+            />
 
             {/*
               #1338: give the calling-device row proper FormField wrappers
