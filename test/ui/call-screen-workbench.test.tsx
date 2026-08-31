@@ -48,4 +48,26 @@ describe("CallScreen.Workbench", () => {
       "Contact and controlsScript questions",
     );
   });
+
+  // Regression for #1343: the xl grid used to hard-code column widths
+  // (340px + 420px min + 380px), which added up to ~1172px and
+  // horizontally scrolled a 13" MacBook (available grid width is
+  // ~916px). Every column must be a `minmax(min, ideal)` so they can
+  // shrink under 1280px viewports.
+  test("#1343: xl grid columns use minmax so they compress on small desktops", () => {
+    render(
+      <CallWorkbench
+        call={<div>Contact and controls</div>}
+        script={<div>Script questions</div>}
+        queue={<div>Queue rail</div>}
+      />,
+    );
+
+    const workspace = screen.getByRole("region", { name: "Call workspace" });
+    // Every xl column entry must be a minmax(...) — a raw pixel width
+    // reintroduces the horizontal-scroll regression.
+    expect(workspace.className).toMatch(
+      /xl:grid-cols-\[minmax\([^)]+\)_minmax\([^)]+\)_minmax\([^)]+\)\]/,
+    );
+  });
 });
