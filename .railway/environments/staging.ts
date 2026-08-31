@@ -8,13 +8,13 @@ import { preservedVariables, source } from "../config/shared.js";
 //
 // Applying this DELETES the legacy hearty-expression service (the Supabase-era
 // staging app, frozen since 2026-06-24). That is the point of phase 2, but the
-// apply is destructive and stays human-reviewed/manual — CI only ever plans
-// staging on PRs (applies fire on production pushes, and this graph reaches
-// the production branch only at cutover).
+// apply is destructive and stays human-reviewed/manual — CI refuses to apply
+// destructive plans on push, so the conversion runs once by hand (see
+// docs/staging-rehearsal-runbook.md) and CI takes over from there.
 //
-// Source: `master` during the rehearsal (it carries v2 as of #1120; the
-// `production` branch is still pre-v2). Phase 3 flips this to
-// source("production") in the same change that promotes v2 to that branch.
+// Source: `master`, permanently. Topology directive 2026-08-31 (#1300):
+// production and staging both track master; there is no `production` deploy
+// branch.
 const appVariables = [
   "BASE_URL",
   "BETTER_AUTH_SECRET",
