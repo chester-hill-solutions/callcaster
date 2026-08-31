@@ -1,4 +1,4 @@
-import { Link, NavLink, Params, useLocation } from "react-router";
+import { Link, NavLink, Params, useLocation, useNavigate } from "react-router";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Check, ChevronDown, Menu, User as UserIcon, LogOut } from "lucide-react";
 import { capitalize } from "@/lib/utils";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
@@ -64,41 +74,61 @@ const WorkspacePicker = ({
   activeWorkspaceId: string | undefined;
 }) => {
   const active = workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null;
+  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const go = (to: string) => {
+    setOpen(false);
+    navigate(to);
+  };
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
         <button
           type="button"
           data-testid="navbar-workspace-picker"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls="navbar-workspace-picker-list"
           aria-label={active ? `Switch workspace, current: ${active.name}` : "Workspaces"}
           className="flex h-10 max-w-[200px] items-center gap-1 rounded-lg border border-transparent bg-white/70 px-2.5 font-Zilla-Slab text-sm font-bold text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white"
         >
           <span className="truncate">{active ? active.name : "Workspaces"}</span>
           <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
         </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-64">
-        <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {workspaces.map((workspace) => (
-          <DropdownMenuItem key={workspace.id} asChild>
-            <Link
-              to={`/workspaces/${workspace.id}`}
-              className="flex items-center justify-between gap-2"
-            >
-              <span className="min-w-0 truncate">{workspace.name}</span>
-              {workspace.id === activeWorkspaceId ? (
-                <Check className="h-4 w-4 shrink-0" aria-hidden />
-              ) : null}
-            </Link>
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/workspaces">All workspaces</Link>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-0" align="start">
+        {/* PopoverContent already draws the border/shadow; flatten Command's. */}
+        <Command className="border-0 shadow-none">
+          <CommandInput placeholder="Search workspaces…" />
+          <CommandList
+            id="navbar-workspace-picker-list"
+            aria-label="Workspaces"
+            renderEmptyState={() => <CommandEmpty>No workspaces found.</CommandEmpty>}
+          >
+            <CommandGroup heading="Workspaces">
+              {workspaces.map((workspace) => (
+                <CommandItem
+                  key={workspace.id}
+                  id={workspace.id}
+                  textValue={workspace.name}
+                  onAction={() => go(`/workspaces/${workspace.id}`)}
+                  className="flex items-center justify-between gap-2"
+                >
+                  <span className="min-w-0 truncate">{workspace.name}</span>
+                  {workspace.id === activeWorkspaceId ? (
+                    <Check className="h-4 w-4 shrink-0" aria-hidden />
+                  ) : null}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+            <CommandSeparator />
+            <CommandItem id="all-workspaces" textValue="All workspaces" onAction={() => go("/workspaces")}>
+              All workspaces
+            </CommandItem>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 };
 

@@ -145,11 +145,33 @@ describe("useCallScreen", () => {
       configurable: true,
     });
 
+    // Full enough for both useAudioDeviceTest and useDialRingback (#1341),
+    // which builds oscillators → gain → MediaStreamDestination on dial.
     class MockAudioContext {
+      currentTime = 0;
       createGain() {
-        return { connect: vi.fn() };
+        return {
+          connect: vi.fn().mockReturnValue({ connect: vi.fn() }),
+          gain: {
+            value: 0,
+            cancelScheduledValues: vi.fn(),
+            setValueAtTime: vi.fn(),
+          },
+        };
       }
-      close = vi.fn();
+      createOscillator() {
+        return {
+          type: "sine",
+          frequency: { value: 0 },
+          connect: vi.fn(),
+          start: vi.fn(),
+          stop: vi.fn(),
+        };
+      }
+      createMediaStreamDestination() {
+        return { stream: {} as MediaStream };
+      }
+      close = vi.fn().mockResolvedValue(undefined);
     }
     vi.stubGlobal("AudioContext", MockAudioContext);
     vi.stubGlobal("webkitAudioContext", MockAudioContext);

@@ -223,17 +223,19 @@ export function useCallHandling({
   }, [clearIncomingListeners, updateIncomingCall]);
 
   const setMicMutedState = useCallback(
+    // The mic itself is muted by syncAgentLegMute below. Never call
+    // device.audio.outgoing(muted) here — that is the SDK's enable/disable
+    // switch for the outgoing DIAL TONE, not the microphone, and the first
+    // unmute would silently kill the dial tone for the rest of the session
+    // (#1341).
     (muted: boolean) => {
       setIsMicMuted(muted);
       isMicMutedRef.current = muted;
-      if (device?.audio) {
-        device.audio.outgoing(muted);
-      }
       const call = activeCallRef.current;
       if (!call) return;
       syncAgentLegMute(call);
     },
-    [device, syncAgentLegMute],
+    [syncAgentLegMute],
   );
 
   const setupIncomingCallListeners = useCallback(
