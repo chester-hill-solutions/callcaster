@@ -21,6 +21,33 @@ import { useCallState } from "@/hooks/call/useCallState";
 import { useCallScreenDialogs } from "@/hooks/call/useCallScreenDialogs";
 import { usePhoneVerification } from "@/hooks/call/usePhoneVerification";
 import { useCallAudioControls } from "@/hooks/call/useCallAudioControls";
+import { useAudioDeviceTest } from "@/hooks/call/useAudioDeviceTest";
+
+/**
+ * Build the #1339 audio-test slice consumed by the settings sheet. Hoisted
+ * out of useCallScreen so the branching stays out of the hook's cyclomatic
+ * budget (the lint-ratchet caps that at 20).
+ */
+function buildAudioTestGroup(
+  audioDeviceTest: ReturnType<typeof useAudioDeviceTest>,
+  outputDeviceId: string | null,
+) {
+  const onToggleMicMonitor = () => {
+    if (audioDeviceTest.isMicMonitoring) {
+      audioDeviceTest.stopMicMonitor();
+    } else {
+      audioDeviceTest.startMicMonitor();
+    }
+  };
+  return {
+    onTestSpeaker: () => audioDeviceTest.playSpeakerTone(outputDeviceId),
+    onToggleMicMonitor,
+    micLevel: audioDeviceTest.micLevel,
+    isMicMonitoring: audioDeviceTest.isMicMonitoring,
+    isSpeakerPlaying: audioDeviceTest.isSpeakerPlaying,
+    audioTestError: audioDeviceTest.error,
+  };
+}
 import { useCampaignQueueFlow } from "@/hooks/call/useCampaignQueueFlow";
 import { useCampaignCallFlow } from "@/hooks/call/useCampaignCallFlow";
 import {
@@ -149,6 +176,11 @@ export function useCallScreen() {
     activeCall,
     micCoordinator: { isMicMuted, setMicMuted },
   });
+
+  // #1339: opt-in "test my mic / speaker" affordances for the settings
+  // sheet. Keyed on the live mic stream from useCallAudioControls so the
+  // meter reflects the same input the call will use.
+  const audioDeviceTest = useAudioDeviceTest({ stream: audioControls.stream });
 
   const {
     status: liveStatus,
@@ -510,6 +542,7 @@ export function useCallScreen() {
     isMicrophoneMuted: audioControls.isMicrophoneMuted,
     handleDTMF: audioControls.handleDTMF,
     requestMicrophoneAccess: audioControls.requestMicrophoneAccess,
+    audioTest: buildAudioTestGroup(audioDeviceTest, audioControls.output),
   };
 
   return {

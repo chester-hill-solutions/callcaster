@@ -139,6 +139,7 @@ export function CallScreenLayout({
     handleMuteMicrophone,
     isMicrophoneMuted,
     handleDTMF,
+    audioTest,
   } = audioControls;
 
   const {
@@ -335,6 +336,7 @@ export function CallScreenLayout({
               onNewPhoneNumberChange={setNewPhoneNumber}
               onVerifyNewNumber={handleVerifyNewNumber}
               verificationPhoneNumber={verificationPhoneNumber}
+              {...audioTest}
             />
           </SheetContent>
         </Sheet>
