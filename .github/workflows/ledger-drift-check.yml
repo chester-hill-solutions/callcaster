@@ -49,7 +49,7 @@ on:
   push:
     branches:
       - dev
-      - production
+      - master
     paths:
       - client/migrations/**
       - scripts/db/check-migration-ledger.mjs
@@ -90,12 +90,12 @@ jobs:
         run: node scripts/db/check-migration-ledger.mjs --require-db
 
   staging:
-    # Runs on: nightly schedule, dispatch-with-input=staging, and push-to-production
-    # (staging tracks the production trunk in the current promotion flow).
+    # Runs on: nightly schedule, dispatch-with-input=staging, and push-to-master
+    # (staging deploys master under the 2026-08-31 topology, #1300).
     if: >-
       github.event_name == 'schedule' ||
       (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/production')
+      (github.event_name == 'push' && github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     environment: staging
     env:
@@ -114,11 +114,12 @@ jobs:
         run: node scripts/db/check-migration-ledger.mjs --require-db
 
   production:
-    # Runs on: nightly schedule, dispatch-with-input=production, and push-to-production.
+    # Runs on: nightly schedule, dispatch-with-input=production, and push-to-master
+    # (production deploys master under the 2026-08-31 topology, #1300).
     if: >-
       github.event_name == 'schedule' ||
       (github.event_name == 'workflow_dispatch' && inputs.environment == 'production') ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/production')
+      (github.event_name == 'push' && github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
     environment: production
     env:
