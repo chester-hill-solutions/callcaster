@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**114** documented / **116** total effects (2 grandfathered, ratcheting to 0).
+**115** documented / **117** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -53,6 +53,7 @@
 | `app/hooks/call/useCallScreen.ts` | Periodically revalidate the call-screen loader data every 50 | revalidator (re-subscribes when the revalidator instance changes) | timer (setInterval) + fetch (revalidator.revalidate); | Polling for client-side freshness; a loader |
 | `app/hooks/call/useCallScreen.ts` | Let the physical/OS keyboard send DTMF digits during an active | [] — intentionally mount-once; the handler always calls | dom (window "keypress" event listener), removed on | DOM event subscription, not request/response data. |
 | `app/hooks/call/useDialFailureRecovery.ts` | Dispatch FAIL to the call FSM when a settled dial fetcher | fetcherState, fetcherData, send, showError (fires once per | none directly (FSM dispatch + toast) | Reacts to a mutation result to fix client FSM |
+| `app/hooks/call/useDialRingback.ts` | Play a looping ringback tone while the call screen is dialing; stop it on connect or any terminal state. | active (displayState === "dialing" from useCampaignCallFlow — the single source of truth for the dialing window) | dom — creates an AudioContext + detached <audio> element (for setSinkId speaker routing) and timers; all torn down on cleanup | Purely client-side audio feedback tied to live call state; no server data involved. |
 | `app/hooks/call/useNextRecipientSync.ts` | When the queue-provided next recipient advances, sync the | nextRecipient, holdAdvance (re-fires when the hold lifts so | none (dispatches to state setters/reducer passed in; | nextRecipient is already realtime/loader-sourced |
 | `app/hooks/call/usePhoneVerification.ts` | Reset handset selection to computer when the previously chosen | selectedDevice, verifiedNumbers | setSelectedDevice, setPhoneConnectionStatus, | Device selection is live client state reconciled |
 | `app/hooks/call/usePhoneVerification.ts` | Surface call-in verification results from the verify fetcher: | verifyFetcher.data | toast + setVerificationPhoneNumber, setIsAddingNumber | Reacts to fetcher submission outcomes after the user |
