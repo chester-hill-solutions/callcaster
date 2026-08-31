@@ -65,6 +65,8 @@ jobs:
 
       # run-compose-e2e.mjs starts the app via `bun run ./server/bun.ts`.
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
 
       - name: Install dependencies
         run: npm ci
