@@ -88,6 +88,7 @@ const WorkspacePicker = ({
           data-testid="navbar-workspace-picker"
           role="combobox"
           aria-expanded={open}
+          aria-controls="navbar-workspace-picker-list"
           aria-label={active ? `Switch workspace, current: ${active.name}` : "Workspaces"}
           className="flex h-10 max-w-[200px] items-center gap-1 rounded-lg border border-transparent bg-white/70 px-2.5 font-Zilla-Slab text-sm font-bold text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white"
         >
@@ -100,6 +101,7 @@ const WorkspacePicker = ({
         <Command className="border-0 shadow-none">
           <CommandInput placeholder="Search workspaces…" />
           <CommandList
+            id="navbar-workspace-picker-list"
             aria-label="Workspaces"
             renderEmptyState={() => <CommandEmpty>No workspaces found.</CommandEmpty>}
           >
