@@ -68,12 +68,15 @@ export function productionResources() {
     // Every config change to this service is deploy-triggering. Topology
     // directive 2026-08-31 (#1300): master is the release trunk — production
     // and staging both deploy it; there is no separate `production` deploy
-    // branch. Build stays NIXPACKS/V2 (what is live and serving): do not adopt
-    // the Dockerfile build or a /readyz healthcheck until databaseListenReady
-    // is green in production — a gating healthcheck that the app cannot pass
-    // would block every subsequent deploy from going live.
+    // branch. Build stays NIXPACKS/V2 (what is live and serving); the
+    // Dockerfile build modernization is a separate decision. The /readyz
+    // healthcheck (#1451) gates go-live like staging's: adopted once #1441
+    // made production pass it — an unhealthy build leaves the prior deploy
+    // serving.
     source: source("master"),
     build: { buildEnvironment: "V2", builder: "NIXPACKS" },
+    healthcheck: "/readyz",
+    healthcheckTimeout: 30,
     replicas: { "us-east4-eqdc4a": 1 },
     env: preservedVariables(appVariables),
   });
