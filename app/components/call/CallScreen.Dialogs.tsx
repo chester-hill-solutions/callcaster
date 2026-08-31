@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Form, NavLink, useFetcher, useNavigate } from "react-router";
+import { Form, NavLink, useFetcher, useNavigate, useParams } from "react-router";
 import { QueueItem } from "@/lib/types";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
@@ -47,6 +47,16 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   const [errorDescription, setErrorDescription] = useState<string>('');
   const fetcher = useFetcher<{ success?: boolean; message?: string; error?: string }>();
   const navigate = useNavigate();
+  const params = useParams();
+  // Explicit destination for dismissing the inactive-campaign dialog: this is
+  // a controlled dialog (open={!isActive}) that can never actually close, so
+  // dismissal IS navigation. navigate(-1) stranded direct-link visitors on
+  // about:blank (#1462).
+  const campaignHome =
+    params.id && params.campaign_id
+      ? `/workspaces/${params.id}/campaigns/${params.campaign_id}`
+      : "/workspaces";
+  const leaveInactiveCampaign = () => navigate(campaignHome);
   const handleSubmitError = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     fetcher.submit(
@@ -72,7 +82,7 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
 
   return (
     <>
-      <Dialog onOpenChange={() => { navigate(-1) }} open={!isActive}>
+      <Dialog onOpenChange={leaveInactiveCampaign} open={!isActive}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
             <DialogTitle>
@@ -91,7 +101,7 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button onClick={() => { navigate(-1) }}>
+            <Button onClick={leaveInactiveCampaign}>
               OK
             </Button>
           </DialogFooter>
