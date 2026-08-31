@@ -4,7 +4,10 @@ import * as schema from "../db/schema";
 import * as authSchema from "../db/auth-schema";
 
 const DATABASE_URL = process.env.DATABASE_URL;
-const DATABASE_DIRECT_URL = process.env.DATABASE_DIRECT_URL ?? DATABASE_URL;
+// `||`, not `??`: a set-but-empty DATABASE_DIRECT_URL (production, 2026-08-31,
+// #1441) must fall back to DATABASE_URL — `postgres("")` connects nowhere and
+// the LISTEN readiness probe fails forever.
+const DATABASE_DIRECT_URL = process.env.DATABASE_DIRECT_URL || DATABASE_URL;
 
 if (!DATABASE_URL) {
   throw new Error(
