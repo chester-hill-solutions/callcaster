@@ -425,6 +425,12 @@ export function useCallScreen() {
 
   useNextRecipientSync({
     nextRecipient,
+    // Keep the just-called contact on screen through dialing, the live call,
+    // and the terminal outcome until the agent hands off (Save and Next /
+    // beginDial reset displayState to idle). Predictive mode always advances —
+    // the system pushing the next contact IS the flow there (#1458).
+    holdAdvance:
+      campaign?.dial_type !== "predictive" && displayState !== "idle",
     send: send as unknown as (action: { type: string }) => void,
     setQuestionContact,
     setCallDuration,
