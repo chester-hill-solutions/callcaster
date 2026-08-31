@@ -105,23 +105,32 @@ export function StatusBar({
 
 export function ContactStrip({
   nextRecipient,
-}: Pick<CallAreaProps, "nextRecipient">) {
-  if (!nextRecipient) return null;
+  questionContact,
+}: Pick<CallAreaProps, "nextRecipient" | "questionContact">) {
+  // #1362: prefer questionContact — it "holds steady through the hangup
+  // window" (see useCampaignDialActions comment on questionContact vs
+  // nextRecipient). Nulling this strip on agent-hangup (when
+  // hangup.action.server.ts dequeues the just-finished row and
+  // nextRecipient collapses) is the divergent behaviour: the same call
+  // ended by the contact keeps the name visible because no auto-dequeue
+  // fires. Falling back to nextRecipient covers the pre-dial state.
+  const contactSource = questionContact ?? nextRecipient;
+  if (!contactSource) return null;
 
   return (
     <div className="flex flex-col gap-1 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <div className="font-Zilla-Slab text-lg font-bold text-foreground">
-          {nextRecipient.contact?.firstname} {nextRecipient.contact?.surname}
+          {contactSource.contact?.firstname} {contactSource.contact?.surname}
         </div>
         <div className="text-lg text-foreground">
-          {nextRecipient.contact?.phone}
+          {contactSource.contact?.phone}
         </div>
       </div>
       <div className="min-w-0 text-sm text-muted-foreground sm:text-right">
-        <div className="truncate">{nextRecipient.contact?.email}</div>
+        <div className="truncate">{contactSource.contact?.email}</div>
         <div className="truncate">
-          {nextRecipient.contact?.address
+          {contactSource.contact?.address
             ?.split(",")
             ?.map((part) => part.trim())
             .join(", ")}
@@ -432,7 +441,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
   return (
     <div className={cn(callPanelShellClass, "min-h-0 justify-between")}>
       <StatusBar displayState={displayState} callDuration={callDuration} />
-      <ContactStrip nextRecipient={nextRecipient} />
+      <ContactStrip nextRecipient={nextRecipient} questionContact={questionContact} />
       <CallControls
         isBusy={isBusy}
         nextRecipient={nextRecipient}
