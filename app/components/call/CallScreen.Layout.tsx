@@ -8,6 +8,7 @@ import { CampaignDialogs } from "@/components/call/CallScreen.Dialogs";
 import { CallScreenLiveCoachingPanels } from "@/components/call/CallScreen.LiveCoachingPanels";
 import { CallWorkbench } from "@/components/call/CallScreen.Workbench";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Sheet,
   SheetContent,
@@ -41,15 +42,11 @@ function ErrorBanner({
   testId?: string;
 }) {
   return (
-    <div
-      className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center"
-      data-testid={testId}
-      role="alert"
-    >
-      <p className="font-Zilla-Slab text-xl font-semibold">{title}</p>
-      {text ? <p className="mt-2 text-sm">{text}</p> : null}
+    <Alert variant="destructive" data-testid={testId}>
+      <AlertTitle>{title}</AlertTitle>
+      {text ? <AlertDescription>{text}</AlertDescription> : null}
       {children}
-    </div>
+    </Alert>
   );
 }
 
@@ -142,6 +139,7 @@ export function CallScreenLayout({
     handleMuteMicrophone,
     isMicrophoneMuted,
     handleDTMF,
+    audioTest,
   } = audioControls;
 
   const {
@@ -338,6 +336,7 @@ export function CallScreenLayout({
               onNewPhoneNumberChange={setNewPhoneNumber}
               onVerifyNewNumber={handleVerifyNewNumber}
               verificationPhoneNumber={verificationPhoneNumber}
+              {...audioTest}
             />
           </SheetContent>
         </Sheet>

@@ -12,6 +12,7 @@ import {
 } from "@/lib/telephony-db.server";
 import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server";
 import { defineAction } from "@/lib/handler.server";
+import { isConservativeEmail } from "../../../shared/inbound-routing-presets";
 import type { ActionFunctionArgs } from "react-router";
 
 type EmailVmAuth = { preflight: "ok" } | { preflight: "failed" };
@@ -106,13 +107,44 @@ export const action = defineAction({
         throw new Error("Workspace not found");
       }
 
+      // The workspace number's `inbound_action` doubles as the voicemail email
+      // recipient when the inbound flow ends in voicemail capture. When it is
+      // unset (or a phone number / URL, not an email — the field also carries
+      // forward-to targets and inbound-flow routing), Resend previously got
+      // `to: [""]` and either silently rejected the message (result.error) or
+      // took an unverified sender path — Twilio then retried indefinitely.
+      // Mark the callback processed with a distinct reason so support can see
+      // why no email arrived without a burning retry loop.
+      const recipient =
+        typeof number.inbound_action === "string" ? number.inbound_action.trim() : "";
+      if (!recipient || !isConservativeEmail(recipient)) {
+        logger.warn("email-vm: workspace number has no email recipient configured", {
+          callSid,
+          workspaceId: number.workspace.id,
+          inbound_action_present: Boolean(recipient),
+        });
+        // Persist the recording URL so the retry guard swallows Twilio's
+        // subsequent retries as "Already processed" instead of hammering.
+        const updated = await updateCallRecordingUrlBySid(callSid, recordingUrl);
+        if (!updated) {
+          logger.warn(
+            "email-vm: no email recipient AND failed to persist recording_url",
+            { callSid },
+          );
+        }
+        return routeData({
+          success: true,
+          resolved: false,
+          reason: "no_email_recipient",
+        });
+      }
+
       const vmTwilioCreds = readTwilioWorkspaceCredentials(number.workspace.twilio_data);
       if (!vmTwilioCreds) {
         throw new Error("Workspace twilio data not found");
       }
 
       const call = callRow;
-      const action = number.inbound_action;
       const now = new Date();
 
       if (!accountSid || typeof accountSid !== "string") {
@@ -170,7 +202,7 @@ export const action = defineAction({
 
       const result = await resend.emails.send({
         from: "Callcaster <info@callcaster.ca>",
-        to: [action?.toString() || ""],
+        to: [recipient],
         subject: `New Voicemail from ${call.from}`,
         html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

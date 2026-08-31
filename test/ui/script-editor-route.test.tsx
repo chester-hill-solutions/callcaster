@@ -15,28 +15,20 @@ vi.mock("../../app/routes/workspaces+/$id/scripts/$scriptId.action.server", () =
 }));
 
 // The script editor body is a large tree of its own; the header is what's under
-// test here. The stub still drives the real onPageDataChange contract, which is
-// the only way the route learns the form is dirty.
+// test here. The stub still drives the real onChange contract, which is the
+// only way the route learns the form is dirty.
 vi.mock("@/components/campaign/settings/script/CampaignSettings.Script", () => ({
   default: ({
-    pageData,
-    onPageDataChange,
+    script,
+    onChange,
   }: {
-    pageData: { campaignDetails: { script: { name: string } } };
-    onPageDataChange: (next: unknown) => void;
+    script: { name: string };
+    onChange: (next: unknown) => void;
   }) =>
     createElement(
       "button",
       {
-        onClick: () =>
-          onPageDataChange({
-            campaignDetails: {
-              script: {
-                ...pageData.campaignDetails.script,
-                name: `${pageData.campaignDetails.script.name} (edited)`,
-              },
-            },
-          }),
+        onClick: () => onChange({ ...script, name: `${script.name} (edited)` }),
       },
       "dirty the form",
     ),

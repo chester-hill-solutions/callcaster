@@ -23,6 +23,7 @@ const campaignIvrMocks = vi.hoisted(() => ({
 
 const queueMocks = vi.hoisted(() => ({
   getCampaignQueueContactIds: vi.fn(),
+  findDequeuedQueueRowsForCampaign: vi.fn(),
 }));
 
 const exportDbMocks = vi.hoisted(() => ({
@@ -65,6 +66,8 @@ vi.mock("@/lib/campaign-queue-db.server", async (importOriginal) => {
     ...actual,
     getCampaignQueueContactIds: (...args: unknown[]) =>
       queueMocks.getCampaignQueueContactIds(...args),
+    findDequeuedQueueRowsForCampaign: (...args: unknown[]) =>
+      queueMocks.findDequeuedQueueRowsForCampaign(...args),
   };
 });
 
@@ -168,6 +171,7 @@ describe("api.campaign-export CSV contract checks", () => {
     requireWorkspaceAccess.mockClear();
     campaignIvrMocks.findCampaignExportMeta.mockResolvedValue(campaignRow);
     queueMocks.getCampaignQueueContactIds.mockResolvedValue([1]);
+    queueMocks.findDequeuedQueueRowsForCampaign.mockResolvedValue([]);
     exportDbMocks.findCampaignForMessageExport.mockResolvedValue(campaignRow);
     exportDbMocks.findExportContactsByIds.mockResolvedValue([contactRow]);
     exportDbMocks.countExportCampaignMessages.mockResolvedValue(1);
@@ -212,5 +216,146 @@ describe("api.campaign-export CSV contract checks", () => {
     // Contract: formula-like strings must be neutralized with a leading single quote.
     // Contact firstname is `=1+1` and should be emitted as `'=1+1`.
     expect(csvText).toContain(",'=1+1,");
+  }, 30000);
+
+  test("SMS export surfaces error_code, error_message, and line_type per issue #1416", async () => {
+    // Three contacts × three message states so the export shape is
+    // observable: delivered mobile, 30006 landline, 30003 disconnected.
+    // Without these columns the three failed rows are indistinguishable
+    // in the CSV.
+    const contacts = [
+      { ...contactRow, id: 10, firstname: "Del", phone: "+15555550100", line_type: "mobile" },
+      { ...contactRow, id: 11, firstname: "Land", phone: "+15555550101", line_type: "landline" },
+      { ...contactRow, id: 12, firstname: "Disc", phone: "+15555550102", line_type: null },
+    ];
+    // Outbound-api messages: `from` is the workspace Twilio number
+    // (identical across rows, does NOT match a contact); `to` is the
+    // contact phone. The export matcher keys on cleaned digits of either
+    // field, so distinct `to` values are what map each message to its
+    // contact.
+    const twilioFrom = "+15559990000";
+    const messages = [
+      {
+        ...messageRow,
+        id: "m10",
+        from: twilioFrom,
+        to: "+15555550100",
+        status: "delivered",
+        error_code: null,
+        error_message: null,
+      },
+      {
+        ...messageRow,
+        id: "m11",
+        from: twilioFrom,
+        to: "+15555550101",
+        status: "undelivered",
+        error_code: 30006,
+        error_message: "Landline or unreachable carrier",
+      },
+      {
+        ...messageRow,
+        id: "m12",
+        from: twilioFrom,
+        to: "+15555550102",
+        status: "undelivered",
+        error_code: 30003,
+        error_message: "Unreachable destination handset",
+      },
+    ];
+    queueMocks.getCampaignQueueContactIds.mockResolvedValue([10, 11, 12]);
+    exportDbMocks.findExportContactsByIds.mockResolvedValue(contacts);
+    exportDbMocks.countExportCampaignMessages.mockResolvedValue(messages.length);
+    exportDbMocks.listExportCampaignMessages.mockResolvedValue(messages);
+
+    const mod = await import("../app/routes/api+/campaign-export");
+    const fd = new FormData();
+    fd.set("campaignId", "123");
+    fd.set("workspaceId", "w1");
+    const res = await asRouteResponse(
+      mod.action({
+        request: new Request("http://localhost/api/campaign-export", {
+          method: "POST",
+          body: fd,
+        }),
+      } as any),
+    );
+    expect(res.status).toBe(200);
+    await flushMicrotasks();
+
+    const csvUpload = objectStorageUploads.find((u) => u.path.endsWith(".csv"));
+    if (!csvUpload) throw new Error("expected a .csv upload from the export");
+    const csvText = csvUpload.text;
+
+    const headerLine = csvText.split("\r\n")[0].replace(/^\uFEFF/, "");
+    // Header names AND relative order matter — downstream consumers key by column index.
+    expect(headerLine).toContain("status,error_code,error_message,line_type,message_date");
+
+    // Delivered mobile: empty error fields, mobile line_type.
+    expect(csvText).toContain(",delivered,,,mobile,");
+    // 30006 landline: numeric error code, message text, landline line_type.
+    expect(csvText).toContain(",undelivered,30006,Landline or unreachable carrier,landline,");
+    // 30003 disconnected: numeric error code, message text, null line_type surfaced as empty cell.
+    expect(csvText).toContain(",undelivered,30003,Unreachable destination handset,,");
+  }, 30000);
+
+  test("SMS export surfaces dequeued queue entries as skipped rows with dequeued_reason per issue #1417", async () => {
+    // One delivered message plus two dequeued contacts: a landline
+    // pre-check drop and an opt-out. Without this, both dequeued
+    // contacts silently vanish from the CSV.
+    const contacts = [
+      { ...contactRow, id: 20, firstname: "Sent", phone: "+15555550200", line_type: "mobile" },
+      { ...contactRow, id: 21, firstname: "Landline", phone: "+15555550201", line_type: "landline" },
+      { ...contactRow, id: 22, firstname: "OptedOut", phone: "+15555550202", opt_out: true },
+    ];
+    const message = {
+      ...messageRow,
+      id: "m20",
+      from: "+15559990000",
+      to: "+15555550200",
+      status: "delivered",
+    };
+    queueMocks.getCampaignQueueContactIds.mockResolvedValue([20, 21, 22]);
+    queueMocks.findDequeuedQueueRowsForCampaign.mockResolvedValue([
+      { contact_id: 21, dequeued_reason: "Landline — cannot receive SMS" },
+      { contact_id: 22, dequeued_reason: "Contact opted out" },
+    ]);
+    exportDbMocks.findExportContactsByIds.mockResolvedValue(contacts);
+    exportDbMocks.countExportCampaignMessages.mockResolvedValue(1);
+    exportDbMocks.listExportCampaignMessages.mockResolvedValue([message]);
+
+    const mod = await import("../app/routes/api+/campaign-export");
+    const fd = new FormData();
+    fd.set("campaignId", "123");
+    fd.set("workspaceId", "w1");
+    const res = await asRouteResponse(
+      mod.action({
+        request: new Request("http://localhost/api/campaign-export", {
+          method: "POST",
+          body: fd,
+        }),
+      } as any),
+    );
+    expect(res.status).toBe(200);
+    await flushMicrotasks();
+
+    const csvUpload = objectStorageUploads.find((u) => u.path.endsWith(".csv"));
+    if (!csvUpload) throw new Error("expected a .csv upload from the export");
+    const csvText = csvUpload.text;
+
+    // Header ends in dequeued_reason so downstream consumers can key on it.
+    const headerLine = csvText.split("\r\n")[0].replace(/^\uFEFF/, "");
+    expect(headerLine.endsWith(",dequeued_reason")).toBe(true);
+
+    // Delivered row: dequeued_reason is empty (never dequeued).
+    expect(csvText).toMatch(/,delivered,[^\n]*,15555550200,[^\n]*,\r\n/);
+
+    // Landline skip: status=skipped, dequeued_reason populated,
+    // body/direction empty, line_type surfaced.
+    expect(csvText).toContain(",,skipped,,,landline,");
+    expect(csvText).toContain(",Landline — cannot receive SMS\r\n");
+
+    // Opt-out skip: same shape, different reason.
+    expect(csvText).toContain(",Contact opted out\r\n");
   }, 30000);
 });

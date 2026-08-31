@@ -381,7 +381,11 @@ function StatusBar({
         </div>
       )}
 
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }

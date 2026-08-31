@@ -197,7 +197,10 @@ export async function getCampaignCallSessionApi(
     attempts,
   } = await getCallScreenData(campaignId, workspaceId, userId);
 
-  const ws = workspaceData!;
+  if (!workspaceData) {
+    throw new Error("getCallScreenData returned no workspace row for campaign");
+  }
+  const ws = workspaceData;
   const twilioData = (ws.twilio_data as unknown) as { sid: string };
   const queue = await getQueueByDialType(
     campaignId,

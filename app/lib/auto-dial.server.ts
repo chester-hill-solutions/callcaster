@@ -66,8 +66,13 @@ export async function createTwilioCall(
 }
 
 function buildCallRow(callData: Partial<Call>) {
+  if (!callData.sid) {
+    throw new Error(
+      "buildCallRow requires callData.sid; Twilio call data must include the Call SID",
+    );
+  }
   return {
-    sid: callData.sid!,
+    sid: callData.sid,
     account_sid: callData.account_sid || null,
     to: callData.to || null,
     from: callData.from || null,
@@ -87,6 +92,7 @@ function buildCallRow(callData: Partial<Call>) {
     campaign_id: callData.campaign_id || null,
     contact_id: callData.contact_id || null,
     outreach_attempt_id: callData.outreach_attempt_id || null,
+    queue_id: callData.queue_id || null,
     conference_id: callData.conference_id || null,
     phone_number_sid: callData.phone_number_sid || null,
     parent_call_sid: callData.parent_call_sid || null,

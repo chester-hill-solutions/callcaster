@@ -80,8 +80,13 @@ export const action = defineAction({
       );
     }
 
-    return redirect(`../../audios?saved=${encodeURIComponent(result.fileName)}`, {
-      headers,
-    });
+    // Absolute path — the `../../audios` relative form used to resolve to
+    // `/workspaces/$id/audios/audios` in React Router's route-relative
+    // resolution, dropping the user on a 404 after a successful edit
+    // (same root cause as #1396's upload flow).
+    return redirect(
+      `/workspaces/${workspaceId}/audios?saved=${encodeURIComponent(result.fileName)}`,
+      { headers },
+    );
   },
 });

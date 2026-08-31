@@ -50,12 +50,22 @@ function walk(dir, out = []) {
  * Grab the JSDoc block (if any) immediately preceding a given char offset.
  * Only whitespace and full-line `//` comments may sit between the block and
  * the effect, and the NEAREST preceding block is used (never a distant one).
+ *
+ * Implemented as a backward line scan, NOT the regex
+ * `/(?:[ \t]*\/\/[^\n]*\n|\s)*$/` it replaces: that pattern backtracks
+ * catastrophically on real-world indented sources and burned minutes of CPU
+ * per CI run for the same result.
  */
 function precedingBlock(src, offset) {
-  const before = src.slice(0, offset);
-  // strip trailing whitespace + line comments between the block and the effect
-  const gap = before.match(/(?:[ \t]*\/\/[^\n]*\n|\s)*$/);
-  const trimmed = before.slice(0, before.length - (gap ? gap[0].length : 0));
+  const before = src.slice(0, offset).replace(/[ \t\r]+$/, "");
+  const lines = before.split("\n");
+  let gapCount = 0;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const trimmedLine = lines[i].trim();
+    if (trimmedLine === "" || trimmedLine.startsWith("//")) gapCount++;
+    else break;
+  }
+  const trimmed = lines.slice(0, lines.length - gapCount).join("\n");
   if (!trimmed.endsWith("*/")) return "";
   const start = trimmed.lastIndexOf("/*");
   return start < 0 ? "" : trimmed.slice(start + 2, trimmed.length - 2);

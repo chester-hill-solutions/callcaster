@@ -263,11 +263,8 @@ export function getCampaignPlaceNav(
     return { back: null, next: null };
   }
 
-  const prevPlace = index > 0 ? SETUP_FLOW_PLACES[index - 1]! : null;
-  const nextPlace =
-    index < SETUP_FLOW_PLACES.length - 1
-      ? SETUP_FLOW_PLACES[index + 1]!
-      : ("results" as const);
+  const prevPlace = index > 0 ? (SETUP_FLOW_PLACES[index - 1] ?? null) : null;
+  const nextPlace = SETUP_FLOW_PLACES[index + 1] ?? "results";
 
   return {
     back: prevPlace

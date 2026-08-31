@@ -3,8 +3,26 @@ import { preservedVariables, source } from "../config/shared.js";
 
 const appVariables = [
   "BASE_URL",
+  // v2 vars pre-staged 2026-08-18 by scripts/railway/stage-production-vars.sh
+  // (--skip-deploys; the cutover build inherits them). They MUST be preserved
+  // here or a plan treats them as deletions — caught live 2026-08-19 when a
+  // plan proposed 14 destructive variable deletes.
+  "BETTER_AUTH_SECRET",
+  "BETTER_AUTH_URL",
+  "COHERE_API_KEY",
   "DATABASE_DIRECT_URL",
   "DATABASE_URL",
+  "ELEVENLABS_API_KEY",
+  "HOST",
+  "NODE_ENV",
+  "PORT",
+  "RUN_CLIENT_MIGRATIONS_ON_BOOT",
+  "S3_ACCESS_KEY_ID",
+  "S3_BUCKET",
+  "S3_ENDPOINT",
+  "S3_REGION",
+  "S3_SECRET_ACCESS_KEY",
+  "SIGNUP_OPEN",
   "OPENAI_API_KEY",
   "RESEND_API_KEY",
   "STRIPE_API_KEY",
@@ -32,6 +50,7 @@ const workerVariables = [
   "NODE_ENV",
   "RAILWAY_DOCKERFILE_PATH",
   "RESEND_API_KEY",
+  "STRIPE_WEBHOOK_SECRET",
   "S3_ACCESS_KEY_ID",
   "S3_BUCKET",
   "S3_ENDPOINT",
@@ -46,11 +65,14 @@ const workerVariables = [
 
 export function productionResources() {
   const app = service("callcaster", {
-    // The 2026-08-18 branch-repoint apply triggered a live redeploy — treat
-    // every config change to this service as deploy-triggering. Build config
-    // stays Supabase-era until the cutover window (#1303) flips it with the
-    // v2 promotion; do not "modernize" it in passing.
-    source: source("production"),
+    // Every config change to this service is deploy-triggering. Topology
+    // directive 2026-08-31 (#1300): master is the release trunk — production
+    // and staging both deploy it; there is no separate `production` deploy
+    // branch. Build stays NIXPACKS/V2 (what is live and serving): do not adopt
+    // the Dockerfile build or a /readyz healthcheck until databaseListenReady
+    // is green in production — a gating healthcheck that the app cannot pass
+    // would block every subsequent deploy from going live.
+    source: source("master"),
     build: { buildEnvironment: "V2", builder: "NIXPACKS" },
     replicas: { "us-east4-eqdc4a": 1 },
     env: preservedVariables(appVariables),
@@ -59,16 +81,17 @@ export function productionResources() {
   // prep (verified 0 workspaces / 0 users on 2026-08-18); the cutover clone
   // refreshes it. The legacy "Postgres" service is decommissioned post-soak.
   const database = postgres("Postgres-jAO4", { region: "us-east4-eqdc4a" });
-  const legacyDatabase = postgres("Postgres", { region: "us-east4-eqdc4a" });
+  // Legacy "Postgres" service was deleted from the live environment before
+  // the #1303 cutover apply (the 2026-08-20 plan proposed recreating it).
   const databaseVolume = volume("postgres-volume", {
     region: "us-east4-eqdc4a",
     sizeMB: 50000,
   });
-  // Created at apply time; builds from `production` FAIL until the v2
-  // promotion lands there (no Dockerfile.worker on the old tree) — expected
-  // and harmless, the instance just waits for the cutover.
+  // Ran early from `master` (2026-08-19) to pre-validate the staged
+  // environment; under the 2026-08-31 topology master is permanent for
+  // production, so the once-planned flip to a `production` branch is dead.
   const worker = service("callcaster-worker", {
-    source: source("production"),
+    source: source("master"),
     build: {
       buildEnvironment: "V3",
       builder: "DOCKERFILE",
@@ -79,5 +102,5 @@ export function productionResources() {
   });
   const uploads = bucket("callcaster-production", { region: "iad" });
 
-  return [database, legacyDatabase, app, worker, databaseVolume, uploads];
+  return [database, app, worker, databaseVolume, uploads];
 }

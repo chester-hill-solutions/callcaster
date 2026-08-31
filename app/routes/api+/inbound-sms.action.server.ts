@@ -17,6 +17,7 @@ import { isOptOutMessage, parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { defineAction } from "@/lib/handler.server";
 import { emitChatMessageEvent } from "@/lib/workspace-events.server";
+import { inboundSmsRateVerdict } from "@/lib/inbound-sms-rate-limit.server";
 
 export const action = defineAction({
   auth: async ({ request }) => {
@@ -90,9 +91,38 @@ export const action = defineAction({
 
     const credsForRest = inboundTwilioCreds;
 
-    const media: string[] = [];
     const now = new Date();
     const nowIso = now.toISOString();
+
+    // #1394 billing-attack guard. Run BEFORE media fetch, message insert,
+    // opt-out/dequeue lookups, and webhook fanout — anything that costs us
+    // money per inbound event. Returning 200 keeps Twilio from retrying
+    // (which would just re-run the attack).
+    const tdb = createTenantDb(workspaceNumber.workspace);
+    const rateVerdict = await inboundSmsRateVerdict(tdb, {
+      workspaceId: workspaceNumber.workspace,
+      fromNumber,
+    });
+    if (!rateVerdict.allowed) {
+      logger.warn("inbound_sms.rate_limited", {
+        workspace: workspaceNumber.workspace,
+        from: fromNumber,
+        messageSid,
+        window: rateVerdict.window,
+        count: rateVerdict.count,
+        limit: rateVerdict.limit,
+      });
+      return routeData(
+        {
+          dropped: true,
+          reason: "rate_limited",
+          window: rateVerdict.window,
+        },
+        200,
+      );
+    }
+
+    const media: string[] = [];
     if (numMedia > 0 && !credsForRest) {
       logger.warn("Skipping inbound SMS MMS fetch: no Twilio REST credentials", {
         workspace: workspaceNumber.workspace,
@@ -155,7 +185,6 @@ export const action = defineAction({
       ...(matchedContactId != null ? { contact_id: matchedContactId } : {}),
     };
 
-    const tdb = createTenantDb(workspaceNumber.workspace);
     let message: unknown[] | null = null;
     let messageError: { message: string } | null = null;
     try {

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { Button } from "@/components/ui/button";
 import { Heading, Text } from "@/components/ui/typography";
+import { useWorkspaceAudioUpload } from "@/hooks/media/useWorkspaceAudioUpload";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
 import { SaveBar } from "@/components/shared/SaveBar";
@@ -22,10 +23,17 @@ export { action } from "./$scriptId.action.server";
 export { RouteErrorBoundary as ErrorBoundary } from "@/components/shared/RouteErrorBoundary";
 
 export default function ScriptEditor() {
-  const { script: loaderScript, mediaNames } = useLoaderData<ScriptIdLoaderData>();
+  const { script: loaderScript, mediaNames: loaderMediaNames, workspace_id } =
+    useLoaderData<ScriptIdLoaderData>();
   const [initScript, setInitScript] = useState(loaderScript);
   const [script, setScript] = useState(loaderScript);
   const [isSaving, setIsSaving] = useState(false);
+  const { uploadAudio, mediaNames } = useWorkspaceAudioUpload(
+    workspace_id,
+    (loaderMediaNames ?? []).map((media) =>
+      typeof media === "string" ? media : media.name,
+    ),
+  );
   const isChanged = useHasChanges(script, initScript, normalizeScriptForComparison);
   useUnsavedChangesGuard(isChanged);
 
@@ -61,14 +69,6 @@ export default function ScriptEditor() {
 
   const handleReset = () => {
     setScript(initScript);
-  };
-
-  type PageData = {
-    campaignDetails: { script: Script };
-  };
-
-  const handlePageDataChange = (newPageData: PageData) => {
-    setScript(newPageData.campaignDetails.script);
   };
 
   return (
@@ -116,15 +116,16 @@ export default function ScriptEditor() {
         </div>
       </div>
       <div className="h-full flex-grow p-4">
-        <CampaignSettingsScript
-          pageData={{ campaignDetails: { script } } as PageData}
-          onPageDataChange={(newData: PageData) => {
-            handlePageDataChange(newData);
-          }}
-          mediaNames={(mediaNames ?? []).map((media) =>
-            typeof media === "string" ? media : media.name,
-          )}
-        />
+        {script ? (
+          <CampaignSettingsScript
+            script={script}
+            onChange={setScript}
+            mediaNames={mediaNames}
+            onUploadAudio={uploadAudio}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">No script selected.</p>
+        )}
       </div>
     </div>
   );

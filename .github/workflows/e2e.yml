@@ -22,8 +22,34 @@ on:
   schedule:
     - cron: "0 6 * * *"
 
+# Superseded runs die instead of queueing: on a PR, a new push cancels the
+# previous run for the same ref. Scheduled runs (and pushes to the default
+# branch) never cancel.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Path scoping (see scripts/lib/ci-changes-lib.mjs): the compose gate is
+  # ~4 minutes and pointless when nothing it boots or builds changed
+  # (docs/tooling/baseline-only PRs). Unresolvable base degrades inside the
+  # script to "run everything".
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.changes.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Three-dot merge-base diff needs real history.
+          fetch-depth: 0
+      - name: Resolve changed-file scope
+        id: changes
+        run: node scripts/ci-changes.mjs --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+
   e2e:
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -47,9 +73,34 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
 
       # The compose bootstrap applies drizzle/ + client/migrations via psql.
+      # Bounded + retried: apt mirror hangs stalled three runs for 20+ min
+      # each on 2026-08-18/19; a dead mirror must fail fast, not wedge CI.
       - name: Install psql client and ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client ffmpeg
+        timeout-minutes: 5
+        run: |
+          # ubuntu-latest images ship both tools; apt only runs if an image
+          # ever drops them, so a dead mirror can't stall a normal run.
+          if command -v psql >/dev/null && command -v ffmpeg >/dev/null; then
+            psql --version; ffmpeg -version | head -1
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            if sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 update &&
+               sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 install -y --no-install-recommends postgresql-client ffmpeg; then
+              exit 0
+            fi
+            echo "apt attempt $attempt failed; retrying"
+            sleep 10
+          done
+          exit 1
 
+      - name: Cache Playwright browsers
+        # Cached across runs; keyed on the lockfile so a Playwright version
+        # bump invalidates it. The install below still verifies OS packages.
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 

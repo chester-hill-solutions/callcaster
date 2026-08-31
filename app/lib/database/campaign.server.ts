@@ -447,7 +447,13 @@ export async function splitMessageCampaign({
     () => [],
   );
   members.forEach((member, index) => {
-    buckets[index % normalizedSegments]!.push(Number(member.contact_id));
+    const bucket = buckets[index % normalizedSegments];
+    if (!bucket) {
+      throw new Error(
+        "Campaign split bucket missing: member index must map into a normalizedSegments bucket",
+      );
+    }
+    bucket.push(Number(member.contact_id));
   });
 
   const {
@@ -459,6 +465,7 @@ export async function splitMessageCampaign({
   const segments: SplitMessageCampaignResult["segments"] = [];
   for (let index = 0; index < normalizedSegments; index++) {
     const title = `${source.title} — Segment ${index + 1} of ${normalizedSegments}`;
+    // type-cast justified: clonableFields spread contains required props (type, etc.), but not visible to literal syntax
     const { campaign: created } = await createCampaign({
       campaignData: {
         ...(clonableFields as unknown as Record<string, unknown>),
@@ -554,6 +561,7 @@ export async function updateCampaignWithScript(args: {
   try {
     return await database.transaction(
       async (txRaw) => {
+        // type-cast justified: drizzle transaction callback type is not precisely exported as Database
         const tdb = createTenantDb(
           args.workspaceId,
           txRaw as unknown as Database,
@@ -684,6 +692,7 @@ export function checkSchedule(campaignData: ScheduleCheckInput) {
   if (!campaignData) return false;
   const { start_date, end_date, schedule } = campaignData;
   if (!schedule) return false;
+  // type-cast justified: schedule from DB or JSON parse needs type assertion to CampaignSchedule
   const scheduleObject =
     typeof schedule === "string"
       ? JSON.parse(schedule)

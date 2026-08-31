@@ -14,7 +14,9 @@ const accountProfileSchema = z.object({
 });
 
 export const loader = defineLoader({
-  auth: ({ request }) => verifyAuth(request, "/account"),
+  // No return-to capture: post-login lands on /workspaces (the safe-redirect
+  // fallback), never back on this settings page (#1317).
+  auth: ({ request }) => verifyAuth(request),
   sideEffects: ["db-read"],
   handler: async ({ auth, request }) => {
     const profile = await getUserById(auth.user.id);
@@ -39,7 +41,7 @@ export const loader = defineLoader({
 });
 
 export const action = defineAction({
-  auth: ({ request }) => verifyAuth(request, "/account"),
+  auth: ({ request }) => verifyAuth(request),
   sideEffects: ["db-write"],
   handler: async ({ request, auth }) => {
     const formData = await request.formData();

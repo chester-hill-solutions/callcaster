@@ -7,6 +7,10 @@ import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.serve
 import { runWorkspaceTwilioComplianceJob } from "@/lib/twilio-compliance-job.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { dispatchCampaignSmsBatch } from "@/lib/campaign-sms-dispatch.server";
+import { dispatchCampaignIvrBatch } from "@/lib/campaign-ivr-dispatch.server";
+import {
+  isMachineDispatchedVoiceCampaignType,
+} from "@/lib/campaign-execution.server";
 import {
   CAMPAIGN_DISPATCH_JOB_TYPE,
   WORKSPACE_TWILIO_COMPLIANCE_JOB_TYPE,
@@ -157,8 +161,17 @@ export async function campaignExportHandler(
 
 /** Queue rows processed per dispatch job; remaining work rolls to a successor. */
 const DISPATCH_BATCH_SIZE = 50;
-/** Retry delay when the whole batch is deferred by the campaign send window. */
+/** Retry delay for deferrals without an exact next-open instant (schedule
+ *  sweep waiting flips, IVR calling-hours gate). The SMS send-window gate
+ *  instead schedules its successor at the exact window boundary (#1352). */
 const SEND_WINDOW_RETRY_MS = 15 * 60 * 1000;
+/** Upper bound on one send-window deferral. The successor wakes at
+ *  min(nextOpenAt, now + this): exact for boundaries within reach (#1352),
+ *  but a boundary days away cannot pin the chain to window config that may
+ *  change first. Every wake re-reads the campaign, so a window edited or
+ *  removed while deferred takes effect within one bounded hop, and the hop
+ *  that lands inside the cap still resumes exactly at the true boundary. */
+const SEND_WINDOW_MAX_DEFER_MS = 60 * 60 * 1000;
 
 async function enqueueDispatchSuccessor(args: {
   workspaceId: string;
@@ -214,12 +227,12 @@ export async function campaignDispatchHandler(
     throw new Error(`campaign_dispatch: campaign ${campaignId} not found`);
   }
 
-  if (campaignRecord.type !== "message") {
+  if (campaignRecord.type !== "message" && !isMachineDispatchedVoiceCampaignType(campaignRecord.type)) {
     logger.warn("campaign_dispatch.wrong_type", {
       campaignId,
       type: campaignRecord.type,
     });
-    return { ok: true, campaignId, skipped: true, reason: "not_message_campaign" };
+    return { ok: true, campaignId, skipped: true, reason: "not_dispatchable_campaign" };
   }
 
   // Claim: a scheduled campaign whose runAt has arrived transitions to
@@ -229,6 +242,22 @@ export async function campaignDispatchHandler(
       status: "running",
     });
   } else if (campaignRecord.status !== "running") {
+    // A machine-dialled voice campaign parked on `waiting` by the schedule
+    // sweep (#1168 — the sweep owns voice status truth) must not kill the
+    // chain: keep ticking until the sweep flips it back to running.
+    if (
+      campaignRecord.type !== "message" &&
+      campaignRecord.status === "waiting"
+    ) {
+      await enqueueDispatchSuccessor({
+        workspaceId,
+        campaignId,
+        userId,
+        completedJobId: job.id,
+        delayMs: SEND_WINDOW_RETRY_MS,
+      });
+      return { ok: true, campaignId, deferred: "waiting_for_schedule" };
+    }
     logger.info("campaign_dispatch.skipped", {
       campaignId,
       status: campaignRecord.status,
@@ -239,6 +268,14 @@ export async function campaignDispatchHandler(
   if (campaignRecord.end_date && new Date(campaignRecord.end_date) < new Date()) {
     logger.info("campaign_dispatch.expired", { campaignId });
     return { ok: true, campaignId, expired: true };
+  }
+
+  if (campaignRecord.type !== "message") {
+    return runMachineVoiceDispatch(job, {
+      workspaceId,
+      campaignId,
+      userId,
+    });
   }
 
   const outcome = await dispatchCampaignSmsBatch({
@@ -257,15 +294,22 @@ export async function campaignDispatchHandler(
       // Config error — retrying cannot fix it; surface loudly and stop.
       logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
       return { ok: true, campaignId, blocked: "caller_id_required" };
-    case "deferred_send_window":
+    case "deferred_send_window": {
+      // Schedule the successor at the exact window boundary (#1352): the
+      // batch's outcome carries the next open instant, so dispatch resumes
+      // the moment sending is allowed. Cap the sleep (see
+      // SEND_WINDOW_MAX_DEFER_MS) so a far-future boundary cannot pin the
+      // chain to config that may change before then.
+      const exactDelayMs = Math.max(0, outcome.nextOpenAt.getTime() - Date.now());
       await enqueueDispatchSuccessor({
         workspaceId,
         campaignId,
         userId,
         completedJobId: job.id,
-        delayMs: SEND_WINDOW_RETRY_MS,
+        delayMs: Math.min(exactDelayMs, SEND_WINDOW_MAX_DEFER_MS),
       });
       return { ok: true, campaignId, deferred: "send_window" };
+    }
     case "dispatched": {
       const { counts, queuedRemaining } = outcome;
 
@@ -300,6 +344,83 @@ export async function campaignDispatchHandler(
         ok: true,
         campaignId,
         sent: counts.sent,
+        failed: counts.failed,
+        dequeued: counts.dequeued,
+        deferred: counts.deferred,
+        queuedRemaining,
+      };
+    }
+  }
+}
+
+/**
+ * IVR branch of the dispatch chain: same claim/successor/completion
+ * orchestration as the SMS path, around `dispatchCampaignIvrBatch`.
+ */
+async function runMachineVoiceDispatch(
+  job: ClaimedJobRow,
+  args: { workspaceId: string; campaignId: number; userId: string },
+): Promise<unknown> {
+  const { workspaceId, campaignId, userId } = args;
+
+  const outcome = await dispatchCampaignIvrBatch({
+    workspaceId,
+    campaignId: String(campaignId),
+    userId,
+  });
+
+  switch (outcome.kind) {
+    case "insufficient_credits":
+      // Not retried: dispatch resumes when the user relaunches after top-up.
+      logger.warn("campaign_dispatch.insufficient_credits", { campaignId, workspaceId });
+      return { ok: true, campaignId, blocked: "insufficient_credits" };
+    case "caller_id_required":
+      // Config error — retrying cannot fix it; surface loudly and stop.
+      logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
+      return { ok: true, campaignId, blocked: "caller_id_required" };
+    case "deferred_send_window":
+      await enqueueDispatchSuccessor({
+        workspaceId,
+        campaignId,
+        userId,
+        completedJobId: job.id,
+        delayMs: SEND_WINDOW_RETRY_MS,
+      });
+      return { ok: true, campaignId, deferred: "send_window" };
+    case "dispatched": {
+      const { counts, queuedRemaining } = outcome;
+
+      // Every attempted call failed and nothing was dequeued: let the job
+      // retry with backoff instead of hot-looping successors. Failed rows
+      // stay queued and the next tick re-attempts them.
+      if (counts.failed > 0 && counts.called === 0 && counts.dequeued === 0) {
+        throw new Error(
+          `campaign_dispatch: all ${counts.failed} IVR calls failed for campaign ${campaignId}`,
+        );
+      }
+
+      if (queuedRemaining > 0) {
+        await enqueueDispatchSuccessor({
+          workspaceId,
+          campaignId,
+          userId,
+          completedJobId: job.id,
+          delayMs: DISPATCH_TICK_MS,
+        });
+      } else {
+        const completed = await rpcTryCompleteCampaignIfDrained(
+          createTenantDb(workspaceId),
+          campaignId,
+        );
+        if (completed) {
+          logger.info("campaign_dispatch.completed", { campaignId, workspaceId });
+        }
+      }
+
+      return {
+        ok: true,
+        campaignId,
+        called: counts.called,
         failed: counts.failed,
         dequeued: counts.dequeued,
         deferred: counts.deferred,

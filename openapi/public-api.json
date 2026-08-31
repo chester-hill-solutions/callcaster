@@ -1125,6 +1125,71 @@
         }
       }
     },
+    "/api/audio-upload": {
+      "post": {
+        "operationId": "postAudio_upload",
+        "summary": "POST /api/audio-upload",
+        "description": "Inline workspace audio upload from the script editor; normalizes to canonical MP3.",
+        "tags": [
+          "Media",
+          "User API"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "session",
+        "x-callcaster-docs-guide": "docs/api-data-management.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Request body; see human docs for field details."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audiodrop": {
       "post": {
         "operationId": "postAudiodrop",

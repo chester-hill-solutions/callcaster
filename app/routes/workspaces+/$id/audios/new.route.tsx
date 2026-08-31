@@ -39,9 +39,12 @@ export default function Media() {
               <Input type="text" name="media-name" id="media-name" />
             </FormField>
             <FormField htmlFor="media" label="Upload">
-              <div className="flex w-full items-center justify-center rounded-xl border-2 border-border py-8 transition-colors duration-150 ease-in-out hover:bg-muted">
+              <label
+                htmlFor="media"
+                className="flex w-full cursor-pointer items-center justify-center rounded-xl border-2 border-border py-8 transition-colors duration-150 ease-in-out hover:bg-muted"
+              >
                 {pendingFileName === "" ? (
-                  <FaPlus size={"26px"} />
+                  <FaPlus size={"26px"} aria-hidden />
                 ) : (
                   <p>{pendingFileName}</p>
                 )}
@@ -53,7 +56,7 @@ export default function Media() {
                   className="hidden"
                   onChange={displayFileToUpload}
                 />
-              </div>
+              </label>
             </FormField>
           </Section>
           <div className="flex flex-col gap-2">

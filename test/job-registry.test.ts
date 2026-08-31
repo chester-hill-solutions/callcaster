@@ -13,6 +13,22 @@ import { jobParamsRegistry } from "@/lib/worker/job-params.server";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
 /**
+ * Look up a job registration by type, asserting the invariant these
+ * drift-guard tests depend on: every job type under test must be registered
+ * in `jobRegistry`. Throws with the missing type named instead of returning
+ * undefined — a missing registration is test-setup drift, not a case to skip.
+ */
+function requireRegistration(type: string): (typeof jobRegistry)[number] {
+  const registration = jobRegistry.find((r) => r.type === type);
+  if (!registration) {
+    throw new Error(
+      `jobRegistry has no registration for job type "${type}" — the registry and the drift-guard expectations have diverged`,
+    );
+  }
+  return registration;
+}
+
+/**
  * Drift guard for #1239 A1: `jobHandlers`, `PAGING_JOB_TYPES`, and
  * `SELF_SCHEDULING_JOB_TYPES` are now DERIVED from the `jobRegistry` list in
  * handlers.server.ts instead of being hand-maintained independently. These
@@ -116,11 +132,10 @@ describe("job registry — derived-set equality guard (#1239 A1)", () => {
 
 describe("job registry — defineJob params validation (proof migrations)", () => {
   test("twilio_open_sync defaults missing/invalid numeric params exactly like the old requireNumberParam helper", async () => {
-    const registration = jobRegistry.find((r) => r.type === "twilio_open_sync");
-    expect(registration).toBeDefined();
+    const registration = requireRegistration("twilio_open_sync");
 
     // Missing params -> defaults (50, 50, 120), matching the old `?? 50` etc.
-    expect(registration!.params.parse({})).toEqual({
+    expect(registration.params.parse({})).toEqual({
       callLimit: 50,
       messageLimit: 50,
       maxAgeMinutes: 120,
@@ -129,12 +144,12 @@ describe("job registry — defineJob params validation (proof migrations)", () =
     // Numeric-string params coerce, matching requireNumberParam's tenant-db
     // bigint-as-string handling (#1078).
     expect(
-      registration!.params.parse({ callLimit: "10", messageLimit: "20", maxAgeMinutes: "30" }),
+      registration.params.parse({ callLimit: "10", messageLimit: "20", maxAgeMinutes: "30" }),
     ).toEqual({ callLimit: 10, messageLimit: 20, maxAgeMinutes: 30 });
 
     // Garbage falls back to default rather than throwing, matching the old
     // `requireNumberParam(...) ?? default` behaviour.
-    expect(registration!.params.parse({ callLimit: "not-a-number" })).toEqual({
+    expect(registration.params.parse({ callLimit: "not-a-number" })).toEqual({
       callLimit: 50,
       messageLimit: 50,
       maxAgeMinutes: 120,
@@ -142,46 +157,41 @@ describe("job registry — defineJob params validation (proof migrations)", () =
   });
 
   test("elevenlabs_batch_transcribe rejects a missing callSid with the original error message", () => {
-    const registration = jobRegistry.find(
-      (r) => r.type === "elevenlabs_batch_transcribe",
-    );
-    expect(registration).toBeDefined();
-    expect(() => registration!.params.parse({})).toThrowError(
+    const registration = requireRegistration("elevenlabs_batch_transcribe");
+    expect(() => registration.params.parse({})).toThrowError(
       "elevenlabs_batch_transcribe: missing callSid",
     );
-    expect(registration!.params.parse({ callSid: "CA123" })).toEqual({
+    expect(registration.params.parse({ callSid: "CA123" })).toEqual({
       callSid: "CA123",
     });
   });
 
   test("billing_reconcile accepts an optional workspaceId and ignores unknown keys", () => {
-    const registration = jobRegistry.find((r) => r.type === "billing_reconcile");
-    expect(registration).toBeDefined();
-    expect(registration!.params.parse({})).toEqual({});
+    const registration = requireRegistration("billing_reconcile");
+    expect(registration.params.parse({})).toEqual({});
     expect(
-      registration!.params.parse({ workspaceId: "ws_1", requestId: "req_1" }),
+      registration.params.parse({ workspaceId: "ws_1", requestId: "req_1" }),
     ).toEqual({ workspaceId: "ws_1" });
   });
 });
 
 describe("job registry — defineJob params validation (#1239 A2 migrations)", () => {
   test("audience_upload rejects a coerced-zero uploadId/audienceId like the old bundled falsy check", () => {
-    const registration = jobRegistry.find((r) => r.type === "audience_upload");
-    expect(registration).toBeDefined();
+    const registration = requireRegistration("audience_upload");
 
     // 0 is falsy in JS — the old `if (!uploadId || !audienceId || ...) throw`
     // treated a coerced 0 as "missing", same as an absent field.
-    expect(() => registration!.params.parse({ uploadId: 0, audienceId: 5 })).toThrowError(
+    expect(() => registration.params.parse({ uploadId: 0, audienceId: 5 })).toThrowError(
       "audience_upload: missing or invalid uploadId",
     );
-    expect(() => registration!.params.parse({ uploadId: 5, audienceId: "not-a-number" })).toThrowError(
+    expect(() => registration.params.parse({ uploadId: 5, audienceId: "not-a-number" })).toThrowError(
       "audience_upload: missing or invalid audienceId",
     );
 
     // Numeric-string ids coerce (tenant-db bigint-as-string, #1078); optional
     // fields fall back exactly like the old `typeof` narrowing.
     expect(
-      registration!.params.parse({ uploadId: "12", audienceId: "34" }),
+      registration.params.parse({ uploadId: "12", audienceId: "34" }),
     ).toEqual({
       uploadId: 12,
       audienceId: 34,
@@ -197,7 +207,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
     // legacyNullableStringParam's doc comment): an out-of-enum string that
     // the old blind cast would have accepted must still pass.
     expect(
-      registration!.params.parse({
+      registration.params.parse({
         uploadId: 1,
         audienceId: 2,
         voterListSource: "not_a_real_source",
@@ -205,26 +215,23 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
       }).voterListSource,
     ).toBe("not_a_real_source");
     expect(
-      registration!.params.parse({ uploadId: 1, audienceId: 2, headerMapping: ["a", "b"] })
+      registration.params.parse({ uploadId: 1, audienceId: 2, headerMapping: ["a", "b"] })
         .headerMapping,
     ).toEqual(["a", "b"]);
   });
 
   test("call/sms/recording side-effect job types share one schema factory and reject the same shapes requireSidAndTwilioParams did", () => {
-    const callStatus = jobRegistry.find((r) => r.type === "call_status_side_effects");
-    const smsStatus = jobRegistry.find((r) => r.type === "sms_status_side_effects");
-    const recording = jobRegistry.find((r) => r.type === "recording_side_effects");
-    expect(callStatus).toBeDefined();
-    expect(smsStatus).toBeDefined();
-    expect(recording).toBeDefined();
+    const callStatus = requireRegistration("call_status_side_effects");
+    const smsStatus = requireRegistration("sms_status_side_effects");
+    const recording = requireRegistration("recording_side_effects");
 
-    expect(() => callStatus!.params.parse({})).toThrowError(
+    expect(() => callStatus.params.parse({})).toThrowError(
       "call_status_side_effects: missing callSid or twilioParams",
     );
-    expect(() => smsStatus!.params.parse({ messageSid: "SM1" })).toThrowError(
+    expect(() => smsStatus.params.parse({ messageSid: "SM1" })).toThrowError(
       "sms_status_side_effects: missing messageSid or twilioParams",
     );
-    expect(() => recording!.params.parse({ callSid: "CA1", twilioParams: "not-an-object" })).toThrowError(
+    expect(() => recording.params.parse({ callSid: "CA1", twilioParams: "not-an-object" })).toThrowError(
       "recording_side_effects: missing callSid or twilioParams",
     );
 
@@ -232,7 +239,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
     // a stray `messageSid` from an unrelated job shape must be ignored, same
     // as the old code reading only `params[sidKey]`.
     expect(
-      callStatus!.params.parse({
+      callStatus.params.parse({
         callSid: "CA1",
         messageSid: "SM_should_be_ignored",
         twilioParams: { CallStatus: "completed" },
@@ -247,10 +254,10 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
    * failing validation and dead-lettering a job that would have billed.
    */
   test("voice side-effect rows queued under the pre-E1 shape still parse, with the event re-derived", () => {
-    const callStatus = jobRegistry.find((r) => r.type === "call_status_side_effects");
-    const recording = jobRegistry.find((r) => r.type === "recording_side_effects");
+    const callStatus = requireRegistration("call_status_side_effects");
+    const recording = requireRegistration("recording_side_effects");
 
-    const oldShape = callStatus!.params.parse({
+    const oldShape = callStatus.params.parse({
       callSid: "CA1",
       twilioParams: { CallSid: "CA1", CallStatus: "completed", Duration: "61" },
     });
@@ -259,7 +266,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
       event: { kind: "call-status", callSid: "CA1", callStatus: "completed", durationSeconds: 61 },
     });
 
-    const oldRecordingShape = recording!.params.parse({
+    const oldRecordingShape = recording.params.parse({
       callSid: "CA1",
       twilioParams: { CallSid: "CA1", RecordingSid: "RE1", RecordingDuration: "12" },
     });
@@ -269,7 +276,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
     });
 
     // A payload written by the new enqueue sites is taken as-is.
-    const newShape = callStatus!.params.parse({
+    const newShape = callStatus.params.parse({
       sid: "CA1",
       twilioParams: { CallSid: "CA1", CallStatus: "busy" },
       event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "busy" }),
@@ -280,7 +287,7 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
 
     // A malformed `event` is not trusted: fall back to the raw params rather
     // than handing a half-typed object to a handler.
-    const junkEvent = callStatus!.params.parse({
+    const junkEvent = callStatus.params.parse({
       callSid: "CA1",
       twilioParams: { CallSid: "CA1", CallStatus: "completed" },
       event: { kind: "not-a-kind" },
@@ -289,32 +296,30 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
 
     // sms_status_side_effects is NOT a voice callback and keeps the plain shape.
     expect(
-      jobRegistry
-        .find((r) => r.type === "sms_status_side_effects")!
+      requireRegistration("sms_status_side_effects")
         .params.parse({ messageSid: "SM1", twilioParams: { SmsStatus: "delivered" } }),
     ).toEqual({ sid: "SM1", twilioParams: { SmsStatus: "delivered" } });
   });
 
   test("webhook_delivery requires a valid eventType and rejects the same falsy payload/eventCategory the old bundled check did", () => {
-    const registration = jobRegistry.find((r) => r.type === "webhook_delivery");
-    expect(registration).toBeDefined();
+    const registration = requireRegistration("webhook_delivery");
 
     expect(() =>
-      registration!.params.parse({
+      registration.params.parse({
         eventCategory: "call",
         eventType: "DELETE",
         payload: { a: 1 },
       }),
     ).toThrow();
     expect(() =>
-      registration!.params.parse({ eventCategory: "call", eventType: "INSERT" }),
+      registration.params.parse({ eventCategory: "call", eventType: "INSERT" }),
     ).toThrowError("webhook_delivery: missing payload");
     expect(() =>
-      registration!.params.parse({ eventType: "INSERT", payload: { a: 1 } }),
+      registration.params.parse({ eventType: "INSERT", payload: { a: 1 } }),
     ).toThrowError("webhook_delivery: missing eventCategory");
 
     expect(
-      registration!.params.parse({
+      registration.params.parse({
         eventCategory: "call",
         eventType: "UPDATE",
         payload: { a: 1 },
@@ -329,21 +334,19 @@ describe("job registry — defineJob params validation (#1239 A2 migrations)", (
   });
 
   test("campaign_export and campaign_dispatch reject a coerced-zero campaignId like the old falsy check, but accept negative ids", () => {
-    const exportReg = jobRegistry.find((r) => r.type === "campaign_export");
-    const dispatchReg = jobRegistry.find((r) => r.type === "campaign_dispatch");
-    expect(exportReg).toBeDefined();
-    expect(dispatchReg).toBeDefined();
+    const exportReg = requireRegistration("campaign_export");
+    const dispatchReg = requireRegistration("campaign_dispatch");
 
     expect(() =>
-      exportReg!.params.parse({ campaignId: 0, exportId: "exp_1", campaignType: "message" }),
+      exportReg.params.parse({ campaignId: 0, exportId: "exp_1", campaignType: "message" }),
     ).toThrowError("campaign_export: missing or invalid campaignId");
-    expect(() => dispatchReg!.params.parse({ campaignId: 0 })).toThrowError(
+    expect(() => dispatchReg.params.parse({ campaignId: 0 })).toThrowError(
       "campaign_dispatch: missing or invalid campaignId",
     );
 
     // Negative numbers are truthy in JS, so the old `!campaignId` check never
     // rejected them — only an exact falsy 0 (or a non-numeric value).
-    expect(dispatchReg!.params.parse({ campaignId: -5 }).campaignId).toBe(-5);
+    expect(dispatchReg.params.parse({ campaignId: -5 }).campaignId).toBe(-5);
   });
 });
 
@@ -365,9 +368,8 @@ describe("job registry — enqueue-side/dequeue-side registry parity (#1239 A3)"
 
   test("jobParamsRegistry and jobRegistry validate each type against the exact same schema instance", () => {
     for (const entry of jobParamsRegistry) {
-      const registration = jobRegistry.find((r) => r.type === entry.type);
-      expect(registration).toBeDefined();
-      expect(registration!.params).toBe(entry.params);
+      const registration = requireRegistration(entry.type);
+      expect(registration.params).toBe(entry.params);
     }
   });
 });

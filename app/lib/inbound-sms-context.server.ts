@@ -204,7 +204,10 @@ export async function resolveInboundWorkspaceContext(
       };
     }
 
-    const row = workspaces[0]!;
+    const row = workspaces[0];
+    if (!row) {
+      return { ok: false, response: routeData({ error: "Number not found" }, { status: 404 }) };
+    }
     const webhooks = await loadWebhooksForWorkspace(row.id);
 
     return {

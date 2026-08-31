@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { createElement } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
+import { Toaster } from "@/components/ui/sonner";
 
 // The route re-exports its loader/action from server-only modules; the
 // component under test never runs them, so stub them out to keep the DB out of
@@ -18,34 +19,44 @@ vi.mock(
 
 // Stub the script editor body: expose whether it is read-only and offer a
 // button that dirties the script CONTENT through the real onPageDataChange
-// contract (#1124's distinction between attaching and editing).
+// contract (#1124's distinction between attaching and editing). Also expose
+// whether an upload handler is wired through, so #1346's regression is visible.
 vi.mock("@/components/campaign/settings/script/CampaignSettings.Script", () => ({
   default: ({
-    pageData,
-    onPageDataChange,
+    script,
+    onChange,
     readOnly,
+    onUploadAudio,
   }: {
-    pageData: { campaignDetails: { script: { name: string; steps: unknown } } };
-    onPageDataChange: (next: unknown) => void;
+    script: { name: string; steps: unknown };
+    onChange: (next: unknown) => void;
     readOnly?: boolean;
+    onUploadAudio?: (file: File) => Promise<string | null>;
   }) =>
     createElement(
       "div",
-      { "data-testid": "script-editor", "data-readonly": String(readOnly ?? false) },
+      {
+        "data-testid": "script-editor",
+        "data-readonly": String(readOnly ?? false),
+        "data-has-upload": String(typeof onUploadAudio === "function"),
+      },
       createElement(
         "button",
         {
           onClick: () =>
-            onPageDataChange({
-              campaignDetails: {
-                script: {
-                  ...pageData.campaignDetails.script,
-                  steps: { pages: { edited: true }, blocks: {} },
-                },
-              },
+            onChange({
+              ...script,
+              steps: { pages: { edited: true }, blocks: {} },
             }),
         },
         "dirty the script content",
+      ),
+      createElement(
+        "button",
+        {
+          onClick: () => onUploadAudio?.(new File(["x"], "message.mp3")),
+        },
+        "upload audio",
       ),
     ),
 }));
@@ -130,15 +141,24 @@ async function renderRoute(loaderData = makeLoaderData()) {
     ],
     { initialEntries: ["/workspaces/ws-1/campaigns/1/script/edit"] },
   );
-  return render(createElement(RouterProvider, { router }));
+  return render(
+    createElement(
+      "div",
+      null,
+      createElement(RouterProvider, { router }),
+      createElement(Toaster),
+    ),
+  );
 }
 
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ script: otherScript }),
+    vi.fn(async (url: string) => {
+      if (String(url).includes("/api/audio-upload")) {
+        return { ok: true, json: async () => ({ name: "message.mp3" }) };
+      }
+      return { ok: true, json: async () => ({ script: otherScript }) };
     }),
   );
 });
@@ -202,5 +222,40 @@ describe("campaign script edit route (#1124)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "attach script nine" }));
     expect(screen.getByTestId("script-editor")).toHaveAttribute("data-readonly", "true");
+  });
+
+  test("audio upload is wired to the campaign script editor (#1346)", async () => {
+    await renderRoute();
+
+    // The editor always receives the handler — even in read-only preview — so
+    // recorded IVR blocks can show their upload affordance once editing.
+    const editor = await screen.findByTestId("script-editor");
+    expect(editor).toHaveAttribute("data-has-upload", "true");
+
+    await userEvent.click(screen.getByRole("button", { name: "upload audio" }));
+
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(url).toBe("/api/audio-upload");
+    const body = (init as RequestInit).body as FormData;
+    expect(body.get("workspaceId")).toBe("ws-1");
+    expect(body.get("media")).toBeInstanceOf(File);
+  });
+
+  test("audio upload failure surfaces a toast and returns null", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, json: async () => ({ error: "Upload rejected." }) }),
+    );
+    await renderRoute();
+
+    await userEvent.click(await screen.findByRole("button", { name: "upload audio" }));
+
+    expect(await screen.findByText("Upload rejected.")).toBeInTheDocument();
+    // The app toaster adapter keeps sonner richColors on, so the typed error
+    // toast gets the shared semantic --error-bg surface (#1335 slice 1).
+    const toastEl = document.querySelector('[data-sonner-toast]');
+    expect(toastEl).not.toBeNull();
+    expect(toastEl?.getAttribute("data-rich-colors")).toBe("true");
   });
 });

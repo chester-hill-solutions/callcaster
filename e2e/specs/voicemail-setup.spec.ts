@@ -121,7 +121,12 @@ ownerTest.describe("Voicemail setup @authenticated", () => {
 
     await page.getByRole("button", { name: /Save voicemail setup/i }).click();
 
-    const alert = page.getByRole("alert").first();
+    // The workspace layout may also render a credit-depletion <Alert role=alert>;
+    // scope to the voicemail error so we assert against this form's alert.
+    const alert = page
+      .getByRole("alert")
+      .filter({ hasNotText: /Credit balance is depleted/i })
+      .first();
     await expect(alert).toBeVisible();
     // ffmpeg's raw output must never reach the user.
     await expect(alert).not.toContainText(/mp3 @ 0x|MPEG audio frames|pipe:0/i);
@@ -167,7 +172,12 @@ ownerTest.describe("Voicemail setup @authenticated", () => {
     await expect(page).toHaveURL(/\/voicemails\?configured=1$/);
 
     await submit();
-    const alert = page.getByRole("alert").first();
+    // The workspace layout may render a credit-depletion <Alert role=alert>;
+    // scope to the voicemail duplicate-name alert so the .first() is this form's.
+    const alert = page
+      .getByRole("alert")
+      .filter({ hasNotText: /Credit balance is depleted/i })
+      .first();
     await expect(alert).toContainText(/already exists/i);
     // The workspace id and object key must not surface.
     await expect(alert).not.toContainText(E2E_WORKSPACES.empty.id);

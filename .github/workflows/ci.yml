@@ -16,6 +16,11 @@ on:
       - .agents/**
       - .opencode/**
       - .gitignore
+  # Nightly full-signal run (the coverage job only runs here now — per-PR
+  # coverage duplicated both test suites on every push for marginal signal).
+  schedule:
+    - cron: "30 6 * * *"
+  workflow_dispatch:
 
 # packages:read lets GITHUB_TOKEN fetch @chester-hill-solutions/* from GitHub
 # Packages when the workflow token is permitted. Prefer repository secret
@@ -24,8 +29,33 @@ permissions:
   contents: read
   packages: read
 
+# Superseded runs die instead of queueing: on a PR, a new push cancels the
+# previous run for the same ref. Scheduled/dispatch runs (and pushes to the
+# default branch, which ride deploys) never cancel.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  # Path scoping for the jobs that can be safely skipped (see
+  # scripts/lib/ci-changes-lib.mjs, unit-tested in test/ci-changes.test.ts).
+  # An unresolvable base degrades to "run everything" inside the script.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.changes.outputs.app }}
+      e2e: ${{ steps.changes.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Three-dot merge-base diff needs real history.
+          fetch-depth: 0
+      - name: Resolve changed-file scope
+        id: changes
+        run: node scripts/ci-changes.mjs --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+
   quality:
+    needs: changes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,8 +75,15 @@ jobs:
       # rebuild silently ships stale code. Build here; the `git diff
       # --exit-code` at the end of this job then fails on a stale dist/.
       - run: npm run vendor:build
+      # npm (package-lock.json) and bun (bun.lock, Railway Docker build) must
+      # move together — a dep added with npm alone fails the Railway image
+      # build minutes after push, far from the cause.
+      - run: npm run check:bun-lock
       - run: npm run typecheck
       - run: npm run lint
+      # Strictness rules (complexity, depth, function size, console, cycles,
+      # non-null assertions) as a ratchet: growth over the baseline fails.
+      - run: npm run check:lint-ratchet
       - run: npm run test:node
         env:
           # The bun-test step imports server/bun.ts, which eagerly constructs
@@ -78,12 +115,22 @@ jobs:
       - run: npm run check:workspace-projection
       - run: npm run check:effects
       - run: npm run check:type-safety
+      # A relative `redirect("../…")` in a loader/action resolves against
+      # `request.url` per RFC 3986. Refactors that move a file up or down
+      # the URL tree silently reroute it — the "successful upload → 404"
+      # flow in #1396. Ratchet the current allowlist so no new one lands.
+      - run: npm run check:relative-redirects
       # Drizzle nests the Postgres SQLSTATE on error.cause; inline
       # `.code === "23505"` checks miss it, which is how duplicate campaign
       # names shipped a generic "Unexpected Server Error" behind green CI.
       - run: npm run check:pg-errors
       - run: npm run check:dry
       - run: npm run check:handlers
+      # A replacing vi.mock factory hard-codes a shared server module's export
+      # surface; when the module gains an export, route tests fail with the
+      # route's catch-all error and nobody connects the two. New factories
+      # must spread importOriginal (ratchet baseline keeps existing ones).
+      - run: npm run check:test-mocks
       - run: npm run check:db-rpcs
       # check:db-rpcs only asks whether a function EXISTS — its header says it
       # cannot see inside one. This reads the body: the queue RPCs must write
@@ -106,6 +153,10 @@ jobs:
       - run: npm run ci:codegen:verify
 
   bundle-guard:
+    needs: changes
+    # Only the production build + forbidden-server-string scan: pointless
+    # when the client bundle cannot have changed (docs/tooling/baseline PRs).
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -120,6 +171,9 @@ jobs:
       - run: npm run check:client-bundle
 
   coverage:
+    # Nightly + manual only: per-PR coverage re-ran both test suites with
+    # instrumentation on every push. Coverage trends do not need PR latency.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

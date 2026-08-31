@@ -82,9 +82,13 @@ const campaignIvrMocks = vi.hoisted(() => ({
   insertCampaignForWorkspace: vi.fn(),
 }));
 
-vi.mock("@/lib/campaign-execution.server", () => ({
-  launchCampaign: (...args: any[]) => mocks.launchCampaign(...args),
-}));
+vi.mock("@/lib/campaign-execution.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/campaign-execution.server")>();
+  return {
+    ...actual,
+    launchCampaign: (...args: any[]) => mocks.launchCampaign(...args),
+  };
+});
 vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/campaign-ivr.server")>();
   return {

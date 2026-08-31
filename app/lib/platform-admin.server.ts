@@ -352,15 +352,20 @@ export async function loadAdminWorkspaceInvitePage(
     listWorkspaceInvitesEnriched(workspaceId),
   ]);
 
-  const users = workspaceUsers
-    .filter((member) => member.user != null)
-    .map((member) => ({
-      id: member.user!.id,
-      username: member.user!.username,
-      first_name: member.user!.first_name,
-      last_name: member.user!.last_name,
-      role: member.role,
-    }));
+  const users = workspaceUsers.flatMap((member) => {
+    if (!member.user) {
+      return [];
+    }
+    return [
+      {
+        id: member.user.id,
+        username: member.user.username,
+        first_name: member.user.first_name,
+        last_name: member.user.last_name,
+        role: member.role,
+      },
+    ];
+  });
 
   const activeMembership = workspaceUsers.find((member) => member.user_id === activeUserId);
   const userRole = activeMembership?.role ?? null;

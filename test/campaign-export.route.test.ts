@@ -28,6 +28,7 @@ const campaignIvrMocks = vi.hoisted(() => ({
 
 const queueMocks = vi.hoisted(() => ({
   getCampaignQueueContactIds: vi.fn(),
+  findDequeuedQueueRowsForCampaign: vi.fn(async () => []),
 }));
 
 const exportDbMocks = vi.hoisted(() => ({
@@ -70,6 +71,8 @@ vi.mock("@/lib/campaign-queue-db.server", async (importOriginal) => {
     ...actual,
     getCampaignQueueContactIds: (...args: unknown[]) =>
       queueMocks.getCampaignQueueContactIds(...args),
+    findDequeuedQueueRowsForCampaign: (...args: unknown[]) =>
+      queueMocks.findDequeuedQueueRowsForCampaign(...args),
   };
 });
 

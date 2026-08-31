@@ -10,6 +10,7 @@ vi.hoisted(() => {
 
 const mocks = vi.hoisted(() => ({
   dispatchCampaignSmsBatch: vi.fn(),
+  dispatchCampaignIvrBatch: vi.fn(),
   enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 99 })),
   findCampaignInWorkspace: vi.fn(),
   updateCampaignStatusInWorkspace: vi.fn(async () => undefined),
@@ -24,6 +25,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/campaign-sms-dispatch.server", () => ({
   dispatchCampaignSmsBatch: mocks.dispatchCampaignSmsBatch,
+}));
+vi.mock("@/lib/campaign-ivr-dispatch.server", () => ({
+  dispatchCampaignIvrBatch: mocks.dispatchCampaignIvrBatch,
 }));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
   unsafeEnqueueJob: mocks.enqueueJob,
@@ -134,13 +138,14 @@ describe("campaignDispatchHandler", () => {
     );
   });
 
-  test("skips non-message campaigns without dispatching", async () => {
+  test("skips non-dispatchable campaigns without dispatching", async () => {
     mocks.findCampaignInWorkspace.mockResolvedValue(
       runningMessageCampaign({ type: "live_call" }),
     );
     const result = await campaignDispatchHandler(makeJob());
-    expect(result).toMatchObject({ ok: true, skipped: true, reason: "not_message_campaign" });
+    expect(result).toMatchObject({ ok: true, skipped: true, reason: "not_dispatchable_campaign" });
     expect(mocks.dispatchCampaignSmsBatch).not.toHaveBeenCalled();
+    expect(mocks.dispatchCampaignIvrBatch).not.toHaveBeenCalled();
   });
 
   test("claims a scheduled campaign into running before dispatching", async () => {
@@ -237,12 +242,34 @@ describe("campaignDispatchHandler", () => {
     expect(mocks.enqueueJob).toHaveBeenCalled();
   });
 
-  test("send-window deferral schedules a delayed successor", async () => {
-    mocks.dispatchCampaignSmsBatch.mockResolvedValue({ kind: "deferred_send_window" });
-    const result = await campaignDispatchHandler(makeJob());
-    expect(result).toMatchObject({ ok: true, deferred: "send_window" });
-    const call = mocks.enqueueJob.mock.calls[0]?.[0] as { runAt: Date };
-    expect(call.runAt.getTime()).toBeGreaterThan(Date.now() + 60_000);
+  test("send-window deferral schedules the successor at the exact next open (#1352)", async () => {
+    const nextOpenAt = new Date(Date.now() + 5 * 60 * 1000);
+    mocks.dispatchCampaignSmsBatch.mockResolvedValue({
+      kind: "deferred_send_window",
+      nextOpenAt,
+    });
+    await campaignDispatchHandler(makeJob());
+    const call = mocks.enqueueJob.mock.calls.at(-1)?.[0] as { runAt: Date };
+    expect(call.runAt).toBeInstanceOf(Date);
+    // Two Date.now() calls (handler + successor) may differ by a tick —
+    // require the scheduled instant to land on the window boundary.
+    expect(Math.abs(call.runAt.getTime() - nextOpenAt.getTime())).toBeLessThanOrEqual(50);
+  });
+
+  test("a far-future window boundary is capped so a stale schedule cannot pin the chain", async () => {
+    // Window opens in 3 days; if the operator edits or removes the window
+    // meanwhile, the next wake must re-read the campaign well before then.
+    const maxDeferMs = 60 * 60 * 1000;
+    const nextOpenAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    mocks.dispatchCampaignSmsBatch.mockResolvedValue({
+      kind: "deferred_send_window",
+      nextOpenAt,
+    });
+    await campaignDispatchHandler(makeJob());
+    const call = mocks.enqueueJob.mock.calls.at(-1)?.[0] as { runAt: Date };
+    expect(call.runAt.getTime()).toBeLessThan(nextOpenAt.getTime());
+    const expectedWake = Date.now() + maxDeferMs;
+    expect(Math.abs(call.runAt.getTime() - expectedWake)).toBeLessThanOrEqual(100);
   });
 
   test("insufficient credits stops the chain without retry", async () => {
@@ -250,6 +277,128 @@ describe("campaignDispatchHandler", () => {
     const result = await campaignDispatchHandler(makeJob());
     expect(result).toMatchObject({ ok: true, blocked: "insufficient_credits" });
     expect(mocks.enqueueJob).not.toHaveBeenCalled();
+  });
+});
+
+describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningMessageCampaign({ type: "simple_ivr" }),
+    );
+    mocks.dispatchCampaignIvrBatch.mockResolvedValue({
+      kind: "dispatched",
+      counts: { called: 1, failed: 0, dequeued: 0, deferred: 0 },
+      queuedRemaining: 0,
+    });
+    mocks.rpcTryCompleteCampaignIfDrained.mockResolvedValue(false);
+  });
+
+  test("dispatches an IVR batch for a running voice campaign", async () => {
+    const result = await campaignDispatchHandler(makeJob());
+    expect(mocks.dispatchCampaignIvrBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: WORKSPACE_ID,
+        campaignId: "42",
+        userId: USER_ID,
+      }),
+    );
+    expect(mocks.dispatchCampaignSmsBatch).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: true, called: 1, queuedRemaining: 0 });
+  });
+
+  test("transitions a scheduled voice campaign to running before dispatching", async () => {
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningMessageCampaign({ type: "robocall", status: "scheduled" }),
+    );
+    await campaignDispatchHandler(makeJob());
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      42,
+      expect.objectContaining({ status: "running" }),
+    );
+    expect(mocks.dispatchCampaignIvrBatch).toHaveBeenCalled();
+  });
+
+  test("a waiting voice campaign keeps the chain alive until the sweep flips it", async () => {
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningMessageCampaign({ type: "simple_ivr", status: "waiting" }),
+    );
+    const result = await campaignDispatchHandler(makeJob());
+    expect(result).toMatchObject({ ok: true, deferred: "waiting_for_schedule" });
+    expect(mocks.dispatchCampaignIvrBatch).not.toHaveBeenCalled();
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        params: expect.objectContaining({ campaignId: 42 }),
+        dedupe: { kind: "live", workspaceId: WORKSPACE_ID, campaignId: 42, excludeJobId: 7 },
+      }),
+    );
+  });
+
+  test("paused voice campaign ends the chain without dispatching", async () => {
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningMessageCampaign({ type: "simple_ivr", status: "paused" }),
+    );
+    const result = await campaignDispatchHandler(makeJob());
+    expect(result).toMatchObject({ ok: true, skipped: true, reason: "paused" });
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  test("IVR remaining work schedules a successor and drain completes the campaign", async () => {
+    mocks.dispatchCampaignIvrBatch.mockResolvedValue({
+      kind: "dispatched",
+      counts: { called: 2, failed: 0, dequeued: 0, deferred: 0 },
+      queuedRemaining: 3,
+    });
+    await campaignDispatchHandler(makeJob());
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({ dedupe: expect.objectContaining({ excludeJobId: 7 }) }),
+    );
+    expect(mocks.rpcTryCompleteCampaignIfDrained).not.toHaveBeenCalled();
+
+    mocks.dispatchCampaignIvrBatch.mockResolvedValue({
+      kind: "dispatched",
+      counts: { called: 1, failed: 0, dequeued: 0, deferred: 0 },
+      queuedRemaining: 0,
+    });
+    await campaignDispatchHandler(makeJob());
+    expect(mocks.rpcTryCompleteCampaignIfDrained).toHaveBeenCalledWith(
+      { tenant: true },
+      42,
+    );
+  });
+
+  test("a fully failed IVR batch throws so the job retries with backoff", async () => {
+    mocks.dispatchCampaignIvrBatch.mockResolvedValue({
+      kind: "dispatched",
+      counts: { called: 0, failed: 2, dequeued: 0, deferred: 0 },
+      queuedRemaining: 2,
+    });
+    await expect(campaignDispatchHandler(makeJob())).rejects.toThrow(/all 2 IVR calls failed/);
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  test("IVR insufficient credits and missing caller-id stop the chain", async () => {
+    mocks.dispatchCampaignIvrBatch.mockResolvedValue({ kind: "insufficient_credits" });
+    expect(await campaignDispatchHandler(makeJob())).toMatchObject({
+      blocked: "insufficient_credits",
+    });
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+
+    mocks.dispatchCampaignIvrBatch.mockResolvedValue({ kind: "caller_id_required" });
+    expect(await campaignDispatchHandler(makeJob())).toMatchObject({
+      blocked: "caller_id_required",
+    });
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  test("IVR schedule deferral schedules a delayed successor", async () => {
+    mocks.dispatchCampaignIvrBatch.mockResolvedValue({ kind: "deferred_send_window" });
+    const result = await campaignDispatchHandler(makeJob());
+    expect(result).toMatchObject({ ok: true, deferred: "send_window" });
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({ runAt: expect.any(Date) }),
+    );
   });
 });
 
@@ -287,6 +436,52 @@ describe("launchCampaign", () => {
         dedupe: { kind: "live", workspaceId: WORKSPACE_ID, campaignId: 42 },
       }),
     );
+  });
+
+  test("machine-dialled voice launch enqueues dispatch like a message launch", async () => {
+    for (const type of ["robocall", "simple_ivr", "complex_ivr"]) {
+      vi.clearAllMocks();
+      mocks.enqueueJob.mockResolvedValue({ enqueued: true, jobId: 99 });
+      const result = await launchCampaign({
+        ...baseArgs,
+        campaign: { type, end_date: null, start_date: null } as never,
+        mode: "now",
+        userId: USER_ID,
+      });
+      expect(result.ok).toBe(true);
+      expect(mocks.enqueueJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: "campaign_dispatch",
+          params: expect.objectContaining({ campaignId: 42 }),
+        }),
+      );
+    }
+  });
+
+  test("scheduled voice launch defers the dispatch job to the start date", async () => {
+    const startDate = "2026-09-01T09:00:00.000Z";
+    const result = await launchCampaign({
+      ...baseArgs,
+      campaign: { type: "simple_ivr", end_date: null, start_date: startDate } as never,
+      mode: "scheduled",
+      userId: USER_ID,
+    });
+    expect(result.ok).toBe(true);
+    expect(result).toMatchObject({ status: "scheduled" });
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({ runAt: startDate }),
+    );
+  });
+
+  test("live_call launch changes status without enqueueing dispatch", async () => {
+    const result = await launchCampaign({
+      ...baseArgs,
+      campaign: { type: "live_call", end_date: null, start_date: null } as never,
+      mode: "now",
+      userId: USER_ID,
+    });
+    expect(result.ok).toBe(true);
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
   });
 
   test("launch without a user is rejected", async () => {

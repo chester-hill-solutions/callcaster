@@ -169,6 +169,24 @@ describe("auto-dial.server", () => {
     );
   });
 
+  test("saveCallToDatabase persists queue_id on insert (#1222)", async () => {
+    // buildCallRow used to silently drop `queue_id`, so the manual dial path
+    // wrote `call.queue_id = NULL` even when the dial action carried it —
+    // making it impossible to key call rows back to their queue entry.
+    tenantDbMocks.findFirst.mockResolvedValue(null);
+    tenantDbMocks.insert.mockResolvedValue([]);
+    await saveCallToDatabase("ws-1", {
+      sid: "CA-Q1",
+      status: "completed",
+      campaign_id: 1,
+      contact_id: 2,
+      queue_id: 3,
+    });
+    expect(tenantDbMocks.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ sid: "CA-Q1", queue_id: 3 }),
+    );
+  });
+
   test("saveCallToDatabase updates call row when existing", async () => {
     tenantDbMocks.findFirst.mockResolvedValue({ sid: "CA123" });
     tenantDbMocks.update.mockResolvedValue([]);

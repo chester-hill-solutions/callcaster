@@ -90,8 +90,11 @@
   --text-xl: var(--font-size-xl);
 }
 
-/* Callcaster warm broadsheet: crimson action, sky uplift, warm paper */
-:root {
+/* Callcaster warm broadsheet: crimson action, sky uplift, warm paper.
+   `.light` re-declares the light tokens so a subtree can opt back out of an
+   ancestor `.dark` (used by side-by-side theme preview surfaces). */
+:root,
+.light {
   --brand-primary: hsl(357 75% 45%);
   --brand-secondary: hsl(198 100% 87%);
   --brand-tertiary: hsl(354 83% 88%);
@@ -112,10 +115,12 @@
   --muted-foreground: hsl(350 10% 40%);
   --accent: hsl(198 100% 93%);
   --accent-foreground: hsl(202 65% 16%);
-  --destructive: hsl(0 78% 52%);
+  --destructive: hsl(0 74% 44%);
   --destructive-foreground: hsl(0 0% 98%);
-  --success: hsl(160 55% 36%);
-  --success-foreground: hsl(0 0% 98%);
+  --success: hsl(160 55% 40%);
+  /* Solid tone surfaces (badges, chips) pair with dark text: white on
+     mid-lightness green/red measures ~3.9:1 and fails WCAG AA. */
+  --success-foreground: hsl(160 50% 8%);
   --warning: hsl(36 95% 48%);
   --warning-foreground: hsl(30 40% 10%);
   --info: hsl(198 78% 40%);
@@ -172,7 +177,9 @@
   --destructive: hsl(0 62% 38%);
   --destructive-foreground: hsl(0 85.7% 97.3%);
   --success: hsl(160 50% 42%);
-  --success-foreground: hsl(0 0% 98%);
+  /* Solid tone surfaces (badges, chips) pair with dark text: white on
+     mid-lightness green measures ~2.8:1 and fails WCAG AA. */
+  --success-foreground: hsl(160 50% 8%);
   --warning: hsl(36 90% 52%);
   --warning-foreground: hsl(30 40% 10%);
   --info: hsl(198 70% 58%);

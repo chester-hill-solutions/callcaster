@@ -43,15 +43,15 @@ function makeScript(): Script {
 }
 
 function renderEditor(script: Script = makeScript()) {
-  const onPageDataChange = vi.fn();
+  const onChange = vi.fn();
   render(
     <CampaignSettingsScript
-      pageData={{ campaignDetails: { script } }}
-      onPageDataChange={onPageDataChange}
+      script={script}
+      onChange={onChange}
       mediaNames={[]}
     />,
   );
-  return { onPageDataChange };
+  return { onChange };
 }
 
 describe("script editor — renders through the real design-system primitives", () => {
@@ -94,27 +94,27 @@ describe("script editor — renders through the real design-system primitives", 
   });
 
   test("adding a page reports the new document upward", () => {
-    const { onPageDataChange } = renderEditor();
+    const { onChange } = renderEditor();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Add page" })[0]!);
 
-    expect(onPageDataChange).toHaveBeenCalled();
-    const next = onPageDataChange.mock.calls.at(-1)?.[0];
-    const steps = next.campaignDetails.script.steps as { pageOrder: string[] };
+    expect(onChange).toHaveBeenCalled();
+    const next = onChange.mock.calls.at(-1)?.[0];
+    const steps = next.steps as { pageOrder: string[] };
     expect(steps.pageOrder).toHaveLength(3);
   });
 
   test("editing an option value keeps the other option's routing", () => {
     // End-to-end version of the identity bug: through the adapter, a real
     // keystroke on one option must not move another option's `next`.
-    const { onPageDataChange } = renderEditor();
+    const { onChange } = renderEditor();
 
     fireEvent.change(screen.getAllByLabelText("Option value")[0]!, {
       target: { value: "changed" },
     });
 
-    const next = onPageDataChange.mock.calls.at(-1)?.[0];
-    const steps = next.campaignDetails.script.steps as {
+    const next = onChange.mock.calls.at(-1)?.[0];
+    const steps = next.steps as {
       blocks: Record<string, { options: Array<{ value: string; next?: string }> }>;
     };
     const options = steps.blocks.b_radio!.options;

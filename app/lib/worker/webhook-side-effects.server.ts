@@ -16,8 +16,9 @@ import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.serve
 import { MMS_CREDITS, SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
 import { smsKey } from "@/lib/billing-keys";
 import type { TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
-import { campaign as campaignTable } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { campaign as campaignTable, campaign_queue as campaignQueueTable } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { findMessageBySid } from "@/lib/message-db.server";
 import {
   findCallBySid,
@@ -74,7 +75,7 @@ export async function runCallStatusSideEffects(args: {
       : null;
 
   const billingWorkspace = currentAttempt?.workspace ?? workspaceId;
-  if (currentAttempt && billingWorkspace) {
+  if (currentAttempt && billingWorkspace && outreachAttemptId != null) {
     await emitPredictiveBroadcast(billingWorkspace, {
       contact_id: currentAttempt.contact_id,
       status: callStatus,
@@ -94,11 +95,58 @@ export async function runCallStatusSideEffects(args: {
         nextDisposition: terminalDisposition,
       })
     ) {
-      await updateOutreachAttemptForWorkspace(billingWorkspace, outreachAttemptId!, {
+      await updateOutreachAttemptForWorkspace(billingWorkspace, outreachAttemptId, {
         disposition: terminalDisposition,
         ended_at: new Date().toISOString(),
       });
     }
+  }
+
+  // A provider-terminal status must collapse the contact's queue entry exactly
+  // like /api/hangup does; otherwise a callee hang-up leaves the agent's
+  // nextRecipient (and the whole queue view) pointing at a finished contact
+  // while an agent hang-up clears it (#1362). Idempotent: if the agent already
+  // hung up, the guarded dequeue_contact RPC no-ops on dequeued rows. The
+  // assignee id is required for the RPC to cover assigned rows, so take it
+  // from the queue row itself — a webhook has no acting user.
+  if (
+    CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()] &&
+    callRow.contact_id != null
+  ) {
+    const dequeueWorkspace = workspaceId ?? callRow.workspace;
+    if (!dequeueWorkspace) {
+      logger.warn("call_status.dequeue_skipped", {
+        callSid: args.callSid,
+        reason: "no workspace",
+      });
+      return { ok: true };
+    }
+    const tdb = createTenantDb(dequeueWorkspace);
+    const [queueRow, campaign] = await Promise.all([
+      callRow.campaign_id
+        ? tdb.campaign_queue.findFirst({
+            where: and(
+              eq(campaignQueueTable.contact_id, callRow.contact_id),
+              eq(campaignQueueTable.campaign_id, callRow.campaign_id),
+            ),
+            columns: { assigned_to_user_id: true },
+          })
+        : Promise.resolve(null),
+      callRow.campaign_id
+        ? tdb.campaign.findFirst({
+            where: eq(campaignTable.id, callRow.campaign_id),
+            columns: { group_household_queue: true },
+          })
+        : Promise.resolve(null),
+    ]);
+    await dequeueQueueEntry({
+      by: { contactId: callRow.contact_id },
+      workspaceId: dequeueWorkspace,
+      household: campaign?.group_household_queue ?? false,
+      userId: queueRow?.assigned_to_user_id ?? null,
+      reason: "Call completed",
+      exec: tdb,
+    });
   }
 
   return { ok: true };

@@ -198,9 +198,16 @@ export function isWithinSendWindow(
   const minutesNow = now.getUTCHours() * 60 + now.getUTCMinutes();
 
   const intervals = sendWindowActiveIntervals(parsed, dayKey);
+  const yesterdayIndex = (now.getUTCDay() + 6) % 7;
+  const yesterdayKey = DAY_KEYS[yesterdayIndex];
+  if (!yesterdayKey) {
+    throw new Error(
+      `DAY_KEYS must cover every weekday index 0-6; missing index ${yesterdayIndex}`,
+    );
+  }
   const overnightFromYesterday = sendWindowActiveIntervals(
     parsed,
-    DAY_KEYS[(now.getUTCDay() + 6) % 7]!,
+    yesterdayKey,
   );
 
   const inToday = intervals.some(({ start, end }) =>
@@ -213,6 +220,43 @@ export function isWithinSendWindow(
   );
 
   return inToday || inOvernight;
+}
+
+/**
+ * The exact next instant the window allows sending, for scheduling a deferred
+ * dispatch instead of a fixed polling interval. Returns `null` when the window
+ * is unrestricted (nothing to wait for). Returns `now` when already inside.
+ * Evaluated in UTC to match {@link isWithinSendWindow}.
+ */
+export function nextSendWindowOpenAt(
+  schedule: Schedule | null | undefined,
+  now: Date = new Date(),
+): Date | null {
+  const parsed = schedule ? parseSendWindow(schedule) : null;
+  if (!parsed) return null;
+  if (isWithinSendWindow(parsed, now)) return new Date(now);
+
+  // Earliest interval-open instant within the next 8 days — a week plus
+  // today's tail covers any weekly schedule.
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const baseMidnightMs = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  let bestMs: number | null = null;
+  for (let offset = 0; offset < 8; offset++) {
+    const dayStartMs = baseMidnightMs + offset * MS_PER_DAY;
+    const dayKey = DAY_KEYS[new Date(dayStartMs).getUTCDay()];
+    if (!dayKey) continue;
+    for (const { start } of sendWindowActiveIntervals(parsed, dayKey)) {
+      const openMs = dayStartMs + start * 60 * 1000;
+      if (openMs > now.getTime() && (bestMs === null || openMs < bestMs)) {
+        bestMs = openMs;
+      }
+    }
+  }
+  return bestMs === null ? null : new Date(bestMs);
 }
 
 /**
@@ -256,7 +300,17 @@ function schedulesEqual(a: Schedule, b: Schedule): boolean {
     const right = sendWindowActiveIntervals(b, day);
     if (left.length !== right.length) return false;
     for (let i = 0; i < left.length; i++) {
-      if (left[i]!.start !== right[i]!.start || left[i]!.end !== right[i]!.end) {
+      const leftInterval = left[i];
+      const rightInterval = right[i];
+      if (!leftInterval || !rightInterval) {
+        throw new Error(
+          "schedulesEqual: interval index out of range despite equal-length check",
+        );
+      }
+      if (
+        leftInterval.start !== rightInterval.start ||
+        leftInterval.end !== rightInterval.end
+      ) {
         return false;
       }
     }

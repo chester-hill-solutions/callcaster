@@ -12,9 +12,9 @@ import {
 } from "react-router";
 import type { LinksFunction, MetaFunction } from "react-router";
 import { useCallback } from "react";
-import { Toaster } from "sonner";
 
 import Navbar from "@/components/layout/Navbar";
+import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import stylesheet from "@/tailwind.css?url";
 
@@ -118,7 +118,7 @@ export default function App() {
             params={params}
           />
           <Outlet context={{} satisfies Record<string, never>} />
-          <Toaster position="top-right" richColors visibleToasts={3} />
+          <Toaster position="top-right" visibleToasts={3} />
           <ScrollRestoration />
           <Scripts />
         </ThemeProvider>
@@ -149,6 +149,18 @@ function ErrorShell({
             Buffer polyfill installed before <Scripts /> too — see the
             comment in App's <head>. */}
         <script src="/buffer-polyfill.mjs" />
+        {/*
+          Error boundary renders a whole separate <html>, so the theme init
+          from App doesn't run here — leaving the page in light-mode tokens
+          during the FOUC ("flash bang" per #1397). Duplicate the same theme
+          bootstrap so the error page respects the user's dark preference
+          synchronously.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var t=localStorage.getItem("callcaster-theme");if(t==="dark")document.documentElement.classList.add("dark");else if(t==="light")document.documentElement.classList.remove("dark");else if(window.matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark");else document.documentElement.classList.remove("dark");})();`,
+          }}
+        />
         <Links />
       </head>
       <body className="min-h-screen bg-background">
@@ -170,6 +182,21 @@ function ErrorShell({
               >
                 Go home
               </a>
+              {/*
+                Go back — the common landing case here is a stale link or a
+                mistyped URL where the user just wants to step back one entry
+                (#1398). window.history.back() is safe from inside the root
+                ErrorBoundary; useNavigate() would require this tree to be
+                inside the RouterProvider, which the ErrorShell intentionally
+                is not.
+              */}
+              <button
+                type="button"
+                onClick={() => window.history.back()}
+                className="inline-flex items-center rounded-md border border-input px-4 py-2 text-foreground hover:bg-accent hover:text-accent-foreground"
+              >
+                Go back
+              </button>
               <button
                 type="button"
                 onClick={() => window.location.reload()}

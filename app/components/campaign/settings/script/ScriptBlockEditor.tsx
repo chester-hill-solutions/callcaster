@@ -1,3 +1,9 @@
+import {
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import type {
   ScriptBlock,
   ScriptOption,
@@ -15,6 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 
 /** Sentinel for "no routing target" — Radix Select rejects empty-string values. */
 const NO_ROUTING_TARGET = "__none__";
@@ -23,6 +30,7 @@ export type ScriptBlockEditorProps = {
   block: ScriptBlock;
   readOnly?: boolean;
   mediaNames: string[];
+  onUploadAudio?: (file: File) => Promise<string | null>;
   routingTargets: RoutingTarget[];
   onChange: (patch: Partial<ScriptBlock>) => void;
   onRemove: () => void;
@@ -38,6 +46,7 @@ export function ScriptBlockEditor({
   block,
   readOnly = false,
   mediaNames,
+  onUploadAudio,
   routingTargets,
   onChange,
   onRemove,
@@ -62,6 +71,35 @@ export function ScriptBlockEditor({
     block.type === "radio" ||
     block.type === "checkbox" ||
     options.length > 0;
+
+  const audioInputRef = useRef<HTMLInputElement>(null);
+  const ivrBlockTypeSelectId = useId();
+  const speechTypeSelectId = useId();
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+
+  const handleAudioFileSelected = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !onUploadAudio) return;
+    setIsUploadingAudio(true);
+    try {
+      const name = await onUploadAudio(file);
+      if (!name) return;
+      // Flip the block to "recorded" alongside setting the file so an upload
+      // from a "say" or "synthetic" block actually plays the uploaded audio.
+      // Without this, IVR playback keeps using TTS and the upload silently
+      // does nothing at runtime (the #1325 discoverability bug).
+      const patch: Partial<ScriptBlock> =
+        block.callcasterType === "recorded"
+          ? ({ audioFile: name } as Partial<ScriptBlock>)
+          : ({ audioFile: name, callcasterType: "recorded" } as Partial<ScriptBlock>);
+      onChange(patch);
+    } finally {
+      setIsUploadingAudio(false);
+    }
+  };
 
   const routingOptions = [
     { value: NO_ROUTING_TARGET, label: "(no target)" },
@@ -123,7 +161,7 @@ export function ScriptBlockEditor({
       )}
       {isIvrBlock && (
         <>
-          <FormField label="IVR block type">
+          <FormField label="IVR block type" htmlFor={ivrBlockTypeSelectId}>
             <Select
               value={block.callcasterType ?? "say"}
               disabled={readOnly}
@@ -131,7 +169,7 @@ export function ScriptBlockEditor({
                 onChange({ callcasterType: value } as Partial<ScriptBlock>)
               }
             >
-              <SelectTrigger>
+              <SelectTrigger id={ivrBlockTypeSelectId}>
                 <SelectValue placeholder="Select…" />
               </SelectTrigger>
               <SelectContent>
@@ -142,7 +180,7 @@ export function ScriptBlockEditor({
             </Select>
           </FormField>
           {block.speechType !== undefined && (
-            <FormField label="Speech type">
+            <FormField label="Speech type" htmlFor={speechTypeSelectId}>
               <Select
                 value={block.speechType}
                 disabled={readOnly}
@@ -150,7 +188,7 @@ export function ScriptBlockEditor({
                   onChange({ speechType: value } as Partial<ScriptBlock>)
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger id={speechTypeSelectId}>
                   <SelectValue placeholder="Select…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -197,6 +235,32 @@ export function ScriptBlockEditor({
               />
             )}
           </Label>
+          {!readOnly && onUploadAudio && (
+            <>
+              <input
+                ref={audioInputRef}
+                type="file"
+                accept={getAudioUploadAcceptValue()}
+                className="hidden"
+                onChange={handleAudioFileSelected}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="justify-self-start"
+                disabled={isUploadingAudio}
+                onClick={() => audioInputRef.current?.click()}
+              >
+                {isUploadingAudio ? "Uploading…" : "Upload audio"}
+              </Button>
+              {block.callcasterType !== "recorded" && (
+                <p className="text-xs text-muted-foreground">
+                  Uploading switches this block to Recorded audio.
+                </p>
+              )}
+            </>
+          )}
         </>
       )}
       {takesOptions && (
@@ -231,7 +295,10 @@ export function ScriptBlockEditor({
                   }
                 />
               </Label>
-              <FormField label="Next target">
+              <FormField
+                label="Next target"
+                htmlFor={`next-target-${option.id ?? index}`}
+              >
                 <Select
                   value={option.next || NO_ROUTING_TARGET}
                   disabled={readOnly}
@@ -241,7 +308,7 @@ export function ScriptBlockEditor({
                     })
                   }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id={`next-target-${option.id ?? index}`}>
                     <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent>

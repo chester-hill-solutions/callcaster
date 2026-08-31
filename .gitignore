@@ -23,6 +23,7 @@ pnpm-debug.log*
 
 # Local generated files
 /public/exports/
+.repl/
 
 # Playwright E2E
 /e2e/.auth/

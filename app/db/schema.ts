@@ -85,7 +85,7 @@ export const workspace = pgTable("workspace", {
 
 export const workspace_users = pgTable("workspace_users", {
   created_at: text().notNull(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   last_accessed: text(),
   role: text().notNull(),
   user_id: uuid().notNull(),
@@ -199,12 +199,12 @@ export const workspace_number = pgTable("workspace_number", {
   created_at: text().notNull(),
   friendly_name: text(),
   handset_enabled: boolean().notNull(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   inbound_action: text(),
   inbound_audio: text(),
-  inbound_queue_id: serial(),
+  inbound_queue_id: bigint({ mode: "number" }),
   inbound_ring_count: integer().notNull(),
-  inbound_script_id: serial(),
+  inbound_script_id: bigint({ mode: "number" }),
   phone_number: text(),
   /** Unpaid cycle count at which the customer was last warned; null = never. */
   rental_warned_cycle: integer(),
@@ -226,7 +226,7 @@ export const campaign = pgTable("campaign", {
   disposition_options: jsonb(),
   end_date: text(),
   group_household_queue: boolean().notNull(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   live_questions: jsonb(),
   message_media: text().array(),
   next_queue_order: integer().notNull(),
@@ -245,8 +245,8 @@ export const campaign = pgTable("campaign", {
 });
 
 export const campaign_audience = pgTable("campaign_audience", {
-  audience_id: serial().notNull(),
-  campaign_id: serial().notNull(),
+  audience_id: bigint({ mode: "number" }).notNull(),
+  campaign_id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity(),
   created_at: text().notNull(),
 });
 
@@ -256,11 +256,11 @@ export const campaign_queue = pgTable(
     assigned_to_user_id: uuid(),
     attempt_count: integer().notNull(),
     attempts: integer().notNull(),
-    campaign_id: serial().notNull(),
+    campaign_id: bigint({ mode: "number" }).notNull(),
     claimed_at: text(),
-    contact_id: serial().notNull(),
+    contact_id: bigint({ mode: "number" }).notNull(),
     created_at: text().notNull(),
-    id: serial().notNull().primaryKey(),
+    id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
     last_attempt_at: text(),
     last_attempt_error: text(),
     provider_status: text(),
@@ -277,7 +277,7 @@ export const campaign_queue = pgTable(
 export const script = pgTable("script", {
   created_at: text().notNull(),
   created_by: uuid(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   name: text().notNull(),
   steps: jsonb(),
   type: text(),
@@ -299,7 +299,7 @@ export const contact = pgTable("contact", {
   external_id: text(),
   firstname: text(),
   household_id: uuid(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   // Twilio Lookup v2 line-type cache: null = never looked up. Populated
   // lazily on a contact's first SMS attempt and treated as permanent once set.
   line_type: text(),
@@ -319,14 +319,14 @@ export const contact = pgTable("contact", {
 });
 
 export const contact_audience = pgTable("contact_audience", {
-  audience_id: serial().notNull(),
-  contact_id: serial().notNull(),
+  audience_id: bigint({ mode: "number" }).notNull(),
+  contact_id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity(),
   created_at: text().notNull(),
 });
 
 export const audience = pgTable("audience", {
   created_at: text().notNull(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   is_conditional: boolean().notNull(),
   name: text(),
   workspace: uuid(),
@@ -338,8 +338,8 @@ export const audience = pgTable("audience", {
 });
 
 export const audience_upload = pgTable("audience_upload", {
-  id: serial().notNull().primaryKey(),
-  audience_id: serial().notNull(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
+  audience_id: bigint({ mode: "number" }).notNull(),
   workspace: uuid().notNull(),
   created_by: uuid(),
   created_at: text().notNull(),
@@ -379,9 +379,9 @@ export const call = pgTable("call", {
   api_version: text(),
   call_duration: integer(),
   caller_name: text(),
-  campaign_id: serial(),
+  campaign_id: bigint({ mode: "number" }),
   conference_id: text(),
-  contact_id: serial(),
+  contact_id: bigint({ mode: "number" }),
   date_created: text().notNull(),
   date_updated: text(),
   direction: text(),
@@ -391,11 +391,11 @@ export const call = pgTable("call", {
   from: text(),
   group_sid: text(),
   is_last: boolean().notNull(),
-  outreach_attempt_id: serial(),
+  outreach_attempt_id: bigint({ mode: "number" }),
   parent_call_sid: text(),
   phone_number_sid: text(),
   price: text(),
-  queue_id: serial(),
+  queue_id: bigint({ mode: "number" }),
   recording_duration: text(),
   recording_sid: text(),
   recording_url: text(),
@@ -418,8 +418,8 @@ export const message = pgTable("message", {
   account_sid: text(),
   api_version: text(),
   body: text(),
-  campaign_id: serial(),
-  contact_id: serial(),
+  campaign_id: bigint({ mode: "number" }),
+  contact_id: bigint({ mode: "number" }),
   date_created: text(),
   date_sent: text(),
   date_updated: text(),
@@ -434,7 +434,7 @@ export const message = pgTable("message", {
   outbound_media: text().array(),
   /** Requested "send later" time for scheduled sends (Twilio doesn't echo `sendAt` back). */
   scheduled_at: text(),
-  outreach_attempt_id: serial(),
+  outreach_attempt_id: bigint({ mode: "number" }),
   price: text(),
   price_unit: text(),
   sid: text().notNull(),
@@ -447,14 +447,14 @@ export const message = pgTable("message", {
 
 export const outreach_attempt = pgTable("outreach_attempt", {
   answered_at: text(),
-  campaign_id: serial().notNull(),
+  campaign_id: bigint({ mode: "number" }).notNull(),
   callback_audit: boolean(),
-  contact_id: serial().notNull(),
+  contact_id: bigint({ mode: "number" }).notNull(),
   created_at: text().notNull(),
   current_step: text(),
   disposition: text(),
   ended_at: text(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   issue_tags: text().array(),
   lawn_sign: boolean(),
   membership_sold: boolean(),
@@ -472,7 +472,7 @@ export const inbound_queue = pgTable("inbound_queue", {
   created_at: text().notNull(),
   description: text(),
   hold_audio: text(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   name: text().notNull(),
   updated_at: text().notNull(),
   workspace_id: uuid().notNull(),
@@ -480,8 +480,8 @@ export const inbound_queue = pgTable("inbound_queue", {
 
 export const inbound_queue_member = pgTable("inbound_queue_member", {
   created_at: text().notNull(),
-  id: serial().notNull().primaryKey(),
-  queue_id: serial().notNull(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
+  queue_id: bigint({ mode: "number" }).notNull(),
   user_id: uuid().notNull(),
   workspace_id: uuid().notNull(),
 });
@@ -493,10 +493,10 @@ export const inbound_queue_entry = pgTable("inbound_queue_entry", {
   caller_number: text(),
   completed_at: text(),
   created_at: text().notNull(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   offered_at: text(),
   offered_to_user_id: text(),
-  queue_id: serial().notNull(),
+  queue_id: bigint({ mode: "number" }).notNull(),
   status: queue_entry_state().notNull(),
   twilio_queue_sid: text(),
   updated_at: text().notNull(),
@@ -509,13 +509,13 @@ export const agent_status = pgTable("agent_status", {
   status: text().notNull(),
   status_reason: text(),
   status_started_at: text().notNull(),
-  current_queue_entry_id: serial(),
+  current_queue_entry_id: bigint({ mode: "number" }),
   last_heartbeat_at: text(),
   updated_at: text().notNull(),
 });
 
 export const agent_status_event = pgTable("agent_status_event", {
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   workspace_id: uuid().notNull(),
   user_id: uuid().notNull(),
   from_status: text().notNull(),
@@ -597,7 +597,7 @@ export const handset_session = pgTable("handset_session", {
 export const transaction_history = pgTable("transaction_history", {
   amount: integer().notNull(),
   created_at: text().notNull(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   idempotency_key: text(),
   note: text(),
   type: text().notNull(),
@@ -633,7 +633,7 @@ export const webhook = pgTable("webhook", {
   custom_headers: jsonb().notNull(),
   destination_url: text().notNull(),
   events: jsonb(),
-  id: serial().notNull().primaryKey(),
+  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   type: text(),
   updated_at: text(),
   updated_by: text(),

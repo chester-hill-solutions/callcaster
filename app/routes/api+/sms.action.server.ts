@@ -127,6 +127,7 @@ export const action = defineAction({
           JSON.stringify({
             deferred: true,
             reason: "Outside campaign send window",
+            nextOpenAt: outcome.nextOpenAt.toISOString(),
             responses: [],
           }),
           {

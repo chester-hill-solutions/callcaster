@@ -110,6 +110,19 @@ async function goToReview(container: HTMLElement, csv: string, fileName?: string
   fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 }
 
+/** The drop zone invariant: the CSV prompt text sits inside a `<label>`. */
+function getDropZone(): HTMLElement {
+  const dropZone = screen
+    .getByText("Drop or choose a CSV file")
+    .closest<HTMLElement>("label");
+  if (!dropZone) {
+    throw new Error(
+      "drop zone label not found: CSV prompt text must be wrapped in a <label>",
+    );
+  }
+  return dropZone;
+}
+
 /** Reach the processing phase with polling enabled. */
 async function startUpload(
   container: HTMLElement,
@@ -184,11 +197,76 @@ describe("app/components/audience/AudienceUploader.tsx", () => {
     render(<AudienceUploader audienceName="A1" />);
     const file = new File(["Phone\n123"], "contacts.csv", { type: "text/csv" });
     (file as any).text = async () => "Phone\n123";
+    const dropZone = getDropZone();
+
+    fireEvent.drop(dropZone, { dataTransfer: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByText("Map CSV Headers")).toBeInTheDocument();
+    });
+  });
+
+  test("shows an active drag state while a file is over the zone and clears it on leave/drop (#1203)", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    render(<AudienceUploader audienceName="A1" />);
+    const dropZone = getDropZone();
+
+    // The drag-active contract is exposed as a stable data attribute; the
+    // exact highlight classes are a styling concern that may change.
+    expect(dropZone.dataset.dragActive).toBe("false");
+    fireEvent.dragEnter(dropZone, { dataTransfer: { files: [] } });
+    expect(dropZone.dataset.dragActive).toBe("true");
+
+    // Nested children emit their own dragleave; the active state must persist
+    // until the cursor truly leaves the zone.
+    fireEvent.dragEnter(dropZone, { dataTransfer: { files: [] } });
+    fireEvent.dragLeave(dropZone, { dataTransfer: { files: [] } });
+    expect(dropZone.dataset.dragActive).toBe("true");
+
+    // Leaving fully clears the highlight.
+    fireEvent.dragLeave(dropZone, { dataTransfer: { files: [] } });
+    expect(dropZone.dataset.dragActive).toBe("false");
+
+    // Re-entering then dropping clears it and still imports the file.
+    const file = new File(["Phone\n123"], "contacts.csv", { type: "text/csv" });
+    (file as any).text = async () => "Phone\n123";
+    fireEvent.dragEnter(dropZone, { dataTransfer: { files: [file] } });
+    expect(dropZone.dataset.dragActive).toBe("true");
+    fireEvent.drop(dropZone, { dataTransfer: { files: [file] } });
+    expect(dropZone.dataset.dragActive).toBe("false");
+    await waitFor(() => {
+      expect(screen.getByText("Map CSV Headers")).toBeInTheDocument();
+    });
+  });
+
+  test("recovers the highlight after an OS-interrupted drag delivers an unpaired dragleave (#1358)", async () => {
+    const { default: AudienceUploader } =
+      await import("@/components/audience/AudienceUploader");
+    render(<AudienceUploader audienceName="A1" />);
     const dropZone = screen.getByText("Drop or choose a CSV file").closest("label");
-
     expect(dropZone).not.toBeNull();
-    fireEvent.drop(dropZone!, { dataTransfer: { files: [file] } });
 
+    // Hovering normally lights the zone.
+    fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("true");
+
+    // The OS can steal key-window mid-drag (Helium repro, even on a bare
+    // page) and deliver a dragleave with no matching dragenter. The highlight
+    // must not stay dead: the next continuous dragover re-asserts it.
+    fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("false");
+    fireEvent.dragOver(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("true");
+
+    // A genuine leave afterwards still clears it, and drop still works.
+    fireEvent.dragLeave(dropZone!, { dataTransfer: { files: [] } });
+    expect(dropZone!.dataset.dragActive).toBe("false");
+
+    const file = new File(["Phone\n123"], "contacts.csv", { type: "text/csv" });
+    (file as any).text = async () => "Phone\n123";
+    fireEvent.dragEnter(dropZone!, { dataTransfer: { files: [file] } });
+    fireEvent.drop(dropZone!, { dataTransfer: { files: [file] } });
     await waitFor(() => {
       expect(screen.getByText("Map CSV Headers")).toBeInTheDocument();
     });

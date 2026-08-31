@@ -67,12 +67,20 @@ test.describe("RBAC @rbac @security", () => {
   });
 
   callerTest("RBAC-18 caller zero credits dialog", async ({ page }) => {
+    // #1435: try/finally guarantees the credit restore runs even when
+    // the banner assertion fails. Previously the trailing
+    // `setWorkspaceCredits(..., 500)` never fired on an assertion
+    // timeout, leaving the shared workspace at credits=0 and cascading
+    // into every subsequent credit-sensitive test in this run.
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 0);
-    const callScreen = new CallScreenPage(page);
-    await callScreen.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
-    const banner = page.getByTestId("credits-error-banner");
-    await expect(banner).toBeVisible({ timeout: 30_000 });
-    await expect(banner.getByText(/Campaign credits required/i)).toBeVisible();
-    await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 500);
+    try {
+      const callScreen = new CallScreenPage(page);
+      await callScreen.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
+      const banner = page.getByTestId("credits-error-banner");
+      await expect(banner).toBeVisible({ timeout: 30_000 });
+      await expect(banner.getByText(/Campaign credits required/i)).toBeVisible();
+    } finally {
+      await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 500);
+    }
   });
 });

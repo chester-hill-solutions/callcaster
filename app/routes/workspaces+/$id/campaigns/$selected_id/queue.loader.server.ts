@@ -41,17 +41,21 @@ export const loader = defineLoader({
 
     if (!auth.ok) return auth.response;
 
-    if (!selected_id) throw redirect("../../");
+    const { workspaceId } = auth.ctx;
+    // Absolute redirect — `../../` resolved against `/workspaces/$id/campaigns/$selected_id/queue`
+    // per RFC 3986 lands on `/workspaces/$id/`, not the campaigns list.
+    const campaignsListUrl = `/workspaces/${workspaceId}/campaigns`;
+
+    if (!selected_id) throw redirect(campaignsListUrl);
 
     const campaignIdNum = Number(selected_id);
-    const { workspaceId } = auth.ctx;
 
     // This loader must verify the campaign belongs to the workspace itself: the
     // parent layout loader's guard can be bypassed under single-fetch route
     // filtering (?_routes=), and without this the queue (contact PII) leaks
     // cross-tenant via an enumerable campaign id.
     const campaign = await findCampaignInWorkspace(workspaceId, campaignIdNum);
-    if (!campaign) throw redirect("../../");
+    if (!campaign) throw redirect(campaignsListUrl);
 
     const filters: QueueSearchFilters = {
       name: searchParams.get("name") || "",

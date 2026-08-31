@@ -105,23 +105,32 @@ export function StatusBar({
 
 export function ContactStrip({
   nextRecipient,
-}: Pick<CallAreaProps, "nextRecipient">) {
-  if (!nextRecipient) return null;
+  questionContact,
+}: Pick<CallAreaProps, "nextRecipient" | "questionContact">) {
+  // #1362: prefer questionContact — it "holds steady through the hangup
+  // window" (see useCampaignDialActions comment on questionContact vs
+  // nextRecipient). Nulling this strip on agent-hangup (when
+  // hangup.action.server.ts dequeues the just-finished row and
+  // nextRecipient collapses) is the divergent behaviour: the same call
+  // ended by the contact keeps the name visible because no auto-dequeue
+  // fires. Falling back to nextRecipient covers the pre-dial state.
+  const contactSource = questionContact ?? nextRecipient;
+  if (!contactSource) return null;
 
   return (
     <div className="flex flex-col gap-1 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <div className="font-Zilla-Slab text-lg font-bold text-foreground">
-          {nextRecipient.contact?.firstname} {nextRecipient.contact?.surname}
+          {contactSource.contact?.firstname} {contactSource.contact?.surname}
         </div>
         <div className="text-lg text-foreground">
-          {nextRecipient.contact?.phone}
+          {contactSource.contact?.phone}
         </div>
       </div>
       <div className="min-w-0 text-sm text-muted-foreground sm:text-right">
-        <div className="truncate">{nextRecipient.contact?.email}</div>
+        <div className="truncate">{contactSource.contact?.email}</div>
         <div className="truncate">
-          {nextRecipient.contact?.address
+          {contactSource.contact?.address
             ?.split(",")
             ?.map((part) => part.trim())
             .join(", ")}
@@ -170,17 +179,21 @@ export function CallControls({
   onResetCall,
 }: CallControlsProps) {
   const [confirmingHangUp, setConfirmingHangUp] = useState(false);
+  const [dialArmed, setDialArmed] = useState(false);
   const confirmTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const dialArmTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevShowInCallRef = useRef(false);
 
   /**
-   * @effect Clean up the hang-up confirmation timer on unmount to prevent
-   * a stale timeout callback from firing after the component is gone.
+   * @effect Clean up the hang-up and dial-arm confirmation timers on unmount
+   * so a stale timeout callback can't fire after the component is gone.
    * @effect-deps [] — fire-once cleanup, no external state to track
    * @effect-side-effects timer (clearTimeout on unmount)
    * @effect-why-not-loader Component lifecycle cleanup, not data fetching.
    */
   useEffect(() => () => {
     if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
+    if (dialArmTimerRef.current) clearTimeout(dialArmTimerRef.current);
   }, []);
 
   const handleHangUpClick = () => {
@@ -198,6 +211,40 @@ export function CallControls({
 
   const inCall = callState === "connected" || callState === "dialing";
   const showInCall = inCall && (!predictive || !!conference);
+
+  /**
+   * @effect Arm a "click again to dial" guard on the Dial button whenever it
+   * replaces the Hang Up button (manual mode only). Prevents an agent's
+   * in-flight click on Hang Up from becoming an accidental dial when the
+   * recipient hangs up first and the button flips in the same spot
+   * (see #1292). Predictive Start/Start Dialing is not click-replacing
+   * anything, so it stays no-confirm.
+   * @effect-deps [showInCall, predictive] — flip is only meaningful when
+   * these two derived values change.
+   * @effect-side-effects timer (arms + 3s auto-disarm)
+   * @effect-why-not-loader Pure UI state, no data fetch.
+   */
+  useEffect(() => {
+    if (prevShowInCallRef.current && !showInCall && !predictive) {
+      if (dialArmTimerRef.current) clearTimeout(dialArmTimerRef.current);
+      setDialArmed(true);
+      dialArmTimerRef.current = setTimeout(() => {
+        setDialArmed(false);
+      }, 3000);
+    }
+    prevShowInCallRef.current = showInCall;
+  }, [showInCall, predictive]);
+
+  const handleDialClick = () => {
+    if (dialArmed) {
+      // First click after a just-ended call: consume as a "wake up" click and
+      // disarm. The agent must click again — deliberately — to actually dial.
+      if (dialArmTimerRef.current) clearTimeout(dialArmTimerRef.current);
+      setDialArmed(false);
+      return;
+    }
+    handleDialNext();
+  };
 
   if (showInCall) {
     return (
@@ -270,10 +317,24 @@ export function CallControls({
     );
   }
 
+  // When the Dial button first appears after a call ends (`dialArmed`), it
+  // reads as "Click again to call back" — Sai's #1342 point 1: the button
+  // that lands in the same spot the Hang Up used to occupy should evoke
+  // "back to calling" so the agent knows *why* the label just changed.
+  // Once the guard window elapses (see the arm effect above) the label
+  // reverts to plain "Dial" for the next-contact flow, unchanged.
+  const dialLabel = dialArmed
+    ? "Click again to call back"
+    : !predictive
+      ? "Dial"
+      : conference
+        ? "Start"
+        : "Start Dialing";
+
   return (
     <div className="flex flex-col gap-3 px-4 py-3">
       <Button
-        onClick={handleDialNext}
+        onClick={handleDialClick}
         disabled={isBusy}
         data-testid="call-screen-dial"
         className="w-full rounded-full bg-success text-success-foreground hover:bg-success/80"
@@ -283,7 +344,7 @@ export function CallControls({
             : undefined
         }
       >
-        {!predictive ? "Dial" : conference ? "Start" : "Start Dialing"}
+        {dialLabel}
       </Button>
     </div>
   );
@@ -380,7 +441,7 @@ export const CallArea: React.FC<CallAreaProps> = ({
   return (
     <div className={cn(callPanelShellClass, "min-h-0 justify-between")}>
       <StatusBar displayState={displayState} callDuration={callDuration} />
-      <ContactStrip nextRecipient={nextRecipient} />
+      <ContactStrip nextRecipient={nextRecipient} questionContact={questionContact} />
       <CallControls
         isBusy={isBusy}
         nextRecipient={nextRecipient}

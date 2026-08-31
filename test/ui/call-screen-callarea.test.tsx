@@ -252,6 +252,106 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
     expect(onLoadQueue).toHaveBeenCalledTimes(1);
   });
 
+  test("dial button requires a confirmation click after a call ends in manual mode (#1292)", async () => {
+    // Scenario: the recipient hangs up first, so the button flips from
+    // Hang Up to Dial under an agent's still-in-flight click. Without the
+    // guard, that click would immediately dial the next contact. The guard
+    // consumes the first click as a "wake up" and only dials on the second.
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const handleDialNext = vi.fn();
+
+    // Start in an in-call state so `showInCall` is true.
+    const { rerender } = render(
+      <CallArea
+        {...baseProps({
+          callState: "connected",
+          displayState: "connected",
+          handleDialNext,
+        })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hang Up" })).toBeInTheDocument();
+
+    // Recipient hangs up: callState transitions to completed. The Dial
+    // button appears, but armed — its label is the confirm prompt.
+    rerender(
+      <CallArea
+        {...baseProps({
+          callState: "idle",
+          displayState: "completed",
+          handleDialNext,
+        })}
+      />,
+    );
+    // Label reads "Click again to call back" while armed — Sai's #1342
+    // point 1: the button that just replaced Hang Up should evoke
+    // "back to calling" so the agent knows why the label changed.
+    const armed = screen.getByRole("button", { name: "Click again to call back" });
+    expect(armed).toBeInTheDocument();
+
+    // The armed click MUST NOT dial.
+    fireEvent.click(armed);
+    expect(handleDialNext).not.toHaveBeenCalled();
+
+    // After disarming, the button flips back to the normal Dial label and
+    // clicking it dials for real.
+    const dial = screen.getByRole("button", { name: "Dial" });
+    fireEvent.click(dial);
+    expect(handleDialNext).toHaveBeenCalledTimes(1);
+  });
+
+  test("dial button does NOT require confirmation when arriving from idle (no prior call to confuse the click)", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const handleDialNext = vi.fn();
+
+    render(
+      <CallArea
+        {...baseProps({
+          callState: "idle",
+          displayState: "idle",
+          handleDialNext,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Dial" }));
+    expect(handleDialNext).toHaveBeenCalledTimes(1);
+  });
+
+  test("predictive Start Dialing does NOT require confirmation after a call ends (only replacing-the-hangup manual dial does)", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+    const handleDialNext = vi.fn();
+
+    const { rerender } = render(
+      <CallArea
+        {...baseProps({
+          predictive: true,
+          conference: { parameters: { Sid: "CF1" } },
+          callState: "connected",
+          displayState: "connected",
+          handleDialNext,
+        })}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Hang Up" })).toBeInTheDocument();
+
+    rerender(
+      <CallArea
+        {...baseProps({
+          predictive: true,
+          // conference cleared → back to Start Dialing
+          conference: null,
+          callState: "idle",
+          displayState: "completed",
+          handleDialNext,
+        })}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Start Dialing" }));
+    expect(handleDialNext).toHaveBeenCalledTimes(1);
+  });
+
   test("dial button is the idle primary action; hidden while dialing/connected", async () => {
     const { CallArea } = await import("@/components/call/CallScreen.CallArea");
 
@@ -375,5 +475,54 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
 
     fireEvent.change(sel, { target: { value: "completed" } });
     expect(setDisposition).toHaveBeenCalledWith("completed");
+  });
+
+  // Regression for #1362: "if the user hangs up, the contact name goes
+  // away but if the contact hangs up it stays. Latter should be true
+  // for both". Same post-hangup shape as #1253 — nextRecipient has
+  // collapsed because hangup.action.server.ts dequeued the just-finished
+  // row, but questionContact still points at the person the agent just
+  // called. ContactStrip must show that contact so the two hangup paths
+  // converge visually.
+  test("#1362: contact name persists after agent hangup (nextRecipient null, questionContact set) — matches contact-hangup", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+
+    render(
+      <CallArea
+        {...baseProps({
+          nextRecipient: null,
+          questionContact: makeRecipient({
+            contact: {
+              firstname: "Rita",
+              surname: "Perez",
+              phone: "+15551234567",
+              email: "rita@example.com",
+              address: "1 Main St, Apt 2, Toronto",
+            },
+          }),
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/Rita Perez/)).toBeInTheDocument();
+    expect(screen.getByText("+15551234567")).toBeInTheDocument();
+  });
+
+  test("#1362: ContactStrip falls back to nextRecipient before the first dial (questionContact null)", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+
+    render(
+      <CallArea
+        {...baseProps({
+          nextRecipient: makeRecipient({
+            contact: { firstname: "Sam", surname: "Lee", phone: "+15550009999" },
+          }),
+          questionContact: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/Sam Lee/)).toBeInTheDocument();
+    expect(screen.getByText("+15550009999")).toBeInTheDocument();
   });
 });

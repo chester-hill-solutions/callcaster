@@ -35,7 +35,15 @@ export function CallWorkbench({
     <section
       className={cn(
         "grid w-full grid-cols-1 items-start gap-4 pb-20 sm:pb-6",
-        "xl:grid-cols-[340px_minmax(420px,1fr)_380px]",
+        // #1343: xl activates at 1280px viewport, but after the workspace
+        // nav rail (252px), page padding (48px), and panel padding (48px),
+        // the actual grid container on a 13" MacBook is ~916px. The
+        // previous fixed columns (340 + 420 + 380 + gap) demanded 1172px
+        // and forced a horizontal scroll. `minmax(min, ideal)` lets each
+        // column shrink when the viewport can't afford it while still
+        // reaching its ideal at wider breakpoints; the center column keeps
+        // `1fr` so extra space still flows into the reading surface.
+        "xl:grid-cols-[minmax(220px,320px)_minmax(340px,1fr)_minmax(260px,340px)]",
         className,
       )}
       aria-label="Call workspace"

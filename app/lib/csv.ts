@@ -32,7 +32,17 @@ function stringifyScalar(value: CsvCell): string {
 export function sanitizeCsvInjection(value: string): string {
   const trimmedStart = value.replace(/^\s+/, "");
   const first = trimmedStart[0];
-  if (first && ["=", "+", "-", "@"]?.includes(first)) {
+  if (!first) return value;
+  // `=` is unambiguously a formula prefix in every spreadsheet — always escape.
+  if (first === "=") return `'${value}`;
+  // `+`, `-`, `@` are only formula triggers when followed by a NON-digit
+  // (function name, cell reference, or `@` name). A digit after these means
+  // it's a signed number or a phone number in E.164, which spreadsheets treat
+  // as data, not a formula. Sai's #1336 report: exported phone numbers came
+  // out as `'+16478657844`, showing the leading quote in Excel/Sheets.
+  if (["+", "-", "@"].includes(first)) {
+    const second = trimmedStart[1];
+    if (second && /\d/.test(second)) return value;
     return `'${value}`;
   }
   return value;

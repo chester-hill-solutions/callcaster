@@ -29,13 +29,21 @@ ownerTest.describe("Dial modes @authenticated @slow", () => {
   });
 
   ownerTest("DIAL-08 zero credits owner billing link", async ({ page }) => {
+    // #1435: try/finally guarantees the credit restore runs even when
+    // the banner assertion fails. Same shape as RBAC-18 — the trailing
+    // `setWorkspaceCredits(..., 500)` used to be a plain statement
+    // that never fired on assertion timeout, cascading credits=0 into
+    // every subsequent credit-sensitive test in the run.
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 0);
-    const callScreen = new CallScreenPage(page);
-    await callScreen.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
-    const banner = page.getByTestId("credits-error-banner");
-    await expect(banner).toBeVisible({ timeout: 30_000 });
-    await expect(banner.getByText(/Credit balance depleted/i)).toBeVisible();
-    await expect(banner.getByRole("link", { name: /Add credits/i })).toBeVisible();
-    await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 500);
+    try {
+      const callScreen = new CallScreenPage(page);
+      await callScreen.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
+      const banner = page.getByTestId("credits-error-banner");
+      await expect(banner).toBeVisible({ timeout: 30_000 });
+      await expect(banner.getByText(/Credit balance depleted/i)).toBeVisible();
+      await expect(banner.getByRole("link", { name: /Add credits/i })).toBeVisible();
+    } finally {
+      await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 500);
+    }
   });
 });

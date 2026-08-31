@@ -66,6 +66,23 @@ describe("account route", () => {
     });
   });
 
+  test("auth bounce must not capture /account as the login return-to (#1317)", async () => {
+    const { loader } = await import("../app/routes/account.loader.server");
+    const request = new Request("http://localhost/account");
+    await asRouteResponse(
+      loader({
+        request,
+        params: {},
+        context: {},
+      }),
+    );
+
+    // Exactly one argument. Reintroducing verifyAuth(request, "/account")
+    // would bounce every unauthenticated visit through /account and land the
+    // user back on this settings page after login instead of /workspaces.
+    expect(mocks.verifyAuth).toHaveBeenCalledWith(request);
+  });
+
   test("updates the signed-in user's profile", async () => {
     mocks.updateMeProfile.mockResolvedValue({
       ok: true,

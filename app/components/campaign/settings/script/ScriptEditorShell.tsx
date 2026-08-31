@@ -30,6 +30,7 @@ export type ScriptEditorShellProps = {
   document: ScriptDocument;
   onChange: (doc: ScriptDocument) => void;
   mediaNames?: string[];
+  onUploadAudio?: (file: File) => Promise<string | null>;
   readOnly?: boolean;
   className?: string;
 };
@@ -38,6 +39,7 @@ export function ScriptEditorShell({
   document,
   onChange,
   mediaNames = [],
+  onUploadAudio,
   readOnly = false,
   className,
 }: ScriptEditorShellProps) {
@@ -261,6 +263,7 @@ export function ScriptEditorShell({
                           block={block}
                           readOnly={readOnly}
                           mediaNames={mediaNames}
+                          onUploadAudio={onUploadAudio}
                           routingTargets={editor.routingTargets}
                           onChange={(patch) =>
                             editor.updateBlock(blockId, patch)
