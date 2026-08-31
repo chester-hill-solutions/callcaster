@@ -272,7 +272,14 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                 </Select>
               </FormField>
 
-              <div className="flex items-end">
+              {/*
+                #1338: wrap the mute button in a FormField with a matching
+                label so its baseline aligns with the Microphone/Speaker
+                selects. Previously `flex items-end` bottom-aligned the
+                button inside a taller sibling column, which read as a
+                stray button floating below the row on the settings sheet.
+              */}
+              <FormField label="Microphone control">
                 <Button
                   onClick={handleMuteMicrophone}
                   variant={isMicrophoneMuted ? "destructive" : "outline"}
@@ -281,47 +288,68 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
                   {isMicrophoneMuted ? <MicOff size={16} /> : <Mic size={16} />}
                   {isMicrophoneMuted ? "Unmute Microphone" : "Mute Microphone"}
                 </Button>
-              </div>
+              </FormField>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4">
-              <div className="relative inline-block">
-                <Select value={selectedDevice} onValueChange={onDeviceSelect}>
-                  <SelectTrigger
-                    className={cn(deviceSelectClass, "cursor-pointer pr-8")}
+            {/*
+              #1338: give the calling-device row proper FormField wrappers
+              so the Select trigger and the Add Phone Number button share
+              a baseline (both anchored to a label above), replacing the
+              old freeform `flex items-center` that left the button
+              vertically off-centered from the Select.
+            */}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <FormField
+                label={
+                  <span className="flex items-center gap-2">
+                    <Phone size={16} /> Calling device
+                  </span>
+                }
+                description={
+                  phoneStatus === "connecting" ? "Connecting..." : undefined
+                }
+                className="md:col-span-2"
+              >
+                <div className="relative">
+                  <Select
+                    value={selectedDevice}
+                    onValueChange={onDeviceSelect}
                   >
-                    <SelectValue placeholder="Select device" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="computer">Computer Audio</SelectItem>
-                    {verifiedNumbers.map((number) => (
-                      <SelectItem key={number} value={number}>
-                        {number}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2">
-                  {selectedDevice === "computer" ? (
-                    <Monitor size={16} />
-                  ) : (
-                    <Phone size={16} />
-                  )}
+                    <SelectTrigger
+                      className={cn(deviceSelectClass, "w-full cursor-pointer pr-8")}
+                    >
+                      <SelectValue placeholder="Select device" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="computer">Computer Audio</SelectItem>
+                      {verifiedNumbers.map((number) => (
+                        <SelectItem key={number} value={number}>
+                          {number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2">
+                    {selectedDevice === "computer" ? (
+                      <Monitor size={16} />
+                    ) : (
+                      <Phone size={16} />
+                    )}
+                  </div>
                 </div>
-                {phoneStatus === "connecting" ? (
-                  <span className="ml-2 text-warning">Connecting...</span>
-                ) : null}
-              </div>
+              </FormField>
 
               {!isAddingNumber && !verificationPhoneNumber ? (
-                <Button
-                  variant="outline"
-                  onClick={onAddNumberClick}
-                  className="flex items-center gap-2"
-                >
-                  <Plus size={16} />
-                  Add Phone Number
-                </Button>
+                <FormField label="Add device">
+                  <Button
+                    variant="outline"
+                    onClick={onAddNumberClick}
+                    className="flex w-full items-center justify-center gap-2"
+                  >
+                    <Plus size={16} />
+                    Add Phone Number
+                  </Button>
+                </FormField>
               ) : null}
             </div>
 
