@@ -21,10 +21,11 @@ export class CallScreenPage {
     if (await creditsDialog.isVisible().catch(() => false)) {
       return;
     }
-    const inactiveDialog = this.page.getByText("This campaign is currently inactive.");
-    if (await inactiveDialog.isVisible().catch(() => false)) {
-      await this.page.keyboard.press("Escape");
-    }
+    // Never press Escape on the inactive-campaign dialog: its onOpenChange
+    // navigates (history back), which on a fresh Playwright page lands on
+    // about:blank and fails every later locator — the actual #1435 flake.
+    // The dialog is an overlay and doesn't block visibility assertions, and
+    // the seeded schedules are always-open now anyway.
     const getStarted = this.page.getByRole("button", { name: "Get started" });
     if (await getStarted.isVisible().catch(() => false)) {
       await getStarted.click();

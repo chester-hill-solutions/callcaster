@@ -40,6 +40,7 @@ vi.mock("react-router", () => ({
     data: undefined,
   }),
   useNavigate: () => mocks.navigate,
+  useParams: () => ({ id: "ws-1", campaign_id: "77" }),
   useNavigation: () => ({ state: mocks.navigationState }),
 }));
 
@@ -85,7 +86,9 @@ describe("app/components/call/CallScreen.Dialogs.tsx", () => {
     expect(mocks.navigate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "OK" }));
     expect(mocks.navigate).toHaveBeenCalledTimes(1);
-    expect(mocks.navigate).toHaveBeenCalledWith(-1);
+    // Explicit destination, never navigate(-1) — history-back stranded
+    // direct-link visitors on about:blank (#1462).
+    expect(mocks.navigate).toHaveBeenCalledWith("/workspaces/ws-1/campaigns/77");
   });
 
   test("welcome dialog (call dial_type) renders copy and Get started fetches more + closes", async () => {
