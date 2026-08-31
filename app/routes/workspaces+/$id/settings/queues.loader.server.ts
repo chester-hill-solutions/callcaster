@@ -13,7 +13,12 @@ export const loader = defineLoader({
       return redirect("/signin");
     }
     if (!userRole || userRole === MemberRole.Caller) {
-      return redirect("..");
+      // Callers can't reach any /settings/* route; bounce them to the
+      // workspace root. Explicit absolute URL — `..` resolved against
+      // `/workspaces/$id/settings/queues` per RFC 3986 also lands on
+      // `/workspaces/$id/`, but a rename or refactor could silently
+      // shift where it points.
+      return redirect(`/workspaces/${workspaceId}`);
     }
 
     const { queues, members, numbers, agents } = await loadInboundQueueSettings(workspaceId);

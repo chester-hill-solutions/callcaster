@@ -13,7 +13,12 @@ export const loader = defineLoader({
       return redirect("/signin");
     }
     if (userRole === MemberRole.Caller) {
-      return redirect("..");
+      // Callers can't reach any /settings/* route. Explicit absolute
+      // URL — `..` resolved against
+      // `/workspaces/$id/settings/numbers/purchase` per RFC 3986 lands
+      // on `/workspaces/$id/settings/numbers/`, which a Caller also
+      // can't access; bounce to workspace root instead.
+      return redirect(`/workspaces/${workspaceId}`);
     }
 
     const creditsBalance = await getWorkspaceCredits(workspaceId);

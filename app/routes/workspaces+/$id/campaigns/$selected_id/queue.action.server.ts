@@ -38,7 +38,9 @@ export const action = defineAction({
     const { selected_id } = params;
     const { workspaceId, userRole, headers } = auth;
 
-    if (!selected_id) throw redirect("../../");
+    // Absolute redirect — `../../` resolved against `/workspaces/$id/campaigns/$selected_id/queue`
+    // per RFC 3986 lands on `/workspaces/$id/`, not the campaigns list.
+    if (!selected_id) throw redirect(`/workspaces/${workspaceId}/campaigns`);
 
     if (!hasMinRole(userRole, MemberRole.Member)) {
       return routeData(
