@@ -66,6 +66,8 @@ jobs:
       # test:node shells out to `bun test`, and the media-stream service tests
       # spawn `bun run services/media-stream/index.ts`.
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
@@ -183,6 +185,8 @@ jobs:
           cache: npm
       # The media-stream service tests spawn `bun run`.
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
