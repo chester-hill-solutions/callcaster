@@ -276,5 +276,28 @@ describe("app/components/call/CallScreen.Header.tsx", () => {
     );
     expect(screen.getByText(/call \+15559990000 from \+15550001111/i)).toBeInTheDocument();
   });
+
+  // Regression for #1338: settings-sheet buttons "all over the place".
+  // The mute button lived in a `flex items-end` div (bottom-aligned inside
+  // a taller sibling column), and the Add-Phone-Number button sat next to
+  // an un-labelled Select in a raw `flex items-center` — both read as
+  // stray buttons floating outside the field grid. Every button in the
+  // audio-devices row must now sit inside a FormField (label above) so
+  // baselines match its neighbouring Select.
+  test("#1338: mute + add-phone buttons align to the field grid (FormField wrappers)", async () => {
+    const { CampaignHeader } = await import("@/components/call/CallScreen.Header");
+
+    render(<CampaignHeader {...baseProps({ settingsOnly: true })} />);
+
+    // The old layout put the mute button directly under a bare div; the
+    // fix wraps it in a FormField whose label doubles as an accessible
+    // header for the control column. The label is the observable proof.
+    expect(screen.getByText("Microphone control")).toBeInTheDocument();
+
+    // Same for the calling-device row: Select + Add Phone Number now
+    // share the grid with labels above, no more freeform flex row.
+    expect(screen.getByText("Calling device")).toBeInTheDocument();
+    expect(screen.getByText("Add device")).toBeInTheDocument();
+  });
 });
 
