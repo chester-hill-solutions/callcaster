@@ -175,6 +175,25 @@ export function businessProfileFieldRequiredMessage(
   );
 }
 
+/**
+ * Shown when a field has a value but fails its native format constraint
+ * (`type="url"` etc.) — distinct from the required message so a typed-but-
+ * malformed value is never reported as "required" (#1122).
+ */
+const BUSINESS_PROFILE_FIELD_FORMAT_MESSAGES: Partial<
+  Record<BusinessProfileFieldKey, string>
+> = {
+  websiteUrl: "Enter a valid URL, e.g. https://example.com.",
+};
+
+export function businessProfileFieldFormatMessage(
+  field: BusinessProfileFieldKey,
+): string {
+  return (
+    BUSINESS_PROFILE_FIELD_FORMAT_MESSAGES[field] ?? "Enter a valid value."
+  );
+}
+
 function isBusinessProfileFieldComplete(
   profile: WorkspaceMessagingBusinessProfile,
   field: BusinessProfileFieldKey,
