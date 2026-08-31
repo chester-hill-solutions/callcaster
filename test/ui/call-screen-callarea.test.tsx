@@ -476,4 +476,53 @@ describe("app/components/call/CallScreen.CallArea.tsx", () => {
     fireEvent.change(sel, { target: { value: "completed" } });
     expect(setDisposition).toHaveBeenCalledWith("completed");
   });
+
+  // Regression for #1362: "if the user hangs up, the contact name goes
+  // away but if the contact hangs up it stays. Latter should be true
+  // for both". Same post-hangup shape as #1253 — nextRecipient has
+  // collapsed because hangup.action.server.ts dequeued the just-finished
+  // row, but questionContact still points at the person the agent just
+  // called. ContactStrip must show that contact so the two hangup paths
+  // converge visually.
+  test("#1362: contact name persists after agent hangup (nextRecipient null, questionContact set) — matches contact-hangup", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+
+    render(
+      <CallArea
+        {...baseProps({
+          nextRecipient: null,
+          questionContact: makeRecipient({
+            contact: {
+              firstname: "Rita",
+              surname: "Perez",
+              phone: "+15551234567",
+              email: "rita@example.com",
+              address: "1 Main St, Apt 2, Toronto",
+            },
+          }),
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/Rita Perez/)).toBeInTheDocument();
+    expect(screen.getByText("+15551234567")).toBeInTheDocument();
+  });
+
+  test("#1362: ContactStrip falls back to nextRecipient before the first dial (questionContact null)", async () => {
+    const { CallArea } = await import("@/components/call/CallScreen.CallArea");
+
+    render(
+      <CallArea
+        {...baseProps({
+          nextRecipient: makeRecipient({
+            contact: { firstname: "Sam", surname: "Lee", phone: "+15550009999" },
+          }),
+          questionContact: null,
+        })}
+      />,
+    );
+
+    expect(screen.getByText(/Sam Lee/)).toBeInTheDocument();
+    expect(screen.getByText("+15550009999")).toBeInTheDocument();
+  });
 });
