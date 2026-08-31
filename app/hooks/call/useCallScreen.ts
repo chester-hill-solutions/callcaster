@@ -16,6 +16,7 @@ import { useWorkspaceRealtime, useWorkspaceEventSubscription } from "@/hooks/rea
 import useDebouncedSave from "@/hooks/utils/useDebouncedSave";
 import useCallRoom from "@/hooks/call/useCallRoom";
 import { useTwilioDevice } from "@/hooks/call/useTwilioDevice";
+import { useDialRingback } from "@/hooks/call/useDialRingback";
 import { useStartConferenceAndDial } from "@/hooks/call/useStartConferenceAndDial";
 import { useCallState } from "@/hooks/call/useCallState";
 import { useCallScreenDialogs } from "@/hooks/call/useCallScreenDialogs";
@@ -242,6 +243,15 @@ export function useCallScreen() {
     predictiveState,
     isPredictive: campaign?.dial_type === "predictive",
     send: send as unknown as (action: { type: string }) => void,
+  });
+
+  // The SDK's own tones can't survive this screen's flow (auto-accepted agent
+  // leg kills the ring; the outgoing sound is capped at 3s), so the dialing
+  // window gets an app-owned ringback (#1341). Predictive mode is excluded —
+  // the system dials there and the agent isn't waiting on a ring.
+  useDialRingback({
+    active: displayState === "dialing" && campaign?.dial_type !== "predictive",
+    outputDeviceId: audioControls.output,
   });
 
   // A missed ledger SSE event would leave the credit display stale after a
