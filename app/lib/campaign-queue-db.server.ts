@@ -276,6 +276,43 @@ export async function getCampaignQueueContactIds(
   return rows.map((row) => row.contact_id);
 }
 
+export type DequeuedQueueRow = {
+  contact_id: number;
+  dequeued_reason: string | null;
+};
+
+/**
+ * Every campaign_queue row that was dequeued before ever producing a
+ * message — landline pre-check, opt-out, duplicate suppression. The SMS
+ * export uses this to synthesize skipped rows so customers can see
+ * whose message never went out and why (#1417).
+ *
+ * `dequeued_at IS NOT NULL` covers both writer paths — the TS helper
+ * (`buildDequeuedQueueUpdate` stamps `dequeued_at` alongside
+ * `queue_state = "dequeued"`) and the plpgsql `fail_exhausted…` UPDATE
+ * (which stamps `dequeued_at` under `queue_state = "failed"`).
+ */
+export async function findDequeuedQueueRowsForCampaign(
+  campaignId: number,
+  workspaceId?: string,
+): Promise<DequeuedQueueRow[]> {
+  const conditions = [
+    eq(campaignQueueTable.campaign_id, campaignId),
+    sql`${campaignQueueTable.dequeued_at} IS NOT NULL`,
+  ];
+  if (workspaceId) {
+    conditions.push(eq(campaignQueueTable.workspace, workspaceId));
+  }
+  const rows = await db
+    .select({
+      contact_id: campaignQueueTable.contact_id,
+      dequeued_reason: campaignQueueTable.dequeued_reason,
+    })
+    .from(campaignQueueTable)
+    .where(and(...conditions));
+  return rows;
+}
+
 export async function getQueuedContactIdsForCampaign(args: {
   campaignId: number;
   contactIds: number[];
