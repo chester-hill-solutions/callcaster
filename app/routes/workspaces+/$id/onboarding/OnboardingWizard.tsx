@@ -187,8 +187,13 @@ export function OnboardingWizard({
     }
   })();
 
+  // Onboarding content reads better narrow (#1318). The first-number step is
+  // the exception: it embeds the number-search table and routing presets and
+  // keeps the full shell width until #1110 reworks that page.
+  const widthCap = activeStep === "first_number" ? "" : "mx-auto w-full max-w-4xl";
+
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${widthCap}`}>
       {/*
         Compliance state is computed by the loader and was previously dropped on
         the floor here, so a workspace stuck in "Action needed by CallCaster
