@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 // react-router's <Form> requires a data router; the assertions here don't
@@ -68,5 +68,42 @@ describe("OnboardingBusinessIdentityStep — Website URL required only for SMS (
     renderStep(onboarding({ selectedGoal: null }));
     const input = screen.getByLabelText(/website url/i) as HTMLInputElement;
     expect(input.required).toBe(false);
+  });
+});
+
+describe("OnboardingBusinessIdentityStep — format vs required errors (#1122)", () => {
+  test("SMS goal + malformed URL: reports a format error, not 'required'", () => {
+    renderStep(onboarding({ selectedGoal: "sms_blast", websiteUrl: "sai.com" }));
+    const input = screen.getByLabelText(/website url/i) as HTMLInputElement;
+    expect(input.validity.typeMismatch).toBe(true);
+    fireEvent.invalid(input);
+    expect(
+      screen.getByText(/enter a valid url, e\.g\. https:\/\/example\.com\./i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/website url is required\./i)).toBeNull();
+  });
+
+  test("SMS goal + empty URL: still reports the required error", () => {
+    renderStep(onboarding({ selectedGoal: "sms_blast" }));
+    const input = screen.getByLabelText(/website url/i) as HTMLInputElement;
+    expect(input.validity.valueMissing).toBe(true);
+    fireEvent.invalid(input);
+    expect(screen.getByText(/website url is required\./i)).toBeInTheDocument();
+  });
+
+  test("optional field + malformed URL: shows the format error in-page and clears on edit", () => {
+    renderStep(onboarding({ selectedGoal: "live_calling", websiteUrl: "sai.com" }));
+    const input = screen.getByLabelText(/website url/i) as HTMLInputElement;
+    expect(input.required).toBe(false);
+    fireEvent.invalid(input);
+    expect(
+      screen.getByText(/enter a valid url, e\.g\. https:\/\/example\.com\./i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/website url is required\./i)).toBeNull();
+
+    fireEvent.change(input, { target: { value: "https://sai.com" } });
+    expect(
+      screen.queryByText(/enter a valid url, e\.g\. https:\/\/example\.com\./i),
+    ).toBeNull();
   });
 });
