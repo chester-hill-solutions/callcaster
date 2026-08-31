@@ -2,9 +2,9 @@ export { loader } from "./new.loader.server";
 export { action } from "./new.action.server";
 
 import { Form, Link, useActionData, useNavigation } from "react-router";
-import { useState } from "react";
-import { FaPlus } from "react-icons/fa";
+import { useRef, useState } from "react";
 import { Section } from "@/components/shared/Section";
+import { FileDropzone } from "@/components/shared/FileDropzone";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -15,11 +15,24 @@ import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 export default function Media() {
   const actionData = useActionData();
   const [pendingFileName, setPendingFileName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { state } = useNavigation();
 
   const displayFileToUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const filePath = e.target.value;
     setPendingFileName(filePath.split("\\").at(-1) ?? "");
+  };
+
+  const handleFileDrop = (file: File) => {
+    // Native <Form> submission reads the input's own FileList, so a dropped
+    // file must be written back into it (real browsers all support this;
+    // jsdom doesn't, hence the feature check).
+    if (fileInputRef.current && typeof DataTransfer !== "undefined") {
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      fileInputRef.current.files = transfer.files;
+    }
+    setPendingFileName(file.name);
   };
 
   return (
@@ -39,42 +52,30 @@ export default function Media() {
               <Input type="text" name="media-name" id="media-name" />
             </FormField>
             <FormField htmlFor="media" label="Upload">
-              <label
-                htmlFor="media"
-                className="flex w-full cursor-pointer items-center justify-center rounded-xl border-2 border-border py-8 transition-colors duration-150 ease-in-out hover:bg-muted"
-              >
-                {pendingFileName === "" ? (
-                  <FaPlus size={"26px"} aria-hidden />
-                ) : (
-                  <p>{pendingFileName}</p>
-                )}
-                <input
-                  type="file"
-                  name="media"
-                  id="media"
-                  accept={getAudioUploadAcceptValue()}
-                  className="hidden"
-                  onChange={displayFileToUpload}
-                />
-              </label>
+              <FileDropzone
+                ref={fileInputRef}
+                name="media"
+                accept={getAudioUploadAcceptValue()}
+                ariaLabel="Choose an audio file to upload"
+                title="Drop or choose an audio file"
+                selectedFileName={pendingFileName || undefined}
+                onFileChange={displayFileToUpload}
+                onFileDrop={handleFileDrop}
+              />
             </FormField>
           </Section>
-          <div className="flex flex-col gap-2">
-            <Button
-              className="h-fit min-h-[48px] w-full rounded-md bg-brand-primary px-8 py-2 font-Zilla-Slab text-lg font-bold tracking-[1px] text-white transition-colors duration-150 ease-in-out hover:bg-brand-secondary hover:bg-white hover:text-black"
-              type="submit"
-              disabled={state !== "idle"}
-            >
-              Upload Audio
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              className="h-fit w-full border-0 border-black bg-zinc-600 font-Zilla-Slab text-lg font-semibold text-white dark:border-white"
-            >
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
+            <Button asChild variant="outline">
               <Link to=".." relative="path">
                 Back
               </Link>
+            </Button>
+            <Button
+              type="submit"
+              disabled={state !== "idle"}
+              className="bg-brand-primary text-white hover:bg-brand-secondary"
+            >
+              Upload Audio
             </Button>
           </div>
         </Form>

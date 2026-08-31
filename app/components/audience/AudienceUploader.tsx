@@ -7,7 +7,7 @@ import {
   validateContactImportMapping,
   type ContactImportTarget,
 } from "../../../shared/contact-import-headers";
-import { AudienceUploadFileStep } from "./AudienceUploadFileStep";
+import { FileDropzone } from "@/components/shared/FileDropzone";
 import { AudienceUploadMapStep } from "./AudienceUploadMapStep";
 import { AudienceUploadReviewStep } from "./AudienceUploadReviewStep";
 import { AudienceUploadProgressPanel } from "./AudienceUploadProgressPanel";
@@ -263,8 +263,13 @@ export default function AudienceUploader({
         switch (phase.kind) {
           case "file":
             return (
-              <AudienceUploadFileStep
+              <FileDropzone
                 ref={fileInputRef}
+                name="contacts"
+                accept=".csv,text/csv"
+                ariaLabel="Choose a CSV file to upload"
+                title="Drop or choose a CSV file"
+                hint="CSV"
                 onFileChange={displayFileToUpload}
                 onFileDrop={(file) => void processSelectedFile(file)}
               />
