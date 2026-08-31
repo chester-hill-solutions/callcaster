@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * Compare in-repo client/migrations/*.sql versions against
- * AUTH_migrations.schema_migrations when DATABASE_URL is set.
+ * Compare in-repo client/migrations/*.sql versions against the union of the
+ * database's two ledgers when DATABASE_URL is set:
+ * AUTH_migrations.schema_migrations (hand-applied era) and
+ * public.client_migration_bootstrap (boot-bootstrap era, #1447).
  *
  * Without DATABASE_URL this can only print the repo inventory — it compares
  * nothing. That is fine for `ci:local` (no database to reach) but useless as a
@@ -66,16 +68,55 @@ function loadRepoVersions() {
   return { files, byVersion };
 }
 
+/**
+ * The database has TWO ledgers (#1447): AUTH_migrations.schema_migrations
+ * (version-keyed, written by the original hand-applies and frozen since the
+ * boot bootstrap took over) and public.client_migration_bootstrap
+ * (filename-keyed, written by applyClientMigrationsOnBoot). A migration is
+ * applied if it appears in EITHER, so the comparison unions them.
+ */
 async function loadDbVersions(databaseUrl) {
   const sql = postgres(databaseUrl, { prepare: false, max: 1 });
   try {
-    const rows = await sql`
+    const authRows = await sql`
       select version
       from AUTH_migrations.schema_migrations
       order by version
     `;
-    const byVersion = new Map(rows.map((r) => [r.version, ""]));
-    return byVersion;
+    const byVersion = new Map(authRows.map((r) => [r.version, ""]));
+
+    // Absent on legacy / pre-bootstrap databases — treat as empty, but say so:
+    // silently ignoring a query failure here would recreate the vacuous-pass
+    // problem this script exists to prevent.
+    let bootstrapRows = [];
+    try {
+      bootstrapRows = await sql`
+        select filename
+        from public.client_migration_bootstrap
+        order by filename
+      `;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/client_migration_bootstrap.*does not exist|relation .* does not exist/i.test(message)) {
+        throw err;
+      }
+      console.warn(
+        "note: public.client_migration_bootstrap does not exist on this database " +
+          "(pre-bootstrap or legacy) — comparing against AUTH_migrations only.",
+      );
+    }
+    for (const row of bootstrapRows) {
+      const match = row.filename.match(/^(\d+)_/);
+      if (match) {
+        byVersion.set(match[1], row.filename);
+      }
+    }
+
+    return {
+      byVersion,
+      authCount: authRows.length,
+      bootstrapCount: bootstrapRows.length,
+    };
   } finally {
     await sql.end({ timeout: 5 });
   }
@@ -150,16 +191,19 @@ async function main() {
     process.exit(0);
   }
 
-  let dbVersions;
+  let ledger;
   try {
-    dbVersions = await loadDbVersions(databaseUrl);
+    ledger = await loadDbVersions(databaseUrl);
   } catch (err) {
-    console.error("\nFailed to query AUTH_migrations.schema_migrations:");
+    console.error("\nFailed to query the database ledgers:");
     console.error(err instanceof Error ? err.message : err);
     process.exit(2);
   }
 
-  const code = reportDiff("Ledger comparison", repoVersions, dbVersions);
+  console.log(
+    `DB ledgers: AUTH_migrations=${ledger.authCount} rows, client_migration_bootstrap=${ledger.bootstrapCount} rows`,
+  );
+  const code = reportDiff("Ledger comparison", repoVersions, ledger.byVersion);
   process.exit(code);
 }
 
