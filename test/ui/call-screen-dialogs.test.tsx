@@ -33,7 +33,6 @@ vi.mock("@/components/ui/dialog", () => ({
 
 vi.mock("react-router", () => ({
   Form: ({ children, ...props }: any) => <form {...props}>{children}</form>,
-  NavLink: ({ to, children }: any) => <a href={String(to)}>{children}</a>,
   useFetcher: () => ({
     submit: (...args: any[]) => mocks.fetcherSubmit(...args),
     state: "idle",
@@ -57,6 +56,7 @@ function baseProps(overrides: Partial<any> = {}) {
     fetchMore: vi.fn(),
     householdMap: {},
     isActive: true,
+    onLeaveCampaign: vi.fn(),
     ...overrides,
   };
 }
@@ -95,6 +95,7 @@ describe("app/components/call/CallScreen.Dialogs.tsx", () => {
     const { CampaignDialogs } = await import("@/components/call/CallScreen.Dialogs");
     const fetchMore = vi.fn();
     const setDialog = vi.fn();
+    const onLeaveCampaign = vi.fn();
 
     render(
       <CampaignDialogs
@@ -105,6 +106,7 @@ describe("app/components/call/CallScreen.Dialogs.tsx", () => {
           fetchMore,
           householdMap: { h1: [] },
           campaign: { title: "T1", dial_type: "call", voicemail_file: true },
+          onLeaveCampaign,
         })}
       />,
     );
@@ -116,6 +118,10 @@ describe("app/components/call/CallScreen.Dialogs.tsx", () => {
     fireEvent.click(screen.getByRole("button", { name: "Get started" }));
     expect(fetchMore).toHaveBeenCalledWith({ householdMap: { h1: [] } });
     expect(setDialog).toHaveBeenCalledWith(false);
+    expect(onLeaveCampaign).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+    expect(onLeaveCampaign).toHaveBeenCalledTimes(1);
   });
 
   test("welcome dialog (predictive dial_type) does not fetchMore but closes", async () => {
@@ -144,11 +150,18 @@ describe("app/components/call/CallScreen.Dialogs.tsx", () => {
     expect(setDialog).toHaveBeenCalledWith(false);
   });
 
-  test("no-script error dialog renders when open", async () => {
+  test("no-script error dialog renders when open and Leave triggers cleanup (#1313)", async () => {
     const { CampaignDialogs } = await import("@/components/call/CallScreen.Dialogs");
-    render(<CampaignDialogs {...baseProps({ isErrorDialogOpen: true })} />);
+    const onLeaveCampaign = vi.fn();
+    render(
+      <CampaignDialogs
+        {...baseProps({ isErrorDialogOpen: true, onLeaveCampaign })}
+      />,
+    );
     expect(screen.getByText("NO SCRIPT SET UP")).toBeInTheDocument();
-    expect(screen.getByText("Go Back")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Leave" }));
+    expect(onLeaveCampaign).toHaveBeenCalledTimes(1);
   });
 
   test("report dialog submits JSON and cancel closes", async () => {
