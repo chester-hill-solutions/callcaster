@@ -126,6 +126,7 @@ export function CallScreenLayout({
     setErrorDialog,
     isReportDialogOpen,
     setReportDialog,
+    onJoin,
   } = dialogControls;
 
   const {
@@ -501,6 +502,7 @@ export function CallScreenLayout({
         currentState={currentState}
         isActive={isActive}
         onLeaveCampaign={handleLeaveCampaign}
+        onJoin={onJoin}
       />
     </div>
   );

@@ -32,6 +32,9 @@ interface CampaignDialogsProps {
   /** The one sanctioned way off the call screen (#1313) — same cleanup as
    * the header's "Leave Campaign" button, not a bare navigation link. */
   onLeaveCampaign: () => void;
+  /** Explicit Join (#1313): "Get started" gates Twilio device registration,
+   * which stays disconnected until this fires. */
+  onJoin: () => void;
 }
 
 export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
@@ -47,6 +50,7 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   currentState,
   isActive,
   onLeaveCampaign,
+  onJoin,
 }) => {
   const [errorDescription, setErrorDescription] = useState<string>('');
   const fetcher = useFetcher<{ success?: boolean; message?: string; error?: string }>();
@@ -144,6 +148,7 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
                     campaign.dial_type === "call" &&
                       fetchMore({ householdMap });
                     setDialog(false);
+                    onJoin();
                   }}
                 >
                   Get started
