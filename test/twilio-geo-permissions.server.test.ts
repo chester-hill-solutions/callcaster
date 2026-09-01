@@ -41,6 +41,7 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 import {
   alertGeoReadinessBlocked,
   alertSmsGeoPermissionBlocked,
+  buildVoiceGeoUpdateRequest,
   ensureVoiceGeoPermissions,
   preflightCountriesFor,
   preflightNumberPurchase,
@@ -61,18 +62,37 @@ describe("twilio-geo-permissions", () => {
     expect(preflightCountriesFor(null)).toEqual(["CA", "US"]);
   });
 
-  test("ensureVoiceGeoPermissions bulk-enables CA and US low-risk dialing", async () => {
+  // Twilio's API reference shape for one UpdateRequest element: iso_code plus
+  // all three *_enabled flags, flags encoded as the strings "true"/"false".
+  // A partial object (only iso_code + low_risk_numbers_enabled) is rejected
+  // with 20001 "unable to parse the updateRequest" (#1474).
+  const EXPECTED_UPDATE_REQUEST =
+    '[{"iso_code":"CA","low_risk_numbers_enabled":"true",' +
+    '"high_risk_special_numbers_enabled":"false",' +
+    '"high_risk_tollfraud_numbers_enabled":"false"},' +
+    '{"iso_code":"US","low_risk_numbers_enabled":"true",' +
+    '"high_risk_special_numbers_enabled":"false",' +
+    '"high_risk_tollfraud_numbers_enabled":"false"}]';
+
+  test("buildVoiceGeoUpdateRequest matches Twilio's documented UpdateRequest shape byte-for-byte", () => {
+    expect(buildVoiceGeoUpdateRequest()).toBe(EXPECTED_UPDATE_REQUEST);
+    expect(buildVoiceGeoUpdateRequest(["GB"])).toBe(
+      '[{"iso_code":"GB","low_risk_numbers_enabled":"true",' +
+        '"high_risk_special_numbers_enabled":"false",' +
+        '"high_risk_tollfraud_numbers_enabled":"false"}]',
+    );
+  });
+
+  test("ensureVoiceGeoPermissions sends exactly the documented UpdateRequest body for CA and US", async () => {
     const result = await ensureVoiceGeoPermissions({ workspaceId: "ws-1" });
 
     expect(result).toEqual({ ok: true });
     expect(mocks.bulkCountryUpdatesCreate).toHaveBeenCalledTimes(1);
-    const arg = mocks.bulkCountryUpdatesCreate.mock.calls[0][0] as {
-      updateRequest: string;
-    };
-    expect(JSON.parse(arg.updateRequest)).toEqual([
-      { iso_code: "CA", low_risk_numbers_enabled: true },
-      { iso_code: "US", low_risk_numbers_enabled: true },
-    ]);
+    // The SDK passes `updateRequest` through untouched as the `UpdateRequest`
+    // form field, so this string is the wire body Twilio parses.
+    expect(mocks.bulkCountryUpdatesCreate).toHaveBeenCalledWith({
+      updateRequest: EXPECTED_UPDATE_REQUEST,
+    });
   });
 
   test("ensureVoiceGeoPermissions never throws — returns the error detail", async () => {
