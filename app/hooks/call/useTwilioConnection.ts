@@ -10,6 +10,13 @@ export type DeviceOptions = {
 
 interface UseTwilioConnectionOptions {
   token: string;
+  /**
+   * Gate device creation/registration behind an explicit user action (#1313
+   * "Join"). Defaults to true so existing callers (the Handset softphone)
+   * keep connecting on mount; the call screen passes `false` until the user
+   * clicks "Get started"/Join.
+   */
+  enabled?: boolean;
   deviceOptions?: DeviceOptions;
   onIncomingCall?: (call: Call) => void;
   onStatusChange?: (status: string) => void;
@@ -45,6 +52,7 @@ interface UseTwilioConnectionReturn {
  */
 export function useTwilioConnection({
   token,
+  enabled = true,
   deviceOptions,
   onIncomingCall,
   onStatusChange,
@@ -88,12 +96,14 @@ export function useTwilioConnection({
    * Rebuilding on every new token string tore the phone down mid-call, because
    * the call-screen loader re-mints the JWT on every revalidation (every
    * fetcher submit: script auto-save, dial, audiodrop, queue ops).
-   * @effect-deps token, deviceOptions (a token change is applied via
-   * updateToken on the existing device, or triggers first-time creation;
-   * callback props are read via refs so they don't retrigger setup),
-   * reconnectNonce (bumped by the returned `reconnect()` — the manual
-   * recovery path for terminal Error/RegistrationFailed/Unregistered states,
-   * which nothing retries automatically)
+   * @effect-deps token, enabled (gates first-time creation behind #1313
+   * "Join" — flipping false to true with no device yet lets this effect run
+   * the create branch for the first time), deviceOptions (a token change is
+   * applied via updateToken on the existing device, or triggers first-time
+   * creation; callback props are read via refs so they don't retrigger
+   * setup), reconnectNonce (bumped by the returned `reconnect()` — the
+   * manual recovery path for terminal Error/RegistrationFailed/Unregistered
+   * states, which nothing retries automatically)
    * @effect-side-effects subscription (Twilio Device event listeners) + network
    * (lazy SDK import, device.register()/updateToken()); teardown lives in the
    * separate unmount-only effect below, NOT in this effect's cleanup — pairing
@@ -103,6 +113,7 @@ export function useTwilioConnection({
    * lifetime; it isn't a request/response data fetch.
    */
   useEffect(() => {
+    if (!enabled) return;
     tokenRef.current = token;
     if (!token) {
       logger.error("No token provided");
@@ -292,7 +303,7 @@ export function useTwilioConnection({
       onErrorRef.current?.(error);
       onCallStateChangeRef.current?.("failed");
     });
-  }, [token, deviceOptions, reconnectNonce]);
+  }, [token, enabled, deviceOptions, reconnectNonce]);
 
   const reconnect = useCallback(() => {
     isReconnectingRef.current = true;

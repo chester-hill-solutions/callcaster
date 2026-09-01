@@ -40,6 +40,9 @@ export function useTwilioDevice(
   workspaceId: string,
   send: (action: { type: string }) => void,
   onTokenWillExpire?: () => void,
+  /** Gate device creation/registration behind explicit Join (#1313). Defaults
+   * to true so callers that don't opt in keep connecting on mount. */
+  enabled: boolean = true,
 ): TwilioDeviceHook {
   if (!token) {
     logger.error("useTwilioDevice: token is required");
@@ -89,6 +92,7 @@ export function useTwilioDevice(
 
   const connection = useTwilioConnection({
     token,
+    enabled,
     onIncomingCall: (call) => receiveIncomingRef.current(call),
     onStatusChange,
     onError: onDeviceError,
