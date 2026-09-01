@@ -14,6 +14,7 @@ interface MessageResultsScreenProps {
   queueCounts: {
     fullCount: number;
     queuedCount: number;
+    completedCount: number;
   };
 }
 
@@ -29,7 +30,7 @@ const MessageResultsScreen = ({
   const params = useParams();
   const campaignId = params.selected_id || "";
   const workspaceId = params.id || "";
-  
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between">
@@ -37,12 +38,16 @@ const MessageResultsScreen = ({
       </div>
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">
-          <TotalMessages
-            totalMessages={totalOfAllResults || 0}
-            expectedTotal={queueCounts.fullCount || 0}
+          <TotalMessages totalMessages={totalOfAllResults || 0} />
+          <AsyncExportButton
+            campaignId={campaignId}
+            workspaceId={workspaceId}
           />
-          <AsyncExportButton campaignId={campaignId} workspaceId={workspaceId} />
         </div>
+        <p className="text-muted-foreground mb-6 text-sm">
+          Contacts completed: {queueCounts.completedCount || 0} of{" "}
+          {queueCounts.fullCount || 0}
+        </p>
         <DispositionBreakdown
           results={results}
           totalsByDisposition={totalsByDisposition}

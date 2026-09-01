@@ -23,7 +23,9 @@ type CampaignCounts = {
 
 const HIDDEN_DISPOSITIONS = new Set(["idle", "no disposition"]);
 
-const normalizeDispositionLabel = (value: string | null | undefined): string | null => {
+const normalizeDispositionLabel = (
+  value: string | null | undefined,
+): string | null => {
   const trimmed = value?.trim();
   if (!trimmed) return null;
 
@@ -51,7 +53,8 @@ const aggregateDispositionResults = (results: CampaignResult[]) => {
 
     existing.count += result.count;
     if (
-      (!existing.average_call_duration || existing.average_call_duration === "00:00:00") &&
+      (!existing.average_call_duration ||
+        existing.average_call_duration === "00:00:00") &&
       result.average_call_duration
     ) {
       existing.average_call_duration = result.average_call_duration;
@@ -74,6 +77,7 @@ export const ResultsDisplay = ({
   queueCounts: {
     fullCount: number;
     queuedCount: number;
+    completedCount: number;
   };
   ivrResponses?: IvrQuestionResults[] | null;
 }) => {
@@ -136,7 +140,9 @@ export const NoResultsYet = ({
   campaignType?: Campaign["type"] | null;
 }) => {
   const isMessage = campaignType === "message";
-  const title = isMessage ? "Message Campaign Results" : "Call Campaign Results";
+  const title = isMessage
+    ? "Message Campaign Results"
+    : "Call Campaign Results";
   const totalLabel = isMessage ? "Total Messages" : "Total Calls";
 
   return (
@@ -144,9 +150,7 @@ export const NoResultsYet = ({
       <h1 className="mb-6 text-3xl font-bold">{title}</h1>
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="mb-8 flex flex-col">
-          <h2 className="mb-0 text-2xl font-semibold">
-            {totalLabel}: 0
-          </h2>
+          <h2 className="mb-0 text-2xl font-semibold">{totalLabel}: 0</h2>
           <h3 className="mb-4 text-xl font-light">of {expectedTotal}</h3>
         </div>
         <div className="mb-8">
