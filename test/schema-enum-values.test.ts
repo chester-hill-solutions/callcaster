@@ -45,8 +45,13 @@ describe("schema-enums parser", () => {
       alter type campaign_status add value 'paused' before 'running';
       CREATE TYPE IF NOT EXISTS "dial_types" AS ENUM ('call', 'it''s');
     `);
-    expect([...enums.get("campaign_status")!]).toEqual(["pending", "running", "waiting", "paused"]);
-    expect([...enums.get("dial_types")!]).toEqual(["call", "it's"]);
+    expect([...(enums.get("campaign_status") ?? [])]).toEqual([
+      "pending",
+      "running",
+      "waiting",
+      "paused",
+    ]);
+    expect([...(enums.get("dial_types") ?? [])]).toEqual(["call", "it's"]);
   });
 
   test("follows ALTER TYPE ... RENAME TO and RENAME VALUE in statement order", () => {
@@ -57,7 +62,7 @@ describe("schema-enums parser", () => {
       ALTER TYPE public.workspace_users_role RENAME VALUE 'member' TO 'agent';
     `);
     expect(enums.has("workspace_role")).toBe(false);
-    expect([...enums.get("workspace_users_role")!]).toEqual(["owner", "caller", "agent"]);
+    expect([...(enums.get("workspace_users_role") ?? [])]).toEqual(["owner", "caller", "agent"]);
   });
 
   test("a value only in schema.ts is reported as a gap; a type never created is too", () => {
