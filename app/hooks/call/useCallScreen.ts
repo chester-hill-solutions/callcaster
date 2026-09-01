@@ -159,14 +159,14 @@ export function useCallScreen() {
     deviceIsBusy,
     error: deviceError,
     reconnect: reconnectDevice,
-  } = useTwilioDevice(
+  } = useTwilioDevice({
     token,
-    phoneVerification.selectedDevice,
+    selectedDevice: phoneVerification.selectedDevice,
     workspaceId,
-    send as unknown as (action: { type: string }) => void,
-    handleTokenWillExpire,
-    hasJoined,
-  );
+    send: send as unknown as (action: { type: string }) => void,
+    onTokenWillExpire: handleTokenWillExpire,
+    enabled: hasJoined,
+  });
 
   // Wrap hangUp to drive lifecycle immediately before SDK teardown.
   // This ensures the display transitions to ending/ended synchronously,

@@ -31,19 +31,28 @@ interface TwilioDeviceHook {
   reconnect: () => void;
 }
 
+interface UseTwilioDeviceOptions {
+  token: string;
+  selectedDevice: string;
+  workspaceId: string;
+  send: (action: { type: string }) => void;
+  onTokenWillExpire?: () => void;
+  /** Gate device creation/registration behind explicit Join (#1313). Defaults
+   * to true so callers that don't opt in keep connecting on mount. */
+  enabled?: boolean;
+}
+
 /**
  * Coordinates Twilio device connection and canonical call session handling.
  */
-export function useTwilioDevice(
-  token: string,
-  selectedDevice: string,
-  workspaceId: string,
-  send: (action: { type: string }) => void,
-  onTokenWillExpire?: () => void,
-  /** Gate device creation/registration behind explicit Join (#1313). Defaults
-   * to true so callers that don't opt in keep connecting on mount. */
-  enabled: boolean = true,
-): TwilioDeviceHook {
+export function useTwilioDevice({
+  token,
+  selectedDevice,
+  workspaceId,
+  send,
+  onTokenWillExpire,
+  enabled = true,
+}: UseTwilioDeviceOptions): TwilioDeviceHook {
   if (!token) {
     logger.error("useTwilioDevice: token is required");
   }
