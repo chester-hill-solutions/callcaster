@@ -114,6 +114,10 @@ describe("app/routes/api+/campaign_audience/route.tsx", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({
       success: true,
+      alreadyLinked: true,
+      audienceLinked: true,
+      enqueued: 0,
+      skipped: 0,
       message: "Audience already added to campaign",
     });
   }, 30000);
