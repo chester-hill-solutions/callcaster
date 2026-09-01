@@ -13,7 +13,6 @@ const appVariables = [
   "NODE_ENV",
   "PORT",
   "RESEND_API_KEY",
-  "RUN_CLIENT_MIGRATIONS_ON_BOOT",
   "S3_ACCESS_KEY_ID",
   "S3_BUCKET",
   "S3_ENDPOINT",
@@ -80,7 +79,13 @@ export function devResources() {
       // the live domain routes to the service's default exposed port.
       customDomains: { "dev.callcaster.ca": {} },
     },
-    env: preservedVariables(appVariables),
+    env: {
+      ...preservedVariables(appVariables),
+      // Not a secret: replay client/migrations at app boot so a migration
+      // merged to this branch reaches this environment's database without a
+      // hand-applied step (#1477). Production already runs with this set.
+      RUN_CLIENT_MIGRATIONS_ON_BOOT: "true",
+    },
   });
   const worker = service("callcaster-worker", {
     source: appSource,
