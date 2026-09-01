@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Form, NavLink, useFetcher, useNavigate, useParams } from "react-router";
+import { Form, useFetcher, useNavigate, useParams } from "react-router";
 import { QueueItem } from "@/lib/types";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
@@ -29,6 +29,9 @@ interface CampaignDialogsProps {
   fetchMore: (params: Record<string, unknown>) => void;
   householdMap: Record<string, QueueItem[]>;
   isActive: boolean;
+  /** The one sanctioned way off the call screen (#1313) — same cleanup as
+   * the header's "Leave Campaign" button, not a bare navigation link. */
+  onLeaveCampaign: () => void;
 }
 
 export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
@@ -43,6 +46,7 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
   householdMap,
   currentState,
   isActive,
+  onLeaveCampaign,
 }) => {
   const [errorDescription, setErrorDescription] = useState<string>('');
   const fetcher = useFetcher<{ success?: boolean; message?: string; error?: string }>();
@@ -128,10 +132,12 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
                   : "The dialer will automatically detect voicemailboxes, and disconnect your call accordingly."}
               </p>
               <div className="mt-4 flex justify-between">
-                <Button asChild className="border-primary" variant="outline">
-                  <NavLink to=".." relative="path">
-                    Go Back
-                  </NavLink>
+                <Button
+                  className="border-primary"
+                  variant="outline"
+                  onClick={onLeaveCampaign}
+                >
+                  Leave
                 </Button>
                 <Button
                   onClick={() => {
@@ -160,10 +166,12 @@ export const CampaignDialogs: React.FC<CampaignDialogsProps> = ({
                 your administrator to get one set up
               </p>
               <div className="mt-4 flex justify-between">
-                <Button asChild className="border-primary" variant="outline">
-                  <NavLink to=".." relative="path">
-                    Go Back
-                  </NavLink>
+                <Button
+                  className="border-primary"
+                  variant="outline"
+                  onClick={onLeaveCampaign}
+                >
+                  Leave
                 </Button>
               </div>
             </div>

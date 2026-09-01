@@ -133,6 +133,10 @@ function WorkspaceResolvedView({
   // Credits page is where users top up — keep the low-credit banner off it (#1097).
   const isBillingPage = /\/billing(?:\/|$)/.test(location.pathname);
   const showLowCreditBanner = !isBillingPage && liveCredits < LOW_CREDIT_THRESHOLD;
+  // The call screen has its own credit banner and hides the sidebar so
+  // "Leave Campaign" is the only way off the page (#1313) — no "Add
+  // credits" link here that would bypass that.
+  const isCallScreen = location.pathname.endsWith("call");
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
@@ -157,7 +161,7 @@ function WorkspaceResolvedView({
               Credit balance is depleted. Add credits to resume campaigns and
               calls.
             </AlertDescription>
-            {canManageBilling && outlet ? (
+            {canManageBilling && outlet && !isCallScreen ? (
               <Button asChild variant="destructive" className="mt-3">
                 <a href={`/workspaces/${workspace.id}/billing`}>
                   Add credits
@@ -171,7 +175,7 @@ function WorkspaceResolvedView({
               Credits are running low ({liveCredits} left). Add credits to keep
               campaigns active.
             </AlertDescription>
-            {canManageBilling && outlet ? (
+            {canManageBilling && outlet && !isCallScreen ? (
               <Button asChild className="mt-3">
                 <a href={`/workspaces/${workspace.id}/billing`}>
                   Add credits
@@ -238,9 +242,12 @@ export default function Workspace() {
   const outlet = useOutlet();
   const context = useOutletContext<ContextType>();
   const onboardingStrip = findOnboardingStripData(useMatches());
+  const location = useLocation();
   // Keep the workspace sidebar available on all workspace screens; onboarding
-  // itself is the only focused layout that should hide it.
-  const showSidebar = !onboardingStrip;
+  // and the live call screen are the focused layouts that hide it — the call
+  // screen specifically so "Leave Campaign" is the only way off the page
+  // (#1313). Mirrors Navbar.tsx's existing pathname check for the same route.
+  const showSidebar = !onboardingStrip && !location.pathname.endsWith("call");
 
   return (
     <>
