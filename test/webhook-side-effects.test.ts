@@ -150,6 +150,7 @@ describe("webhook side-effect handlers", () => {
     mocks.findMessageBySid.mockResolvedValue({
       sid: "SM1",
       workspace: "w1",
+      campaign_id: 7,
       status: "delivered",
       num_segments: "1",
       num_media: "0",
@@ -307,9 +308,35 @@ describe("webhook side-effect handlers", () => {
       expect.objectContaining({
         workspaceId: "w1",
         type: "DEBIT",
+        messageSid: "SM1",
+        campaignId: 7,
       }),
     );
     expect(mocks.sendWorkspaceWebhookNotification).toHaveBeenCalled();
+  });
+
+  test("runSmsStatusSideEffects records a null campaign for non-campaign SMS", async () => {
+    mocks.findMessageBySid.mockResolvedValue({
+      sid: "SM3",
+      workspace: "w1",
+      campaign_id: null,
+      status: "delivered",
+      num_segments: "1",
+      num_media: "0",
+    });
+    const { runSmsStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runSmsStatusSideEffects({
+      messageSid: "SM3",
+      twilioParams: { SmsSid: "SM3", SmsStatus: "delivered" },
+    });
+
+    expect(mocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ messageSid: "SM3", campaignId: null }),
+    );
   });
 
   test("runSmsStatusSideEffects raises the geo-permission alert on Twilio 21408", async () => {
