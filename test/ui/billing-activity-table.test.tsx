@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, test } from "vitest";
 
@@ -12,6 +12,46 @@ const history = [
     amount: 500,
     note: "Added 500 credits, stripe_session:cs_test_123",
     idempotency_key: "stripe_session:cs_test_123",
+  },
+];
+
+const campaignHistory = [
+  ...history,
+  {
+    id: "sms-1",
+    created_at: "2026-08-20T12:00:00.000Z",
+    type: "DEBIT" as const,
+    amount: -1,
+    note: "SMS SM1 delivered (1 segment)",
+    idempotency_key: "sms:SM1",
+    campaign_id: 12,
+  },
+  {
+    id: "call-1",
+    created_at: "2026-08-18T12:00:00.000Z",
+    type: "DEBIT" as const,
+    amount: -2,
+    note: "Call CA1, Contact 5, Outreach Attempt 9",
+    idempotency_key: "call:CA1",
+    campaign_id: 12,
+  },
+  {
+    id: "sms-2",
+    created_at: "2026-08-03T12:00:00.000Z",
+    type: "DEBIT" as const,
+    amount: -1,
+    note: "SMS SM2 delivered (1 segment)",
+    idempotency_key: "sms:SM2",
+    campaign_id: 12,
+  },
+  {
+    id: "rent-1",
+    created_at: "2026-08-01T12:00:00.000Z",
+    type: "DEBIT" as const,
+    amount: -100,
+    note: "Monthly rental for +14165550123",
+    idempotency_key: "number_rent:42:2026-08",
+    campaign_id: null,
   },
 ];
 
@@ -64,5 +104,68 @@ describe("BillingActivityTable", () => {
     expect(
       screen.getByText("Purchases and campaign activity will appear here."),
     ).toBeInTheDocument();
+  });
+
+  test("rolls a campaign's usage for one period into a single summary row", () => {
+    render(
+      <BillingActivityTable
+        history={campaignHistory}
+        campaignNames={{ 12: "Fall outreach" }}
+      />,
+    );
+
+    const rows = screen.getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(3);
+
+    const summary = rows[0];
+    expect(within(summary).getByText("Fall outreach")).toBeInTheDocument();
+    expect(
+      within(summary).getByText(
+        "August 2026 · 3 entries · SMS messaging, Voice calling",
+      ),
+    ).toBeInTheDocument();
+    expect(within(summary).getByText("−4 credits")).toBeInTheDocument();
+
+    expect(screen.queryByText("SMS messaging")).toBeNull();
+    expect(screen.queryByText("Voice calling")).toBeNull();
+    expect(screen.getByText("Phone number rental")).toBeInTheDocument();
+    expect(screen.getByText("Credit purchase")).toBeInTheDocument();
+  });
+
+  test("expands a summary row to the underlying ledger entries", async () => {
+    const user = userEvent.setup();
+    render(
+      <BillingActivityTable
+        history={campaignHistory}
+        campaignNames={{ 12: "Fall outreach" }}
+      />,
+    );
+
+    const toggle = screen.getByRole("button", {
+      name: "Show 3 entries for Fall outreach, August 2026",
+    });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAccessibleName(
+      "Hide 3 entries for Fall outreach, August 2026",
+    );
+    expect(screen.getAllByText("SMS messaging")).toHaveLength(2);
+    expect(screen.getByText("Voice calling")).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: /Advanced details for SMS messaging/ }),
+    ).toHaveLength(2);
+
+    await user.click(toggle);
+
+    expect(screen.queryByText("SMS messaging")).toBeNull();
+  });
+
+  test("names an untitled campaign by its id", () => {
+    render(<BillingActivityTable history={campaignHistory} />);
+
+    expect(screen.getByText("Campaign 12")).toBeInTheDocument();
   });
 });

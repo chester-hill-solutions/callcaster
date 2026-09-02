@@ -393,7 +393,7 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     );
   });
 
-  test("sendMessage throws when message insert fails", async () => {
+  test("sendMessage still returns the accepted message when the insert fails", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
     const client = makeDbClientStub({ messageInsertError: { message: "db" }, webhookRows: [] });
     tenantDbMocks.message.insert.mockRejectedValueOnce(new Error("db"));
@@ -401,21 +401,22 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
       messages: { create: vi.fn(async () => ({ sid: "SM1" })) },
     });
     const mod = await import("../app/routes/api+/chat_sms.send.server");
-    await expect(
-      mod.sendMessage({
-        body: "hi",
-        to: "+15551234567",
-        from: "+15550000000",
-        media: "[]",
-        client: client as any,
-        workspace: "w1",
-        contact_id: "",
-        user: null,
-      }),
-    ).rejects.toThrow(
-      "Something went wrong with the phone provider. If this continues, contact support.",
+    const res = await mod.sendMessage({
+      body: "hi",
+      to: "+15551234567",
+      from: "+15550000000",
+      media: "[]",
+      client: client as any,
+      workspace: "w1",
+      contact_id: "",
+      user: null,
+    });
+    expect(res.message).toMatchObject({ sid: "SM1" });
+    expect(res.data).toBeNull();
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "chat_sms.persist_failed",
+      expect.objectContaining({ workspace: "w1", sid: "SM1" }),
     );
-    expect(mocks.logger.error).toHaveBeenCalled();
   });
 
   test("sendMessage logs webhook failures but still returns when webhook delivery fails", async () => {

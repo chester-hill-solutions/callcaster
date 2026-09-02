@@ -211,6 +211,7 @@ export async function runSmsStatusSideEffects(args: {
       note,
       idempotencyKey: smsKey(sid),
       messageSid: sid,
+      campaignId: messageData.campaign_id ?? null,
     });
   }
 
