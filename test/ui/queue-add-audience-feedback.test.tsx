@@ -110,9 +110,18 @@ async function renderQueueRoute() {
   return { ...utils, rerender: () => utils.rerender(<Queue />) };
 }
 
+function getAudiencePicker() {
+  // QueueTable also renders <Select> combobox filters; scope to the header
+  // picker via its "Select Audience" placeholder option.
+  const placeholder = screen.getAllByText("Select Audience").find((el) => el.tagName === "OPTION");
+  const select = placeholder?.closest("select");
+  if (!select) throw new Error("audience picker <select> not found");
+  return select as HTMLSelectElement;
+}
+
 function pickAudienceAndSubmit() {
   fireEvent.click(screen.getByRole("button", { name: "Add from Audience" }));
-  fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
+  fireEvent.change(getAudiencePicker(), { target: { value: "1" } });
   fireEvent.click(screen.getByRole("button", { name: "Add Audience A" }));
   expect(fetcher.submit).toHaveBeenCalledWith(
     { audience_id: 1, campaign_id: 7 },
@@ -208,7 +217,7 @@ describe("queue route: Add from Audience feedback (#1472)", () => {
   test("leaves the picker alone when an unrelated queue action succeeds", async () => {
     const { rerender } = await renderQueueRoute();
     fireEvent.click(screen.getByRole("button", { name: "Add from Audience" }));
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
+    fireEvent.change(getAudiencePicker(), { target: { value: "1" } });
 
     fetcher.data = { success: true };
     rerender();
