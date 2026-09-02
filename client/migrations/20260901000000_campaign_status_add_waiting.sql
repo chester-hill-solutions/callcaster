@@ -1,0 +1,27 @@
+-- campaign_status gains 'waiting' — the value the app has written since #1168.
+--
+-- PR #1168 added 'waiting' to the campaign_status pgEnum in app/db/schema.ts
+-- and nowhere else. No lineage — drizzle/0000_baseline.sql, the later
+-- drizzle/*.sql, or client/migrations/*.sql — ever ran ALTER TYPE ... ADD
+-- VALUE, so every database rejected the literal: the campaign_schedule_sync
+-- worker job (`where status in ('running', 'waiting')`) dead-lettered every
+-- minute in production and dev, and Drizzle's "Failed query" wrapper hid the
+-- `invalid input value for enum campaign_status` cause (#1476). Campaigns
+-- therefore never moved between running and waiting outside calling hours,
+-- and try_complete_campaign_if_drained (20260813120000) raised the same error
+-- the first time it reached its UPDATE.
+--
+-- WHY THIS FILE IS ONE STATEMENT WITH NO BEGIN/COMMIT. Postgres refuses to
+-- USE a value added by ALTER TYPE ... ADD VALUE inside the transaction that
+-- added it (and before 12 refused ADD VALUE inside any transaction block).
+-- The boot runner (app/server/bootstrap-migrations.server.ts) sends each file
+-- as ONE simple-protocol query, and Postgres runs a multi-statement simple
+-- query as an implicit transaction block — so this file must not also read
+-- or write 'waiting', and must not open a transaction of its own. A single
+-- statement autocommits under the runner and under `psql -f` (both bootstrap
+-- scripts) alike. IF NOT EXISTS keeps it re-runnable on a database where the
+-- value was already added by hand.
+--
+-- scripts/db/check-schema-enums.mjs now fails CI when a schema.ts pgEnum
+-- value has no CREATE TYPE / ADD VALUE anywhere in this lineage.
+ALTER TYPE public.campaign_status ADD VALUE IF NOT EXISTS 'waiting';

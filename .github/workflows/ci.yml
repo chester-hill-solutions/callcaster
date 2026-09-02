@@ -146,6 +146,10 @@ jobs:
       # list but not the fresh-DB list was green here and produced a prod schema
       # missing that migration.
       - run: npm run db:bootstrap:check
+      # Enum VALUES. Every other DB gate looks at functions and tables; a value
+      # added to a schema.ts pgEnum with no ADD VALUE migration was green here
+      # while campaign_schedule_sync dead-lettered every minute in prod (#1476).
+      - run: npm run db:enums:check
       - run: npm run db:orphans:check
       # Ratchet (#1048): fail on new >800-line app files or growth of allowlisted offenders.
       - run: npm run tools:check-file-size
