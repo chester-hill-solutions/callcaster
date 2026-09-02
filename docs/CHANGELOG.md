@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Added
+
+- CI blocks a release pull request into `master` whose behavior changes have no dated changelog entries or that leaves entries under Unreleased ([#1505](https://github.com/chester-hill-solutions/callcaster/pull/1505)).
+
 ### Fixed
 
 - Campaigns launched with **Schedule** no longer start sending early. The worker holds a scheduled campaign until its start date, and a scheduled launch re-times any dispatch job already queued for the campaign ([#1502](https://github.com/chester-hill-solutions/callcaster/pull/1502), [#1501](https://github.com/chester-hill-solutions/callcaster/issues/1501)).

@@ -53,6 +53,11 @@ jobs:
       - name: Resolve changed-file scope
         id: changes
         run: node scripts/ci-changes.mjs --base "${{ github.event.pull_request.base.sha || github.event.before }}"
+      # Release PRs (into master) must ship their changelog: entries dated,
+      # Unreleased left empty. Docs-only PRs pass; PRs into dev are not gated.
+      - name: Release changelog gate
+        if: github.event_name == 'pull_request' && github.base_ref == 'master'
+        run: node scripts/check-changelog.mjs --base "${{ github.event.pull_request.base.sha }}"
 
   quality:
     needs: changes
