@@ -39,7 +39,7 @@ Use `gh auth refresh -s <scope>` only when the operation requires an additional 
 ## Changelog
 
 - Every PR that changes app behavior adds one line under `## [Unreleased]` in `docs/CHANGELOG.md` (Added / Changed / Fixed / Removed / Security), phrased for a customer or operator, linking the PR and the issue. Do this in the same PR as the change.
-- A dev → master release PR renames the Unreleased section to `## YYYY-MM-DD — release #<PR>` and adds a fresh empty `## [Unreleased]` above it.
+- A dev → master release PR renames the Unreleased section to `## YYYY-MM-DD — release #<PR>` and adds a fresh empty `## [Unreleased]` above it. CI enforces this on pull requests into `master` (`npm run check:changelog -- --base origin/master` locally); PRs into `dev` are not gated.
 
 ## Verification
 
