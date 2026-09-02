@@ -18,9 +18,21 @@ import {
   outboundCreditsBlockedResponse,
   requireOutboundCredits,
 } from "@/lib/outbound-credit-gate.server";
+import { estimateMessageCredits } from "@/lib/pricing";
+import { OUTBOUND_CREDIT_FLOOR } from "../../../../shared/credit-floor";
 import type { BaseUser, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { defineAction } from "@/lib/handler.server";
 import { toUserMessage } from "@/lib/user-message";
+
+function parseMediaList(raw: FormDataEntryValue | undefined): unknown[] {
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
 
 export const action = defineAction({
   auth: workspaceRouteAuth,
@@ -230,7 +242,20 @@ export const action = defineAction({
       sendAt: sendAt || null,
     });
     if (!params.contact_number) return redirect(contact_number);
-    return routeData({ responseData });
+    const mediaList = parseMediaList(data["media"]);
+    const estimatedCredits = estimateMessageCredits({
+      body: String(data["body"] ?? ""),
+      hasMedia: mediaList.length > 0,
+    }).credits;
+    return routeData({
+      responseData,
+      billing: {
+        balanceBefore: credits.balance,
+        estimatedCredits,
+        nextSendBlocked:
+          credits.balance - estimatedCredits <= OUTBOUND_CREDIT_FLOOR,
+      },
+    });
   } catch (error) {
     logger.error("Error sending chat message:", error);
     return routeData(

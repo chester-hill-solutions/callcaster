@@ -169,6 +169,72 @@ describe("app/lib/chat-sms.server.ts", () => {
     );
   });
 
+  const immediateSend = {
+    body: "hi",
+    to: "+15551234567",
+    from: "+15550000000",
+    media: "",
+    workspace: "w1",
+    contact_id: "",
+    user: null,
+    portalConfig: { ...basePortal, sendMode: "from_number" as const, messagingServiceSid: null },
+  };
+
+  test("reports a Twilio rejection as a send failure with the presented message", async () => {
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      messages: { create: vi.fn() },
+    });
+    mocks.sendSmsAndPersist.mockRejectedValueOnce({
+      code: 21606,
+      message: "The From phone number is not a valid, SMS-capable inbound phone number",
+    });
+
+    const { sendMessage } = await import("../app/lib/chat-sms.server");
+    await expect(sendMessage(immediateSend)).rejects.toThrow(
+      "Messaging Service setup is incomplete. Finish workspace onboarding or contact support.",
+    );
+    expect(mocks.sendWorkspaceWebhookNotification).not.toHaveBeenCalled();
+  });
+
+  test("still resolves with the accepted message when persistence fails afterwards", async () => {
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      messages: { create: vi.fn() },
+    });
+    mocks.sendSmsAndPersist.mockResolvedValueOnce({
+      message: { sid: "SM3", status: "queued" },
+      result: { data: null, error: { message: "insert failed: credits column" } },
+    });
+
+    const { sendMessage } = await import("../app/lib/chat-sms.server");
+    const res = await sendMessage(immediateSend);
+
+    expect(res.message).toEqual({ sid: "SM3", status: "queued" });
+    expect(res.data).toBeNull();
+    expect(mocks.logger.error).toHaveBeenCalledWith(
+      "chat_sms.persist_failed",
+      expect.objectContaining({ workspace: "w1", sid: "SM3" }),
+    );
+    expect(mocks.sendWorkspaceWebhookNotification).toHaveBeenCalledOnce();
+  });
+
+  test("still resolves when the outbound webhook notification fails afterwards", async () => {
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      messages: { create: vi.fn() },
+    });
+    mocks.sendSmsAndPersist.mockResolvedValueOnce({
+      message: { sid: "SM4", status: "queued" },
+      result: { data: [{ sid: "SM4" }], error: null },
+    });
+    mocks.sendWorkspaceWebhookNotification.mockRejectedValueOnce(
+      new Error("webhook credit check exploded"),
+    );
+
+    const { sendMessage } = await import("../app/lib/chat-sms.server");
+    await expect(sendMessage(immediateSend)).resolves.toMatchObject({
+      message: { sid: "SM4" },
+    });
+  });
+
   test("cancelScheduledMessage cancels via Twilio and marks the row canceled", async () => {
     const update = vi.fn(async () => ({ sid: "SM1", status: "canceled" }));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({

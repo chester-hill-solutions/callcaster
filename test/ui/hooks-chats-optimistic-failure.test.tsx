@@ -6,7 +6,18 @@ import {
   createWorkspaceEventSourceMock,
 } from "./hooks-test-helpers";
 
-const messageFetcher = createMockFetcher<{ error?: string } | undefined>({
+const toastMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+  warning: vi.fn(),
+  success: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({ toast: toastMocks }));
+
+const messageFetcher = createMockFetcher<
+  | { error?: string; billing?: { nextSendBlocked?: boolean } }
+  | undefined
+>({
   state: "idle",
   data: undefined,
 });
@@ -72,6 +83,9 @@ vi.mock("react-router", async () => {
 describe("useChatsPage optimistic failure handling", () => {
   beforeEach(() => {
     createWorkspaceEventSourceMock();
+    toastMocks.error.mockReset();
+    toastMocks.warning.mockReset();
+    toastMocks.success.mockReset();
     messageFetcher.state = "idle";
     messageFetcher.data = undefined;
     document.body.innerHTML =
@@ -161,6 +175,43 @@ describe("useChatsPage optimistic failure handling", () => {
     rerender();
 
     expect(markOptimisticMessageFailed).not.toHaveBeenCalled();
+    expect(toastMocks.error).not.toHaveBeenCalled();
+    expect(toastMocks.warning).not.toHaveBeenCalled();
+    expect(textarea.value).toBe("");
+  });
+
+  test("shows a billing warning, not a failure, when the send used up the balance", async () => {
+    const { useChatsPage } = await import("@/hooks/chats/useChatsPage");
+    const { result, rerender } = renderHook(() => useChatsPage());
+
+    const addOptimisticMessage = vi.fn();
+    const markOptimisticMessageFailed = vi.fn();
+    act(() => {
+      result.current.registerChatActions({
+        addOptimisticMessage,
+        markOptimisticMessageFailed,
+      });
+    });
+
+    const form = document.querySelector("form") as HTMLFormElement;
+    const textarea = document.getElementById("body") as HTMLTextAreaElement;
+    textarea.value = "last one";
+
+    act(() => {
+      result.current.handleSubmit({
+        preventDefault: vi.fn(),
+        currentTarget: form,
+      } as unknown as FormEvent<HTMLFormElement>);
+    });
+
+    messageFetcher.data = { billing: { nextSendBlocked: true } };
+    rerender();
+
+    expect(markOptimisticMessageFailed).not.toHaveBeenCalled();
+    expect(toastMocks.error).not.toHaveBeenCalled();
+    expect(toastMocks.warning).toHaveBeenCalledWith(
+      expect.stringMatching(/^Message sent\./),
+    );
     expect(textarea.value).toBe("");
   });
 });
