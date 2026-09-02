@@ -751,6 +751,9 @@ test/sms.route.test.ts::@/lib/workspace-credits.server
 test/stripe-webhook.route.test.ts::@/lib/env.server
 test/stripe-webhook.route.test.ts::@/lib/logger.server
 test/stripe-webhook.route.test.ts::@/lib/transaction-history.server
+test/stripe-webhook.signature.test.ts::@/lib/env.server
+test/stripe-webhook.signature.test.ts::@/lib/logger.server
+test/stripe-webhook.signature.test.ts::@/lib/transaction-history.server
 test/survey-answer.route.test.ts::@/lib/survey-db.server
 test/survey-answer.route.test.ts::@/lib/survey-respondent.server
 test/survey-complete.route.test.ts::@/lib/logger.server
