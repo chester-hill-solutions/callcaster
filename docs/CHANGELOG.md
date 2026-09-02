@@ -1,6 +1,75 @@
 # Changelog
 
+Customer- and operator-facing changes, newest first. Every PR that changes app behavior adds a line under **Unreleased**; each dev → master release PR moves those lines into a dated section headed by the release PR. Format follows [Keep a Changelog](https://keepachangelog.com/).
+
 ## [Unreleased]
+
+## 2026-09-02 — release [#1506](https://github.com/chester-hill-solutions/callcaster/pull/1506)
+
+### Added
+
+- CI blocks a release pull request into `master` whose behavior changes have no dated changelog entries or that leaves entries under Unreleased ([#1505](https://github.com/chester-hill-solutions/callcaster/pull/1505)).
+
+### Fixed
+
+- Campaigns launched with **Schedule** no longer start sending early. The worker holds a scheduled campaign until its start date, and a scheduled launch re-times any dispatch job already queued for the campaign ([#1502](https://github.com/chester-hill-solutions/callcaster/pull/1502), [#1501](https://github.com/chester-hill-solutions/callcaster/issues/1501)).
+- **Duplicate campaign** works again and always creates a draft under a free title ("X (Copy)", "X (Copy 2)", …). It copies the queue and audience links, and a title race returns a clear conflict instead of a generic failure ([#1503](https://github.com/chester-hill-solutions/callcaster/pull/1503), [#1500](https://github.com/chester-hill-solutions/callcaster/issues/1500)).
+
+## 2026-09-02 — release [#1499](https://github.com/chester-hill-solutions/callcaster/pull/1499)
+
+### Added
+
+- Workspace **Billing → Activity** rolls usage for the same campaign and calendar month into one expandable row showing the period, entry count, activity types, and total credits. Purchases, number rentals, and one-off usage stay as individual lines ([#1496](https://github.com/chester-hill-solutions/callcaster/pull/1496), [#1488](https://github.com/chester-hill-solutions/callcaster/issues/1488)).
+
+### Fixed
+
+- A chat SMS that Twilio accepted is never reported as a failed send. A send that uses up the balance shows a separate billing warning instead ([#1497](https://github.com/chester-hill-solutions/callcaster/pull/1497), [#1487](https://github.com/chester-hill-solutions/callcaster/issues/1487)).
+- SMS usage debits now record the campaign they belong to, matching voice debits ([#1495](https://github.com/chester-hill-solutions/callcaster/pull/1495), [#1494](https://github.com/chester-hill-solutions/callcaster/issues/1494)).
+
+## 2026-09-02 — release [#1493](https://github.com/chester-hill-solutions/callcaster/pull/1493)
+
+### Added
+
+- **Join** on the call screen now explicitly registers the phone device instead of registering on page load ([#1470](https://github.com/chester-hill-solutions/callcaster/pull/1470)).
+- `db:schema:check` compares enum values against the live database, so a missing enum value fails the drift check ([#1479](https://github.com/chester-hill-solutions/callcaster/pull/1479)).
+- Client migrations run on boot in the dev and staging environments, not only production ([#1478](https://github.com/chester-hill-solutions/callcaster/pull/1478)).
+
+### Fixed
+
+- **Add from Audience** on the campaign queue reports every outcome, including "already linked" and "no contacts with a phone number", and resets the picker so it cannot be double-submitted ([#1489](https://github.com/chester-hill-solutions/callcaster/pull/1489), [#1472](https://github.com/chester-hill-solutions/callcaster/issues/1472)).
+- Twilio voice geo-permission updates send the complete per-country object; enabling permissions during onboarding no longer fails with error 20001 ([#1490](https://github.com/chester-hill-solutions/callcaster/pull/1490), [#1474](https://github.com/chester-hill-solutions/callcaster/issues/1474)).
+- The `waiting` campaign status exists in every database lineage; the campaign schedule sync no longer dead-letters every minute and drained campaigns can complete ([#1491](https://github.com/chester-hill-solutions/callcaster/pull/1491), [#1476](https://github.com/chester-hill-solutions/callcaster/issues/1476)).
+- Stripe webhook signatures verify under Bun, so credit purchases confirm again ([#1480](https://github.com/chester-hill-solutions/callcaster/pull/1480)).
+- The call screen's only navigate-away action is **Leave Campaign** ([#1469](https://github.com/chester-hill-solutions/callcaster/pull/1469)).
+- Add Audio and call-list upload zones share one drop zone component ([#1467](https://github.com/chester-hill-solutions/callcaster/pull/1467)).
+
+## 2026-08-31 — release [#1466](https://github.com/chester-hill-solutions/callcaster/pull/1466)
+
+### Added
+
+- An audible end-of-call tone plays when either side hangs up ([#1461](https://github.com/chester-hill-solutions/callcaster/pull/1461), [#1363](https://github.com/chester-hill-solutions/callcaster/issues/1363)).
+
+### Fixed
+
+- The inactive-campaign dialog on the call screen navigates to the campaign page instead of history-back ([#1465](https://github.com/chester-hill-solutions/callcaster/pull/1465)).
+
+## 2026-08-31 — release [#1460](https://github.com/chester-hill-solutions/callcaster/pull/1460)
+
+### Added
+
+- The workspace switcher is a searchable combobox, and long dropdowns cap to the viewport ([#1454](https://github.com/chester-hill-solutions/callcaster/pull/1454)).
+
+### Fixed
+
+- The dial tone keeps ringing for the whole dialing window; unmuting no longer silences it ([#1457](https://github.com/chester-hill-solutions/callcaster/pull/1457)).
+- The call-screen header holds the just-called contact until the agent hands off ([#1459](https://github.com/chester-hill-solutions/callcaster/pull/1459)).
+- Onboarding reports format errors as format errors, not "required" ([#1456](https://github.com/chester-hill-solutions/callcaster/pull/1456), [#1122](https://github.com/chester-hill-solutions/callcaster/issues/1122)).
+- Onboarding wizard content width is capped, except on the first-number step ([#1455](https://github.com/chester-hill-solutions/callcaster/pull/1455)).
+
+## v2 platform cutover — 2026-08-31 and earlier
+
+Production moved from the Supabase-era app to the v2 platform on 2026-08-31. The entries below were accumulated during that migration and are kept as written.
+
 
 ### Added
 

@@ -3,10 +3,10 @@ import { dataPlaneCapabilityAuthForResource } from "@/lib/capability-guard.serve
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
 import {
-  duplicateCampaignApi,
   getCampaignDetailApi,
   transitionCampaignStatusApi,
 } from "@/lib/platform-data.server";
+import { duplicateCampaign } from "@/lib/campaign-duplicate.server";
 import { campaignStatusBodySchema } from "@/lib/schemas/api/platform-data";
 
 export const loader = defineLoader({
@@ -36,14 +36,14 @@ export const action = defineAction({
     const operation = url.searchParams.get("operation");
 
     if (request.method === "POST" && operation === "duplicate") {
-      const result = await duplicateCampaignApi(
-        auth.campaignId,
-        auth.workspaceId,
-      );
+      const result = await duplicateCampaign({
+        workspaceId: auth.workspaceId,
+        campaignId: auth.campaignId,
+      });
       if (!result.ok) {
         return jsonError(result.error, result.status);
       }
-      return jsonResponse({ campaign_id: result.campaign_id }, 201);
+      return jsonResponse({ campaign_id: result.campaignId }, 201);
     }
 
     if (request.method === "POST" && operation === "status") {

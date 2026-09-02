@@ -38,7 +38,6 @@ import {
   fetchCampaignQueuePage,
   searchCampaignQueueIds,
 } from "@/lib/campaign-queue-search.server";
-import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import type { QueueSearchFilters } from "@/lib/campaign-queue-search.server";
 import type { Campaign } from "@/lib/types";
 import type {
@@ -55,8 +54,6 @@ import {
   audience as audienceTable,
   audience_upload as audienceUploadTable,
   campaign as campaignTable,
-  campaign_audience as campaignAudienceTable,
-  campaign_queue as campaignQueueTable,
   contact as contactTable,
   contact_audience as contactAudienceTable,
   outreach_attempt as outreachAttemptTable,
@@ -69,6 +66,7 @@ import {
   survey_response as surveyResponseTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
+import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { downloadObject } from "@/lib/object-storage.server";
 
@@ -339,84 +337,6 @@ export async function getCampaignDetailApi(
   };
 }
 
-export async function duplicateCampaignApi(
-    campaignId: string,
-  workspaceId: string,
-) {
-  const campaign = await fetchCampaignData({ workspaceId, campaignId });
-  if (!campaign || campaign.workspace !== workspaceId) {
-    return { ok: false as const, error: "Campaign not found", status: 404 };
-  }
-
-  const {
-    id: _id,
-    created_at: _createdAt,
-    campaign_audience: audiences,
-    ...rest
-  } = campaign;
-
-  const insertPayload = {
-    ...rest,
-    title: `${campaign.title} (Copy)`,
-    status: "draft" as const,
-  };
-
-  const tdb = createTenantDb(workspaceId);
-  let newCampaign: { id: number };
-  try {
-    const inserted = await tdb.campaign.insert(insertPayload);
-    const row = inserted[0];
-    if (!row?.id) {
-      return {
-        ok: false as const,
-        error: "Failed to duplicate campaign",
-        status: 500,
-      };
-    }
-    newCampaign = { id: row.id };
-  } catch (error) {
-    logger.error("duplicateCampaignApi insert", error);
-    return {
-      ok: false as const,
-      error: error instanceof Error ? error.message : "Failed to duplicate campaign",
-      status: 500,
-    };
-  }
-
-  const originalQueue = await db
-    .select({ contact_id: campaignQueueTable.contact_id })
-    .from(campaignQueueTable)
-    .where(eq(campaignQueueTable.campaign_id, Number(campaignId)));
-
-  if (originalQueue.length > 0) {
-    try {
-      await enqueueContactsForCampaign(
-        newCampaign.id,
-        originalQueue.map((item) => item.contact_id),
-        { requeue: false },
-      );
-    } catch (error) {
-      logger.error("duplicateCampaignApi queue copy", error);
-      return {
-        ok: false as const,
-        error: error instanceof Error ? error.message : "Failed to copy campaign queue",
-        status: 500,
-      };
-    }
-  }
-
-  if (audiences?.length) {
-    await db.insert(campaignAudienceTable).values(
-      audiences.map((row: { audience_id: number }) => ({
-        campaign_id: newCampaign.id,
-        audience_id: row.audience_id,
-        created_at: new Date().toISOString(),
-      })),
-    );
-  }
-
-  return { ok: true as const, campaign_id: newCampaign.id };
-}
 
 export async function transitionCampaignStatusApi(
     campaignId: string,

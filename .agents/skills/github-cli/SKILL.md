@@ -36,6 +36,11 @@ Use `gh auth refresh -s <scope>` only when the operation requires an additional 
 - Use a separate worktree for the linked branch. Fetch an explicit remote-tracking ref, then create the local tracking branch: `git fetch origin <branch>:refs/remotes/origin/<branch>` followed by `git worktree add --track -b <branch> ../<worktree-name> origin/<branch>`. Name the worktree after the branch without slashes, for example `../feature-1157-build-ai-test-audiences`.
 - For an unlinked chore branch, create the worktree from `dev`: `git worktree add -b chore/<kebab-description> ../chore-<kebab-description> dev`. After verification, commit, push with `git push -u origin <branch>`, and create the review with `gh pr create --repo chester-hill-solutions/callcaster --base dev --head <branch>`.
 
+## Changelog
+
+- Every PR that changes app behavior adds one line under `## [Unreleased]` in `docs/CHANGELOG.md` (Added / Changed / Fixed / Removed / Security), phrased for a customer or operator, linking the PR and the issue. Do this in the same PR as the change.
+- A dev → master release PR renames the Unreleased section to `## YYYY-MM-DD — release #<PR>` and adds a fresh empty `## [Unreleased]` above it. CI enforces this on pull requests into `master` (`npm run check:changelog -- --base origin/master` locally); PRs into `dev` are not gated.
+
 ## Verification
 
 After a mutation, query the target object and report its URL plus the fields that changed. Do not treat successful command exit status as sufficient proof of remote state.
