@@ -14,42 +14,6 @@ export class TwilioMocks {
   }
 
   async install(page: Page): Promise<void> {
-    await page.addInitScript(() => {
-      class FakeCall {
-        parameters = {};
-        on() {
-          return this;
-        }
-        disconnect() {}
-      }
-
-      class FakeDevice {
-        state = "unregistered";
-        constructor(_token: string, _options?: unknown) {}
-        on(event: string, handler: (...args: unknown[]) => void) {
-          if (event === "registered") {
-            queueMicrotask(() => {
-              this.state = "registered";
-              handler();
-            });
-          }
-          return this;
-        }
-        register() {
-          this.state = "registered";
-          return Promise.resolve();
-        }
-        connect() {
-          return Promise.resolve(new FakeCall());
-        }
-        destroy() {}
-      }
-
-      (window as unknown as { Twilio?: { Device: typeof FakeDevice } }).Twilio = {
-        Device: FakeDevice,
-      };
-    });
-
     const handler = async (route: Route) => {
       const url = route.request().url();
       const path = new URL(url).pathname;

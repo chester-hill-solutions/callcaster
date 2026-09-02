@@ -8,7 +8,7 @@ ownerTest.describe("Call screen @authenticated", () => {
     await setWorkspaceCredits(E2E_WORKSPACES.ready.id, 500);
   });
 
-  ownerTest("DIAL-09 call screen loads with mocked device", async ({ page }) => {
+  ownerTest("DIAL-09 call screen loads with dial controls visible", async ({ page }) => {
     const callScreen = new CallScreenPage(page);
     await callScreen.goto(E2E_WORKSPACES.ready.id, E2E_CAMPAIGNS.liveCall.id);
     await expect(callScreen.dialButton()).toBeVisible();

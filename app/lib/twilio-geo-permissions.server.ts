@@ -27,6 +27,39 @@ import type { WorkspaceOperatingCountry } from "@/lib/types";
 /** Countries CallCaster provisions for today (Canada-first, US second). */
 export const VOICE_GEO_COUNTRIES = ["CA", "US"] as const;
 
+/**
+ * One element of the `UpdateRequest` array Twilio's Voice
+ * `DialingPermissions/BulkCountryUpdates` endpoint accepts. Mirrors Twilio's
+ * API reference verbatim: `iso_code` plus all three `*_enabled` flags, with
+ * the flags encoded as the strings "true"/"false" (the form Twilio documents
+ * for the parameter). Twilio rejects a partial object — sending only
+ * `iso_code` + `low_risk_numbers_enabled` fails with 20001 "unable to parse
+ * the updateRequest" (#1474).
+ */
+export type VoiceGeoCountryUpdate = {
+  iso_code: string;
+  low_risk_numbers_enabled: "true" | "false";
+  high_risk_special_numbers_enabled: "true" | "false";
+  high_risk_tollfraud_numbers_enabled: "true" | "false";
+};
+
+/**
+ * Build the JSON string sent as the `UpdateRequest` form field: low-risk
+ * dialing on, both high-risk classes (premium/special numbers, toll-fraud
+ * destinations) explicitly off for every country.
+ */
+export function buildVoiceGeoUpdateRequest(
+  countries: readonly string[] = VOICE_GEO_COUNTRIES,
+): string {
+  const updates: VoiceGeoCountryUpdate[] = countries.map((isoCode) => ({
+    iso_code: isoCode,
+    low_risk_numbers_enabled: "true",
+    high_risk_special_numbers_enabled: "false",
+    high_risk_tollfraud_numbers_enabled: "false",
+  }));
+  return JSON.stringify(updates);
+}
+
 /** One ops alert per workspace per window — a campaign of failing sends must not fan out into hundreds of emails. */
 const GEO_ALERT_WINDOW_MS = 6 * 60 * 60 * 1000;
 
@@ -62,12 +95,7 @@ export async function ensureVoiceGeoPermissions(args: {
     await withTwilioRetry(
       () =>
         client.voice.v1.dialingPermissions.bulkCountryUpdates.create({
-          updateRequest: JSON.stringify(
-            VOICE_GEO_COUNTRIES.map((isoCode) => ({
-              iso_code: isoCode,
-              low_risk_numbers_enabled: true,
-            })),
-          ),
+          updateRequest: buildVoiceGeoUpdateRequest(),
         }),
       { workspaceId: args.workspaceId, operation: "voice_geo_permissions_enable" },
     );

@@ -340,10 +340,12 @@ describe("call hooks", () => {
     const { useTwilioDevice } = await import("@/hooks/call/useTwilioDevice");
     const send = vi.fn();
 
-    expect(() => useTwilioDevice("", "d", "ws", send)).toThrow();
+    expect(() =>
+      useTwilioDevice({ token: "", selectedDevice: "d", workspaceId: "ws", send }),
+    ).toThrow();
 
     const { result } = renderHook(() =>
-      useTwilioDevice("tok", "computer", "ws", send),
+      useTwilioDevice({ token: "tok", selectedDevice: "computer", workspaceId: "ws", send }),
     );
 
     await act(async () => {
@@ -372,7 +374,7 @@ describe("call hooks", () => {
     const send = vi.fn();
 
     const { result } = renderHook(() =>
-      useTwilioDevice("tok", "computer", "ws", send),
+      useTwilioDevice({ token: "tok", selectedDevice: "computer", workspaceId: "ws", send }),
     );
     await act(async () => {
       await Promise.resolve();
@@ -420,7 +422,7 @@ describe("call hooks", () => {
     const send = vi.fn();
 
     const { result } = renderHook(() =>
-      useTwilioDevice("tok", "computer", "ws", send),
+      useTwilioDevice({ token: "tok", selectedDevice: "computer", workspaceId: "ws", send }),
     );
 
     await act(async () => {

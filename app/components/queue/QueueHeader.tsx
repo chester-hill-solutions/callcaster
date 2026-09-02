@@ -14,6 +14,8 @@ interface QueueHeaderProps {
     onAddFromAudience: (value: number) => void;
     onAddContact: () => void;
     unfilteredCount: number;
+    /** True while the add-from-audience request is in flight; blocks a second submit. */
+    isAddingAudience?: boolean;
 }
 
 export function QueueHeader({
@@ -25,8 +27,10 @@ export function QueueHeader({
     onSelectingAudienceChange,
     onSelectedAudienceChange,
     onAddFromAudience,
-    onAddContact
+    onAddContact,
+    isAddingAudience = false,
 }: QueueHeaderProps) {
+    const selectedAudienceName = audiences.find((audience) => audience?.id === selectedAudience)?.name;
     return (
         <div className="flex justify-between items-center">
             <div className="text-sm text-gray-500">
@@ -58,18 +62,20 @@ export function QueueHeader({
                 ) : (
                     <>
                     
-                        <Button 
-                            variant="outline" 
-                            className="bg-green-500/20 border-green-500/60 hover:bg-green-500/30" 
-                            size="sm" 
+                        <Button
+                            variant="outline"
+                            className="bg-green-500/20 border-green-500/60 hover:bg-green-500/30"
+                            size="sm"
+                            disabled={isAddingAudience}
                             onClick={() => onAddFromAudience(selectedAudience)}
                         >
-                            Add {audiences.find((audience) => audience?.id === selectedAudience)?.name}
+                            {isAddingAudience ? `Adding ${selectedAudienceName}...` : `Add ${selectedAudienceName}`}
                         </Button>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => { 
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={isAddingAudience}
+                            onClick={() => {
                                 onSelectedAudienceChange(null); 
                                 onSelectingAudienceChange(false); 
                             }}

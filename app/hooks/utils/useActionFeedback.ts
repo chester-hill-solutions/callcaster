@@ -4,6 +4,7 @@ import { toast } from "sonner";
 type ActionFeedbackOptions<T> = {
   enabled?: boolean;
   onSuccess?: (data: T) => void;
+  onWarning?: (data: T) => void;
   onError?: (error: unknown) => void;
   successMessage?: string | ((data: T) => string);
   errorMessage?: string | ((error: unknown) => string);
@@ -26,6 +27,7 @@ export function useActionFeedback<T>(
   {
     enabled = true,
     onSuccess,
+    onWarning,
     onError,
     successMessage,
     errorMessage,
@@ -45,11 +47,11 @@ export function useActionFeedback<T>(
   const lastHandledRef = useRef<T | undefined>(undefined);
 
   /**
-   * @effect Show a toast (warning/error/success) and fire onSuccess/onError once per new actionData.
+   * @effect Show a toast (warning/error/success) and fire onSuccess/onWarning/onError once per new actionData.
    * @effect-deps actionData (identity-guarded via lastHandledRef so re-renders with the same data
    *   don't re-toast), enabled, and the message/getter/callback options that shape the toast
    * @effect-side-effects none directly (this hook doesn't fetch) — calls toast.warning/error/success
-   *   (sonner) and the caller's onSuccess/onError callbacks
+   *   (sonner) and the caller's onSuccess/onWarning/onError callbacks
    * @effect-why-not-loader actionData already arrived via the caller's own action/fetcher result;
    *   this only reacts to it with an imperative toast, which can't run during render.
    */
@@ -65,6 +67,7 @@ export function useActionFeedback<T>(
         resolveMessage(warningMessage, actionData) ??
         (typeof warning === "string" ? warning : String(warning));
       toast.warning(message);
+      onWarning?.(actionData);
       return;
     }
 
@@ -99,6 +102,7 @@ export function useActionFeedback<T>(
     getSuccess,
     onError,
     onSuccess,
+    onWarning,
     successMessage,
   ]);
 }

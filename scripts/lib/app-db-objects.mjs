@@ -145,3 +145,62 @@ export function collectSchemaTables(root) {
   }
   return tables;
 }
+
+/**
+ * Postgres enum types and their values from the Drizzle schema, in declared
+ * order: `pgEnum("campaign_status", ["pending", ...])` → campaign_status.
+ *
+ * Tables and columns were checked while enum values were not, and that is how
+ * `'waiting'` was added to `campaign_status` in schema.ts without a migration
+ * and stayed absent from every environment (#1475). The first string argument
+ * is the database type name; the exported binding name is irrelevant
+ * (`workspace_role` maps to `workspace_users_role`).
+ */
+export function collectSchemaEnums(root) {
+  const enums = new Map();
+  for (const relPath of SCHEMA_FILES) {
+    let src;
+    try {
+      src = readFileSync(join(root, relPath), "utf8");
+    } catch {
+      continue;
+    }
+    const enumRe = /pgEnum\(\s*"([a-z_0-9]+)"\s*,\s*\[([^\]]*)\]/g;
+    let match;
+    while ((match = enumRe.exec(src))) {
+      const [, enumName, body] = match;
+      const values = [...body.matchAll(/"([^"]*)"|'([^']*)'/g)].map((m) => m[1] ?? m[2]);
+      enums.set(enumName, [...new Set(values)]);
+    }
+  }
+  return enums;
+}
+
+/**
+ * Compare the enum values the app expects against what a database has.
+ *
+ * `expected` and `actual` both map enum name → value list. A value the schema
+ * declares but the database lacks is a failure: the app will write it and
+ * Postgres will reject the row. A value only the database has is a warning:
+ * harmless to the app, but schema.ts and the database drifted in the other
+ * direction and someone should decide which is right.
+ */
+export function diffEnums(expected, actual) {
+  const missingEnums = [];
+  const missingValues = [];
+  const extraValues = [];
+  for (const [name, values] of expected) {
+    const present = actual.get(name);
+    if (!present) {
+      missingEnums.push(name);
+      continue;
+    }
+    const presentSet = new Set(present);
+    const expectedSet = new Set(values);
+    const missing = values.filter((v) => !presentSet.has(v));
+    const extra = present.filter((v) => !expectedSet.has(v));
+    if (missing.length > 0) missingValues.push({ name, values: missing });
+    if (extra.length > 0) extraValues.push({ name, values: extra });
+  }
+  return { missingEnums, missingValues, extraValues };
+}

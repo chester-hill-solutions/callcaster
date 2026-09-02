@@ -128,8 +128,14 @@ export function useCallScreen() {
 
   const dialogs = useCallScreenDialogs({
     hasScript: Boolean(campaignDetails?.script_id),
-    isPredictive: campaign?.dial_type === "predictive",
   });
+  // Explicit Join (#1313): the welcome dialog's "Get started" flips this,
+  // which is what gates Twilio device registration below. A campaign with no
+  // script never shows the welcome dialog (the no-script error dialog takes
+  // over instead) and would otherwise never register a device — the user has
+  // no productive next step there anyway.
+  const [hasJoined, setHasJoined] = useState(!dialogs.isDialogOpen);
+  const onJoin = useCallback(() => setHasJoined(true), []);
 
   const phoneVerification = usePhoneVerification({
     verifiedNumbers,
@@ -153,13 +159,14 @@ export function useCallScreen() {
     deviceIsBusy,
     error: deviceError,
     reconnect: reconnectDevice,
-  } = useTwilioDevice(
+  } = useTwilioDevice({
     token,
-    phoneVerification.selectedDevice,
+    selectedDevice: phoneVerification.selectedDevice,
     workspaceId,
-    send as unknown as (action: { type: string }) => void,
-    handleTokenWillExpire,
-  );
+    send: send as unknown as (action: { type: string }) => void,
+    onTokenWillExpire: handleTokenWillExpire,
+    enabled: hasJoined,
+  });
 
   // Wrap hangUp to drive lifecycle immediately before SDK teardown.
   // This ensures the display transitions to ending/ended synchronously,
@@ -552,6 +559,7 @@ export function useCallScreen() {
     setErrorDialog: dialogs.setErrorDialog,
     isReportDialogOpen: dialogs.isReportDialogOpen,
     setReportDialog: dialogs.setReportDialog,
+    onJoin,
   };
 
   const audioControlsGroup = {

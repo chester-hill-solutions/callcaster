@@ -16,7 +16,10 @@ import { logger } from "@/lib/logger.server";
  *
  * Safety — three independent interlocks so this can never touch the wrong DB:
  *   1. Off by default. Only runs when RUN_CLIENT_MIGRATIONS_ON_BOOT is "1"/"true".
- *      Production never sets it, so production never runs this.
+ *      Every Railway environment (dev, staging, production) sets it via
+ *      .railway/environments/*.ts, so a merged migration reaches each database
+ *      on the next deploy of that environment (#1477). Local and test runs
+ *      leave it unset.
  *   2. Legacy-database refusal. The v2 migrations DROP the Supabase-era
  *      `transaction_history_update_credits` trigger, which on the legacy
  *      customer-prod database IS the live credits mechanism. If that trigger

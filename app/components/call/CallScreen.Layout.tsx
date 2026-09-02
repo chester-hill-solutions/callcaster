@@ -17,8 +17,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { NavLink } from "react-router";
 import { Grid3X3, List, Settings } from "lucide-react";
+import { NavLink } from "react-router";
 import {
   declineIncomingCall,
   IncomingCallPanel,
@@ -126,6 +126,7 @@ export function CallScreenLayout({
     setErrorDialog,
     isReportDialogOpen,
     setReportDialog,
+    onJoin,
   } = dialogControls;
 
   const {
@@ -159,6 +160,16 @@ export function CallScreenLayout({
     value: option,
     label: option,
   }));
+
+  // The one sanctioned way off the call screen (#1313) — reused by TopChrome,
+  // the settings sheet, and the welcome/no-script dialogs' "Leave" action
+  // instead of each wiring its own copy or a bare navigation link.
+  const handleLeaveCampaign = () => {
+    hangUp();
+    device?.destroy();
+    requeueContacts();
+    navigate(-1);
+  };
 
   // One queue list instance shared by the mobile sheet and the desktop rail.
   const queueList = (
@@ -224,12 +235,7 @@ export function CallScreenLayout({
         creditState={creditState}
         hasAccess={hasAccess}
         predictive={campaign.dial_type === "predictive"}
-        onLeaveCampaign={() => {
-          hangUp();
-          device?.destroy();
-          requeueContacts();
-          navigate(-1);
-        }}
+        onLeaveCampaign={handleLeaveCampaign}
         onReportError={() => setReportDialog(!isReportDialogOpen)}
       >
         <Sheet>
@@ -306,12 +312,7 @@ export function CallScreenLayout({
               campaign={campaign}
               count={count}
               completed={completed}
-              onLeaveCampaign={() => {
-                hangUp();
-                device?.destroy();
-                requeueContacts();
-                navigate(-1);
-              }}
+              onLeaveCampaign={handleLeaveCampaign}
               onReportError={() => setReportDialog(!isReportDialogOpen)}
               mediaStream={stream}
               availableMicrophones={availableMicrophones}
@@ -500,6 +501,8 @@ export function CallScreenLayout({
         householdMap={householdMap}
         currentState={currentState}
         isActive={isActive}
+        onLeaveCampaign={handleLeaveCampaign}
+        onJoin={onJoin}
       />
     </div>
   );
