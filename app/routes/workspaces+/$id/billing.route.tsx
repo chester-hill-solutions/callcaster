@@ -46,6 +46,7 @@ type TransactionRow = {
   amount: number;
   note?: string | null;
   idempotency_key?: string | null;
+  campaign_id?: number | null;
 };
 
 type LoaderData = {
@@ -53,11 +54,12 @@ type LoaderData = {
     balance: number;
     history: TransactionRow[];
   };
+  campaignNames: Record<number, string>;
   stripeKeyMode: "test" | "live" | "unknown";
 };
 
 export default function Credits() {
-  const { credits, stripeKeyMode } = useLoaderData<LoaderData>();
+  const { credits, campaignNames, stripeKeyMode } = useLoaderData<LoaderData>();
   const { userRole } = useOutletContext<{ userRole?: string | null }>();
   // The purchase action is gated to Admin+ server-side (billing.action.server.ts).
   // Nav already hides the "Credits" link from callers/members; this gate covers
@@ -295,7 +297,10 @@ export default function Credits() {
 
       <Section variant="flat">
         <SectionHeader branded={false} compact title="Activity" />
-        <BillingActivityTable history={credits.history} />
+        <BillingActivityTable
+          history={credits.history}
+          campaignNames={campaignNames}
+        />
       </Section>
     </div>
   );
