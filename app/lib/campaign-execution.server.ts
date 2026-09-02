@@ -1,5 +1,6 @@
 import type { EnqueueJobResult } from "@/lib/worker/enqueue-job.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
+import { rescheduleQueuedJob } from "@/lib/worker/enqueue-job.server";
 import { getCampaignReadiness, type CampaignReadinessIssue } from "@/lib/campaign-readiness";
 import { updateCampaignStatusInWorkspace } from "@/lib/campaign-ivr.server";
 import { CAMPAIGN_DISPATCH_JOB_TYPE } from "@/lib/worker/job-types.server";
@@ -118,6 +119,14 @@ export async function launchCampaign(args: {
       dedupe: { kind: "live", workspaceId, campaignId: Number(campaignId) },
       runAt: mode === "scheduled" ? campaign.start_date : undefined,
     });
+    if (
+      mode === "scheduled" &&
+      job.deduped &&
+      job.jobId != null &&
+      campaign.start_date
+    ) {
+      await rescheduleQueuedJob(job.jobId, campaign.start_date);
+    }
     return { ok: true, status, job };
   }
 

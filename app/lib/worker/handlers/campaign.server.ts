@@ -173,6 +173,17 @@ const SEND_WINDOW_RETRY_MS = 15 * 60 * 1000;
  *  that lands inside the cap still resumes exactly at the true boundary. */
 const SEND_WINDOW_MAX_DEFER_MS = 60 * 60 * 1000;
 
+/** Milliseconds until a campaign's start date; 0 when unset, invalid, or past. */
+function msUntilCampaignStart(
+  startDate: string | null | undefined,
+  now: number = Date.now(),
+): number {
+  if (!startDate) return 0;
+  const startMs = new Date(startDate).getTime();
+  if (Number.isNaN(startMs)) return 0;
+  return Math.max(0, startMs - now);
+}
+
 async function enqueueDispatchSuccessor(args: {
   workspaceId: string;
   campaignId: number;
@@ -238,6 +249,17 @@ export async function campaignDispatchHandler(
   // Claim: a scheduled campaign whose runAt has arrived transitions to
   // running here. Paused/archived/complete campaigns end the chain.
   if (campaignRecord.status === "scheduled") {
+    const startsInMs = msUntilCampaignStart(campaignRecord.start_date);
+    if (startsInMs > 0) {
+      await enqueueDispatchSuccessor({
+        workspaceId,
+        campaignId,
+        userId,
+        completedJobId: job.id,
+        delayMs: Math.min(startsInMs, SEND_WINDOW_MAX_DEFER_MS),
+      });
+      return { ok: true, campaignId, deferred: "scheduled_start" };
+    }
     await updateCampaignStatusInWorkspace(workspaceId, campaignId, {
       status: "running",
     });

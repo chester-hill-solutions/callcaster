@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   dispatchCampaignSmsBatch: vi.fn(),
   dispatchCampaignIvrBatch: vi.fn(),
   enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 99 })),
+  rescheduleQueuedJob: vi.fn(async () => true),
   findCampaignInWorkspace: vi.fn(),
   updateCampaignStatusInWorkspace: vi.fn(async () => undefined),
   rpcTryCompleteCampaignIfDrained: vi.fn(async () => true),
@@ -31,6 +32,7 @@ vi.mock("@/lib/campaign-ivr-dispatch.server", () => ({
 }));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
   unsafeEnqueueJob: mocks.enqueueJob,
+  rescheduleQueuedJob: mocks.rescheduleQueuedJob,
 }));
 vi.mock("@/lib/campaign-ivr.server", () => ({
   findCampaignInWorkspace: mocks.findCampaignInWorkspace,
@@ -151,6 +153,40 @@ describe("campaignDispatchHandler", () => {
   test("claims a scheduled campaign into running before dispatching", async () => {
     mocks.findCampaignInWorkspace.mockResolvedValue(
       runningMessageCampaign({ status: "scheduled" }),
+    );
+    await campaignDispatchHandler(makeJob());
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      42,
+      expect.objectContaining({ status: "running" }),
+    );
+    expect(mocks.dispatchCampaignSmsBatch).toHaveBeenCalled();
+  });
+
+  test("defers a scheduled campaign whose start date is still ahead", async () => {
+    const startDate = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningMessageCampaign({ status: "scheduled", start_date: startDate }),
+    );
+    const before = Date.now();
+    const result = await campaignDispatchHandler(makeJob());
+
+    expect(result).toMatchObject({ ok: true, deferred: "scheduled_start" });
+    expect(mocks.updateCampaignStatusInWorkspace).not.toHaveBeenCalled();
+    expect(mocks.dispatchCampaignSmsBatch).not.toHaveBeenCalled();
+    expect(mocks.enqueueJob).toHaveBeenCalledOnce();
+    const runAt = (mocks.enqueueJob.mock.calls[0]?.[0] as { runAt: Date }).runAt;
+    // Capped at the one-hour deferral bound, never the full two hours.
+    expect(runAt.getTime()).toBeGreaterThanOrEqual(before + 60 * 60 * 1000 - 1000);
+    expect(runAt.getTime()).toBeLessThanOrEqual(before + 60 * 60 * 1000 + 5000);
+  });
+
+  test("promotes a scheduled campaign once its start date has passed", async () => {
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningMessageCampaign({
+        status: "scheduled",
+        start_date: new Date(Date.now() - 60 * 1000).toISOString(),
+      }),
     );
     await campaignDispatchHandler(makeJob());
     expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
@@ -471,6 +507,39 @@ describe("launchCampaign", () => {
     expect(mocks.enqueueJob).toHaveBeenCalledWith(
       expect.objectContaining({ runAt: startDate }),
     );
+  });
+
+  test("scheduled launch re-times an already-queued dispatch job to the start date", async () => {
+    const startDate = "2026-09-10T13:00:00.000Z";
+    mocks.enqueueJob.mockResolvedValueOnce({ enqueued: false, deduped: true, jobId: 12 });
+    const result = await launchCampaign({
+      ...baseArgs,
+      campaign: {
+        type: "message",
+        end_date: null,
+        start_date: startDate,
+      } as never,
+      mode: "scheduled",
+      userId: USER_ID,
+    });
+    expect(result.ok).toBe(true);
+    expect(mocks.rescheduleQueuedJob).toHaveBeenCalledWith(12, startDate);
+  });
+
+  test("immediate launch never re-times a deduped job", async () => {
+    mocks.enqueueJob.mockResolvedValueOnce({ enqueued: false, deduped: true, jobId: 12 });
+    const result = await launchCampaign({
+      ...baseArgs,
+      campaign: {
+        type: "message",
+        end_date: null,
+        start_date: "2026-09-10T13:00:00.000Z",
+      } as never,
+      mode: "now",
+      userId: USER_ID,
+    });
+    expect(result.ok).toBe(true);
+    expect(mocks.rescheduleQueuedJob).not.toHaveBeenCalled();
   });
 
   test("live_call launch changes status without enqueueing dispatch", async () => {

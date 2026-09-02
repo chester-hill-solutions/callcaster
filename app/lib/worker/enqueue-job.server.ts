@@ -126,6 +126,25 @@ async function reviveDeadLetterJob(args: {
   return jobId;
 }
 
+/**
+ * Move a still-queued job to a new run time. Running, completed, and
+ * dead-lettered jobs are left alone; returns whether a row changed.
+ */
+export async function rescheduleQueuedJob(
+  jobId: number,
+  runAt: Date | string | null,
+): Promise<boolean> {
+  const rows = (await db.execute(sql`
+    UPDATE job
+    SET retry_at = ${normalizeJobRunAt(runAt)},
+        updated_at = now()
+    WHERE id = ${jobId}
+      AND status = 'queued'
+    RETURNING id
+  `)) as Array<{ id: number }>;
+  return rows.length > 0;
+}
+
 async function enqueueWithIdempotency(args: {
   type: string;
   params: Record<string, unknown>;
