@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-09-02 — release [#1506](https://github.com/chester-hill-solutions/callcaster/pull/1506)
+
 ### Added
 
 - CI blocks a release pull request into `master` whose behavior changes have no dated changelog entries or that leaves entries under Unreleased ([#1505](https://github.com/chester-hill-solutions/callcaster/pull/1505)).
