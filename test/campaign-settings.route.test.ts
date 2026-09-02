@@ -70,7 +70,13 @@ vi.mock("@/lib/platform-media.server", () => ({
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: vi.fn(() => ({
     script: { findMany: vi.fn(async () => [{ id: 7 }]) },
+    campaign: { findMany: vi.fn(async () => [{ title: "Copy me" }]) },
   })),
+}));
+vi.mock("@/lib/campaign-audience-db.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-audience-db.server")>()),
+  listCampaignAudienceIds: vi.fn(async () => []),
+  insertCampaignAudienceLink: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/request-utils.server", () => ({
   parseActionRequest: (...args: any[]) => mocks.parseActionRequest(...args),
