@@ -20,17 +20,15 @@ import { deepEqual } from "@/lib/utils";
 import { parseActionRequest } from "@/lib/request-utils.server";
 import {
   findCampaignInWorkspace,
-  insertCampaignForWorkspace,
   updateCampaignStatusInWorkspace,
 } from "@/lib/campaign-ivr.server";
-import { getCampaignQueueContactIds } from "@/lib/campaign-queue-db.server";
 import {
   splitMessageCampaign,
   fetchCampaignDetails,
   fetchQueueCounts,
   updateCampaign,
 } from "@/lib/database/campaign.server";
-import { enqueueContactsForCampaign } from "@/lib/queue.server";
+import { duplicateCampaign } from "@/lib/campaign-duplicate.server";
 import {
   getCampaignReadiness,
   getScheduleValidation,
@@ -65,38 +63,6 @@ async function updateCampaignStatus(
   status: string,
 ) {
   await updateCampaignStatusInWorkspace(workspaceId, Number(selected_id), { status });
-  return { success: true };
-}
-
-async function handleCampaignDuplicate(
-  selected_id: string,
-  workspace_id: string,
-  campaignData: string,
-) {
-  const parsedData = JSON.parse(campaignData);
-
-  // Don't trust the client's (possibly stale/edited) draft for the script
-  // reference — read the source campaign's real script_id off the DB so the
-  // duplicate always points at a script that actually exists in this
-  // workspace. Null it out if the source has none.
-  const sourceCampaign = await findCampaignInWorkspace(workspace_id, selected_id);
-
-  const campaign = await insertCampaignForWorkspace(workspace_id, {
-    ...parsedData,
-    script_id: sourceCampaign?.script_id ?? null,
-    live_questions: parsedData.live_questions ?? parsedData.questions ?? null,
-  });
-
-  const originalContactIds = await getCampaignQueueContactIds(Number(selected_id));
-
-  if (originalContactIds.length > 0) {
-    await enqueueContactsForCampaign(
-      campaign.id,
-      originalContactIds,
-      { requeue: false },
-    );
-  }
-
   return { success: true };
 }
 
@@ -307,9 +273,25 @@ export const action = defineAction({
 
     case "duplicate": {
       try {
-        const campaignData = data.campaignData != null ? String(data.campaignData) : "";
-        await handleCampaignDuplicate(selected_id, workspace_id, campaignData);
-        return routeData({ success: true, actionType: "duplicate" as const });
+        const result = await duplicateCampaign({
+          workspaceId: workspace_id,
+          campaignId: selected_id,
+        });
+        if (!result.ok) {
+          return routeData(
+            {
+              success: false,
+              error: result.error,
+              actionType: "duplicate" as const,
+            },
+            { status: result.status === 404 ? 404 : 400 },
+          );
+        }
+        return routeData({
+          success: true,
+          actionType: "duplicate" as const,
+          campaignId: result.campaignId,
+        });
       } catch (error) {
         logger.error("Error duplicating campaign", error);
         return routeData(
