@@ -46,7 +46,7 @@ const MEMBERSHIP_PROOF =
 
 /** Requests that are authenticated as Twilio/Stripe/cron rather than as a user. */
 const NON_USER_SURFACE =
-  /requireTwilioSignature\w*\s*\(|requireTwilioEventsSinkSecret\s*\(|validateTwilioWebhook|constructEvent\s*\(|verifyCronSecret\s*\(|createCronEnqueueAction\s*\(|retiredEndpoint\s*\(/;
+  /requireTwilioSignature\w*\s*\(|requireTwilioEventsSinkSecret\s*\(|validateTwilioWebhook|constructEvent(?:Async)?\s*\(|verifyCronSecret\s*\(|createCronEnqueueAction\s*\(|retiredEndpoint\s*\(/;
 
 /**
  * Touches tenant data at all. A route with no tenancy has nothing to prove.

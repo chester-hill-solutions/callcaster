@@ -8,7 +8,7 @@ const transactionHistoryMock = vi.hoisted(() => ({
 
 const stripeMock = vi.hoisted(() => ({
   webhooks: {
-    constructEvent: vi.fn(),
+    constructEventAsync: vi.fn(),
   },
 }));
 
@@ -44,7 +44,7 @@ describe("app/routes/api+/stripe-webhook/route.tsx", () => {
     vi.resetModules();
     envState.webhookSecret = "";
     transactionHistoryMock.insertTransactionHistoryIdempotent.mockReset();
-    stripeMock.webhooks.constructEvent.mockReset();
+    stripeMock.webhooks.constructEventAsync.mockReset();
   });
 
   test("returns 503 when webhook secret is not configured", async () => {
@@ -63,7 +63,7 @@ describe("app/routes/api+/stripe-webhook/route.tsx", () => {
 
   test("credits workspace once using stripeSessionKey(session.id) when complete and paid", async () => {
     envState.webhookSecret = "whsec";
-    stripeMock.webhooks.constructEvent.mockReturnValue({
+    stripeMock.webhooks.constructEventAsync.mockResolvedValue({
       id: "evt_123",
       type: "checkout.session.completed",
       data: {
@@ -100,7 +100,7 @@ describe("app/routes/api+/stripe-webhook/route.tsx", () => {
 
   test("does not credit when session status is not complete", async () => {
     envState.webhookSecret = "whsec";
-    stripeMock.webhooks.constructEvent.mockReturnValue({
+    stripeMock.webhooks.constructEventAsync.mockResolvedValue({
       id: "evt_open",
       type: "checkout.session.completed",
       data: {
@@ -129,7 +129,7 @@ describe("app/routes/api+/stripe-webhook/route.tsx", () => {
 
   test("does not credit when payment_status is not paid", async () => {
     envState.webhookSecret = "whsec";
-    stripeMock.webhooks.constructEvent.mockReturnValue({
+    stripeMock.webhooks.constructEventAsync.mockResolvedValue({
       id: "evt_unpaid",
       type: "checkout.session.completed",
       data: {
