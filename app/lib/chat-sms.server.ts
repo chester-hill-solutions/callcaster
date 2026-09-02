@@ -86,13 +86,12 @@ export const sendMessage = async ({
   });
   const statusCallback = `${env.BASE_URL()}/api/sms/status`;
 
+  let sent: Awaited<ReturnType<typeof sendSmsAndPersist>>;
   try {
-    const processedBody = body;
-
-    const { message, result } = await sendSmsAndPersist({
+    sent = await sendSmsAndPersist({
       twilio,
       createParams: buildTwilioOutboundSmsCreateParams({
-        body: processedBody,
+        body,
         to,
         from,
         media: mediaData && mediaData.length > 0 ? [...mediaData] : [],
@@ -111,11 +110,24 @@ export const sendMessage = async ({
         ...(schedule && { scheduled_at: schedule.sendAt.toISOString() }),
       },
     });
+  } catch (error) {
+    logger.error("Error sending message:", error);
+    const presented = presentTwilioError(error);
+    throw new Error(presented.userMessage);
+  }
 
-    const { data, error } = result;
+  // Twilio has accepted the message: from here on nothing may be reported as
+  // a send failure. Status callbacks and billing run on their own paths.
+  const { message, result } = sent;
+  if (result.error) {
+    logger.error("chat_sms.persist_failed", {
+      workspace,
+      sid: message.sid,
+      error: result.error.message,
+    });
+  }
 
-    if (error) throw { "message_entry_error:": error };
-
+  try {
     const webhookResult = await sendWorkspaceWebhookNotification({workspaceId: workspace,
       eventCategory: "outbound_sms",
       eventType: "INSERT",
@@ -125,13 +137,11 @@ export const sendMessage = async ({
     if (!webhookResult.success) {
       logger.error("Outbound SMS webhook delivery failed", webhookResult.error);
     }
-
-    return { message, data };
   } catch (error) {
-    logger.error("Error sending message:", error);
-    const presented = presentTwilioError(error);
-    throw new Error(presented.userMessage);
+    logger.error("Outbound SMS webhook delivery failed", error);
   }
+
+  return { message, data: result.data };
 };
 
 /**

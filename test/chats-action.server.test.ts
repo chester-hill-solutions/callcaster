@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
   linkContactToConversation: vi.fn(),
   getEffectivePortalConfig: vi.fn(),
+  getWorkspaceCreditsBalance: vi.fn(async () => 100),
 }));
 
 const tenantDbMocks = vi.hoisted(() => ({
@@ -50,7 +51,8 @@ vi.mock("@/lib/inbound-sms-context.server", () => ({
 }));
 
 vi.mock("@/lib/workspace-credits.server", () => ({
-  getWorkspaceCreditsBalance: vi.fn(async () => 100),
+  getWorkspaceCreditsBalance: (...args: unknown[]) =>
+    mocks.getWorkspaceCreditsBalance(...args),
 }));
 
 describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
@@ -59,6 +61,8 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     mocks.verifyAuth.mockReset();
     mocks.sendMessage.mockReset();
     mocks.linkContactToConversation.mockReset();
+    mocks.getWorkspaceCreditsBalance.mockReset();
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(100);
     mocks.getEffectivePortalConfig.mockReset();
     mocks.getEffectivePortalConfig.mockResolvedValue({
       sendMode: "from_number",
@@ -152,6 +156,69 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
       expect.objectContaining({ to: "+15555550100", body: "hi" }),
     );
     expect(mocks.linkContactToConversation).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toMatchObject({
+      billing: { balanceBefore: 100, estimatedCredits: 1, nextSendBlocked: false },
+    });
+  });
+
+  test("a send that uses up the balance succeeds and carries a billing notice", async () => {
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(1);
+    mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" } });
+
+    const { action } = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+
+    const formData = new FormData();
+    formData.set("body", "hi");
+    formData.set("from", "+15550000000");
+
+    const res = await asRouteResponse(action(await withWorkspaceRouteArgs({
+        request: new Request("http://x/workspaces/w1/chats/+15555550100", {
+          method: "POST",
+          body: formData,
+        }),
+        params: { id: "w1", contact_number: "+15555550100" },
+      })),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.sendMessage).toHaveBeenCalledOnce();
+    const body = await res.json();
+    expect(body.error).toBeUndefined();
+    expect(body.billing).toEqual({
+      balanceBefore: 1,
+      estimatedCredits: 1,
+      nextSendBlocked: true,
+    });
+  });
+
+  test("a depleted balance blocks before sending", async () => {
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+
+    const { action } = await import(
+      "../app/routes/workspaces+/$id/chats.action.server"
+    );
+
+    const formData = new FormData();
+    formData.set("body", "hi");
+    formData.set("from", "+15550000000");
+
+    const res = await asRouteResponse(action(await withWorkspaceRouteArgs({
+        request: new Request("http://x/workspaces/w1/chats/+15555550100", {
+          method: "POST",
+          body: formData,
+        }),
+        params: { id: "w1", contact_number: "+15555550100" },
+      })),
+    );
+
+    expect(res.status).toBe(402);
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+    await expect(res.json()).resolves.toEqual({
+      error: "Insufficient credits",
+      creditsError: true,
+    });
   });
 
   test("does not require from when the server resolves Messaging Service mode", async () => {

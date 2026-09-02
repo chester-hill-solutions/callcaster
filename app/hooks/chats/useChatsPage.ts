@@ -393,8 +393,15 @@ export function useChatsPage() {
     const pending = pendingOptimisticMessageRef.current;
     if (!pending) return;
 
-    const data = messageFetcher.data as { error?: string } | undefined;
+    const data = messageFetcher.data as
+      | { error?: string; billing?: { nextSendBlocked?: boolean } }
+      | undefined;
     if (!data || !data.error) {
+      if (data?.billing?.nextSendBlocked) {
+        toast.warning(
+          "Message sent. Your credit balance is used up — add credits before sending more.",
+        );
+      }
       pendingOptimisticMessageRef.current = null;
       return;
     }
