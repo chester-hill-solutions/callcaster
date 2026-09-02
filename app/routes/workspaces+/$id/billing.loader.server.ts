@@ -1,5 +1,5 @@
 import { data as routeData } from "react-router";
-import { getWorkspaceBilling } from "@/lib/platform-billing.server";
+import { getWorkspaceBillingActivity } from "@/lib/billing-activity.server";
 import { env, getStripeKeyMode } from "@/lib/env.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 import { defineLoader } from "@/lib/handler.server";
@@ -11,7 +11,7 @@ export const loader = defineLoader({
     if (!result.ok) return result.response;
     const { user, workspaceId } = result.ctx;
 
-    const billing = await getWorkspaceBilling(user.id, workspaceId);
+    const billing = await getWorkspaceBillingActivity(user.id, workspaceId);
     if (!billing.ok) {
       throw new Error(billing.error);
     }
@@ -21,8 +21,9 @@ export const loader = defineLoader({
     return routeData({
       credits: {
         balance: billing.balance,
-        history: billing.transactions,
+        history: billing.history,
       },
+      campaignNames: billing.campaignNames,
       stripeKeyMode,
     });
   },

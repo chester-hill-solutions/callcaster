@@ -7,6 +7,8 @@ export type BillingActivityRow = {
   amount: number;
   note?: string | null;
   idempotency_key?: string | null;
+  /** Campaign the usage belongs to, when the ledger row records one. */
+  campaign_id?: number | null;
 };
 
 export type BillingReference = {
