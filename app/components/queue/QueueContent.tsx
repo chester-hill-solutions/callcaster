@@ -30,6 +30,7 @@ interface QueueContentProps {
   setIsSelectingAudience: (value: boolean) => void;
   setSelectedAudience: (value: number | null) => void;
   handleAddFromAudience: (value: number) => void;
+  isAddingAudience?: boolean;
   handleAddContact: () => void;
   onStatusChange: (ids: string[], newStatus: string) => void;
   isAllFilteredSelected: boolean;
@@ -51,6 +52,7 @@ export function QueueContent({
     setIsSelectingAudience,
     setSelectedAudience,
     handleAddFromAudience,
+    isAddingAudience,
     handleAddContact,
     onStatusChange,
     isAllFilteredSelected,
@@ -86,6 +88,7 @@ export function QueueContent({
                 onSelectingAudienceChange={setIsSelectingAudience}
                 onSelectedAudienceChange={setSelectedAudience}
                 onAddFromAudience={handleAddFromAudience}
+                isAddingAudience={isAddingAudience}
                 onAddContact={handleAddContact}
             />
             <QueueTable

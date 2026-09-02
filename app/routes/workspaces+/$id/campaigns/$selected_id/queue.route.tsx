@@ -4,6 +4,10 @@ export { action } from "./queue.action.server";
 import { redirect, Await, useFetcher, useLoaderData, useOutletContext, useRouteError, useSearchParams } from "react-router";
 import { Suspense, useState, type Dispatch, type SetStateAction } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
+import {
+    getAudienceLinkWarning,
+    isAudienceLinkResponse,
+} from "@/components/queue/audience-link-feedback";
 
 
 import { Spinner } from "@/components/ui/spinner";
@@ -167,12 +171,24 @@ function QueueResolvedContent({
         queueError: queueValue.queueError || null,
     } as QueueResponse;
 
+    // Once the link request has a definite answer (linked, nothing new, or
+    // already linked) the picker goes back to its resting state so the same
+    // audience cannot be submitted again from a stale "Add {name}" button.
+    const resetAudiencePicker = (data: unknown) => {
+        if (!isAudienceLinkResponse(data)) return;
+        setSelectedAudience(null);
+        setIsSelectingAudience(false);
+    };
+
     useActionFeedback(queueActions.queueFetcher.data, {
         enabled: queueActions.queueFetcher.state === "idle",
         getWarning: (data) =>
-            data && typeof data === "object" && "warning" in data
+            getAudienceLinkWarning(data) ??
+            (data && typeof data === "object" && "warning" in data
                 ? (data as { warning?: string }).warning
-                : undefined,
+                : undefined),
+        onWarning: resetAudiencePicker,
+        onSuccess: resetAudiencePicker,
         getSuccess: (data) =>
             Boolean(
                 data &&
@@ -204,6 +220,7 @@ function QueueResolvedContent({
                 setIsSelectingAudience={setIsSelectingAudience}
                 setSelectedAudience={setSelectedAudience}
                 handleAddFromAudience={queueActions.handleAddFromAudience}
+                isAddingAudience={queueActions.queueFetcher.state !== "idle"}
                 handleAddContact={() => setSearchModalOpen(true)}
                 onStatusChange={(ids, status) => queueActions.handleStatusChange(ids, status, isAllFilteredSelected)}
                 isAllFilteredSelected={isAllFilteredSelected}

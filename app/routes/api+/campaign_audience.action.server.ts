@@ -93,7 +93,19 @@ export const action = defineAction({
 
       const existing = await findCampaignAudienceLink(campaignId, audienceId);
       if (existing) {
-        return routeData({ success: true, message: "Audience already added to campaign" }, { headers });
+        // `alreadyLinked` is the stable marker the queue page keys its feedback
+        // on; `message` stays for API-key callers that already read it.
+        return routeData(
+          {
+            success: true,
+            alreadyLinked: true,
+            audienceLinked: true,
+            enqueued: 0,
+            skipped: 0,
+            message: "Audience already added to campaign",
+          },
+          { headers },
+        );
       }
 
       await insertCampaignAudienceLink(campaignId, audienceId);
