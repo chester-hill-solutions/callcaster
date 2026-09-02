@@ -211,6 +211,9 @@ export async function runSmsStatusSideEffects(args: {
       note,
       idempotencyKey: smsKey(sid),
       messageSid: sid,
+      // Voice debits already record campaign_id; SMS must too so the ledger
+      // can be rolled up per campaign without a join back through message.sid.
+      campaignId: messageData.campaign_id ?? null,
     });
   }
 
