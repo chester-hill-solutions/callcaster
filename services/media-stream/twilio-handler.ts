@@ -125,9 +125,23 @@ export async function handleTwilioStreamMessage(
       const params = msg.start.customParameters ?? {};
       const direction = params.direction ?? "outbound";
 
+      // The DB writes below are keyed only by call_sid, so a start frame is
+      // otherwise free to name another workspace's live call. When the token
+      // was minted for a specific call, bind to that trusted SID and refuse a
+      // mismatching frame instead of persisting rows against a foreign call.
+      const tokenCallSid = ws.data.callSid;
+      if (
+        tokenCallSid &&
+        msg.start.callSid &&
+        msg.start.callSid !== tokenCallSid
+      ) {
+        ws.close(1008, "call_sid_mismatch");
+        return;
+      }
+
       state.phase = "streaming";
       state.streamSid = msg.start.streamSid ?? msg.streamSid;
-      state.callSid = msg.start.callSid;
+      state.callSid = tokenCallSid ?? msg.start.callSid;
       state.direction = direction;
       state.startTime = Date.now();
 
