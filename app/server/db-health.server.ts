@@ -44,9 +44,13 @@ export type DatabaseReadiness = {
 
 async function probeListenConnection(): Promise<boolean> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
+  // Hold the listen() promise so a late resolution can still be unsubscribed.
+  // If the timeout wins the race, the registration would otherwise leak for the
+  // process lifetime every time the probe times out (e.g. under DB latency).
+  const listenPromise = directPool.listen(LISTEN_PROBE_CHANNEL, () => undefined);
   try {
     const listener = await Promise.race([
-      directPool.listen(LISTEN_PROBE_CHANNEL, () => undefined),
+      listenPromise,
       new Promise<never>((_, reject) => {
         timeout = setTimeout(
           () => reject(new Error("Postgres LISTEN probe timed out")),
@@ -57,6 +61,9 @@ async function probeListenConnection(): Promise<boolean> {
     await listener.unlisten();
     return true;
   } catch {
+    // The timeout (or a listen error) won. If listen() still resolves later,
+    // unsubscribe it in the background so no registration is left dangling.
+    void listenPromise.then((l) => l.unlisten()).catch(() => undefined);
     return false;
   } finally {
     if (timeout) {
