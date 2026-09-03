@@ -150,6 +150,32 @@ describe("campaignDispatchHandler", () => {
     expect(mocks.dispatchCampaignIvrBatch).not.toHaveBeenCalled();
   });
 
+  test("terminalizes an expired campaign to complete instead of dispatching (#1512)", async () => {
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningMessageCampaign({ end_date: "2000-01-01T00:00:00.000Z" }),
+    );
+    const result = await campaignDispatchHandler(makeJob());
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      42,
+      { status: "complete" },
+    );
+    expect(result).toMatchObject({ ok: true, expired: true });
+    expect(mocks.dispatchCampaignSmsBatch).not.toHaveBeenCalled();
+  });
+
+  test("leaves a paused expired campaign's status untouched (#1512)", async () => {
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningMessageCampaign({
+        status: "paused",
+        end_date: "2000-01-01T00:00:00.000Z",
+      }),
+    );
+    const result = await campaignDispatchHandler(makeJob());
+    expect(mocks.updateCampaignStatusInWorkspace).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: true, expired: true });
+  });
+
   test("claims a scheduled campaign into running before dispatching", async () => {
     mocks.findCampaignInWorkspace.mockResolvedValue(
       runningMessageCampaign({ status: "scheduled" }),

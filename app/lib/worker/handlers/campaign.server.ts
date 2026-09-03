@@ -246,6 +246,34 @@ export async function campaignDispatchHandler(
     return { ok: true, campaignId, skipped: true, reason: "not_dispatchable_campaign" };
   }
 
+  // Expired campaigns terminalize here — before the scheduled->running flip
+  // below — so an end date that passed while contacts were still queued (or a
+  // scheduled start that arrives after the end date) can no longer leave the
+  // campaign stuck "running" with an undrained queue. Only active/queued
+  // states move to complete; paused/draft/archived/complete keep the status
+  // the user chose.
+  if (
+    campaignRecord.end_date &&
+    new Date(campaignRecord.end_date) < new Date()
+  ) {
+    const terminalizable = new Set([
+      "running",
+      "scheduled",
+      "waiting",
+      "pending",
+    ]);
+    if (campaignRecord.status && terminalizable.has(campaignRecord.status)) {
+      await updateCampaignStatusInWorkspace(workspaceId, campaignId, {
+        status: "complete",
+      });
+    }
+    logger.info("campaign_dispatch.expired", {
+      campaignId,
+      previousStatus: campaignRecord.status,
+    });
+    return { ok: true, campaignId, expired: true };
+  }
+
   // Claim: a scheduled campaign whose runAt has arrived transitions to
   // running here. Paused/archived/complete campaigns end the chain.
   if (campaignRecord.status === "scheduled") {
@@ -285,11 +313,6 @@ export async function campaignDispatchHandler(
       status: campaignRecord.status,
     });
     return { ok: true, campaignId, skipped: true, reason: campaignRecord.status };
-  }
-
-  if (campaignRecord.end_date && new Date(campaignRecord.end_date) < new Date()) {
-    logger.info("campaign_dispatch.expired", { campaignId });
-    return { ok: true, campaignId, expired: true };
   }
 
   if (campaignRecord.type !== "message") {
