@@ -72,6 +72,11 @@ bun run services/media-stream/index.ts
 
 The service listens on `MEDIA_STREAM_PORT` (default `3001`). Set `MEDIA_STREAM_SECRET` and `MEDIA_STREAM_HOST` in `.env` if you want to change defaults.
 
+Transcription and coaching need two optional API keys (both are skipped when unset, so local demos run without them):
+
+- `ELEVENLABS_API_KEY` — live speech-to-text (`scribe_v2_realtime`) and the post-call `elevenlabs_batch_transcribe` worker job (`scribe_v2`). If unset, live STT is skipped and the batch job throws and dead-letters roughly every 15 minutes, so set it wherever the worker runs.
+- `COHERE_API_KEY` — live coaching cues (`api.cohere.com`). If unset, coaching cues are skipped.
+
 6. Start the app:
 
 ```bash
