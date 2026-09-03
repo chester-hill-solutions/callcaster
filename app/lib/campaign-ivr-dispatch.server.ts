@@ -37,11 +37,12 @@ import {
 } from "@/lib/throughput-config.server";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
-import { insertCallForWorkspace } from "@/lib/telephony-db.server";
+import { insertCallForWorkspace, hasDuplicateCampaignCall } from "@/lib/telephony-db.server";
 import { logger } from "@/lib/logger.server";
 
 export const IVR_CALL_DEQUEUED_REASON = "IVR call completed";
 export const OPTED_OUT_IVR_DEQUEUED_REASON = "Contact opted out";
+export const DUPLICATE_IVR_DEQUEUED_REASON = "Duplicate IVR call prevented";
 
 export type CampaignIvrBatchOutcome =
   | { kind: "insufficient_credits" }
@@ -125,6 +126,13 @@ export async function dispatchCampaignIvrBatch(args: {
 
   const counts = { called: 0, failed: 0, dequeued: 0, deferred: 0 };
 
+  // In-batch normalized-number reservation. hasDuplicateCampaignCall reads
+  // persisted call history and cannot see sibling rows still executing in this
+  // same Promise.all — two queue rows for one household phone would both pass
+  // and both dial. Reserve synchronously before the first await so the second
+  // occurrence dequeues as a duplicate.
+  const claimedNumbers = new Set<string>();
+
   // Claim size is CPS-derived (1–2 rows at legacy pacing), so a single
   // Promise.all per batch keeps us inside the workspace's call rate.
   await Promise.all(
@@ -150,6 +158,39 @@ export async function dispatchCampaignIvrBatch(args: {
           by: { id: member.id },
           userId,
           reason: OPTED_OUT_IVR_DEQUEUED_REASON,
+        });
+        counts.dequeued += 1;
+        return;
+      }
+
+      // Never dial the same number twice in one campaign (household phones).
+      // Check + reserve synchronously before the first await; then confirm
+      // against persisted call history for cross-batch / prior dispatches.
+      if (phone && claimedNumbers.has(phone)) {
+        await dequeueQueueEntry({
+          by: { id: member.id },
+          userId,
+          reason: DUPLICATE_IVR_DEQUEUED_REASON,
+        });
+        counts.dequeued += 1;
+        return;
+      }
+      if (phone) {
+        claimedNumbers.add(phone);
+      }
+      if (
+        phone &&
+        (await hasDuplicateCampaignCall({
+          workspaceId,
+          campaignId,
+          to: phone,
+          tdb,
+        }))
+      ) {
+        await dequeueQueueEntry({
+          by: { id: member.id },
+          userId,
+          reason: DUPLICATE_IVR_DEQUEUED_REASON,
         });
         counts.dequeued += 1;
         return;

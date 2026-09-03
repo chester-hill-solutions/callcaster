@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   })),
   rpcCreateOutreachAttempt: vi.fn(),
   insertCallForWorkspace: vi.fn(),
+  hasDuplicateCampaignCall: vi.fn(async () => false),
   dequeueQueueEntry: vi.fn(),
   recipientCallingWindowStatus: vi.fn(),
   createTenantDb: vi.fn(() => ({ tenant: true })),
@@ -63,6 +64,7 @@ vi.mock("@/lib/twilio-client.server", () => ({
 }));
 vi.mock("@/lib/telephony-db.server", () => ({
   insertCallForWorkspace: mocks.insertCallForWorkspace,
+  hasDuplicateCampaignCall: (...a: unknown[]) => mocks.hasDuplicateCampaignCall(...a),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -107,6 +109,7 @@ function defaultMocks() {
   mocks.twilioCallCreate.mockResolvedValue({ sid: "CAsid" });
   mocks.rpcCreateOutreachAttempt.mockResolvedValue(777);
   mocks.insertCallForWorkspace.mockResolvedValue({ id: 1 });
+  mocks.hasDuplicateCampaignCall.mockResolvedValue(false);
   mocks.dequeueQueueEntry.mockResolvedValue({ dequeuedPrimary: true });
   mocks.recipientCallingWindowStatus.mockReturnValue({ allowed: true });
 }
@@ -190,6 +193,31 @@ describe("dispatchCampaignIvrBatch", () => {
     expect(outcome.kind).toBe("dispatched");
     expect(outcome.counts).toEqual({ called: 1, failed: 0, dequeued: 0, deferred: 0 });
     expect(outcome.queuedRemaining).toBe(0);
+  });
+
+  test("does not dial the same number twice in one campaign (#1517)", async () => {
+    mocks.getCampaignQueueById.mockResolvedValue([
+      queuedRow(),
+      queuedRow({
+        id: 502,
+        contact_id: 9002,
+        contact: { id: 9002, phone: "+16135550100", opt_out: false },
+      }),
+    ]);
+
+    const outcome = (await dispatchCampaignIvrBatch({
+      workspaceId: WORKSPACE_ID,
+      campaignId: "42",
+      userId: USER_ID,
+    })) as Extract<Awaited<ReturnType<typeof dispatchCampaignIvrBatch>>, { kind: "dispatched" }>;
+
+    expect(mocks.twilioCallCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
+      by: { id: 502 },
+      userId: USER_ID,
+      reason: "Duplicate IVR call prevented",
+    });
+    expect(outcome.counts).toEqual({ called: 1, failed: 0, dequeued: 1, deferred: 0 });
   });
 
   test("an out-of-window recipient stays queued for a later tick", async () => {
