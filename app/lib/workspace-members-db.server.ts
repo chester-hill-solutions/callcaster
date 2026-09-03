@@ -12,6 +12,7 @@ import {
 import { authUser } from "@/db/auth-schema";
 import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
+import { isTwoFactorEnabled } from "@/lib/two-factor.server";
 import type { Database } from "@/lib/db-types";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
@@ -161,6 +162,12 @@ export async function transferWorkspaceOwnership(args: {
   currentOwnerUserId: string;
   newOwnerUserId: string;
 }) {
+  if (!(await isTwoFactorEnabled(args.newOwnerUserId))) {
+    throw new Error(
+      "The new owner must enroll in two-factor authentication before ownership can be transferred.",
+    );
+  }
+
   return db.transaction(async (tx) => {
     const tdb = createTenantDb(args.workspaceId, tx as unknown as typeof db);
 
