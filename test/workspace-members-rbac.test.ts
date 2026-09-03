@@ -39,6 +39,8 @@ vi.mock("@/lib/two-factor.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/two-factor.server")>();
   return {
     ...actual,
+    isTwoFactorEnabled: (...args: unknown[]) =>
+      twoFactorMocks.isTwoFactorEnabled(...(args as [string])),
     requireTwoFactorForPrivilegedRoleAssignment: async (
       targetUserId: string,
       role: string,
@@ -296,6 +298,21 @@ describe("workspace member RBAC", () => {
           newOwnerUserId: "u2",
         }),
       ).rejects.toThrow("new owner");
+    });
+
+    test("rejects when the new owner has not enrolled in 2FA (#1519)", async () => {
+      twoFactorMocks.isTwoFactorEnabled.mockResolvedValueOnce(false);
+      const actual = await vi.importActual<typeof import("../app/lib/workspace-members-db.server")>(
+        "../app/lib/workspace-members-db.server",
+      );
+      await expect(
+        actual.transferWorkspaceOwnership({
+          workspaceId: "w1",
+          currentOwnerUserId: "u1",
+          newOwnerUserId: "u2",
+        }),
+      ).rejects.toThrow("two-factor");
+      expect(dbMock.transaction).not.toHaveBeenCalled();
     });
 
     test("promotes the new owner and demotes the previous owner in a transaction", async () => {
