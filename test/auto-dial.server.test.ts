@@ -55,6 +55,15 @@ vi.mock("@/lib/recipient-calling-window", () => ({
     windowMock.recipientCallingWindowStatus(...args),
 }));
 
+const creditGateMock = vi.hoisted(() => ({
+  requireOutboundCredits: vi.fn(async () => ({ ok: true }) as { ok: boolean; reason?: string }),
+}));
+vi.mock("@/lib/outbound-credit-gate.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/outbound-credit-gate.server")>()),
+  requireOutboundCredits: (...args: unknown[]) =>
+    creditGateMock.requireOutboundCredits(...args),
+}));
+
 const tenantDbMocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   update: vi.fn(),
@@ -360,6 +369,23 @@ describe("auto-dial.server", () => {
       expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(21, "ws-1");
       expect(dequeueQueueEntryMock).not.toHaveBeenCalled();
       expect(result).toEqual({ success: false, error: "Invalid phone number" });
+    });
+
+    test("stops and releases the claim when credits run out mid-session (#1508)", async () => {
+      creditGateMock.requireOutboundCredits.mockResolvedValueOnce({
+        ok: false,
+        reason: "insufficient_credits",
+      });
+
+      const result = await runAutoDialerTurn(turnInput);
+
+      expect(twilioMocks.callsCreate).not.toHaveBeenCalled();
+      expect(rpcMocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+      expect(requeueCampaignQueueByIdMock).toHaveBeenCalledWith(21, "ws-1");
+      expect(result).toEqual({
+        success: true,
+        message: "Insufficient credits, stopping auto-dial",
+      });
     });
 
     test("parks (dequeues with reason) on ambiguous network failure — never requeues", async () => {
