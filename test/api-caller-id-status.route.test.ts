@@ -56,6 +56,16 @@ vi.mock("@/lib/inbound-call-db.server", () => ({
     inboundMocks.updateWorkspaceNumberCapabilitiesByPhone(...args),
 }));
 
+const mergeMocks = vi.hoisted(() => ({
+  findWorkspaceIdByTwilioAccountSid: vi.fn(async () => "w1"),
+}));
+
+vi.mock("@/lib/merge-workspace-twilio-data.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/merge-workspace-twilio-data.server")>()),
+  findWorkspaceIdByTwilioAccountSid: (...args: unknown[]) =>
+    mergeMocks.findWorkspaceIdByTwilioAccountSid(...args),
+}));
+
 const twilioMocks = vi.hoisted(() => ({
   requireTwilioSignature: vi.fn(),
 }));
@@ -98,6 +108,8 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
     twilioMocks.requireTwilioSignature.mockResolvedValue(null);
     inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone.mockReset();
     inboundMocks.updateWorkspaceNumberCapabilitiesByPhone.mockReset();
+    mergeMocks.findWorkspaceIdByTwilioAccountSid.mockReset();
+    mergeMocks.findWorkspaceIdByTwilioAccountSid.mockResolvedValue("w1");
     inboundMocks.listWorkspaceNumberTwilioCandidatesByPhone.mockResolvedValue([
       { twilioData: { account_sid: "AC123", auth_token: "auth" } },
     ]);
@@ -142,6 +154,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
     const fd = new FormData();
     fd.set("VerificationStatus", "success");
     fd.set("To", "+15555550100");
+    fd.set("AccountSid", "AC123");
     const res = await asRouteResponse(mod.action({
       request: makeCallerIdRequest(fd),
     } as any));
@@ -154,6 +167,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
         voice: true,
         verification_status: "success",
       }),
+      "w1",
     );
     expect(onboardingMocks.updateMessagingServiceSenders).toHaveBeenCalledWith(
       expect.any(Object),
@@ -177,6 +191,7 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
       const fd = new FormData();
       fd.set("VerificationStatus", "failed");
       fd.set("To", "+15555550100");
+      fd.set("AccountSid", "AC123");
       return makeCallerIdRequest(fd);
     };
 
@@ -198,7 +213,25 @@ describe("app/routes/api+/call/routeer-id.status.tsx", () => {
         voice: false,
         verification_status: "failed",
       }),
+      "w1",
     );
+  });
+
+  test("skips the capability write when no workspace resolves from AccountSid", async () => {
+    mergeMocks.findWorkspaceIdByTwilioAccountSid.mockResolvedValueOnce(null);
+
+    const mod = await import("../app/routes/api+/caller-id/status.route");
+    const fd = new FormData();
+    fd.set("VerificationStatus", "success");
+    fd.set("To", "+15555550100");
+    fd.set("AccountSid", "AC_unknown");
+    const res = await asRouteResponse(mod.action({
+      request: makeCallerIdRequest(fd),
+    } as any));
+
+    expect((res as Response).status).toBe(200);
+    expect(await (res as Response).json()).toEqual({ skipped: "unresolved_workspace" });
+    expect(inboundMocks.updateWorkspaceNumberCapabilitiesByPhone).not.toHaveBeenCalled();
   });
 
   test("returns 403 when Twilio signature does not validate", async () => {

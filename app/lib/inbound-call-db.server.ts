@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   call as callTable,
   script as scriptTable,
@@ -133,11 +133,21 @@ export async function listWorkspaceNumberTwilioCandidatesByPhone(
 export async function updateWorkspaceNumberCapabilitiesByPhone(
   phoneNumber: string,
   capabilities: Record<string, unknown>,
+  workspaceId: string,
 ) {
+  // Scope by workspace as well as phone number: workspace_number is unique on
+  // (workspace, phone_number), not phone_number alone, so several workspaces can
+  // register the same external number as a caller ID. A phone-only UPDATE from a
+  // Twilio verification callback would fan out across every such workspace.
   const rows = await db
     .update(workspaceNumberTable)
     .set({ capabilities: capabilities as typeof workspaceNumberTable.$inferInsert.capabilities })
-    .where(eq(workspaceNumberTable.phone_number, phoneNumber))
+    .where(
+      and(
+        eq(workspaceNumberTable.workspace, workspaceId),
+        eq(workspaceNumberTable.phone_number, phoneNumber),
+      ),
+    )
     .returning();
   return rows;
 }
