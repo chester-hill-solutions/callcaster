@@ -13,6 +13,41 @@ import { logger } from "@/lib/logger.server";
 import type { OutreachAttempt } from "@/lib/types";
 
 type CallRow = typeof callTable.$inferSelect;
+
+/**
+ * Count calls already placed to a phone number within a campaign. Used to keep
+ * IVR/robocall campaigns from dialling the same number twice (e.g. two contacts
+ * sharing one household phone), mirroring hasDuplicateCampaignSms for SMS.
+ */
+export async function countCampaignCallsToPhone(
+  workspaceId: string,
+  campaignId: string | number,
+  to: string,
+  options?: { tdb?: TenantDb },
+): Promise<number> {
+  const tdb = options?.tdb ?? createTenantDb(workspaceId);
+  return tdb.call.count({
+    where: and(
+      eq(callTable.campaign_id, Number(campaignId)),
+      eq(callTable.to, to),
+    ),
+  });
+}
+
+export async function hasDuplicateCampaignCall(args: {
+  workspaceId: string;
+  campaignId: string | number;
+  to: string;
+  tdb?: TenantDb;
+}): Promise<boolean> {
+  const count = await countCampaignCallsToPhone(
+    args.workspaceId,
+    args.campaignId,
+    args.to,
+    { tdb: args.tdb },
+  );
+  return count > 0;
+}
 type OutreachRow = typeof outreachAttemptTable.$inferSelect;
 
 /**
