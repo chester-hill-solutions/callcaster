@@ -44,10 +44,17 @@ function deriveExpectedTwilioActionFiles() {
 
   for (const file of entries) {
     const source = readFileSync(join(SURFACE_DIR, file), "utf8");
-    const seedBlocks = source.match(/[a-zA-Z]*[Ss]eed\(\{[\s\S]*?\}\)\s*[,;]/g) ?? [];
+    // Each registry entry is an object literal that ends with its nested
+    // `operations: [ ... ]` array, e.g.
+    //   { path: "...", routeModule: "...", authClass: "twilioSignature",
+    //     authVia: "...", operations: [{ method: "POST", handler: "action" }] }
+    // (before commit c4d0d040 these were `xSeed({ ... })` calls; the registry
+    // is now generated as plain object literals — see api-surface-generated.ts).
+    const entryBlocks =
+      source.match(/\{\s*path:[\s\S]*?operations:\s*\[[\s\S]*?\]\s*\}/g) ?? [];
 
-    for (const block of seedBlocks) {
-      if (!/"twilioSignature"/.test(block)) continue;
+    for (const block of entryBlocks) {
+      if (!/authClass:\s*"twilioSignature"/.test(block)) continue;
       if (!/method:\s*"POST"/.test(block)) continue;
 
       const rmMatch = block.match(/routeModule:\s*"([^"]+)"/);
@@ -100,6 +107,21 @@ function hasValidation(source) {
 }
 
 const expectedTwilioRoutes = deriveExpectedTwilioActionFiles();
+
+// Self-test: the derivation regressed silently once already (commit c4d0d040
+// changed the registry format from xSeed({...}) calls to object literals and
+// this gate matched zero routes for weeks while exiting 0). If we derive no
+// twilioSignature routes, the derivation is broken again — fail loudly rather
+// than green-light an unvalidated Twilio surface.
+if (expectedTwilioRoutes.length === 0) {
+  console.error(
+    "check-twilio-webhooks: derived 0 twilioSignature routes from the API surface " +
+      "registry (app/lib/api-surface-*.ts). The registry format likely changed — " +
+      "fix deriveExpectedTwilioActionFiles before trusting this gate.",
+  );
+  process.exit(1);
+}
+
 const actionFiles = collectActionFiles(API_DIR);
 
 // Filter the derived list to only files that actually exist on disk
