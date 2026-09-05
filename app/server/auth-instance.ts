@@ -25,6 +25,9 @@ function createAuth() {
       // row — forgot-password was completely dead (P0-7). See
       // app/lib/send-reset-password-email.server.ts.
       sendResetPassword: sendResetPasswordEmail,
+      // A reset is usually a response to suspected compromise; the sessions
+      // that already exist are exactly the ones that must stop working.
+      revokeSessionsOnPasswordReset: true,
     },
     database: drizzleAdapter(db, {
       provider: "pg",

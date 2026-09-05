@@ -74,4 +74,16 @@ describe("app/server/auth-instance.ts", () => {
     );
     expect(options.emailAndPassword?.sendResetPassword).toBe(sendResetPasswordEmail);
   });
+
+  test("a password reset revokes every existing session for the user", async () => {
+    // Better Auth only calls deleteUserSessions on reset when this flag is set
+    // (node_modules/better-auth/dist/api/routes/password.mjs); without it an
+    // attacker's session survives the very reset meant to evict them.
+    const { auth } = await import("../app/server/auth-instance");
+    void auth.api;
+    const options = mocks.betterAuth.mock.calls.at(0)?.[0] as {
+      emailAndPassword?: { revokeSessionsOnPasswordReset?: boolean };
+    };
+    expect(options.emailAndPassword?.revokeSessionsOnPasswordReset).toBe(true);
+  });
 });

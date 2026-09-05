@@ -20,6 +20,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Security
 
+- Resetting your password now signs out every other session on the account, so a session that was already open elsewhere stops working ([#1561](https://github.com/chester-hill-solutions/callcaster/issues/1561)).
 - Workspace-scoped database updates now drop the workspace column from the update payload at runtime, so no code path can move a row to another workspace ([#1542](https://github.com/chester-hill-solutions/callcaster/issues/1542)).
 - The contacts API creates a new contact in the workspace the caller was authorized for, ignoring any other workspace named in the request body ([#1541](https://github.com/chester-hill-solutions/callcaster/issues/1541)).
 - Workspace invites from **Settings → Members** validate the requested role and refuse a role above the inviter's own, so a member can no longer invite someone as admin or owner ([#1543](https://github.com/chester-hill-solutions/callcaster/issues/1543)).
