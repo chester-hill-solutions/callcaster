@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- The Twilio status recovery sweep finishes pending campaign texts that never received a delivery callback: it matches them to the provider record and bills them, or marks them failed without a charge when the provider has no record ([#1578](https://github.com/chester-hill-solutions/callcaster/issues/1578)).
 - Campaign texts are recorded before they are handed to Twilio, so a send can no longer go out unrecorded and unbilled if the write after sending fails; the delivery callback attaches the provider ID to the pending record. A contact whose send Twilio refused stays eligible for the next attempt ([#1582](https://github.com/chester-hill-solutions/callcaster/issues/1582)).
 - A campaign text that Twilio accepted but whose record could not be saved is now reported to operations immediately instead of disappearing from billing and the conversation view unnoticed ([#1581](https://github.com/chester-hill-solutions/callcaster/issues/1581)).
 - Polling the status of a campaign export that no longer exists returns "not found" instead of a server error ([#1577](https://github.com/chester-hill-solutions/callcaster/issues/1577)).
