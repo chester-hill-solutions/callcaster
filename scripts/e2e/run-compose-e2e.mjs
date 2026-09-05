@@ -13,6 +13,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertLocalTarget } from "../lib/local-target-guard.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -23,6 +24,8 @@ const databaseUrl =
   process.env.DATABASE_URL ??
   "postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster";
 
+assertLocalTarget(databaseUrl, "DATABASE_URL");
+
 const e2eS3Env = {
   S3_ENDPOINT: process.env.S3_ENDPOINT ?? "http://127.0.0.1:9000",
   S3_REGION: process.env.S3_REGION ?? "us-east-1",
@@ -30,6 +33,7 @@ const e2eS3Env = {
   S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY ?? "callcaster-dev-secret",
   S3_BUCKET: process.env.S3_BUCKET ?? "callcaster",
 };
+assertLocalTarget(e2eS3Env.S3_ENDPOINT, "S3_ENDPOINT");
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {

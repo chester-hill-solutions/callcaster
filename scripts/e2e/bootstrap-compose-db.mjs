@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertLocalTarget } from "../lib/local-target-guard.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -15,6 +16,7 @@ const rootDir = path.resolve(__dirname, "../..");
 const databaseUrl =
   process.env.DATABASE_URL ??
   "postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster";
+assertLocalTarget(databaseUrl, "DATABASE_URL");
 
 const steps = [
   "scripts/e2e/bootstrap-compose-reset.sql",
