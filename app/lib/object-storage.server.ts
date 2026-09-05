@@ -149,6 +149,29 @@ function basenameFromKey(key: string, prefix: string): string {
   return key.slice(prefix.length);
 }
 
+/** Thrown by downloadObject when the key does not exist (S3 NoSuchKey / 404). */
+export class ObjectNotFoundError extends Error {
+  constructor(logicalBucket: string, objectPath: string) {
+    super(`Object not found: ${logicalBucket}/${objectPath}`);
+    this.name = "ObjectNotFoundError";
+  }
+}
+
+/** S3 and MinIO answer a missing key with NoSuchKey (GET) or NotFound (HEAD), HTTP 404. */
+function isNotFound(error: unknown): boolean {
+  const candidate = error as {
+    name?: string;
+    Code?: string;
+    $metadata?: { httpStatusCode?: number };
+  };
+  return (
+    candidate?.$metadata?.httpStatusCode === 404 ||
+    candidate?.name === "NoSuchKey" ||
+    candidate?.name === "NotFound" ||
+    candidate?.Code === "NoSuchKey"
+  );
+}
+
 /** Thrown when `upsert: false` was requested and the key already exists. */
 export class ObjectExistsError extends Error {
   constructor(objectPath: string) {
@@ -216,15 +239,25 @@ export async function downloadObject(
   objectPath: string,
 ): Promise<Buffer> {
   const { bucketName, key } = resolveLocation(logicalBucket, objectPath);
-  const response = await getS3Client().send(
-    new GetObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-    }),
-  );
+  let response;
+  try {
+    response = await getS3Client().send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: key,
+      }),
+    );
+  } catch (error) {
+    // Callers must be able to tell "gone" from "storage down": a status poll
+    // answers 404 for the former and must not for the latter.
+    if (isNotFound(error)) {
+      throw new ObjectNotFoundError(logicalBucket, objectPath);
+    }
+    throw error;
+  }
 
   if (!response.Body) {
-    throw new Error(`Object not found: ${logicalBucket}/${objectPath}`);
+    throw new ObjectNotFoundError(logicalBucket, objectPath);
   }
 
   const bytes = await response.Body.transformToByteArray();
