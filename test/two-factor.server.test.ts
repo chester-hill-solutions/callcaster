@@ -187,6 +187,28 @@ describe("requireTwoFactorEnrollmentForPrivilegedUser (sudo path)", () => {
     delete process.env.E2E_TEST;
   });
 
+  test("with TWO_FACTOR_ENABLED unset, enforcement is off everywhere, production included", async () => {
+    const saved = process.env.TWO_FACTOR_ENABLED;
+    delete process.env.TWO_FACTOR_ENABLED;
+    delete process.env.DISABLE_2FA_ENFORCEMENT;
+    process.env.NODE_ENV = "production";
+    process.env.RAILWAY_ENVIRONMENT_NAME = "production";
+    try {
+      expect(isTwoFactorEnforcementDisabled()).toBe(true);
+      await expect(
+        requireTwoFactorEnrollmentForPrivilegedUser({
+          userId: "sudo-1",
+          request: new Request("http://x/admin"),
+          isPrivileged: true,
+        }),
+      ).resolves.toBeUndefined();
+    } finally {
+      process.env.TWO_FACTOR_ENABLED = saved;
+      delete process.env.NODE_ENV;
+      delete process.env.RAILWAY_ENVIRONMENT_NAME;
+    }
+  });
+
   test("DISABLE_2FA_ENFORCEMENT on PR preview env short-circuits enforcement", async () => {
     process.env.DISABLE_2FA_ENFORCEMENT = "1";
     process.env.NODE_ENV = "production";

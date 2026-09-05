@@ -32,6 +32,7 @@ vi.mock("@/lib/auth-trusted-origins.server", () => ({
 
 vi.mock("@/lib/env.server", () => ({
   env: new Proxy({}, { get: () => () => "test" }),
+  isTwoFactorFeatureEnabled: () => process.env.TWO_FACTOR_ENABLED === "1",
 }));
 
 vi.mock("@/lib/ensure-user-profile.server", () => ({
@@ -43,6 +44,28 @@ vi.mock("@/lib/send-reset-password-email.server", () => ({
 }));
 
 describe("app/server/auth-instance.ts", () => {
+  test("registers the twoFactor plugin only when TWO_FACTOR_ENABLED is set", async () => {
+    const saved = process.env.TWO_FACTOR_ENABLED;
+    try {
+      process.env.TWO_FACTOR_ENABLED = "1";
+      let mod = await import("../app/server/auth-instance");
+      void mod.auth.api;
+      let options = mocks.betterAuth.mock.calls.at(-1)?.[0] as { plugins?: unknown[] };
+      expect(options.plugins).toHaveLength(1);
+
+      vi.resetModules();
+      mocks.betterAuth.mockClear();
+      delete process.env.TWO_FACTOR_ENABLED;
+      mod = await import("../app/server/auth-instance");
+      void mod.auth.api;
+      options = mocks.betterAuth.mock.calls.at(-1)?.[0] as { plugins?: unknown[] };
+      // No plugin means sign-in never issues a twoFactorRedirect, for anyone.
+      expect(options.plugins).toEqual([]);
+    } finally {
+      process.env.TWO_FACTOR_ENABLED = saved;
+    }
+  });
+
   beforeEach(() => {
     vi.resetModules();
     mocks.betterAuth.mockClear();

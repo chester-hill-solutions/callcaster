@@ -61,6 +61,7 @@ describe("account route", () => {
       lastName: "Last",
       email: "person@example.com",
       twoFactorEnabled: false,
+      twoFactorAvailable: true,
       privileged: false,
       enrollRequired: false,
     });

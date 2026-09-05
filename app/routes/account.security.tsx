@@ -10,6 +10,7 @@ import { Text } from "@/components/ui/typography";
 
 export default function AccountSecurity() {
   const data = useLoaderData<{
+    twoFactorAvailable: boolean;
     privileged: boolean;
     twoFactorEnabled: boolean;
     enrollRequired: boolean;
@@ -51,11 +52,20 @@ export default function AccountSecurity() {
           <Text className="text-green-600">{actionData.success}</Text>
         ) : null}
 
-        <Text className="text-sm text-muted-foreground">
-          Status: {enabled ? "Enabled" : "Not enabled"}
-        </Text>
+        {!data.twoFactorAvailable ? (
+          <Text className="text-sm text-muted-foreground">
+            Two-factor authentication is turned off for this deployment. You will
+            not be asked for a code at sign-in, and enrollment is unavailable.
+          </Text>
+        ) : null}
 
-        {!enabled && !showVerify ? (
+        {data.twoFactorAvailable ? (
+          <Text className="text-sm text-muted-foreground">
+            Status: {enabled ? "Enabled" : "Not enabled"}
+          </Text>
+        ) : null}
+
+        {data.twoFactorAvailable && !enabled && !showVerify ? (
           <Form method="POST" className="flex flex-col gap-4">
             <input type="hidden" name="intent" value="enable" />
             <FormField htmlFor="password" label="Current password">
@@ -86,7 +96,7 @@ export default function AccountSecurity() {
           </div>
         ) : null}
 
-        {enabled && !data.privileged ? (
+        {data.twoFactorAvailable && enabled && !data.privileged ? (
           <Form method="POST" className="mt-4 flex flex-col gap-4 border-t pt-4">
             <input type="hidden" name="intent" value="disable" />
             <FormField htmlFor="disable-password" label="Current password">
