@@ -164,7 +164,13 @@ const mockState = vi.hoisted(() => {
       queryString.includes("SET status = 'completed'")
     ) {
       const id = findParam(query, (s) => s.includes("WHERE id = ")) as number;
-      const job = state.jobs.find((j) => j.id === id);
+      const owner = findParam(query, (s) => s.includes("claimed_by = "));
+      // Mirror SQL: an unfenced UPDATE (no claimed_by predicate) matches on id alone.
+      const job = state.jobs.find((j) =>
+        owner === undefined
+          ? j.id === id
+          : j.id === id && j.status === "running" && j.claimed_by === owner,
+      );
       if (job) {
         job.status = "completed";
         job.completed_at = currentNow;
@@ -180,7 +186,13 @@ const mockState = vi.hoisted(() => {
       queryString.includes("retry_at")
     ) {
       const id = findParam(query, (s) => s.includes("WHERE id = ")) as number;
-      const job = state.jobs.find((j) => j.id === id);
+      const owner = findParam(query, (s) => s.includes("claimed_by = "));
+      // Mirror SQL: an unfenced UPDATE (no claimed_by predicate) matches on id alone.
+      const job = state.jobs.find((j) =>
+        owner === undefined
+          ? j.id === id
+          : j.id === id && j.status === "running" && j.claimed_by === owner,
+      );
       if (job) {
         job.status = "queued";
         job.retry_at = new Date(
@@ -201,7 +213,13 @@ const mockState = vi.hoisted(() => {
       queryString.includes("SET status = 'dead_letter'")
     ) {
       const id = findParam(query, (s) => s.includes("WHERE id = ")) as number;
-      const job = state.jobs.find((j) => j.id === id);
+      const owner = findParam(query, (s) => s.includes("claimed_by = "));
+      // Mirror SQL: an unfenced UPDATE (no claimed_by predicate) matches on id alone.
+      const job = state.jobs.find((j) =>
+        owner === undefined
+          ? j.id === id
+          : j.id === id && j.status === "running" && j.claimed_by === owner,
+      );
       if (job) {
         job.status = "dead_letter";
         job.failed_at = currentNow;
@@ -223,7 +241,18 @@ const mockState = vi.hoisted(() => {
       queryString.includes("claimed_until") &&
       !queryString.includes("SET status")
     ) {
-      return [];
+      const id = findParam(query, (s) => s.includes("WHERE id = ")) as number;
+      const owner = findParam(query, (s) => s.includes("claimed_by = "));
+      // Mirror SQL: an unfenced UPDATE (no claimed_by predicate) matches on id alone.
+      const job = state.jobs.find((j) =>
+        owner === undefined
+          ? j.id === id
+          : j.id === id && j.status === "running" && j.claimed_by === owner,
+      );
+      if (job) {
+        job.claimed_until = new Date(state.now.getTime() + 60_000).toISOString();
+      }
+      return job ? [job] : [];
     }
 
     return [];
@@ -285,10 +314,10 @@ describe("worker poll-jobs lifecycle", () => {
 
   test("completes a job", async () => {
     mockState.state.jobs.push(
-      createJob({ id: 42, status: "running", attempt_count: 1 }),
+      createJob({ id: 42, status: "running", attempt_count: 1, claimed_by: "worker-1" }),
     );
 
-    await completeJob(42, { processed: true });
+    await completeJob(42, { processed: true }, "worker-1");
 
     const stored = mockState.state.jobs.find((j) => j.id === 42);
     expect(stored?.status).toBe("completed");
@@ -298,10 +327,10 @@ describe("worker poll-jobs lifecycle", () => {
 
   test("fails a job and retries when under max attempts", async () => {
     mockState.state.jobs.push(
-      createJob({ id: 42, status: "running", attempt_count: 1 }),
+      createJob({ id: 42, status: "running", attempt_count: 1, claimed_by: "worker-1" }),
     );
 
-    await failJob(42, 1, 3, "Temporary error");
+    await failJob({ jobId: 42, attemptCount: 1, maxAttempts: 3, error: "Temporary error", jobType: "test", workerId: "worker-1" });
 
     const stored = mockState.state.jobs.find((j) => j.id === 42);
     expect(stored?.status).toBe("queued");
@@ -313,16 +342,109 @@ describe("worker poll-jobs lifecycle", () => {
 
   test("dead-letters a job after max attempts", async () => {
     mockState.state.jobs.push(
-      createJob({ id: 42, status: "running", attempt_count: 3 }),
+      createJob({ id: 42, status: "running", attempt_count: 3, claimed_by: "worker-1" }),
     );
 
-    await failJob(42, 3, 3, "Permanent error");
+    await failJob({ jobId: 42, attemptCount: 3, maxAttempts: 3, error: "Permanent error", jobType: "test", workerId: "worker-1" });
 
     const stored = mockState.state.jobs.find((j) => j.id === 42);
     expect(stored?.status).toBe("dead_letter");
     expect(stored?.failed_at).toBe(mockState.baseTime.toISOString());
     expect(stored?.dead_letter_reason).toBe("Permanent error");
     expect(stored?.error_message).toBe("Permanent error");
+  });
+
+  test("a stale worker cannot complete a job another worker has reclaimed", async () => {
+    const { logger } = await import("@/lib/logger.server");
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    try {
+      mockState.state.jobs.push(
+        createJob({ id: 42, status: "running", attempt_count: 2, claimed_by: "worker-2" }),
+      );
+
+      await completeJob(42, { processed: true }, "worker-1");
+
+      const stored = mockState.state.jobs.find((j) => j.id === 42);
+      expect(stored?.status).toBe("running");
+      expect(stored?.claimed_by).toBe("worker-2");
+      expect(stored?.result).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        "worker.claim_lost",
+        expect.objectContaining({ jobId: 42, phase: "complete", workerId: "worker-1" }),
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  test("a stale worker cannot re-queue or dead-letter a job another worker has reclaimed", async () => {
+    const { logger } = await import("@/lib/logger.server");
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const error = vi.spyOn(logger, "error").mockImplementation(() => {});
+    try {
+      mockState.state.jobs.push(
+        createJob({ id: 42, status: "running", attempt_count: 2, claimed_by: "worker-2" }),
+      );
+
+      await failJob({ jobId: 42, attemptCount: 1, maxAttempts: 3, error: "stale retry", jobType: "test", workerId: "worker-1" });
+      await failJob({ jobId: 42, attemptCount: 3, maxAttempts: 3, error: "stale dead-letter", jobType: "test", workerId: "worker-1" });
+
+      const stored = mockState.state.jobs.find((j) => j.id === 42);
+      expect(stored?.status).toBe("running");
+      expect(stored?.claimed_by).toBe("worker-2");
+      expect(stored?.error_message).toBeUndefined();
+      expect(stored?.dead_letter_reason).toBeUndefined();
+      expect(warn).toHaveBeenCalledTimes(2);
+      // No dead-letter alert for a row this worker no longer owns.
+      expect(error).not.toHaveBeenCalledWith("worker.job.dead_letter", expect.anything());
+    } finally {
+      warn.mockRestore();
+      error.mockRestore();
+    }
+  });
+
+  test("the heartbeat stops extending a claim once another worker owns it", async () => {
+    const { logger } = await import("@/lib/logger.server");
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => {});
+    const info = vi.spyOn(logger, "info").mockImplementation(() => {});
+    try {
+      mockState.state.jobs.push(createJob({ id: 44, type: "slow" }));
+      const controller = new AbortController();
+      const stolenAt = new Date(mockState.baseTime.getTime() + 1).toISOString();
+
+      await runWorkerPollLoop(
+        controller.signal,
+        {
+          slow: async () => {
+            // Simulate resetStaleClaims + a peer re-claiming mid-run.
+            for (const row of mockState.state.jobs.filter((j) => j.id === 44)) {
+              row.claimed_by = "worker-2";
+              row.claimed_until = stolenAt;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 40));
+            controller.abort();
+            return { ok: true };
+          },
+        },
+        { pollIntervalMs: 5, heartbeatIntervalMs: 10 },
+      );
+
+      const stored = mockState.state.jobs.find((j) => j.id === 44);
+      expect(stored?.claimed_until).toBe(stolenAt);
+      expect(stored?.claimed_by).toBe("worker-2");
+      expect(stored?.status).toBe("running");
+      expect(warn).toHaveBeenCalledWith(
+        "worker.claim_lost",
+        expect.objectContaining({ jobId: 44, phase: "heartbeat" }),
+      );
+      expect(warn).toHaveBeenCalledWith(
+        "worker.claim_lost",
+        expect.objectContaining({ jobId: 44, phase: "complete" }),
+      );
+    } finally {
+      warn.mockRestore();
+      info.mockRestore();
+    }
   });
 
   test("resets stale claims without bumping attempt_count", async () => {

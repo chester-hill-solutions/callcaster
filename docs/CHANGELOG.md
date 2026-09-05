@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Fixed
+
+- A background worker that stalls past its claim timeout can no longer complete, retry, dead-letter, or extend a job that another worker has since taken over. Those writes are fenced to the claiming worker and log `worker.claim_lost` instead ([#1548](https://github.com/chester-hill-solutions/callcaster/issues/1548)).
+
 ### Changed
 
 - Outbound messages now cost **2 credits per SMS segment** ($0.04) and **4 credits per MMS** ($0.08), up from 1 and 2. The billing page, campaign cost estimates, and the Twilio reconciliation report all follow the new rate ([#1533](https://github.com/chester-hill-solutions/callcaster/issues/1533)).
