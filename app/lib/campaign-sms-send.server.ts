@@ -11,6 +11,7 @@ import { countCampaignMessagesToPhone } from "@/lib/message-db.server";
 import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
+import { notifyOps } from "@/lib/ops-alert.server";
 import {
   persistMessageRecord,
   twilioMessageToPersistFields,
@@ -122,8 +123,10 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
     throw new Error(await outreachUpdate.text());
   }
 
-  await Promise.all([
+  const [persisted] = await Promise.all([
     persistMessageRecord(workspace, messageFields),
+    // Dequeue regardless: Twilio has the text. With no row to dedupe against,
+    // a still-queued entry would send it again on the next dispatch.
     dequeueQueueEntry({
       by: { id: Number(queue_id) },
       userId: user_id,
@@ -131,7 +134,27 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
     }),
   ]);
 
-  return { message };
+  if (persisted.error) {
+    // The text went out but nothing records it: the status webhook will not
+    // find the SID and the send is never billed. Until the outbox (#1578)
+    // makes this recoverable, it must at least be loud.
+    logger.error("campaign_sms.persist_failed", {
+      workspaceId: workspace,
+      campaignId: campaign_id,
+      contactId: contact_id,
+      sid: message.sid,
+      error: persisted.error.message,
+    });
+    void notifyOps({
+      event: "sms.persist_failed",
+      summary: `Campaign SMS ${message.sid} was sent but its message row could not be written; it will not be billed or shown until reconciled`,
+      dedupeKey: `sms_persist_failed:${campaign_id}`,
+      workspaceId: workspace,
+      context: { campaignId: campaign_id, contactId: contact_id, sid: message.sid, error: persisted.error.message },
+    });
+  }
+
+  return { message, persisted: !persisted.error };
 }
 
 async function createOutreachAttempt(args: {
