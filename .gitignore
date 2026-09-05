@@ -49,3 +49,5 @@ skills-lock.json
 app/transcribe.json
 *.serviceaccount.json
 scripts/dev/certs/
+/CLIPBOARD.md
+/.agent/
