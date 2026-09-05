@@ -3,6 +3,38 @@
 **Date:** 2026-09-05
 **Handoff source session:** `ses_f8e04a8e5ffeDyarFLMPDzKcDQ`
 
+## Status as of 2026-09-05 (end of day)
+
+Everything below landed on `dev` as one PR per issue. Do not re-verify these.
+
+| Phase | Item | Issue | PR |
+| --- | --- | --- | --- |
+| 1 | Contacts API bound to the authorized workspace | #1541 | #1545 |
+| 1 | Tenant db `update` strips the tenancy column at runtime | #1542 | #1544 |
+| 1 | Workspace invites validate the role and enforce the escalation guard | #1543 | #1546 |
+| 2 | Client-migration bootstrap holds an advisory lock | #1547 | #1549 |
+| 3 | accept-invite refuses account creation while signup is closed | #1550 | #1552 |
+| 3 | Browser password reset surfaces failure, stops trimming | #1559 | #1562 |
+| 3 | JSON reset endpoint public, carries the token | #1560 | #1568 |
+| 3 | Password reset revokes existing sessions | #1561 | #1565 |
+| 3 | Bearer sign-out revokes the session token | #1563 | #1566 |
+| 3 | Account security verify forwards Better Auth cookies | #1564 | #1573 |
+| 3 | Two-factor turned off behind `TWO_FACTOR_ENABLED` (product decision) | #1567 | #1569 |
+| 4 | Worker complete/fail/heartbeat fenced to the claiming worker | #1548 | #1551 |
+| 4 | Schedule-chain watchdog + reschedule-failure alert | #1570 | #1572 |
+| 5 | Number-rental technical failures kept out of the non-payment ladder | #1555 | #1556 |
+| 5 | Open-sync queues the SMS billing job before the terminal write | #1571 | #1574 |
+| 6 | Inbound MMS attachments signed for the chat view | #1557 | #1558 |
+| 6 | Campaign media delete is reference-safe | #1575 | #1576 |
+| 6 | S3 missing key normalized to `ObjectNotFoundError` | #1577 | #1579 |
+| 7 | Compose reset/purge scripts refuse non-local targets | #1553 | #1554 |
+
+Still open, by design:
+
+- **Durable SMS send outbox** (Phase 5): designed in #1578, awaiting review before implementation.
+- **Backup-code login** (Phase 3): moot while two-factor is off.
+- **Decisions for the owner**: per-file migration failure stopping boot (#1547 body; would break fresh PR environments), Railway `checkSuites: false`, and the six `SUPABASE_*` variables still set in production.
+
 ## Goal
 
 Implement the Supabase-exit robustness plan on a current baseline. The app
