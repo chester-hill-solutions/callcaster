@@ -291,6 +291,15 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
       expect(mocks.updateMessageBySid).toHaveBeenCalledWith("ws-1", "SM_match", expect.objectContaining({ status: "delivered" }));
     });
 
+    test("a stale intent without a from (Messaging Service send) matches on to alone", async () => {
+      mocks.messageFindMany.mockResolvedValue([intent({ from: null })]);
+      mocks.messagesList.mockResolvedValue([
+        { sid: "SM_svc", status: "delivered", to: "+15555550100", from: "+15550009999", dateCreated: new Date(Date.now() - 29 * 60_000), errorCode: null, dateUpdated: new Date() },
+      ]);
+      await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+      expect(mocks.resolveMessageByClientRef).toHaveBeenCalledWith("ws-1", "ref-1", { sid: "SM_svc" });
+    });
+
     test("a stale pending intent with nothing at the provider is failed without a debit", async () => {
       mocks.messageFindMany.mockResolvedValue([intent()]);
       mocks.messagesList.mockResolvedValue([

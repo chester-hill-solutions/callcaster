@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- One-off chat texts are recorded before they are handed to Twilio, the same protection campaign texts gained, so a write failure after sending can no longer leave a sent text unbilled and missing from the conversation ([#1586](https://github.com/chester-hill-solutions/callcaster/issues/1586)).
 - The Twilio status recovery sweep finishes pending campaign texts that never received a delivery callback: it matches them to the provider record and bills them, or marks them failed without a charge when the provider has no record ([#1578](https://github.com/chester-hill-solutions/callcaster/issues/1578)).
 - Campaign texts are recorded before they are handed to Twilio, so a send can no longer go out unrecorded and unbilled if the write after sending fails; the delivery callback attaches the provider ID to the pending record. A contact whose send Twilio refused stays eligible for the next attempt ([#1582](https://github.com/chester-hill-solutions/callcaster/issues/1582)).
 - A campaign text that Twilio accepted but whose record could not be saved is now reported to operations immediately instead of disappearing from billing and the conversation view unnoticed ([#1581](https://github.com/chester-hill-solutions/callcaster/issues/1581)).

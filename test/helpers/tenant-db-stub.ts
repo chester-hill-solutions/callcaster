@@ -34,6 +34,11 @@ function applyTenantDbMockImplementations() {
 
   tenantDbMocks.messageUpdate.mockImplementation(async (opts: { set?: Record<string, unknown> }) => {
     tenantDbStubState.messageUpdateCalls.push(opts);
+    // The intent-row resolve (#1584) returns the row a send ends with; honor a
+    // configured insert result so route tests keep their exact payload shape.
+    if (tenantDbStubState.messageInsertResult.length) {
+      return tenantDbStubState.messageInsertResult;
+    }
     const last = tenantDbStubState.messageInsertCalls.at(-1) as Record<string, unknown> | undefined;
     return [{ ...(last ?? {}), ...(opts.set ?? {}) }];
   });

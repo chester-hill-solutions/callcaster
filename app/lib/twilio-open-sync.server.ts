@@ -71,7 +71,12 @@ async function reconcilePendingIntent<T extends ProviderMessage>(args: {
     return { kind: "skipped" };
   }
   const match = twilioMessages
-    .filter((m) => m.to === local.to && m.from === local.from && providerTime(m) >= createdAt)
+    .filter(
+      (m) =>
+        m.to === local.to &&
+        (local.from == null || m.from === local.from) &&
+        providerTime(m) >= createdAt,
+    )
     .sort((a, b) => providerTime(a) - providerTime(b))[0];
   if (!match || !local.client_ref) {
     await updateMessageBySid(workspaceId, local.sid, {

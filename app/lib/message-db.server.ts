@@ -338,7 +338,9 @@ export async function findPendingMessageIntentByNumbers(args: {
     .from(messageTable)
     .where(
       and(
-        eq(messageTable.from, args.from),
+        // A Messaging Service send has no `from` until Twilio picks one, so an
+        // intent without one matches on `to` alone.
+        or(eq(messageTable.from, args.from), sql`${messageTable.from} IS NULL`),
         eq(messageTable.to, args.to),
         like(messageTable.sid, `${PENDING_MESSAGE_SID_PREFIX}%`),
         isNotNull(messageTable.client_ref),
