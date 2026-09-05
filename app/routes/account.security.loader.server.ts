@@ -2,6 +2,7 @@ import { data as routeData, redirect } from "react-router";
 import { getSafeRedirectPath } from "@/lib/safe-redirect";
 import { verifyAuth } from "@/lib/auth.server";
 import { isTwoFactorFeatureEnabled } from "@/lib/env.server";
+import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import {
   isTwoFactorEnabled,
   PRIVILEGED_WORKSPACE_ROLES,
@@ -112,17 +113,24 @@ export const action = defineAction({
       const next = String(formData.get("next") ?? "").trim();
 
       try {
-        await authApi.verifyTOTP({
+        const result = (await authApi.verifyTOTP({
           body: { code },
           headers: request.headers,
           returnHeaders: true,
-        });
+        })) as { headers?: Headers } | undefined;
+        // Better Auth marks the session as two-factor verified via Set-Cookie
+        // on this response; dropping it makes the next privileged request
+        // bounce the user back to the code screen.
+        const verifiedHeaders = mergeBetterAuthSetCookieHeaders(result?.headers, headers);
 
         if (next) {
-          throw redirect(getSafeRedirectPath(next), { headers });
+          throw redirect(getSafeRedirectPath(next), { headers: verifiedHeaders });
         }
 
-        return routeData({ success: "Two-factor authentication is enabled.", enabled: true }, { headers });
+        return routeData(
+          { success: "Two-factor authentication is enabled.", enabled: true },
+          { headers: verifiedHeaders },
+        );
       } catch (error) {
         if (error instanceof Response) {
           throw error;

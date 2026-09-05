@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Confirming a new authenticator code on **Account → Security** now keeps you verified. The confirmation response was missing the cookie that records the check, so the next protected page could send you back to the code screen ([#1564](https://github.com/chester-hill-solutions/callcaster/issues/1564)).
 - The monthly number-rental sweep no longer treats its own errors as non-payment. A failed balance lookup, an unknown balance, or a failed ledger write skips that number for the day and retries on the next sweep, instead of warning, suspending, or releasing a number whose owner did nothing wrong ([#1555](https://github.com/chester-hill-solutions/callcaster/issues/1555)).
 - The **Reset password** page now tells you when a reset link is invalid or expired instead of reporting success, and it no longer strips spaces from the start or end of the new password ([#1559](https://github.com/chester-hill-solutions/callcaster/issues/1559)).
 - A background worker that stalls past its claim timeout can no longer complete, retry, dead-letter, or extend a job that another worker has since taken over. Those writes are fenced to the claiming worker and log `worker.claim_lost` instead ([#1548](https://github.com/chester-hill-solutions/callcaster/issues/1548)).
