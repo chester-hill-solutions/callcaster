@@ -1,3 +1,4 @@
+import { browserTimeZone } from "@/lib/schedule-timezone";
 import {
   Table,
   TableHeader,
@@ -35,14 +36,15 @@ const WeeklyScheduleTable = ({
   /** Channel-specific hint for the End column ("dialing" vs "sending"). */
   endTooltip?: string;
 }) => {
+  const timeZone = browserTimeZone();
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Day</TableHead>
           <TableHead>Active</TableHead>
-          <TableHead>Start</TableHead>
-          <TableHead>End{" "}<InfoPopover tooltip={endTooltip} /></TableHead>
+          <TableHead>Start ({timeZone})</TableHead>
+          <TableHead>End ({timeZone}){" "}<InfoPopover tooltip={endTooltip} /></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

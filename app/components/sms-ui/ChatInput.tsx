@@ -1,3 +1,4 @@
+import { browserTimeZone } from "@/lib/schedule-timezone";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ImageIcon, SendHorizontal } from "lucide-react";
 import ChatImages from "./ChatImages";
@@ -334,6 +335,11 @@ export default function ChatInput({
                 className="h-8 w-auto px-2 py-1 text-xs"
                 aria-label="Send at"
               />
+            ) : null}
+            {sendLater ? (
+              <span className="text-xs text-muted-foreground" data-testid="send-at-timezone">
+                {browserTimeZone()}
+              </span>
             ) : null}
           </div>
         </div>

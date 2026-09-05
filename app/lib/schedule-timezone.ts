@@ -145,3 +145,16 @@ export function utcToWallClockHm(
  */
 export const DEFAULT_CALLING_HOURS = { start: "09:00", end: "21:00" } as const;
 export const DEFAULT_CALLING_HOURS_LABEL = `${DEFAULT_CALLING_HOURS.start}–${DEFAULT_CALLING_HOURS.end}`;
+
+/**
+ * The IANA zone every time control and timestamp is shown in (#969). Browser
+ * only: the app stores no workspace time zone yet, so every surface discloses
+ * the zone it is rendering in rather than leaving the reader to guess.
+ */
+export function browserTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
