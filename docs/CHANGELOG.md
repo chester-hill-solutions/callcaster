@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Removing an image from one campaign's message no longer deletes the file while another campaign in the workspace still uses it. The file is only deleted when no campaign references it ([#1575](https://github.com/chester-hill-solutions/callcaster/issues/1575)).
 - Background schedules (billing reconciliation, number rental billing, low-credit notices, campaign schedule sweeps) now restart themselves within minutes if a run fails to queue its next occurrence, and ops is alerted when that happens. Previously one such failure silently paused the schedule until the worker was redeployed ([#1570](https://github.com/chester-hill-solutions/callcaster/issues/1570)).
 - Confirming a new authenticator code on **Account → Security** now keeps you verified. The confirmation response was missing the cookie that records the check, so the next protected page could send you back to the code screen ([#1564](https://github.com/chester-hill-solutions/callcaster/issues/1564)).
 - The monthly number-rental sweep no longer treats its own errors as non-payment. A failed balance lookup, an unknown balance, or a failed ledger write skips that number for the day and retries on the next sweep, instead of warning, suspending, or releasing a number whose owner did nothing wrong ([#1555](https://github.com/chester-hill-solutions/callcaster/issues/1555)).
