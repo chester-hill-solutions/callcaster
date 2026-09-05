@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- The **Identity** step in onboarding now shows as complete once the legal business name is saved. It previously stayed marked unfinished because it was judged against the messaging-program fields collected on a later step ([#1204](https://github.com/chester-hill-solutions/callcaster/issues/1204)).
 - One-off chat texts are recorded before they are handed to Twilio, the same protection campaign texts gained, so a write failure after sending can no longer leave a sent text unbilled and missing from the conversation ([#1586](https://github.com/chester-hill-solutions/callcaster/issues/1586)).
 - The Twilio status recovery sweep finishes pending campaign texts that never received a delivery callback: it matches them to the provider record and bills them, or marks them failed without a charge when the provider has no record ([#1578](https://github.com/chester-hill-solutions/callcaster/issues/1578)).
 - Campaign texts are recorded before they are handed to Twilio, so a send can no longer go out unrecorded and unbilled if the write after sending fails; the delivery callback attaches the provider ID to the pending record. A contact whose send Twilio refused stays eligible for the next attempt ([#1582](https://github.com/chester-hill-solutions/callcaster/issues/1582)).
