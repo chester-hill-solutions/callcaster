@@ -68,6 +68,15 @@ export async function signOut(request: Request): Promise<Headers> {
 }
 
 /** Resolve a bearer session token to a user (API clients). */
+/**
+ * Bearer clients hold the raw session token (see resolveBearerSessionUser);
+ * Better Auth's cookie-based signOut cannot see it, so sign-out must delete
+ * the row directly or the token keeps working until it expires.
+ */
+export async function revokeSessionByToken(token: string): Promise<void> {
+  await adminDb.delete(authSession).where(eq(authSession.token, token));
+}
+
 export async function resolveBearerSessionUser(
   accessToken: string,
 ): Promise<AuthUser | null> {

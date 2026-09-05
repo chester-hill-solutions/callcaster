@@ -24,7 +24,7 @@ import type {
   verifyEmailBodySchema,
 } from "@/lib/schemas/api/platform-auth";
 import type { z } from "zod";
-import { getSession } from "@/lib/auth.server";
+import { getSession, revokeSessionByToken } from "@/lib/auth.server";
 
 // Types for better-auth API responses (library doesn't export these)
 type BetterAuthApiUser = { id: string; email?: string | null; name?: string | null };
@@ -261,7 +261,20 @@ export async function refreshTokens(
   }
 }
 
+function bearerTokenFrom(request: Request): string | null {
+  const header = request.headers.get("Authorization");
+  if (!header?.startsWith("Bearer ")) return null;
+  const token = header.slice("Bearer ".length).trim();
+  return token.length > 0 ? token : null;
+}
+
 export async function signOutUser(request: Request): Promise<Headers> {
+  // Bearer clients hold the raw session token; Better Auth's cookie signOut
+  // cannot see it, so revoke the row directly or the token outlives sign-out.
+  const bearerToken = bearerTokenFrom(request);
+  if (bearerToken) {
+    await revokeSessionByToken(bearerToken);
+  }
   const result = await auth.api.signOut({
     headers: request.headers,
     returnHeaders: true,
