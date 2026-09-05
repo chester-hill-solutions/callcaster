@@ -315,11 +315,10 @@ export async function resetPassword(
   }
 
   try {
-    // type-cast justified: token comes from URL query string/headers, not request body schema
     await auth.api.resetPassword({
       body: {
         newPassword: body.password,
-        token: (body as any).token ?? "",
+        token: body.token,
       },
       headers: request.headers,
     });
