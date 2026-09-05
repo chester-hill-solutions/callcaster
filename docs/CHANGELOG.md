@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- The `POST /api/auth/reset-password` endpoint works again: it accepts the reset `token` in the body and no longer requires a signed-in session to reset a forgotten password ([#1560](https://github.com/chester-hill-solutions/callcaster/issues/1560)).
 - The Twilio status recovery sweep now queues an SMS's billing job before marking the message delivered or failed. Previously a failure between those two steps left the message marked terminal and never billed ([#1571](https://github.com/chester-hill-solutions/callcaster/issues/1571)).
 - Removing an image from one campaign's message no longer deletes the file while another campaign in the workspace still uses it. The file is only deleted when no campaign references it ([#1575](https://github.com/chester-hill-solutions/callcaster/issues/1575)).
 - Background schedules (billing reconciliation, number rental billing, low-credit notices, campaign schedule sweeps) now restart themselves within minutes if a run fails to queue its next occurrence, and ops is alerted when that happens. Previously one such failure silently paused the schedule until the worker was redeployed ([#1570](https://github.com/chester-hill-solutions/callcaster/issues/1570)).

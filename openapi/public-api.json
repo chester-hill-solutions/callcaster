@@ -1707,17 +1707,13 @@
         "description": "",
         "tags": [
           "Authentication",
-          "User API"
+          "Public Form"
         ],
         "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
         "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
