@@ -59,7 +59,8 @@ describe("BillingActivityTable", () => {
   test("shows only the customer-facing columns by default", () => {
     render(<BillingActivityTable history={history} />);
 
-    expect(screen.getByRole("columnheader", { name: "Date" })).toBeInTheDocument();
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    expect(screen.getByRole("columnheader", { name: `Date (${zone})` })).toBeInTheDocument();
     expect(
       screen.getByRole("columnheader", { name: "Activity" }),
     ).toBeInTheDocument();

@@ -15,6 +15,7 @@ import {
   utcToWallClockHm,
   DEFAULT_CALLING_HOURS,
   DEFAULT_CALLING_HOURS_LABEL,
+  browserTimeZone,
 } from "@/lib/schedule-timezone";
 
 // Schedule type matching the WeeklyScheduleTable component
@@ -164,7 +165,7 @@ export default function SelectDates({
     setCurrentSchedule(parseSchedule(scheduleSource as Campaign["schedule"]));
   }
 
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timeZone = browserTimeZone();
 
   const utcToLocal = (utcTime: string) =>
     utcToWallClockHm(utcTime, timeZone);
@@ -391,7 +392,7 @@ export default function SelectDates({
         )}
         <p className="text-xs text-muted-foreground">
           Times are shown in your local time zone (
-          {Intl.DateTimeFormat().resolvedOptions().timeZone}). Regardless of
+          {browserTimeZone()}). Regardless of
           the hours set here, contacts are only dialed or messaged between
           8:00&nbsp;a.m. and 9:00&nbsp;p.m. in their own time zone, based on
           their phone number&apos;s area code.

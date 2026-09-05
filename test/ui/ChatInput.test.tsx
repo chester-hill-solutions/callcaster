@@ -243,6 +243,10 @@ describe("ChatInput opt-out and send-later", () => {
     expect(sendAtInput).toHaveAttribute("min");
     expect(sendAtInput).toHaveAttribute("max");
     expect(screen.getByRole("button", { name: /send message/i })).toBeDisabled();
+    // The picker discloses the zone it is entered in (#969).
+    expect(screen.getByTestId("send-at-timezone")).toHaveTextContent(
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    );
   });
 
   test("keeps schedule controls after submit until success is observed", async () => {

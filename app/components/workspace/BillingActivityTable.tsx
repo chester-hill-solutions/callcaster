@@ -1,3 +1,4 @@
+import { browserTimeZone } from "@/lib/schedule-timezone";
 import { useMemo, useState } from "react";
 import {
   Accordion,
@@ -183,7 +184,7 @@ export function BillingActivityTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
+            <TableHead>Date ({browserTimeZone()})</TableHead>
             <TableHead>Activity</TableHead>
             <TableHead className="text-right">Amount</TableHead>
           </TableRow>
