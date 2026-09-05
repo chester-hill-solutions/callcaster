@@ -105,6 +105,11 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
 }));
 vi.mock("@/lib/message-db.server", () => ({
   countCampaignMessagesToPhone: (...args: unknown[]) => mocks.countCampaignMessagesToPhone(...args),
+  // Intent-row helpers (#1582): the contract covers dispatch gates and pacing,
+  // so the row lifecycle is stubbed as a success here.
+  pendingMessageSid: (ref: string) => `pending:${ref}`,
+  resolveMessageByClientRef: vi.fn(async (_ws: string, _ref: string, update: { sid: string }) => ({ id: 1, ...update })),
+  deleteMessageByClientRef: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/sms-campaign-db.server", () => ({
   loadCampaignSmsDispatchData: (...args: unknown[]) => mocks.loadCampaignSmsDispatchData(...args),
@@ -123,6 +128,7 @@ vi.mock("@/lib/twilio-client.server", () => ({
 vi.mock("@/lib/sms-send.server", () => ({
   persistMessageRecord: (...args: unknown[]) => mocks.persistMessageRecord(...args),
   twilioMessageToPersistFields: (message: any, extras: any) => ({ ...message, ...extras }),
+  buildMessageInsert: (fields: Record<string, unknown>) => fields,
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...args: unknown[]) => mocks.rpcCreateOutreachAttempt(...args),

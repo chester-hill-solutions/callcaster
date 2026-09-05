@@ -37,6 +37,8 @@ export type MessagePersistFields = {
   workspace: string;
   contact_id?: string | number | null;
   campaign_id?: string | number | null;
+  /** Sender-side reference for an intent row (#1582). */
+  client_ref?: string | null;
   outbound_media?: unknown[];
   /**
    * Requested "send later" time (ISO string). Twilio's Message resource does
@@ -139,7 +141,8 @@ export function twilioMessageToPersistFields(
   };
 }
 
-function buildMessageInsert(fields: MessagePersistFields): MessageInsert {
+/** Persist-field → column mapping, shared by insert and intent-row resolve. */
+export function buildMessageInsert(fields: MessagePersistFields): MessageInsert {
   const row: MessageInsert = {
     sid: fields.sid,
     body: fields.body ?? null,
@@ -161,6 +164,7 @@ function buildMessageInsert(fields: MessagePersistFields): MessageInsert {
     api_version: fields.api_version ?? null,
     subresource_uris: (fields.subresource_uris as MessageInsert["subresource_uris"]) ?? null,
     workspace: fields.workspace,
+    client_ref: fields.client_ref ?? null,
   };
   if (fields.date_created != null) {
     row.date_created = toDateIso(fields.date_created);

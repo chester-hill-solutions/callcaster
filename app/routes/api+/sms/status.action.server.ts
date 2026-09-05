@@ -7,7 +7,12 @@ import {
   pickRawTwilioSmsStatus,
 } from "@/lib/sms-status";
 import type { TwilioSmsStatusWebhook } from "@/lib/twilio.types";
-import { findMessageBySid, updateMessageBySid } from "@/lib/message-db.server";
+import {
+  findMessageBySid,
+  findPendingMessageIntentByNumbers,
+  resolveMessageByClientRef,
+  updateMessageBySid,
+} from "@/lib/message-db.server";
 import { defineAction } from "@/lib/handler.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { SMS_STATUS_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
@@ -84,7 +89,25 @@ export const action = defineAction({
         );
       }
 
-      const preUpdateMessage = await findMessageBySid(sid);
+      let preUpdateMessage = await findMessageBySid(sid);
+
+      // An unknown SID can be an intent row whose post-send resolve failed
+      // (#1582): the placeholder still carries from/to, so attach the SID here
+      // and let the normal path bill it.
+      if (!preUpdateMessage && payload.From && payload.To) {
+        const intent = await findPendingMessageIntentByNumbers({
+          from: payload.From,
+          to: payload.To,
+        });
+        if (intent?.client_ref) {
+          preUpdateMessage = await resolveMessageByClientRef(intent.workspace, intent.client_ref, { sid });
+          logger.warn("sms_status.resolved_pending_intent", {
+            sid,
+            clientRef: intent.client_ref,
+            workspaceId: intent.workspace,
+          });
+        }
+      }
 
       if (!preUpdateMessage?.workspace) {
         throw new Error("Failed to find message workspace for SMS status webhook");

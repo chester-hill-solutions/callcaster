@@ -443,6 +443,7 @@ export const message = pgTable("message", {
   to: text(),
   uri: text(),
   workspace: uuid().notNull(),
+  client_ref: text(),
 });
 
 export const outreach_attempt = pgTable("outreach_attempt", {

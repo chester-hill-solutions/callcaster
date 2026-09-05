@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   persistMessageRecord: vi.fn(async () => ({ data: [{ id: 1 }], error: null as { message: string } | null })),
   updateOutreachAttemptForWorkspace: vi.fn(async () => ({ campaign_id: 1 })),
   rpcCreateOutreachAttempt: vi.fn(async () => 7),
+  resolveMessageByClientRef: vi.fn(async () => ({ id: 1 })),
+  deleteMessageByClientRef: vi.fn(async () => undefined),
   notifyOps: vi.fn(async () => ({ ok: true })),
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -15,6 +17,11 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
   createWorkspaceTwilioInstance: vi.fn(async () => ({
     messages: { create: (...args: unknown[]) => mocks.messagesCreate(...args) },
   })),
+}));
+vi.mock("@/lib/message-db.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/message-db.server")>()),
+  resolveMessageByClientRef: (...args: unknown[]) => mocks.resolveMessageByClientRef(...args),
+  deleteMessageByClientRef: (...args: unknown[]) => mocks.deleteMessageByClientRef(...args),
 }));
 vi.mock("@/lib/campaign-queue-db.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/campaign-queue-db.server")>()),
@@ -70,15 +77,66 @@ function params() {
   };
 }
 
+describe("sendSingleCampaignSms intent row (#1582)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messagesCreate.mockResolvedValue({ sid: "SM_sent", status: "queued", to: "+15555550100", from: "+15555550101", body: "hello", numSegments: "1", dateCreated: new Date() });
+    mocks.persistMessageRecord.mockResolvedValue({ data: [{ id: 1 }], error: null });
+    mocks.resolveMessageByClientRef.mockResolvedValue({ id: 1, sid: "SM_sent" });
+  });
+
+  test("writes a pending intent row before calling Twilio, then resolves it with the real SID", async () => {
+    const result = await sendSingleCampaignSms(params());
+
+    expect(result.persisted).toBe(true);
+    expect(mocks.persistMessageRecord).toHaveBeenCalledTimes(1);
+    const [workspace, fields] = mocks.persistMessageRecord.mock.calls[0] as [string, Record<string, unknown>];
+    expect(workspace).toBe("ws_1");
+    expect(String(fields.sid)).toMatch(/^pending:/);
+    expect(fields.status).toBe("queued");
+    expect(fields.client_ref).toBe(String(fields.sid).slice("pending:".length));
+    expect(fields).toMatchObject({ campaign_id: "42", contact_id: 9, to: "+15555550100", from: "+15555550101", body: "hello" });
+    // Intent first, provider second.
+    expect(mocks.persistMessageRecord.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.messagesCreate.mock.invocationCallOrder[0] as number,
+    );
+    expect(mocks.resolveMessageByClientRef).toHaveBeenCalledWith(
+      "ws_1",
+      fields.client_ref,
+      expect.objectContaining({ sid: "SM_sent" }),
+    );
+    expect(mocks.deleteMessageByClientRef).not.toHaveBeenCalled();
+  });
+
+  test("deletes the intent and rethrows when Twilio refuses the send", async () => {
+    mocks.messagesCreate.mockRejectedValue(Object.assign(new Error("Invalid To"), { status: 400 }));
+
+    await expect(sendSingleCampaignSms(params())).rejects.toThrow("Invalid To");
+
+    const [, fields] = mocks.persistMessageRecord.mock.calls[0] as [string, Record<string, unknown>];
+    expect(mocks.deleteMessageByClientRef).toHaveBeenCalledWith("ws_1", fields.client_ref);
+    expect(mocks.resolveMessageByClientRef).not.toHaveBeenCalled();
+    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+  });
+
+  test("does not call Twilio when the intent row cannot be written", async () => {
+    mocks.persistMessageRecord.mockResolvedValueOnce({ data: null, error: { message: "db down" } });
+
+    await expect(sendSingleCampaignSms(params())).rejects.toThrow(/before sending/);
+    expect(mocks.messagesCreate).not.toHaveBeenCalled();
+  });
+});
+
 describe("sendSingleCampaignSms persist failure", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messagesCreate.mockResolvedValue({ sid: "SM_sent", status: "queued", to: "+15555550100", from: "+15555550101", body: "hello", numSegments: "1", dateCreated: new Date() });
     mocks.persistMessageRecord.mockResolvedValue({ data: [{ id: 1 }], error: null });
+    mocks.resolveMessageByClientRef.mockResolvedValue({ id: 1, sid: "SM_sent" });
   });
 
-  test("a failed message-row write alerts ops, logs at error, and still dequeues", async () => {
-    mocks.persistMessageRecord.mockResolvedValueOnce({ data: null, error: { message: "connection reset" } });
+  test("a failed resolve after the send alerts ops, logs at error, and still dequeues", async () => {
+    mocks.resolveMessageByClientRef.mockRejectedValueOnce(new Error("connection reset"));
 
     const result = await sendSingleCampaignSms(params());
 
@@ -95,7 +153,7 @@ describe("sendSingleCampaignSms persist failure", () => {
     );
   });
 
-  test("a successful write does not alert", async () => {
+  test("a successful resolve does not alert", async () => {
     const result = await sendSingleCampaignSms(params());
 
     expect(result.persisted).toBe(true);

@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   requireTwilioSignature: vi.fn(),
   findMessageBySid: vi.fn(),
   updateMessageBySid: vi.fn(),
+  findPendingMessageIntentByNumbers: vi.fn(async () => null),
+  resolveMessageByClientRef: vi.fn(),
   findOutreachAttemptById: vi.fn(),
   updateOutreachAttemptForWorkspace: vi.fn(),
   sendWorkspaceWebhookNotification: vi.fn(async () => ({ success: true })),
@@ -31,6 +33,9 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
 vi.mock("@/lib/message-db.server", () => ({
   findMessageBySid: (...args: unknown[]) => mocks.findMessageBySid(...args),
   updateMessageBySid: (...args: unknown[]) => mocks.updateMessageBySid(...args),
+  findPendingMessageIntentByNumbers: (...args: unknown[]) =>
+    mocks.findPendingMessageIntentByNumbers(...args),
+  resolveMessageByClientRef: (...args: unknown[]) => mocks.resolveMessageByClientRef(...args),
 }));
 vi.mock("@/lib/telephony-db.server", () => ({
   findOutreachAttemptById: (...args: unknown[]) =>
@@ -72,13 +77,10 @@ vi.mock("@/lib/worker/enqueue-job.server", () => ({
   unsafeEnqueueJob: (...args: unknown[]) => enqueueJobMock(...args),
 }));
 
-function makeSmsStatusRequest(payload: { SmsSid?: string; SmsStatus?: string }) {
+function makeSmsStatusRequest(payload: Record<string, string | undefined>) {
   const formData = new FormData();
-  if (payload.SmsSid !== undefined) {
-    formData.set("SmsSid", payload.SmsSid);
-  }
-  if (payload.SmsStatus !== undefined) {
-    formData.set("SmsStatus", payload.SmsStatus);
+  for (const [key, value] of Object.entries(payload)) {
+    if (value !== undefined) formData.set(key, value);
   }
 
   return new Request("http://x", { method: "POST", body: formData });
@@ -272,6 +274,53 @@ describe("app/routes/api+/sms/status.route.tsx", () => {
       expect.objectContaining({ type: "sms_status_side_effects" }),
     );
     expect(mocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
+  });
+
+  test("resolves an unknown SID from the newest pending intent for the from/to pair", async () => {
+    mocks.findMessageBySid.mockResolvedValueOnce(null);
+    mocks.findPendingMessageIntentByNumbers.mockResolvedValueOnce({
+      workspace: "w1",
+      client_ref: "ref-1",
+      sid: "pending:ref-1",
+      direction: "outbound-api",
+      from: "+15550000001",
+      to: "+15555550100",
+    });
+    mocks.resolveMessageByClientRef.mockResolvedValueOnce({
+      workspace: "w1",
+      direction: "outbound-api",
+      sid: "SM9",
+      outreach_attempt_id: null,
+      campaign_id: null,
+    });
+    mocks.updateMessageBySid.mockResolvedValueOnce({
+      sid: "SM9",
+      workspace: "w1",
+      status: "delivered",
+      num_media: "0",
+      num_segments: "1",
+      outreach_attempt_id: null,
+      campaign_id: null,
+    });
+
+    const mod = await import("../app/routes/api+/sms/status.route");
+    const res = await asRouteResponse(mod.action({
+        request: makeSmsStatusRequest({
+          SmsSid: "SM9",
+          SmsStatus: "delivered",
+          From: "+15550000001",
+          To: "+15555550100",
+        }),
+      } as never),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.findPendingMessageIntentByNumbers).toHaveBeenCalledWith({
+      from: "+15550000001",
+      to: "+15555550100",
+    });
+    expect(mocks.resolveMessageByClientRef).toHaveBeenCalledWith("w1", "ref-1", { sid: "SM9" });
+    expect(mocks.updateMessageBySid).toHaveBeenCalledWith("w1", "SM9", expect.objectContaining({ status: "delivered" }));
   });
 
   test("enqueues side-effects job instead of inline SMS billing", async () => {
