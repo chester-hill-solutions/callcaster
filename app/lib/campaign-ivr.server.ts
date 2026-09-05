@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import type { Database } from "@/lib/db-types";
 import type { Script } from "@/lib/types";
 import {
@@ -122,6 +122,25 @@ export async function updateCampaignMessageMedia(
     where: eq(campaignTable.id, campaignId),
   });
   return row ?? null;
+}
+
+/**
+ * Media objects are keyed per workspace, not per campaign, so a file may be
+ * attached to several campaigns. Count the OTHER campaigns still listing it
+ * so a delete can unlink without destroying an object a sibling still sends.
+ */
+export async function countOtherCampaignsReferencingMedia(
+  workspaceId: string,
+  fileName: string,
+  excludeCampaignId: number,
+): Promise<number> {
+  const tdb = createTenantDb(workspaceId);
+  return tdb.campaign.count({
+    where: and(
+      ne(campaignTable.id, excludeCampaignId),
+      sql`${fileName} = ANY(${campaignTable.message_media})`,
+    ),
+  });
 }
 
 export async function updateCampaignVoicedropAudio(
