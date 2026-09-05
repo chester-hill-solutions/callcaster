@@ -1,6 +1,14 @@
 import type { CampaignType } from "@/lib/db-types";
 import type { WorkspaceOnboardingGoal } from "@/lib/types";
 
+/**
+ * The one customer-facing name for the robocall / IVR campaign goal (#1347).
+ * Internal enum values (`robocall`, `simple_ivr`, `complex_ivr`) and API
+ * fields are unchanged; only copy reads from here. "Advanced IVR" stays a
+ * distinct, technical label for the simple/complex IVR builders.
+ */
+export const AUTOMATED_PHONE_MENU_LABEL = "Automated phone menu";
+
 export const CAMPAIGN_PRODUCT_GOAL_VALUES = [
   "live_calling",
   "text_campaign",
@@ -29,7 +37,7 @@ export const CAMPAIGN_PRODUCT_GOAL_OPTIONS = [
   },
   {
     id: "automated_phone_menu",
-    label: "Automated phone menu",
+    label: AUTOMATED_PHONE_MENU_LABEL,
     description: "Play automated prompts and collect responses by phone.",
   },
 ] as const satisfies readonly CampaignProductGoalOption[];

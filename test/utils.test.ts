@@ -205,7 +205,7 @@ describe("app/lib/utils.ts", () => {
   test("campaignTypeText maps known types and default", async () => {
     const mod = await import("../app/lib/utils");
     expect(mod.campaignTypeText("message")).toBe("Message");
-    expect(mod.campaignTypeText("robocall")).toBe("Robocall");
+    expect(mod.campaignTypeText("robocall")).toBe("Automated phone menu");
     expect(mod.campaignTypeText("simple_ivr")).toBe("Simple IVR");
     expect(mod.campaignTypeText("complex_ivr")).toBe("Complex IVR");
     expect(mod.campaignTypeText("live_call")).toBe("Live Call");

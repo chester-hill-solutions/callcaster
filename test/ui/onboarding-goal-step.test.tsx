@@ -164,7 +164,7 @@ describe("goal-based onboarding UI", () => {
 
     expect(screen.getByText("What are you setting up?")).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /Live call session/i })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: /IVR/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /Automated phone menu/i })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: /SMS blast/i })).toBeInTheDocument();
     expect(screen.queryByText("Choose channels")).toBeNull();
     expect(screen.queryByText("Provider setup")).toBeNull();
