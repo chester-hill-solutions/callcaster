@@ -192,6 +192,20 @@ describe("BillingActivityTable", () => {
     expect(screen.getByText("No usage yet.")).toBeInTheDocument();
   });
 
+  test("links Stripe purchases to their hosted receipt when a workspace id is given (#1322)", () => {
+    render(<BillingActivityTable history={campaignHistory} workspaceId="ws-1" />);
+    const link = screen.getByRole("link", { name: /^Receipt/ });
+    expect(link).toHaveAttribute("href", "/api/workspaces/ws-1/billing/receipt?transaction=purchase-1");
+    expect(link).toHaveAttribute("target", "_blank");
+    // Usage rows have no receipt.
+    expect(screen.getAllByRole("link", { name: /^Receipt/ })).toHaveLength(1);
+  });
+
+  test("shows no receipt link without a workspace id", () => {
+    render(<BillingActivityTable history={history} />);
+    expect(screen.queryByRole("link", { name: /^Receipt/ })).toBeNull();
+  });
+
   test("names an untitled campaign by its id", () => {
     render(<BillingActivityTable history={campaignHistory} />);
 

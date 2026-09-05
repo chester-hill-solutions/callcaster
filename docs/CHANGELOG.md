@@ -45,6 +45,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Added
 
+- **Billing → Activity** shows a **Receipt** link on each credit purchase that opens the Stripe-hosted invoice or receipt. Receipts are looked up per workspace, and a purchase that has no receipt yet says so instead of failing ([#1322](https://github.com/chester-hill-solutions/callcaster/issues/1322)).
 - **Billing → Activity** can be filtered to purchases and credits, or to usage only, so receipts are easy to find once the ledger fills with campaign activity ([#1322](https://github.com/chester-hill-solutions/callcaster/issues/1322)).
 
 ## 2026-09-02 — release [#1506](https://github.com/chester-hill-solutions/callcaster/pull/1506)

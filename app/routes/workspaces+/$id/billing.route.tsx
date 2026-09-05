@@ -305,6 +305,7 @@ export default function Credits() {
         <BillingActivityTable
           history={credits.history}
           campaignNames={campaignNames}
+          workspaceId={params.id}
         />
       </Section>
     </div>

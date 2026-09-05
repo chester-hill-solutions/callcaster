@@ -135,6 +135,7 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/audit-events` | GET | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/audit-events.route.tsx` | `docs/api-workspace-admin.md` | Requires owner session (via role matrix) or an API key with audit.read. |
 | `/api/workspaces/:workspaceId/billing` | POST, GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/workspaces/:workspaceId/billing/checkout-session` | POST | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing/checkout-session.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/workspaces/:workspaceId/billing/receipt` | GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/workspaces/:workspaceId/billing/sessions/:sessionId` | GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/billing/sessions/$sessionId.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/workspaces/:workspaceId/calls` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/calls.route.tsx` | `docs/api-live-operations.md` |  |
 | `/api/workspaces/:workspaceId/calls/:callSid/disconnect` | POST | Integrator API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/calls/$callSid/disconnect.route.tsx` | `docs/api-telephony-provisioning.md` | Workspace-scoped call disconnect using workspace Twilio credentials. Capability: calls.control. |
@@ -160,5 +161,5 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/voicemails` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/voicemails.route.tsx` | `docs/api-analytics-export.md` |  |
 | `/api/workspaces/:workspaceId/webhook` | POST, PUT, GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/webhook.route.tsx` | `docs/api-workspace-admin.md` | POST tests webhook delivery. |
 
-Total entries: **147**
+Total entries: **148**
 

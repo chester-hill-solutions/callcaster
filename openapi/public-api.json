@@ -7897,6 +7897,70 @@
         }
       }
     },
+    "/api/workspaces/{workspaceId}/billing/receipt": {
+      "get": {
+        "operationId": "getWorkspaces_workspaceId_billing_receipt",
+        "summary": "GET /api/workspaces/:workspaceId/billing/receipt",
+        "description": "",
+        "tags": [
+          "Billing",
+          "Workspace Admin"
+        ],
+        "x-callcaster-supported": true,
+        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-auth-class": "workspaceAdmin",
+        "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Workspace scope (required for session auth)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/workspaces/{workspaceId}/billing/sessions/{sessionId}": {
       "get": {
         "operationId": "getWorkspaces_workspaceId_billing_sessions_sessionId",
