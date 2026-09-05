@@ -13,6 +13,7 @@ vi.mock("@/lib/logger.server", () => ({
 import {
   ensureSelfSchedulingJobsSeeded,
   SELF_SCHEDULING_JOB_TYPES,
+  startScheduleWatchdog,
 } from "@/lib/worker/ensure-scheduled-jobs.server";
 
 describe("ensureSelfSchedulingJobsSeeded", () => {
@@ -47,6 +48,29 @@ describe("ensureSelfSchedulingJobsSeeded", () => {
     // (now registry-derived, #1239 A1) SELF_SCHEDULING_JOB_TYPES order gets
     // the one seed the mock allows through.
     expect(result.seeded).toEqual([SELF_SCHEDULING_JOB_TYPES[0]]);
+  });
+
+  test("the watchdog re-seeds every tick and stops on abort", async () => {
+    vi.useFakeTimers();
+    try {
+      enqueueJobMock.mockResolvedValue({ enqueued: false, deduped: true });
+      const controller = new AbortController();
+      const perTick = SELF_SCHEDULING_JOB_TYPES.length;
+
+      startScheduleWatchdog({ signal: controller.signal, intervalMs: 1_000 });
+      expect(enqueueJobMock).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(enqueueJobMock).toHaveBeenCalledTimes(perTick);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(enqueueJobMock).toHaveBeenCalledTimes(perTick * 2);
+
+      controller.abort();
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(enqueueJobMock).toHaveBeenCalledTimes(perTick * 2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("a failed seed does not abort the remaining types", async () => {

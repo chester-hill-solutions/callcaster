@@ -20,7 +20,10 @@ import {
   failJob,
 } from "../app/lib/adapters/jobqueue.adapter.server.ts";
 import { jobHandlers } from "../app/lib/worker/handlers.server.ts";
-import { ensureSelfSchedulingJobsSeeded } from "../app/lib/worker/ensure-scheduled-jobs.server.ts";
+import {
+  ensureSelfSchedulingJobsSeeded,
+  startScheduleWatchdog,
+} from "../app/lib/worker/ensure-scheduled-jobs.server.ts";
 import {
   captureException,
   initializeSentry,
@@ -163,5 +166,6 @@ if (mode === "drain") {
 }
 
 console.info("worker.start", { mode, workerId });
+startScheduleWatchdog({ signal: abort.signal });
 await runWorkerPollLoop(abort.signal, jobHandlers);
 console.info("worker.shutdown");

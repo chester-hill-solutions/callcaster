@@ -60,3 +60,42 @@ export async function ensureSelfSchedulingJobsSeeded(): Promise<{
   }
   return { seeded };
 }
+
+/** How often the running worker re-checks that every chain has a live row. */
+export const SCHEDULE_WATCHDOG_INTERVAL_MS = 10 * 60_000;
+
+/**
+ * Chains are their own scheduler, so a successor enqueue that fails once
+ * (see rescheduleJob) leaves no future row and nothing to notice. Boot-time
+ * seeding only helps after a redeploy. Re-run the idempotent seed on a timer
+ * for the life of the worker so a dropped chain restarts within minutes.
+ */
+export function startScheduleWatchdog(args: {
+  signal: AbortSignal;
+  intervalMs?: number;
+}): () => void {
+  const intervalMs = args.intervalMs ?? SCHEDULE_WATCHDOG_INTERVAL_MS;
+  const tick = async () => {
+    try {
+      const { seeded } = await ensureSelfSchedulingJobsSeeded();
+      if (seeded.length > 0) {
+        logger.warn("worker.schedule_watchdog.reseeded", { seeded });
+      }
+    } catch (error) {
+      logger.error("worker.schedule_watchdog.failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+  const timer = setInterval(() => {
+    void tick();
+  }, intervalMs);
+  timer.unref?.();
+  const stop = () => clearInterval(timer);
+  if (args.signal.aborted) {
+    stop();
+  } else {
+    args.signal.addEventListener("abort", stop, { once: true });
+  }
+  return stop;
+}
