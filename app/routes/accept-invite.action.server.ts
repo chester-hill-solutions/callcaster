@@ -3,6 +3,7 @@ import {
   getInvitesByUserId,
 } from "@/lib/database/workspace.server";
 import { getSession, verifyAuth } from "@/lib/auth.server";
+import { isSignupOpen } from "@/lib/env.server";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import { auth } from "@/server/auth-instance";
 import { data as routeData, redirect } from "react-router";
@@ -22,6 +23,15 @@ export const action = defineAction({
     const actionType = formData.get("actionType");
 
     if (actionType === "updateUser") {
+      // This branch creates an account for whatever email the form carries;
+      // invites are keyed by an existing user id, so nothing here proves an
+      // invite exists. It is registration and must honor the same gate.
+      if (!isSignupOpen()) {
+        return routeData<ActionData>(
+          { status: "error", error: "Registration is closed." },
+          { headers, status: 403 },
+        );
+      }
       try {
         const entries = Object.fromEntries(formData.entries()) as Record<
           string,
