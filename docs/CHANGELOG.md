@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- The **Reset password** page now tells you when a reset link is invalid or expired instead of reporting success, and it no longer strips spaces from the start or end of the new password ([#1559](https://github.com/chester-hill-solutions/callcaster/issues/1559)).
 - A background worker that stalls past its claim timeout can no longer complete, retry, dead-letter, or extend a job that another worker has since taken over. Those writes are fenced to the claiming worker and log `worker.claim_lost` instead ([#1548](https://github.com/chester-hill-solutions/callcaster/issues/1548)).
 - The boot-time migration bootstrap takes a database advisory lock for the whole pass, so two app instances starting at once no longer replay the same migration files concurrently ([#1547](https://github.com/chester-hill-solutions/callcaster/issues/1547)).
 - Photos and other attachments on **inbound** text messages now show in the chat view. They were stored correctly but never given a viewable link, so only the message text appeared ([#1557](https://github.com/chester-hill-solutions/callcaster/issues/1557)).
