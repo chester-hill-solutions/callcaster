@@ -163,7 +163,7 @@ describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", (
     );
     fireEvent.click(screen.getByRole("button", { name: "Edit Send Window" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Apply 09:00–17:00 local to Weekdays" }),
+      screen.getByRole("button", { name: "Apply 09:00–21:00 local to Weekdays" }),
     );
     expect(onChange).toHaveBeenCalled();
     const [field, value] = onChange.mock.calls.at(-1)!;
@@ -184,7 +184,7 @@ describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", (
     );
     fireEvent.click(screen.getByRole("button", { name: "Edit Calling Hours" }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Apply 09:00–17:00 local to Weekdays" }),
+      screen.getByRole("button", { name: "Apply 09:00–21:00 local to Weekdays" }),
     );
     const [field] = onChange.mock.calls.at(-1)!;
     expect(field).toBe("schedule");
@@ -205,7 +205,7 @@ describe("app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx", (
     const parsed = JSON.parse(String(value));
     expect(parsed.monday.active).toBe(true);
     expect(parsed.monday.intervals).toHaveLength(1);
-    // Stored as UTC; local 09:00–17:00 must not be the all-day sentinel.
+    // Stored as UTC; local 09:00–21:00 must not be the all-day sentinel.
     expect(parsed.monday.intervals[0]).not.toEqual({
       start: expect.stringMatching(/^00:00/),
       end: expect.stringMatching(/^23:59/),

@@ -25,6 +25,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- New campaigns default to calling hours of **09:00 to 21:00** local (was 09:00 to 17:00), and the same default applies when you enable a day or use the "Apply … to Weekdays / All Days" buttons. Saved schedules are unchanged ([#1127](https://github.com/chester-hill-solutions/callcaster/issues/1127)).
 - Two-factor authentication is turned off for all accounts for now. Sign-in no longer asks for an authenticator code, owners and admins are not asked to enroll, and **Account → Security** says so. Existing enrollments are kept and everything returns when the `TWO_FACTOR_ENABLED` setting is switched on ([#1567](https://github.com/chester-hill-solutions/callcaster/issues/1567)).
 - The compose e2e scripts that drop the database schema and purge the MinIO bucket now refuse any `DATABASE_URL` or `S3_ENDPOINT` that is not the local stack, so a stray exported variable cannot point them at a real environment ([#1553](https://github.com/chester-hill-solutions/callcaster/issues/1553)).
 

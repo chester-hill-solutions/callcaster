@@ -136,3 +136,12 @@ export function utcToWallClockHm(
 
   return `${parts.hour ?? "00"}:${parts.minute ?? "00"}`;
 }
+
+/**
+ * Product default for a new campaign's calling hours, in the campaign's local
+ * time zone. Calling happens mostly in the evening, so the default runs to the
+ * CASL quiet boundary (21:00) rather than office hours (#1127). One source of
+ * truth for new campaigns, newly enabled days, and the "apply to days" buttons.
+ */
+export const DEFAULT_CALLING_HOURS = { start: "09:00", end: "21:00" } as const;
+export const DEFAULT_CALLING_HOURS_LABEL = `${DEFAULT_CALLING_HOURS.start}–${DEFAULT_CALLING_HOURS.end}`;
