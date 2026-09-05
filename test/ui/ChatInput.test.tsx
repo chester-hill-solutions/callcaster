@@ -291,7 +291,7 @@ describe("ChatInput segment counter and credit estimate", () => {
 
     expect(screen.getByText("8/153")).toBeInTheDocument();
     expect(screen.getByText("2 segments")).toBeInTheDocument();
-    expect(screen.getByText("≈ 2 credits")).toBeInTheDocument();
+    expect(screen.getByText("≈ 4 credits")).toBeInTheDocument();
   });
 
   test("switches to UCS-2 and doubles the unit cost for a single emoji", async () => {
@@ -304,7 +304,7 @@ describe("ChatInput segment counter and credit estimate", () => {
     // A single astral-plane emoji is a UTF-16 surrogate pair: 2 units, not 1.
     expect(screen.getByText("2/70")).toBeInTheDocument();
     expect(screen.getByText("(UCS-2)")).toBeInTheDocument();
-    expect(screen.getByText("≈ 1 credit")).toBeInTheDocument();
+    expect(screen.getByText("≈ 2 credits")).toBeInTheDocument();
   });
 
   test("flips the credit estimate to the flat MMS rate the instant media is attached, independent of body length", () => {
@@ -315,7 +315,7 @@ describe("ChatInput segment counter and credit estimate", () => {
 
     // Still 3 text segments' worth of characters typed...
     expect(screen.getByText("3 segments")).toBeInTheDocument();
-    // ...but the credit estimate is the flat MMS rate (2), not 3x per-segment.
-    expect(screen.getByText("≈ 2 credits")).toBeInTheDocument();
+    // ...but the credit estimate is the flat MMS rate (4), not 3x per-segment (6).
+    expect(screen.getByText("≈ 4 credits")).toBeInTheDocument();
   });
 });
