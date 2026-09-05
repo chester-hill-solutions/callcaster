@@ -36,7 +36,7 @@ export const API_SURFACE_CORE: readonly ApiSurfaceCore[] = [
   { path: "/api/auth/invites", routeModule: "app/routes/api+/auth/invites.route.tsx", authClass: null, authVia: "action:requireJsonAuth + loader:requireJsonAuth", operations: [{ method: "POST", handler: "action" }, { method: "GET", handler: "loader" }] },
   { path: "/api/auth/refresh", routeModule: "app/routes/api+/auth/refresh.route.tsx", authClass: "publicForm", authVia: "action:rateLimitedPostAuth", operations: [{ method: "POST", handler: "action" }] },
   { path: "/api/auth/register", routeModule: "app/routes/api+/auth/register.route.tsx", authClass: "publicForm", authVia: "action:rateLimitedPostAuth", operations: [{ method: "POST", handler: "action" }] },
-  { path: "/api/auth/reset-password", routeModule: "app/routes/api+/auth/reset-password.route.tsx", authClass: null, authVia: "action:requireJsonAuth", operations: [{ method: "POST", handler: "action" }] },
+  { path: "/api/auth/reset-password", routeModule: "app/routes/api+/auth/reset-password.route.tsx", authClass: "publicForm", authVia: "action:rateLimitedPostAuth", operations: [{ method: "POST", handler: "action" }] },
   { path: "/api/auth/signout", routeModule: "app/routes/api+/auth/signout.route.tsx", authClass: null, authVia: "action:unrecognised", operations: [{ method: "POST", handler: "action" }] },
   { path: "/api/auth/token", routeModule: "app/routes/api+/auth/token.route.tsx", authClass: "publicForm", authVia: "action:rateLimitedPostAuth", operations: [{ method: "POST", handler: "action" }] },
   { path: "/api/auth/verify-email", routeModule: "app/routes/api+/auth/verify-email.route.tsx", authClass: "publicForm", authVia: "action:rateLimitedPostAuth", operations: [{ method: "POST", handler: "action" }] },

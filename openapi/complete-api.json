@@ -1721,18 +1721,14 @@
         "summary": "POST /api/auth/reset-password",
         "description": "",
         "tags": [
-          "User API",
+          "Public Form",
           "auth"
         ],
         "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
+        "x-callcaster-exposure": "publicUnauthenticated",
+        "x-callcaster-auth-class": "publicForm",
         "x-callcaster-docs-guide": "docs/api-agent-quickstart.md",
-        "security": [
-          {
-            "sessionCookie": []
-          }
-        ],
+        "security": [],
         "requestBody": {
           "required": true,
           "content": {
