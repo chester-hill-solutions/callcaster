@@ -11,6 +11,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Security
 
 - Workspace-scoped database updates now drop the workspace column from the update payload at runtime, so no code path can move a row to another workspace ([#1542](https://github.com/chester-hill-solutions/callcaster/issues/1542)).
+- The contacts API creates a new contact in the workspace the caller was authorized for, ignoring any other workspace named in the request body ([#1541](https://github.com/chester-hill-solutions/callcaster/issues/1541)).
 
 ## 2026-09-02 — release [#1506](https://github.com/chester-hill-solutions/callcaster/pull/1506)
 
@@ -77,7 +78,6 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ## v2 platform cutover — 2026-08-31 and earlier
 
 Production moved from the Supabase-era app to the v2 platform on 2026-08-31. The entries below were accumulated during that migration and are kept as written.
-
 
 ### Added
 
