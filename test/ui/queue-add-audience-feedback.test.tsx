@@ -112,8 +112,8 @@ async function renderQueueRoute() {
 
 function getAudiencePicker() {
   // QueueTable also renders <Select> combobox filters; scope to the header
-  // picker via its "Select Audience" placeholder option.
-  const placeholder = screen.getAllByText("Select Audience").find((el) => el.tagName === "OPTION");
+  // picker via its "Select Call list" placeholder option.
+  const placeholder = screen.getAllByText("Select Call list").find((el) => el.tagName === "OPTION");
   const select = placeholder?.closest("select");
   if (!select) throw new Error("audience picker <select> not found");
   return select as HTMLSelectElement;

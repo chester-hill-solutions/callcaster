@@ -448,10 +448,10 @@ export function QueueTable({
             header: ({ column }) => (
                 <div className="space-y-1">
                     <div className="flex items-center px-1 justify-between">
-                        <span className="font-medium text-xs">Audiences</span>
+                        <span className="font-medium text-xs">Call lists</span>
                         <QueueSortButton
                             column={column}
-                            label="Audiences"
+                            label="Call lists"
                             field="audiences"
                             onSortChange={handleFilterChange}
                         />
