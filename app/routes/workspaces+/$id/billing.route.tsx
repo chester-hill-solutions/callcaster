@@ -85,8 +85,11 @@ export default function Credits() {
   const paymentMessage = searchParams.get("payment_message");
   const creditsAdded = Number(searchParams.get("credits_added") || "0");
   const isSubmitting = navigation.state === "submitting";
-  const selectedCredits = isCustom ? Number(customAmount || "0") : selectedAmount;
-  const estimatedCost = selectedCredits > 0 ? selectedCredits * CREDIT_PRICE_CAD : 0;
+  const selectedCredits = isCustom
+    ? Number(customAmount || "0")
+    : selectedAmount;
+  const estimatedCost =
+    selectedCredits > 0 ? selectedCredits * CREDIT_PRICE_CAD : 0;
   const creditPackages = [
     { amount: 500, price: 10 },
     { amount: 1250, price: 25 },
@@ -110,7 +113,7 @@ export default function Credits() {
       {returnTo ? (
         <Link
           to={returnTo}
-          className="inline-block text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          className="text-muted-foreground hover:text-foreground inline-block text-sm underline underline-offset-4"
         >
           &larr; Back to setup
         </Link>
@@ -140,8 +143,8 @@ export default function Credits() {
         <Alert variant="success">
           <AlertTitle>Payment successful</AlertTitle>
           <AlertDescription>
-            Added {formatCredits(creditsAdded)} credits successfully. Your balance
-            has been refreshed.
+            Added {formatCredits(creditsAdded)} credits successfully. Your
+            balance has been refreshed.
           </AlertDescription>
         </Alert>
       ) : null}
@@ -167,29 +170,26 @@ export default function Credits() {
       ) : null}
 
       <Section variant="flat">
-        <SectionHeader
-          branded={false}
-          compact
-          title="Current Balance"
-        />
-        <div className="text-4xl font-bold text-primary">
+        <SectionHeader branded={false} compact title="Current Balance" />
+        <div className="text-primary text-4xl font-bold">
           {credits.balance} credits
         </div>
         <Accordion type="single" collapsible className="w-full max-w-lg">
           <AccordionItem value="rates" className="border-border/60">
-            <AccordionTrigger className="py-3 text-sm text-muted-foreground hover:no-underline">
+            <AccordionTrigger className="text-muted-foreground py-3 text-sm hover:no-underline">
               Credit rates for messaging and calling
             </AccordionTrigger>
             <AccordionContent>
-              <div className="flex flex-col gap-2 text-sm text-muted-foreground">
-                <div>SMS: 1 credit per segment ($0.02)</div>
+              <div className="text-muted-foreground flex flex-col gap-2 text-sm">
+                <div>SMS: 2 credits per segment ($0.04)</div>
+                <div>MMS: 4 credits per message ($0.08)</div>
                 <div>
-                  IVR / auto-dial: 2 credits per dial ($0.04), then 3 credits per
-                  additional minute ($0.06)
+                  IVR / auto-dial: 2 credits per dial ($0.04), then 3 credits
+                  per additional minute ($0.06)
                 </div>
                 <div>
-                  Live staffed calls: 4 credits per dial ($0.08), then 5 credits per
-                  additional minute ($0.10)
+                  Live staffed calls: 4 credits per dial ($0.08), then 5 credits
+                  per additional minute ($0.10)
                 </div>
                 <div>Phone numbers: 100 credits per month ($2.00)</div>
               </div>
@@ -201,97 +201,102 @@ export default function Credits() {
       <Section variant="flat">
         <SectionHeader branded={false} compact title="Purchase Credits" />
         {!canPurchase ? (
-          <Text variant="muted" className="rounded-lg border bg-muted/30 p-4">
+          <Text variant="muted" className="bg-muted/30 rounded-lg border p-4">
             Contact your workspace admin or owner to purchase credits.
           </Text>
         ) : (
-        <Form method="post" className="space-y-4">
-          <input type="hidden" name="amount" value={selectedCredits || ""} />
-          <Text variant="muted" className="rounded-lg border bg-muted/30 p-4">
-            Credits cost {formatUnitPrice()} each. The minimum purchase is{" "}
-            {formatCredits(MIN_CREDITS)} credits ({formatCurrency(MIN_PURCHASE_CAD)}).
-          </Text>
-          <div className="grid gap-4 md:grid-cols-3">
-            {creditPackages.map((pkg) => (
-              <button
-                type="button"
-                key={pkg.amount}
-                className={`w-full rounded-lg border p-4 text-left transition-colors duration-150 ${
-                  selectedAmount === pkg.amount && !isCustom
+          <Form method="post" className="space-y-4">
+            <input type="hidden" name="amount" value={selectedCredits || ""} />
+            <Text variant="muted" className="bg-muted/30 rounded-lg border p-4">
+              Credits cost {formatUnitPrice()} each. The minimum purchase is{" "}
+              {formatCredits(MIN_CREDITS)} credits (
+              {formatCurrency(MIN_PURCHASE_CAD)}).
+            </Text>
+            <div className="grid gap-4 md:grid-cols-3">
+              {creditPackages.map((pkg) => (
+                <button
+                  type="button"
+                  key={pkg.amount}
+                  className={`w-full rounded-lg border p-4 text-left transition-colors duration-150 ${
+                    selectedAmount === pkg.amount && !isCustom
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:bg-muted/50"
+                  }`}
+                  onClick={() => {
+                    setSelectedAmount(pkg.amount);
+                    setIsCustom(false);
+                  }}
+                >
+                  <div className="text-2xl font-bold">
+                    {formatCredits(pkg.amount)} credits
+                  </div>
+                  <div className="text-muted-foreground">
+                    {formatCurrency(pkg.price)}
+                  </div>
+                </button>
+              ))}
+              <div
+                role="button"
+                tabIndex={0}
+                className={`rounded-lg border p-4 transition-colors duration-150 ${
+                  isCustom
                     ? "border-primary bg-primary/5"
                     : "border-border hover:bg-muted/50"
                 }`}
                 onClick={() => {
-                  setSelectedAmount(pkg.amount);
-                  setIsCustom(false);
-                }}
-              >
-                <div className="text-2xl font-bold">{formatCredits(pkg.amount)} credits</div>
-                <div className="text-muted-foreground">{formatCurrency(pkg.price)}</div>
-              </button>
-            ))}
-            <div
-              role="button"
-              tabIndex={0}
-              className={`rounded-lg border p-4 transition-colors duration-150 ${
-                isCustom
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:bg-muted/50"
-              }`}
-              onClick={() => {
-                setIsCustom(true);
-                setSelectedAmount(0);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
                   setIsCustom(true);
                   setSelectedAmount(0);
-                }
-              }}
-            >
-              <div className="text-2xl font-bold">Custom Credits</div>
-              <Input
-                type="number"
-                value={customAmount}
-                onChange={(e) => {
-                  setCustomAmount(e.target.value);
-                  setIsCustom(true);
                 }}
-                className="mt-2"
-                placeholder="Enter credits"
-                min={MIN_CREDITS}
-              />
-              {customCostLabel ? (
-                <Text variant="small" className="mt-1">
-                  {customCostLabel}
-                </Text>
-              ) : null}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setIsCustom(true);
+                    setSelectedAmount(0);
+                  }
+                }}
+              >
+                <div className="text-2xl font-bold">Custom Credits</div>
+                <Input
+                  type="number"
+                  value={customAmount}
+                  onChange={(e) => {
+                    setCustomAmount(e.target.value);
+                    setIsCustom(true);
+                  }}
+                  className="mt-2"
+                  placeholder="Enter credits"
+                  min={MIN_CREDITS}
+                />
+                {customCostLabel ? (
+                  <Text variant="small" className="mt-1">
+                    {customCostLabel}
+                  </Text>
+                ) : null}
+              </div>
             </div>
-          </div>
 
-          <div className="rounded-md bg-muted/30 p-4">
-            <Text variant="muted">Checkout summary</Text>
-            <p className="mt-1 text-lg font-semibold">
-              {selectedCredits > 0
-                ? `${formatCredits(selectedCredits)} credits for ${formatCurrency(estimatedCost)}`
-                : "Select a package or enter a custom credit amount"}
-            </p>
-          </div>
+            <div className="bg-muted/30 rounded-md p-4">
+              <Text variant="muted">Checkout summary</Text>
+              <p className="mt-1 text-lg font-semibold">
+                {selectedCredits > 0
+                  ? `${formatCredits(selectedCredits)} credits for ${formatCurrency(estimatedCost)}`
+                  : "Select a package or enter a custom credit amount"}
+              </p>
+            </div>
 
-          {actionData?.error ? (
-            <Alert variant="destructive">
-              <AlertDescription>{actionData.error}</AlertDescription>
-            </Alert>
-          ) : null}
+            {actionData?.error ? (
+              <Alert variant="destructive">
+                <AlertDescription>{actionData.error}</AlertDescription>
+              </Alert>
+            ) : null}
 
-          <Button
-            type="submit"
-            disabled={isSubmitting || selectedCredits < MIN_CREDITS}
-          >
-            {isSubmitting ? "Redirecting to checkout…" : "Purchase Credits"}
-          </Button>
-        </Form>
+            <Button
+              type="submit"
+              disabled={isSubmitting || selectedCredits < MIN_CREDITS}
+            >
+              {isSubmitting ? "Redirecting to checkout…" : "Purchase Credits"}
+            </Button>
+          </Form>
         )}
       </Section>
 

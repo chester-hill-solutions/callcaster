@@ -1,14 +1,13 @@
 import { describe, expect, test } from "vitest";
 
-import {
-  estimateCampaignCredits,
-} from "../shared/campaign-billing";
+import { estimateCampaignCredits } from "../shared/campaign-billing";
 
 describe("campaign-billing", () => {
-  test("estimates SMS campaigns at 1 credit per contact", () => {
+  test("estimates SMS campaigns at 2 credits per contact", () => {
     const estimate = estimateCampaignCredits("message", 100);
-    expect(estimate.totalCredits).toBe(100);
-    expect(estimate.perContactCredits).toBe(1);
+    expect(estimate.totalCredits).toBe(200);
+    expect(estimate.perContactCredits).toBe(2);
+    expect(estimate.rateDescription).toBe("2 credits per SMS segment");
   });
 
   test("estimates IVR campaigns at 2 credits per dial", () => {

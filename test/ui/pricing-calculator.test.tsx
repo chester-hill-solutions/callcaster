@@ -152,9 +152,9 @@ describe("PricingCalculator (#1393)", () => {
 
     fireEvent.change(smsInput, { target: { value: "100" } });
 
-    // 100 segments × 1 credit = 100 credits. formatCreditLabel emits "100 credits".
-    expect(screen.getByTestId("calc-line-sms").textContent).toMatch(/100 credits/);
-    expect(total.textContent).toMatch(/100 credits/);
+    // 100 segments × 2 credits = 200 credits. formatCreditLabel emits "200 credits".
+    expect(screen.getByTestId("calc-line-sms").textContent).toMatch(/200 credits/);
+    expect(total.textContent).toMatch(/200 credits/);
   });
 
   test("expanding a second time collapses back to the heading only", () => {
