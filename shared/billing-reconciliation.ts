@@ -1,5 +1,6 @@
-// Inline bucket classifier to avoid cross-file import incompatibility between Node (extensionless) and Deno (.ts extension).
-// Keep in sync with `shared/billing-keys.ts` `bucketFromIdempotencyKey`.
+import { SMS_SEGMENT_CREDITS } from "./pricing";
+
+// Inline bucket classifier. Keep in sync with `shared/billing-keys.ts` `bucketFromIdempotencyKey`.
 type LedgerBucket = "sms" | "voice" | "numbers" | "purchase" | "ai" | "other";
 
 function bucketFromIdempotencyKey(
@@ -175,6 +176,8 @@ export function buildBillingReconciliationReport(args: {
 }): BillingReconciliationReport {
   const ledgerInPeriod = filterLedgerRowsInPeriod(args.ledgerRows, args.period);
   const ledgerSummary = summarizeLedger(ledgerInPeriod);
+  const smsLedgerSegments =
+    ledgerSummary.sms.credits / SMS_SEGMENT_CREDITS;
 
   const smsTwilioUnits = sumTwilioUsage(
     args.twilioUsage,
@@ -207,10 +210,10 @@ export function buildBillingReconciliationReport(args: {
         twilioUnitLabel: "segments",
         ledgerEvents: ledgerSummary.sms.events,
         ledgerCredits: ledgerSummary.sms.credits,
-        // Segments against segments. SMS_SEGMENT_CREDITS is 2, so the credit
-        // total IS the segment count — whereas the row count is one per
-        // message, making every multi-segment SMS look like drift.
-        variance: smsTwilioUnits - ledgerSummary.sms.credits,
+        // Segments against segments. The ledger stores credits, so divide by
+        // the per-segment rate to get segments back — whereas the row count
+        // is one per message, making every multi-segment SMS look like drift.
+        variance: smsTwilioUnits - smsLedgerSegments,
       },
       voice: {
         twilioUnits: voiceTwilioMinutes,

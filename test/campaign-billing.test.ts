@@ -7,6 +7,7 @@ describe("campaign-billing", () => {
     const estimate = estimateCampaignCredits("message", 100);
     expect(estimate.totalCredits).toBe(200);
     expect(estimate.perContactCredits).toBe(2);
+    expect(estimate.rateDescription).toBe("2 credits per SMS segment");
   });
 
   test("estimates IVR campaigns at 2 credits per dial", () => {
