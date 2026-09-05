@@ -4,11 +4,15 @@ export const tenantDbStubState = {
   messageInsertResult: [] as unknown[],
   messageInsertError: null as Error | null,
   messageInsertCalls: [] as unknown[],
+  messageUpdateCalls: [] as unknown[],
+  messageDeleteCalls: [] as unknown[],
   contactUpdateCalls: [] as unknown[],
 };
 
 export const tenantDbMocks = {
   messageInsert: vi.fn(),
+  messageUpdate: vi.fn(),
+  messageDelete: vi.fn(),
   contactUpdate: vi.fn(),
   callInsert: vi.fn(),
   callDelete: vi.fn(),
@@ -26,6 +30,15 @@ function applyTenantDbMockImplementations() {
       ? tenantDbStubState.messageInsertResult
       : [{ sid: "SM1", ...(payload as object) }];
     return rows;
+  });
+
+  tenantDbMocks.messageUpdate.mockImplementation(async (opts: { set?: Record<string, unknown> }) => {
+    tenantDbStubState.messageUpdateCalls.push(opts);
+    const last = tenantDbStubState.messageInsertCalls.at(-1) as Record<string, unknown> | undefined;
+    return [{ ...(last ?? {}), ...(opts.set ?? {}) }];
+  });
+  tenantDbMocks.messageDelete.mockImplementation(async (opts: unknown) => {
+    tenantDbStubState.messageDeleteCalls.push(opts);
   });
 
   tenantDbMocks.contactUpdate.mockImplementation(async (opts: unknown) => {
@@ -50,13 +63,19 @@ export function configureTenantDbStub(
   tenantDbStubState.messageInsertResult = config.messageInsertResult ?? [];
   tenantDbStubState.messageInsertError = config.messageInsertError ?? null;
   tenantDbStubState.messageInsertCalls = [];
+  tenantDbStubState.messageUpdateCalls = [];
+  tenantDbStubState.messageDeleteCalls = [];
   tenantDbStubState.contactUpdateCalls = [];
   applyTenantDbMockImplementations();
 }
 
 export function createTenantDbMock() {
   return {
-    message: { insert: tenantDbMocks.messageInsert },
+    message: {
+      insert: tenantDbMocks.messageInsert,
+      update: tenantDbMocks.messageUpdate,
+      delete: tenantDbMocks.messageDelete,
+    },
     contact: { update: tenantDbMocks.contactUpdate },
     call: {
       insert: tenantDbMocks.callInsert,

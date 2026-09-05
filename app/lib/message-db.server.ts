@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, like, lt, or, sql } from "drizzle-orm";
 import { message as messageTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -6,7 +6,7 @@ import { emitChatMessageEvent } from "@/lib/workspace-events.server";
 import { logger } from "@/lib/logger.server";
 import { stripPhoneNumber } from "@/lib/phone";
 
-type MessageRow = typeof messageTable.$inferSelect;
+export type MessageRow = typeof messageTable.$inferSelect;
 
 /**
  * Statuses a message must never regress out of: the outbound billable
@@ -199,6 +199,21 @@ export async function findMessageBySid(sid: string): Promise<MessageRow | null> 
   return rows[0] ?? null;
 }
 
+/**
+ * Status-transition guard, enforced atomically inside the UPDATE (same shape
+ * as updateCallBySid): keep the row's current status when it is already
+ * terminal and the incoming status is not — out-of-order Twilio callbacks
+ * must not regress delivered/failed back to sent/sending. `::text` because
+ * message.status is the message_status ENUM in every real database (#1289).
+ */
+function withTerminalStatusGuard(update: Partial<MessageRow>): Partial<MessageRow> {
+  if (update.status == null) return update;
+  return {
+    ...update,
+    status: sql`CASE WHEN LOWER(${messageTable.status}::text) = ANY(${TERMINAL_MESSAGE_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_MESSAGE_STATUSES_SQL}) THEN ${messageTable.status} ELSE ${update.status} END`,
+  } as unknown as Partial<MessageRow>;
+}
+
 export async function updateMessageBySid(
   workspaceId: string,
   sid: string,
@@ -216,17 +231,7 @@ export async function updateMessageBySid(
   // shape as updateCallBySid): keep the row's current status when it is
   // already terminal and the incoming status is not — out-of-order Twilio
   // callbacks must not regress delivered/failed back to sent/sending.
-  const set =
-    update.status == null
-      ? update
-      : ({
-          ...update,
-          // ::text — message.status is the message_status ENUM in every real
-          // database; lower(message_status) does not exist and the uncast
-          // guard threw instead of guarding (#1289, sibling of the call
-          // guard in telephony-db.server.ts).
-          status: sql`CASE WHEN LOWER(${messageTable.status}::text) = ANY(${TERMINAL_MESSAGE_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_MESSAGE_STATUSES_SQL}) THEN ${messageTable.status} ELSE ${update.status} END`,
-        } as unknown as Partial<MessageRow>);
+  const set = withTerminalStatusGuard(update);
 
   const [row] = await tdb.message.update({
     set,
@@ -250,6 +255,17 @@ export async function updateMessageBySid(
   return row ?? null;
 }
 
+/** Placeholder SID an intent row carries until Twilio answers (#1582). */
+export const PENDING_MESSAGE_SID_PREFIX = "pending:";
+
+export function pendingMessageSid(clientRef: string): string {
+  return `${PENDING_MESSAGE_SID_PREFIX}${clientRef}`;
+}
+
+export function isPendingMessageSid(sid: string | null | undefined): boolean {
+  return typeof sid === "string" && sid.startsWith(PENDING_MESSAGE_SID_PREFIX);
+}
+
 export async function countCampaignMessagesToPhone(
   workspaceId: string,
   campaignId: string | number,
@@ -261,6 +277,90 @@ export async function countCampaignMessagesToPhone(
     where: and(
       eq(messageTable.campaign_id, Number(campaignId)),
       eq(messageTable.to, to),
+      // An intent row counts (it is the double-send guard), except one that
+      // was marked failed without ever reaching Twilio: nothing was sent, so
+      // the contact must stay eligible.
+      sql`NOT (${messageTable.sid} LIKE ${`${PENDING_MESSAGE_SID_PREFIX}%`} AND LOWER(${messageTable.status}::text) = 'failed')`,
+    ),
+  });
+}
+
+export async function findMessageByClientRef(
+  workspaceId: string,
+  clientRef: string,
+  options?: { tdb?: TenantDb },
+): Promise<MessageRow | null> {
+  const tdb = options?.tdb ?? createTenantDb(workspaceId);
+  const rows = (await tdb.message.findMany({
+    where: eq(messageTable.client_ref, clientRef),
+    limit: 1,
+  })) as MessageRow[];
+  return rows[0] ?? null;
+}
+
+/**
+ * Resolve an intent row once Twilio has answered: swap the placeholder SID
+ * for the real one and take Twilio's fields. Same terminal-status guard as
+ * updateMessageBySid so a late resolve cannot regress a delivered row.
+ */
+export async function resolveMessageByClientRef(
+  workspaceId: string,
+  clientRef: string,
+  update: Partial<MessageRow> & { sid: string },
+  options?: { tdb?: TenantDb },
+): Promise<MessageRow | null> {
+  const tdb = options?.tdb ?? createTenantDb(workspaceId);
+  const set = withTerminalStatusGuard(update);
+  const [row] = await tdb.message.update({
+    set,
+    where: eq(messageTable.client_ref, clientRef),
+  });
+  if (row) {
+    await emitChatMessageEvent(workspaceId, "UPDATE", row as Record<string, unknown>, null);
+  }
+  return (row as MessageRow | undefined) ?? null;
+}
+
+/**
+ * The status webhook carries no workspace and, for a row whose post-send
+ * resolve failed, an unknown SID. A Twilio number belongs to one workspace,
+ * so the newest pending intent for this from/to pair (within the hour) is
+ * the message the callback is about.
+ */
+export async function findPendingMessageIntentByNumbers(args: {
+  from: string;
+  to: string;
+  maxAgeMs?: number;
+}): Promise<MessageRow | null> {
+  const since = new Date(Date.now() - (args.maxAgeMs ?? 60 * 60_000)).toISOString();
+  const rows = await db
+    .select()
+    .from(messageTable)
+    .where(
+      and(
+        eq(messageTable.from, args.from),
+        eq(messageTable.to, args.to),
+        like(messageTable.sid, `${PENDING_MESSAGE_SID_PREFIX}%`),
+        isNotNull(messageTable.client_ref),
+        sql`${messageTable.date_created} >= ${since}`,
+      ),
+    )
+    .orderBy(desc(messageTable.date_created))
+    .limit(1);
+  return (rows[0] as MessageRow | undefined) ?? null;
+}
+
+/** Remove an intent row when Twilio refused the send: nothing went out. */
+export async function deleteMessageByClientRef(
+  workspaceId: string,
+  clientRef: string,
+  options?: { tdb?: TenantDb },
+): Promise<void> {
+  const tdb = options?.tdb ?? createTenantDb(workspaceId);
+  await tdb.message.delete({
+    where: and(
+      eq(messageTable.client_ref, clientRef),
+      like(messageTable.sid, `${PENDING_MESSAGE_SID_PREFIX}%`),
     ),
   });
 }

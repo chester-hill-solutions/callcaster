@@ -70,6 +70,7 @@ const steps = [
   "client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql",
   "client/migrations/20260815130000_dequeue_contact_returns_rows_affected.sql",
   "client/migrations/20260901000000_campaign_status_add_waiting.sql",
+  "client/migrations/20260905120000_message_client_ref.sql",
 ];
 
 /**

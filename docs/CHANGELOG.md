@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Campaign texts are recorded before they are handed to Twilio, so a send can no longer go out unrecorded and unbilled if the write after sending fails; the delivery callback attaches the provider ID to the pending record. A contact whose send Twilio refused stays eligible for the next attempt ([#1582](https://github.com/chester-hill-solutions/callcaster/issues/1582)).
 - A campaign text that Twilio accepted but whose record could not be saved is now reported to operations immediately instead of disappearing from billing and the conversation view unnoticed ([#1581](https://github.com/chester-hill-solutions/callcaster/issues/1581)).
 - Polling the status of a campaign export that no longer exists returns "not found" instead of a server error ([#1577](https://github.com/chester-hill-solutions/callcaster/issues/1577)).
 - The `POST /api/auth/reset-password` endpoint works again: it accepts the reset `token` in the body and no longer requires a signed-in session to reset a forgotten password ([#1560](https://github.com/chester-hill-solutions/callcaster/issues/1560)).

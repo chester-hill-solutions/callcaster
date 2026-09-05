@@ -668,7 +668,12 @@ describe("app/routes/api+/sms/route.tsx", () => {
     const mod = await import("../app/routes/api+/sms");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     expect(res.status).toBe(200);
-    expect(tenantDbStubState.messageInsertCalls[0]?.sid).toBe("failed-+15551234567-123");
+    // The intent row goes in first with a placeholder; the fallback SID lands
+    // on the resolve (#1582).
+    const intent = tenantDbStubState.messageInsertCalls[0] as { sid?: string } | undefined;
+    expect(intent?.sid).toMatch(/^pending:/);
+    const resolve = tenantDbStubState.messageUpdateCalls[0] as { set?: { sid?: string } } | undefined;
+    expect(resolve?.set?.sid).toBe("failed-+15551234567-123");
     dateNowSpy.mockRestore();
   });
 
