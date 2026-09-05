@@ -1,4 +1,5 @@
 import { browserTimeZone } from "@/lib/schedule-timezone";
+import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
 import {
   Accordion,
@@ -170,17 +171,69 @@ function ActivityGroupRows({ group }: { group: BillingActivityGroupItem }) {
   );
 }
 
+export type BillingActivityFilter = "all" | "purchases" | "usage";
+
+const ACTIVITY_FILTERS: ReadonlyArray<{ id: BillingActivityFilter; label: string }> = [
+  { id: "all", label: "All activity" },
+  { id: "purchases", label: "Purchases and credits" },
+  { id: "usage", label: "Usage" },
+];
+
+function matchesActivityFilter(row: BillingActivityRow, filter: BillingActivityFilter): boolean {
+  if (filter === "purchases") return row.type === "CREDIT";
+  if (filter === "usage") return row.type === "DEBIT";
+  return true;
+}
+
+function emptyCopyFor(filter: BillingActivityFilter): string {
+  if (filter === "purchases") return "No purchases or credits yet.";
+  if (filter === "usage") return "No usage yet.";
+  return "Purchases and campaign activity will appear here.";
+}
+
+/** Purchases vs usage split (#1322, first slice): a ledger with months of usage buries the receipts. */
+function ActivityFilterBar({
+  value,
+  onChange,
+}: {
+  value: BillingActivityFilter;
+  onChange: (next: BillingActivityFilter) => void;
+}) {
+  return (
+    <div role="group" aria-label="Filter activity" className="mb-3 flex flex-wrap gap-2">
+      {ACTIVITY_FILTERS.map((option) => (
+        <Button
+          key={option.id}
+          type="button"
+          size="sm"
+          variant={value === option.id ? "default" : "outline"}
+          aria-pressed={value === option.id}
+          onClick={() => onChange(option.id)}
+        >
+          {option.label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 export function BillingActivityTable({
   history,
   campaignNames,
 }: BillingActivityTableProps) {
+  const [filter, setFilter] = useState<BillingActivityFilter>("all");
   const items = useMemo(
-    () => rollUpBillingActivity(history, { campaignNames }),
-    [history, campaignNames],
+    () =>
+      rollUpBillingActivity(
+        history.filter((row) => matchesActivityFilter(row, filter)),
+        { campaignNames },
+      ),
+    [history, campaignNames, filter],
   );
 
   return (
     <div className="overflow-x-auto">
+      <ActivityFilterBar value={filter} onChange={setFilter} />
       <Table>
         <TableHeader>
           <TableRow>
@@ -193,9 +246,7 @@ export function BillingActivityTable({
           {items.length === 0 ? (
             <TableRow>
               <TableCell colSpan={3} className="py-8 text-center">
-                <Text variant="muted">
-                  Purchases and campaign activity will appear here.
-                </Text>
+                <Text variant="muted">{emptyCopyFor(filter)}</Text>
               </TableCell>
             </TableRow>
           ) : null}

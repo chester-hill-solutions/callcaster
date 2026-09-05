@@ -164,6 +164,34 @@ describe("BillingActivityTable", () => {
     expect(screen.queryByText("SMS messaging")).toBeNull();
   });
 
+  test("filters to purchases and credits, or to usage, and back to all (#1322)", async () => {
+    const user = userEvent.setup();
+    render(<BillingActivityTable history={campaignHistory} campaignNames={{ 12: "Fall drive" }} />);
+    const bar = screen.getByRole("group", { name: "Filter activity" });
+    expect(within(bar).getByRole("button", { name: "All activity", pressed: true })).toBeInTheDocument();
+    expect(screen.getByText("Credit purchase")).toBeInTheDocument();
+    expect(screen.getByText("Phone number rental")).toBeInTheDocument();
+
+    await user.click(within(bar).getByRole("button", { name: "Purchases and credits" }));
+    expect(screen.getByText("Credit purchase")).toBeInTheDocument();
+    expect(screen.queryByText("Phone number rental")).toBeNull();
+    expect(screen.queryByText(/Fall drive/)).toBeNull();
+
+    await user.click(within(bar).getByRole("button", { name: "Usage" }));
+    expect(screen.queryByText("Credit purchase")).toBeNull();
+    expect(screen.getByText("Phone number rental")).toBeInTheDocument();
+
+    await user.click(within(bar).getByRole("button", { name: "All activity" }));
+    expect(screen.getByText("Credit purchase")).toBeInTheDocument();
+  });
+
+  test("an empty filtered view says what is missing", async () => {
+    const user = userEvent.setup();
+    render(<BillingActivityTable history={history} />);
+    await user.click(screen.getByRole("button", { name: "Usage" }));
+    expect(screen.getByText("No usage yet.")).toBeInTheDocument();
+  });
+
   test("names an untitled campaign by its id", () => {
     render(<BillingActivityTable history={campaignHistory} />);
 

@@ -31,9 +31,6 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - New campaigns default to calling hours of **09:00 to 21:00** local (was 09:00 to 17:00), and the same default applies when you enable a day or use the "Apply … to Weekdays / All Days" buttons. Saved schedules are unchanged ([#1127](https://github.com/chester-hill-solutions/callcaster/issues/1127)).
 - Two-factor authentication is turned off for all accounts for now. Sign-in no longer asks for an authenticator code, owners and admins are not asked to enroll, and **Account → Security** says so. Existing enrollments are kept and everything returns when the `TWO_FACTOR_ENABLED` setting is switched on ([#1567](https://github.com/chester-hill-solutions/callcaster/issues/1567)).
 - The compose e2e scripts that drop the database schema and purge the MinIO bucket now refuse any `DATABASE_URL` or `S3_ENDPOINT` that is not the local stack, so a stray exported variable cannot point them at a real environment ([#1553](https://github.com/chester-hill-solutions/callcaster/issues/1553)).
-
-### Changed
-
 - Outbound messages now cost **2 credits per SMS segment** ($0.04) and **4 credits per MMS** ($0.08), up from 1 and 2. The billing page, campaign cost estimates, and the Twilio reconciliation report all follow the new rate ([#1533](https://github.com/chester-hill-solutions/callcaster/issues/1533)).
 
 ### Security
@@ -44,6 +41,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - The contacts API creates a new contact in the workspace the caller was authorized for, ignoring any other workspace named in the request body ([#1541](https://github.com/chester-hill-solutions/callcaster/issues/1541)).
 - Workspace invites from **Settings → Members** validate the requested role and refuse a role above the inviter's own, so a member can no longer invite someone as admin or owner ([#1543](https://github.com/chester-hill-solutions/callcaster/issues/1543)).
 - The accept-invite page no longer creates accounts while registration is closed. It now returns the same "Registration is closed." refusal as the signup page ([#1550](https://github.com/chester-hill-solutions/callcaster/issues/1550)).
+
+### Added
+
+- **Billing → Activity** can be filtered to purchases and credits, or to usage only, so receipts are easy to find once the ledger fills with campaign activity ([#1322](https://github.com/chester-hill-solutions/callcaster/issues/1322)).
 
 ## 2026-09-02 — release [#1506](https://github.com/chester-hill-solutions/callcaster/pull/1506)
 
