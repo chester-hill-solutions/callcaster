@@ -112,7 +112,7 @@ export const API_SURFACE_ANNOTATIONS: Readonly<
   "app/routes/api+/auth/refresh.route.tsx": { ownerArea: "auth", exposure: "publicUnauthenticated", docsGuide: "docs/api-agent-quickstart.md", bodyType: "json", specTarget: "publicOpenApi" },
   "app/routes/api+/auth/signout.route.tsx": { ownerArea: "auth", exposure: "sessionOnly", docsGuide: "docs/api-agent-quickstart.md", bodyType: "json", authClass: "session" },
   "app/routes/api+/auth/forgot-password.route.tsx": { ownerArea: "auth", exposure: "publicUnauthenticated", docsGuide: "docs/api-agent-quickstart.md", bodyType: "json", specTarget: "publicOpenApi" },
-  "app/routes/api+/auth/reset-password.route.tsx": { ownerArea: "auth", exposure: "sessionOnly", docsGuide: "docs/api-agent-quickstart.md", bodyType: "json", authClass: "session" },
+  "app/routes/api+/auth/reset-password.route.tsx": { ownerArea: "auth", exposure: "publicUnauthenticated", docsGuide: "docs/api-agent-quickstart.md", bodyType: "json", specTarget: "publicOpenApi" },
   "app/routes/api+/auth/verify-email.route.tsx": { ownerArea: "auth", exposure: "publicUnauthenticated", docsGuide: "docs/api-agent-quickstart.md", bodyType: "json", specTarget: "publicOpenApi" },
   "app/routes/api+/auth/invites.route.tsx": { ownerArea: "auth", exposure: "sessionOnly", docsGuide: "docs/api-agent-quickstart.md", bodyType: "json", authClass: "session" },
   "app/routes/api+/me.route.tsx": { ownerArea: "auth", exposure: "sessionOnly", docsGuide: "docs/api-agent-quickstart.md", bodyType: "json", authClass: "session" },

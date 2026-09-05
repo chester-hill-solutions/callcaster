@@ -32,7 +32,7 @@ Interactive specs:
 | `/api/auth/invites` | POST, GET | User API | sessionOnly | yes | `routes/api+/auth/invites.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auth/refresh` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/refresh.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auth/register` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/register.route.tsx` | `docs/api-agent-quickstart.md` |  |
-| `/api/auth/reset-password` | POST | User API | sessionOnly | yes | `routes/api+/auth/reset-password.route.tsx` | `docs/api-agent-quickstart.md` |  |
+| `/api/auth/reset-password` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/reset-password.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auth/signout` | POST | User API | sessionOnly | yes | `routes/api+/auth/signout.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auth/token` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/token.route.tsx` | `docs/api-agent-quickstart.md` |  |
 | `/api/auth/verify-email` | POST | Public Form | publicUnauthenticated | yes | `routes/api+/auth/verify-email.route.tsx` | `docs/api-agent-quickstart.md` |  |
