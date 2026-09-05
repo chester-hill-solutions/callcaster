@@ -1,9 +1,15 @@
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
   signOut: vi.fn(),
+  revokeSessionByToken: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/lib/auth.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/auth.server")>()),
+  revokeSessionByToken: (...args: unknown[]) => mocks.revokeSessionByToken(...args),
 }));
 
 vi.mock("@/server/auth-instance", () => ({
@@ -19,6 +25,43 @@ vi.mock("@/lib/env.server", () => ({
 }));
 
 describe("app/routes/api+/auth/signout.action.server.ts", () => {
+  beforeEach(() => {
+    // The node suite shares a module registry across files; re-import so
+    // platform-auth.server binds to THIS file's auth.server mock.
+    vi.resetModules();
+  });
+
+  test("a bearer sign-out revokes that session token, not only the cookie", async () => {
+    mocks.revokeSessionByToken.mockClear();
+    mocks.signOut.mockResolvedValueOnce({ headers: new Headers() });
+
+    const mod = await import("../app/routes/api+/auth/signout.action.server");
+    const response = await asRouteResponse(mod.action({
+        request: new Request("http://localhost/api/auth/signout", {
+          method: "POST",
+          headers: { Authorization: "Bearer sess_token_abc" },
+        }),
+      } as any),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.revokeSessionByToken).toHaveBeenCalledWith("sess_token_abc");
+    expect(mocks.signOut).toHaveBeenCalled();
+  });
+
+  test("a cookie-only sign-out does not touch bearer revocation", async () => {
+    mocks.revokeSessionByToken.mockClear();
+    mocks.signOut.mockResolvedValueOnce({ headers: new Headers() });
+
+    const mod = await import("../app/routes/api+/auth/signout.action.server");
+    await asRouteResponse(mod.action({
+        request: new Request("http://localhost/api/auth/signout", { method: "POST" }),
+      } as any),
+    );
+
+    expect(mocks.revokeSessionByToken).not.toHaveBeenCalled();
+  });
+
   test("rejects non-POST methods", async () => {
     const mod = await import("../app/routes/api+/auth/signout.action.server");
     const response = await asRouteResponse(mod.action({
