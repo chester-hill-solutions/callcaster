@@ -5,7 +5,7 @@ import {
   workspace as workspaceTable,
   transaction_history as transactionHistoryTable,
 } from "@/db/schema";
-import { createTenantDb } from "@/server/tenant-db";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { db } from "@/server/db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
@@ -326,6 +326,137 @@ async function sendRentalLifecycleEmail(args: {
   });
 }
 
+type RentedNumberRow = Awaited<ReturnType<TenantDb["workspace_number"]["findMany"]>>[number];
+
+/**
+ * Bill every elapsed, not-yet-billed cycle for one number. Stops at the first
+ * cycle the workspace cannot afford (genuine non-payment) or at the first
+ * technical failure (balance lookup failed/unknown, ledger write threw), which
+ * is OUR problem and must never count as the customer's non-payment.
+ */
+async function billElapsedCycles(args: {
+  number: RentedNumberRow;
+  dueDates: Date[];
+  tdb: TenantDb;
+  phoneNumberLabel: string;
+}): Promise<{
+  previouslyBilled: number;
+  charged: number;
+  unpaid: number;
+  unsuspended: number;
+  technicalFailure: boolean;
+}> {
+  const { number, dueDates, tdb, phoneNumberLabel } = args;
+let previouslyBilled = 0;
+let charged = 0;
+let unpaid = 0;
+let unsuspended = 0;
+  // A cycle we could not bill for OUR reasons (balance lookup failed or
+  // unknown, ledger write threw) is not the customer's non-payment. It must
+  // never feed the warn/suspend/release ladder: stop this number for today
+  // and let tomorrow's sweep retry.
+  let technicalFailure = false;
+
+  for (const dueDate of dueDates) {
+    const cycleKey = getCycleKey(dueDate);
+    const idempotencyKey = numberRentalCycleKey(number.id, cycleKey);
+
+    // Idempotency is authoritative: if this cycle was already billed on an
+    // earlier (at-least-once) run, take no action. Checking the balance
+    // first would be wrong — a re-run after the charge (or any other spend)
+    // dropped the balance below the rental cost would falsely re-mark a paid
+    // number as unpaid.
+    const alreadyBilled = await tdb.transaction_history.findFirst({
+      where: eq(transactionHistoryTable.idempotency_key, idempotencyKey),
+      columns: { id: true },
+    });
+    if (alreadyBilled) {
+      previouslyBilled++;
+      continue;
+    }
+
+    // The ledger RPC applies a DEBIT unconditionally (no balance floor), so a
+    // failed charge does NOT throw — it would silently drive the balance
+    // negative and keep the number active for free. Check funds explicitly
+    // and route an unaffordable new charge to the unpaid/grace path instead.
+    let balance: number | null;
+    try {
+      balance = await getWorkspaceCreditsBalance(number.workspace);
+    } catch (error) {
+      technicalFailure = true;
+      logger.error("number_rental_billing.balance_lookup_failed", {
+        numberId: number.id,
+        workspaceId: number.workspace,
+        cycleKey,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      break;
+    }
+    // An unknown balance (null → workspace row missing / replication gap)
+    // is not evidence of non-payment. Do not debit, do not escalate.
+    if (balance == null) {
+      technicalFailure = true;
+      logger.error("number_rental_billing.balance_unavailable", {
+        numberId: number.id,
+        workspaceId: number.workspace,
+        cycleKey,
+      });
+      break;
+    }
+    if (balance < NUMBER_RENTAL_MONTHLY_CREDITS) {
+      unpaid++;
+      logger.info("Number rental left unpaid: insufficient credits", {
+        numberId: number.id,
+        workspaceId: number.workspace,
+        balance,
+        required: NUMBER_RENTAL_MONTHLY_CREDITS,
+        cycleKey,
+      });
+      // Later cycles for this number would also be unaffordable.
+      break;
+    }
+
+    try {
+      await insertTransactionHistoryIdempotent(db, {
+        workspaceId: number.workspace,
+        type: "DEBIT",
+        amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
+        note: `Monthly rental for ${phoneNumberLabel} (cycle ${cycleKey})`,
+        idempotencyKey,
+      });
+      charged++;
+
+      // Paying restores outbound use. Without this `suspended_at` is written
+      // once and never cleared by anything, so a suspended customer who pays
+      // stays suspended forever — while the suspension email tells them to
+      // "add credits to restore it".
+      if (number.suspended_at) {
+        await tdb.workspace_number.update({
+          set: { suspended_at: null },
+          where: eq(workspaceNumberTable.id, number.id),
+        });
+        number.suspended_at = null;
+        unsuspended++;
+        logger.info("number_rental_billing.unsuspended_after_payment", {
+          numberId: number.id,
+          workspaceId: number.workspace,
+          cycleKey,
+        });
+      }
+    } catch (error) {
+      technicalFailure = true;
+      logger.error("Number rental charge failed", {
+        numberId: number.id,
+        workspaceId: number.workspace,
+        cycleKey,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      break;
+    }
+  }
+  return { previouslyBilled, charged, unpaid, unsuspended, technicalFailure };
+}
+
 /**
  * Daily sweep for number rental billing.
  * Runs as the self-scheduling `number_rental_billing` worker job (or via
@@ -350,6 +481,8 @@ export async function runNumberRentalBilling(args: {
   warned: number;
   remindersSent: number;
   remindersFailed: number;
+  /** Numbers skipped this run because billing them hit a technical error. */
+  technicalFailures: number;
   autoReleaseImplemented: true;
 }> {
   const today = args.today ?? new Date();
@@ -382,6 +515,7 @@ export async function runNumberRentalBilling(args: {
   let warned = 0;
   let remindersSent = 0;
   let remindersFailed = 0;
+  let technicalFailures = 0;
 
   for (const number of numbers) {
     const anchorDate = number.created_at;
@@ -438,85 +572,16 @@ export async function runNumberRentalBilling(args: {
     // caps the count at 1 no matter how many cycles are owed, so suspend and
     // release could never be reached.
     const dueDates = elapsedDueDates(anchorDate, today);
-    let previouslyBilledCycles = 0;
-    let chargedCyclesForNumber = 0;
-
-    for (const dueDate of dueDates) {
-      const cycleKey = getCycleKey(dueDate);
-      const idempotencyKey = numberRentalCycleKey(number.id, cycleKey);
-
-      // Idempotency is authoritative: if this cycle was already billed on an
-      // earlier (at-least-once) run, take no action. Checking the balance
-      // first would be wrong — a re-run after the charge (or any other spend)
-      // dropped the balance below the rental cost would falsely re-mark a paid
-      // number as unpaid.
-      const alreadyBilled = await tdb.transaction_history.findFirst({
-        where: eq(transactionHistoryTable.idempotency_key, idempotencyKey),
-        columns: { id: true },
-      });
-      if (alreadyBilled) {
-        previouslyBilledCycles++;
-        continue;
-      }
-
-      // The ledger RPC applies a DEBIT unconditionally (no balance floor), so a
-      // failed charge does NOT throw — it would silently drive the balance
-      // negative and keep the number active for free. Check funds explicitly
-      // and route an unaffordable new charge to the unpaid/grace path instead.
-      const balance = await getWorkspaceCreditsBalance(number.workspace);
-      // Treat an unknown balance (null → workspace row missing / replication
-      // gap) as unaffordable rather than debiting it negative.
-      if (balance == null || balance < NUMBER_RENTAL_MONTHLY_CREDITS) {
-        unpaid++;
-        logger.info("Number rental left unpaid: insufficient credits", {
-          numberId: number.id,
-          workspaceId: number.workspace,
-          balance,
-          required: NUMBER_RENTAL_MONTHLY_CREDITS,
-          cycleKey,
-        });
-        // Later cycles for this number would also be unaffordable.
-        break;
-      }
-
-      try {
-        await insertTransactionHistoryIdempotent(db, {
-          workspaceId: number.workspace,
-          type: "DEBIT",
-          amount: debitAmountFromCredits(NUMBER_RENTAL_MONTHLY_CREDITS),
-          note: `Monthly rental for ${phoneNumberLabel} (cycle ${cycleKey})`,
-          idempotencyKey,
-        });
-        charged++;
-        chargedCyclesForNumber++;
-
-        // Paying restores outbound use. Without this `suspended_at` is written
-        // once and never cleared by anything, so a suspended customer who pays
-        // stays suspended forever — while the suspension email tells them to
-        // "add credits to restore it".
-        if (number.suspended_at) {
-          await tdb.workspace_number.update({
-            set: { suspended_at: null },
-            where: eq(workspaceNumberTable.id, number.id),
-          });
-          number.suspended_at = null;
-          unsuspended++;
-          logger.info("number_rental_billing.unsuspended_after_payment", {
-            numberId: number.id,
-            workspaceId: number.workspace,
-            cycleKey,
-          });
-        }
-      } catch (error) {
-        unpaid++;
-        logger.error("Number rental charge failed", {
-          numberId: number.id,
-          workspaceId: number.workspace,
-          cycleKey,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+    const billing = await billElapsedCycles({ number, dueDates, tdb, phoneNumberLabel });
+    charged += billing.charged;
+    unpaid += billing.unpaid;
+    unsuspended += billing.unsuspended;
+    if (billing.technicalFailure) {
+      technicalFailures++;
+      continue;
     }
+    const previouslyBilledCycles = billing.previouslyBilled;
+    const chargedCyclesForNumber = billing.charged;
 
     // Non-payment ladder: 1 unpaid cycle warns, 2 suspends, 3 releases.
     // The action is derived from the count in one place
@@ -565,6 +630,7 @@ export async function runNumberRentalBilling(args: {
     warned,
     remindersSent,
     remindersFailed,
+    technicalFailures,
     autoReleaseImplemented: true,
   };
 }
