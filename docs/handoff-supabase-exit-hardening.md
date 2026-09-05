@@ -28,10 +28,13 @@ Everything below landed on `dev` as one PR per issue. Do not re-verify these.
 | 6 | Campaign media delete is reference-safe | #1575 | #1576 |
 | 6 | S3 missing key normalized to `ObjectNotFoundError` | #1577 | #1579 |
 | 7 | Compose reset/purge scripts refuse non-local targets | #1553 | #1554 |
+| 5 | Sent campaign text whose row write fails alerts ops | #1581 | #1583 |
+| 5 | SMS outbox: intent row before Twilio, webhook resolves by from/to | #1582 | #1584 |
+| 5 | SMS outbox: open-sync reconciles or fails stale intents | #1578 | #1585 |
+| 5 | SMS outbox: chat sends, from-less matching for Messaging Service | #1586 | #1587 |
 
 Still open, by design:
 
-- **Durable SMS send outbox** (Phase 5): designed in #1578, awaiting review before implementation.
 - **Backup-code login** (Phase 3): moot while two-factor is off.
 - **Decisions for the owner**: per-file migration failure stopping boot (#1547 body; would break fresh PR environments), Railway `checkSuites: false`, and the six `SUPABASE_*` variables still set in production.
 
