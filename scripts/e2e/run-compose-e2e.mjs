@@ -118,7 +118,7 @@ if (process.env.E2E_SKIP_BUILD !== "1") {
     env: {
       ...process.env,
       BASE_URL: baseURL,
-      TWILIO_VALIDATE_WEBHOOKS: "false",
+      TWILIO_VALIDATE_WEBHOOKS: "true",
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "sk_test_e2e_placeholder",
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_placeholder",
       RESEND_API_KEY: process.env.RESEND_API_KEY ?? "re_e2e_placeholder",
@@ -143,7 +143,8 @@ const serverEnv = {
   E2E_TEST: "1",
   SIGNUP_OPEN: process.env.SIGNUP_OPEN ?? "true",
   PORT: e2ePort,
-  TWILIO_VALIDATE_WEBHOOKS: "false",
+  // Webhook fixtures sign with the seeded subaccount token (e2e/fixtures/webhooks.ts).
+  TWILIO_VALIDATE_WEBHOOKS: "true",
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "sk_test_e2e_placeholder",
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_placeholder",
   RESEND_API_KEY: process.env.RESEND_API_KEY ?? "re_e2e_placeholder",
@@ -212,14 +213,14 @@ try {
   // Surface contract probe: asserts every inventoried endpoint is actually
   // routed (unit tests import handlers directly and cannot catch a routing
   // failure) and that no-credential requests match the declared authClass.
-  // Provider-auth stays relaxed here because this harness sets
-  // TWILIO_VALIDATE_WEBHOOKS=false; deployed environments run it with
-  // --strict-provider-auth. Uses spawnSync + throw rather than run(), whose
+  // Signature validation is on in this harness, so unsigned provider
+  // webhooks must 403 here exactly as they do in deployed environments.
+  // Uses spawnSync + throw rather than run(), whose
   // process.exit would skip the finally block and orphan bun children.
   console.log("[e2e-compose] probing surface contracts…");
   const probe = spawnSync(
     "npx",
-    ["tsx", "--tsconfig", "tsconfig.json", "scripts/probe-surfaces.mjs", baseURL],
+    ["tsx", "--tsconfig", "tsconfig.json", "scripts/probe-surfaces.mjs", baseURL, "--strict"],
     { cwd: rootDir, stdio: "inherit", env: { ...process.env, DATABASE_URL: databaseUrl } },
   );
   if (probe.status !== 0) {

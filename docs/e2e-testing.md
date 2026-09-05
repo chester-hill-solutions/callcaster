@@ -101,7 +101,7 @@ Seed users are created in `auth_user` / `auth_account` (Better Auth) via `script
 
 - **Twilio**: network routes intercepted in `e2e/fixtures/twilio-mocks.ts`; Voice SDK stubbed in-browser. No real calls.
 - **Stripe**: billing UI tested; checkout uses mock redirects (no stripe.com in CI).
-- **Webhooks**: `e2e/fixtures/webhooks.ts` POSTs to local routes with `TWILIO_VALIDATE_WEBHOOKS=false`.
+- **Webhooks**: `e2e/fixtures/webhooks.ts` POSTs to local routes with a real `X-Twilio-Signature`, computed with the seeded subaccount token (`E2E_TWILIO_SUBACCOUNT`) against `BASE_URL + pathname`. The harness runs with `TWILIO_VALIDATE_WEBHOOKS=true`; pass `signing: "missing" | "wrong-token" | "tampered"` to exercise the rejection paths (`twilio-webhook-auth.spec.ts`).
 
 ## Scenario catalog
 
