@@ -25,6 +25,7 @@ type LoaderData = {
   lastName: string;
   email: string;
   twoFactorEnabled: boolean;
+  twoFactorAvailable: boolean;
   privileged: boolean;
   enrollRequired: boolean;
 };
@@ -52,7 +53,9 @@ export default function Account() {
   const mfaFetcher = useFetcher<MfaActionData>();
   const profileFormRef = useRef<HTMLFormElement>(null);
   const [editingProfile, setEditingProfile] = useState(false);
-  const [editingMfa, setEditingMfa] = useState(profile.enrollRequired);
+  const [editingMfa, setEditingMfa] = useState(
+    profile.twoFactorAvailable && profile.enrollRequired,
+  );
   const isSaving = navigation.state === "submitting";
   const mfaData = mfaFetcher.data;
   const twoFactorEnabled = mfaData?.enabled ?? profile.twoFactorEnabled;
@@ -204,11 +207,11 @@ export default function Account() {
                     Cancel
                   </Button>
                 </div>
-              ) : (
+              ) : profile.twoFactorAvailable ? (
                 <Button type="button" variant="outline" onClick={() => setEditingMfa(true)}>
                   Edit
                 </Button>
-              )
+              ) : null
             }
           />
           {profile.enrollRequired && profile.privileged && !twoFactorEnabled ? (
@@ -217,7 +220,9 @@ export default function Account() {
             </Text>
           ) : null}
           <Text className="text-sm text-muted-foreground">
-            Status: {twoFactorEnabled ? "Enabled" : "Not enabled"}
+            {profile.twoFactorAvailable
+              ? `Status: ${twoFactorEnabled ? "Enabled" : "Not enabled"}`
+              : "Two-factor authentication is turned off for this deployment."}
           </Text>
           {mfaData?.error ? (
             <Alert variant="destructive" role="alert">
@@ -292,7 +297,7 @@ export default function Account() {
             </div>
           ) : null}
 
-          {!editingMfa && !twoFactorEnabled ? (
+          {profile.twoFactorAvailable && !editingMfa && !twoFactorEnabled ? (
             <Text className="text-sm text-muted-foreground">MFA is not enabled.</Text>
           ) : null}
         </Section>

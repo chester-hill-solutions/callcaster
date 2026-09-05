@@ -261,6 +261,17 @@ export function isProduction(): boolean {
   return process.env.NODE_ENV === "production";
 }
 
+/**
+ * Two-factor authentication kill switch. Off unless TWO_FACTOR_ENABLED=true|1:
+ * the Better Auth twoFactor plugin is not registered (no code prompt at
+ * sign-in, for enrolled users too), and every privileged-role mandate is off.
+ * Enrollment rows are kept, so setting the flag turns it all back on.
+ */
+export function isTwoFactorFeatureEnabled(): boolean {
+  const v = process.env.TWO_FACTOR_ENABLED;
+  return v === "true" || v === "1";
+}
+
 /** Self-service signup is opt-in via SIGNUP_OPEN=true|1 (non-prod deployments). */
 export function isSignupOpen(): boolean {
   const v = process.env.SIGNUP_OPEN;

@@ -7,6 +7,7 @@ import { defineAction, defineLoader } from "@/lib/handler.server";
 import { updateMeProfile } from "@/lib/platform-auth.server";
 import { getUserById } from "@/lib/workspace-members-db.server";
 import { isTwoFactorEnabled, userHasPrivilegedWorkspaceRole } from "@/lib/two-factor.server";
+import { isTwoFactorFeatureEnabled } from "@/lib/env.server";
 
 const accountProfileSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required").max(100),
@@ -32,6 +33,7 @@ export const loader = defineLoader({
         lastName: profile?.last_name ?? "",
         email: auth.user.email ?? profile?.username ?? "",
         twoFactorEnabled,
+        twoFactorAvailable: isTwoFactorFeatureEnabled(),
         privileged,
         enrollRequired: url.searchParams.get("enroll") === "1",
       },

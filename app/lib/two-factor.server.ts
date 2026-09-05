@@ -1,6 +1,7 @@
 import { redirect } from "react-router";
 import { eq } from "drizzle-orm";
 import { jsonError } from "@/lib/platform-api.server";
+import { isTwoFactorFeatureEnabled } from "@/lib/env.server";
 import { adminDb } from "@/server/admin-db";
 import { authUser } from "@/db/auth-schema";
 import { user as platformUser, workspace_member } from "@/db/schema";
@@ -52,6 +53,12 @@ function isNonProductionRailwayEnvironment(): boolean {
  * previews). Never honored on Railway production.
  */
 export function isTwoFactorEnforcementDisabled(): boolean {
+  // Feature off entirely (TWO_FACTOR_ENABLED unset): nothing to enforce, on
+  // any environment. The production refusal below only guards the narrower
+  // enforcement-only override.
+  if (!isTwoFactorFeatureEnabled()) {
+    return true;
+  }
   const flagSet = DISABLE_2FA_ENV_KEYS.some((key) => process.env[key] === "1");
   if (!flagSet) {
     return false;

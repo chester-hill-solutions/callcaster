@@ -6,6 +6,9 @@ import "./helpers/route-auth-mock";
 
 beforeEach(() => {
   process.env.NODE_ENV = "test";
+  // Existing suites exercise 2FA behavior; the kill switch defaults off in
+  // production, so tests opt in here and the kill-switch tests unset it.
+  process.env.TWO_FACTOR_ENABLED ??= "1";
 
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
   process.env.BETTER_AUTH_SECRET ??= "test-better-auth-secret";

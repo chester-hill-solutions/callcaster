@@ -1,6 +1,7 @@
 import { data as routeData, redirect } from "react-router";
 import { getSafeRedirectPath } from "@/lib/safe-redirect";
 import { verifyAuth } from "@/lib/auth.server";
+import { isTwoFactorFeatureEnabled } from "@/lib/env.server";
 import {
   isTwoFactorEnabled,
   PRIVILEGED_WORKSPACE_ROLES,
@@ -24,6 +25,7 @@ export const loader = defineLoader({
 
     return routeData(
       {
+        twoFactorAvailable: isTwoFactorFeatureEnabled(),
         privileged,
         twoFactorEnabled: enabled,
         enrollRequired,
@@ -40,6 +42,12 @@ export const action = defineAction({
   sideEffects: ["db-write"],
   handler: async ({ request, auth: authContext }) => {
     const { headers, user } = authContext;
+    if (!isTwoFactorFeatureEnabled()) {
+      return routeData(
+        { error: "Two-factor authentication is turned off for this deployment." },
+        { headers, status: 403 },
+      );
+    }
     const formData = await request.formData();
     const intent = String(formData.get("intent") ?? "");
     const { auth } = await import("@/server/auth-instance");
