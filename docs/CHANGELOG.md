@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- The **Reset password** page now tells you when a reset link is invalid or expired instead of reporting success, and it no longer strips spaces from the start or end of the new password ([#1559](https://github.com/chester-hill-solutions/callcaster/issues/1559)).
 - A background worker that stalls past its claim timeout can no longer complete, retry, dead-letter, or extend a job that another worker has since taken over. Those writes are fenced to the claiming worker and log `worker.claim_lost` instead ([#1548](https://github.com/chester-hill-solutions/callcaster/issues/1548)).
 - The boot-time migration bootstrap takes a database advisory lock for the whole pass, so two app instances starting at once no longer replay the same migration files concurrently ([#1547](https://github.com/chester-hill-solutions/callcaster/issues/1547)).
 
@@ -22,6 +23,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Workspace-scoped database updates now drop the workspace column from the update payload at runtime, so no code path can move a row to another workspace ([#1542](https://github.com/chester-hill-solutions/callcaster/issues/1542)).
 - The contacts API creates a new contact in the workspace the caller was authorized for, ignoring any other workspace named in the request body ([#1541](https://github.com/chester-hill-solutions/callcaster/issues/1541)).
 - Workspace invites from **Settings → Members** validate the requested role and refuse a role above the inviter's own, so a member can no longer invite someone as admin or owner ([#1543](https://github.com/chester-hill-solutions/callcaster/issues/1543)).
+- The accept-invite page no longer creates accounts while registration is closed. It now returns the same "Registration is closed." refusal as the signup page ([#1550](https://github.com/chester-hill-solutions/callcaster/issues/1550)).
 
 ## 2026-09-02 — release [#1506](https://github.com/chester-hill-solutions/callcaster/pull/1506)
 

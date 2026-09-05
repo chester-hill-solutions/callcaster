@@ -6,6 +6,11 @@ const mocks = vi.hoisted(() => ({
   resetPassword: vi.fn(),
 }));
 
+vi.mock("@/lib/logger.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/logger.server")>()),
+  logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn(), debug: vi.fn() },
+}));
+
 vi.mock("@/server/auth-instance", () => ({
   auth: {
     api: {
@@ -33,7 +38,7 @@ describe("app/routes/reset-password", () => {
     await expect(response.json()).resolves.toEqual({ token: null });
   });
 
-  test("action returns success even when resetPassword fails", async () => {
+  test("action surfaces a rejected reset instead of claiming success", async () => {
     mocks.resetPassword.mockRejectedValueOnce(new Error("invalid token"));
 
     const form = new FormData();
@@ -51,10 +56,38 @@ describe("app/routes/reset-password", () => {
       ),
     );
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ success: true, error: null });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      success: null,
+      error: { message: expect.stringContaining("invalid or has expired") },
+    });
     expect(mocks.resetPassword).toHaveBeenCalledWith({
       body: { newPassword: "newPassword123", token: "abc123" },
+      headers: expect.any(Headers),
+    });
+  });
+
+  test("action forwards the password exactly as typed, spaces included", async () => {
+    mocks.resetPassword.mockResolvedValueOnce({});
+
+    const form = new FormData();
+    form.set("password", " spaced secret ");
+    form.set("confirmPassword", " spaced secret ");
+
+    const mod = await import("../app/routes/reset-password");
+    const response = await asRouteResponse(mod.action(
+        routeArgs(
+          new Request("http://localhost/reset-password?token=abc123", {
+            method: "POST",
+            body: form,
+          }),
+        ),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.resetPassword).toHaveBeenCalledWith({
+      body: { newPassword: " spaced secret ", token: "abc123" },
       headers: expect.any(Headers),
     });
   });
