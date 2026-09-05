@@ -162,10 +162,10 @@ const ContactDetails = React.forwardRef<
   // Helper function to safely get audience name
   const getAudienceName = useCallback((audience: Audience): string => {
     try {
-      return audience.name || `Audience ${audience.id}`;
+      return audience.name || `Call list ${audience.id}`;
     } catch (error) {
       logger.error('Error getting audience name:', error);
-      return `Audience ${audience.id}`;
+      return `Call list ${audience.id}`;
     }
   }, []);
 
@@ -187,7 +187,7 @@ const ContactDetails = React.forwardRef<
       />
 
       <div className="border-t border-border pt-6">
-        <Heading level={4} className="mb-4">Audiences</Heading>
+        <Heading level={4} className="mb-4">Call lists</Heading>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
           {audiences.map((audience) => (
             <div key={audience.id} className="flex items-center space-x-2">

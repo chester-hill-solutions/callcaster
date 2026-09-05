@@ -44,7 +44,7 @@ export function QueueHeader({
                 ) : !selectedAudience ? (
                     <Select onValueChange={(value) => onSelectedAudienceChange(Number(value))}>
                         <SelectTrigger aria-label="Select audience to add">
-                            <SelectValue placeholder="Select Audience" />
+                            <SelectValue placeholder="Select Call list" />
                         </SelectTrigger>
                         <SelectContent>
                             {audiences.map((audience) => audience && (

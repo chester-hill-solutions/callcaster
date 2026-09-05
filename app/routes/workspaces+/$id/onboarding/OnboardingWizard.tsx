@@ -273,7 +273,7 @@ export function OnboardingWizard({
 
       {!showIntro && activeStep === "audience" && continueTarget ? (
         <OnboardingChecklistLinkStep
-          title="Audience"
+          title="Call list"
           description="Upload the contacts you want to reach. Every live call, IVR, and SMS campaign uses a call list."
           complete={audienceCount > 0}
           completeLabel={`You have ${audienceCount} call list${audienceCount === 1 ? "" : "s"} ready.`}
