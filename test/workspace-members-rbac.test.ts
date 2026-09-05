@@ -14,6 +14,8 @@ const membersDbMocks = vi.hoisted(() => ({
   listWorkspaceMembersEnriched: vi.fn(async () => [] as any[]),
   updateWorkspaceMemberRole: vi.fn(async () => ({ id: "u2" } as any)),
   removeWorkspaceMember: vi.fn(async () => ({ id: "u2" } as any)),
+  findUserIdByUsername: vi.fn(async () => null as string | null),
+  findWorkspaceInviteForUser: vi.fn(async () => null as unknown),
 }));
 
 const txDb = vi.hoisted(() => ({
@@ -211,6 +213,20 @@ describe("workspace member RBAC", () => {
       });
       // Blocked before any user lookup / invite send.
       expect(accessMocks.getWorkspaceUsers).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("platform-members inviteWorkspaceMemberAsPlatformAdmin", () => {
+    test("lets the admin console mint an owner invite without a workspace membership", async () => {
+      const mod = await import("../app/lib/platform-members.server");
+      const result = await mod.inviteWorkspaceMemberAsPlatformAdmin(
+        "w1",
+        "new@example.com",
+        "owner",
+      );
+      expect(result).not.toMatchObject({ error: expect.stringContaining("higher than your own") });
+      expect(accessMocks.getUserRole).not.toHaveBeenCalled();
+      expect(accessMocks.getWorkspaceUsers).toHaveBeenCalled();
     });
   });
 

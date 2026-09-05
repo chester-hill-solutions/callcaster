@@ -152,6 +152,28 @@ describe("workspace settings RBAC", () => {
       expect(utilsMocks.handleDeleteSelf).not.toHaveBeenCalled();
     });
 
+    test("passes the session user as the invite actor for addUser", async () => {
+      const mod = await import("../app/routes/workspaces+/$id/settings.action.server");
+
+      const fd = new FormData();
+      fd.set("formName", "addUser");
+      fd.set("username", "new@example.com");
+      fd.set("new_user_workspace_role", "owner");
+      await mod.action(
+        await withWorkspaceRouteArgs(
+          { request: buildRequest(fd), params: { id: "w1" } },
+          { userId: "u1", workspaceId: "w1", userRole: "member" },
+        ),
+      );
+
+      expect(utilsMocks.handleAddUser).toHaveBeenCalledWith(
+        expect.any(FormData),
+        "w1",
+        expect.any(Headers),
+        { kind: "member", userId: "u1" },
+      );
+    });
+
     test("uses the session user id for transferWorkspaceOwnership, not the form", async () => {
       const mod = await import("../app/routes/workspaces+/$id/settings.action.server");
 

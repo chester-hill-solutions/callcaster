@@ -6,6 +6,13 @@ export enum MemberRole {
   Caller = "caller",
 }
 
+const MEMBER_ROLE_VALUES: ReadonlySet<string> = new Set(Object.values(MemberRole));
+
+/** True when `value` is one of the four workspace roles. */
+export function isMemberRole(value: unknown): value is MemberRole {
+  return typeof value === "string" && MEMBER_ROLE_VALUES.has(value);
+}
+
 /** Numeric ranks for min-role gates (owner highest). */
 export const WORKSPACE_ROLE_RANK: Record<string, number> = {
   owner: 4,
