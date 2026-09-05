@@ -13,6 +13,8 @@ import {
 import {
   wallClockToUtcHm,
   utcToWallClockHm,
+  DEFAULT_CALLING_HOURS,
+  DEFAULT_CALLING_HOURS_LABEL,
 } from "@/lib/schedule-timezone";
 
 // Schedule type matching the WeeklyScheduleTable component
@@ -184,6 +186,10 @@ export default function SelectDates({
     setCurrentSchedule(cleaned);
     handleInputChange(copy.field, JSON.stringify(cleaned));
   };
+  const defaultHoursUtc = () => ({
+    start: localToUTC(DEFAULT_CALLING_HOURS.start),
+    end: localToUTC(DEFAULT_CALLING_HOURS.end),
+  });
 
   const applyScheduleToAll = (schedule: { start: string; end: string }) => {
     const iv = schedule.start !== schedule.end ? [schedule] : [];
@@ -210,11 +216,8 @@ export default function SelectDates({
   };
 
   const handleCheckboxChange = (day: DayName) => {
-    // Newly enabled days default to weekday business hours (local 09:00–17:00).
-    const businessHours = {
-      start: localToUTC("09:00"),
-      end: localToUTC("17:00"),
-    };
+    // Newly enabled days get the product default calling hours (local).
+    const businessHours = defaultHoursUtc();
 
     commitSchedule({
       ...currentSchedule,
@@ -232,10 +235,7 @@ export default function SelectDates({
     index = 0
   ) => {
     const utcValue = localToUTC(localValue);
-    const businessHours = {
-      start: localToUTC("09:00"),
-      end: localToUTC("17:00"),
-    };
+    const businessHours = defaultHoursUtc();
     const daySchedule: ScheduleDay = currentSchedule[day] || {
       active: true,
       intervals: [businessHours],
@@ -405,20 +405,20 @@ export default function SelectDates({
                 size="sm"
                 onClick={(e) => {
                   e.preventDefault();
-                  applyScheduleToAll({ start: localToUTC("09:00"), end: localToUTC("17:00") })
+                  applyScheduleToAll(defaultHoursUtc())
                 }}
               >
-                Apply 09:00–17:00 local to All Days
+                Apply {DEFAULT_CALLING_HOURS_LABEL} local to All Days
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={(e) => {
                   e.preventDefault()
-                  applyScheduleToWeekdays({ start: localToUTC("09:00"), end: localToUTC("17:00") })
+                  applyScheduleToWeekdays(defaultHoursUtc())
                 }}
               >
-                Apply 09:00–17:00 local to Weekdays
+                Apply {DEFAULT_CALLING_HOURS_LABEL} local to Weekdays
               </Button>
             </div>
             <WeeklyScheduleTable
