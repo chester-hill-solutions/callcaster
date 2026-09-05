@@ -222,6 +222,38 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
     );
   });
 
+  test("a failed side-effects enqueue leaves the message open so the next sweep retries the debit", async () => {
+    mocks.messageFindMany.mockResolvedValue([
+      { sid: "SM_lost", status: "sent", date_created: "2026-05-01T00:00:00.000Z", date_updated: null },
+    ]);
+    mocks.messagesList.mockResolvedValue([
+      { sid: "SM_lost", status: "delivered", errorCode: null, dateUpdated: new Date("2026-05-01T00:05:00.000Z") },
+    ]);
+    mocks.enqueueJob.mockRejectedValueOnce(new Error("lock timeout"));
+
+    const result = await triggerTwilioOpenSync({ workspaceId: "ws_1" });
+
+    expect(result.ok).toBe(false);
+    expect(mocks.updateMessageBySid).not.toHaveBeenCalled();
+  });
+
+  test("queues the billing job before writing the terminal status", async () => {
+    mocks.messageFindMany.mockResolvedValue([
+      { sid: "SM_order", status: "sent", date_created: "2026-05-01T00:00:00.000Z", date_updated: null },
+    ]);
+    mocks.messagesList.mockResolvedValue([
+      { sid: "SM_order", status: "delivered", errorCode: null, dateUpdated: new Date("2026-05-01T00:05:00.000Z") },
+    ]);
+
+    await triggerTwilioOpenSync({ workspaceId: "ws_1" });
+
+    const enqueueOrder = mocks.enqueueJob.mock.invocationCallOrder[0];
+    const updateOrder = mocks.updateMessageBySid.mock.invocationCallOrder[0];
+    expect(enqueueOrder).toBeDefined();
+    expect(updateOrder).toBeDefined();
+    expect(enqueueOrder).toBeLessThan(updateOrder as number);
+  });
+
   test("non-terminal message drift updates the row but does not enqueue billing", async () => {
     mocks.messageFindMany.mockResolvedValue([
       { sid: "SM2", status: "queued", date_created: "2026-07-29T00:00:00Z", date_updated: null },

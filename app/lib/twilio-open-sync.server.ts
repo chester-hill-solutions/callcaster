@@ -191,17 +191,13 @@ export async function triggerTwilioOpenSync({
         if (!twilioStatus || twilioStatus === local.status) continue;
 
         const errorCode = remote.errorCode ? Number(remote.errorCode) : null;
-        await updateMessageBySid(workspaceId, local.sid, {
-          status: twilioStatus,
-          date_updated:
-            remote.dateUpdated?.toISOString() ?? local.date_updated,
-          ...(errorCode != null ? { error_code: errorCode } : {}),
-        });
-        messagesUpdated++;
 
         // Terminal discovery must also run the billing/side-effects path the
-        // lost webhook would have run. The job + ledger are both idempotent,
-        // so racing a late-arriving webhook cannot double-debit.
+        // lost webhook would have run. Queue it BEFORE the status write: this
+        // sweep only revisits open rows, so a terminal status with no queued
+        // job would never be billed. The job + ledger are both idempotent, so
+        // a retry of this row (status write failed) or a late-arriving webhook
+        // cannot double-debit.
         if (isTerminalSmsStatus(normalizeSmsStatus(twilioStatus))) {
           await enqueueRegisteredJob({
             type: SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
@@ -216,6 +212,14 @@ export async function triggerTwilioOpenSync({
             },
           });
         }
+
+        await updateMessageBySid(workspaceId, local.sid, {
+          status: twilioStatus,
+          date_updated:
+            remote.dateUpdated?.toISOString() ?? local.date_updated,
+          ...(errorCode != null ? { error_code: errorCode } : {}),
+        });
+        messagesUpdated++;
       }
     }
 
