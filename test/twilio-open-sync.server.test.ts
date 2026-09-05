@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     billingResult: { inserted: true },
   })),
   updateMessageBySid: vi.fn(async () => ({})),
+  resolveMessageByClientRef: vi.fn(async () => ({})),
   enqueueJob: vi.fn(async () => ({ enqueued: true })),
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
@@ -41,6 +42,8 @@ vi.mock("@/lib/twilio-call-status.server", () => ({
 }));
 vi.mock("@/lib/message-db.server", () => ({
   updateMessageBySid: (...args: unknown[]) => mocks.updateMessageBySid(...args),
+  resolveMessageByClientRef: (...args: unknown[]) => mocks.resolveMessageByClientRef(...args),
+  isPendingMessageSid: (sid: unknown) => String(sid).startsWith("pending:"),
 }));
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
   unsafeEnqueueJob: (...args: unknown[]) => mocks.enqueueJob(...args),
@@ -252,6 +255,56 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
     expect(enqueueOrder).toBeDefined();
     expect(updateOrder).toBeDefined();
     expect(enqueueOrder).toBeLessThan(updateOrder as number);
+  });
+
+  describe("pending intent rows (#1582 part 2)", () => {
+    const intent = (over: Record<string, unknown> = {}) => ({
+      sid: "pending:ref-1",
+      client_ref: "ref-1",
+      status: "queued",
+      to: "+15555550100",
+      from: "+15550000001",
+      date_created: new Date(Date.now() - 30 * 60_000).toISOString(),
+      date_updated: null,
+      ...over,
+    });
+
+    test("a young pending intent is left alone", async () => {
+      mocks.messageFindMany.mockResolvedValue([intent({ date_created: new Date().toISOString() })]);
+      mocks.messagesList.mockResolvedValue([]);
+      await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+      expect(mocks.updateMessageBySid).not.toHaveBeenCalled();
+      expect(mocks.resolveMessageByClientRef).not.toHaveBeenCalled();
+    });
+
+    test("a stale pending intent with a provider match is resolved, then billed through the normal path", async () => {
+      mocks.messageFindMany.mockResolvedValue([intent()]);
+      mocks.messagesList.mockResolvedValue([
+        { sid: "SM_other", status: "delivered", to: "+15555550199", from: "+15550000001", dateCreated: new Date(), errorCode: null },
+        { sid: "SM_match", status: "delivered", to: "+15555550100", from: "+15550000001", dateCreated: new Date(Date.now() - 29 * 60_000), errorCode: null, dateUpdated: new Date() },
+      ]);
+      await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+      expect(mocks.resolveMessageByClientRef).toHaveBeenCalledWith("ws-1", "ref-1", { sid: "SM_match" });
+      expect(mocks.enqueueJob).toHaveBeenCalledWith(
+        expect.objectContaining({ idempotencyKey: "sms_status_side_effects:SM_match:delivered" }),
+      );
+      expect(mocks.updateMessageBySid).toHaveBeenCalledWith("ws-1", "SM_match", expect.objectContaining({ status: "delivered" }));
+    });
+
+    test("a stale pending intent with nothing at the provider is failed without a debit", async () => {
+      mocks.messageFindMany.mockResolvedValue([intent()]);
+      mocks.messagesList.mockResolvedValue([
+        { sid: "SM_before", status: "delivered", to: "+15555550100", from: "+15550000001", dateCreated: new Date(Date.now() - 60 * 60_000), errorCode: null },
+      ]);
+      await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+      expect(mocks.resolveMessageByClientRef).not.toHaveBeenCalled();
+      expect(mocks.enqueueJob).not.toHaveBeenCalled();
+      expect(mocks.updateMessageBySid).toHaveBeenCalledWith(
+        "ws-1",
+        "pending:ref-1",
+        expect.objectContaining({ status: "failed" }),
+      );
+    });
   });
 
   test("non-terminal message drift updates the row but does not enqueue billing", async () => {
