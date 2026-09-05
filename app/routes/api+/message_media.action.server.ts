@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger.server";
 import { requireDualAuth, getDualAuthUser } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import {
+  countOtherCampaignsReferencingMedia,
   findCampaignMessageMedia,
   updateCampaignMessageMedia,
 } from "@/lib/campaign-ivr.server";
@@ -256,13 +257,24 @@ export const action = defineAction({
         return routeData({ success: false, error: "Failed to update campaign" }, { headers });
       }
 
-      await deleteObject("messageMedia", `${workspaceIdStr}/${safeFileName}`);
+      // Only the last referrer may destroy the object; another campaign that
+      // attached the same file would otherwise sign URLs to nothing.
+      const otherReferences = await countOtherCampaignsReferencingMedia(
+        workspaceIdStr,
+        safeFileName,
+        campaignId,
+      );
+      const objectDeleted = otherReferences === 0;
+      if (objectDeleted) {
+        await deleteObject("messageMedia", `${workspaceIdStr}/${safeFileName}`);
+      }
 
       return routeData({
         success: true,
         error: null,
         campaignUpdate: [campaignUpdate],
         removedFileName: safeFileName,
+        objectDeleted,
       }, { headers });
     } catch (error) {
       logger.error("Campaign Error", error);
