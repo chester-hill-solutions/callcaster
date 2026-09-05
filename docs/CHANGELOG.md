@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- On the onboarding **Number** step, the "Rent a Canadian number" and "Verify your own number" titles no longer have the box edge drawn through them ([#1113](https://github.com/chester-hill-solutions/callcaster/issues/1113)).
 - The **Identity** step in onboarding now shows as complete once the legal business name is saved. It previously stayed marked unfinished because it was judged against the messaging-program fields collected on a later step ([#1204](https://github.com/chester-hill-solutions/callcaster/issues/1204)).
 - One-off chat texts are recorded before they are handed to Twilio, the same protection campaign texts gained, so a write failure after sending can no longer leave a sent text unbilled and missing from the conversation ([#1586](https://github.com/chester-hill-solutions/callcaster/issues/1586)).
 - The Twilio status recovery sweep finishes pending campaign texts that never received a delivery callback: it matches them to the provider record and bills them, or marks them failed without a charge when the provider has no record ([#1578](https://github.com/chester-hill-solutions/callcaster/issues/1578)).
