@@ -157,7 +157,7 @@ describe("billing-reconciliation", () => {
   test("SMS variance measures segments to segments, not rows to segments", () => {
     // Regression: a multi-segment SMS creates a ledger row, so old code comparing
     // event count (1 row) to Twilio segments (3) would report false drift even with
-    // perfect balance. New code compares credits (3, since SMS_SEGMENT_CREDITS is 1)
+    // perfect balance. New code compares credits (6, since SMS_SEGMENT_CREDITS is 2)
     // to segments (3), which correctly shows variance of 0.
     const ledgerRows = [
       {

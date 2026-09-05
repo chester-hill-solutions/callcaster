@@ -207,7 +207,7 @@ export function buildBillingReconciliationReport(args: {
         twilioUnitLabel: "segments",
         ledgerEvents: ledgerSummary.sms.events,
         ledgerCredits: ledgerSummary.sms.credits,
-        // Segments against segments. SMS_SEGMENT_CREDITS is 1, so the credit
+        // Segments against segments. SMS_SEGMENT_CREDITS is 2, so the credit
         // total IS the segment count — whereas the row count is one per
         // message, making every multi-segment SMS look like drift.
         variance: smsTwilioUnits - ledgerSummary.sms.credits,
