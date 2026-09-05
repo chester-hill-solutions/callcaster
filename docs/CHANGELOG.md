@@ -26,6 +26,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- The automated calling goal is called **Automated phone menu** everywhere: the onboarding goal picker no longer says "IVR" and campaign labels no longer say "Robocall". Advanced IVR keeps its own name ([#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347)).
 - Every place that shows or edits a time now says which time zone it uses: the campaign schedule's Start and End columns, the chat "Send later" picker, and the billing activity date column all show your browser's time zone alongside the value ([#969](https://github.com/chester-hill-solutions/callcaster/issues/969)).
 - Contact, call-list, and onboarding screens now consistently say **Call list** where some labels still said "Audience" (headings, the queue picker placeholder, the add-list page, and the onboarding step) ([#1067](https://github.com/chester-hill-solutions/callcaster/issues/1067)).
 - New campaigns default to calling hours of **09:00 to 21:00** local (was 09:00 to 17:00), and the same default applies when you enable a day or use the "Apply … to Weekdays / All Days" buttons. Saved schedules are unchanged ([#1127](https://github.com/chester-hill-solutions/callcaster/issues/1127)).

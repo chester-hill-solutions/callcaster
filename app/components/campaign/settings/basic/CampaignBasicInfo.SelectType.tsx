@@ -1,3 +1,4 @@
+import { AUTOMATED_PHONE_MENU_LABEL } from "@/lib/campaign-goals";
 import { FormField } from "@/components/ui/form-field";
 import {
   Select,
@@ -16,7 +17,7 @@ interface CampaignBasicInfoSelectTypeProps {
 
 const CAMPAIGN_TYPE_OPTIONS = [
   { value: "message", label: "Text campaign" },
-  { value: "robocall", label: "Automated phone menu" },
+  { value: "robocall", label: AUTOMATED_PHONE_MENU_LABEL },
   { value: "live_call", label: "Live calling" },
 ] as const;
 
