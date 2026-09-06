@@ -56,3 +56,9 @@ export function workspacePath(workspaceId: string, suffix = ""): string {
   const base = `/workspaces/${workspaceId}`;
   return suffix ? `${base}/${suffix.replace(/^\//, "")}` : base;
 }
+
+/** Subaccount credentials stored on the ready workspace's `twilio_data` (`readyTwilioData` in scripts/e2e/seed-data.mjs). */
+export const E2E_TWILIO_SUBACCOUNT = {
+  sid: "AC_e2e_test",
+  authToken: "e2e_auth_token",
+} as const;

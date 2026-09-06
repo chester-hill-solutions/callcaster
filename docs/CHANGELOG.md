@@ -26,6 +26,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- E2E webhook fixtures sign every Twilio callback with the seeded subaccount token; both E2E harnesses now run with `TWILIO_VALIDATE_WEBHOOKS=true`, the surface probe runs strict there, and `twilio-webhook-auth.spec.ts` covers missing, foreign-token, and tampered signatures (#1190).
 - The automated calling goal is called **Automated phone menu** everywhere: the onboarding goal picker no longer says "IVR" and campaign labels no longer say "Robocall". Advanced IVR keeps its own name ([#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347)).
 - Every place that shows or edits a time now says which time zone it uses: the campaign schedule's Start and End columns, the chat "Send later" picker, and the billing activity date column all show your browser's time zone alongside the value ([#969](https://github.com/chester-hill-solutions/callcaster/issues/969)).
 - Contact, call-list, and onboarding screens now consistently say **Call list** where some labels still said "Audience" (headings, the queue picker placeholder, the add-list page, and the onboarding step) ([#1067](https://github.com/chester-hill-solutions/callcaster/issues/1067)).
