@@ -104,6 +104,10 @@ Seed users are created in `auth_user` / `auth_account` (Better Auth) via `script
 - **Stripe**: billing UI tested; checkout uses mock redirects (no stripe.com in CI).
 - **Webhooks**: `e2e/fixtures/webhooks.ts` POSTs to local routes with a real `X-Twilio-Signature`, computed with the seeded subaccount token (`E2E_TWILIO_SUBACCOUNT`) against `BASE_URL + pathname`. The harness runs with `TWILIO_VALIDATE_WEBHOOKS=true`; pass `signing: "missing" | "wrong-token" | "tampered"` to exercise the rejection paths (`twilio-webhook-auth.spec.ts`).
 
+## Supervised runs
+
+`npm run test:e2e:signup:headed` runs the full sign-up flow (`e2e/specs/signup-flow.spec.ts`: create account → workspace picker → first workspace → onboarding) in a visible browser against `E2E_BASE_URL`, for watching the first-run path by hand. The same spec runs headless in the compose harness.
+
 ## Scenario catalog
 
 Specs live under `e2e/specs/` with IDs in test titles:
