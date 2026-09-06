@@ -358,6 +358,24 @@ export async function campaignDispatchHandler(
     case "dispatched": {
       const { counts, queuedRemaining } = outcome;
 
+      // The balance ran out inside the batch: stop the chain exactly as the
+      // entry gate does. Rows the budget refused stay queued for a relaunch.
+      if (outcome.creditsExhausted) {
+        logger.warn("campaign_dispatch.insufficient_credits", {
+          campaignId,
+          workspaceId,
+          sent: counts.sent,
+          unaffordable: counts.unaffordable,
+        });
+        return {
+          ok: true,
+          campaignId,
+          blocked: "insufficient_credits",
+          sent: counts.sent,
+          unaffordable: counts.unaffordable,
+        };
+      }
+
       // Every attempted send failed and nothing was dequeued: let the job
       // retry with backoff instead of hot-looping successors. Failed rows
       // stay queued and the duplicate gate keeps retries single-send.
@@ -392,6 +410,7 @@ export async function campaignDispatchHandler(
         failed: counts.failed,
         dequeued: counts.dequeued,
         deferred: counts.deferred,
+        unaffordable: counts.unaffordable,
         queuedRemaining,
       };
     }
