@@ -18,6 +18,9 @@ export const WORKSPACES = {
   ready: { id: "a0000000-0000-4000-8000-000000000001", name: "E2E Ready Workspace" },
   onboarding: { id: "a0000000-0000-4000-8000-000000000002", name: "E2E Onboarding Workspace" },
   empty: { id: "a0000000-0000-4000-8000-000000000003", name: "E2E Empty Workspace" },
+  // Nothing seeded beyond the owner membership: no numbers, no traffic, no
+  // business basics. The fixture for the fresh-workspace onboarding redirect.
+  fresh: { id: "a0000000-0000-4000-8000-000000000004", name: "E2E Fresh Workspace" },
 };
 
 export const CAMPAIGNS = {
