@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-09-05 — release dev → master
+
 ### Fixed
 
 - On the onboarding **Number** step, the "Rent a Canadian number" and "Verify your own number" titles no longer have the box edge drawn through them ([#1113](https://github.com/chester-hill-solutions/callcaster/issues/1113)).
