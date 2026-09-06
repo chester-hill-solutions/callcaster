@@ -95,7 +95,8 @@ Seed users are created in `auth_user` / `auth_account` (Better Auth) via `script
 |----|------|---------|
 | `a0000000-0000-4000-8000-000000000001` | E2E Ready Workspace | Primary — campaigns, queue, chats, survey |
 | `a0000000-0000-4000-8000-000000000002` | E2E Onboarding Workspace | Incomplete onboarding redirect |
-| `a0000000-0000-4000-8000-000000000003` | E2E Empty Workspace | Empty states, zero credits |
+| `a0000000-0000-4000-8000-000000000003` | E2E Empty Workspace | Empty states, zero credits; has a rented number, so it is in legacy mode and never redirects into onboarding |
+| `a0000000-0000-4000-8000-000000000004` | E2E Fresh Workspace | Owner membership only: no numbers, no traffic, no business basics; the fresh-workspace onboarding redirect fixture |
 
 ## Mock boundaries
 

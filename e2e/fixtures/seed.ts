@@ -24,6 +24,11 @@ export const E2E_WORKSPACES = {
     id: "a0000000-0000-4000-8000-000000000003",
     name: "E2E Empty Workspace",
   },
+  /** Owner membership only: no numbers, no traffic, no business basics. */
+  fresh: {
+    id: "a0000000-0000-4000-8000-000000000004",
+    name: "E2E Fresh Workspace",
+  },
 } as const;
 
 export const E2E_CAMPAIGNS = {
