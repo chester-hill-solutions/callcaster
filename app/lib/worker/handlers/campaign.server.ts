@@ -376,10 +376,16 @@ export async function campaignDispatchHandler(
         };
       }
 
-      // Every attempted send failed and nothing was dequeued: let the job
-      // retry with backoff instead of hot-looping successors. Failed rows
-      // stay queued and the duplicate gate keeps retries single-send.
-      if (counts.failed > 0 && counts.sent === 0 && counts.dequeued === 0) {
+      // Every attempted send failed and nothing was dequeued or dead-lettered:
+      // let the job retry with backoff instead of hot-looping successors.
+      // Failed rows stay queued (attempt recorded) and the duplicate gate
+      // keeps retries single-send; exhausted rows count as progress.
+      if (
+        counts.failed > 0 &&
+        counts.sent === 0 &&
+        counts.dequeued === 0 &&
+        counts.exhausted === 0
+      ) {
         throw new Error(
           `campaign_dispatch: all ${counts.failed} sends failed for campaign ${campaignId}`,
         );
@@ -411,6 +417,7 @@ export async function campaignDispatchHandler(
         dequeued: counts.dequeued,
         deferred: counts.deferred,
         unaffordable: counts.unaffordable,
+        exhausted: counts.exhausted,
         queuedRemaining,
       };
     }
@@ -454,10 +461,16 @@ async function runMachineVoiceDispatch(
     case "dispatched": {
       const { counts, queuedRemaining } = outcome;
 
-      // Every attempted call failed and nothing was dequeued: let the job
-      // retry with backoff instead of hot-looping successors. Failed rows
-      // stay queued and the next tick re-attempts them.
-      if (counts.failed > 0 && counts.called === 0 && counts.dequeued === 0) {
+      // Every attempted call failed and nothing was dequeued or dead-lettered:
+      // let the job retry with backoff instead of hot-looping successors.
+      // Failed rows stay queued (attempt recorded); exhausted rows count as
+      // progress.
+      if (
+        counts.failed > 0 &&
+        counts.called === 0 &&
+        counts.dequeued === 0 &&
+        counts.exhausted === 0
+      ) {
         throw new Error(
           `campaign_dispatch: all ${counts.failed} IVR calls failed for campaign ${campaignId}`,
         );
@@ -488,6 +501,7 @@ async function runMachineVoiceDispatch(
         failed: counts.failed,
         dequeued: counts.dequeued,
         deferred: counts.deferred,
+        exhausted: counts.exhausted,
         queuedRemaining,
       };
     }

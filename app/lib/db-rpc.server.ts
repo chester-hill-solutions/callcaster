@@ -157,6 +157,22 @@ export async function rpcResetStaleCampaignQueueClaims(
   return Number(rows[0]?.reset_count ?? 0);
 }
 
+/**
+ * Dead-letter every queue row of the campaign whose attempt_count reached the
+ * policy maximum: queue_state 'failed', dequeued_at set, reason kept or
+ * "Max queue attempts exceeded". Returns the number of rows failed.
+ */
+export async function rpcFailExhaustedCampaignQueueContacts(
+  executor: RpcExecutor,
+  campaignId: number,
+): Promise<number> {
+  const rows = await queryRows<{ failed_count: number }>(
+    executor,
+    sql`select fail_exhausted_campaign_queue_contacts(${campaignId}) as failed_count`,
+  );
+  return Number(rows[0]?.failed_count ?? 0);
+}
+
 export async function rpcTryCompleteCampaignIfDrained(
   executor: RpcExecutor,
   campaignId: number,
