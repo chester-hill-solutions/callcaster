@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import { eq } from "drizzle-orm";
-import { workspace as workspaceTable } from "@/db/schema";
+import { transaction_history as transactionHistoryTable, workspace as workspaceTable } from "@/db/schema";
 import { createStripeContact } from "@/lib/database/stripe.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
@@ -343,4 +343,65 @@ export async function confirmStripeCheckoutSessionForRedirect(args: {
       error,
     };
   }
+}
+
+/** Ledger keys and notes carry the Checkout Session id; the receipt lives on its charge or invoice. */
+function stripeSessionIdForLedgerRow(row: { idempotency_key: string | null; note: string | null }): string | null {
+  const key = row.idempotency_key ?? "";
+  if (key.startsWith("stripe_session:")) return key.slice("stripe_session:".length) || null;
+  const fromNote = /stripe_session:(cs_[A-Za-z0-9_]+)/.exec(row.note ?? "");
+  return fromNote?.[1] ?? null;
+}
+
+/**
+ * Resolve the Stripe-hosted receipt for one credit purchase on the ledger
+ * (#1322). Workspace-scoped: the row is read through the tenant db and the
+ * session's metadata must name the same workspace, so a transaction id from
+ * another workspace yields 404/403, never a receipt. Failures are typed so the
+ * route can answer honestly instead of a bare 500.
+ */
+export async function getPurchaseReceiptUrl(args: {
+  userId: string;
+  workspaceId: string;
+  transactionId: number;
+}): Promise<{ ok: true; url: string } | { ok: false; error: string; status: number }> {
+  const { userId, workspaceId, transactionId } = args;
+  await requireWorkspaceAccess({ user: { id: userId }, workspaceId });
+  const tdb = createTenantDb(workspaceId);
+  const row = await tdb.transaction_history.findFirst({
+    where: eq(transactionHistoryTable.id, transactionId),
+    columns: { id: true, type: true, idempotency_key: true, note: true },
+  });
+  if (!row || row.type !== "CREDIT") {
+    return { ok: false as const, error: "No receipt for this entry.", status: 404 };
+  }
+  const sessionId = stripeSessionIdForLedgerRow(row);
+  if (!sessionId) {
+    return { ok: false as const, error: "No receipt for this entry.", status: 404 };
+  }
+  const stripe = createStripeClient();
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["payment_intent.latest_charge", "invoice"],
+    });
+  } catch (error) {
+    logger.error("getPurchaseReceiptUrl retrieve error", { workspaceId, transactionId, error });
+    return { ok: false as const, error: "Could not reach the payment provider.", status: 502 };
+  }
+  if ((session.metadata?.workspaceId ?? null) !== workspaceId) {
+    return { ok: false as const, error: "Receipt does not belong to this workspace.", status: 403 };
+  }
+  const invoice = session.invoice;
+  const hostedInvoiceUrl =
+    invoice && typeof invoice !== "string" ? invoice.hosted_invoice_url ?? null : null;
+  const paymentIntent = session.payment_intent;
+  const charge =
+    paymentIntent && typeof paymentIntent !== "string" ? paymentIntent.latest_charge : null;
+  const receiptUrl = charge && typeof charge !== "string" ? charge.receipt_url ?? null : null;
+  const url = hostedInvoiceUrl ?? receiptUrl;
+  if (!url) {
+    return { ok: false as const, error: "Receipt not available yet.", status: 404 };
+  }
+  return { ok: true as const, url };
 }

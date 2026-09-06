@@ -153,6 +153,7 @@ pricing
 purchase
 queue
 queues
+receipt
 record
 release
 remember
