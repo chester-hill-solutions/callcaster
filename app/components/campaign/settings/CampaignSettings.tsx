@@ -110,6 +110,16 @@ export const CampaignSettings = ({
           </div>
         </Section>
       </Form>
+      {handleSave && handleResetData && (
+        <SaveBar
+          placement="bottom"
+          isChanged={isChanged || false}
+          isSaving={isSaving}
+          onSave={handleSave}
+          onReset={handleResetData}
+          message="Unsaved changes. Save or discard them before moving on."
+        />
+      )}
       <CampaignPlaceNav current="setup" />
     </div>
   );
