@@ -92,6 +92,12 @@ vi.mock("@/server/tenant-db", () => ({
   }),
 }));
 
+const sampleMocks = vi.hoisted(() => ({ retargetSampleCampaignForGoal: vi.fn(async () => ({ retargeted: true, type: "live_call" })) }));
+vi.mock("@/lib/seed/seed-workspace-sample-data.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/seed/seed-workspace-sample-data.server")>()),
+  retargetSampleCampaignForGoal: (...args: unknown[]) => sampleMocks.retargetSampleCampaignForGoal(...args),
+}));
+
 vi.mock("@/lib/database/workspace-twilio-portal-snapshot.server", () => ({
   getWorkspaceRecentOutboundMessageCount: vi.fn().mockResolvedValue(0),
 }));
@@ -233,5 +239,38 @@ describe("save_channels bootstrap failure surfaces a friendly payload, not a thr
       step: "business_identity",
     });
     expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("save_channels reshapes the sample campaign for the chosen goal (#1323)", () => {
+  test("a successful goal save retargets the sample with that goal", async () => {
+    mocks.getUserRole.mockResolvedValue({ role: "owner" });
+    mocks.getWorkspaceCredits.mockResolvedValue(0);
+    mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
+    mocks.getWorkspacePhoneNumbers.mockResolvedValue({ data: [] });
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState());
+    mocks.ensureWorkspaceTwilioBootstrap.mockResolvedValue(undefined);
+    mocks.persistWorkspaceOnboardingState.mockResolvedValue(undefined);
+    sampleMocks.retargetSampleCampaignForGoal.mockClear();
+
+    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_channels", saveChannelsForm());
+
+    expect(outcome.ok).toBe(true);
+    expect(sampleMocks.retargetSampleCampaignForGoal).toHaveBeenCalledWith({ workspaceId: WORKSPACE_ID, goal: "live_call" });
+  });
+
+  test("a sample retarget failure never fails the goal save", async () => {
+    mocks.getUserRole.mockResolvedValue({ role: "owner" });
+    mocks.getWorkspaceCredits.mockResolvedValue(0);
+    mocks.requireWorkspaceAccess.mockResolvedValue(undefined);
+    mocks.getWorkspacePhoneNumbers.mockResolvedValue({ data: [] });
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(onboardingState());
+    mocks.ensureWorkspaceTwilioBootstrap.mockResolvedValue(undefined);
+    mocks.persistWorkspaceOnboardingState.mockResolvedValue(undefined);
+    sampleMocks.retargetSampleCampaignForGoal.mockRejectedValueOnce(new Error("db down"));
+
+    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_channels", saveChannelsForm());
+    expect(outcome.ok).toBe(true);
+    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalled();
   });
 });

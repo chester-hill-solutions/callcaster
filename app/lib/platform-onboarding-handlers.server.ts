@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger.server";
+import { retargetSampleCampaignForGoal } from "@/lib/seed/seed-workspace-sample-data.server";
 import { startWorkspaceCallerIdVerification } from "@/lib/caller-id-verification.server";
 import {
   getWorkspaceMessagingOnboardingState,
@@ -231,6 +233,19 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
       currentStep: nextStep,
     },
   });
+
+  // The seeded sample campaign follows the chosen goal (#1323); best-effort.
+  if (selectedGoal) {
+    try {
+      await retargetSampleCampaignForGoal({ workspaceId: ctx.workspaceId, goal: selectedGoal });
+    } catch (error) {
+      logger.warn("onboarding.sample_retarget_failed", {
+        workspaceId: ctx.workspaceId,
+        goal: selectedGoal,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   // Kick off Twilio compliance provisioning when a compliance path is newly
   // selected. Idempotent enqueue — repeated saves do not stack duplicate jobs.

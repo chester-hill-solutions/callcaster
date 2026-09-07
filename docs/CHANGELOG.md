@@ -7,6 +7,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Fixed
 
 - A brand-new workspace is no longer told it already has a campaign and a script. The sample campaign and sample script every workspace starts with are marked as samples and no longer count toward the setup wizard's Campaign and Script steps or the launch checklist ([#1070](https://github.com/chester-hill-solutions/callcaster/issues/1070)).
+- The sample campaign every new workspace starts with now follows the goal chosen in onboarding: a texting goal turns it into a message campaign with sample copy, an automated phone menu goal into an IVR campaign on the sample script, and live calling keeps the live-call sample ([#1323](https://github.com/chester-hill-solutions/callcaster/issues/1323)).
 
 ## 2026-09-05 — release dev → master
 
