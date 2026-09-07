@@ -29,9 +29,35 @@ function rememberNumber(value: string) {
   }
 }
 
+export type CampaignTestKind = "message" | "call";
+
+const COPY: Record<
+  CampaignTestKind,
+  { title: string; description: string; hint: string; submit: string; busy: string }
+> = {
+  message: {
+    title: "Send a test message",
+    description:
+      "Sends this campaign's message to one number using the campaign's sending settings. Credits are charged as usual and the test does not appear in campaign results.",
+    hint:
+      "If the number belongs to a contact in this workspace, tags render with that contact's details. Otherwise a sample contact is used.",
+    submit: "Send test",
+    busy: "Sending...",
+  },
+  call: {
+    title: "Place a test call",
+    description:
+      "Calls one number from this campaign's caller ID and plays the campaign's flow, so you can hear it and walk the menu. Credits are charged as usual and the call does not appear in campaign results.",
+    hint: "Answer to hear the flow. Let it ring through to voicemail to hear the voicemail drop.",
+    submit: "Place test call",
+    busy: "Calling...",
+  },
+};
+
 export type CampaignTestSendDialogProps = {
   open: boolean;
   busy: boolean;
+  kind?: CampaignTestKind;
   onOpenChange: (open: boolean) => void;
   onSend: (phone: string) => void;
 };
@@ -39,9 +65,11 @@ export type CampaignTestSendDialogProps = {
 export function CampaignTestSendDialog({
   open,
   busy,
+  kind = "message",
   onOpenChange,
   onSend,
 }: CampaignTestSendDialogProps) {
+  const copy = COPY[kind];
   const [phone, setPhone] = useState(readLastNumber);
   const trimmed = phone.trim();
 
@@ -62,12 +90,8 @@ export function CampaignTestSendDialog({
           }}
         >
           <DialogHeader>
-            <DialogTitle>Send a test message</DialogTitle>
-            <DialogDescription>
-              Sends this campaign&apos;s message to one number using the campaign&apos;s
-              sending settings. Credits are charged as usual and the test does not
-              appear in campaign results.
-            </DialogDescription>
+            <DialogTitle>{copy.title}</DialogTitle>
+            <DialogDescription>{copy.description}</DialogDescription>
           </DialogHeader>
           <div className="my-4 flex flex-col gap-2">
             <Label htmlFor="campaign-test-send-phone">Phone number</Label>
@@ -82,10 +106,7 @@ export function CampaignTestSendDialog({
               onChange={(event) => setPhone(event.target.value)}
               disabled={busy}
             />
-            <p className="text-xs text-muted-foreground">
-              If the number belongs to a contact in this workspace, tags render
-              with that contact&apos;s details. Otherwise a sample contact is used.
-            </p>
+            <p className="text-xs text-muted-foreground">{copy.hint}</p>
           </div>
           <DialogFooter>
             <Button
@@ -98,7 +119,7 @@ export function CampaignTestSendDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={busy || !trimmed} data-testid="campaign-test-send-submit">
-              {busy ? "Sending..." : "Send test"}
+              {busy ? copy.busy : copy.submit}
             </Button>
           </DialogFooter>
         </form>

@@ -69,6 +69,7 @@ type ActionData = {
   deduped?: boolean;
   to?: string;
   usedSampleContact?: boolean;
+  kind?: "message" | "call";
 };
 
 type SettingsLoaderData = {
@@ -255,9 +256,11 @@ export function useCampaignSettingsController() {
                 ? "Campaign dispatch is already running."
                 : "Campaign dispatch kicked off."
               : fetcher.data.actionType === "test_send"
-                ? `Test message sent to ${fetcher.data.to ?? "the number"}${
-                    fetcher.data.usedSampleContact ? " using the sample contact." : "."
-                  }`
+                ? fetcher.data.kind === "call"
+                  ? `Test call placed to ${fetcher.data.to ?? "the number"}. Answer it to hear the flow.`
+                  : `Test message sent to ${fetcher.data.to ?? "the number"}${
+                      fetcher.data.usedSampleContact ? " using the sample contact." : "."
+                    }`
                 : null
       : null;
   const feedbackTone: "success" | "error" | null = fetcher.data?.error

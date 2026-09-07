@@ -110,6 +110,11 @@ vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
 
 const testSendMocks = vi.hoisted(() => ({
   sendCampaignTestSms: vi.fn(),
+  sendCampaignTestCall: vi.fn(),
+}));
+vi.mock("@/lib/campaign-test-call.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-test-call.server")>()),
+  sendCampaignTestCall: (...args: unknown[]) => testSendMocks.sendCampaignTestCall(...args),
 }));
 vi.mock("@/lib/campaign-test-send.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/campaign-test-send.server")>()),
@@ -408,6 +413,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
   describe("test_send intent", () => {
     beforeEach(() => {
       testSendMocks.sendCampaignTestSms.mockReset();
+      testSendMocks.sendCampaignTestCall.mockReset();
     });
 
     test("sends a test for a message campaign and returns the recipient", async () => {
@@ -433,6 +439,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       await expect(res.json()).resolves.toEqual({
         success: true,
         actionType: "test_send",
+        kind: "message",
         to: "+16135550199",
         usedSampleContact: true,
       });
@@ -441,8 +448,36 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       );
     });
 
-    test("rejects non-message campaigns without sending", async () => {
+    test("places a test call for voice campaigns", async () => {
       makeDbClientForSettingsRoute({ campaign: { id: 99, workspace: "w1", type: "robocall" } });
+      mocks.parseActionRequest.mockResolvedValue({ intent: "test_send", phone: "6135550199" });
+      testSendMocks.sendCampaignTestCall.mockResolvedValue({
+        ok: true,
+        to: "+16135550199",
+        callSid: "CA1",
+        usedContact: false,
+      });
+      const mod = await import(
+        "../app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server"
+      );
+
+      const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: new Request("http://x", { method: "POST" }),
+        params: { id: "w1", selected_id: "99" },
+      })));
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        success: true,
+        actionType: "test_send",
+        kind: "call",
+        to: "+16135550199",
+      });
+      expect(testSendMocks.sendCampaignTestSms).not.toHaveBeenCalled();
+    });
+
+    test("rejects live-call campaigns without sending", async () => {
+      makeDbClientForSettingsRoute({ campaign: { id: 99, workspace: "w1", type: "live_call" } });
       mocks.parseActionRequest.mockResolvedValue({ intent: "test_send", phone: "6135550199" });
       const mod = await import(
         "../app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server"
@@ -456,6 +491,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       expect(res.status).toBe(400);
       await expect(res.json()).resolves.toMatchObject({ success: false, actionType: "test_send" });
       expect(testSendMocks.sendCampaignTestSms).not.toHaveBeenCalled();
+      expect(testSendMocks.sendCampaignTestCall).not.toHaveBeenCalled();
     });
 
     test("maps a credit failure to 402 and passes the helper message through", async () => {
