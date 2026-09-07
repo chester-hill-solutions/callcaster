@@ -896,8 +896,18 @@ describe("app/lib/database/campaign.server.ts", () => {
       } as any),
     ).toBe(true);
 
-    // Covers the `currentTime < interval.end` side of the overnight OR.
-    vi.setSystemTime(new Date("2020-01-06T01:00:00.000Z"));
+    // The early-morning tail of an overnight interval belongs to the day it
+    // started on (E2.2): Monday 23:00–02:00 covers Tuesday 01:00, not Monday
+    // 01:00, exactly as the SMS send window already did.
+    vi.setSystemTime(new Date("2020-01-06T01:00:00.000Z")); // Monday 01:00
+    expect(
+      mod.checkSchedule({
+        start_date: "2020-01-01T00:00:00.000Z",
+        end_date: "2020-02-01T00:00:00.000Z",
+        schedule: overnight,
+      } as any),
+    ).toBe(false);
+    vi.setSystemTime(new Date("2020-01-07T01:00:00.000Z")); // Tuesday 01:00
     expect(
       mod.checkSchedule({
         start_date: "2020-01-01T00:00:00.000Z",

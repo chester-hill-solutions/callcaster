@@ -25,7 +25,11 @@ import {
   estimateMessageCampaignOutbound,
   estimateOutboundCompletion,
 } from "@/lib/campaign-outbound-estimate";
-import type { Schedule } from "@/lib/types";
+import {
+  ivrCallingPolicy,
+  smsSendPolicy,
+  type DispatchPolicy,
+} from "@/lib/campaign-dispatch-policy";
 
 type CampaignDetails = NonNullable<LiveCampaign | MessageCampaign | IVRCampaign>;
 
@@ -81,21 +85,25 @@ function getEtaRange(input: {
   queueCount: number;
   ratePerSecond: number;
   /**
-   * Raw stored dispatch-time restriction (SMS send window or calling-hours
-   * schedule). Projected through so the ETA starts consuming time at the
-   * next in-window moment instead of assuming continuous sending (#1351).
+   * The campaign's dispatch policy (SMS send window, or IVR calling hours
+   * with start/end dates). Projected through so the ETA starts consuming
+   * time at the next allowed moment instead of assuming continuous sending
+   * (#1351), and so IVR dates bound it (E2.2).
    */
-  dispatchWindow?: Schedule | null;
+  policy: DispatchPolicy;
 }) {
   const estimate = estimateOutboundCompletion({
     queueCount: input.queueCount,
     ratePerSecond: input.ratePerSecond,
-    sendWindow: input.dispatchWindow ?? null,
+    policy: input.policy,
   });
   if (!estimate) {
     return null;
   }
-  return `${formatCompletionTime(estimate.fastFinish)} - ${formatCompletionTime(estimate.slowFinish)}`;
+  const range = `${formatCompletionTime(estimate.fastFinish)} - ${formatCompletionTime(estimate.slowFinish)}`;
+  return estimate.exceedsEndDate
+    ? `${range} (may not finish before the campaign end date)`
+    : range;
 }
 
 function OutboundEstimateAlert({
@@ -188,13 +196,13 @@ export function CampaignLaunchExtras({
   const smsEtaRange = getEtaRange({
     queueCount,
     ratePerSecond: messageEstimate.effectiveMessagesPerSecond,
-    dispatchWindow: (campaignData.sms_send_window ?? null) as Schedule | null,
+    policy: smsSendPolicy(campaignData),
   });
   const ivrEtaRange = isIvrCampaign
     ? getEtaRange({
         queueCount,
         ratePerSecond: ivrEstimate.effectiveDialAttemptsPerSecond,
-        dispatchWindow: (campaignData.schedule ?? null) as Schedule | null,
+        policy: ivrCallingPolicy(campaignData),
       })
     : null;
 
