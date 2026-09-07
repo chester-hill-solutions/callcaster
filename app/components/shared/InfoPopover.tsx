@@ -10,12 +10,20 @@ interface InfoPopoverProps {
   size?: number;
   tooltip?: string;
   align?: "center" | "start" | "end";
+  side?: "top" | "right" | "bottom" | "left";
+  /** Tailwind max-width class for the bubble; defaults to the tooltip's bound. */
+  maxWidthClassName?: string;
+  /** Tailwind max-height class for the bubble; longer text scrolls. */
+  maxHeightClassName?: string;
 }
 
 export default function InfoPopover({
   size = 18,
   tooltip = "",
   align = "center",
+  side,
+  maxWidthClassName,
+  maxHeightClassName,
 }: InfoPopoverProps) {
   return (
     <TooltipProvider delayDuration={200}>
@@ -30,7 +38,12 @@ export default function InfoPopover({
             <Info size={size} />
           </button>
         </TooltipTrigger>
-        <TooltipContent align={align}>
+        <TooltipContent
+          align={align}
+          side={side}
+          maxWidthClassName={maxWidthClassName}
+          maxHeightClassName={maxHeightClassName}
+        >
           <p>{tooltip}</p>
         </TooltipContent>
       </Tooltip>
