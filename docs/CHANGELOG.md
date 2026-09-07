@@ -6,11 +6,11 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## 2026-09-07 — release [#1638](https://github.com/chester-hill-solutions/callcaster/pull/1638)
 
-Eighty-six commits on `dev` since the 2026-09-02 release. Manual verification steps for every entry are in [the release test guide](./release-test-guide-2026-09-07.md).
+Ninety-three commits on `dev` since the 2026-09-02 release. Manual verification steps for every entry are in [the release test guide](./release-test-guide-2026-09-07.md).
 
 ### Fixed
 
-- SMS template tags: the parser now accepts the `{{field}}` and `{{field|"fallback"}}` syntax the message editor inserts, strips fallback quotes, and renders `{{contact_id}}`; previously tags reached recipients with braces attached ([#1641](https://github.com/chester-hill-solutions/callcaster/issues/1641)).
+- SMS template tags: the parser now accepts the `{{field}}` and `{{field|"fallback"}}` syntax the message editor inserts, strips fallback quotes, and renders `{{contact_id}}`; previously tags reached recipients with braces attached ([#1641](https://github.com/chester-hill-solutions/callcaster/issues/1641)). PR [#1643](https://github.com/chester-hill-solutions/callcaster/pull/1643).
 - The live-call auto-dialer re-checks the workspace credit floor before every dial, not only when the conference starts. A session that reaches the floor releases the contact it just claimed and stops, instead of dialling the rest of its queue into a negative balance ([#1508](https://github.com/chester-hill-solutions/callcaster/issues/1508)). PR [#1524](https://github.com/chester-hill-solutions/callcaster/pull/1524).
 - Verifying a workspace number you already rent as a caller ID is refused before any call to Twilio, so verification can no longer downgrade a rented number and strip its voicemail and emergency eligibility ([#1518](https://github.com/chester-hill-solutions/callcaster/issues/1518)). PR [#1527](https://github.com/chester-hill-solutions/callcaster/pull/1527).
 - Automated phone menu campaigns no longer dial the same phone number twice in one campaign when two contacts share it, matching the guard text campaigns already had ([#1517](https://github.com/chester-hill-solutions/callcaster/issues/1517)). PR [#1529](https://github.com/chester-hill-solutions/callcaster/pull/1529).
@@ -78,12 +78,16 @@ Eighty-six commits on `dev` since the 2026-09-02 release. Manual verification st
 
 ### Added
 
-- Message campaigns: a "Send test" button on the launch page sends the campaign message to one phone number through the real SMS path, with template tags rendered for the matching contact or a sample contact; the test row carries no campaign ID so it stays out of campaign results ([#1647](https://github.com/chester-hill-solutions/callcaster/issues/1647), slice 1 of [#1645](https://github.com/chester-hill-solutions/callcaster/issues/1645)).
-- SMS message editor: a hint below the message body explains personalization tags and opens the picker, and a live preview renders the body for a sample contact so users can check templates before sending ([#1640](https://github.com/chester-hill-solutions/callcaster/issues/1640)).
+- Message campaigns: a "Send test" button on the launch page sends the campaign message to one phone number through the real SMS path, with template tags rendered for the matching contact or a sample contact; the test row carries no campaign ID so it stays out of campaign results ([#1647](https://github.com/chester-hill-solutions/callcaster/issues/1647), slice 1 of [#1645](https://github.com/chester-hill-solutions/callcaster/issues/1645)). PR [#1648](https://github.com/chester-hill-solutions/callcaster/pull/1648).
+- SMS message editor: a hint below the message body explains personalization tags and opens the picker, and a live preview renders the body for a sample contact so users can check templates before sending ([#1640](https://github.com/chester-hill-solutions/callcaster/issues/1640)). PR [#1646](https://github.com/chester-hill-solutions/callcaster/pull/1646).
 - A "Kick off" button on the campaign launch page restarts automated dispatch for a running or paused message or automated-voice campaign whose sending stopped. Pressing it while dispatch is already running does nothing and says so. PR [#1635](https://github.com/chester-hill-solutions/callcaster/pull/1635).
 - Workspace admins can override the "large bulk send on a local number" safeguard for one campaign from the launch page, after acknowledging the deliverability risk. The safeguard stays on by default, the override is recorded on the campaign and shown while active, and it can be removed again ([#1482](https://github.com/chester-hill-solutions/callcaster/issues/1482)). PR [#1623](https://github.com/chester-hill-solutions/callcaster/pull/1623).
 - **Billing → Activity** shows a **Receipt** link on each credit purchase that opens the Stripe-hosted invoice or receipt. Receipts are looked up per workspace, and a purchase that has no receipt yet says so instead of failing ([#1322](https://github.com/chester-hill-solutions/callcaster/issues/1322)). PR [#1596](https://github.com/chester-hill-solutions/callcaster/pull/1596).
 - **Billing → Activity** can be filtered to purchases and credits, or to usage only, so receipts are easy to find once the ledger fills with campaign activity ([#1322](https://github.com/chester-hill-solutions/callcaster/issues/1322)). PR [#1596](https://github.com/chester-hill-solutions/callcaster/pull/1596), [#1595](https://github.com/chester-hill-solutions/callcaster/pull/1595).
+
+### Removed
+
+- SMS message editor: the template-tag picker no longer offers `survey(...)` links or a survey-link preview; nothing rendered them, so recipients received the literal function text ([#1642](https://github.com/chester-hill-solutions/callcaster/issues/1642)). PR [#1644](https://github.com/chester-hill-solutions/callcaster/pull/1644).
 
 ### Internal
 
@@ -189,7 +193,6 @@ Production moved from the Supabase-era app to the v2 platform on 2026-08-31. The
 
 ### Removed
 
-- SMS message editor: the template-tag picker no longer offers `survey(...)` links or a survey-link preview; nothing rendered them, so recipients received the literal function text ([#1642](https://github.com/chester-hill-solutions/callcaster/issues/1642)).
 - Legacy `app/routes/archive/**` and `old.*` IVR/dashboard routes; `app/lib/legacy-route.server.ts`. Route modules now live under nested folders (`workspaces+/$id/...`, `api+/...`) via remix-flat-routes.
 - Legacy `twilio-serverless` JS assets (`flow.js`, `ivr.js`, `recording.js`, `status.js`, etc.) and root `websocket.server.js` removed in favor of current app and Edge Function paths.
 

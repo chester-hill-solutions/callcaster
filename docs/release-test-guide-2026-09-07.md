@@ -79,6 +79,10 @@ Prerequisites: a message campaign with a small call list, a workspace with a low
 | M4 | Force a message-row write failure after Twilio accepts (ops only, staging) | An operations alert fires naming the message; the send is not silently lost | #1583 | |
 | M5 | Make a message reach a terminal state through open sync | The billing job is queued before the terminal status is written; the ledger shows the debit | #1574 | |
 | M6 | Text a photo to a workspace number | The image renders in the conversation view | #1558 | |
+| M7 | Message campaign → Content: type `Hi {{firstname|"there"}}, see you in {{city}}.` | The preview under the box reads "Hi Jordan, see you in Ottawa."; **Browse tags** opens the picker; the picker has no `survey(...)` entries | #1643, #1644, #1646 | |
+| M8 | Send that campaign to one contact with a first name and one without | The first text carries the name, the second says "there"; neither contains braces or quotes | #1643 | |
+| M9 | Message campaign → Launch → **Send test** → your own number | The text arrives from the campaign's sender with tags rendered; the campaign's Results counts do not change; Billing → Activity shows the debit | #1648 | |
+| M10 | Launch page of a robocall or live-call campaign | No **Send test** button | #1648 | |
 
 ## 5. Billing
 
@@ -134,6 +138,7 @@ Prerequisites: a message campaign with a small call list, a workspace with a low
 | SMS dispatch contract and credit budget | `test/campaign-sms-dispatch-contract.test.ts`, `test/campaign-dispatch-worker.test.ts` (#1600, #1625, #1634, #1635) | C5, C6, C18 |
 | Queue completion and dead-lettering | `test/campaign-queue-throughput.integration.test.ts`, `test/campaign-dispatch-worker.test.ts` (#1601, #1603) | C8, C10 |
 | Twilio error codes and request shape | `npm run test:integration-twilio` with test credentials (#1607) | C10 |
+| SMS template tags and test send | `test/utils.test.ts`, `test/campaign-test-send.test.ts`, `test/campaign-settings.route.test.ts`, `test/ui/message-settings.test.tsx`, `test/ui/campaign-test-send-dialog.test.tsx` (#1643, #1646, #1648) | M7–M10 |
 | Auth flows | `test/reset-password.route.test.ts`, `test/api-reset-password.route.test.ts`, `test/signout.route.test.ts`, `test/accept-invite.route.test.ts`, invite role tests (#1562–#1568, #1546, #1552) | A3–A10 |
 
 ## Rollback
