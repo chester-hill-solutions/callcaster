@@ -1,6 +1,6 @@
-# Release test guide — 2026-09-07 (dev → master)
+# Release test guide — 2026-09-07 (release [#1638](https://github.com/chester-hill-solutions/callcaster/pull/1638))
 
-Manual verification for every customer- and operator-facing entry in the [2026-09-07 changelog section](./CHANGELOG.md#2026-09-07--release-dev--master). Each row names the PR it checks. Automated coverage for the same change is listed at the end so you can skip rows that CI already proves when time is short.
+Manual verification for every customer- and operator-facing entry in the [2026-09-07 changelog section](./CHANGELOG.md#2026-09-07--release-1638). Each row names the PR it checks. Automated coverage for the same change is listed at the end so you can skip rows that CI already proves when time is short.
 
 **Where to run it:** staging first (tracks `master`, so run after the release PR merges and Railway redeploys), then the same smoke rows on production. Rows marked **API** use `curl` with a bearer session token; rows marked **ops** need Railway logs or database access.
 
