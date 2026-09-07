@@ -340,8 +340,12 @@ async function handleSaveBusinessProfile(
     );
   }
 
-  // After intake, return to the capability surface instead of wizard steps.
-  if (isWorkspaceIntakeComplete(current)) {
+  // A step-hinted save comes from the wizard's "Save & continue" and must
+  // land on the next step. Intake is already complete by the time the Program
+  // step saves (the Identity save completed it), so gating on intake alone
+  // sent that save back to a payload and the wizard never moved (#1471).
+  // Hint-less posts (API, capability surfaces) still return to where they came from.
+  if (wizardStep === null && isWorkspaceIntakeComplete(current)) {
     return redirectToReturnToOrPayload(
       formData,
       ctx.workspaceId,
