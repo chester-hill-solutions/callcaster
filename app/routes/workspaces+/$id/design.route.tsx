@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 function ThemeScope({ theme, children }: { theme: "light" | "dark"; children: ReactNode }) {
   return (
     <div
+      data-theme-scope={theme}
       className={cn(
         "rounded-lg border p-4",
         // Tokens live on `:root`/`.light` and `.dark`, so these class scopes
@@ -118,9 +119,19 @@ export function Gallery({ scope }: { scope: string }) {
           <Button variant="outline">Outline</Button>
           <Button variant="ghost">Ghost</Button>
           <Button disabled>Disabled</Button>
+          <Button disabled data-loading="true">
+            <Spinner aria-hidden className="mr-2 size-4" />
+            Saving…
+          </Button>
         </div>
         <div className="grid max-w-md gap-2">
           <Input placeholder="Text input" aria-label="Preview input" />
+          <Input
+            placeholder="Invalid input"
+            aria-label="Preview invalid input"
+            aria-invalid="true"
+            defaultValue="not-an-email"
+          />
           <Textarea placeholder="Textarea" aria-label="Preview textarea" />
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
