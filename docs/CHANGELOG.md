@@ -4,15 +4,12 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-### Fixed
-
-- A brand-new workspace is no longer told it already has a campaign and a script. The sample campaign and sample script every workspace starts with are marked as samples and no longer count toward the setup wizard's Campaign and Script steps or the launch checklist ([#1070](https://github.com/chester-hill-solutions/callcaster/issues/1070)).
-- The sample campaign every new workspace starts with now follows the goal chosen in onboarding: a texting goal turns it into a message campaign with sample copy, an automated phone menu goal into an IVR campaign on the sample script, and live calling keeps the live-call sample ([#1323](https://github.com/chester-hill-solutions/callcaster/issues/1323)).
-
 ## 2026-09-05 — release dev → master
 
 ### Fixed
 
+- A brand-new workspace is no longer told it already has a campaign and a script. The sample campaign and sample script every workspace starts with are marked as samples and no longer count toward the setup wizard's Campaign and Script steps or the launch checklist ([#1070](https://github.com/chester-hill-solutions/callcaster/issues/1070)).
+- The sample campaign every new workspace starts with now follows the goal chosen in onboarding: a texting goal turns it into a message campaign with sample copy, an automated phone menu goal into an IVR campaign on the sample script, and live calling keeps the live-call sample ([#1323](https://github.com/chester-hill-solutions/callcaster/issues/1323)).
 - Campaign SMS dispatch stops starting sends once the remaining balance cannot cover the next message's estimated cost. Unaffordable rows stay queued for a relaunch after a top-up, and the worker stops the chain instead of scheduling another tick ([#1483](https://github.com/chester-hill-solutions/callcaster/issues/1483)).
 - A campaign now completes as soon as its last queued contact is dequeued, whichever path did it: an agent's final call, an opt-out, a duplicate, a landline, or a sent text. Completion used to depend on a worker dispatch tick observing an empty queue, so campaigns stayed running after all their contacts were processed ([#1484](https://github.com/chester-hill-solutions/callcaster/issues/1484)).
 - The Supabase-era orphan cleanup migration now runs each drop in its own guarded block. On a long-lived database where another object still depends on one of them, that drop is skipped with a warning naming it and the rest of the file applies and is recorded, instead of the whole file failing and being retried on every boot ([#1450](https://github.com/chester-hill-solutions/callcaster/issues/1450)).
