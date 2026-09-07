@@ -25,6 +25,7 @@ Completed:
 - CI performance and load work: PRs `#1389`, `#1390`, and `#1391`.
 - E5.1: `POST /api/sms` documents its dispatched and deferred variants (`oneOf`, with `creditsExhausted`, `deferred`, `reason`, `nextOpenAt`) and the 402 credits error; generated clients regenerated and the runtime bodies are validated against the generated Zod in the dispatch contract test.
 - E6.3: `app/lib/sql-conditions.ts` is the one non-empty `and`/`or` combinator (call log and queue search dropped their copies) and `weekdayKey` in `schedule-intervals.ts` is the total weekday accessor the send-window module reuses.
+- E6.2: `getCallScreenData` validates the workspace, campaign, and audience lookups itself and returns a typed `CallScreenData` (no `as unknown as`); the call loader and telephony readiness dropped their repeated null checks.
 - E2.2: `app/lib/campaign-dispatch-policy.ts` holds the explicit SMS (`sms_send_window`) and IVR (calling hours plus `start_date`/`end_date`) policies; `checkSchedule`, the SMS dispatch gate, and the launch ETA all go through them, and the `as Schedule` casts in `CampaignLaunchExtras` are gone.
 - E2.1: `app/lib/schedule-intervals.ts` projects a weekly schedule to absolute UTC intervals once; `isWithinSendWindow`, `nextSendWindowOpenAt`, and the ETA projection consume it instead of walking the schedule themselves.
 - E4.1: issue-board generation is staged and atomic (`scripts/issue-board-generate.mjs`); a failed run leaves every enrichment file and the board unchanged.
