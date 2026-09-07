@@ -245,7 +245,7 @@ describe("app/components/MessageSettings.tsx", () => {
     await vi.runAllTimersAsync();
   });
 
-  test("template tag preview detects simple tags, fallbacks, and btoa; dedupes; ignores survey()", async () => {
+  test("template preview renders the body for a sample contact and hides when there are no tags", async () => {
     const { MessageSettings } = await import("@/components/MessageSettings");
 
     const props = baseProps({
@@ -253,24 +253,35 @@ describe("app/components/MessageSettings.tsx", () => {
       details: {
         ...baseProps().details,
         message_media: [],
-        body_text:
-          '{{firstname}} {{firstname|"x"}} {{surname|"x"}} btoa({{phone}}:{{external_id}}) btoa({{phone}}:{{external_id}}) survey({{contact_id}}, "s1")',
+        body_text: 'Hi {{firstname}}, {{address|"your street"}} in {{city}}. Code: {{contact_id}}',
       },
     });
 
-    render(<MessageSettings {...props} />);
+    const { unmount } = render(<MessageSettings {...props} />);
 
-    expect(screen.getByText("Template Tags Found:")).toBeInTheDocument();
-    const preview = screen.getByText("Template Tags Found:").closest("div")
-      ?.parentElement as HTMLElement;
-    expect(within(preview).getByText(/{{firstname}}/)).toBeInTheDocument();
-    // firstname fallback should be detected but NOT added as a separate foundTag (already present)
-    expect(within(preview).queryByText(/{{firstname\|"x"}}/)).toBeNull();
-    expect(within(preview).getByText(/{{surname\|"x"}}/)).toBeInTheDocument();
-    expect(within(preview).getAllByText(/Base64 function/).length).toBe(1); // deduped
-    expect(within(preview).queryByText(/Survey link function/)).toBeNull();
-    expect(screen.queryByText("Survey Links Preview:")).toBeNull();
-    expect(screen.queryByText(/Survey links will be automatically generated/)).toBeNull();
+    expect(screen.getByText(/Preview for a sample contact/)).toBeInTheDocument();
+    expect(screen.getByTestId("template-preview").textContent).toBe(
+      "Hi Jordan, 100 Main St in Ottawa. Code: 1042",
+    );
+    expect(screen.queryByText("Template Tags Found:")).toBeNull();
+    unmount();
+
+    render(
+      <MessageSettings
+        {...baseProps({
+          mediaLinks: [],
+          details: { ...baseProps().details, message_media: [], body_text: "Plain text only" },
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("template-preview")).toBeNull();
+  });
+
+  test("hint text opens the template tag picker", async () => {
+    const { MessageSettings } = await import("@/components/MessageSettings");
+    render(<MessageSettings {...baseProps({ mediaLinks: [] })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Browse tags" }));
+    expect(screen.getByText("Template Tags")).toBeInTheDocument();
   });
 
   test("handleAddMedia no-ops when no file; submits multipart when file provided (campaignId nullish branch)", async () => {

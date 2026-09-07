@@ -4,6 +4,8 @@ import { useFetcher } from "react-router";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { useFetcherOnIdle } from "@/hooks/utils";
+import { processTemplateTags } from "@/lib/message-templates";
+import type { Contact } from "@/lib/types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -23,7 +25,44 @@ const TEMPLATE_TAGS = [
     { key: '{{contact_id}}', label: 'Contact ID', description: 'Contact\'s unique ID' },
 ];
 
-// Function-style template examples
+// Sample contact used to render the editor preview.
+const SAMPLE_CONTACT = {
+    id: 1042,
+    firstname: "Jordan",
+    surname: "Lee",
+    phone: "+16135550142",
+    email: "jordan.lee@example.com",
+    address: "100 Main St",
+    city: "Ottawa",
+    province: "ON",
+    postal: "K1A 0B1",
+    country: "Canada",
+    external_id: "C-1042",
+} as unknown as Contact;
+
+const TEMPLATE_SYNTAX = /\{|btoa\(/;
+
+function TemplatePreview({ body }: { body: string }) {
+    if (!body || !TEMPLATE_SYNTAX.test(body)) return null;
+    const rendered = processTemplateTags(body, SAMPLE_CONTACT);
+    return (
+        <div className="mt-3 rounded border border-secondary/60 bg-secondary/30 p-2">
+            <div className="mb-1 text-xs font-semibold text-foreground">
+                Preview for a sample contact ({SAMPLE_CONTACT.firstname} {SAMPLE_CONTACT.surname})
+            </div>
+            <p
+                data-testid="template-preview"
+                className="whitespace-pre-wrap text-sm text-foreground"
+            >
+                {rendered}
+            </p>
+            <div className="mt-1 text-xs text-muted-foreground">
+                Each recipient sees their own details in place of the tags.
+            </div>
+        </div>
+    );
+}
+
 
 interface CampaignDetails {
   body_text?: string | null;
@@ -248,8 +287,17 @@ export const MessageSettings = ({ mediaLinks, details, onChange }: MessageSettin
                                     onChange={handleBodyTextChange}
                                 />
                             </div>
-                            <div className="flex justify-end my-2">
-                            </div>
+                            <p className="my-2 text-xs text-muted-foreground">
+                                Personalize with tags like{" "}
+                                <span className="font-mono">&#123;&#123;firstname&#125;&#125;</span>.{" "}
+                                <button
+                                    type="button"
+                                    className="underline underline-offset-2 hover:text-foreground"
+                                    onClick={() => setTagsMenuOpen(true)}
+                                >
+                                    Browse tags
+                                </button>
+                            </p>
                         </div>
                         {getErrorMessage(mediaFetcher.data?.error) && (
                             <Alert variant="destructive">
@@ -378,60 +426,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange }: MessageSettin
                             </div>
                         )}
 
-                        {/* Template Tags Preview */}
-                        {displayText && (
-                            (() => {
-                                // Find all template tags in the text (including fallbacks)
-                                const foundTags: Array<{ key: string; label: string }> = [];
-
-                                // Check for simple tags
-                                TEMPLATE_TAGS.forEach(tag => {
-                                    if (displayText.includes(tag.key)) {
-                                        foundTags.push({ key: tag.key, label: tag.label });
-                                    }
-                                });
-
-                                // Check for fallback patterns
-                                const fallbackRegex = /\{\{\s*([a-zA-Z0-9_]+)\s*\|\s*"[^"]+"\s*\}\}/g;
-                                const fallbackMatches = displayText.match(fallbackRegex);
-                                if (fallbackMatches) {
-                                    fallbackMatches.forEach(match => {
-                                        const fieldMatch = match.match(/\{\{\s*([a-zA-Z0-9_]+)/);
-                                        if (fieldMatch) {
-                                            const fieldName = fieldMatch[1];
-                                            const tag = TEMPLATE_TAGS.find(t => t.key === `{{${fieldName}}}`);
-                                            if (tag && !foundTags.some(ft => ft.key === tag.key)) {
-                                                foundTags.push({ key: match, label: `${tag.label} (with fallback)` });
-                                            }
-                                        }
-                                    });
-                                }
-
-                                // Check for btoa function patterns
-                                const btoaRegex = /btoa\([^)]+\)/g;
-                                const btoaMatches = displayText.match(btoaRegex);
-                                if (btoaMatches) {
-                                    btoaMatches.forEach(match => {
-                                        if (!foundTags.some(ft => ft.key === match)) {
-                                            foundTags.push({ key: match, label: 'Base64 function' });
-                                        }
-                                    });
-                                }
-
-                                return foundTags.length > 0 ? (
-                                    <div className="mt-3 p-2 bg-secondary/30 rounded border border-secondary/60">
-                                        <div className="text-xs font-semibold text-foreground mb-1">Template Tags Found:</div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {foundTags.map((tag, index) => (
-                                                <span key={index} className="inline-block mr-2 mb-1 px-2 py-1 bg-secondary/60 rounded">
-                                                    {tag.key} → {tag.label}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ) : null;
-                            })()
-                        )}
+                        <TemplatePreview body={displayText} />
                     </div>
             </div>
         </div>)
