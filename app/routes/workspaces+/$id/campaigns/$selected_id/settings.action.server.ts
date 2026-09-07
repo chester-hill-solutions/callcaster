@@ -50,6 +50,10 @@ import { createTenantDb } from "@/server/tenant-db";
 import { MemberRole } from "@/lib/member-role";
 import { toUserMessage } from "@/lib/user-message";
 import { sendCampaignTestSms } from "@/lib/campaign-test-send.server";
+import {
+  sendCampaignTestCall,
+  VOICE_TEST_CAMPAIGN_TYPES,
+} from "@/lib/campaign-test-call.server";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived" | "waiting";
 
@@ -331,34 +335,51 @@ export const action = defineAction({
           { status: 404 },
         );
       }
-      if (campaignRecord.type !== "message") {
-        return routeData(
-          {
-            success: false,
-            error: "Test sends are only available for message campaigns right now.",
-            actionType: "test_send" as const,
-          },
-          { status: 400 },
-        );
-      }
-      const result = await sendCampaignTestSms({
+      const testArgs = {
         workspaceId: workspace_id,
         campaignId: selected_id,
         userId: user.id,
         to: String(data.phone ?? ""),
-      });
-      if (!result.ok) {
-        return routeData(
-          { success: false, error: result.message, actionType: "test_send" as const },
-          { status: result.reason === "insufficient_credits" ? 402 : 400 },
-        );
+      };
+      if (campaignRecord.type === "message") {
+        const result = await sendCampaignTestSms(testArgs);
+        if (!result.ok) {
+          return routeData(
+            { success: false, error: result.message, actionType: "test_send" as const },
+            { status: result.reason === "insufficient_credits" ? 402 : 400 },
+          );
+        }
+        return routeData({
+          success: true,
+          actionType: "test_send" as const,
+          kind: "message" as const,
+          to: result.to,
+          usedSampleContact: result.usedSampleContact,
+        });
       }
-      return routeData({
-        success: true,
-        actionType: "test_send" as const,
-        to: result.to,
-        usedSampleContact: result.usedSampleContact,
-      });
+      if (campaignRecord.type && VOICE_TEST_CAMPAIGN_TYPES.has(campaignRecord.type)) {
+        const result = await sendCampaignTestCall(testArgs);
+        if (!result.ok) {
+          return routeData(
+            { success: false, error: result.message, actionType: "test_send" as const },
+            { status: result.reason === "insufficient_credits" ? 402 : 400 },
+          );
+        }
+        return routeData({
+          success: true,
+          actionType: "test_send" as const,
+          kind: "call" as const,
+          to: result.to,
+        });
+      }
+      return routeData(
+        {
+          success: false,
+          error: "Test sends are not available for live-call campaigns yet.",
+          actionType: "test_send" as const,
+        },
+        { status: 400 },
+      );
     }
     case "duplicate": {
       try {

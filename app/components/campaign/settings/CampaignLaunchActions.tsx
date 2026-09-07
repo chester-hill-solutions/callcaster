@@ -171,6 +171,8 @@ export type CampaignLaunchActionsProps = {
   onKickoff?: () => void;
   /** Present only for campaign types that support one-number test sends. */
   onSendTest?: () => void;
+  /** Button text for the test action; defaults to "Send test". */
+  sendTestLabel?: string;
 };
 
 export function CampaignLaunchActions({
@@ -187,6 +189,7 @@ export function CampaignLaunchActions({
   onDuplicate,
   onKickoff,
   onSendTest,
+  sendTestLabel = "Send test",
 }: CampaignLaunchActionsProps) {
   const buttonStates = getCampaignLaunchButtonStates(
     status as CampaignLifecycleState,
@@ -265,7 +268,7 @@ export function CampaignLaunchActions({
           ) : null}
           {onSendTest ? (
             <LaunchActionButton
-              label="Send test"
+              label={sendTestLabel}
               icon={<Send className="size-4" />}
               state="Inactive"
               busy={isBusy}

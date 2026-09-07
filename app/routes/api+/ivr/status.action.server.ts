@@ -86,7 +86,11 @@ function findVoicemailPage(pagesObject: Record<string, { title: string; blocks: 
 
 const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { script: Script | Script[] | null }): Promise<void> => {
     const call = twilio.calls(callSid);
-    await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
+    // Test calls (#1653) have a campaign but no outreach attempt; the voicemail
+    // drop must still play for them.
+    if (dbCall.outreach_attempt_id) {
+        await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
+    }
     const scriptSteps = (resolveCampaignScript(campaign)?.steps as unknown) as ScriptSteps | null | undefined;
     const step = findVoicemailPage(scriptSteps?.pages);
     if (!step) {

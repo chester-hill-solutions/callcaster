@@ -51,4 +51,13 @@ describe("CampaignTestSendDialog", () => {
     expect(screen.getByTestId("campaign-test-send-submit")).toBeDisabled();
     expect(screen.getByTestId("campaign-test-send-submit")).toHaveTextContent("Sending...");
   });
+
+  test("uses call copy for voice campaigns", () => {
+    render(
+      <CampaignTestSendDialog open busy={false} kind="call" onOpenChange={vi.fn()} onSend={vi.fn()} />,
+    );
+    expect(screen.getByRole("heading", { name: "Place a test call" })).toBeInTheDocument();
+    expect(screen.getByTestId("campaign-test-send-submit")).toHaveTextContent("Place test call");
+    expect(screen.getByText(/voicemail drop/)).toBeInTheDocument();
+  });
 });

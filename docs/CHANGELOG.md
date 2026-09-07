@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Added
 
+- Robocall and phone menu campaigns: the launch page's test control places a **Test call** to one number through the campaign's real flow, so you can hear it and walk the menu. The call carries no outreach attempt, so it stays out of results, exports, and analytics; the voicemail drop still plays on a test call that reaches voicemail ([#1653](https://github.com/chester-hill-solutions/callcaster/issues/1653), slice 2 of [#1645](https://github.com/chester-hill-solutions/callcaster/issues/1645)).
 - Chat: template tags typed in the conversation composer now fill in from the linked contact, or from the single contact matching the number; text with no match is sent as typed, and the composer says so when a contact is linked ([#1650](https://github.com/chester-hill-solutions/callcaster/issues/1650)).
 
 ## 2026-09-07 — release [#1638](https://github.com/chester-hill-solutions/callcaster/pull/1638)
