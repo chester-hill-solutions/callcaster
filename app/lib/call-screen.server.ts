@@ -15,77 +15,77 @@ import {
   isQueued,
 } from "@/lib/queue-status";
 import type { Call, OutreachAttempt, QueueItem } from "@/lib/types";
-import { rpcGetAudiencesByCampaign } from "@/lib/db-rpc.server";
+import { rpcGetAudiencesByCampaign, type AudienceByCampaignRow } from "@/lib/db-rpc.server";
 import { logger } from "@/lib/logger.server";
 import { fetchCampaignWithScriptForWorkspace } from "@/lib/campaign-ivr.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { getUserById } from "@/lib/workspace-members-db.server";
 import { normalizeDispositionOptions } from "@/lib/outreach-disposition";
 
+type CampaignWithScript = NonNullable<
+  Awaited<ReturnType<typeof fetchCampaignWithScriptForWorkspace>>
+>;
+
+/** Everything the call screen loads, with existence already established (roadmap E6.2). */
+export type CallScreenData = {
+  workspaceData: typeof workspace.$inferSelect;
+  campaign: CampaignWithScript;
+  campaignDetails: CampaignWithScript & {
+    disposition_options: ReturnType<typeof normalizeDispositionOptions>;
+  };
+  audiences: AudienceByCampaignRow[];
+  queueCount: number;
+  completedCount: number;
+  attempts: OutreachAttempt[];
+};
+
+/**
+ * Load the call screen's data. Validates the workspace, campaign, and audience
+ * lookups here, so callers receive non-null values and never repeat the checks;
+ * a missing row or a failed lookup throws with the same message the loaders
+ * already handle.
+ */
 export async function getCallScreenData(
   campaignId: string,
   workspaceId: string,
   userId: string,
-) {
+): Promise<CallScreenData> {
   const tdb = createTenantDb(workspaceId);
   const campaignIdNum = parseInt(campaignId);
 
-  const [
-    workspaceData,
-    campaignWithScript,
-    audiences,
-    queueCount,
-    completedCount,
-    attemptRows,
-  ] = await Promise.all([
-    adminDb.select().from(workspace).where(eq(workspace.id, workspaceId)).limit(1).then((rows) => ({
-      data: rows[0] ?? null,
-      error: rows[0] ? null : { message: "Workspace not found" },
-    })),
-    fetchCampaignWithScriptForWorkspace(workspaceId, campaignIdNum).catch((error) => {
-      logger.error("Error fetching campaign data:", error);
-      return null;
-    }),
-    rpcGetAudiencesByCampaign(campaignIdNum),
-    countCampaignQueueRows(campaignIdNum),
-    countCompletedCampaignQueueRows(campaignIdNum),
-    tdb.outreach_attempt.findMany({
-      where: and(
-        eq(outreachAttemptTable.campaign_id, campaignIdNum),
-        eq(outreachAttemptTable.user_id, userId),
-      ),
-    }),
-  ]);
+  const [workspaceRows, campaignWithScript, audiences, queueCount, completedCount, attemptRows] =
+    await Promise.all([
+      adminDb.select().from(workspace).where(eq(workspace.id, workspaceId)).limit(1),
+      fetchCampaignWithScriptForWorkspace(workspaceId, campaignIdNum).catch((error) => {
+        logger.error("Error fetching campaign data:", error);
+        return null;
+      }),
+      rpcGetAudiencesByCampaign(campaignIdNum),
+      countCampaignQueueRows(campaignIdNum),
+      countCompletedCampaignQueueRows(campaignIdNum),
+      tdb.outreach_attempt.findMany({
+        where: and(
+          eq(outreachAttemptTable.campaign_id, campaignIdNum),
+          eq(outreachAttemptTable.user_id, userId),
+        ),
+      }),
+    ]);
 
-  let attempts: OutreachAttempt[] = [];
-  if (attemptRows.length > 0) {
-    const attemptIds = attemptRows.map((row) => row.id);
-    const callRows = await tdb.call.findMany({
-      where: inArray(callTable.outreach_attempt_id, attemptIds),
-    });
-    attempts = attemptRows.map((attempt) => ({
-      ...attempt,
-      call: callRows.filter((call) => call.outreach_attempt_id === attempt.id),
-    })) as unknown as OutreachAttempt[];
-  }
-
-  const errors = [
-    workspaceData.error,
-    campaignWithScript ? null : new Error("Campaign not found"),
-    audiences.error,
-  ].filter(Boolean);
-
-  if (errors.length) {
-    logger.error("Error fetching campaign data:", errors);
+  const workspaceData = workspaceRows[0] ?? null;
+  const problems = [
+    workspaceData ? null : "Workspace not found",
+    campaignWithScript ? null : "Campaign not found",
+    audiences.error ? audiences.error.message : null,
+  ].filter((problem): problem is string => problem !== null);
+  if (problems.length > 0 || !workspaceData || !campaignWithScript || audiences.data === null) {
+    logger.error("Error fetching campaign data:", problems);
     throw new Error("Error fetching campaign data");
   }
 
-  if (!campaignWithScript) {
-    throw new Error("Error fetching campaign data");
-  }
+  const attempts = await loadAttemptsWithCalls(tdb, attemptRows);
   const campaign = campaignWithScript;
   return {
-    workspaceData: workspaceData.data,
+    workspaceData,
     campaign,
     campaignDetails: {
       ...campaign,
@@ -96,6 +96,26 @@ export async function getCallScreenData(
     completedCount,
     attempts,
   };
+}
+
+type OutreachAttemptRow = typeof outreachAttemptTable.$inferSelect;
+
+/** Attach each attempt's call rows; typed through the schema instead of a blind cast. */
+async function loadAttemptsWithCalls(
+  tdb: ReturnType<typeof createTenantDb>,
+  attemptRows: OutreachAttemptRow[],
+): Promise<OutreachAttempt[]> {
+  if (attemptRows.length === 0) return [];
+  const callRows = await tdb.call.findMany({
+    where: inArray(
+      callTable.outreach_attempt_id,
+      attemptRows.map((row) => row.id),
+    ),
+  });
+  return attemptRows.map((attempt) => ({
+    ...attempt,
+    call: callRows.filter((call) => call.outreach_attempt_id === attempt.id),
+  }));
 }
 
 export async function getVerifiedNumbers(userId: string) {

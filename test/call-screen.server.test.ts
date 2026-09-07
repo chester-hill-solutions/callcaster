@@ -280,3 +280,34 @@ describe("call-screen.server", () => {
     ]);
   });
 });
+
+describe("getCallScreenData validates before it returns (E6.2)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    adminDbMocks.workspaceRows = [{ id: "ws-1" }];
+    adminDbMocks.workspaceError = null;
+    rpcMocks.rpcGetAudiencesByCampaign.mockReset();
+    rpcMocks.rpcGetAudiencesByCampaign.mockResolvedValue({ data: [{ id: 5, name: "A" }], error: null });
+    queueSearchMocks.countCampaignQueueRows.mockResolvedValue(10);
+    queueSearchMocks.countCompletedCampaignQueueRows.mockResolvedValue(4);
+    tenantDbMocks.fetchCampaignWithScriptForWorkspace.mockResolvedValue({ id: 1, dial_type: "call", disposition_options: null });
+    tenantDbMocks.outreachFindMany.mockResolvedValue([]);
+  });
+
+  test("a missing workspace row throws instead of returning null data", async () => {
+    adminDbMocks.workspaceRows = [];
+    await expect(getCallScreenData("1", "ws-1", "user-1")).rejects.toThrow("Error fetching campaign data");
+  });
+
+  test("an audience lookup failure throws", async () => {
+    rpcMocks.rpcGetAudiencesByCampaign.mockResolvedValue({ data: null, error: new Error("rpc down") });
+    await expect(getCallScreenData("1", "ws-1", "user-1")).rejects.toThrow("Error fetching campaign data");
+  });
+
+  test("a good load returns the workspace row and a concrete audience list", async () => {
+    const result = await getCallScreenData("1", "ws-1", "user-1");
+    expect(result.workspaceData).toEqual({ id: "ws-1" });
+    expect(result.audiences).toEqual([{ id: 5, name: "A" }]);
+    expect(result.attempts).toEqual([]);
+  });
+});
