@@ -220,8 +220,11 @@ const schemas = {
       },
     },
   },
-  CampaignSmsDispatchResponse: {
+  CampaignSmsDispatched: {
     type: "object" as const,
+    // creditsExhausted is always present on a dispatched body, so a deferred
+    // body (which carries `responses: []` too) can never satisfy this variant.
+    required: ["responses", "creditsExhausted"],
     properties: {
       responses: {
         type: "array" as const,
@@ -229,6 +232,48 @@ const schemas = {
         description:
           "Per-contact send results keyed by contact_id (success, skipped, or error).",
       },
+      creditsExhausted: {
+        type: "boolean" as const,
+        description:
+          "True when the workspace balance ran out part-way through the batch: the remaining rows stay queued and no further batch is scheduled until credits are added.",
+      },
+    },
+  },
+  CampaignSmsDeferred: {
+    type: "object" as const,
+    required: ["deferred", "reason", "nextOpenAt", "responses"],
+    properties: {
+      deferred: { type: "boolean" as const, enum: [true] },
+      reason: {
+        type: "string" as const,
+        description: "Why nothing was sent, e.g. \"Outside campaign send window\".",
+      },
+      nextOpenAt: {
+        type: "string" as const,
+        format: "date-time",
+        description: "The next instant the campaign's send window allows dispatch.",
+      },
+      responses: {
+        type: "array" as const,
+        items: { type: "object" as const, additionalProperties: true },
+        description: "Always empty on a deferral; present so clients can treat both variants alike.",
+      },
+    },
+  },
+  CampaignSmsDispatchResponse: {
+    description:
+      "Either the batch ran (dispatched) or the campaign's send window kept it queued (deferred). Both are 200; check `deferred`.",
+    oneOf: [
+      { $ref: "#/components/schemas/CampaignSmsDispatched" },
+      { $ref: "#/components/schemas/CampaignSmsDeferred" },
+    ],
+  },
+  InsufficientCreditsError: {
+    type: "object" as const,
+    required: ["creditsError", "error"],
+    properties: {
+      creditsError: { type: "boolean" as const, enum: [true] },
+      error: { type: "string" as const },
     },
   },
 };
@@ -351,7 +396,8 @@ export const integratorPathOverrides = {
       },
       responses: {
         "200": {
-          description: "Batch dispatch completed",
+          description:
+            "Batch dispatch completed, or deferred to the campaign's next send-window opening",
           content: {
             "application/json": {
               schema: {
@@ -360,8 +406,16 @@ export const integratorPathOverrides = {
             },
           },
         },
-        "400": errorResponse("Validation or campaign error"),
+        "400": errorResponse("Validation or campaign error (including a missing caller_id)"),
         "401": errorResponse("Unauthorized"),
+        "402": {
+          description: "The workspace has no credits to start the batch",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/InsufficientCreditsError" },
+            },
+          },
+        },
         "403": errorResponse("Forbidden (workspace mismatch)"),
         "500": errorResponse("Dispatch failure"),
       },

@@ -178,13 +178,45 @@ export type CampaignSmsDispatchRequest = {
     messaging_service_sid?: string;
 };
 
-export type CampaignSmsDispatchResponse = {
+export type CampaignSmsDispatched = {
     /**
      * Per-contact send results keyed by contact_id (success, skipped, or error).
      */
-    responses?: Array<{
+    responses: Array<{
         [key: string]: unknown;
     }>;
+    /**
+     * True when the workspace balance ran out part-way through the batch: the remaining rows stay queued and no further batch is scheduled until credits are added.
+     */
+    creditsExhausted: boolean;
+};
+
+export type CampaignSmsDeferred = {
+    deferred: true;
+    /**
+     * Why nothing was sent, e.g. "Outside campaign send window".
+     */
+    reason: string;
+    /**
+     * The next instant the campaign's send window allows dispatch.
+     */
+    nextOpenAt: string;
+    /**
+     * Always empty on a deferral; present so clients can treat both variants alike.
+     */
+    responses: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+/**
+ * Either the batch ran (dispatched) or the campaign's send window kept it queued (deferred). Both are 200; check `deferred`.
+ */
+export type CampaignSmsDispatchResponse = CampaignSmsDispatched | CampaignSmsDeferred;
+
+export type InsufficientCreditsError = {
+    creditsError: true;
+    error: string;
 };
 
 export type CreateCampaignWithScriptData = {
@@ -278,13 +310,17 @@ export type DispatchCampaignSmsData = {
 
 export type DispatchCampaignSmsErrors = {
     /**
-     * Validation or campaign error
+     * Validation or campaign error (including a missing caller_id)
      */
     400: _Error;
     /**
      * Unauthorized
      */
     401: _Error;
+    /**
+     * The workspace has no credits to start the batch
+     */
+    402: InsufficientCreditsError;
     /**
      * Forbidden (workspace mismatch)
      */
@@ -299,7 +335,7 @@ export type DispatchCampaignSmsError = DispatchCampaignSmsErrors[keyof DispatchC
 
 export type DispatchCampaignSmsResponses = {
     /**
-     * Batch dispatch completed
+     * Batch dispatch completed, or deferred to the campaign's next send-window opening
      */
     200: CampaignSmsDispatchResponse;
 };

@@ -23,6 +23,7 @@ Completed:
 - E0.1: removed the unsafe unattended overnight runner from the worktree.
 - E1.1: bounded SMS send-window deferrals in PR `#1388`.
 - CI performance and load work: PRs `#1389`, `#1390`, and `#1391`.
+- E5.1: `POST /api/sms` documents its dispatched and deferred variants (`oneOf`, with `creditsExhausted`, `deferred`, `reason`, `nextOpenAt`) and the 402 credits error; generated clients regenerated and the runtime bodies are validated against the generated Zod in the dispatch contract test.
 - E2.2: `app/lib/campaign-dispatch-policy.ts` holds the explicit SMS (`sms_send_window`) and IVR (calling hours plus `start_date`/`end_date`) policies; `checkSchedule`, the SMS dispatch gate, and the launch ETA all go through them, and the `as Schedule` casts in `CampaignLaunchExtras` are gone.
 - E2.1: `app/lib/schedule-intervals.ts` projects a weekly schedule to absolute UTC intervals once; `isWithinSendWindow`, `nextSendWindowOpenAt`, and the ETA projection consume it instead of walking the schedule themselves.
 - E4.1: issue-board generation is staged and atomic (`scripts/issue-board-generate.mjs`); a failed run leaves every enrichment file and the board unchanged.
@@ -34,7 +35,6 @@ Completed:
 Remaining high-priority work:
 
 - Fix theme-token contrast and test rendered toast states.
-- Restore the SMS OpenAPI response contract.
 
 ## Roadmap Summary
 
