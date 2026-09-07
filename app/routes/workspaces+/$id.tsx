@@ -133,6 +133,10 @@ function WorkspaceResolvedView({
   // Credits page is where users top up — keep the low-credit banner off it (#1097).
   const isBillingPage = /\/billing(?:\/|$)/.test(location.pathname);
   const showLowCreditBanner = !isBillingPage && liveCredits < LOW_CREDIT_THRESHOLD;
+  // A workspace with nothing in it has not spent anything: "depleted" and
+  // "resume" would imply prior usage that never happened (#1069).
+  const hasNeverBeenSetUp =
+    campaigns.length === 0 && phoneNumbers.length === 0 && audiences.length === 0;
   // The call screen has its own credit banner and hides the sidebar so
   // "Leave Campaign" is the only way off the page (#1313) — no "Add
   // credits" link here that would bypass that.
@@ -158,8 +162,9 @@ function WorkspaceResolvedView({
         {showLowCreditBanner && liveCredits <= 0 ? (
           <Alert variant="destructive">
             <AlertDescription>
-              Credit balance is depleted. Add credits to resume campaigns and
-              calls.
+              {hasNeverBeenSetUp
+                ? "No credits yet. Add credits to start campaigns and calls."
+                : "Credit balance is depleted. Add credits to resume campaigns and calls."}
             </AlertDescription>
             {canManageBilling && outlet && !isCallScreen ? (
               <Button asChild variant="destructive" className="mt-3">
