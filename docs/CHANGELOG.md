@@ -187,6 +187,7 @@ Production moved from the Supabase-era app to the v2 platform on 2026-08-31. The
 
 ### Removed
 
+- SMS message editor: the template-tag picker no longer offers `survey(...)` links or a survey-link preview; nothing rendered them, so recipients received the literal function text ([#1642](https://github.com/chester-hill-solutions/callcaster/issues/1642)).
 - Legacy `app/routes/archive/**` and `old.*` IVR/dashboard routes; `app/lib/legacy-route.server.ts`. Route modules now live under nested folders (`workspaces+/$id/...`, `api+/...`) via remix-flat-routes.
 - Legacy `twilio-serverless` JS assets (`flow.js`, `ivr.js`, `recording.js`, `status.js`, etc.) and root `websocket.server.js` removed in favor of current app and Edge Function paths.
 

@@ -293,7 +293,6 @@ export default function ScriptEditor() {
                     },
                   });
                 }}
-                surveys={[]}
               />
             </div>
           )}
