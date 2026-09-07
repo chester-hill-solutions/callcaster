@@ -4,17 +4,16 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-### Fixed
-
-- Importing a CSV that has no header row keeps its first contact. The upload wizard and the server now agree on when a first row is data (a phone number, including one with an extension, an email, a street address, or a postal code) and both name the columns "Column 1", "Column 2", and so on ([#1481](https://github.com/chester-hill-solutions/callcaster/issues/1481), [#1511](https://github.com/chester-hill-solutions/callcaster/issues/1511)).
-### Added
-
-- Workspace admins can override the "large bulk send on a local number" safeguard for one campaign from the launch page, after acknowledging the deliverability risk. The safeguard stays on by default, the override is recorded on the campaign and shown while active, and it can be removed again ([#1482](https://github.com/chester-hill-solutions/callcaster/issues/1482)).
-
 ## 2026-09-05 — release dev → master
 
 ### Fixed
 
+- Campaign SMS dispatch stops starting sends once the remaining balance cannot cover the next message's estimated cost. Unaffordable rows stay queued for a relaunch after a top-up, and the worker stops the chain instead of scheduling another tick ([#1483](https://github.com/chester-hill-solutions/callcaster/issues/1483)).
+- A campaign now completes as soon as its last queued contact is dequeued, whichever path did it: an agent's final call, an opt-out, a duplicate, a landline, or a sent text. Completion used to depend on a worker dispatch tick observing an empty queue, so campaigns stayed running after all their contacts were processed ([#1484](https://github.com/chester-hill-solutions/callcaster/issues/1484)).
+- The Supabase-era orphan cleanup migration now runs each drop in its own guarded block. On a long-lived database where another object still depends on one of them, that drop is skipped with a warning naming it and the rest of the file applies and is recorded, instead of the whole file failing and being retried on every boot ([#1450](https://github.com/chester-hill-solutions/callcaster/issues/1450)).
+- **Save & continue** on the onboarding SMS program details step now moves to the next step. It used to save and stay put because the Identity step had already completed intake, which sent the save back to the same screen ([#1471](https://github.com/chester-hill-solutions/callcaster/issues/1471)).
+- Campaign SMS and automated-call dispatch now record each failed attempt on the queue row and dead-letter rows that reach the attempt limit, so one undeliverable number no longer keeps a campaign running forever with its dispatch job retrying until it dies ([#1513](https://github.com/chester-hill-solutions/callcaster/issues/1513)).
+- Importing a CSV that has no header row keeps its first contact. The upload wizard and the server now agree on when a first row is data (a phone number, including one with an extension, an email, a street address, or a postal code) and both name the columns "Column 1", "Column 2", and so on ([#1481](https://github.com/chester-hill-solutions/callcaster/issues/1481), [#1511](https://github.com/chester-hill-solutions/callcaster/issues/1511)).
 - On the onboarding **Number** step, the "Rent a Canadian number" and "Verify your own number" titles no longer have the box edge drawn through them ([#1113](https://github.com/chester-hill-solutions/callcaster/issues/1113)).
 - The **Identity** step in onboarding now shows as complete once the legal business name is saved. It previously stayed marked unfinished because it was judged against the messaging-program fields collected on a later step ([#1204](https://github.com/chester-hill-solutions/callcaster/issues/1204)).
 - One-off chat texts are recorded before they are handed to Twilio, the same protection campaign texts gained, so a write failure after sending can no longer leave a sent text unbilled and missing from the conversation ([#1586](https://github.com/chester-hill-solutions/callcaster/issues/1586)).
@@ -35,6 +34,11 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- Tooltips wrap at a readable width and scroll past a modest height instead of spanning the page; individual tooltips can widen or unbound themselves. The SMS goal guidance in onboarding no longer repeats its own text in a tooltip ([#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148)).
+- A workspace that has never had campaigns, numbers, or audiences now sees "No credits yet. Add credits to start campaigns and calls." instead of a banner saying its balance is depleted and campaigns can resume ([#1069](https://github.com/chester-hill-solutions/callcaster/issues/1069) copy nit).
+- Campaign Setup shows its save bar at the bottom of the form as well as the top, the bar's buttons now read **Discard changes** and **Save changes**, and **Next** is inert with an explanation while there are unsaved changes instead of opening the discard dialog ([#1128](https://github.com/chester-hill-solutions/callcaster/issues/1128)).
+- The design preview page under a workspace (`/design`, a tone-system workbench for automated accessibility scans) answers 404 in production unless `DESIGN_GALLERY_ENABLED` is set. It stays available in development and the E2E harness.
+- Calling hours and SMS send windows now follow one rule for overnight intervals: an interval such as 23:00–02:00 applies from its start day into the next morning, and no longer also matches the early hours of its own start day. The launch page ETA also says when a queue may not finish before the campaign end date.
 - E2E webhook fixtures sign every Twilio callback with the seeded subaccount token; both E2E harnesses now run with `TWILIO_VALIDATE_WEBHOOKS=true`, the surface probe runs strict there, and `twilio-webhook-auth.spec.ts` covers missing, foreign-token, and tampered signatures (#1190).
 - The automated calling goal is called **Automated phone menu** everywhere: the onboarding goal picker no longer says "IVR" and campaign labels no longer say "Robocall". Advanced IVR keeps its own name ([#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347)).
 - Every place that shows or edits a time now says which time zone it uses: the campaign schedule's Start and End columns, the chat "Send later" picker, and the billing activity date column all show your browser's time zone alongside the value ([#969](https://github.com/chester-hill-solutions/callcaster/issues/969)).
@@ -55,6 +59,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Added
 
+- Workspace admins can override the "large bulk send on a local number" safeguard for one campaign from the launch page, after acknowledging the deliverability risk. The safeguard stays on by default, the override is recorded on the campaign and shown while active, and it can be removed again ([#1482](https://github.com/chester-hill-solutions/callcaster/issues/1482)).
 - **Billing → Activity** shows a **Receipt** link on each credit purchase that opens the Stripe-hosted invoice or receipt. Receipts are looked up per workspace, and a purchase that has no receipt yet says so instead of failing ([#1322](https://github.com/chester-hill-solutions/callcaster/issues/1322)).
 - **Billing → Activity** can be filtered to purchases and credits, or to usage only, so receipts are easy to find once the ledger fills with campaign activity ([#1322](https://github.com/chester-hill-solutions/callcaster/issues/1322)).
 
