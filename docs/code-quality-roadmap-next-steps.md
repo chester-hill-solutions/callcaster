@@ -23,6 +23,7 @@ Completed:
 - E0.1: removed the unsafe unattended overnight runner from the worktree.
 - E1.1: bounded SMS send-window deferrals in PR `#1388`.
 - CI performance and load work: PRs `#1389`, `#1390`, and `#1391`.
+- E2.2: `app/lib/campaign-dispatch-policy.ts` holds the explicit SMS (`sms_send_window`) and IVR (calling hours plus `start_date`/`end_date`) policies; `checkSchedule`, the SMS dispatch gate, and the launch ETA all go through them, and the `as Schedule` casts in `CampaignLaunchExtras` are gone.
 - E2.1: `app/lib/schedule-intervals.ts` projects a weekly schedule to absolute UTC intervals once; `isWithinSendWindow`, `nextSendWindowOpenAt`, and the ETA projection consume it instead of walking the schedule themselves.
 - E4.1: issue-board generation is staged and atomic (`scripts/issue-board-generate.mjs`); a failed run leaves every enrichment file and the board unchanged.
 - E7.1 (scriptkit): `npm run check:vendor-dist` rebuilds the two scriptkit packages and fails on any dist/ byte that src/ does not produce; runs first in `ci:local` and in the CI quality job. `shad-cc` is excluded because its tsup build with code splitting is not deterministic (chunk hashes flip between identical runs); making it reproducible is the remaining E7.1 work.
@@ -33,7 +34,6 @@ Completed:
 Remaining high-priority work:
 
 - Fix theme-token contrast and test rendered toast states.
-- Unify SMS and IVR schedule projection (E2.2 policy adapters; the shared interval engine landed in E2.1).
 - Restore the SMS OpenAPI response contract.
 
 ## Roadmap Summary

@@ -1,6 +1,7 @@
 /**
  * Campaign-related database functions
  */
+import { isDispatchAllowedAt, ivrCallingPolicy } from "@/lib/campaign-dispatch-policy";
 import { eq, inArray } from "drizzle-orm";
 import {
   Campaign,
@@ -690,63 +691,8 @@ export type ScheduleCheckInput = {
 
 export function checkSchedule(campaignData: ScheduleCheckInput) {
   if (!campaignData) return false;
-  const { start_date, end_date, schedule } = campaignData;
-  if (!schedule) return false;
-  // type-cast justified: schedule from DB or JSON parse needs type assertion to CampaignSchedule
-  const scheduleObject =
-    typeof schedule === "string"
-      ? JSON.parse(schedule)
-      : (schedule as unknown as CampaignSchedule);
-  const now = new Date();
-  const utcNow = new Date(
-    Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-      now.getUTCHours(),
-      now.getUTCMinutes(),
-      now.getUTCSeconds(),
-    ),
-  );
-
-  if (
-    !start_date ||
-    !end_date ||
-    !(utcNow >= new Date(start_date) && utcNow <= new Date(end_date))
-  ) {
-    return false;
-  }
-
-  const currentDay = utcNow.getUTCDay();
-  const daysOfWeek = [
-    "sunday",
-    "monday",
-    "tuesday",
-    "wednesday",
-    "thursday",
-    "friday",
-    "saturday",
-  ] as const;
-  const dayKey = daysOfWeek[currentDay];
-  if (!dayKey) {
-    return false;
-  }
-  // Partial/legacy schedules (e.g. an API-created campaign whose schedule JSON
-  // omits some weekdays, or a day with no intervals array) must read as "outside
-  // the calling window", not throw a 500 on the auto-dial/call-screen hot path.
-  const todaySchedule = scheduleObject[dayKey];
-  if (!todaySchedule?.active || !Array.isArray(todaySchedule.intervals)) {
-    return false;
-  }
-
-  const currentTime = utcNow.toISOString().slice(11, 16);
-  return todaySchedule.intervals.some(
-    (interval: { start: string; end: string }) => {
-      if (interval.start === interval.end) return false;
-      if (interval.end < interval.start) {
-        return currentTime >= interval.start || currentTime < interval.end;
-      }
-      return currentTime >= interval.start && currentTime < interval.end;
-    },
-  );
+  // One IVR/calling policy for the dispatch gate, the schedule sweep, the call
+  // screen, and the launch ETA (roadmap E2.2): calling hours plus start/end
+  // dates, absent schedule means never, zero-length intervals are inactive.
+  return isDispatchAllowedAt(ivrCallingPolicy(campaignData));
 }
