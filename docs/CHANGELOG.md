@@ -13,6 +13,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Status colours used as plain text (success, warning, info, and error messages, and the chips in the queue table) are darker in light mode and lighter in dark mode so they meet contrast guidelines; the info badge is slightly darker in light mode for the same reason. Solid badges, buttons, and icons keep their colours.
 
+### Added
+
+- A "Kick off" button on the campaign launch page restarts automated dispatch for a running or paused message or automated-voice campaign whose sending stopped. Pressing it while dispatch is already running does nothing and says so.
+
 ## 2026-09-05 — release dev → master
 
 ### Fixed

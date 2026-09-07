@@ -65,6 +65,7 @@ export type CampaignLaunchProps = {
   phoneNumbers: WorkspaceNumbers[];
   handleInputChange: (name: string, value: unknown) => void;
   handleDuplicateButton: () => void;
+  handleKickoffButton: () => void;
   handleStatusButton: (type: "play" | "pause" | "archive" | "schedule") => void;
   handleScheduleButton: () => void;
   handleSave?: () => void;
@@ -104,6 +105,7 @@ export const CampaignLaunch = ({
   handleScheduleButton,
   handleStatusButton,
   handleDuplicateButton,
+  handleKickoffButton,
   formFetcher,
   scripts,
   startDisabledReason,
@@ -390,6 +392,7 @@ export const CampaignLaunch = ({
                 onSchedule={() => handleScheduleButton()}
                 onArchive={() => handleConfirmStatus("archive")}
                 onDuplicate={() => handleDuplicateButton()}
+                onKickoff={() => handleKickoffButton()}
               />
               {startDisabledReason ? (
                 <p className="text-sm text-muted-foreground">{startDisabledReason}</p>

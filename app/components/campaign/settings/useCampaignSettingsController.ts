@@ -64,8 +64,9 @@ type ActionData = {
   error?: string;
   campaign?: CampaignWithAudiences;
   campaignDetails?: CampaignDetails;
-  actionType?: "save" | "status" | "duplicate";
+  actionType?: "save" | "status" | "duplicate" | "kickoff";
   status?: string;
+  deduped?: boolean;
 };
 
 type SettingsLoaderData = {
@@ -247,7 +248,11 @@ export function useCampaignSettingsController() {
           ? "Campaign status updated."
           : fetcher.data.actionType === "duplicate"
             ? "Campaign duplicated."
-            : null
+            : fetcher.data.actionType === "kickoff"
+              ? fetcher.data.deduped
+                ? "Campaign dispatch is already running."
+                : "Campaign dispatch kicked off."
+              : null
       : null;
   const feedbackTone: "success" | "error" | null = fetcher.data?.error
     ? "error"
@@ -285,6 +290,10 @@ export function useCampaignSettingsController() {
       }
     }
   })();
+
+  const handleKickoff = () => {
+    fetcher.submit({ intent: "kickoff" }, { method: "post" });
+  };
 
   const handleDuplicate = () => {
     const { id, ...dataToDuplicate } = draftCampaignData;
@@ -475,6 +484,7 @@ export function useCampaignSettingsController() {
     readinessIssues,
     launchLabel,
     handleDuplicate,
+    handleKickoff,
     handleConfirmStatus,
     handleInputChange,
     handleSave,

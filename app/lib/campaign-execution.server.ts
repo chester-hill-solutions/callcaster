@@ -3,6 +3,7 @@ import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { rescheduleQueuedJob } from "@/lib/worker/enqueue-job.server";
 import { getCampaignReadiness, type CampaignReadinessIssue } from "@/lib/campaign-readiness";
 import { updateCampaignStatusInWorkspace } from "@/lib/campaign-ivr.server";
+import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
 import { CAMPAIGN_DISPATCH_JOB_TYPE } from "@/lib/worker/job-types.server";
 import type { Campaign, LiveCampaign, MessageCampaign, IVRCampaign } from "@/lib/types";
 
@@ -131,4 +132,59 @@ export async function launchCampaign(args: {
   }
 
   return { ok: true, status };
+}
+
+/**
+ * Re-arm dispatch for a campaign whose chain stopped (worker restart, credit
+ * pause, lost successor). Idempotent: the live dedupe key means a chain that
+ * is still running gets no second job, and the result says so.
+ */
+export async function kickoffCampaign(args: {
+  workspaceId: string;
+  campaignId: number;
+  campaign: Campaign;
+  userId: string;
+}): Promise<
+  | { ok: true; status: "running"; job: EnqueueJobResult }
+  | { ok: false; error: string }
+> {
+  if (!args.userId) {
+    return { ok: false, error: "A launching user is required to kick off this campaign." };
+  }
+
+  if (
+    args.campaign.type !== "message" &&
+    !isMachineDispatchedVoiceCampaignType(args.campaign.type)
+  ) {
+    return { ok: false, error: "This campaign does not have an automated dispatch queue." };
+  }
+
+  const credits = await requireOutboundCredits(args.workspaceId);
+  if (!credits.ok) {
+    return { ok: false, error: "Insufficient credits" };
+  }
+
+  if (args.campaign.status === "paused") {
+    await updateCampaignStatusInWorkspace(args.workspaceId, args.campaignId, {
+      status: "running",
+    });
+  }
+
+  const job = await enqueueRegisteredJob({
+    type: CAMPAIGN_DISPATCH_JOB_TYPE,
+    workspaceId: args.workspaceId,
+    userId: args.userId,
+    params: {
+      workspaceId: args.workspaceId,
+      campaignId: args.campaignId,
+      userId: args.userId,
+    },
+    dedupe: {
+      kind: "live",
+      workspaceId: args.workspaceId,
+      campaignId: args.campaignId,
+    },
+  });
+
+  return { ok: true, status: "running", job };
 }
