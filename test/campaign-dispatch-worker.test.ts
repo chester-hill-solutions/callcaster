@@ -281,6 +281,24 @@ describe("campaignDispatchHandler", () => {
     );
   });
 
+  test("a balance that runs out mid-batch pauses the campaign and stops the chain", async () => {
+    mocks.dispatchCampaignSmsBatch.mockResolvedValue({
+      ...dispatchedOutcome({
+        counts: { sent: 2, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 },
+        queuedRemaining: 5,
+      }),
+      creditsExhausted: true,
+    });
+    const result = await campaignDispatchHandler(makeJob());
+    expect(result).toMatchObject({ ok: true, blocked: "insufficient_credits", sent: 2 });
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      42,
+      { status: "paused" },
+    );
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+  });
+
   test("a fully failed batch throws so the job retries with backoff", async () => {
     mocks.dispatchCampaignSmsBatch.mockResolvedValue(
       dispatchedOutcome({
@@ -351,6 +369,11 @@ describe("campaignDispatchHandler", () => {
     mocks.dispatchCampaignSmsBatch.mockResolvedValue({ kind: "insufficient_credits" });
     const result = await campaignDispatchHandler(makeJob());
     expect(result).toMatchObject({ ok: true, blocked: "insufficient_credits" });
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      42,
+      { status: "paused" },
+    );
     expect(mocks.enqueueJob).not.toHaveBeenCalled();
   });
 });
@@ -458,6 +481,11 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
     expect(await campaignDispatchHandler(makeJob())).toMatchObject({
       blocked: "insufficient_credits",
     });
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      42,
+      { status: "paused" },
+    );
     expect(mocks.enqueueJob).not.toHaveBeenCalled();
 
     mocks.dispatchCampaignIvrBatch.mockResolvedValue({ kind: "caller_id_required" });
