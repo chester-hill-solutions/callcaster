@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Fixed
+
+- Campaign results show message totals and contact progress as separate numbers, so a contact who received several messages no longer counts several times toward progress.
+
 ## 2026-09-05 — release dev → master
 
 ### Fixed
