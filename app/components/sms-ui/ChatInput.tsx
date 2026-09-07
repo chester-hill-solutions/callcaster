@@ -412,6 +412,17 @@ export default function ChatInput({
           </div>
         </div>
 
+        {selectedContact ? (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="chat-template-hint"
+          >
+            Tags like{" "}
+            <span className="font-mono">&#123;&#123;firstname&#125;&#125;</span> fill in
+            from this contact&apos;s details when you send.
+          </p>
+        ) : null}
+
         {phoneNumber && isValid && (
           <input
             hidden

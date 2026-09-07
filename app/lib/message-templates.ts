@@ -18,6 +18,13 @@ export const SAMPLE_TEMPLATE_CONTACT = {
   external_id: "C-1042",
 } as unknown as Contact;
 
+const TEMPLATE_SYNTAX = /\{|btoa\(/;
+
+/** True when the text contains anything processTemplateTags would rewrite. */
+export function hasTemplateSyntax(text: string): boolean {
+  return TEMPLATE_SYNTAX.test(text);
+}
+
 const TAG_PATTERN = /\{\{?\s*([a-zA-Z0-9_]+)(?:\|([^}]+))?\s*\}\}?/g;
 
 const FIELD_READERS: Record<string, (contact: Contact) => string | number | null | undefined> = {
