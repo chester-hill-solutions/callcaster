@@ -4,23 +4,12 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
-### Fixed
-
-- Campaign results show message totals and contact progress as separate numbers, so a contact who received several messages no longer counts several times toward progress.
-- A campaign whose workspace runs out of credits is paused instead of staying marked as running after dispatch stops. Relaunch it after topping up.
-
-### Changed
-
-- Status colours used as plain text (success, warning, info, and error messages, and the chips in the queue table) are darker in light mode and lighter in dark mode so they meet contrast guidelines; the info badge is slightly darker in light mode for the same reason. Solid badges, buttons, and icons keep their colours.
-
-### Added
-
-- A "Kick off" button on the campaign launch page restarts automated dispatch for a running or paused message or automated-voice campaign whose sending stopped. Pressing it while dispatch is already running does nothing and says so.
-
 ## 2026-09-05 — release dev → master
 
 ### Fixed
 
+- Campaign results show message totals and contact progress as separate numbers, so a contact who received several messages no longer counts several times toward progress.
+- A campaign whose workspace runs out of credits is paused instead of staying marked as running after dispatch stops. Relaunch it after topping up.
 - A brand-new workspace is no longer told it already has a campaign and a script. The sample campaign and sample script every workspace starts with are marked as samples and no longer count toward the setup wizard's Campaign and Script steps or the launch checklist ([#1070](https://github.com/chester-hill-solutions/callcaster/issues/1070)).
 - The sample campaign every new workspace starts with now follows the goal chosen in onboarding: a texting goal turns it into a message campaign with sample copy, an automated phone menu goal into an IVR campaign on the sample script, and live calling keeps the live-call sample ([#1323](https://github.com/chester-hill-solutions/callcaster/issues/1323)).
 - Campaign SMS dispatch stops starting sends once the remaining balance cannot cover the next message's estimated cost. Unaffordable rows stay queued for a relaunch after a top-up, and the worker stops the chain instead of scheduling another tick ([#1483](https://github.com/chester-hill-solutions/callcaster/issues/1483)).
@@ -49,6 +38,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- Status colours used as plain text (success, warning, info, and error messages, and the chips in the queue table) are darker in light mode and lighter in dark mode so they meet contrast guidelines; the info badge is slightly darker in light mode for the same reason. Solid badges, buttons, and icons keep their colours.
 - Tooltips wrap at a readable width and scroll past a modest height instead of spanning the page; individual tooltips can widen or unbound themselves. The SMS goal guidance in onboarding no longer repeats its own text in a tooltip ([#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148)).
 - A workspace that has never had campaigns, numbers, or audiences now sees "No credits yet. Add credits to start campaigns and calls." instead of a banner saying its balance is depleted and campaigns can resume ([#1069](https://github.com/chester-hill-solutions/callcaster/issues/1069) copy nit).
 - Campaign Setup shows its save bar at the bottom of the form as well as the top, the bar's buttons now read **Discard changes** and **Save changes**, and **Next** is inert with an explanation while there are unsaved changes instead of opening the discard dialog ([#1128](https://github.com/chester-hill-solutions/callcaster/issues/1128)).
@@ -74,6 +64,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Added
 
+- A "Kick off" button on the campaign launch page restarts automated dispatch for a running or paused message or automated-voice campaign whose sending stopped. Pressing it while dispatch is already running does nothing and says so.
 - Workspace admins can override the "large bulk send on a local number" safeguard for one campaign from the launch page, after acknowledging the deliverability risk. The safeguard stays on by default, the override is recorded on the campaign and shown while active, and it can be removed again ([#1482](https://github.com/chester-hill-solutions/callcaster/issues/1482)).
 - **Billing → Activity** shows a **Receipt** link on each credit purchase that opens the Stripe-hosted invoice or receipt. Receipts are looked up per workspace, and a purchase that has no receipt yet says so instead of failing ([#1322](https://github.com/chester-hill-solutions/callcaster/issues/1322)).
 - **Billing → Activity** can be filtered to purchases and credits, or to usage only, so receipts are easy to find once the ledger fills with campaign activity ([#1322](https://github.com/chester-hill-solutions/callcaster/issues/1322)).
