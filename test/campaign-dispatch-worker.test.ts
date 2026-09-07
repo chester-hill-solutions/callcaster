@@ -113,7 +113,7 @@ function dispatchedOutcome(overrides?: {
   return {
     kind: "dispatched" as const,
     responses: [],
-    counts: { sent: 1, failed: 0, dequeued: 0, deferred: 0, ...overrides?.counts },
+    counts: { sent: 1, failed: 0, dequeued: 0, deferred: 0, exhausted: 0, ...overrides?.counts },
     queuedRemaining: overrides?.queuedRemaining ?? 0,
   };
 }
@@ -284,7 +284,7 @@ describe("campaignDispatchHandler", () => {
   test("a fully failed batch throws so the job retries with backoff", async () => {
     mocks.dispatchCampaignSmsBatch.mockResolvedValue(
       dispatchedOutcome({
-        counts: { sent: 0, failed: 3, dequeued: 0, deferred: 0 },
+        counts: { sent: 0, failed: 3, dequeued: 0, deferred: 0, exhausted: 0 },
         queuedRemaining: 3,
       }),
     );
@@ -292,10 +292,23 @@ describe("campaignDispatchHandler", () => {
     expect(mocks.enqueueJob).not.toHaveBeenCalled();
   });
 
+  test("a batch whose failures were all dead-lettered does not throw and finishes the campaign (#1513)", async () => {
+    mocks.dispatchCampaignSmsBatch.mockResolvedValue(
+      dispatchedOutcome({
+        counts: { sent: 0, failed: 1, dequeued: 0, deferred: 0, exhausted: 1 },
+        queuedRemaining: 0,
+      }),
+    );
+    const result = await campaignDispatchHandler(makeJob());
+    expect(result).toMatchObject({ ok: true, exhausted: 1, queuedRemaining: 0 });
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+    expect(mocks.rpcTryCompleteCampaignIfDrained).toHaveBeenCalled();
+  });
+
   test("partial failure still schedules a successor for the queued remainder", async () => {
     mocks.dispatchCampaignSmsBatch.mockResolvedValue(
       dispatchedOutcome({
-        counts: { sent: 2, failed: 1, dequeued: 0, deferred: 0 },
+        counts: { sent: 2, failed: 1, dequeued: 0, deferred: 0, exhausted: 0 },
         queuedRemaining: 1,
       }),
     );
@@ -350,7 +363,7 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
     );
     mocks.dispatchCampaignIvrBatch.mockResolvedValue({
       kind: "dispatched",
-      counts: { called: 1, failed: 0, dequeued: 0, deferred: 0 },
+      counts: { called: 1, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 },
       queuedRemaining: 0,
     });
     mocks.rpcTryCompleteCampaignIfDrained.mockResolvedValue(false);
@@ -409,7 +422,7 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
   test("IVR remaining work schedules a successor and drain completes the campaign", async () => {
     mocks.dispatchCampaignIvrBatch.mockResolvedValue({
       kind: "dispatched",
-      counts: { called: 2, failed: 0, dequeued: 0, deferred: 0 },
+      counts: { called: 2, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 },
       queuedRemaining: 3,
     });
     await campaignDispatchHandler(makeJob());
@@ -420,7 +433,7 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
 
     mocks.dispatchCampaignIvrBatch.mockResolvedValue({
       kind: "dispatched",
-      counts: { called: 1, failed: 0, dequeued: 0, deferred: 0 },
+      counts: { called: 1, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 },
       queuedRemaining: 0,
     });
     await campaignDispatchHandler(makeJob());
@@ -433,7 +446,7 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
   test("a fully failed IVR batch throws so the job retries with backoff", async () => {
     mocks.dispatchCampaignIvrBatch.mockResolvedValue({
       kind: "dispatched",
-      counts: { called: 0, failed: 2, dequeued: 0, deferred: 0 },
+      counts: { called: 0, failed: 2, dequeued: 0, deferred: 0, exhausted: 0 },
       queuedRemaining: 2,
     });
     await expect(campaignDispatchHandler(makeJob())).rejects.toThrow(/all 2 IVR calls failed/);

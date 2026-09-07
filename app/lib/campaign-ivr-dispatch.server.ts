@@ -25,8 +25,11 @@ import {
 } from "@/lib/database/workspace.server";
 import { getCampaignQueueById, checkSchedule } from "@/lib/database/campaign.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
-import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
+import { dequeueQueueEntry, recordQueueAttemptFailure } from "@/lib/campaign-queue-db.server";
+import {
+  rpcCreateOutreachAttempt,
+  rpcFailExhaustedCampaignQueueContacts,
+} from "@/lib/db-rpc.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
@@ -53,6 +56,8 @@ export type CampaignIvrBatchOutcome =
       counts: {
         called: number;
         failed: number;
+        /** Dead-lettered by the exhaustion sweep: failed rows at the attempt maximum. */
+        exhausted: number;
         /** Dequeued without a call: opted out. */
         dequeued: number;
         /** Left queued for a later tick (recipient quiet hours). */
@@ -115,7 +120,7 @@ export async function dispatchCampaignIvrBatch(args: {
   if (queueMembers.length === 0) {
     return {
       kind: "dispatched",
-      counts: { called: 0, failed: 0, dequeued: 0, deferred: 0 },
+      counts: { called: 0, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 },
       queuedRemaining: 0,
     };
   }
@@ -124,7 +129,7 @@ export async function dispatchCampaignIvrBatch(args: {
   const ivrUrls = resolveIvrCallUrls(campaignId);
   const tdb = createTenantDb(workspaceId);
 
-  const counts = { called: 0, failed: 0, dequeued: 0, deferred: 0 };
+  const counts = { called: 0, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 };
 
   // In-batch normalized-number reservation. hasDuplicateCampaignCall reads
   // persisted call history and cannot see sibling rows still executing in this
@@ -237,22 +242,30 @@ export async function dispatchCampaignIvrBatch(args: {
         });
         counts.called += 1;
       } catch (error) {
-        // Failed calls stay queued: the duplicate-free queue is the retry
-        // ledger, and the worker's all-failed guard escalates to job backoff.
+        // Failed calls stay queued with the attempt recorded: the queue is the
+        // retry ledger until the exhaustion sweep below dead-letters the row.
+        const message = error instanceof Error ? error.message : String(error);
         counts.failed += 1;
+        await recordQueueAttemptFailure({ queueId: member.id, error: message, workspaceId });
         logger.error("campaign_ivr_dispatch.call_failed", {
           campaignId,
           queueId: member.id,
-          error: error instanceof Error ? error.message : String(error),
+          error: message,
         });
       }
     }),
   );
 
+  // Dead-letter rows that failed for the last time so one bad number cannot
+  // pin the chain to retries forever (#1513); see the SMS twin for the clamp.
+  if (counts.failed > 0) {
+    counts.exhausted = await rpcFailExhaustedCampaignQueueContacts(tdb, Number(campaignId));
+  }
+
   const truncated = allQueued.length - queueMembers.length;
   return {
     kind: "dispatched",
     counts,
-    queuedRemaining: truncated + counts.deferred + counts.failed,
+    queuedRemaining: Math.max(0, truncated + counts.deferred + counts.failed - counts.exhausted),
   };
 }

@@ -14,7 +14,7 @@
 import {
   messageCampaignRequiresCallerId,
 } from "@/lib/sms-send-resolve";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry, recordQueueAttemptFailure } from "@/lib/campaign-queue-db.server";
 import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
 import { getCampaignQueueById } from "@/lib/database/campaign.server";
 import { getWorkspaceTwilioPortalConfig } from "@/lib/database/workspace.server";
@@ -30,6 +30,8 @@ import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
 import { OUTBOUND_CREDIT_FLOOR } from "../../shared/credit-floor";
 import { estimateMessageCredits } from "../../shared/pricing";
+import { rpcFailExhaustedCampaignQueueContacts } from "@/lib/db-rpc.server";
+import { createTenantDb } from "@/server/tenant-db";
 import type { TwilioMessageIntent } from "@/lib/types";
 import {
   sendSingleCampaignSms,
@@ -67,11 +69,13 @@ export type CampaignSmsBatchOutcome =
         deferred: number;
         /** Left queued because the remaining balance could not cover the estimated cost. */
         unaffordable: number;
+        /** Dead-lettered by the exhaustion sweep: failed rows at the attempt maximum. */
+        exhausted: number;
       };
       /**
        * Rows still queued after this batch: quiet-hours deferrals, failed
-       * sends (which stay queued), unaffordable rows, and contacts beyond
-       * `maxContacts`.
+       * sends that still have attempts left, unaffordable rows, and contacts
+       * beyond `maxContacts`.
        */
       queuedRemaining: number;
       /**
@@ -219,7 +223,7 @@ export async function dispatchCampaignSmsBatch(args: {
     typeof maxContacts === "number" ? allQueued.slice(0, maxContacts) : allQueued;
 
   const responses: ContactDispatchResult[] = [];
-  const counts = { sent: 0, failed: 0, dequeued: 0, deferred: 0, unaffordable: 0 };
+  const counts = { sent: 0, failed: 0, dequeued: 0, deferred: 0, unaffordable: 0, exhausted: 0 };
   const budget = createDispatchCreditBudget(credits.balance);
 
   // Start-rate cap: keep dispatch-loop starts under `configuredDispatcherSmsMps`.
@@ -255,12 +259,25 @@ export async function dispatchCampaignSmsBatch(args: {
 
   await runPacedSendBatches({ queueMembers, ctx, batchSize: BATCH_SIZE, minStartIntervalMs, responses });
 
+  // Rows that failed for the last time are dead-lettered now so a bad number
+  // cannot pin the chain to retries forever (#1513). Exhausted rows may also
+  // include failures from earlier ticks, so clamp the remaining count.
+  if (counts.failed > 0) {
+    counts.exhausted = await rpcFailExhaustedCampaignQueueContacts(
+      createTenantDb(workspaceId),
+      Number(campaignId),
+    );
+  }
+
   const truncated = allQueued.length - queueMembers.length;
   return {
     kind: "dispatched",
     responses,
     counts,
-    queuedRemaining: truncated + counts.deferred + counts.failed + counts.unaffordable,
+    queuedRemaining: Math.max(
+      0,
+      truncated + counts.deferred + counts.failed + counts.unaffordable - counts.exhausted,
+    ),
     creditsExhausted: counts.unaffordable > 0 && budget.exhausted,
   };
 }
@@ -305,6 +322,7 @@ type DispatchCounts = {
   dequeued: number;
   deferred: number;
   unaffordable: number;
+  exhausted: number;
 };
 
 /** The row stays queued; a relaunch after a top-up picks it up. */
@@ -485,15 +503,12 @@ async function handleMember(
       counts.sent += 1;
       return { [member.contact_id]: { success: true, ...result } };
     },
-    (error) => {
+    async (error) => {
       ctx.budget.release(cost);
+      const message = error instanceof Error ? error.message : String(error);
       counts.failed += 1;
-      return {
-        [member.contact_id]: {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      };
+      await recordQueueAttemptFailure({ queueId: member.id, error: message, workspaceId });
+      return { [member.contact_id]: { success: false, error: message } };
     },
   );
 }

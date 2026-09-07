@@ -135,6 +135,7 @@ vi.mock("@/server/tenant-db", () => ({
 }));
 
 vi.mock("@/lib/campaign-queue-db.server", () => ({
+  recordQueueAttemptFailure: vi.fn(async () => undefined),
   dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
 }));
 
@@ -143,6 +144,7 @@ vi.mock("@/lib/sms-campaign-db.server", () => ({
 }));
 
 vi.mock("@/lib/db-rpc.server", () => ({
+  rpcFailExhaustedCampaignQueueContacts: vi.fn(async () => 0),
   rpcCreateOutreachAttempt: (...args: unknown[]) => mocks.rpcCreateOutreachAttempt(...args),
 }));
 vi.mock("@/lib/object-storage.server", () => ({

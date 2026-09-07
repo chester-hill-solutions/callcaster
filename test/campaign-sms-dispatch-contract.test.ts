@@ -60,6 +60,8 @@ const mocks = vi.hoisted(() => ({
   findCampaignInWorkspace: vi.fn(),
   updateCampaignStatusInWorkspace: vi.fn(async () => undefined),
   rpcTryCompleteCampaignIfDrained: vi.fn(async () => true),
+  rpcFailExhaustedCampaignQueueContacts: vi.fn(async () => 0),
+  recordQueueAttemptFailure: vi.fn(async () => undefined),
   createTenantDb: vi.fn(() => ({ tenant: true })),
   enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 99 })),
 
@@ -102,6 +104,7 @@ vi.mock("@/lib/database/workspace.server", () => ({
 }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
+  recordQueueAttemptFailure: (...args: unknown[]) => mocks.recordQueueAttemptFailure(...args),
 }));
 vi.mock("@/lib/message-db.server", () => ({
   countCampaignMessagesToPhone: (...args: unknown[]) => mocks.countCampaignMessagesToPhone(...args),
@@ -133,6 +136,8 @@ vi.mock("@/lib/sms-send.server", () => ({
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...args: unknown[]) => mocks.rpcCreateOutreachAttempt(...args),
   rpcTryCompleteCampaignIfDrained: (...args: unknown[]) => mocks.rpcTryCompleteCampaignIfDrained(...args),
+  rpcFailExhaustedCampaignQueueContacts: (...args: unknown[]) =>
+    mocks.rpcFailExhaustedCampaignQueueContacts(...args),
 }));
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: (...args: unknown[]) => mocks.createTenantDb(...args),
@@ -573,5 +578,41 @@ describe("SMS dispatch contract — balance covers one send, not two", () => {
     assertSendContract(1);
     assertDequeueContract(["SMS message sent"]);
     expect(mocks.enqueueJob).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Exhaustion (#1513): a send that fails records the attempt on its queue row
+// and the batch runs the exhaustion sweep, so a row at the attempt maximum is
+// dead-lettered and reported instead of pinning the chain to retries.
+// ---------------------------------------------------------------------------
+
+describe("SMS dispatch contract — a failing send records its attempt and the sweep dead-letters it", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    seedCommonMocks();
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue(baseCampaignData());
+    mocks.getCampaignQueueById.mockResolvedValue([
+      {
+        id: 701,
+        contact_id: 30,
+        contact: { id: 30, phone: "+15551110001", firstname: "One", opt_out: false },
+      },
+    ]);
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({
+      messages: { create: vi.fn(async () => { throw new Error("Twilio 30006 landline"); }) },
+    });
+    mocks.rpcFailExhaustedCampaignQueueContacts.mockResolvedValue(1);
+  });
+
+  test("worker adapter reports the dead-lettered row and stops the chain cleanly", async () => {
+    const result = await runWorkerAdapter();
+    expect(mocks.recordQueueAttemptFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ queueId: 701, error: expect.stringContaining("30006") }),
+    );
+    expect(mocks.rpcFailExhaustedCampaignQueueContacts).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ ok: true, failed: 1, exhausted: 1, queuedRemaining: 0 });
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+    assertDequeueContract([]);
   });
 });

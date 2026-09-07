@@ -619,6 +619,29 @@ function isByIdArgs(args: DequeueQueueEntryArgs): args is DequeueQueueEntryByIdA
   return "id" in args.by;
 }
 
+/**
+ * Record a failed dispatch attempt on a queued row so the exhaustion sweep
+ * (`fail_exhausted_campaign_queue_contacts`) can dead-letter it once the
+ * policy maximum is reached, instead of leaving it queued forever (#1513).
+ * The live-call claim path bumps `attempt_count` inside its claim RPC; the
+ * SMS and IVR dispatch loops never claim, so they record here.
+ */
+export async function recordQueueAttemptFailure(args: {
+  queueId: number;
+  error: string;
+  workspaceId?: string;
+}): Promise<void> {
+  await updateCampaignQueueAndEmit({
+    conditions: [eq(campaignQueueTable.id, args.queueId), isNull(campaignQueueTable.dequeued_at)],
+    set: {
+      attempt_count: sql`${campaignQueueTable.attempt_count} + 1`,
+      last_attempt_at: new Date().toISOString(),
+      last_attempt_error: args.error.slice(0, 500),
+    },
+    workspaceId: args.workspaceId,
+  });
+}
+
 export async function dequeueQueueEntry(
   args: DequeueQueueEntryArgs,
 ): Promise<DequeueQueueEntryResult> {
