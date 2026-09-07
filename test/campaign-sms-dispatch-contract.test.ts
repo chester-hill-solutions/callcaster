@@ -515,3 +515,63 @@ describe("SMS dispatch contract — start rate does not exceed configured MPS", 
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Credit budget (#1483): the entry gate reads the balance once, but debits
+// land after delivery, so every row in a batch would pass on the same stale
+// balance. Both adapters must stop starting sends once the remaining balance
+// cannot cover the next estimated message, and leave those rows queued.
+// ---------------------------------------------------------------------------
+
+const TWO_ELIGIBLE_ROWS: QueueMember[] = [
+  {
+    id: 701,
+    contact_id: 30,
+    contact: { id: 30, phone: "+15551110001", firstname: "One", opt_out: false },
+  },
+  {
+    id: 702,
+    contact_id: 31,
+    contact: { id: 31, phone: "+15551110002", firstname: "Two", opt_out: false },
+  },
+];
+
+describe("SMS dispatch contract — balance covers one send, not two", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    seedCommonMocks();
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue(baseCampaignData());
+    mocks.getCampaignQueueById.mockResolvedValue(TWO_ELIGIBLE_ROWS);
+    // One-segment SMS costs 2 credits; a balance of 3 passes the entry gate
+    // and affords exactly one send.
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(3);
+  });
+
+  test("HTTP adapter sends one row, leaves the other queued, and reports exhaustion", async () => {
+    const res = await runHttpAdapter();
+    const body = (await res.json()) as {
+      responses: Record<string, { skipped?: boolean; reason?: string }>[];
+      creditsExhausted: boolean;
+    };
+    expect(body.creditsExhausted).toBe(true);
+    assertSendContract(1);
+    assertDequeueContract(["SMS message sent"]);
+    const skipped = body.responses.flatMap((r) => Object.values(r)).filter((r) => r.skipped);
+    expect(skipped).toEqual([
+      { success: false, skipped: true, reason: "Insufficient credits for the estimated message cost" },
+    ]);
+  });
+
+  test("worker adapter stops the chain as insufficient credits after the affordable send", async () => {
+    const result = await runWorkerAdapter();
+    expect(result).toMatchObject({
+      ok: true,
+      blocked: "insufficient_credits",
+      sent: 1,
+      unaffordable: 1,
+    });
+    assertSendContract(1);
+    assertDequeueContract(["SMS message sent"]);
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+  });
+});
