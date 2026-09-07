@@ -7,6 +7,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Fixed
 
 - Campaign results show message totals and contact progress as separate numbers, so a contact who received several messages no longer counts several times toward progress.
+- A campaign whose workspace runs out of credits is paused instead of staying marked as running after dispatch stops. Relaunch it after topping up.
 
 ## 2026-09-05 — release dev → master
 

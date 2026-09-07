@@ -216,6 +216,21 @@ export type CampaignDispatchParams = {
   userId: string | undefined;
 };
 
+async function pauseForInsufficientCredits(
+  workspaceId: string,
+  campaignId: number,
+  detail: Record<string, number> = {},
+): Promise<void> {
+  await updateCampaignStatusInWorkspace(workspaceId, campaignId, {
+    status: "paused",
+  });
+  logger.warn("campaign_dispatch.insufficient_credits", {
+    campaignId,
+    workspaceId,
+    ...detail,
+  });
+}
+
 export async function campaignDispatchHandler(
   job: ClaimedJobRow,
   params: CampaignDispatchParams,
@@ -332,8 +347,9 @@ export async function campaignDispatchHandler(
 
   switch (outcome.kind) {
     case "insufficient_credits":
-      // Not retried: dispatch resumes when the user relaunches after top-up.
-      logger.warn("campaign_dispatch.insufficient_credits", { campaignId, workspaceId });
+      // Park the campaign so a stopped chain cannot leave it marked running;
+      // the owner relaunches after topping up.
+      await pauseForInsufficientCredits(workspaceId, campaignId);
       return { ok: true, campaignId, blocked: "insufficient_credits" };
     case "caller_id_required":
       // Config error — retrying cannot fix it; surface loudly and stop.
@@ -361,9 +377,7 @@ export async function campaignDispatchHandler(
       // The balance ran out inside the batch: stop the chain exactly as the
       // entry gate does. Rows the budget refused stay queued for a relaunch.
       if (outcome.creditsExhausted) {
-        logger.warn("campaign_dispatch.insufficient_credits", {
-          campaignId,
-          workspaceId,
+        await pauseForInsufficientCredits(workspaceId, campaignId, {
           sent: counts.sent,
           unaffordable: counts.unaffordable,
         });
@@ -442,8 +456,9 @@ async function runMachineVoiceDispatch(
 
   switch (outcome.kind) {
     case "insufficient_credits":
-      // Not retried: dispatch resumes when the user relaunches after top-up.
-      logger.warn("campaign_dispatch.insufficient_credits", { campaignId, workspaceId });
+      // Park the campaign so a stopped chain cannot leave it marked running;
+      // the owner relaunches after topping up.
+      await pauseForInsufficientCredits(workspaceId, campaignId);
       return { ok: true, campaignId, blocked: "insufficient_credits" };
     case "caller_id_required":
       // Config error — retrying cannot fix it; surface loudly and stop.
