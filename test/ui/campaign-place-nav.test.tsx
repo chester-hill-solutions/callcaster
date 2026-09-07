@@ -3,6 +3,8 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, test } from "vitest";
 
 import { CampaignPlaceNav } from "@/components/campaign/CampaignPlaceNav";
+import { CampaignShellDirtyProvider, useCampaignShellDirty } from "@/components/campaign/home/CampaignShellDirty";
+import { useEffect } from "react";
 
 function renderPlaceNav(current: "setup" | "content" | "queue" | "launch") {
   const router = createMemoryRouter(
@@ -47,5 +49,39 @@ describe("CampaignPlaceNav", () => {
     expect(screen.getByTestId("campaign-place-nav-next")).toHaveTextContent(
       "View Results",
     );
+  });
+});
+
+function DirtySetupNav() {
+  const { setIsDirty } = useCampaignShellDirty();
+  useEffect(() => {
+    setIsDirty(true);
+  }, [setIsDirty]);
+  return <CampaignPlaceNav current="setup" />;
+}
+
+describe("CampaignPlaceNav with unsaved Setup changes (#1128)", () => {
+  test("Next is inert and explains why while edits are unsaved", () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/workspaces/:id/campaigns/:selected_id/*",
+          element: (
+            <CampaignShellDirtyProvider>
+              <DirtySetupNav />
+            </CampaignShellDirtyProvider>
+          ),
+        },
+      ],
+      { initialEntries: ["/workspaces/ws-1/campaigns/9/settings"] },
+    );
+    render(<RouterProvider router={router} />);
+    const next = screen.getByTestId("campaign-place-nav-next");
+    expect(next.tagName).toBe("BUTTON");
+    expect(next).toBeDisabled();
+    expect(next).not.toHaveAttribute("href");
+    expect(next).toHaveAccessibleDescription("Save or discard your changes to continue.");
+    expect(screen.getByText("Save or discard your changes to continue.")).toBeVisible();
+    expect(next).toHaveTextContent("Next: Content");
   });
 });
