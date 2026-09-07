@@ -49,6 +49,7 @@ import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { MemberRole } from "@/lib/member-role";
 import { toUserMessage } from "@/lib/user-message";
+import { sendCampaignTestSms } from "@/lib/campaign-test-send.server";
 
 type CampaignStatus = "pending" | "scheduled" | "running" | "complete" | "paused" | "draft" | "archived" | "waiting";
 
@@ -322,6 +323,43 @@ export const action = defineAction({
       }
     }
 
+    case "test_send": {
+      const campaignRecord = await findCampaignInWorkspace(workspace_id, selected_id);
+      if (!campaignRecord) {
+        return routeData(
+          { success: false, error: "Campaign could not be loaded", actionType: "test_send" as const },
+          { status: 404 },
+        );
+      }
+      if (campaignRecord.type !== "message") {
+        return routeData(
+          {
+            success: false,
+            error: "Test sends are only available for message campaigns right now.",
+            actionType: "test_send" as const,
+          },
+          { status: 400 },
+        );
+      }
+      const result = await sendCampaignTestSms({
+        workspaceId: workspace_id,
+        campaignId: selected_id,
+        userId: user.id,
+        to: String(data.phone ?? ""),
+      });
+      if (!result.ok) {
+        return routeData(
+          { success: false, error: result.message, actionType: "test_send" as const },
+          { status: result.reason === "insufficient_credits" ? 402 : 400 },
+        );
+      }
+      return routeData({
+        success: true,
+        actionType: "test_send" as const,
+        to: result.to,
+        usedSampleContact: result.usedSampleContact,
+      });
+    }
     case "duplicate": {
       try {
         const result = await duplicateCampaign({
