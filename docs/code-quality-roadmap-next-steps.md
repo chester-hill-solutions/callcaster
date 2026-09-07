@@ -27,6 +27,7 @@ Completed:
 - E4.1: issue-board generation is staged and atomic (`scripts/issue-board-generate.mjs`); a failed run leaves every enrichment file and the board unchanged.
 - E7.1 (scriptkit): `npm run check:vendor-dist` rebuilds the two scriptkit packages and fails on any dist/ byte that src/ does not produce; runs first in `ci:local` and in the CI quality job. `shad-cc` is excluded because its tsup build with code splitting is not deterministic (chunk hashes flip between identical runs); making it reproducible is the remaining E7.1 work.
 - E6.1: the queue-action body is a discriminated union (`patchCampaignQueueBodySchema`); each action's required fields are enforced at the boundary.
+- E3.3: the design gallery route is gated by `isDesignGalleryEnabled` (development, E2E, or `DESIGN_GALLERY_ENABLED` in production; 404 otherwise), its light and dark copies use scoped element ids, and the page theme toggle goes through the app theme provider.
 
 Remaining high-priority work:
 
