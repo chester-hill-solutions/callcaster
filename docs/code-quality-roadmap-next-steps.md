@@ -23,10 +23,10 @@ Completed:
 - E0.1: removed the unsafe unattended overnight runner from the worktree.
 - E1.1: bounded SMS send-window deferrals in PR `#1388`.
 - CI performance and load work: PRs `#1389`, `#1390`, and `#1391`.
+- E4.1: issue-board generation is staged and atomic (`scripts/issue-board-generate.mjs`); a failed run leaves every enrichment file and the board unchanged.
 
 Remaining high-priority work:
 
-- Make issue-board pruning atomic.
 - Fix theme-token contrast and test rendered toast states.
 - Unify SMS and IVR schedule projection.
 - Restore the SMS OpenAPI response contract.
