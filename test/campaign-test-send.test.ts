@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+vi.hoisted(() => {
+  // Real server modules are spread into the mocks below; the db client
+  // refuses to load without a connection string even though nothing queries.
+  process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
+});
+
 const mocks = vi.hoisted(() => ({
   requireOutboundCredits: vi.fn(),
   loadCampaignSmsDispatchData: vi.fn(),
@@ -10,26 +16,35 @@ const mocks = vi.hoisted(() => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock("@/lib/outbound-credit-gate.server", () => ({
+vi.mock("@/lib/outbound-credit-gate.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/outbound-credit-gate.server")>()),
   requireOutboundCredits: (...args: unknown[]) => mocks.requireOutboundCredits(...args),
 }));
-vi.mock("@/lib/sms-campaign-db.server", () => ({
+vi.mock("@/lib/sms-campaign-db.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/sms-campaign-db.server")>()),
   loadCampaignSmsDispatchData: (...args: unknown[]) =>
     mocks.loadCampaignSmsDispatchData(...args),
 }));
-vi.mock("@/lib/database/contact.server", () => ({
+vi.mock("@/lib/database/contact.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/database/contact.server")>()),
   findContactsByPhone: (...args: unknown[]) => mocks.findContactsByPhone(...args),
 }));
-vi.mock("@/lib/chat-sms-guards.server", () => ({
+vi.mock("@/lib/chat-sms-guards.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/chat-sms-guards.server")>()),
   isOptedOutRecipient: (...args: unknown[]) => mocks.isOptedOutRecipient(...args),
 }));
-vi.mock("@/lib/object-storage.server", () => ({
+vi.mock("@/lib/object-storage.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/object-storage.server")>()),
   createSignedObjectUrl: (...args: unknown[]) => mocks.createSignedObjectUrl(...args),
 }));
-vi.mock("@/lib/chat-sms.server", () => ({
+vi.mock("@/lib/chat-sms.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/chat-sms.server")>()),
   sendMessage: (...args: unknown[]) => mocks.sendMessage(...args),
 }));
-vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+vi.mock("@/lib/logger.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/logger.server")>()),
+  logger: mocks.logger,
+}));
 
 const campaign = (overrides: Partial<{
   body_text: string;

@@ -111,7 +111,8 @@ vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
 const testSendMocks = vi.hoisted(() => ({
   sendCampaignTestSms: vi.fn(),
 }));
-vi.mock("@/lib/campaign-test-send.server", () => ({
+vi.mock("@/lib/campaign-test-send.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-test-send.server")>()),
   sendCampaignTestSms: (...args: unknown[]) => testSendMocks.sendCampaignTestSms(...args),
 }));
 
