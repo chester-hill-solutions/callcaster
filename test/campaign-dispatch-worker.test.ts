@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   dispatchCampaignIvrBatch: vi.fn(),
   enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 99 })),
   rescheduleQueuedJob: vi.fn(async () => true),
+  requireOutboundCredits: vi.fn(async () => ({ ok: true, balance: 100 })),
   findCampaignInWorkspace: vi.fn(),
   updateCampaignStatusInWorkspace: vi.fn(async () => undefined),
   rpcTryCompleteCampaignIfDrained: vi.fn(async () => true),
@@ -33,6 +34,10 @@ vi.mock("@/lib/campaign-ivr-dispatch.server", () => ({
 vi.mock("@/lib/worker/enqueue-job.server", () => ({
   unsafeEnqueueJob: mocks.enqueueJob,
   rescheduleQueuedJob: mocks.rescheduleQueuedJob,
+}));
+vi.mock("@/lib/outbound-credit-gate.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/outbound-credit-gate.server")>()),
+  requireOutboundCredits: mocks.requireOutboundCredits,
 }));
 vi.mock("@/lib/campaign-ivr.server", () => ({
   findCampaignInWorkspace: mocks.findCampaignInWorkspace,
@@ -69,7 +74,7 @@ import {
   campaignDispatchHandler as realCampaignDispatchHandler,
   type CampaignDispatchParams,
 } from "@/lib/worker/handlers/campaign.server";
-import { launchCampaign } from "@/lib/campaign-execution.server";
+import { kickoffCampaign, launchCampaign } from "@/lib/campaign-execution.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 
 const WORKSPACE_ID = "3b6f0a52-6f5e-4b2d-9d55-000000000001";
@@ -627,6 +632,77 @@ describe("launchCampaign", () => {
       userId: "",
     });
     expect(result.ok).toBe(false);
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+  });
+});
+
+describe("kickoffCampaign (#1486)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.requireOutboundCredits.mockResolvedValue({ ok: true, balance: 100 });
+  });
+
+  test("enqueues one live-deduped dispatch job without touching a running campaign", async () => {
+    const result = await kickoffCampaign({
+      workspaceId: WORKSPACE_ID,
+      campaignId: 42,
+      campaign: runningMessageCampaign() as never,
+      userId: USER_ID,
+    });
+    expect(result).toMatchObject({ ok: true, status: "running" });
+    expect(mocks.updateCampaignStatusInWorkspace).not.toHaveBeenCalled();
+    expect(mocks.enqueueJob).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "campaign_dispatch",
+        dedupe: { kind: "live", workspaceId: WORKSPACE_ID, campaignId: 42 },
+      }),
+    );
+  });
+
+  test("a paused campaign is set back to running before the job is enqueued", async () => {
+    await kickoffCampaign({
+      workspaceId: WORKSPACE_ID,
+      campaignId: 42,
+      campaign: runningMessageCampaign({ status: "paused" }) as never,
+      userId: USER_ID,
+    });
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
+      WORKSPACE_ID,
+      42,
+      { status: "running" },
+    );
+    expect(mocks.enqueueJob).toHaveBeenCalledTimes(1);
+  });
+
+  test("refuses without credits, for a human-dialled campaign, and without a user", async () => {
+    mocks.requireOutboundCredits.mockResolvedValueOnce({ ok: false, reason: "insufficient_credits" });
+    expect(
+      await kickoffCampaign({
+        workspaceId: WORKSPACE_ID,
+        campaignId: 42,
+        campaign: runningMessageCampaign() as never,
+        userId: USER_ID,
+      }),
+    ).toMatchObject({ ok: false, error: "Insufficient credits" });
+
+    expect(
+      await kickoffCampaign({
+        workspaceId: WORKSPACE_ID,
+        campaignId: 42,
+        campaign: runningMessageCampaign({ type: "live_call" }) as never,
+        userId: USER_ID,
+      }),
+    ).toMatchObject({ ok: false });
+
+    expect(
+      await kickoffCampaign({
+        workspaceId: WORKSPACE_ID,
+        campaignId: 42,
+        campaign: runningMessageCampaign() as never,
+        userId: "",
+      }),
+    ).toMatchObject({ ok: false });
     expect(mocks.enqueueJob).not.toHaveBeenCalled();
   });
 });

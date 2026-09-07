@@ -35,7 +35,11 @@ import {
   getScheduleValidation,
   resolveReadinessQueueCount,
 } from "@/lib/campaign-readiness";
-import { launchCampaign, isMachineDispatchedVoiceCampaignType } from "@/lib/campaign-execution.server";
+import {
+  launchCampaign,
+  kickoffCampaign,
+  isMachineDispatchedVoiceCampaignType,
+} from "@/lib/campaign-execution.server";
 import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
 import { logger } from "@/lib/logger.server";
@@ -266,6 +270,52 @@ export const action = defineAction({
             success: false,
             error: toUserMessage(error, "Campaign status could not be updated"),
             actionType: "status" as const,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    case "kickoff": {
+      try {
+        const campaignRecord = await findCampaignInWorkspace(workspace_id, selected_id);
+        if (!campaignRecord) {
+          return routeData(
+            { success: false, error: "Campaign could not be loaded", actionType: "kickoff" as const },
+            { status: 404 },
+          );
+        }
+        const result = await kickoffCampaign({
+          workspaceId: workspace_id,
+          campaignId: Number(selected_id),
+          campaign: campaignRecord as Campaign,
+          userId: user.id,
+        });
+        if (!result.ok) {
+          return routeData(
+            { success: false, error: result.error, actionType: "kickoff" as const },
+            { status: 400 },
+          );
+        }
+        logger.info("campaign.kickoff", {
+          workspaceId: workspace_id,
+          campaignId: selected_id,
+          userId: user.id,
+          deduped: result.job.deduped ?? false,
+        });
+        return routeData({
+          success: true,
+          actionType: "kickoff" as const,
+          status: result.status,
+          deduped: result.job.deduped ?? false,
+        });
+      } catch (error) {
+        logger.error("Error kicking off campaign", error);
+        return routeData(
+          {
+            success: false,
+            error: toUserMessage(error, "Campaign could not be kicked off"),
+            actionType: "kickoff" as const,
           },
           { status: 400 },
         );

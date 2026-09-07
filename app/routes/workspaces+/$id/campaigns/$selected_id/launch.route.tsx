@@ -30,6 +30,7 @@ export default function CampaignLaunchRoute() {
     readinessIssues,
     launchLabel,
     handleDuplicate,
+    handleKickoff,
     handleConfirmStatus,
     handleInputChange,
     handleSave,
@@ -49,6 +50,7 @@ export default function CampaignLaunchRoute() {
       phoneNumbers={phoneNumbers}
       handleInputChange={handleInputChange}
       handleDuplicateButton={handleDuplicate}
+      handleKickoffButton={handleKickoff}
       handleStatusButton={handleStatusButton}
       handleConfirmStatus={handleConfirmStatus}
       handleScheduleButton={handleScheduleButton}
