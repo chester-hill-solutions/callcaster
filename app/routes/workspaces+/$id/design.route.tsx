@@ -95,6 +95,26 @@ export function Gallery({ scope }: { scope: string }) {
         </Alert>
       </section>
 
+      <section className="grid gap-2" aria-label="Tone text">
+        <h3 className="text-sm font-semibold">Standalone tone text</h3>
+        <p className="text-xs text-muted-foreground">
+          Text-only uses of a tone (no wash, no surface) take the `text-*-text` tokens; the
+          surface tokens are for badges, borders, icons, and washes.
+        </p>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <span className="text-success-text">Success text</span>
+          <span className="text-info-text">Info text</span>
+          <span className="text-warning-text">Warning text</span>
+          <span className="text-destructive-text">Destructive text</span>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full border border-success/40 bg-success/20 px-2 py-0.5 text-success-text">On success wash</span>
+          <span className="rounded-full border border-warning/60 bg-warning/20 px-2 py-0.5 text-warning-text">On warning wash</span>
+          <span className="rounded-full border border-info/40 bg-info/20 px-2 py-0.5 text-info-text">On info wash</span>
+          <span className="rounded-full border border-destructive/40 bg-destructive/20 px-2 py-0.5 text-destructive-text">On destructive wash</span>
+        </div>
+      </section>
+
       <section className="grid gap-2" aria-label="Badges and status">
         <h3 className="text-sm font-semibold">Badges</h3>
         <div className="flex flex-wrap items-center gap-2">

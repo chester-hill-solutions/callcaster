@@ -110,11 +110,11 @@ const SUPPORT_LEVEL_LABELS: Record<SupportLevel, string> = {
 };
 
 const SUPPORT_LEVEL_BADGE_CLASS: Record<SupportLevel, string> = {
-    1: "bg-success/20 text-success border-success/40",
-    2: "bg-success/10 text-success border-success/30",
-    3: "bg-warning/20 text-warning border-warning/60 ring-2 ring-warning/40 font-semibold",
-    4: "bg-destructive/10 text-destructive border-destructive/30",
-    5: "bg-destructive/20 text-destructive border-destructive/40",
+    1: "bg-success/20 text-success-text border-success/40",
+    2: "bg-success/10 text-success-text border-success/30",
+    3: "bg-warning/20 text-warning-text border-warning/60 ring-2 ring-warning/40 font-semibold",
+    4: "bg-destructive/10 text-destructive-text border-destructive/30",
+    5: "bg-destructive/20 text-destructive-text border-destructive/40",
 };
 
 function getContactSupportLevel(contact: Contact & {

@@ -404,7 +404,7 @@ export default function NewSurveyPage() {
         ))}
 
         {fetcher.data && "error" in fetcher.data && fetcher.data.error && (
-          <p role="alert" className="text-sm text-destructive mb-4">
+          <p role="alert" className="text-sm text-destructive-text mb-4">
             {fetcher.data.error}
           </p>
         )}

@@ -59,7 +59,7 @@ export function NumberPurchaseConfirmDialog({
               />
               <input type="hidden" name="workspace_id" value={workspaceId} />
               {purchaseFetcher.data?.creditsError ? (
-                <Text className="text-sm text-destructive">
+                <Text className="text-sm text-destructive-text">
                   You do not have enough credits to purchase this number.
                 </Text>
               ) : null}

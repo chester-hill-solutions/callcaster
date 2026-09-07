@@ -299,7 +299,7 @@ export function AdminWorkspacesPanel({ workspaceRows }: AdminWorkspacesPanelProp
                                                         : "Never synced"}
                                                 </div>
                                                 {workspace.twilioLastSyncError && (
-                                                    <div className="text-xs text-destructive">
+                                                    <div className="text-xs text-destructive-text">
                                                         {workspace.twilioLastSyncError}
                                                     </div>
                                                 )}

@@ -124,7 +124,7 @@ function AttemptAccordionItem({
             </span>
           </div>
           <div className="flex shrink-0 items-center gap-2">
-            <Clipboard className="h-4 w-4 text-success" aria-hidden="true" />
+            <Clipboard className="h-4 w-4 text-success-text" aria-hidden="true" />
             <span className="text-sm font-semibold capitalize text-foreground">
               {getDisposition()}
             </span>

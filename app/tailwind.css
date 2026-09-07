@@ -10,6 +10,40 @@
 @source "../vendor/chester-hill-solutions/shad-cc/src";
 @source "./**/*.{ts,tsx}";
 
+/*
+ * Tone text tokens (roadmap E3.1). The shared `--success` / `--warning` /
+ * `--info` / `--destructive` tokens are surface colours: right for solid
+ * badges, buttons, washes, borders, and icons, but as standalone text on the
+ * page background they miss WCAG AA (light: success 3.3:1, warning 2.4:1,
+ * info 4.0:1; dark: destructive 2.3:1). `text-*-text` is the utility for tone
+ * text on `background`/`card` and on the 20% tone washes; every value here
+ * clears 4.5:1 in its theme (test/theme-contrast.test.ts pins that).
+ * `--info` in light is also pulled down so the solid info badge's white
+ * foreground clears 4.5:1 (it was 3.9:1). Owned here until CHS adopts it.
+ */
+:root,
+.light {
+  --info: hsl(198 78% 34%);
+  --success-text: hsl(160 55% 29%);
+  --warning-text: hsl(36 95% 30%);
+  --info-text: hsl(198 78% 28%);
+  --destructive-text: hsl(0 74% 41%);
+}
+
+.dark {
+  --success-text: hsl(160 50% 44%);
+  --warning-text: hsl(36 90% 46%);
+  --info-text: hsl(198 70% 52%);
+  --destructive-text: hsl(0 62% 63%);
+}
+
+@theme inline {
+  --color-success-text: var(--success-text);
+  --color-warning-text: var(--warning-text);
+  --color-info-text: var(--info-text);
+  --color-destructive-text: var(--destructive-text);
+}
+
 /* Preserve CallCaster legacy font utility class names */
 @theme inline {
   --font-Tabac-Slab: var(--font-brand);

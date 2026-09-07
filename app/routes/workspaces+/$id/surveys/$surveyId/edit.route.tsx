@@ -426,7 +426,7 @@ export default function EditSurveyPage() {
         </div>
 
         {fetcher.data && "error" in fetcher.data && fetcher.data.error && (
-          <p role="alert" className="text-sm text-destructive mt-4">
+          <p role="alert" className="text-sm text-destructive-text mt-4">
             {fetcher.data.error}
           </p>
         )}

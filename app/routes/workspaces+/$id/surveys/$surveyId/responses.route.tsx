@@ -162,11 +162,11 @@ export default function SurveyResponsesPage() {
                 <Text variant="small">
                   Completed
                 </Text>
-                <p className="text-2xl font-bold text-success">
+                <p className="text-2xl font-bold text-success-text">
                   {stats.completed}
                 </p>
               </div>
-              <CheckCircle className="h-8 w-8 text-success" />
+              <CheckCircle className="h-8 w-8 text-success-text" />
             </div>
         </div>
 
@@ -176,11 +176,11 @@ export default function SurveyResponsesPage() {
                 <Text variant="small">
                   In Progress
                 </Text>
-                <p className="text-2xl font-bold text-warning">
+                <p className="text-2xl font-bold text-warning-text">
                   {stats.inProgress}
                 </p>
               </div>
-              <Clock className="h-8 w-8 text-warning" />
+              <Clock className="h-8 w-8 text-warning-text" />
             </div>
         </div>
 

@@ -23,6 +23,7 @@ Completed:
 - E0.1: removed the unsafe unattended overnight runner from the worktree.
 - E1.1: bounded SMS send-window deferrals in PR `#1388`.
 - CI performance and load work: PRs `#1389`, `#1390`, and `#1391`.
+- E3.1: standalone tone text has its own tokens (`--*-text`, utilities `text-*-text`) that clear AA in both themes; the light `--info` surface is darker so its badge foreground passes; `test/theme-contrast.test.ts` reads the stylesheets and fails on any tone text, solid surface, or body text below 4.5:1.
 - E5.1: `POST /api/sms` documents its dispatched and deferred variants (`oneOf`, with `creditsExhausted`, `deferred`, `reason`, `nextOpenAt`) and the 402 credits error; generated clients regenerated and the runtime bodies are validated against the generated Zod in the dispatch contract test.
 - E6.3: `app/lib/sql-conditions.ts` is the one non-empty `and`/`or` combinator (call log and queue search dropped their copies) and `weekdayKey` in `schedule-intervals.ts` is the total weekday accessor the send-window module reuses.
 - E6.2: `getCallScreenData` validates the workspace, campaign, and audience lookups itself and returns a typed `CallScreenData` (no `as unknown as`); the call loader and telephony readiness dropped their repeated null checks.
@@ -36,7 +37,6 @@ Completed:
 
 Remaining high-priority work:
 
-- Fix theme-token contrast and test rendered toast states.
 
 ## Roadmap Summary
 

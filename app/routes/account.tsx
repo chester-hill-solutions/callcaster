@@ -215,7 +215,7 @@ export default function Account() {
             }
           />
           {profile.enrollRequired && profile.privileged && !twoFactorEnabled ? (
-            <Text className="text-sm text-destructive">
+            <Text className="text-sm text-destructive-text">
               MFA enrollment is required before you can access your workspace.
             </Text>
           ) : null}

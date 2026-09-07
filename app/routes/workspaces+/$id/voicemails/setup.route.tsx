@@ -227,7 +227,7 @@ export default function VoicemailSetupPage() {
                           <Text variant="caption">No greeting yet</Text>
                         )}
                         {number.currentRouting && number.routingWouldChange ? (
-                          <Text variant="caption" className="text-warning">
+                          <Text variant="caption" className="text-warning-text">
                             {number.currentRouting} — voicemail will replace this
                           </Text>
                         ) : null}
