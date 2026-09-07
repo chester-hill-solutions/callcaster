@@ -27,38 +27,47 @@ export const queueFiltersSchema = z.object({
   queueStatus: z.string().optional(),
 });
 
+/** Which queue rows an action applies to: explicit ids, or every row matching the filters. */
+const queueSelectionFields = {
+  ids: z.array(z.number().int()).optional(),
+  all: z.boolean().optional(),
+  filters: queueFiltersSchema.optional(),
+};
+
+/**
+ * One variant per action, so each action's required fields are enforced at
+ * the request boundary and handlers get a narrowed body instead of guarding
+ * for fields that "should" be there (roadmap E6.1).
+ */
 export const patchCampaignQueueBodySchema = z
-  .object({
-    action: z.enum([
-      "update_status",
-      "add_contact_ids",
-      "add_audience",
-      "remove",
-    ]),
-    status: z.string().optional(),
-    ids: z.array(z.number().int()).optional(),
-    contact_ids: z.array(z.number().int()).optional(),
-    audience_id: z.number().int().optional(),
-    all: z.boolean().optional(),
-    filters: queueFiltersSchema.optional(),
-  })
-  .refine(
-    (body) => {
-      switch (body.action) {
-        case "update_status":
-          return Boolean(body.status);
-        case "add_contact_ids":
-          return (body.contact_ids?.length ?? 0) > 0;
-        case "add_audience":
-          return body.audience_id != null;
-        case "remove":
-          return body.all === true || (body.ids?.length ?? 0) > 0;
-        default:
-          return false;
-      }
-    },
-    { message: "Invalid queue patch payload for action" },
-  );
+  .discriminatedUnion("action", [
+    z.object({
+      action: z.literal("update_status"),
+      status: z.string().min(1),
+      ...queueSelectionFields,
+    }),
+    z.object({
+      action: z.literal("add_contact_ids"),
+      contact_ids: z.array(z.number().int()).min(1),
+    }),
+    z.object({
+      action: z.literal("add_audience"),
+      audience_id: z.number().int(),
+    }),
+    z.object({
+      action: z.literal("remove"),
+      ...queueSelectionFields,
+    }),
+  ])
+  .superRefine((body, ctx) => {
+    if (body.action === "remove" && body.all !== true && (body.ids?.length ?? 0) === 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: "remove requires all: true or a non-empty ids list",
+        path: ["ids"],
+      });
+    }
+  });
 
 export type PatchCampaignQueueBody = z.infer<typeof patchCampaignQueueBodySchema>;
 export type CampaignStatusBody = z.infer<typeof campaignStatusBodySchema>;
