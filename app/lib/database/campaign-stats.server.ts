@@ -66,7 +66,10 @@ export async function fetchBasicResults({
     });
     campaignType = campaign?.type;
   } catch (campaignError) {
-    logger.error("Error fetching campaign type for basic results:", campaignError);
+    logger.error(
+      "Error fetching campaign type for basic results:",
+      campaignError,
+    );
   }
 
   if (campaignType !== "message") {
@@ -74,10 +77,9 @@ export async function fetchBasicResults({
   }
 
   const campaignIdNum = Number(campaignId);
-  const [queueCounts, completedQueueCount, messageStatuses, attemptDispositions] =
-    await Promise.all([
+  const [queueCounts, messageStatuses, attemptDispositions] = await Promise.all(
+    [
       fetchQueueCounts({ workspaceId, campaignId }),
-      countDialableCompletedCampaignQueueRows(campaignIdNum),
       tdb.message.findMany({
         where: and(
           eq(messageTable.campaign_id, campaignIdNum),
@@ -93,7 +95,8 @@ export async function fetchBasicResults({
         ),
         columns: { disposition: true },
       }),
-    ]);
+    ],
+  );
 
   const dispositionCounts = messageStatuses.reduce(
     (acc, row) => {
@@ -114,7 +117,12 @@ export async function fetchBasicResults({
     {} as Record<string, number>,
   );
 
-  const outcomeFallbackKeys = ["failed", "undelivered", "delivered", "sent"] as const;
+  const outcomeFallbackKeys = [
+    "failed",
+    "undelivered",
+    "delivered",
+    "sent",
+  ] as const;
   for (const key of outcomeFallbackKeys) {
     if ((dispositionCounts[key] ?? 0) > 0) continue;
     if ((attemptDispositionCounts[key] ?? 0) > 0) {
@@ -122,20 +130,15 @@ export async function fetchBasicResults({
     }
   }
 
-  dispositionCounts.queued = queueCounts.queuedCount ?? 0;
-  if (completedQueueCount > 0 && dispositionCounts.dequeued == null) {
-    dispositionCounts.dequeued = completedQueueCount;
-  }
-
   logger.info("Message campaign stats assembled", {
     campaignId,
     queuedCount: queueCounts.queuedCount ?? 0,
-    completedQueueCount,
     groupedStatuses: dispositionCounts,
     groupedAttemptDispositions: attemptDispositionCounts,
   });
 
-  const expectedTotal = queueCounts.fullCount ?? Number(baseResults[0]?.expected_total ?? 0);
+  const expectedTotal =
+    queueCounts.fullCount ?? Number(baseResults[0]?.expected_total ?? 0);
   const messageResults = Object.entries(dispositionCounts).map(
     ([disposition, count]) => ({
       disposition,
@@ -357,13 +360,17 @@ export async function fetchCampaignAudience({
   const tdb = tdbIn ?? createTenantDb(workspaceId);
   const campaignIdNum = Number(campaignId);
 
-  const [campaignQueue, queueCount, dequeuedCount, totalCount, scripts] = await Promise.all([
-    fetchDialableCampaignQueueWithContacts({ campaignId: campaignIdNum, limit: 25 }),
-    countDialableQueuedCampaignQueueRows(campaignIdNum),
-    countDialableCompletedCampaignQueueRows(campaignIdNum),
-    countDialableCampaignQueueRows(campaignIdNum),
-    tdb.script.findMany({}),
-  ]);
+  const [campaignQueue, queueCount, dequeuedCount, totalCount, scripts] =
+    await Promise.all([
+      fetchDialableCampaignQueueWithContacts({
+        campaignId: campaignIdNum,
+        limit: 25,
+      }),
+      countDialableQueuedCampaignQueueRows(campaignIdNum),
+      countDialableCompletedCampaignQueueRows(campaignIdNum),
+      countDialableCampaignQueueRows(campaignIdNum),
+      tdb.script.findMany({}),
+    ]);
 
   return {
     campaign_queue: campaignQueue,
@@ -382,7 +389,8 @@ export async function fetchAdvancedCampaignDetails({
 }: {
   workspaceId: string;
   campaignId: string | number;
-  campaignType: "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr";
+  campaignType:
+    "live_call" | "message" | "robocall" | "simple_ivr" | "complex_ivr";
   /** Storage signed URLs for message media */
   tdb?: TenantDb;
 }) {
@@ -409,7 +417,8 @@ export async function fetchAdvancedCampaignDetails({
         where: eq(scriptTable.id, row.script_id),
       })) as Script | null;
     } catch (scriptError) {
-      const message = scriptError instanceof Error ? scriptError.message : "Unknown error";
+      const message =
+        scriptError instanceof Error ? scriptError.message : "Unknown error";
       throw new Error(`Error fetching campaign details: ${message}`);
     }
   }
@@ -427,11 +436,12 @@ export async function fetchAdvancedCampaignDetails({
     mediaLinks: undefined as string[] | undefined,
   };
 
-  if (campaignType === "message" && Array.isArray(data.message_media) && data.message_media.length) {
-    data.mediaLinks = await getSignedUrls(
-      workspaceId,
-      data.message_media,
-    );
+  if (
+    campaignType === "message" &&
+    Array.isArray(data.message_media) &&
+    data.message_media.length
+  ) {
+    data.mediaLinks = await getSignedUrls(workspaceId, data.message_media);
   }
 
   return data;
