@@ -10,6 +10,7 @@ Eighty-six commits on `dev` since the 2026-09-02 release. Manual verification st
 
 ### Fixed
 
+- SMS template tags: the parser now accepts the `{{field}}` and `{{field|"fallback"}}` syntax the message editor inserts, strips fallback quotes, and renders `{{contact_id}}`; previously tags reached recipients with braces attached ([#1641](https://github.com/chester-hill-solutions/callcaster/issues/1641)).
 - The live-call auto-dialer re-checks the workspace credit floor before every dial, not only when the conference starts. A session that reaches the floor releases the contact it just claimed and stops, instead of dialling the rest of its queue into a negative balance ([#1508](https://github.com/chester-hill-solutions/callcaster/issues/1508)). PR [#1524](https://github.com/chester-hill-solutions/callcaster/pull/1524).
 - Verifying a workspace number you already rent as a caller ID is refused before any call to Twilio, so verification can no longer downgrade a rented number and strip its voicemail and emergency eligibility ([#1518](https://github.com/chester-hill-solutions/callcaster/issues/1518)). PR [#1527](https://github.com/chester-hill-solutions/callcaster/pull/1527).
 - Automated phone menu campaigns no longer dial the same phone number twice in one campaign when two contacts share it, matching the guard text campaigns already had ([#1517](https://github.com/chester-hill-solutions/callcaster/issues/1517)). PR [#1529](https://github.com/chester-hill-solutions/callcaster/pull/1529).
