@@ -234,7 +234,7 @@ Node 24+.
 
 ## Vendored packages
 
-`vendor/` carries generated `dist/` output for `shad-cc` and the two `scriptkit` packages, and the app imports that dist. Editing a package's `src/` does nothing until you rebuild (`npm run vendor:build` for scriptkit; `npm --prefix vendor/chester-hill-solutions/shad-cc run build` for shad-cc) and commit the rebuilt `dist/` with it; never edit `dist/` by hand. `npm run check:vendor-dist` (first step of `ci:local`, and a CI quality step) rebuilds the scriptkit packages and fails, naming the files, when the committed dist is not what the committed source produces. shad-cc is not checked yet: its tsup build is not deterministic.
+`vendor/` carries generated `dist/` output for `shad-cc` and the two `scriptkit` packages, and the app imports that dist. Editing a package's `src/` does nothing until you rebuild (`npm run vendor:build` for scriptkit; `npm --prefix vendor/chester-hill-solutions/shad-cc run build` for shad-cc) and commit the rebuilt `dist/` with it; never edit `dist/` by hand. `npm run check:vendor-dist` (first step of `ci:local`, and a CI quality step) rebuilds the scriptkit packages and fails, naming the files, when the committed dist is not what the committed source produces. shad-cc runs in warn-only mode until its build is proven reproducible in CI (#1615).
 
 ## Build, Typegen, And Production Server
 
