@@ -2,9 +2,43 @@
 
 This app runs as a React Router v7 app on `http://localhost:3000`, backed by Postgres (Drizzle ORM), an S3-compatible object store (MinIO locally), and Better Auth. Local services run via Docker Compose. Calling flows also need a public HTTPS URL so Twilio can reach your local webhook endpoints.
 
+## Quick start
+
+```bash
+npm install
+make init         # npm run setup — idempotent; re-run to repair a broken local environment
+make app          # npm run dev → http://localhost:3000
+```
+
+`make init` (`npm run setup`) starts Postgres, MinIO, and mail via docker compose, creates `.env` from the example if missing, applies the full database schema, creates the object-storage bucket, and seeds test users and workspaces. Sign in with a seeded account from [`e2e/fixtures/seed.ts`](../e2e/fixtures/seed.ts). Already running the services elsewhere? `npm run setup -- --skip-docker`.
+
+Verify the setup:
+
+```bash
+npm run typecheck   # react-router typegen + tsc
+npm run lint
+npm test            # vitest node + UI suites, plus bun server-runtime tests
+make e2e            # full Playwright run against compose Postgres + MinIO
+```
+
+## Service control
+
+The `Makefile` wraps `docker compose -f docker-compose.dev.yml` and the npm scripts. A service name before the action scopes it; no service means all of them.
+
+| Command | What it does |
+|---|---|
+| `make up` / `make down` / `make logs` | Start, stop, or follow logs for postgres, minio, and inbucket |
+| `make postgres up`, `make postgres minio logs` | The same for one or more services |
+| `make postgres init` | Start Postgres and bootstrap the schema only (`make minio init` creates the bucket) |
+| `make ps` | Compose status |
+| `make app`, `make worker`, `make media-stream` | Run the app, the job worker, or the media-stream service in the foreground |
+| `make help` | This list |
+
+Tail an app process by running it in its own terminal; the compose services are the only ones behind `make logs`.
+
 ## Prerequisites
 
-- Node `>=20` and Bun `>=1.2.15`
+- Node `22.x` (the repo pins it and CI uses it; other majors produce test failures that do not reproduce in CI) and Bun `>=1.2.15`
 - Docker Desktop or another Docker runtime
 - `psql` (Postgres client, used by the schema bootstrap script)
 - Localtunnel (only for live Twilio calling)
@@ -38,7 +72,9 @@ Notes:
 - `STRIPE_SECRET_KEY` and `RESEND_API_KEY` are required by app startup, but placeholder values are fine until you test those integrations.
 - `OPENAI_API_KEY` is optional.
 
-## First-Time Local Boot
+## What `make init` does, step by step
+
+Use these when you want to run one step by hand (for example after `make postgres down` and a volume wipe). `make init` runs all of them.
 
 1. Install dependencies:
 
@@ -210,8 +246,8 @@ Node 24+.
 
 ## Suggested Daily Workflow
 
-1. Start services with `docker compose -f docker-compose.dev.yml up -d`
-2. Start the app with `npm run dev`
+1. Start services with `make up`
+2. Start the app with `make app` (and `make worker` in a second terminal when you need queued jobs to run)
 3. Start Localtunnel with `lt --port 3000`
 4. Update `BASE_URL` in `.env` if the tunnel changed
 5. Run `npm run dev:calling:sync -- --workspace-id <workspace-id> --base-url <your-localtunnel-url>`
@@ -248,8 +284,8 @@ App starts but calling still does not work
 - Workspace-specific Twilio credentials stored in the database must also be valid for number-level webhook sync
 
 Database errors on startup
-- Ensure Docker is running and the compose Postgres is up (`docker compose -f docker-compose.dev.yml ps`)
-- Re-run the schema bootstrap on a fresh database (`node scripts/e2e/bootstrap-compose-db.mjs`)
+- Ensure Docker is running and the compose Postgres is up (`make ps`)
+- Re-run the schema bootstrap on a fresh database (`make postgres init`)
 - The server refuses to boot if the ledger RPC is missing or legacy Supabase triggers remain (see `app/server/db-health.server.ts`)
 
 Email or billing features fail locally

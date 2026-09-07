@@ -10,30 +10,14 @@ and **psql**.
 
 ```bash
 npm install
-npm run setup     # services, .env, database schema, storage bucket, seed data
-npm run dev       # http://localhost:3000
+make init         # npm run setup: services, .env, database schema, storage bucket, seed data
+make app          # npm run dev → http://localhost:3000
 ```
 
-`npm run setup` is idempotent — re-run it any time to repair a broken local
-environment. It starts Postgres/MinIO/mail via docker compose, creates `.env`
-from the example if missing, applies the full database schema, creates the
-object-storage bucket, and seeds test users and workspaces. Sign in with a
-seeded account from [`e2e/fixtures/seed.ts`](./e2e/fixtures/seed.ts).
-
-Already running the services elsewhere? `npm run setup -- --skip-docker`.
-
-Outbound calling additionally needs a public tunnel so Twilio can reach your
-machine — see [docs/local-development.md](./docs/local-development.md), and note
-the shared-TwiML-App hazard documented there before pointing Twilio at a tunnel.
-
-Verify your setup:
-
-```bash
-npm run typecheck   # react-router typegen + tsc
-npm run lint
-npm test            # vitest node + UI suites, plus bun server-runtime tests
-npm run test:e2e:compose   # full E2E against compose Postgres + MinIO
-```
+Everything else about running the app locally — what `setup` does and how to
+repair it, per-service `make <service> up|down|logs`, seeded sign-ins, Twilio
+calling through a tunnel, and the verification commands — lives in one place:
+[docs/local-development.md](./docs/local-development.md).
 
 Production entry points: `npm start` (Bun server, `server/bun.ts`) and `npm run worker` (job worker, `worker/index.ts`); images build from `Dockerfile` and `Dockerfile.worker`.
 
