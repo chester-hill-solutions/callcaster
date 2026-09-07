@@ -218,6 +218,7 @@ export const workspace_number = pgTable("workspace_number", {
 // ─── Campaign ──────────────────────────────────────
 
 export const campaign = pgTable("campaign", {
+  allow_bulk_local_send: boolean().notNull().default(false),
   body_text: text(),
   caller_id: text(),
   created_at: text().notNull(),
@@ -300,8 +301,7 @@ export const contact = pgTable("contact", {
   firstname: text(),
   household_id: uuid(),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  // Twilio Lookup v2 line-type cache: null = never looked up. Populated
-  // lazily on a contact's first SMS attempt and treated as permanent once set.
+  // Twilio Lookup v2 line-type cache: null = never looked up; set lazily on the first SMS attempt, then permanent.
   line_type: text(),
   line_type_checked_at: timestamp({ withTimezone: true, mode: "string" }),
   opt_out: boolean(),

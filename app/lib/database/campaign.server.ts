@@ -405,6 +405,23 @@ export type SplitMessageCampaignResult = {
  * Intended to be driven by the `bulk_sender_misaligned` split wizard when a
  * `ca_local` queue is large enough that a single sender would throttle badly.
  */
+/**
+ * Record or clear an admin's explicit override of the bulk-on-local-number
+ * launch block for one campaign (#1482). Tenant-scoped by construction.
+ */
+export async function setCampaignBulkLocalOverride(args: {
+  workspaceId: string;
+  campaignId: number;
+  enabled: boolean;
+}): Promise<boolean> {
+  const tdb = createTenantDb(args.workspaceId);
+  const [row] = await tdb.campaign.update({
+    set: { allow_bulk_local_send: args.enabled },
+    where: eq(campaignTable.id, args.campaignId),
+  });
+  return Boolean(row);
+}
+
 export async function splitMessageCampaign({
   workspaceId,
   sourceCampaignId,
