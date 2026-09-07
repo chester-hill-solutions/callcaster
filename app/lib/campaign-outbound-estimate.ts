@@ -13,11 +13,8 @@ import {
   LEGACY_MESSAGE_PIPELINE_MPS,
   twilioAssumedSmsMps,
 } from "@/lib/throughput-config";
-import {
-  parseSendWindow,
-  sendWindowActiveIntervals,
-  type SendWindowDayKey,
-} from "@/lib/campaign-send-window";
+import { parseSendWindow } from "@/lib/campaign-send-window";
+import { consumeScheduleTime } from "@/lib/schedule-intervals";
 
 export const QUEUE_NEXT_DELAY_MS = 200;
 export const SMS_HANDLER_NEXT_DELAY_MS = 300;
@@ -75,16 +72,6 @@ function normalizeSenderPoolSize(value: number) {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 1;
 }
 
-const OUTBOUND_ETA_DAY_KEYS: SendWindowDayKey[] = [
-  "sunday",
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-];
-
 const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
 
@@ -112,54 +99,23 @@ export type OutboundCompletionEstimate = {
   slowFinish: Date;
 };
 
+/** Bounded lookahead for ETA projection: about a year of schedule. */
+const ETA_LOOKAHEAD_DAYS = 366;
+
 /**
  * Walk a weekly send window forward from `now`, consuming `neededSeconds` of
- * in-window dispatch time, and return the wall-clock finish. Bounded lookahead
- * (~1 year); falls back to continuous projection if the window has no active
- * time. Overnight intervals are approximated by extending past midnight, which
- * is acceptable for an ETA range (the built-in presets never wrap midnight).
+ * in-window dispatch time, and return the wall-clock finish. Uses the shared
+ * interval projection (E2.1), so overnight intervals are exact rather than
+ * approximated. Falls back to continuous projection when the window has no
+ * usable active time within the lookahead.
  */
 function projectThroughSendWindow(
   now: Date,
   neededSeconds: number,
   schedule: Schedule,
 ): Date {
-  let remaining = neededSeconds;
-  const nowMs = now.getTime();
-  const baseMidnightMs = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
-
-  for (let dayOffset = 0; dayOffset < 366 && remaining > 0; dayOffset++) {
-    const dayStartMs = baseMidnightMs + dayOffset * MS_PER_DAY;
-    const dayKey = OUTBOUND_ETA_DAY_KEYS[new Date(dayStartMs).getUTCDay()];
-    if (!dayKey) continue;
-
-    const intervals = sendWindowActiveIntervals(schedule, dayKey).sort(
-      (a, b) => a.start - b.start,
-    );
-    for (const interval of intervals) {
-      const intervalStartMs = dayStartMs + interval.start * MS_PER_MINUTE;
-      const spanMinutes =
-        interval.end > interval.start
-          ? interval.end - interval.start
-          : interval.end + 24 * 60 - interval.start;
-      const intervalEndMs = intervalStartMs + spanMinutes * MS_PER_MINUTE;
-      const effectiveStartMs = Math.max(intervalStartMs, nowMs);
-      if (intervalEndMs <= effectiveStartMs) continue;
-
-      const availableSeconds = (intervalEndMs - effectiveStartMs) / 1000;
-      if (availableSeconds >= remaining) {
-        return new Date(effectiveStartMs + remaining * 1000);
-      }
-      remaining -= availableSeconds;
-    }
-  }
-
-  // No usable in-window time within lookahead: fall back to continuous.
-  return new Date(nowMs + neededSeconds * 1000);
+  const finishMs = consumeScheduleTime(schedule, now.getTime(), neededSeconds, ETA_LOOKAHEAD_DAYS);
+  return new Date(finishMs ?? now.getTime() + neededSeconds * 1000);
 }
 
 /**

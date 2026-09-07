@@ -1,4 +1,5 @@
 import type { Schedule, ScheduleDay } from "@/lib/types";
+import { nextScheduleOpenMs, scheduleIntervalAt } from "@/lib/schedule-intervals";
 
 /**
  * Phase F — per-campaign SMS send windows.
@@ -184,7 +185,9 @@ export function sendWindowActiveIntervals(
  * Whether `now` falls inside the send window. A `null` window is unrestricted
  * (always true). Evaluated in UTC to match {@link checkSchedule} in
  * campaign.server, so the stored clock times are interpreted as workspace/UTC
- * wall time consistently with existing calling-hours enforcement.
+ * wall time consistently with existing calling-hours enforcement. Uses the
+ * shared interval projection (E2.1), so overnight tails from the previous day
+ * and exact boundaries behave the same here as in next-open and ETA math.
  */
 export function isWithinSendWindow(
   schedule: Schedule | null | undefined,
@@ -192,35 +195,11 @@ export function isWithinSendWindow(
 ): boolean {
   const parsed = schedule ? parseSendWindow(schedule) : null;
   if (!parsed) return true;
-
-  const dayKey = DAY_KEYS[now.getUTCDay()];
-  if (!dayKey) return true;
-  const minutesNow = now.getUTCHours() * 60 + now.getUTCMinutes();
-
-  const intervals = sendWindowActiveIntervals(parsed, dayKey);
-  const yesterdayIndex = (now.getUTCDay() + 6) % 7;
-  const yesterdayKey = DAY_KEYS[yesterdayIndex];
-  if (!yesterdayKey) {
-    throw new Error(
-      `DAY_KEYS must cover every weekday index 0-6; missing index ${yesterdayIndex}`,
-    );
-  }
-  const overnightFromYesterday = sendWindowActiveIntervals(
-    parsed,
-    yesterdayKey,
-  );
-
-  const inToday = intervals.some(({ start, end }) =>
-    end > start
-      ? minutesNow >= start && minutesNow < end
-      : minutesNow >= start, // overnight tail runs to midnight
-  );
-  const inOvernight = overnightFromYesterday.some(
-    ({ start, end }) => end <= start && minutesNow < end,
-  );
-
-  return inToday || inOvernight;
+  return scheduleIntervalAt(parsed, now.getTime()) !== null;
 }
+
+/** A week plus today's tail covers any weekly schedule. */
+const NEXT_OPEN_LOOKAHEAD_DAYS = 8;
 
 /**
  * The exact next instant the window allows sending, for scheduling a deferred
@@ -235,28 +214,8 @@ export function nextSendWindowOpenAt(
   const parsed = schedule ? parseSendWindow(schedule) : null;
   if (!parsed) return null;
   if (isWithinSendWindow(parsed, now)) return new Date(now);
-
-  // Earliest interval-open instant within the next 8 days — a week plus
-  // today's tail covers any weekly schedule.
-  const MS_PER_DAY = 24 * 60 * 60 * 1000;
-  const baseMidnightMs = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
-  let bestMs: number | null = null;
-  for (let offset = 0; offset < 8; offset++) {
-    const dayStartMs = baseMidnightMs + offset * MS_PER_DAY;
-    const dayKey = DAY_KEYS[new Date(dayStartMs).getUTCDay()];
-    if (!dayKey) continue;
-    for (const { start } of sendWindowActiveIntervals(parsed, dayKey)) {
-      const openMs = dayStartMs + start * 60 * 1000;
-      if (openMs > now.getTime() && (bestMs === null || openMs < bestMs)) {
-        bestMs = openMs;
-      }
-    }
-  }
-  return bestMs === null ? null : new Date(bestMs);
+  const openMs = nextScheduleOpenMs(parsed, now.getTime(), NEXT_OPEN_LOOKAHEAD_DAYS);
+  return openMs === null ? null : new Date(openMs);
 }
 
 /**
