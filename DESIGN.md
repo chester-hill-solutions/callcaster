@@ -47,6 +47,7 @@ Inventory: accordion, alert, badge, button, calendar, card, checkbox, command, d
 
 - **Sentence case** for buttons, labels, menu items, and headings ("Add contact", not "Add Contact").
 - **Icon-only buttons require `aria-label`** (and usually a Tooltip).
+- **Tooltips are bounded by default** (`max-w-xs`, `max-h-64`, scroll beyond). Pass `maxWidthClassName` / `maxHeightClassName` to `TooltipContent` or `InfoPopover` for a specific tooltip; never repeat visible body text in a tooltip.
 - **User-facing errors**: never render `error.message` from a caught unknown. Route through `toUserMessage(error, fallback)` (`app/lib/user-message.ts`), then show it in `<Alert variant="destructive">` or a toast. Log the raw detail via `getErrorDetail(error)`.
 - **Empty states** get the icon-chip treatment (round `bg-brand-tertiary/40 text-brand-primary` chip + heading + muted description + action), as in `WorkspaceResourceListShell`.
 - **Destructive confirmations** use a `Dialog` with a `variant="destructive"` confirm button that names the action ("Delete campaign", not "OK").

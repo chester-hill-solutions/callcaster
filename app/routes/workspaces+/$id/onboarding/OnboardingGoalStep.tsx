@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import InfoPopover from "@/components/shared/InfoPopover";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import {
   channelsForOnboardingGoal,
@@ -288,19 +287,11 @@ export function OnboardingGoalStep({
 
         {selectedGoal === "sms_blast" ? (
           <div className="space-y-3 rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
-            <div className="flex items-start gap-2">
-              <span className="mt-0.5 shrink-0">
-                <InfoPopover
-                  size={16}
-                  tooltip="Toll-free SMS verification uses your CRA business number (BN). Local numbers use the local-number path at lower volume."
-                />
-              </span>
-              <p>
-                Toll-free is the higher-volume path and uses your Canadian business
-                number (BN) for carrier verification. A local number sends at lower
-                volume on the local-number path.
-              </p>
-            </div>
+            <p>
+              Toll-free is the higher-volume path and uses your Canadian business
+              number (BN) for carrier verification. A local number sends at lower
+              volume on the local-number path.
+            </p>
             {offersTollFree ? (
               <div
                 className="flex flex-wrap gap-2"
