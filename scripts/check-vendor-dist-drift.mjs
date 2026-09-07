@@ -19,13 +19,14 @@ import { join, relative } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
-// shad-cc is deliberately absent: its tsup build (code splitting on) is not
-// deterministic — chunk hashes flip between identical runs — so a byte
-// comparison would fail at random. Tracked separately; until its build is
-// made reproducible, shad-cc dist changes are reviewed by hand.
+// shad-cc runs in warn-only mode: one local run once produced a different
+// chunk hash from identical source, but twelve later builds across three
+// configurations were byte-identical (#1615). Warn-only gathers CI evidence
+// without failing unrelated builds; flip `enforce` once it stays quiet.
 const PACKAGES = [
-  "vendor/scriptkit/scriptkit-call-script-core",
-  "vendor/scriptkit/scriptkit-call-script-react",
+  { dir: "vendor/scriptkit/scriptkit-call-script-core", enforce: true },
+  { dir: "vendor/scriptkit/scriptkit-call-script-react", enforce: true },
+  { dir: "vendor/chester-hill-solutions/shad-cc", enforce: false },
 ];
 
 function walk(dir, out = []) {
@@ -57,24 +58,30 @@ function diffSnapshots(before, after) {
 }
 
 let failed = false;
-for (const pkg of PACKAGES) {
+for (const { dir: pkg, enforce } of PACKAGES) {
   const pkgDir = join(ROOT, pkg);
   const distDir = join(pkgDir, "dist");
   const before = snapshot(distDir);
   const build = spawnSync("npm", ["--prefix", pkgDir, "run", "build"], { cwd: ROOT, encoding: "utf8" });
   if (build.status !== 0) {
     console.error(`check-vendor-dist: build failed for ${pkg}\n${build.stderr || build.stdout}`);
-    failed = true;
+    failed = failed || enforce;
     continue;
   }
   const changed = diffSnapshots(before, snapshot(distDir));
   if (changed.length > 0) {
-    failed = true;
-    console.error(`check-vendor-dist: ${pkg}/dist is not what its source builds (${changed.length} file(s)):`);
+    const label = enforce ? "check-vendor-dist" : "check-vendor-dist (warn-only, #1615)";
+    failed = failed || enforce;
+    console.error(`${label}: ${pkg}/dist is not what its source builds (${changed.length} file(s)):`);
     for (const line of changed.slice(0, 20)) console.error(`  ${line}`);
     if (changed.length > 20) console.error(`  … and ${changed.length - 20} more`);
+    if (!enforce) {
+      // Leave the tree as it was found so a warn-only rebuild never dirties a checkout.
+      spawnSync("git", ["checkout", "--", `${pkg}/dist`], { cwd: ROOT });
+      spawnSync("git", ["clean", "-fdq", `${pkg}/dist`], { cwd: ROOT });
+    }
   } else {
-    console.log(`check-vendor-dist: ${pkg} — dist matches source (${before.size} files)`);
+    console.log(`check-vendor-dist: ${pkg} — dist matches source (${before.size} files)${enforce ? "" : " [warn-only]"}`);
   }
 }
 
