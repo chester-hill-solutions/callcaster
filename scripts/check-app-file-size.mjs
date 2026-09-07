@@ -26,7 +26,9 @@ const BASELINE_ALLOWLIST = {
   // instead of raising the number again. Survey moved to db/schema-survey.ts on
   // 2026-08-03 when a new column would have breached the cap; the same move is
   // available for the remaining domains.
-  "db/schema.ts": 754,
+  // Inbound-queue tables moved to db/schema-inbound-queue.ts on 2026-09-06
+  // (713 lines after the move); the pin leaves room for a handful of columns.
+  "db/schema.ts": 720,
   // Crossed 800 on 2026-08-04 merging feat/live-coaching: this barrel re-exports
   // both the onboarding-goal types and the new coaching hydration type. Pinned,
   // not exempted — the next type added here fails, which is the moment to split
