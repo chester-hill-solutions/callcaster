@@ -7,6 +7,9 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Fixed
 
 - Importing a CSV that has no header row keeps its first contact. The upload wizard and the server now agree on when a first row is data (a phone number, including one with an extension, an email, a street address, or a postal code) and both name the columns "Column 1", "Column 2", and so on ([#1481](https://github.com/chester-hill-solutions/callcaster/issues/1481), [#1511](https://github.com/chester-hill-solutions/callcaster/issues/1511)).
+### Added
+
+- Workspace admins can override the "large bulk send on a local number" safeguard for one campaign from the launch page, after acknowledging the deliverability risk. The safeguard stays on by default, the override is recorded on the campaign and shown while active, and it can be removed again ([#1482](https://github.com/chester-hill-solutions/callcaster/issues/1482)).
 
 ## 2026-09-05 — release dev → master
 

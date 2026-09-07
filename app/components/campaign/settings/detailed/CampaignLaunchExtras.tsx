@@ -308,6 +308,7 @@ export function CampaignLaunchExtras({
             queueCount={queueCount}
             senderClass={outboundEstimateInputs.portalConfig.smsSenderClass}
             disabled={isBusy}
+            overrideActive={Boolean(campaignData.allow_bulk_local_send)}
           />
         </>
       ) : null}
