@@ -174,7 +174,7 @@ const ContactDetails = React.forwardRef<
       <div className="flex items-center justify-between border-b border-border pb-4">
         <Heading level={3}>Contact Details</Heading>
         {isDirty && (
-          <span className="text-sm font-medium text-warning">
+          <span className="text-sm font-medium text-warning-text">
             Unsaved changes
           </span>
         )}

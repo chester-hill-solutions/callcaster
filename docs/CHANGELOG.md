@@ -8,6 +8,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 - Campaign results show message totals and contact progress as separate numbers, so a contact who received several messages no longer counts several times toward progress.
 
+### Changed
+
+- Status colours used as plain text (success, warning, info, and error messages, and the chips in the queue table) are darker in light mode and lighter in dark mode so they meet contrast guidelines; the info badge is slightly darker in light mode for the same reason. Solid badges, buttons, and icons keep their colours.
+
 ## 2026-09-05 — release dev → master
 
 ### Fixed

@@ -47,6 +47,7 @@ Inventory: accordion, alert, badge, button, calendar, card, checkbox, command, d
 
 - **Sentence case** for buttons, labels, menu items, and headings ("Add contact", not "Add Contact").
 - **Icon-only buttons require `aria-label`** (and usually a Tooltip).
+- **Tone text vs tone surfaces:** `text-success` / `text-warning` / `text-info` / `text-destructive` are surface colours (icons, borders, washes, solid badges and buttons with their `-foreground`). Standalone text in a tone uses `text-success-text` / `text-warning-text` / `text-info-text` / `text-destructive-text`, which clear WCAG AA on the page, on cards, and on 20% washes in both themes (`test/theme-contrast.test.ts` pins the ratios).
 - **Tooltips are bounded by default** (`max-w-xs`, `max-h-64`, scroll beyond). Pass `maxWidthClassName` / `maxHeightClassName` to `TooltipContent` or `InfoPopover` for a specific tooltip; never repeat visible body text in a tooltip.
 - **User-facing errors**: never render `error.message` from a caught unknown. Route through `toUserMessage(error, fallback)` (`app/lib/user-message.ts`), then show it in `<Alert variant="destructive">` or a toast. Log the raw detail via `getErrorDetail(error)`.
 - **Empty states** get the icon-chip treatment (round `bg-brand-tertiary/40 text-brand-primary` chip + heading + muted description + action), as in `WorkspaceResourceListShell`.

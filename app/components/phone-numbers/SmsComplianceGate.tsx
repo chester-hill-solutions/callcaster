@@ -117,7 +117,7 @@ export function SmsComplianceGate({
             <div className="space-y-2">
               <Label htmlFor="businessRegistrationNumber">
                 Business registration number (BN){" "}
-                <span className="text-destructive" aria-hidden>
+                <span className="text-destructive-text" aria-hidden>
                   *
                 </span>
               </Label>

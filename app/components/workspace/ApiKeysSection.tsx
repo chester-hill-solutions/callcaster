@@ -192,7 +192,7 @@ export default function ApiKeysSection({
             className="rounded-md border border-warning/50 bg-warning/10 p-3"
             data-testid="api-key-reveal"
           >
-            <p className="mb-2 text-sm font-semibold text-warning">
+            <p className="mb-2 text-sm font-semibold text-warning-text">
               Copy your key now. We won’t show it again.
             </p>
             <div className="flex flex-wrap gap-2">

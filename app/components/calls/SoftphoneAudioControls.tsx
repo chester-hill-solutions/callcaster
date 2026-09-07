@@ -92,7 +92,7 @@ export function SoftphoneAudioControls({
                 size="sm"
                 className={cn(
                   "w-full gap-1",
-                  micMuted && "bg-destructive/10 text-destructive",
+                  micMuted && "bg-destructive/10 text-destructive-text",
                 )}
                 onClick={onMuteMic}
               >

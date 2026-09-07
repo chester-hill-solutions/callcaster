@@ -137,7 +137,7 @@ export default function WorkspaceExports() {
     }
 
     if (exportItem.status === "error") {
-      return <span className="text-destructive">Failed</span>;
+      return <span className="text-destructive-text">Failed</span>;
     }
 
     if (exportItem.status === "processing" || exportItem.status === "started") {
@@ -217,7 +217,7 @@ export default function WorkspaceExports() {
       )}
 
       {startState.status === "error" && (
-        <Text variant="muted" className="text-destructive">
+        <Text variant="muted" className="text-destructive-text">
           {startState.message}
         </Text>
       )}
@@ -280,13 +280,13 @@ export default function WorkspaceExports() {
                       </a>
                     )}
                     {exportItem.isExpired && (
-                      <span className="text-sm text-destructive">Expired</span>
+                      <span className="text-sm text-destructive-text">Expired</span>
                     )}
                     {(exportItem.status === "processing" || exportItem.status === "started") && (
                       <span className="text-sm text-muted-foreground">Processing...</span>
                     )}
                     {exportItem.status === "error" && (
-                      <span className="text-sm text-destructive">Failed</span>
+                      <span className="text-sm text-destructive-text">Failed</span>
                     )}
                   </TableCell>
                 </TableRow>

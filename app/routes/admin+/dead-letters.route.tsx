@@ -44,7 +44,7 @@ function RequeueButton({ jobId }: { jobId: number }) {
         {busy ? "Requeuing..." : "Requeue"}
       </Button>
       {fetcher.data?.error && (
-        <span className="text-xs text-destructive">{fetcher.data.error}</span>
+        <span className="text-xs text-destructive-text">{fetcher.data.error}</span>
       )}
       {fetcher.data?.message && (
         <span className="text-xs text-muted-foreground">{fetcher.data.message}</span>

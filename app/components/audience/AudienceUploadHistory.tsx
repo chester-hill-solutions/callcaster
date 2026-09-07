@@ -28,12 +28,12 @@ export default function AudienceUploadHistory({
 
   if (error) {
     return (
-      <div className="p-4 border border-destructive/30 rounded-md bg-destructive/10 text-destructive">
+      <div className="p-4 border border-destructive/30 rounded-md bg-destructive/10 text-destructive-text">
         <p className="font-semibold">Error loading upload history</p>
         <p className="text-sm">{error}</p>
         <button
           onClick={() => refresh()}
-          className="mt-2 text-sm underline hover:text-destructive/80"
+          className="mt-2 text-sm underline hover:text-destructive-text/80"
         >
           Try again
         </button>

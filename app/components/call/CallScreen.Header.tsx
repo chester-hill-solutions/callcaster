@@ -196,7 +196,7 @@ function AudioDeviceTestRow({
       {audioTestError ? (
         <p
           role="alert"
-          className="text-sm text-destructive"
+          className="text-sm text-destructive-text"
           data-testid="audio-test-error"
         >
           {audioTestError}
@@ -612,7 +612,7 @@ export function TopChrome({
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={onLeaveCampaign}
-                className="text-destructive focus:text-destructive"
+                className="text-destructive-text focus:text-destructive-text"
               >
                 <PhoneOff className="mr-2 h-4 w-4" />
                 Leave Campaign

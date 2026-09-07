@@ -69,7 +69,7 @@ export const CampaignSettings = ({
         <div
           className={`rounded-md border px-4 py-3 text-sm ${
             feedbackTone === "error"
-              ? "border-destructive/30 bg-destructive/5 text-destructive"
+              ? "border-destructive/30 bg-destructive/5 text-destructive-text"
               : "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
           }`}
           role={feedbackTone === "error" ? "alert" : "status"}

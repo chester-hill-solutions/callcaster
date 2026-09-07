@@ -47,7 +47,7 @@ export function HeldCallsList({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="gap-1 text-destructive hover:text-destructive"
+                    className="gap-1 text-destructive-text hover:text-destructive-text"
                     onClick={() => onHangUp(held)}
                   >
                     <PhoneOff size={14} />

@@ -42,7 +42,7 @@ export function FormField({
         {label ? (
           <Label htmlFor={htmlFor} className="text-sm font-semibold">
             {label}
-            {required ? <span className="ml-1 text-destructive">*</span> : null}
+            {required ? <span className="ml-1 text-destructive-text">*</span> : null}
           </Label>
         ) : null}
         {children}
@@ -52,7 +52,7 @@ export function FormField({
           </p>
         ) : null}
         {error ? (
-          <p id={errorId} className="text-sm font-medium text-destructive">
+          <p id={errorId} className="text-sm font-medium text-destructive-text">
             {error}
           </p>
         ) : null}

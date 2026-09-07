@@ -317,7 +317,7 @@ export default function WorkspaceSettings() {
                     ) : number.capabilities?.verification_status === "failed" ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <span className="text-xs uppercase">Failed</span>
-                        <MdError className="text-destructive" size={20} />
+                        <MdError className="text-destructive-text" size={20} />
                       </div>
                     ) : number.capabilities?.verification_status === "pending" ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">

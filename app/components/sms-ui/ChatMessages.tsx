@@ -54,7 +54,7 @@ function ScheduledMessageMeta({
           <button
             type="submit"
             disabled={isCanceling}
-            className="font-medium text-destructive underline-offset-2 hover:underline disabled:opacity-50"
+            className="font-medium text-destructive-text underline-offset-2 hover:underline disabled:opacity-50"
           >
             {isCanceling ? "Canceling…" : "Cancel"}
           </button>
@@ -223,7 +223,7 @@ export default function ChatMessages({
                     </button>
                   ))}
                   {isFailed ? (
-                    <div className="mt-1 flex items-center gap-1 text-xs font-medium text-destructive">
+                    <div className="mt-1 flex items-center gap-1 text-xs font-medium text-destructive-text">
                       <span>Not delivered</span>
                       {message.error_message ? (
                         <span className="font-normal opacity-80">

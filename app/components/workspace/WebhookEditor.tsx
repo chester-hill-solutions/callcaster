@@ -298,7 +298,7 @@ export default function WebhookEditor({
           }
         />
         {eventsError ? (
-          <p className="text-sm text-destructive" role="alert">
+          <p className="text-sm text-destructive-text" role="alert">
             {eventsError}
           </p>
         ) : null}

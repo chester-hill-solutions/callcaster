@@ -492,7 +492,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                                 </span>
                                             ))}
                                         </div>
-                                        <div className="text-xs text-success mt-2">
+                                        <div className="text-xs text-success-text mt-2">
                                             <span className="font-semibold">💡 Tip:</span> Survey links will be automatically generated when messages are sent!
                                         </div>
                                         {/* Survey Link Preview */}
@@ -501,8 +501,8 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                             if (surveyMatches) {
                                                 return (
                                                     (<div className="mt-3 p-2 bg-success/10 rounded border border-success/30">
-                                                        <div className="text-xs font-semibold text-success mb-1">Survey Links Preview:</div>
-                                                        <div className="text-xs text-success space-y-1">
+                                                        <div className="text-xs font-semibold text-success-text mb-1">Survey Links Preview:</div>
+                                                        <div className="text-xs text-success-text space-y-1">
                                                             {surveyMatches.map((match, index) => {
                                                                 // Extract survey ID from the function
                                                                 const surveyIdMatch = match.match(/survey\([^,]+,\s*"([^"]+)"/);
@@ -515,7 +515,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                                                             {match}
                                                                         </span>
                                                                         <span>→</span>
-                                                                        <span className="text-xs text-success">
+                                                                        <span className="text-xs text-success-text">
                                                                             {previewLink}
                                                                         </span>
                                                                     </div>

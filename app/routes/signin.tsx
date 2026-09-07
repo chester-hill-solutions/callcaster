@@ -34,7 +34,7 @@ export default function SignIn() {
         id="login-hero"
       >
         {actionData?.error ? (
-          <Text className="block text-center text-destructive">
+          <Text className="block text-center text-destructive-text">
             {actionData.error}
           </Text>
         ) : null}

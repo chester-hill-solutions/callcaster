@@ -67,7 +67,7 @@ function SupportDetail({
 }
 
 function amountClassName(direction: "credit" | "debit"): string {
-  return direction === "credit" ? "text-success" : "text-destructive";
+  return direction === "credit" ? "text-success-text" : "text-destructive-text";
 }
 
 function ActivityEntryRow({
