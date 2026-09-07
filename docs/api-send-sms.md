@@ -94,7 +94,12 @@ curl -X POST "$BASE_URL/api/sms" \
 
 ### Response
 
-`200` with `{ "responses": [ ... ] }` — array of per-contact result objects keyed by `contact_id`.
+`200` with one of two bodies; check `deferred`.
+
+- Dispatched: `{ "responses": [ ... ], "creditsExhausted": false }`. `responses` is an array of per-contact result objects keyed by `contact_id` (`success`, `skipped`, or `error`). `creditsExhausted: true` means the balance ran out part-way through the batch: the remaining rows stay queued and no further batch is scheduled until credits are added.
+- Deferred: `{ "deferred": true, "reason": "Outside campaign send window", "nextOpenAt": "2026-09-08T13:00:00.000Z", "responses": [] }`. Nothing was sent or dequeued; call again at `nextOpenAt` or leave it to the worker, which reschedules itself for that instant.
+
+`402` with `{ "creditsError": true, "error": "Insufficient credits" }` when the workspace has no credits to start the batch at all. `400` when the campaign needs a `caller_id` and none was given.
 
 ---
 

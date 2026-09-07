@@ -616,3 +616,57 @@ describe("SMS dispatch contract — a failing send records its attempt and the s
     assertDequeueContract([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// E5.1: the runtime bodies must match the generated OpenAPI/Zod contract, and
+// the two 200 variants must narrow cleanly (a deferred body carries an empty
+// `responses` too, so `creditsExhausted` is what keeps them apart).
+// ---------------------------------------------------------------------------
+
+describe("SMS dispatch contract — response bodies match the generated API contract (E5.1)", () => {
+  const ELIGIBLE = [
+    { id: 801, contact_id: 40, contact: { id: 40, phone: "+15552220001", firstname: "Ann", opt_out: false } },
+  ];
+
+  beforeEach(() => {
+    vi.resetModules();
+    seedCommonMocks();
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue(baseCampaignData());
+    mocks.getCampaignQueueById.mockResolvedValue(ELIGIBLE);
+  });
+
+  test("a dispatched body validates as Dispatched and not as Deferred", async () => {
+    const zod = await import("@/lib/api-generated/zod.gen");
+    const res = await runHttpAdapter();
+    const body = await res.json();
+    expect(zod.zCampaignSmsDispatchResponse.safeParse(body).success).toBe(true);
+    expect(zod.zCampaignSmsDispatched.safeParse(body).success).toBe(true);
+    expect(zod.zCampaignSmsDeferred.safeParse(body).success).toBe(false);
+  });
+
+  test("a deferred body validates as Deferred and not as Dispatched", async () => {
+    mocks.isWithinSendWindow.mockReturnValue(false);
+    mocks.nextSendWindowOpenAt.mockReturnValue(new Date("2026-09-08T13:00:00.000Z"));
+    const zod = await import("@/lib/api-generated/zod.gen");
+    const res = await runHttpAdapter();
+    const body = await res.json();
+    expect(zod.zCampaignSmsDispatchResponse.safeParse(body).success).toBe(true);
+    expect(zod.zCampaignSmsDeferred.safeParse(body).success).toBe(true);
+    expect(zod.zCampaignSmsDispatched.safeParse(body).success).toBe(false);
+    expect(body.nextOpenAt).toBe("2026-09-08T13:00:00.000Z");
+  });
+
+  test("an empty balance answers 402 with the documented credits error", async () => {
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+    const zod = await import("@/lib/api-generated/zod.gen");
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
+      campaign_id: String(CAMPAIGN_ID),
+      workspace_id: TEST_WORKSPACE_ID,
+      caller_id: "+15550000000",
+    });
+    const mod = await import("../app/routes/api+/sms.action.server");
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
+    expect(zod.zInsufficientCreditsError.safeParse(await res.json()).success).toBe(true);
+  });
+});
