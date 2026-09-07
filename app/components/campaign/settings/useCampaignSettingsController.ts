@@ -64,9 +64,11 @@ type ActionData = {
   error?: string;
   campaign?: CampaignWithAudiences;
   campaignDetails?: CampaignDetails;
-  actionType?: "save" | "status" | "duplicate" | "kickoff";
+  actionType?: "save" | "status" | "duplicate" | "kickoff" | "test_send";
   status?: string;
   deduped?: boolean;
+  to?: string;
+  usedSampleContact?: boolean;
 };
 
 type SettingsLoaderData = {
@@ -252,7 +254,11 @@ export function useCampaignSettingsController() {
               ? fetcher.data.deduped
                 ? "Campaign dispatch is already running."
                 : "Campaign dispatch kicked off."
-              : null
+              : fetcher.data.actionType === "test_send"
+                ? `Test message sent to ${fetcher.data.to ?? "the number"}${
+                    fetcher.data.usedSampleContact ? " using the sample contact." : "."
+                  }`
+                : null
       : null;
   const feedbackTone: "success" | "error" | null = fetcher.data?.error
     ? "error"
@@ -293,6 +299,10 @@ export function useCampaignSettingsController() {
 
   const handleKickoff = () => {
     fetcher.submit({ intent: "kickoff" }, { method: "post" });
+  };
+
+  const handleTestSend = (phone: string) => {
+    fetcher.submit({ intent: "test_send", phone }, { method: "post" });
   };
 
   const handleDuplicate = () => {
@@ -485,6 +495,7 @@ export function useCampaignSettingsController() {
     launchLabel,
     handleDuplicate,
     handleKickoff,
+    handleTestSend,
     handleConfirmStatus,
     handleInputChange,
     handleSave,
