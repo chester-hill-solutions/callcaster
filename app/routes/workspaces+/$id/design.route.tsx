@@ -1,4 +1,5 @@
 export { loader } from "./design.loader.server";
+import { useTheme } from "next-themes";
 
 import type { ReactNode } from "react";
 import { useLoaderData } from "react-router";
@@ -53,7 +54,8 @@ function ThemeScope({ theme, children }: { theme: "light" | "dark"; children: Re
   );
 }
 
-function Gallery() {
+/** `scope` keys every element id so the light and dark copies never collide. */
+export function Gallery({ scope }: { scope: string }) {
   return (
     <div className="grid gap-4">
       <section className="grid gap-2" aria-label="Alerts">
@@ -122,12 +124,12 @@ function Gallery() {
           <Textarea placeholder="Textarea" aria-label="Preview textarea" />
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <Checkbox id="preview-checkbox" />
-              <label htmlFor="preview-checkbox">Checkbox</label>
+              <Checkbox id={`${scope}-preview-checkbox`} />
+              <label htmlFor={`${scope}-preview-checkbox`}>Checkbox</label>
             </div>
             <div className="flex items-center gap-2">
-              <Switch id="preview-switch" />
-              <label htmlFor="preview-switch">Switch</label>
+              <Switch id={`${scope}-preview-switch`} />
+              <label htmlFor={`${scope}-preview-switch`}>Switch</label>
             </div>
           </div>
         </div>
@@ -178,27 +180,15 @@ function Gallery() {
   );
 }
 
+/** Drives the page theme through the app's provider, the same way the header toggle does. */
 function PageThemeToggle() {
+  const { setTheme } = useTheme();
   return (
     <div className="flex items-center gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          document.documentElement.classList.remove("dark");
-          localStorage.setItem("callcaster-theme", "light");
-        }}
-      >
+      <Button size="sm" variant="outline" onClick={() => setTheme("light")}>
         Page: light
       </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          document.documentElement.classList.add("dark");
-          localStorage.setItem("callcaster-theme", "dark");
-        }}
-      >
+      <Button size="sm" variant="outline" onClick={() => setTheme("dark")}>
         Page: dark
       </Button>
     </div>
@@ -218,10 +208,10 @@ export default function DesignPreviewPage() {
         <PageThemeToggle />
       </header>
       <ThemeScope theme="light">
-        <Gallery />
+        <Gallery scope="light" />
       </ThemeScope>
       <ThemeScope theme="dark">
-        <Gallery />
+        <Gallery scope="dark" />
       </ThemeScope>
     </div>
   );

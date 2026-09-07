@@ -272,6 +272,19 @@ export function isTwoFactorFeatureEnabled(): boolean {
   return v === "true" || v === "1";
 }
 
+/**
+ * The design gallery (`/workspaces/:id/design`) is a workbench for the tone
+ * system, scanned by axe in E2E. It is not a customer surface: available in
+ * development and the E2E harness, and in production only behind an explicit
+ * DESIGN_GALLERY_ENABLED=true|1 (roadmap E3.3).
+ */
+export function isDesignGalleryEnabled(): boolean {
+  const v = process.env.DESIGN_GALLERY_ENABLED;
+  if (v === "true" || v === "1") return true;
+  if (v === "false" || v === "0") return false;
+  return !isProduction() || process.env.E2E_TEST === "1";
+}
+
 /** Self-service signup is opt-in via SIGNUP_OPEN=true|1 (non-prod deployments). */
 export function isSignupOpen(): boolean {
   const v = process.env.SIGNUP_OPEN;
