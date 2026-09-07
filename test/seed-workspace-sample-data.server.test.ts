@@ -38,12 +38,14 @@ describe("app/lib/seed/seed-workspace-sample-data.server.ts", () => {
     expect(createTenantDbMock).toHaveBeenCalledWith("w1");
     expect(tdbMocks.script.insert).toHaveBeenCalledWith({
       name: "Sample script — customer check-in",
+      is_sample: true,
       type: "script",
       steps: SAMPLE_SCRIPT_STEPS,
       created_by: "u1",
     });
     expect(tdbMocks.campaign.insert).toHaveBeenCalledWith({
       title: "Sample campaign — explore CallCaster",
+      is_sample: true,
       status: "draft",
       type: "live_call",
       caller_id: null,

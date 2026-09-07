@@ -72,6 +72,7 @@ const steps = [
   "client/migrations/20260901000000_campaign_status_add_waiting.sql",
   "client/migrations/20260905120000_message_client_ref.sql",
   "client/migrations/20260906120000_campaign_allow_bulk_local_send.sql",
+  "client/migrations/20260906130000_sample_content_marker.sql",
 ];
 
 /**
