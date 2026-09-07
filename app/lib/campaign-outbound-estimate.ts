@@ -13,8 +13,11 @@ import {
   LEGACY_MESSAGE_PIPELINE_MPS,
   twilioAssumedSmsMps,
 } from "@/lib/throughput-config";
-import { parseSendWindow } from "@/lib/campaign-send-window";
-import { consumeScheduleTime } from "@/lib/schedule-intervals";
+import {
+  projectDispatchTime,
+  smsSendPolicy,
+  type DispatchPolicy,
+} from "@/lib/campaign-dispatch-policy";
 
 export const QUEUE_NEXT_DELAY_MS = 200;
 export const SMS_HANDLER_NEXT_DELAY_MS = 300;
@@ -89,6 +92,13 @@ export type OutboundCompletionInput = {
    * unrestricted.
    */
   sendWindow?: Schedule | null;
+  /**
+   * Explicit dispatch policy (SMS send window or IVR calling hours with
+   * dates). Takes precedence over `sendWindow`; the ETA then starts no
+   * earlier than the campaign start date and reports when it cannot finish
+   * before the end date.
+   */
+  policy?: DispatchPolicy | null;
 };
 
 export type OutboundCompletionEstimate = {
@@ -97,26 +107,9 @@ export type OutboundCompletionEstimate = {
   fastFinish: Date;
   averageFinish: Date;
   slowFinish: Date;
+  /** The slow bound runs past the policy's end date: the queue may not finish in time. */
+  exceedsEndDate: boolean;
 };
-
-/** Bounded lookahead for ETA projection: about a year of schedule. */
-const ETA_LOOKAHEAD_DAYS = 366;
-
-/**
- * Walk a weekly send window forward from `now`, consuming `neededSeconds` of
- * in-window dispatch time, and return the wall-clock finish. Uses the shared
- * interval projection (E2.1), so overnight intervals are exact rather than
- * approximated. Falls back to continuous projection when the window has no
- * usable active time within the lookahead.
- */
-function projectThroughSendWindow(
-  now: Date,
-  neededSeconds: number,
-  schedule: Schedule,
-): Date {
-  const finishMs = consumeScheduleTime(schedule, now.getTime(), neededSeconds, ETA_LOOKAHEAD_DAYS);
-  return new Date(finishMs ?? now.getTime() + neededSeconds * 1000);
-}
 
 /**
  * Projected queue-completion estimate at a given effective throughput, with
@@ -134,22 +127,26 @@ export function estimateOutboundCompletion(
 
   const now = input.now ?? new Date();
   const activeSeconds = queueCount / ratePerSecond;
-  const window = input.sendWindow ? parseSendWindow(input.sendWindow) : null;
+  const policy =
+    input.policy ?? smsSendPolicy({ sms_send_window: input.sendWindow ?? null });
 
+  let exceedsEndDate = false;
   const project = (multiplier: number): Date => {
     const neededSeconds = activeSeconds * multiplier;
-    if (!window) {
-      return new Date(now.getTime() + neededSeconds * 1000);
+    const projection = projectDispatchTime(policy, now, neededSeconds);
+    if (projection.kind === "finish") return new Date(projection.finishMs);
+    if (projection.kind === "beyond_end_date") {
+      exceedsEndDate = true;
+      return new Date(projection.notAfterMs);
     }
-    return projectThroughSendWindow(now, neededSeconds, window);
+    // No usable in-window time within lookahead: fall back to continuous.
+    return new Date(now.getTime() + neededSeconds * 1000);
   };
 
-  return {
-    activeSeconds,
-    fastFinish: project(0.8),
-    averageFinish: project(1),
-    slowFinish: project(1.2),
-  };
+  const fastFinish = project(0.8);
+  const averageFinish = project(1);
+  const slowFinish = project(1.2);
+  return { activeSeconds, fastFinish, averageFinish, slowFinish, exceedsEndDate };
 }
 
 function estimateTwilioMessagesPerSecond({

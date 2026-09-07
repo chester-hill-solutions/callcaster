@@ -23,7 +23,7 @@ import {
   claimBatchSizeForRate,
   configuredDispatcherSmsMps,
 } from "@/lib/throughput-config.server";
-import { isWithinSendWindow, nextSendWindowOpenAt, parseSendWindow } from "@/lib/campaign-send-window";
+import { isDispatchAllowedAt, nextDispatchOpenAt, smsSendPolicy } from "@/lib/campaign-dispatch-policy";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
@@ -185,15 +185,15 @@ export async function dispatchCampaignSmsBatch(args: {
   // later in-window tick. A `null` window is unrestricted. The outcome
   // carries the exact next open so the durable adapter can schedule its
   // successor at the window boundary instead of a fixed poll interval.
-  const sendWindow = parseSendWindow(campaign.campaign?.sms_send_window ?? null);
-  if (!isWithinSendWindow(sendWindow)) {
+  const sendPolicy = smsSendPolicy(campaign.campaign);
+  if (!isDispatchAllowedAt(sendPolicy)) {
     return {
       kind: "deferred_send_window",
       // Defensive fallback: a parsed window with active intervals always has
       // an open instant within the week, but never hot-loop if that invariant
       // is somehow violated.
       nextOpenAt:
-        nextSendWindowOpenAt(sendWindow) ?? new Date(Date.now() + 15 * 60 * 1000),
+        nextDispatchOpenAt(sendPolicy) ?? new Date(Date.now() + 15 * 60 * 1000),
     };
   }
 
