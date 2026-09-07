@@ -16,6 +16,11 @@ import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { emitQueueEvent } from "@/lib/workspace-events.server";
 import { rpcDequeueContact, type RpcExecutor } from "@/lib/db-rpc.server";
+import {
+  campaignIdsForContact,
+  completeCampaignsDrainedByDequeue,
+  tryCompleteDrainedCampaigns,
+} from "@/lib/campaign-queue-completion.server";
 
 export type ClaimedQueueContact = {
   contact_id: number;
@@ -624,6 +629,7 @@ export async function dequeueQueueEntry(
       reason: args.reason,
       workspaceId: args.workspaceId,
     });
+    await completeCampaignsDrainedByDequeue(rows, args.workspaceId ?? rows[0]?.workspace);
     return { dequeuedPrimary: rows.length > 0 };
   }
 
@@ -643,6 +649,13 @@ export async function dequeueQueueEntry(
       dequeuedById: args.userId,
       dequeuedReasonText: args.reason,
     });
+    if (primaryRowsDequeued > 0) {
+      const campaignIds =
+        campaignId != null
+          ? [campaignId]
+          : await campaignIdsForContact(contactId, args.workspaceId);
+      await tryCompleteDrainedCampaigns(campaignIds, exec);
+    }
     return { dequeuedPrimary: primaryRowsDequeued > 0 };
   }
 
@@ -653,8 +666,10 @@ export async function dequeueQueueEntry(
     reason: args.reason,
     workspaceId: args.workspaceId,
   });
+  await completeCampaignsDrainedByDequeue(rows, args.workspaceId ?? rows[0]?.workspace);
   return { dequeuedPrimary: rows.length > 0 };
 }
+
 
 /**
  * Why a dequeue reported `dequeuedPrimary: false` (#1278).
