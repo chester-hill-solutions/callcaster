@@ -24,7 +24,7 @@ export type AbsoluteInterval = {
   endMs: number;
 };
 
-const DAY_KEYS = [
+export const WEEKDAY_KEYS = [
   "sunday",
   "monday",
   "tuesday",
@@ -33,6 +33,17 @@ const DAY_KEYS = [
   "friday",
   "saturday",
 ] as const;
+
+export type WeekdayKey = (typeof WEEKDAY_KEYS)[number];
+
+/**
+ * Total weekday accessor for `Date#getUTCDay()` values (and any integer):
+ * always returns a key, so callers never carry an "impossible index" guard.
+ */
+export function weekdayKey(dayIndex: number): WeekdayKey {
+  const index = ((Math.trunc(dayIndex) % 7) + 7) % 7;
+  return WEEKDAY_KEYS[index] ?? "sunday";
+}
 
 export const MS_PER_MINUTE = 60 * 1000;
 export const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
@@ -53,9 +64,7 @@ export function scheduleDayIntervals(
   dayIndex: number,
 ): Array<{ start: number; end: number }> {
   if (!schedule) return [];
-  const key = DAY_KEYS[dayIndex];
-  if (!key) return [];
-  const day = (schedule as Record<string, ScheduleDay | undefined>)[key];
+  const day = (schedule as Record<string, ScheduleDay | undefined>)[weekdayKey(dayIndex)];
   if (!day || !day.active || !Array.isArray(day.intervals)) return [];
   const out: Array<{ start: number; end: number }> = [];
   for (const interval of day.intervals) {
