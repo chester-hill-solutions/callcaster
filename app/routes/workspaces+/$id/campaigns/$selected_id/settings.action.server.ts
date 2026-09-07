@@ -27,6 +27,7 @@ import {
   fetchCampaignDetails,
   fetchQueueCounts,
   updateCampaign,
+  setCampaignBulkLocalOverride,
 } from "@/lib/database/campaign.server";
 import { duplicateCampaign } from "@/lib/campaign-duplicate.server";
 import {
@@ -299,6 +300,40 @@ export const action = defineAction({
             success: false,
             error: toUserMessage(error, "Campaign could not be duplicated"),
             actionType: "duplicate" as const,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    case "bulk_local_override": {
+      const enabled = String(data.enabled ?? "") === "true";
+      try {
+        const updated = await setCampaignBulkLocalOverride({
+          workspaceId: workspace_id,
+          campaignId: Number(selected_id),
+          enabled,
+        });
+        if (!updated) {
+          return routeData(
+            { success: false, error: "Campaign not found", actionType: "bulk_local_override" as const },
+            { status: 404 },
+          );
+        }
+        logger.info("campaign.bulk_local_override", {
+          workspaceId: workspace_id,
+          campaignId: selected_id,
+          enabled,
+          userId: user.id,
+        });
+        return routeData({ success: true, actionType: "bulk_local_override" as const, enabled });
+      } catch (error) {
+        logger.error("Error updating bulk local override", error);
+        return routeData(
+          {
+            success: false,
+            error: toUserMessage(error, "The override could not be saved"),
+            actionType: "bulk_local_override" as const,
           },
           { status: 400 },
         );

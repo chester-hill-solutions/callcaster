@@ -509,11 +509,14 @@ export function getCampaignReadiness(
     );
   }
 
+  // An admin can take the deliverability risk knowingly (#1482): the block
+  // stays the default and lifts only for a campaign with the explicit override.
   if (
     campaignData.type === "message" &&
     options.smsSenderClass &&
     typeof options.queueCount === "number" &&
-    isBulkSmsSenderMisaligned(options.smsSenderClass, options.queueCount)
+    isBulkSmsSenderMisaligned(options.smsSenderClass, options.queueCount) &&
+    !campaignData.allow_bulk_local_send
   ) {
     commonIssues.push(
       issue(

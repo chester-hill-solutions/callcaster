@@ -111,6 +111,7 @@ const steps = [
   "client/migrations/20260815130000_dequeue_contact_returns_rows_affected.sql",
   "client/migrations/20260901000000_campaign_status_add_waiting.sql",
   "client/migrations/20260905120000_message_client_ref.sql",
+  "client/migrations/20260906120000_campaign_allow_bulk_local_send.sql",
 ];
 
 /**
