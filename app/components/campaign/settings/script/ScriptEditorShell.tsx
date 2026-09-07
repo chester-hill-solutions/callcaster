@@ -300,7 +300,7 @@ export function ScriptEditorShell({
       </div>
 
       {!editor.validation.ok && (
-        <div className="text-sm text-destructive" role="alert">
+        <div className="text-sm text-destructive-text" role="alert">
           {editor.validation.errors.join("; ")}
         </div>
       )}

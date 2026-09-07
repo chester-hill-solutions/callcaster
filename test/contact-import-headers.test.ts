@@ -77,3 +77,36 @@ describe("contact import headers", () => {
     expect(splitContactFullName(name)).toEqual(expected);
   });
 });
+
+describe("headerless CSV detection (#1481, #1511)", async () => {
+  const { csvFirstRowIsHeader, generatedContactImportHeaders, isLikelyContactDataRow } = await import(
+    "../shared/contact-import-headers"
+  );
+
+  test("a known column name always makes the row a header", () => {
+    expect(csvFirstRowIsHeader(["First Name", "Phone"])).toBe(true);
+    expect(csvFirstRowIsHeader(["Phone Number", "6135551234"])).toBe(true);
+  });
+
+  test("a phone with an extension is data", () => {
+    expect(isLikelyContactDataRow(["Jane Doe", "6135551234 ext 202"])).toBe(true);
+    expect(isLikelyContactDataRow(["Jane Doe", "(613) 555-1234 x12"])).toBe(true);
+    expect(csvFirstRowIsHeader(["Jane Doe", "6135551234 ext 202"])).toBe(false);
+  });
+
+  test("a name plus street address, or a postal code, is data", () => {
+    expect(isLikelyContactDataRow(["Jane Doe", "123 Main St"])).toBe(true);
+    expect(isLikelyContactDataRow(["Jane Doe", "K1A 0B1"])).toBe(true);
+    expect(isLikelyContactDataRow(["Jane Doe", "90210"])).toBe(true);
+    expect(isLikelyContactDataRow(["Jane Doe", "Ottawa"])).toBe(false);
+  });
+
+  test("an email is data; column-name-like words are not", () => {
+    expect(isLikelyContactDataRow(["jane@example.com"])).toBe(true);
+    expect(csvFirstRowIsHeader(["Nickname", "Notes"])).toBe(true);
+  });
+
+  test("generated headers match the wizard's names", () => {
+    expect(generatedContactImportHeaders(3)).toEqual(["Column 1", "Column 2", "Column 3"]);
+  });
+});

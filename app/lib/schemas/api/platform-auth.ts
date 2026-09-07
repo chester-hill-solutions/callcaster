@@ -21,6 +21,8 @@ export const forgotPasswordBodySchema = z.object({
 });
 
 export const resetPasswordBodySchema = z.object({
+  /** The single-use token from the reset email; it is the credential here. */
+  token: z.string().min(1),
   password: z.string().min(8),
   confirm_password: z.string().min(8),
 });

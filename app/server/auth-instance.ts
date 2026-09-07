@@ -4,7 +4,7 @@ import { twoFactor } from "better-auth/plugins";
 import { db } from "./db";
 import * as authSchema from "../db/auth-schema";
 import { resolveAuthTrustedOrigins } from "@/lib/auth-trusted-origins.server";
-import { env } from "@/lib/env.server";
+import { env, isTwoFactorFeatureEnabled } from "@/lib/env.server";
 import { ensureProfileForUser } from "@/lib/ensure-user-profile.server";
 import { sendResetPasswordEmail } from "@/lib/send-reset-password-email.server";
 
@@ -25,6 +25,9 @@ function createAuth() {
       // row — forgot-password was completely dead (P0-7). See
       // app/lib/send-reset-password-email.server.ts.
       sendResetPassword: sendResetPasswordEmail,
+      // A reset is usually a response to suspected compromise; the sessions
+      // that already exist are exactly the ones that must stop working.
+      revokeSessionsOnPasswordReset: true,
     },
     database: drizzleAdapter(db, {
       provider: "pg",
@@ -53,11 +56,15 @@ function createAuth() {
         generateId: () => crypto.randomUUID(),
       },
     },
-    plugins: [
-      twoFactor({
-        twoFactorTable: "auth_two_factor",
-      }),
-    ],
+    // With the plugin absent, sign-in issues a full session for everyone and
+    // never returns a twoFactorRedirect, whatever auth_two_factor holds.
+    plugins: isTwoFactorFeatureEnabled()
+      ? [
+          twoFactor({
+            twoFactorTable: "auth_two_factor",
+          }),
+        ]
+      : [],
     user: {
       modelName: "auth_user",
     },

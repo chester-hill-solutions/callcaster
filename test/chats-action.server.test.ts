@@ -157,12 +157,12 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     );
     expect(mocks.linkContactToConversation).not.toHaveBeenCalled();
     await expect(res.json()).resolves.toMatchObject({
-      billing: { balanceBefore: 100, estimatedCredits: 1, nextSendBlocked: false },
+      billing: { balanceBefore: 100, estimatedCredits: 2, nextSendBlocked: false },
     });
   });
 
   test("a send that uses up the balance succeeds and carries a billing notice", async () => {
-    mocks.getWorkspaceCreditsBalance.mockResolvedValue(1);
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(2);
     mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" } });
 
     const { action } = await import(
@@ -187,8 +187,8 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     const body = await res.json();
     expect(body.error).toBeUndefined();
     expect(body.billing).toEqual({
-      balanceBefore: 1,
-      estimatedCredits: 1,
+      balanceBefore: 2,
+      estimatedCredits: 2,
       nextSendBlocked: true,
     });
   });

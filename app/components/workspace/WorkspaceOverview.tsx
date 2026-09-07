@@ -138,7 +138,7 @@ export default function WorkspaceOverview({
                         {syncSnapshot?.lastSyncError && (
                             <div className="flex flex-col">
                                 <dt className="text-sm font-medium text-muted-foreground">Last Error</dt>
-                                <dd className="mt-1 text-sm text-destructive">{syncSnapshot.lastSyncError}</dd>
+                                <dd className="mt-1 text-sm text-destructive-text">{syncSnapshot.lastSyncError}</dd>
                             </div>
                         )}
                     </dl>

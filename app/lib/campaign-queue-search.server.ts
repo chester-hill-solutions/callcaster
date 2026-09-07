@@ -1,3 +1,4 @@
+import { andConditions, orConditions } from "@/lib/sql-conditions";
 import {
   and,
   asc,
@@ -38,22 +39,6 @@ export type QueueSearchFilters = {
   disposition: string;
   queueStatus: string;
 };
-
-function andConditions(conditions: SQL[], context: string): SQL {
-  const joined = and(...conditions);
-  if (!joined) {
-    throw new Error(`${context} requires at least one SQL condition`);
-  }
-  return joined;
-}
-
-function orConditions(conditions: SQL[], context: string): SQL {
-  const joined = or(...conditions);
-  if (!joined) {
-    throw new Error(`${context} requires at least one SQL condition`);
-  }
-  return joined;
-}
 
 function queueStatusWhere(queueStatus: QueueStatusFilter): SQL {
   if (queueStatus === "queued") {

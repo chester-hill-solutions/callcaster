@@ -59,7 +59,8 @@ describe("BillingActivityTable", () => {
   test("shows only the customer-facing columns by default", () => {
     render(<BillingActivityTable history={history} />);
 
-    expect(screen.getByRole("columnheader", { name: "Date" })).toBeInTheDocument();
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    expect(screen.getByRole("columnheader", { name: `Date (${zone})` })).toBeInTheDocument();
     expect(
       screen.getByRole("columnheader", { name: "Activity" }),
     ).toBeInTheDocument();
@@ -161,6 +162,48 @@ describe("BillingActivityTable", () => {
     await user.click(toggle);
 
     expect(screen.queryByText("SMS messaging")).toBeNull();
+  });
+
+  test("filters to purchases and credits, or to usage, and back to all (#1322)", async () => {
+    const user = userEvent.setup();
+    render(<BillingActivityTable history={campaignHistory} campaignNames={{ 12: "Fall drive" }} />);
+    const bar = screen.getByRole("group", { name: "Filter activity" });
+    expect(within(bar).getByRole("button", { name: "All activity", pressed: true })).toBeInTheDocument();
+    expect(screen.getByText("Credit purchase")).toBeInTheDocument();
+    expect(screen.getByText("Phone number rental")).toBeInTheDocument();
+
+    await user.click(within(bar).getByRole("button", { name: "Purchases and credits" }));
+    expect(screen.getByText("Credit purchase")).toBeInTheDocument();
+    expect(screen.queryByText("Phone number rental")).toBeNull();
+    expect(screen.queryByText(/Fall drive/)).toBeNull();
+
+    await user.click(within(bar).getByRole("button", { name: "Usage" }));
+    expect(screen.queryByText("Credit purchase")).toBeNull();
+    expect(screen.getByText("Phone number rental")).toBeInTheDocument();
+
+    await user.click(within(bar).getByRole("button", { name: "All activity" }));
+    expect(screen.getByText("Credit purchase")).toBeInTheDocument();
+  });
+
+  test("an empty filtered view says what is missing", async () => {
+    const user = userEvent.setup();
+    render(<BillingActivityTable history={history} />);
+    await user.click(screen.getByRole("button", { name: "Usage" }));
+    expect(screen.getByText("No usage yet.")).toBeInTheDocument();
+  });
+
+  test("links Stripe purchases to their hosted receipt when a workspace id is given (#1322)", () => {
+    render(<BillingActivityTable history={campaignHistory} workspaceId="ws-1" />);
+    const link = screen.getByRole("link", { name: /^Receipt/ });
+    expect(link).toHaveAttribute("href", "/api/workspaces/ws-1/billing/receipt?transaction=purchase-1");
+    expect(link).toHaveAttribute("target", "_blank");
+    // Usage rows have no receipt.
+    expect(screen.getAllByRole("link", { name: /^Receipt/ })).toHaveLength(1);
+  });
+
+  test("shows no receipt link without a workspace id", () => {
+    render(<BillingActivityTable history={history} />);
+    expect(screen.queryByRole("link", { name: /^Receipt/ })).toBeNull();
   });
 
   test("names an untitled campaign by its id", () => {

@@ -153,6 +153,8 @@ test/call-status.route.test.ts::@/lib/transaction-history.server
 test/call-status.route.test.ts::@/lib/twilio-webhook.server
 test/call-status.route.test.ts::@/lib/worker/enqueue-job.server
 test/call-status.route.test.ts::@/lib/workspace-events.server
+test/caller-id-verification.server.test.ts::@/lib/database/workspace.server
+test/caller-id-verification.server.test.ts::@/lib/env.server
 test/campaign-audience.route.test.ts::@/lib/api-auth.server
 test/campaign-audience.route.test.ts::@/lib/auth.server
 test/campaign-audience.route.test.ts::@/lib/campaign-audience-db.server

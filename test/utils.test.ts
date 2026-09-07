@@ -205,7 +205,7 @@ describe("app/lib/utils.ts", () => {
   test("campaignTypeText maps known types and default", async () => {
     const mod = await import("../app/lib/utils");
     expect(mod.campaignTypeText("message")).toBe("Message");
-    expect(mod.campaignTypeText("robocall")).toBe("Robocall");
+    expect(mod.campaignTypeText("robocall")).toBe("Automated phone menu");
     expect(mod.campaignTypeText("simple_ivr")).toBe("Simple IVR");
     expect(mod.campaignTypeText("complex_ivr")).toBe("Complex IVR");
     expect(mod.campaignTypeText("live_call")).toBe("Live Call");
@@ -381,6 +381,24 @@ describe("app/lib/utils.ts", () => {
     expect(
       mod.processTemplateTags("{city},{province} {postal} {country}", contact),
     ).toBe("London,LN ABC UK");
+
+    // The editor inserts double-brace tags; those are the shipped syntax.
+    expect(mod.processTemplateTags("Hi {{firstname}}!", contact)).toBe("Hi Ada!");
+    expect(mod.processTemplateTags("{{fullname}} at {{city}}", contact)).toBe(
+      "Ada Lovelace at London",
+    );
+    expect(mod.processTemplateTags('Hi {{address|"there"}}!', contact)).toBe(
+      "Hi there!",
+    );
+    expect(mod.processTemplateTags("{{address|'there'}}", contact)).toBe("there");
+    expect(mod.processTemplateTags("{{ firstname }}", contact)).toBe("Ada");
+    expect(mod.processTemplateTags("{{contact_id}}", { ...contact, id: 42 })).toBe(
+      "42",
+    );
+    expect(mod.processTemplateTags("{{contact_id}}", contact)).toBe("");
+    expect(
+      mod.processTemplateTags('btoa({{phone}}:{{external_id|"none"}})', contact),
+    ).toBe(Buffer.from(`${contact.phone}:${contact.external_id}`, "utf-8").toString("base64"));
 
     const nodeB64 = mod.processTemplateTags("btoa({phone}:{external_id})", contact);
     expect(nodeB64).toBe(Buffer.from(`${contact.phone}:${contact.external_id}`, "utf-8").toString("base64"));

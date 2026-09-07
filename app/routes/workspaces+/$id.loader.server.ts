@@ -1,3 +1,4 @@
+import { countRealCampaignRows, countRealScripts } from "@/lib/real-content-counts.server";
 import { type WorkspaceMessagingReadiness } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
 import {
@@ -74,9 +75,7 @@ export const loader = defineLoader({
           ? getWorkspaceUnreadConversationCount(workspaceId)
           : Promise.resolve(0),
         isExactWorkspaceRoot ? tdb.audience.count() : Promise.resolve(0),
-        isExactWorkspaceRoot
-          ? tdb.script.count()
-          : Promise.resolve(0),
+        isExactWorkspaceRoot ? countRealScripts(tdb) : Promise.resolve(0),
         fetchWorkspaceCampaignQueueProgressMap(workspaceId),
       ]);
       const workspaceNumbers = (phoneNumbersResult.data ?? []).map((number) => ({
@@ -96,7 +95,7 @@ export const loader = defineLoader({
         launchContext: {
           audienceCount,
           scriptCount,
-          campaignCount: workspaceData.campaigns.length,
+          campaignCount: countRealCampaignRows(workspaceData.campaigns),
           creditsBalance: creditsSafe,
         },
       });
@@ -115,7 +114,7 @@ export const loader = defineLoader({
         onboarding,
         audienceCount,
         scriptCount,
-        campaignCount: workspaceData.campaigns.length,
+        campaignCount: countRealCampaignRows(workspaceData.campaigns),
         creditsBalance: creditsSafe,
         workspaceNumbers,
         draftCampaignId: workspaceData.campaigns[0]?.id ?? null,

@@ -514,6 +514,24 @@ describe("app/lib/campaign-readiness.ts", () => {
       "Bulk SMS at this queue size requires verified toll-free or a Canadian short code sender. Canadian local long codes are not recommended for campaign volume.",
     );
   });
+
+  test("an explicit admin override lifts the bulk local block for that campaign (#1482)", () => {
+    const readiness = getCampaignReadiness(
+      {
+        type: "message",
+        caller_id: "+15555550100",
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+        schedule: {
+          monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] },
+        },
+        allow_bulk_local_send: true,
+      } as any,
+      { body_text: "Hello", message_media: [] } as any,
+      { queueCount: 500, smsSenderClass: "ca_local" },
+    );
+    expect(readiness.startIssues.some((m) => m.startsWith("Bulk SMS at this queue size"))).toBe(false);
+  });
 });
 
 describe("app/lib/campaign-readiness.ts resolveReadinessQueueCount", () => {

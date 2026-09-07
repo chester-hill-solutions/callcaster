@@ -6,6 +6,8 @@ export type MediaStreamTokenPayload = {
   campaignId: string;
   userId: string;
   sessionId: string;
+  /** Twilio Call SID this stream is authorized for, when known at mint time. */
+  callSid?: string;
   /** Unix timestamp (seconds) when the token expires. */
   exp: number;
 };
@@ -24,6 +26,7 @@ export function createMediaStreamToken({
   campaignId,
   userId,
   sessionId,
+  callSid,
   exp,
 }: CreateMediaStreamTokenInput): string {
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -32,6 +35,7 @@ export function createMediaStreamToken({
     campaignId,
     userId,
     sessionId,
+    ...(callSid ? { callSid } : {}),
     exp: exp ?? nowSeconds + 3600,
   };
 

@@ -1,4 +1,5 @@
 export { loader } from "./design.loader.server";
+import { useTheme } from "next-themes";
 
 import type { ReactNode } from "react";
 import { useLoaderData } from "react-router";
@@ -38,6 +39,7 @@ import { cn } from "@/lib/utils";
 function ThemeScope({ theme, children }: { theme: "light" | "dark"; children: ReactNode }) {
   return (
     <div
+      data-theme-scope={theme}
       className={cn(
         "rounded-lg border p-4",
         // Tokens live on `:root`/`.light` and `.dark`, so these class scopes
@@ -53,7 +55,8 @@ function ThemeScope({ theme, children }: { theme: "light" | "dark"; children: Re
   );
 }
 
-function Gallery() {
+/** `scope` keys every element id so the light and dark copies never collide. */
+export function Gallery({ scope }: { scope: string }) {
   return (
     <div className="grid gap-4">
       <section className="grid gap-2" aria-label="Alerts">
@@ -92,6 +95,26 @@ function Gallery() {
         </Alert>
       </section>
 
+      <section className="grid gap-2" aria-label="Tone text">
+        <h3 className="text-sm font-semibold">Standalone tone text</h3>
+        <p className="text-xs text-muted-foreground">
+          Text-only uses of a tone (no wash, no surface) take the `text-*-text` tokens; the
+          surface tokens are for badges, borders, icons, and washes.
+        </p>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <span className="text-success-text">Success text</span>
+          <span className="text-info-text">Info text</span>
+          <span className="text-warning-text">Warning text</span>
+          <span className="text-destructive-text">Destructive text</span>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="rounded-full border border-success/40 bg-success/20 px-2 py-0.5 text-success-text">On success wash</span>
+          <span className="rounded-full border border-warning/60 bg-warning/20 px-2 py-0.5 text-warning-text">On warning wash</span>
+          <span className="rounded-full border border-info/40 bg-info/20 px-2 py-0.5 text-info-text">On info wash</span>
+          <span className="rounded-full border border-destructive/40 bg-destructive/20 px-2 py-0.5 text-destructive-text">On destructive wash</span>
+        </div>
+      </section>
+
       <section className="grid gap-2" aria-label="Badges and status">
         <h3 className="text-sm font-semibold">Badges</h3>
         <div className="flex flex-wrap items-center gap-2">
@@ -116,18 +139,28 @@ function Gallery() {
           <Button variant="outline">Outline</Button>
           <Button variant="ghost">Ghost</Button>
           <Button disabled>Disabled</Button>
+          <Button disabled data-loading="true">
+            <Spinner aria-hidden className="mr-2 size-4" />
+            Saving…
+          </Button>
         </div>
         <div className="grid max-w-md gap-2">
           <Input placeholder="Text input" aria-label="Preview input" />
+          <Input
+            placeholder="Invalid input"
+            aria-label="Preview invalid input"
+            aria-invalid="true"
+            defaultValue="not-an-email"
+          />
           <Textarea placeholder="Textarea" aria-label="Preview textarea" />
           <div className="flex items-center gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <Checkbox id="preview-checkbox" />
-              <label htmlFor="preview-checkbox">Checkbox</label>
+              <Checkbox id={`${scope}-preview-checkbox`} />
+              <label htmlFor={`${scope}-preview-checkbox`}>Checkbox</label>
             </div>
             <div className="flex items-center gap-2">
-              <Switch id="preview-switch" />
-              <label htmlFor="preview-switch">Switch</label>
+              <Switch id={`${scope}-preview-switch`} />
+              <label htmlFor={`${scope}-preview-switch`}>Switch</label>
             </div>
           </div>
         </div>
@@ -178,27 +211,15 @@ function Gallery() {
   );
 }
 
+/** Drives the page theme through the app's provider, the same way the header toggle does. */
 function PageThemeToggle() {
+  const { setTheme } = useTheme();
   return (
     <div className="flex items-center gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          document.documentElement.classList.remove("dark");
-          localStorage.setItem("callcaster-theme", "light");
-        }}
-      >
+      <Button size="sm" variant="outline" onClick={() => setTheme("light")}>
         Page: light
       </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => {
-          document.documentElement.classList.add("dark");
-          localStorage.setItem("callcaster-theme", "dark");
-        }}
-      >
+      <Button size="sm" variant="outline" onClick={() => setTheme("dark")}>
         Page: dark
       </Button>
     </div>
@@ -218,10 +239,10 @@ export default function DesignPreviewPage() {
         <PageThemeToggle />
       </header>
       <ThemeScope theme="light">
-        <Gallery />
+        <Gallery scope="light" />
       </ThemeScope>
       <ThemeScope theme="dark">
-        <Gallery />
+        <Gallery scope="dark" />
       </ThemeScope>
     </div>
   );

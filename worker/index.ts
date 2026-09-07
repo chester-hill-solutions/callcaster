@@ -20,7 +20,10 @@ import {
   failJob,
 } from "../app/lib/adapters/jobqueue.adapter.server.ts";
 import { jobHandlers } from "../app/lib/worker/handlers.server.ts";
-import { ensureSelfSchedulingJobsSeeded } from "../app/lib/worker/ensure-scheduled-jobs.server.ts";
+import {
+  ensureSelfSchedulingJobsSeeded,
+  startScheduleWatchdog,
+} from "../app/lib/worker/ensure-scheduled-jobs.server.ts";
 import {
   captureException,
   initializeSentry,
@@ -126,13 +129,20 @@ if (mode === "drain") {
       jobId: job.id,
       error: `No handler registered for job type: ${job.type}`,
     });
-    await failJob(job.id, job.attempt_count, job.max_attempts, `No handler registered for job type: ${job.type}`, job.type);
+    await failJob({
+      jobId: job.id,
+      attemptCount: job.attempt_count,
+      maxAttempts: job.max_attempts,
+      error: `No handler registered for job type: ${job.type}`,
+      jobType: job.type,
+      workerId,
+    });
     process.exit(1);
   }
 
   try {
     const result = await handler(job);
-    await completeJob(job.id, result);
+    await completeJob(job.id, result, workerId);
     console.info("worker.drain", { jobId: job.id, status: "completed" });
     process.exit(0);
   } catch (error) {
@@ -143,11 +153,19 @@ if (mode === "drain") {
       jobType: job.type,
     });
     console.error("worker.drain", { jobId: job.id, error: message });
-    await failJob(job.id, job.attempt_count, job.max_attempts, message, job.type);
+    await failJob({
+      jobId: job.id,
+      attemptCount: job.attempt_count,
+      maxAttempts: job.max_attempts,
+      error: message,
+      jobType: job.type,
+      workerId,
+    });
     process.exit(1);
   }
 }
 
 console.info("worker.start", { mode, workerId });
+startScheduleWatchdog({ signal: abort.signal });
 await runWorkerPollLoop(abort.signal, jobHandlers);
 console.info("worker.shutdown");

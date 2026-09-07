@@ -23,7 +23,8 @@ const env = {
   HOST: process.env.HOST ?? "0.0.0.0",
   PORT: port,
   BASE_URL: baseURL,
-  TWILIO_VALIDATE_WEBHOOKS: process.env.TWILIO_VALIDATE_WEBHOOKS ?? "false",
+  // Webhook fixtures sign with the seeded subaccount token (e2e/fixtures/webhooks.ts).
+  TWILIO_VALIDATE_WEBHOOKS: process.env.TWILIO_VALIDATE_WEBHOOKS ?? "true",
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "sk_test_e2e_placeholder",
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_e2e_placeholder",
   RESEND_API_KEY: process.env.RESEND_API_KEY ?? "re_e2e_placeholder",

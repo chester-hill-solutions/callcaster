@@ -50,7 +50,7 @@ function RestoreCampaignButton({
         {isRestoring ? "Restoring…" : "Restore"}
       </Button>
       {restoreFailed ? (
-        <Text variant="muted" className="text-xs text-destructive">
+        <Text variant="muted" className="text-xs text-destructive-text">
           {fetcher.data?.error || "Could not restore this campaign."}
         </Text>
       ) : null}

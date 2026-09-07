@@ -60,6 +60,8 @@ const mocks = vi.hoisted(() => ({
   findCampaignInWorkspace: vi.fn(),
   updateCampaignStatusInWorkspace: vi.fn(async () => undefined),
   rpcTryCompleteCampaignIfDrained: vi.fn(async () => true),
+  rpcFailExhaustedCampaignQueueContacts: vi.fn(async () => 0),
+  recordQueueAttemptFailure: vi.fn(async () => undefined),
   createTenantDb: vi.fn(() => ({ tenant: true })),
   enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 99 })),
 
@@ -102,9 +104,15 @@ vi.mock("@/lib/database/workspace.server", () => ({
 }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
+  recordQueueAttemptFailure: (...args: unknown[]) => mocks.recordQueueAttemptFailure(...args),
 }));
 vi.mock("@/lib/message-db.server", () => ({
   countCampaignMessagesToPhone: (...args: unknown[]) => mocks.countCampaignMessagesToPhone(...args),
+  // Intent-row helpers (#1582): the contract covers dispatch gates and pacing,
+  // so the row lifecycle is stubbed as a success here.
+  pendingMessageSid: (ref: string) => `pending:${ref}`,
+  resolveMessageByClientRef: vi.fn(async (_ws: string, _ref: string, update: { sid: string }) => ({ id: 1, ...update })),
+  deleteMessageByClientRef: vi.fn(async () => undefined),
 }));
 vi.mock("@/lib/sms-campaign-db.server", () => ({
   loadCampaignSmsDispatchData: (...args: unknown[]) => mocks.loadCampaignSmsDispatchData(...args),
@@ -123,10 +131,13 @@ vi.mock("@/lib/twilio-client.server", () => ({
 vi.mock("@/lib/sms-send.server", () => ({
   persistMessageRecord: (...args: unknown[]) => mocks.persistMessageRecord(...args),
   twilioMessageToPersistFields: (message: any, extras: any) => ({ ...message, ...extras }),
+  buildMessageInsert: (fields: Record<string, unknown>) => fields,
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...args: unknown[]) => mocks.rpcCreateOutreachAttempt(...args),
   rpcTryCompleteCampaignIfDrained: (...args: unknown[]) => mocks.rpcTryCompleteCampaignIfDrained(...args),
+  rpcFailExhaustedCampaignQueueContacts: (...args: unknown[]) =>
+    mocks.rpcFailExhaustedCampaignQueueContacts(...args),
 }));
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: (...args: unknown[]) => mocks.createTenantDb(...args),
@@ -507,5 +518,155 @@ describe("SMS dispatch contract — start rate does not exceed configured MPS", 
     for (const gap of gaps) {
       expect(gap).toBeGreaterThanOrEqual(10);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Credit budget (#1483): the entry gate reads the balance once, but debits
+// land after delivery, so every row in a batch would pass on the same stale
+// balance. Both adapters must stop starting sends once the remaining balance
+// cannot cover the next estimated message, and leave those rows queued.
+// ---------------------------------------------------------------------------
+
+const TWO_ELIGIBLE_ROWS: QueueMember[] = [
+  {
+    id: 701,
+    contact_id: 30,
+    contact: { id: 30, phone: "+15551110001", firstname: "One", opt_out: false },
+  },
+  {
+    id: 702,
+    contact_id: 31,
+    contact: { id: 31, phone: "+15551110002", firstname: "Two", opt_out: false },
+  },
+];
+
+describe("SMS dispatch contract — balance covers one send, not two", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    seedCommonMocks();
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue(baseCampaignData());
+    mocks.getCampaignQueueById.mockResolvedValue(TWO_ELIGIBLE_ROWS);
+    // One-segment SMS costs 2 credits; a balance of 3 passes the entry gate
+    // and affords exactly one send.
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(3);
+  });
+
+  test("HTTP adapter sends one row, leaves the other queued, and reports exhaustion", async () => {
+    const res = await runHttpAdapter();
+    const body = (await res.json()) as {
+      responses: Record<string, { skipped?: boolean; reason?: string }>[];
+      creditsExhausted: boolean;
+    };
+    expect(body.creditsExhausted).toBe(true);
+    assertSendContract(1);
+    assertDequeueContract(["SMS message sent"]);
+    const skipped = body.responses.flatMap((r) => Object.values(r)).filter((r) => r.skipped);
+    expect(skipped).toEqual([
+      { success: false, skipped: true, reason: "Insufficient credits for the estimated message cost" },
+    ]);
+  });
+
+  test("worker adapter stops the chain as insufficient credits after the affordable send", async () => {
+    const result = await runWorkerAdapter();
+    expect(result).toMatchObject({
+      ok: true,
+      blocked: "insufficient_credits",
+      sent: 1,
+      unaffordable: 1,
+    });
+    assertSendContract(1);
+    assertDequeueContract(["SMS message sent"]);
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Exhaustion (#1513): a send that fails records the attempt on its queue row
+// and the batch runs the exhaustion sweep, so a row at the attempt maximum is
+// dead-lettered and reported instead of pinning the chain to retries.
+// ---------------------------------------------------------------------------
+
+describe("SMS dispatch contract — a failing send records its attempt and the sweep dead-letters it", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    seedCommonMocks();
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue(baseCampaignData());
+    mocks.getCampaignQueueById.mockResolvedValue([
+      {
+        id: 701,
+        contact_id: 30,
+        contact: { id: 30, phone: "+15551110001", firstname: "One", opt_out: false },
+      },
+    ]);
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({
+      messages: { create: vi.fn(async () => { throw new Error("Twilio 30006 landline"); }) },
+    });
+    mocks.rpcFailExhaustedCampaignQueueContacts.mockResolvedValue(1);
+  });
+
+  test("worker adapter reports the dead-lettered row and stops the chain cleanly", async () => {
+    const result = await runWorkerAdapter();
+    expect(mocks.recordQueueAttemptFailure).toHaveBeenCalledWith(
+      expect.objectContaining({ queueId: 701, error: expect.stringContaining("30006") }),
+    );
+    expect(mocks.rpcFailExhaustedCampaignQueueContacts).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ ok: true, failed: 1, exhausted: 1, queuedRemaining: 0 });
+    expect(mocks.enqueueJob).not.toHaveBeenCalled();
+    assertDequeueContract([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// E5.1: the runtime bodies must match the generated OpenAPI/Zod contract, and
+// the two 200 variants must narrow cleanly (a deferred body carries an empty
+// `responses` too, so `creditsExhausted` is what keeps them apart).
+// ---------------------------------------------------------------------------
+
+describe("SMS dispatch contract — response bodies match the generated API contract (E5.1)", () => {
+  const ELIGIBLE = [
+    { id: 801, contact_id: 40, contact: { id: 40, phone: "+15552220001", firstname: "Ann", opt_out: false } },
+  ];
+
+  beforeEach(() => {
+    vi.resetModules();
+    seedCommonMocks();
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue(baseCampaignData());
+    mocks.getCampaignQueueById.mockResolvedValue(ELIGIBLE);
+  });
+
+  test("a dispatched body validates as Dispatched and not as Deferred", async () => {
+    const zod = await import("@/lib/api-generated/zod.gen");
+    const res = await runHttpAdapter();
+    const body = await res.json();
+    expect(zod.zCampaignSmsDispatchResponse.safeParse(body).success).toBe(true);
+    expect(zod.zCampaignSmsDispatched.safeParse(body).success).toBe(true);
+    expect(zod.zCampaignSmsDeferred.safeParse(body).success).toBe(false);
+  });
+
+  test("a deferred body validates as Deferred and not as Dispatched", async () => {
+    mocks.isWithinSendWindow.mockReturnValue(false);
+    mocks.nextSendWindowOpenAt.mockReturnValue(new Date("2026-09-08T13:00:00.000Z"));
+    const zod = await import("@/lib/api-generated/zod.gen");
+    const res = await runHttpAdapter();
+    const body = await res.json();
+    expect(zod.zCampaignSmsDispatchResponse.safeParse(body).success).toBe(true);
+    expect(zod.zCampaignSmsDeferred.safeParse(body).success).toBe(true);
+    expect(zod.zCampaignSmsDispatched.safeParse(body).success).toBe(false);
+    expect(body.nextOpenAt).toBe("2026-09-08T13:00:00.000Z");
+  });
+
+  test("an empty balance answers 402 with the documented credits error", async () => {
+    mocks.getWorkspaceCreditsBalance.mockResolvedValue(0);
+    const zod = await import("@/lib/api-generated/zod.gen");
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
+      campaign_id: String(CAMPAIGN_ID),
+      workspace_id: TEST_WORKSPACE_ID,
+      caller_id: "+15550000000",
+    });
+    const mod = await import("../app/routes/api+/sms.action.server");
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(402);
+    expect(zod.zInsufficientCreditsError.safeParse(await res.json()).success).toBe(true);
   });
 });

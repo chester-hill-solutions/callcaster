@@ -430,6 +430,30 @@ describe("messaging onboarding helpers", () => {
     expect(steps.find((step) => step.id === "launch_checks")?.status).toBe("complete");
   });
 
+  test("Identity completes with only what the Identity screen collects (#1204)", () => {
+    // The screen saves with just the legal business name; the milestone must
+    // not keep demanding website/use-case/samples, which belong to Program.
+    const nameOnly = mergeWorkspaceMessagingOnboardingState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      {
+        businessProfile: {
+          ...DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE.businessProfile,
+          legalBusinessName: "Acme Health",
+        },
+      },
+    );
+    const steps = buildOnboardingStepsForState(nameOnly, { hasFirstNumber: false });
+    expect(steps.find((step) => step.id === "business_profile")?.status).toBe("complete");
+
+    const blankName = buildOnboardingStepsForState(
+      DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,
+      { hasFirstNumber: false },
+    );
+    expect(blankName.find((step) => step.id === "business_profile")?.status).toBe(
+      "in_progress",
+    );
+  });
+
   test("marks first_number complete when hasFirstNumber is true", () => {
     const state = mergeWorkspaceMessagingOnboardingState(
       DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE,

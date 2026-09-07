@@ -36,7 +36,7 @@ export default function WorkspaceAnalyticsPage() {
       </div>
 
       {error ? (
-        <p className="text-center text-lg font-semibold text-destructive">
+        <p className="text-center text-lg font-semibold text-destructive-text">
           {error}
         </p>
       ) : (

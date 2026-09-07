@@ -90,7 +90,10 @@ export const action = defineAction({
 
     switch (formName) {
       case "addUser": {
-        return handleAddUser(formData, workspaceId, headers);
+        return handleAddUser(formData, workspaceId, headers, {
+          kind: "member",
+          userId: user.id,
+        });
       }
       case "updateUser": {
         return handleUpdateUser(formData, workspaceId, headers, user.id);

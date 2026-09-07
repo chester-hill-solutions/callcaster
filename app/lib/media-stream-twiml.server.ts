@@ -72,6 +72,7 @@ export function appendLiveTranscriptionStreamTwiml({
         params.campaignId != null ? String(params.campaignId) : "",
       userId,
       sessionId,
+      callSid: params.callSid != null ? String(params.callSid) : undefined,
     });
 
     const url = buildMediaStreamWsUrl(sessionId, token);

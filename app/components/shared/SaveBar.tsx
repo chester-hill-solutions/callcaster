@@ -7,6 +7,12 @@ interface SaveBarProps {
   onReset?: () => void;
   isSaving?: boolean;
   message?: string;
+  /**
+   * Where the bar sticks. A form long enough to scroll shows one at each end
+   * so the actions are always in reach (#1128); only the top bar owns the
+   * Cmd/Ctrl+S shortcut so two bars never double-submit.
+   */
+  placement?: 'top' | 'bottom';
 }
 
 export const SaveBar = ({
@@ -14,7 +20,8 @@ export const SaveBar = ({
   onSave,
   onReset,
   isSaving = false,
-  message = 'You have unsaved changes'
+  message = 'You have unsaved changes',
+  placement = 'top',
 }: SaveBarProps) => {
   /**
    * @effect Wire a global Cmd/Ctrl+S keyboard shortcut to trigger onSave while there are unsaved changes.
@@ -23,6 +30,7 @@ export const SaveBar = ({
    * @effect-why-not-loader A global keyboard shortcut requires a document-level event listener; there's no loader/fetcher equivalent for DOM key events.
    */
   useEffect(() => {
+    if (placement !== 'top') return;
     const handleKeyPress = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key === 's') {
         event.preventDefault();
@@ -34,12 +42,18 @@ export const SaveBar = ({
 
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [isChanged, isSaving, onSave]);
+  }, [isChanged, isSaving, onSave, placement]);
 
   if (!isChanged && !isSaving) return null;
 
+  const stick =
+    placement === 'bottom' ? 'sticky bottom-0 border-t' : 'sticky top-0 border-b';
+
   return (
-    <div className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b bg-background px-4 py-2">
+    <div
+      className={`${stick} z-50 flex items-center justify-between gap-3 bg-background px-4 py-2`}
+      data-placement={placement}
+    >
       <span className="text-sm">{message}</span>
       <div className="flex gap-2">
         {onReset && (
@@ -49,11 +63,11 @@ export const SaveBar = ({
             size="sm"
             disabled={isSaving}
           >
-            Reset
+            Discard changes
           </Button>
         )}
         <Button onClick={onSave} size="sm" disabled={isSaving}>
-          {isSaving ? "Saving..." : "Save Changes"}
+          {isSaving ? "Saving…" : "Save changes"}
         </Button>
       </div>
     </div>

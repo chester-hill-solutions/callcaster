@@ -106,6 +106,7 @@ async function seed() {
   const readyId = WORKSPACES.ready.id;
   const onboardingId = WORKSPACES.onboarding.id;
   const emptyId = WORKSPACES.empty.id;
+  const freshId = WORKSPACES.fresh.id;
 
   for (const ws of Object.values(WORKSPACES)) {
     const isReady = ws.id === readyId;
@@ -148,6 +149,7 @@ async function seed() {
   await upsertMembership(sql, emptyId, USERS.owner.id, "owner");
   await upsertMembership(sql, emptyId, USERS.member.id, "member");
   await upsertMembership(sql, emptyId, USERS.caller.id, "caller");
+  await upsertMembership(sql, freshId, USERS.owner.id, "owner");
 
   await sql`
     INSERT INTO workspace_number (id, workspace, phone_number, type, friendly_name, handset_enabled, inbound_ring_count, capabilities)

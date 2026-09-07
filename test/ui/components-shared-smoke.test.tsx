@@ -247,8 +247,8 @@ describe("app/components/shared/SaveBar.tsx", () => {
       />,
     );
     expect(screen.getByText("Unsaved edits")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
-    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onReset).toHaveBeenCalledTimes(1);
   });
@@ -263,7 +263,7 @@ describe("app/components/shared/SaveBar.tsx", () => {
     expect(bar).toHaveClass("bg-background");
     expect(bar.className).not.toMatch(/bg-white/);
 
-    const save = screen.getByRole("button", { name: "Save Changes" });
+    const save = screen.getByRole("button", { name: "Save changes" });
     expect(save.className).not.toMatch(/bg-red-|text-white/);
   });
 

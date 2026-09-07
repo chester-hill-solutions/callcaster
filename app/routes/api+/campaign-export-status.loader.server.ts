@@ -2,7 +2,7 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
-import { downloadObject } from "@/lib/object-storage.server";
+import { downloadObject, ObjectNotFoundError } from "@/lib/object-storage.server";
 import { defineLoader } from "@/lib/handler.server";
 import {
   markCampaignExportInterruptedIfStale,
@@ -38,7 +38,7 @@ export const loader = defineLoader({
           `${workspaceId}/${exportId}.json`,
         );
       } catch (error) {
-        if (error instanceof Error && error.message.includes("Object not found")) {
+        if (error instanceof ObjectNotFoundError) {
           return routeData({ error: "Export not found" }, { status: 404 });
         }
         throw error;

@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger.server";
+import { retargetSampleCampaignForGoal } from "@/lib/seed/seed-workspace-sample-data.server";
 import { startWorkspaceCallerIdVerification } from "@/lib/caller-id-verification.server";
 import {
   getWorkspaceMessagingOnboardingState,
@@ -232,6 +234,19 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
     },
   });
 
+  // The seeded sample campaign follows the chosen goal (#1323); best-effort.
+  if (selectedGoal) {
+    try {
+      await retargetSampleCampaignForGoal({ workspaceId: ctx.workspaceId, goal: selectedGoal });
+    } catch (error) {
+      logger.warn("onboarding.sample_retarget_failed", {
+        workspaceId: ctx.workspaceId,
+        goal: selectedGoal,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   // Kick off Twilio compliance provisioning when a compliance path is newly
   // selected. Idempotent enqueue — repeated saves do not stack duplicate jobs.
   const previousChannels = new Set(current.selectedChannels as string[]);
@@ -340,8 +355,12 @@ async function handleSaveBusinessProfile(
     );
   }
 
-  // After intake, return to the capability surface instead of wizard steps.
-  if (isWorkspaceIntakeComplete(current)) {
+  // A step-hinted save comes from the wizard's "Save & continue" and must
+  // land on the next step. Intake is already complete by the time the Program
+  // step saves (the Identity save completed it), so gating on intake alone
+  // sent that save back to a payload and the wizard never moved (#1471).
+  // Hint-less posts (API, capability surfaces) still return to where they came from.
+  if (wizardStep === null && isWorkspaceIntakeComplete(current)) {
     return redirectToReturnToOrPayload(
       formData,
       ctx.workspaceId,

@@ -60,13 +60,15 @@ credentials**:
 
 ## Strict vs relaxed provider auth
 
-The compose E2E harness sets `TWILIO_VALIDATE_WEBHOOKS=false`,
-`E2E_DISABLE_2FA_ENFORCEMENT=1`, and `E2E_DISABLE_AUTH_RATE_LIMIT=1` — so **E2E
-structurally cannot verify those three declared behaviors.** Consequently:
+The compose E2E harness sets `E2E_DISABLE_2FA_ENFORCEMENT=1` and
+`E2E_DISABLE_AUTH_RATE_LIMIT=1` — so **E2E structurally cannot verify those two
+declared behaviors.** Twilio signature validation stays on there (fixtures sign
+with the seeded subaccount token), so the harness runs the probe strict.
+Consequently:
 
 | Where | Mode | Wired in |
 |---|---|---|
-| compose E2E (CI) | relaxed — reachability + non-provider auth | `scripts/e2e/run-compose-e2e.mjs`, after `waitForReady`, before Playwright |
+| compose E2E (CI) | strict — unsigned provider webhooks must 403 | `scripts/e2e/run-compose-e2e.mjs` passes `--strict`, after `waitForReady`, before Playwright |
 | any deployed env | strict by default — also requires unsigned webhooks to 403 | run manually / as a WS-D release gate |
 
 Run against a deployed environment before every production release:

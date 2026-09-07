@@ -4,10 +4,21 @@ import { call, message } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
 import { logger } from "@/lib/logger.server";
 import { processCallStatusWebhook } from "@/lib/twilio-call-status.server";
-import { updateMessageBySid } from "@/lib/message-db.server";
+import {
+  isPendingMessageSid,
+  resolveMessageByClientRef,
+  updateMessageBySid,
+} from "@/lib/message-db.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
 import { SMS_STATUS_SIDE_EFFECTS_JOB_TYPE } from "@/lib/worker/job-types.server";
 import { isTerminalSmsStatus, normalizeSmsStatus } from "@/lib/sms-status";
+
+/**
+ * An intent row (#1582) normally gets its real SID within seconds, from the
+ * post-send resolve or the first status callback. Past this age, neither
+ * happened: match it to the provider by number pair, or fail it (no debit).
+ */
+const PENDING_INTENT_STALE_MS = 10 * 60_000;
 
 const OPEN_CALL_STATUSES = [
   "queued",
@@ -22,6 +33,72 @@ const OPEN_MESSAGE_STATUSES = [
   "queued",
   "sending",
 ] as const;
+
+type ProviderMessage = {
+  sid: string;
+  to?: string | null;
+  from?: string | null;
+  status?: string | null;
+  errorCode?: string | number | null;
+  dateCreated?: Date | null;
+  dateSent?: Date | null;
+  dateUpdated?: Date | null;
+};
+
+function providerTime(m: ProviderMessage): number {
+  return (m.dateCreated ?? m.dateSent ?? new Date(0)).getTime();
+}
+
+/**
+ * A placeholder row (#1582) has no SID to fetch. Young ones are still in
+ * flight. Stale ones are matched to the earliest provider message for the
+ * same number pair sent after the intent (a Twilio number belongs to one
+ * workspace); when the provider has nothing, the intent is failed with no
+ * debit.
+ */
+async function reconcilePendingIntent<T extends ProviderMessage>(args: {
+  workspaceId: string;
+  local: { sid: string; to: string | null; from: string | null; client_ref: string | null; date_created: string | null };
+  twilioMessages: T[];
+}): Promise<
+  | { kind: "skipped" }
+  | { kind: "failed" }
+  | { kind: "resolved"; remote: T }
+> {
+  const { workspaceId, local, twilioMessages } = args;
+  const createdAt = local.date_created ? new Date(local.date_created).getTime() : 0;
+  if (Date.now() - createdAt < PENDING_INTENT_STALE_MS) {
+    return { kind: "skipped" };
+  }
+  const match = twilioMessages
+    .filter(
+      (m) =>
+        m.to === local.to &&
+        (local.from == null || m.from === local.from) &&
+        providerTime(m) >= createdAt,
+    )
+    .sort((a, b) => providerTime(a) - providerTime(b))[0];
+  if (!match || !local.client_ref) {
+    await updateMessageBySid(workspaceId, local.sid, {
+      status: "failed",
+      error_message: "No provider record for this send (open-sync)",
+      date_updated: new Date().toISOString(),
+    });
+    logger.warn("Twilio open sync: pending intent failed, nothing at provider", {
+      workspaceId,
+      clientRef: local.client_ref,
+      to: local.to,
+    });
+    return { kind: "failed" };
+  }
+  await resolveMessageByClientRef(workspaceId, local.client_ref, { sid: match.sid });
+  logger.warn("Twilio open sync: pending intent resolved by number pair", {
+    workspaceId,
+    clientRef: local.client_ref,
+    sid: match.sid,
+  });
+  return { kind: "resolved", remote: match };
+}
 
 /**
  * Reconcile stale LOCAL call/message statuses against Twilio REST for a
@@ -156,6 +233,8 @@ export async function triggerTwilioOpenSync({
     // ─── Messages ──────────────────────────────────────────
     let messagesUpdated = 0;
     let messagesSkipped = 0;
+    let intentsResolved = 0;
+    let intentsFailed = 0;
 
     // Same open-population sweep as calls (#1289): the old windowed selection
     // let a message stuck longer than maxAgeMinutes escape the sweep forever.
@@ -176,8 +255,25 @@ export async function triggerTwilioOpenSync({
       });
       const twilioBySid = new Map(twilioMessages.map((m) => [m.sid, m]));
 
-      for (const local of localOpenMessages) {
+      for (const localRow of localOpenMessages) {
+        let local = localRow;
         let remote = twilioBySid.get(local.sid);
+
+        // Flat on purpose: an extra nesting level here trips the depth ratchet.
+        const intentOutcome = isPendingMessageSid(local.sid)
+          ? await reconcilePendingIntent({ workspaceId, local, twilioMessages })
+          : null;
+        if (intentOutcome && intentOutcome.kind !== "resolved") {
+          messagesSkipped += intentOutcome.kind === "skipped" ? 1 : 0;
+          intentsFailed += intentOutcome.kind === "failed" ? 1 : 0;
+          continue;
+        }
+        if (intentOutcome) {
+          intentsResolved++;
+          local = { ...local, sid: intentOutcome.remote.sid };
+          remote = intentOutcome.remote;
+        }
+
         if (!remote) {
           try {
             remote = await twilio.messages(local.sid).fetch();
@@ -191,17 +287,13 @@ export async function triggerTwilioOpenSync({
         if (!twilioStatus || twilioStatus === local.status) continue;
 
         const errorCode = remote.errorCode ? Number(remote.errorCode) : null;
-        await updateMessageBySid(workspaceId, local.sid, {
-          status: twilioStatus,
-          date_updated:
-            remote.dateUpdated?.toISOString() ?? local.date_updated,
-          ...(errorCode != null ? { error_code: errorCode } : {}),
-        });
-        messagesUpdated++;
 
         // Terminal discovery must also run the billing/side-effects path the
-        // lost webhook would have run. The job + ledger are both idempotent,
-        // so racing a late-arriving webhook cannot double-debit.
+        // lost webhook would have run. Queue it BEFORE the status write: this
+        // sweep only revisits open rows, so a terminal status with no queued
+        // job would never be billed. The job + ledger are both idempotent, so
+        // a retry of this row (status write failed) or a late-arriving webhook
+        // cannot double-debit.
         if (isTerminalSmsStatus(normalizeSmsStatus(twilioStatus))) {
           await enqueueRegisteredJob({
             type: SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
@@ -216,12 +308,21 @@ export async function triggerTwilioOpenSync({
             },
           });
         }
+
+        await updateMessageBySid(workspaceId, local.sid, {
+          status: twilioStatus,
+          date_updated:
+            remote.dateUpdated?.toISOString() ?? local.date_updated,
+          ...(errorCode != null ? { error_code: errorCode } : {}),
+        });
+        messagesUpdated++;
       }
     }
 
     const msg =
       `Open sync complete: ${callsUpdated} calls updated (${callsBilled} billed), ${callsSkipped} calls unresolvable at Twilio; ` +
-      `${messagesUpdated} messages updated, ${messagesSkipped} messages unresolvable at Twilio.`;
+      `${messagesUpdated} messages updated, ${messagesSkipped} messages unresolvable at Twilio, ` +
+      `${intentsResolved} pending intents resolved, ${intentsFailed} pending intents failed.`;
 
     logger.info("Twilio open sync complete", {
       workspaceId,
@@ -230,6 +331,8 @@ export async function triggerTwilioOpenSync({
       callsSkipped,
       messagesUpdated,
       messagesSkipped,
+      intentsResolved,
+      intentsFailed,
     });
 
     return { ok: true, message: msg };

@@ -14,10 +14,10 @@ import {
   twilioAssumedSmsMps,
 } from "@/lib/throughput-config";
 import {
-  parseSendWindow,
-  sendWindowActiveIntervals,
-  type SendWindowDayKey,
-} from "@/lib/campaign-send-window";
+  projectDispatchTime,
+  smsSendPolicy,
+  type DispatchPolicy,
+} from "@/lib/campaign-dispatch-policy";
 
 export const QUEUE_NEXT_DELAY_MS = 200;
 export const SMS_HANDLER_NEXT_DELAY_MS = 300;
@@ -75,16 +75,6 @@ function normalizeSenderPoolSize(value: number) {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 1;
 }
 
-const OUTBOUND_ETA_DAY_KEYS: SendWindowDayKey[] = [
-  "sunday",
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-];
-
 const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
 
@@ -102,6 +92,13 @@ export type OutboundCompletionInput = {
    * unrestricted.
    */
   sendWindow?: Schedule | null;
+  /**
+   * Explicit dispatch policy (SMS send window or IVR calling hours with
+   * dates). Takes precedence over `sendWindow`; the ETA then starts no
+   * earlier than the campaign start date and reports when it cannot finish
+   * before the end date.
+   */
+  policy?: DispatchPolicy | null;
 };
 
 export type OutboundCompletionEstimate = {
@@ -110,57 +107,9 @@ export type OutboundCompletionEstimate = {
   fastFinish: Date;
   averageFinish: Date;
   slowFinish: Date;
+  /** The slow bound runs past the policy's end date: the queue may not finish in time. */
+  exceedsEndDate: boolean;
 };
-
-/**
- * Walk a weekly send window forward from `now`, consuming `neededSeconds` of
- * in-window dispatch time, and return the wall-clock finish. Bounded lookahead
- * (~1 year); falls back to continuous projection if the window has no active
- * time. Overnight intervals are approximated by extending past midnight, which
- * is acceptable for an ETA range (the built-in presets never wrap midnight).
- */
-function projectThroughSendWindow(
-  now: Date,
-  neededSeconds: number,
-  schedule: Schedule,
-): Date {
-  let remaining = neededSeconds;
-  const nowMs = now.getTime();
-  const baseMidnightMs = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
-
-  for (let dayOffset = 0; dayOffset < 366 && remaining > 0; dayOffset++) {
-    const dayStartMs = baseMidnightMs + dayOffset * MS_PER_DAY;
-    const dayKey = OUTBOUND_ETA_DAY_KEYS[new Date(dayStartMs).getUTCDay()];
-    if (!dayKey) continue;
-
-    const intervals = sendWindowActiveIntervals(schedule, dayKey).sort(
-      (a, b) => a.start - b.start,
-    );
-    for (const interval of intervals) {
-      const intervalStartMs = dayStartMs + interval.start * MS_PER_MINUTE;
-      const spanMinutes =
-        interval.end > interval.start
-          ? interval.end - interval.start
-          : interval.end + 24 * 60 - interval.start;
-      const intervalEndMs = intervalStartMs + spanMinutes * MS_PER_MINUTE;
-      const effectiveStartMs = Math.max(intervalStartMs, nowMs);
-      if (intervalEndMs <= effectiveStartMs) continue;
-
-      const availableSeconds = (intervalEndMs - effectiveStartMs) / 1000;
-      if (availableSeconds >= remaining) {
-        return new Date(effectiveStartMs + remaining * 1000);
-      }
-      remaining -= availableSeconds;
-    }
-  }
-
-  // No usable in-window time within lookahead: fall back to continuous.
-  return new Date(nowMs + neededSeconds * 1000);
-}
 
 /**
  * Projected queue-completion estimate at a given effective throughput, with
@@ -178,22 +127,26 @@ export function estimateOutboundCompletion(
 
   const now = input.now ?? new Date();
   const activeSeconds = queueCount / ratePerSecond;
-  const window = input.sendWindow ? parseSendWindow(input.sendWindow) : null;
+  const policy =
+    input.policy ?? smsSendPolicy({ sms_send_window: input.sendWindow ?? null });
 
+  let exceedsEndDate = false;
   const project = (multiplier: number): Date => {
     const neededSeconds = activeSeconds * multiplier;
-    if (!window) {
-      return new Date(now.getTime() + neededSeconds * 1000);
+    const projection = projectDispatchTime(policy, now, neededSeconds);
+    if (projection.kind === "finish") return new Date(projection.finishMs);
+    if (projection.kind === "beyond_end_date") {
+      exceedsEndDate = true;
+      return new Date(projection.notAfterMs);
     }
-    return projectThroughSendWindow(now, neededSeconds, window);
+    // No usable in-window time within lookahead: fall back to continuous.
+    return new Date(now.getTime() + neededSeconds * 1000);
   };
 
-  return {
-    activeSeconds,
-    fastFinish: project(0.8),
-    averageFinish: project(1),
-    slowFinish: project(1.2),
-  };
+  const fastFinish = project(0.8);
+  const averageFinish = project(1);
+  const slowFinish = project(1.2);
+  return { activeSeconds, fastFinish, averageFinish, slowFinish, exceedsEndDate };
 }
 
 function estimateTwilioMessagesPerSecond({

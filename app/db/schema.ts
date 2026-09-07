@@ -31,6 +31,25 @@ export {
   call_transcript,
 } from "./schema-transcription";
 
+// Inbound-queue tables and their enum live in schema-inbound-queue.ts; the
+// relations block below still wires them, so import as well as re-export.
+import {
+  queue_entry_state,
+  inbound_queue,
+  inbound_queue_member,
+  inbound_queue_entry,
+  agent_status,
+  agent_status_event
+} from "./schema-inbound-queue";
+export {
+  queue_entry_state,
+  inbound_queue,
+  inbound_queue_member,
+  inbound_queue_entry,
+  agent_status,
+  agent_status_event
+};
+
 // Re-exported so `@/db/schema` stays the single import site; also imported
 // because the relations block below wires these to campaign/contact.
 import {
@@ -58,7 +77,6 @@ export const campaign_type = pgEnum("campaign_type", ["message","robocall","simp
 export const dial_types = pgEnum("dial_types", ["call","predictive"]);
 export const message_direction = pgEnum("message_direction", ["inbound","outbound-api","outbound-call","outbound-reply"]);
 export const message_status = pgEnum("message_status", ["accepted","scheduled","canceled","queued","sending","sent","failed","delivered","undelivered","receiving","received","read"]);
-export const queue_entry_state = pgEnum("queue_entry_state", ["queued","offered","accepted","declined","timed_out","abandoned","completed"]);
 export const queue_status = pgEnum("queue_status", ["queued","dequeued"]);
 export const voter_list_source = pgEnum("voter_list_source", ["liberalist","van","elections_canada","elections_ontario","manual","other"]);
 /** Legacy enum renamed in 0008_chs_workspace_membership (CHS table claims workspace_role). */
@@ -218,6 +236,7 @@ export const workspace_number = pgTable("workspace_number", {
 // ─── Campaign ──────────────────────────────────────
 
 export const campaign = pgTable("campaign", {
+  allow_bulk_local_send: boolean().notNull().default(false),
   body_text: text(),
   caller_id: text(),
   created_at: text().notNull(),
@@ -227,6 +246,7 @@ export const campaign = pgTable("campaign", {
   end_date: text(),
   group_household_queue: boolean().notNull(),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
+  is_sample: boolean().notNull().default(false),
   live_questions: jsonb(),
   message_media: text().array(),
   next_queue_order: integer().notNull(),
@@ -278,6 +298,7 @@ export const script = pgTable("script", {
   created_at: text().notNull(),
   created_by: uuid(),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
+  is_sample: boolean().notNull().default(false),
   name: text().notNull(),
   steps: jsonb(),
   type: text(),
@@ -300,8 +321,7 @@ export const contact = pgTable("contact", {
   firstname: text(),
   household_id: uuid(),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  // Twilio Lookup v2 line-type cache: null = never looked up. Populated
-  // lazily on a contact's first SMS attempt and treated as permanent once set.
+  // Twilio Lookup v2 line-type cache: null = never looked up; set lazily on the first SMS attempt, then permanent.
   line_type: text(),
   line_type_checked_at: timestamp({ withTimezone: true, mode: "string" }),
   opt_out: boolean(),
@@ -443,6 +463,7 @@ export const message = pgTable("message", {
   to: text(),
   uri: text(),
   workspace: uuid().notNull(),
+  client_ref: text(),
 });
 
 export const outreach_attempt = pgTable("outreach_attempt", {
@@ -464,64 +485,6 @@ export const outreach_attempt = pgTable("outreach_attempt", {
   volunteer_interest: text(),
   vote_by_mail: boolean(),
   workspace: uuid().notNull(),
-});
-
-// ─── Inbound Queue ──────────────────────────────────────
-
-export const inbound_queue = pgTable("inbound_queue", {
-  created_at: text().notNull(),
-  description: text(),
-  hold_audio: text(),
-  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  name: text().notNull(),
-  updated_at: text().notNull(),
-  workspace_id: uuid().notNull(),
-});
-
-export const inbound_queue_member = pgTable("inbound_queue_member", {
-  created_at: text().notNull(),
-  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  queue_id: bigint({ mode: "number" }).notNull(),
-  user_id: uuid().notNull(),
-  workspace_id: uuid().notNull(),
-});
-
-export const inbound_queue_entry = pgTable("inbound_queue_entry", {
-  abandoned_at: text(),
-  accepted_at: text(),
-  call_sid: text(),
-  caller_number: text(),
-  completed_at: text(),
-  created_at: text().notNull(),
-  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  offered_at: text(),
-  offered_to_user_id: text(),
-  queue_id: bigint({ mode: "number" }).notNull(),
-  status: queue_entry_state().notNull(),
-  twilio_queue_sid: text(),
-  updated_at: text().notNull(),
-  workspace_id: uuid().notNull(),
-});
-
-export const agent_status = pgTable("agent_status", {
-  workspace_id: uuid().notNull(),
-  user_id: uuid().notNull(),
-  status: text().notNull(),
-  status_reason: text(),
-  status_started_at: text().notNull(),
-  current_queue_entry_id: bigint({ mode: "number" }),
-  last_heartbeat_at: text(),
-  updated_at: text().notNull(),
-});
-
-export const agent_status_event = pgTable("agent_status_event", {
-  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  workspace_id: uuid().notNull(),
-  user_id: uuid().notNull(),
-  from_status: text().notNull(),
-  to_status: text().notNull(),
-  reason: text(),
-  created_at: text().notNull(),
 });
 
 export const workspace_events = pgTable("workspace_events", {

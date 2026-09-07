@@ -216,6 +216,21 @@ export type CampaignDispatchParams = {
   userId: string | undefined;
 };
 
+async function pauseForInsufficientCredits(
+  workspaceId: string,
+  campaignId: number,
+  detail: Record<string, number> = {},
+): Promise<void> {
+  await updateCampaignStatusInWorkspace(workspaceId, campaignId, {
+    status: "paused",
+  });
+  logger.warn("campaign_dispatch.insufficient_credits", {
+    campaignId,
+    workspaceId,
+    ...detail,
+  });
+}
+
 export async function campaignDispatchHandler(
   job: ClaimedJobRow,
   params: CampaignDispatchParams,
@@ -244,6 +259,34 @@ export async function campaignDispatchHandler(
       type: campaignRecord.type,
     });
     return { ok: true, campaignId, skipped: true, reason: "not_dispatchable_campaign" };
+  }
+
+  // Expired campaigns terminalize here — before the scheduled->running flip
+  // below — so an end date that passed while contacts were still queued (or a
+  // scheduled start that arrives after the end date) can no longer leave the
+  // campaign stuck "running" with an undrained queue. Only active/queued
+  // states move to complete; paused/draft/archived/complete keep the status
+  // the user chose.
+  if (
+    campaignRecord.end_date &&
+    new Date(campaignRecord.end_date) < new Date()
+  ) {
+    const terminalizable = new Set([
+      "running",
+      "scheduled",
+      "waiting",
+      "pending",
+    ]);
+    if (campaignRecord.status && terminalizable.has(campaignRecord.status)) {
+      await updateCampaignStatusInWorkspace(workspaceId, campaignId, {
+        status: "complete",
+      });
+    }
+    logger.info("campaign_dispatch.expired", {
+      campaignId,
+      previousStatus: campaignRecord.status,
+    });
+    return { ok: true, campaignId, expired: true };
   }
 
   // Claim: a scheduled campaign whose runAt has arrived transitions to
@@ -287,11 +330,6 @@ export async function campaignDispatchHandler(
     return { ok: true, campaignId, skipped: true, reason: campaignRecord.status };
   }
 
-  if (campaignRecord.end_date && new Date(campaignRecord.end_date) < new Date()) {
-    logger.info("campaign_dispatch.expired", { campaignId });
-    return { ok: true, campaignId, expired: true };
-  }
-
   if (campaignRecord.type !== "message") {
     return runMachineVoiceDispatch(job, {
       workspaceId,
@@ -309,8 +347,9 @@ export async function campaignDispatchHandler(
 
   switch (outcome.kind) {
     case "insufficient_credits":
-      // Not retried: dispatch resumes when the user relaunches after top-up.
-      logger.warn("campaign_dispatch.insufficient_credits", { campaignId, workspaceId });
+      // Park the campaign so a stopped chain cannot leave it marked running;
+      // the owner relaunches after topping up.
+      await pauseForInsufficientCredits(workspaceId, campaignId);
       return { ok: true, campaignId, blocked: "insufficient_credits" };
     case "caller_id_required":
       // Config error — retrying cannot fix it; surface loudly and stop.
@@ -335,10 +374,32 @@ export async function campaignDispatchHandler(
     case "dispatched": {
       const { counts, queuedRemaining } = outcome;
 
-      // Every attempted send failed and nothing was dequeued: let the job
-      // retry with backoff instead of hot-looping successors. Failed rows
-      // stay queued and the duplicate gate keeps retries single-send.
-      if (counts.failed > 0 && counts.sent === 0 && counts.dequeued === 0) {
+      // The balance ran out inside the batch: stop the chain exactly as the
+      // entry gate does. Rows the budget refused stay queued for a relaunch.
+      if (outcome.creditsExhausted) {
+        await pauseForInsufficientCredits(workspaceId, campaignId, {
+          sent: counts.sent,
+          unaffordable: counts.unaffordable,
+        });
+        return {
+          ok: true,
+          campaignId,
+          blocked: "insufficient_credits",
+          sent: counts.sent,
+          unaffordable: counts.unaffordable,
+        };
+      }
+
+      // Every attempted send failed and nothing was dequeued or dead-lettered:
+      // let the job retry with backoff instead of hot-looping successors.
+      // Failed rows stay queued (attempt recorded) and the duplicate gate
+      // keeps retries single-send; exhausted rows count as progress.
+      if (
+        counts.failed > 0 &&
+        counts.sent === 0 &&
+        counts.dequeued === 0 &&
+        counts.exhausted === 0
+      ) {
         throw new Error(
           `campaign_dispatch: all ${counts.failed} sends failed for campaign ${campaignId}`,
         );
@@ -369,6 +430,8 @@ export async function campaignDispatchHandler(
         failed: counts.failed,
         dequeued: counts.dequeued,
         deferred: counts.deferred,
+        unaffordable: counts.unaffordable,
+        exhausted: counts.exhausted,
         queuedRemaining,
       };
     }
@@ -393,8 +456,9 @@ async function runMachineVoiceDispatch(
 
   switch (outcome.kind) {
     case "insufficient_credits":
-      // Not retried: dispatch resumes when the user relaunches after top-up.
-      logger.warn("campaign_dispatch.insufficient_credits", { campaignId, workspaceId });
+      // Park the campaign so a stopped chain cannot leave it marked running;
+      // the owner relaunches after topping up.
+      await pauseForInsufficientCredits(workspaceId, campaignId);
       return { ok: true, campaignId, blocked: "insufficient_credits" };
     case "caller_id_required":
       // Config error — retrying cannot fix it; surface loudly and stop.
@@ -412,10 +476,16 @@ async function runMachineVoiceDispatch(
     case "dispatched": {
       const { counts, queuedRemaining } = outcome;
 
-      // Every attempted call failed and nothing was dequeued: let the job
-      // retry with backoff instead of hot-looping successors. Failed rows
-      // stay queued and the next tick re-attempts them.
-      if (counts.failed > 0 && counts.called === 0 && counts.dequeued === 0) {
+      // Every attempted call failed and nothing was dequeued or dead-lettered:
+      // let the job retry with backoff instead of hot-looping successors.
+      // Failed rows stay queued (attempt recorded); exhausted rows count as
+      // progress.
+      if (
+        counts.failed > 0 &&
+        counts.called === 0 &&
+        counts.dequeued === 0 &&
+        counts.exhausted === 0
+      ) {
         throw new Error(
           `campaign_dispatch: all ${counts.failed} IVR calls failed for campaign ${campaignId}`,
         );
@@ -446,6 +516,7 @@ async function runMachineVoiceDispatch(
         failed: counts.failed,
         dequeued: counts.dequeued,
         deferred: counts.deferred,
+        exhausted: counts.exhausted,
         queuedRemaining,
       };
     }

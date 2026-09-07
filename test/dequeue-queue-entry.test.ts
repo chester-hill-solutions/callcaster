@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
  */
 
 const rpcDequeueContactMock = vi.hoisted(() => vi.fn(async () => 1));
+const rpcTryCompleteMock = vi.hoisted(() => vi.fn(async () => false));
 
 const dbMocks = vi.hoisted(() => ({
   select: vi.fn(),
@@ -40,11 +41,17 @@ vi.mock("@/lib/workspace-events.server", () => ({
 }));
 vi.mock("@/lib/db-rpc.server", () => ({
   rpcDequeueContact: (...args: unknown[]) => rpcDequeueContactMock(...args),
+  rpcTryCompleteCampaignIfDrained: (...args: unknown[]) => rpcTryCompleteMock(...args),
+}));
+vi.mock("@/lib/logger.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/logger.server")>()),
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 // Captured `set` payloads and `where` filters from db.update().set(...).where(...) calls.
 let updateSetCalls: unknown[] = [];
 let updateCount = 0;
+let returningRows: Array<Record<string, unknown>> = [];
 
 function installDbMockImplementations() {
   dbMocks.select.mockImplementation(() => {
@@ -61,7 +68,7 @@ function installDbMockImplementations() {
       updateCount++;
       return {
         where: () => ({
-          returning: () => Promise.resolve([{ id: 1, workspace: "workspace-1" }]),
+          returning: () => Promise.resolve(returningRows),
         }),
       };
     },
@@ -77,6 +84,9 @@ beforeEach(() => {
   rpcDequeueContactMock.mockResolvedValue(1);
   updateSetCalls = [];
   updateCount = 0;
+  returningRows = [{ id: 1, workspace: "workspace-1", campaign_id: 99 }];
+  rpcTryCompleteMock.mockReset();
+  rpcTryCompleteMock.mockResolvedValue(false);
   installDbMockImplementations();
 });
 
@@ -268,5 +278,58 @@ describe("dequeueQueueEntry routing", () => {
       }),
     ).rejects.toThrow(/workspaceId/);
     expect(rpcDequeueContactMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("dequeueQueueEntry completes a campaign its dequeue drained (#1484)", () => {
+  test("a Drizzle dequeue tries completion for the row's campaign", async () => {
+    const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
+
+    await dequeueQueueEntry({
+      by: { id: 42 },
+      userId: "user-1",
+      reason: "SMS message sent",
+      workspaceId: "workspace-1",
+    });
+
+    expect(rpcTryCompleteMock).toHaveBeenCalledTimes(1);
+    expect(rpcTryCompleteMock).toHaveBeenCalledWith(expect.anything(), 99);
+  });
+
+  test("no completion attempt when nothing was dequeued", async () => {
+    returningRows = [];
+    const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
+
+    await dequeueQueueEntry({ by: { id: 42 }, userId: "user-1", reason: "x", workspaceId: "workspace-1" });
+
+    expect(rpcTryCompleteMock).not.toHaveBeenCalled();
+  });
+
+  test("the household RPC path tries completion for the given campaign", async () => {
+    const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
+
+    await dequeueQueueEntry({
+      by: { contactId: 7, campaignId: 55 },
+      userId: "user-1",
+      reason: "Predictive Dialer called contact",
+      workspaceId: "workspace-1",
+      household: true,
+    });
+
+    expect(rpcTryCompleteMock).toHaveBeenCalledWith(expect.anything(), 55);
+  });
+
+  test("a completion failure never fails the dequeue", async () => {
+    rpcTryCompleteMock.mockRejectedValueOnce(new Error("db down"));
+    const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
+
+    const result = await dequeueQueueEntry({
+      by: { id: 42 },
+      userId: "user-1",
+      reason: "SMS message sent",
+      workspaceId: "workspace-1",
+    });
+
+    expect(result).toEqual({ dequeuedPrimary: true });
   });
 });

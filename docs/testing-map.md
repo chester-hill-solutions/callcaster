@@ -144,6 +144,10 @@ Top remaining blockers (smallest surface area first — use strict report for ex
 - **UI (JSDOM) breadth**:
   - Focus on **small, deterministic components/hooks first**, then expand with targeted smoke renders for wiring components.
 
+### Twilio test-credential contract (real SDK, no cost)
+
+`npm run test:integration-twilio` (`vitest.integration-twilio.config.ts`, `test/integration-twilio/`) runs the real Twilio SDK with Twilio Test Credentials and the documented magic numbers: a valid sender queues a message or call and returns an `SM`/`CA` sid; invalid, unowned, unroutable, blocked, and SMS-incapable numbers come back with the exact codes (21211, 21212, 21606, 21610, 21611, 21612, 21614; 21210, 21214, 21216, 21217 for voice) that `presentTwilioError` and the retry predicates must classify as non-retryable. Skipped unless `TWILIO_TEST_ACCOUNT_SID` and `TWILIO_TEST_AUTH_TOKEN` are set. Test credentials do not run webhooks, TwiML, recordings, voicemail, or delivery, so those stay in E2E (#1195).
+
 ### E2E (Playwright browser)
 
 Full browser journeys complement Vitest route tests. See **[e2e-testing.md](e2e-testing.md)** for runbook, seed users, and scenario catalog.

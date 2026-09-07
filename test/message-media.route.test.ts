@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => {
 const campaignMocks = vi.hoisted(() => ({
   findCampaignMessageMedia: vi.fn(),
   updateCampaignMessageMedia: vi.fn(),
+  countOtherCampaignsReferencingMedia: vi.fn(async () => 0),
 }));
 
 vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
@@ -31,6 +32,8 @@ vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
       campaignMocks.findCampaignMessageMedia(...args),
     updateCampaignMessageMedia: (...args: unknown[]) =>
       campaignMocks.updateCampaignMessageMedia(...args),
+    countOtherCampaignsReferencingMedia: (...args: unknown[]) =>
+      campaignMocks.countOtherCampaignsReferencingMedia(...args),
   };
 });
 
@@ -278,9 +281,34 @@ describe("app/routes/api+/message_media/route.tsx", () => {
 
     queueDualAuthSession(authSession());
     makeDbClient({ campaign: { id: 1, message_media: ["x.png", "y.png"] } });
+    campaignMocks.countOtherCampaignsReferencingMedia.mockResolvedValueOnce(0);
     res = await asRouteResponse(mod.action({ request: req("DELETE", fd) } as any));
-    await expect(res.json()).resolves.toMatchObject({ success: true });
+    await expect(res.json()).resolves.toMatchObject({ success: true, objectDeleted: true });
     expect(vi.mocked(deleteObject)).toHaveBeenCalledWith("messageMedia", "w1/x.png");
+    expect(campaignMocks.countOtherCampaignsReferencingMedia).toHaveBeenCalledWith("w1", "x.png", 1);
+  });
+
+  test("DELETE unlinks but keeps the S3 object while another campaign still references it", async () => {
+    const mod = await import("../app/routes/api+/message_media");
+    const fd = new FormData();
+    fd.set("workspaceId", "w1");
+    fd.set("fileName", "shared.png");
+    fd.set("campaignId", "1");
+
+    vi.mocked(deleteObject).mockClear();
+    queueDualAuthSession(authSession());
+    makeDbClient({ campaign: { id: 1, message_media: ["shared.png"] } });
+    campaignMocks.countOtherCampaignsReferencingMedia.mockResolvedValueOnce(2);
+
+    const res = await asRouteResponse(mod.action({ request: req("DELETE", fd) } as any));
+
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      removedFileName: "shared.png",
+      objectDeleted: false,
+    });
+    expect(campaignMocks.updateCampaignMessageMedia).toHaveBeenCalledWith("w1", 1, []);
+    expect(vi.mocked(deleteObject)).not.toHaveBeenCalled();
   });
 
   test("returns 405 for unsupported method", async () => {

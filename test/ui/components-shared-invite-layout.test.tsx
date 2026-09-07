@@ -69,7 +69,7 @@ describe("app/components/shared/SaveBar.tsx", () => {
       <SaveBar isChanged onSave={onSave} onReset={onReset} isSaving={false} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
-    fireEvent.click(screen.getByRole("button", { name: /reset/i }));
+    fireEvent.click(screen.getByRole("button", { name: /discard/i }));
     expect(onSave).toHaveBeenCalled();
     expect(onReset).toHaveBeenCalled();
     render(<SaveBar isChanged={false} onSave={onSave} onReset={onReset} isSaving />);

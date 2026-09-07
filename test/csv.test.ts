@@ -175,3 +175,25 @@ describe("csv utilities", () => {
   });
 });
 
+
+describe("parseCSV keeps the first row of a headerless file (#1511)", async () => {
+  const { parseCSV } = await import("../app/lib/csv");
+
+  test("a headerless file gets generated column names and no row is lost", () => {
+    const result = parseCSV("Jane,Doe,6135551234 ext 202\nJohn,Roe,6135550000\n");
+    expect(result.headers).toEqual(["Column 1", "Column 2", "Column 3"]);
+    expect(result.contacts).toHaveLength(2);
+    expect(result.contacts[0]).toEqual({ "Column 1": "Jane", "Column 2": "Doe", "Column 3": "6135551234 ext 202" });
+  });
+
+  test("a single-row headerless file imports its only row", () => {
+    const result = parseCSV("Jane Doe,123 Main St\n");
+    expect(result.contacts).toEqual([{ "Column 1": "Jane Doe", "Column 2": "123 Main St" }]);
+  });
+
+  test("a file with a header row is unchanged", () => {
+    const result = parseCSV("firstname,phone\nJane,6135551234\n");
+    expect(result.headers).toEqual(["firstname", "phone"]);
+    expect(result.contacts).toEqual([{ firstname: "Jane", phone: "6135551234" }]);
+  });
+});

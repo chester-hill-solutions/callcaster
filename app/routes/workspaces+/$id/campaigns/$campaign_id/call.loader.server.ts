@@ -38,7 +38,6 @@ export const loader = defineLoader({
       completedCount,
       attempts,
     } = callScreenData;
-    if (!workspaceData || !campaign) throw redirect("/signin");
     const rawTwilioData = workspaceData.twilio_data;
     const twilioData = (
       typeof rawTwilioData === "string"

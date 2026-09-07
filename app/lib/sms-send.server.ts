@@ -1,3 +1,10 @@
+import { logger } from "@/lib/logger.server";
+import {
+  deleteMessageByClientRef,
+  pendingMessageSid,
+  resolveMessageByClientRef,
+  type MessageRow,
+} from "@/lib/message-db.server";
 import type { Database } from "@/lib/db-types";
 import { createTenantDb } from "@/server/tenant-db";
 import { withTwilioRetry, type TwilioClientCallOptions } from "@/lib/twilio-client.server";
@@ -37,6 +44,8 @@ export type MessagePersistFields = {
   workspace: string;
   contact_id?: string | number | null;
   campaign_id?: string | number | null;
+  /** Sender-side reference for an intent row (#1582). */
+  client_ref?: string | null;
   outbound_media?: unknown[];
   /**
    * Requested "send later" time (ISO string). Twilio's Message resource does
@@ -139,7 +148,8 @@ export function twilioMessageToPersistFields(
   };
 }
 
-function buildMessageInsert(fields: MessagePersistFields): MessageInsert {
+/** Persist-field → column mapping, shared by insert and intent-row resolve. */
+export function buildMessageInsert(fields: MessagePersistFields): MessageInsert {
   const row: MessageInsert = {
     sid: fields.sid,
     body: fields.body ?? null,
@@ -161,6 +171,7 @@ function buildMessageInsert(fields: MessagePersistFields): MessageInsert {
     api_version: fields.api_version ?? null,
     subresource_uris: (fields.subresource_uris as MessageInsert["subresource_uris"]) ?? null,
     workspace: fields.workspace,
+    client_ref: fields.client_ref ?? null,
   };
   if (fields.date_created != null) {
     row.date_created = toDateIso(fields.date_created);
@@ -226,11 +237,52 @@ export async function sendSmsAndPersist(args: {
   message: TwilioMessageLike;
   result: { data: unknown[] | null; error: { message: string } | null };
 }> {
-  const message = await withTwilioRetry(
-    () => args.twilio.messages.create(args.createParams),
-    args.retryOptions,
-  );
+  const workspace = args.persistExtras.workspace;
+  const str = (v: unknown) => (typeof v === "string" && v.length > 0 ? v : undefined);
+  // Intent row BEFORE the provider call (#1586, same contract as campaign
+  // sends): a crash between Twilio and the write leaves a recoverable
+  // placeholder instead of an unrecorded, unbilled text. `from` is absent for
+  // Messaging Service sends; the fallbacks then match on `to` alone.
+  const clientRef = crypto.randomUUID();
+  const intent = await persistMessageRecord(workspace, {
+    ...args.persistExtras,
+    sid: pendingMessageSid(clientRef),
+    client_ref: clientRef,
+    body: str(args.createParams.body),
+    to: str(args.createParams.to),
+    from: str(args.createParams.from),
+    direction: "outbound-api",
+    status: "queued",
+    date_created: new Date(),
+    workspace,
+  });
+  if (intent.error) {
+    throw new Error(`Could not record the message before sending: ${intent.error.message}`);
+  }
+
+  let message: TwilioMessageLike;
+  try {
+    message = await withTwilioRetry(
+      () => args.twilio.messages.create(args.createParams),
+      args.retryOptions,
+    );
+  } catch (error) {
+    await deleteMessageByClientRef(workspace, clientRef).catch((cleanupError: unknown) => {
+      logger.error("sms.intent_cleanup_failed", {
+        workspaceId: workspace,
+        clientRef,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      });
+    });
+    throw error;
+  }
+
   const fields = twilioMessageToPersistFields(message, args.persistExtras);
-  const result = await persistMessageRecord(args.persistExtras.workspace, fields);
+  const result = await resolveMessageByClientRef(workspace, clientRef, {
+    ...(buildMessageInsert(fields) as Partial<MessageRow>),
+    sid: fields.sid,
+  })
+    .then((row) => (row ? { data: [row], error: null } : { data: null, error: { message: "intent row not found" } }))
+    .catch((error: unknown) => ({ data: null, error: { message: error instanceof Error ? error.message : String(error) } }));
   return { message, result };
 }

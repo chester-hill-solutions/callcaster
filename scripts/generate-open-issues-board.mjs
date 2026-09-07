@@ -13,10 +13,10 @@
  *   BOARD_REVIEWED_COMMIT=<sha> npm run tools:issues:board   # override git HEAD
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
-import { buildBoard, loadEnrichment } from "./issue-board-lib.mjs";
+import { generateIssueBoard } from "./issue-board-generate.mjs";
 
 const ROOT = join(import.meta.dirname, "..");
 const OUTPUT = join(ROOT, "ISSUE_BOARD.md");
@@ -115,60 +115,21 @@ function reviewedAt() {
   return `dev@${result.stdout.trim()}`;
 }
 
-/**
- * Drop enrichment records for issues that are no longer open, rewriting the
- * affected lane files in place. Agents used to have to prune these by hand
- * after every closure before the generator would run again — the generator
- * failing on stale records was the reminder. Records still referenced via
- * blockedBy by a surviving record stay behind on purpose: loadEnrichment's
- * dependency validation then surfaces the dangling edge as an actionable
- * error instead of silently severing it.
- */
-function pruneClosedEnrichment(openNumbers) {
-  const pruned = [];
-  for (const file of readdirSync(ENRICHMENT_DIR)) {
-    if (!file.endsWith(".json")) continue;
-    const path = join(ENRICHMENT_DIR, file);
-    let records;
-    try {
-      records = JSON.parse(readFileSync(path, "utf8"));
-    } catch {
-      continue; // leave malformed files for loadEnrichment to report
-    }
-    if (!Array.isArray(records)) continue;
-    const kept = records.filter((record) => {
-      if (openNumbers.has(record.issueNumber)) return true;
-      pruned.push(record.issueNumber);
-      return false;
-    });
-    if (kept.length !== records.length) {
-      writeFileSync(path, `${JSON.stringify(kept, null, 2)}\n`, "utf8");
-    }
-  }
-  return pruned.sort((a, b) => a - b);
-}
-
 function main() {
   const issues = fetchOpenIssues();
-  const pruned = pruneClosedEnrichment(new Set(issues.map((issue) => issue.number)));
+  const { pruned, counts } = generateIssueBoard({
+    enrichmentDir: ENRICHMENT_DIR,
+    output: OUTPUT,
+    issues,
+    repo: REPO,
+    projectNumber: BOARD_PROJECT_NUMBER,
+    reviewedAt: reviewedAt(),
+  });
   if (pruned.length) {
     console.log(
       `[issues-board] pruned records for closed issues: ${pruned.join(", ")}`,
     );
   }
-  const records = loadEnrichment(ENRICHMENT_DIR);
-  const { md, counts } = buildBoard({
-    issues,
-    records,
-    repo: REPO,
-    projectNumber: BOARD_PROJECT_NUMBER,
-    reviewedAt: reviewedAt(),
-  });
-
-  // Validate everything before touching the tracked output; then swap atomically.
-  writeFileSync(TMP_OUTPUT, md, "utf8");
-  renameSync(TMP_OUTPUT, OUTPUT);
-
   const laneSummary = Object.entries(counts)
     .map(([key, n]) => `${key}: ${n}`)
     .join(", ");
@@ -180,7 +141,7 @@ try {
 } catch (error) {
   process.stderr.write(`[issues-board] ${error.message}\n`);
   if (existsSync(TMP_OUTPUT)) {
-    // never leave a partial write that could be mistaken for the real board
+    unlinkSync(TMP_OUTPUT); // never leave a partial write that could be mistaken for the real board
   }
   process.exit(1);
 }

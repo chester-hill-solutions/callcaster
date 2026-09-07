@@ -48,7 +48,7 @@ describe("OnboardingBusinessIdentityStep — Website URL required only for SMS (
     ).toBeInTheDocument();
     // No red asterisk on the label.
     const label = document.querySelector('label[for="websiteUrl"]');
-    expect(label?.querySelector(".text-destructive")).toBeNull();
+    expect(label?.querySelector(".text-destructive-text")).toBeNull();
   });
 
   test("goal is SMS blast: website input IS required, description flips to required copy, red asterisk appears", () => {
@@ -61,7 +61,7 @@ describe("OnboardingBusinessIdentityStep — Website URL required only for SMS (
       ),
     ).toBeInTheDocument();
     const label = document.querySelector('label[for="websiteUrl"]');
-    expect(label?.querySelector(".text-destructive")).not.toBeNull();
+    expect(label?.querySelector(".text-destructive-text")).not.toBeNull();
   });
 
   test("goal is null (initial state): website is optional (nothing has demanded it yet)", () => {

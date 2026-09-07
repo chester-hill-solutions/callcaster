@@ -1,69 +1,56 @@
 import { data as routeData, redirect } from "react-router";
 import type { Database } from "@/lib/db-types";
-import { getWorkspaceUsers } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
-import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
+import { isMemberRole } from "@/lib/member-role";
 import { logger } from "@/lib/logger.server";
 import { assertSafeOutboundUrl, safeOutboundFetch } from "@/lib/safe-outbound-url.server";
 import {
+  inviteWorkspaceMember,
+  inviteWorkspaceMemberAsPlatformAdmin,
   removeWorkspaceMember,
   updateWorkspaceMemberRole,
 } from "@/lib/platform-members.server";
 import {
   deleteWorkspaceById,
-  findUserIdByUsername,
-  findWorkspaceInviteForUser,
   removeWorkspaceInviteForUser,
   transferWorkspaceOwnership,
   upsertWorkspaceWebhookRow,
 } from "@/lib/workspace-members-db.server";
 
+export type InviteActor =
+  | { kind: "member"; userId: string }
+  | { kind: "platform-admin" };
+
 export async function handleAddUser(
   formData: FormData,
   workspaceId: string,
   headers: Headers,
+  actor: InviteActor,
 ) {
   const username = formData.get("username") as string;
-  const newUserRole = formData.get("new_user_workspace_role") as string;
+  const requestedRole = formData.get("new_user_workspace_role");
   if (!username) {
     return routeData({ user: null, error: "Must provide an email address" }, 400);
   }
+  if (!isMemberRole(requestedRole)) {
+    return routeData({ user: null, error: "Invalid workspace role" }, 400);
+  }
   const cleanedName = username.toLowerCase().trim();
-  const { data: users } = await getWorkspaceUsers({
-    workspaceId,
-  });
-  const match = users?.filter((user) => {
-    return user.username === cleanedName;
-  });
-  if (match?.length) {
-    return routeData({ user: null, error: "This user is already an agent in the workspace." }, 403);
-  }
 
-  const existingUserId = await findUserIdByUsername(cleanedName);
-
-  if (existingUserId) {
-    const pendingInvite = await findWorkspaceInviteForUser(workspaceId, existingUserId);
-    if (pendingInvite) {
-      return routeData(
-        {
-          data: null,
-          error: null,
-          success: true,
-          warning: "An invite is already pending for this email.",
-        },
-        { headers },
-      );
-    }
-  }
-
-  const result = await inviteUserByEmail({
-    workspaceId,
-    email: cleanedName,
-    role: newUserRole,
-  });
+  const result =
+    actor.kind === "platform-admin"
+      ? await inviteWorkspaceMemberAsPlatformAdmin(workspaceId, cleanedName, requestedRole)
+      : await inviteWorkspaceMember(actor.userId, workspaceId, cleanedName, requestedRole);
 
   if (!result.ok) {
-    return routeData({ user: null, error: result.error }, { headers });
+    return routeData({ user: null, error: result.error }, { headers, status: result.status });
+  }
+
+  if ("warning" in result) {
+    return routeData(
+      { data: null, error: null, success: true, warning: result.warning },
+      { headers },
+    );
   }
 
   return routeData(

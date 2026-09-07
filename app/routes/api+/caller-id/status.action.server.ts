@@ -3,6 +3,7 @@ import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
 import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { updateWorkspaceNumberCapabilitiesByPhone } from "@/lib/inbound-call-db.server";
+import { findWorkspaceIdByTwilioAccountSid } from "@/lib/merge-workspace-twilio-data.server";
 import {
   applyOnboardingStepsWithWorkspaceNumbers,
   getWorkspaceMessagingOnboardingState,
@@ -35,20 +36,42 @@ export const action = defineAction({
     const formData = await request.clone().formData();
     const parsedBody: FormData = Object.fromEntries(formData) as FormData;
 
-    const forbidden = await requireTwilioSignature(request, { phoneNumber: parsedBody.To });
+    // Each workspace validates a caller ID through its own Twilio subaccount, so
+    // the callback's AccountSid identifies the workspace that owns this request.
+    // Resolve it up front and validate the signature against that subaccount's
+    // token (deterministic, unlike a phone-number lookup that is ambiguous when
+    // two workspaces share the number).
+    const workspaceId = parsedBody.AccountSid
+      ? await findWorkspaceIdByTwilioAccountSid(parsedBody.AccountSid)
+      : null;
+
+    const forbidden = await requireTwilioSignature(request, {
+      workspaceId: workspaceId ?? undefined,
+      phoneNumber: parsedBody.To,
+    });
     if (forbidden) return forbidden;
 
-    return parsedBody;
+    return { body: parsedBody, workspaceId };
   },
   sideEffects: ["db-write"],
   handler: async ({ auth }) => {
-    const parsedBody = auth;
+    const { body: parsedBody, workspaceId } = auth;
 
     try {
       if (
         parsedBody.VerificationStatus === "success" ||
         parsedBody.VerificationStatus === "failed"
       ) {
+        if (!workspaceId) {
+          // No resolvable workspace: never fall back to a phone-only write, which
+          // would touch every workspace sharing this number. Ack so Twilio stops
+          // retrying and surface it for investigation.
+          logger.warn(
+            "caller-id status callback without a resolvable workspace; skipping capability write",
+            { to: parsedBody.To },
+          );
+          return routeData({ skipped: "unresolved_workspace" });
+        }
         const capabilities: Capabilities = {
           fax: false,
           mms: parsedBody.VerificationStatus === "success",
@@ -64,6 +87,7 @@ export const action = defineAction({
         const numberRequest = await updateWorkspaceNumberCapabilitiesByPhone(
           parsedBody.To,
           capabilities as unknown as Record<string, unknown>,
+          workspaceId,
         );
 
         if (numberRequest.length === 0) {

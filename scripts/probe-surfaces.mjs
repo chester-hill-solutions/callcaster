@@ -27,9 +27,9 @@
  *   npm run probe:local      npm run probe -- --help
  *
  * Deployed targets default to strict provider auth + page routes; `local`
- * relaxes provider auth because the compose harness sets
- * TWILIO_VALIDATE_WEBHOOKS=false. Override with --strict / --relaxed /
- * --no-pages.
+ * relaxes provider auth because a local dev server may run with
+ * TWILIO_VALIDATE_WEBHOOKS=false (the compose E2E harness validates and
+ * passes --strict). Override with --strict / --relaxed / --no-pages.
  */
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -116,9 +116,9 @@ const isLocalTarget =
   targetName === "local" ||
   /^https?:\/\/(127\.0\.0\.1|localhost|0\.0\.0\.0)(:|\/|$)/.test(BASE_URL);
 
-// Deployed environments enforce provider signatures; the compose harness
-// disables them. Default accordingly so the common case needs no flags, and
-// let either side be forced explicitly.
+// Deployed environments enforce provider signatures; a local dev server may
+// not. Default accordingly so the common case needs no flags, and let either
+// side be forced explicitly (the compose E2E harness passes --strict).
 const STRICT_PROVIDER_AUTH = args.includes("--strict")
   ? true
   : args.includes("--relaxed")

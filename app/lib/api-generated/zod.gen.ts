@@ -83,8 +83,26 @@ export const zCampaignSmsDispatchRequest = z.object({
     messaging_service_sid: z.string().optional()
 });
 
-export const zCampaignSmsDispatchResponse = z.object({
-    responses: z.array(z.object({})).optional()
+export const zCampaignSmsDispatched = z.object({
+    responses: z.array(z.object({})),
+    creditsExhausted: z.boolean()
+});
+
+export const zCampaignSmsDeferred = z.object({
+    deferred: z.unknown(),
+    reason: z.string(),
+    nextOpenAt: z.string().datetime(),
+    responses: z.array(z.object({}))
+});
+
+export const zCampaignSmsDispatchResponse = z.union([
+    zCampaignSmsDispatched,
+    zCampaignSmsDeferred
+]);
+
+export const zInsufficientCreditsError = z.object({
+    creditsError: z.unknown(),
+    error: z.string()
 });
 
 export const zCreateCampaignWithScriptResponse2 = zCreateCampaignWithScriptResponse;

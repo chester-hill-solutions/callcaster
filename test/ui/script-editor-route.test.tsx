@@ -77,7 +77,7 @@ describe("app/routes/workspaces+/$id/scripts/$scriptId.route.tsx", () => {
   });
 
   // The header deliberately does NOT mirror a Save button: two controls whose
-  // accessible names differ only by a suffix ("Save" vs "Save Changes") are
+  // accessible names differ only by a suffix ("Save" vs "Save changes") are
   // ambiguous to anyone resolving by name — a screen-reader user, or
   // e2e/specs/script-builder-smoke.spec.ts, which broke on exactly that.
   test("exposes exactly one save control once the form is dirty", async () => {
@@ -86,7 +86,7 @@ describe("app/routes/workspaces+/$id/scripts/$scriptId.route.tsx", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "dirty the form" }));
 
-    expect(await screen.findByRole("button", { name: "Save Changes" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Save changes" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /save/i })).toHaveLength(1);
   });
 });

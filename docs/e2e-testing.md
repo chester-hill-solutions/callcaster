@@ -95,13 +95,18 @@ Seed users are created in `auth_user` / `auth_account` (Better Auth) via `script
 |----|------|---------|
 | `a0000000-0000-4000-8000-000000000001` | E2E Ready Workspace | Primary — campaigns, queue, chats, survey |
 | `a0000000-0000-4000-8000-000000000002` | E2E Onboarding Workspace | Incomplete onboarding redirect |
-| `a0000000-0000-4000-8000-000000000003` | E2E Empty Workspace | Empty states, zero credits |
+| `a0000000-0000-4000-8000-000000000003` | E2E Empty Workspace | Empty states, zero credits; has a rented number, so it is in legacy mode and never redirects into onboarding |
+| `a0000000-0000-4000-8000-000000000004` | E2E Fresh Workspace | Owner membership only: no numbers, no traffic, no business basics; the fresh-workspace onboarding redirect fixture |
 
 ## Mock boundaries
 
 - **Twilio**: network routes intercepted in `e2e/fixtures/twilio-mocks.ts`; Voice SDK stubbed in-browser. No real calls.
 - **Stripe**: billing UI tested; checkout uses mock redirects (no stripe.com in CI).
-- **Webhooks**: `e2e/fixtures/webhooks.ts` POSTs to local routes with `TWILIO_VALIDATE_WEBHOOKS=false`.
+- **Webhooks**: `e2e/fixtures/webhooks.ts` POSTs to local routes with a real `X-Twilio-Signature`, computed with the seeded subaccount token (`E2E_TWILIO_SUBACCOUNT`) against `BASE_URL + pathname`. The harness runs with `TWILIO_VALIDATE_WEBHOOKS=true`; pass `signing: "missing" | "wrong-token" | "tampered"` to exercise the rejection paths (`twilio-webhook-auth.spec.ts`).
+
+## Supervised runs
+
+`npm run test:e2e:signup:headed` runs the full sign-up flow (`e2e/specs/signup-flow.spec.ts`: create account → workspace picker → first workspace → onboarding) in a visible browser against `E2E_BASE_URL`, for watching the first-run path by hand. The same spec runs headless in the compose harness.
 
 ## Scenario catalog
 

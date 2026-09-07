@@ -183,38 +183,67 @@ export async function claimNextJob(
   });
 }
 
+/**
+ * Fence every post-claim write to the worker that holds the claim. A worker
+ * that stalled past its claim TTL (GC pause, slow provider call, partition)
+ * has had its row re-queued by resetStaleClaims and possibly re-claimed by a
+ * peer; when it resumes, its complete/fail/heartbeat must not overwrite the
+ * new owner's state. Zero affected rows means the claim was lost.
+ */
+function claimLost(
+  affected: number,
+  phase: "complete" | "fail" | "heartbeat",
+  jobId: number,
+  workerId: string,
+): boolean {
+  if (affected > 0) return false;
+  logger.warn("worker.claim_lost", { jobId, phase, workerId });
+  return true;
+}
+
 export async function completeJob(
   jobId: number,
   result: unknown,
+  workerId: string,
 ): Promise<void> {
-  await db.execute(sql`
+  const updated = await db.execute(sql`
     UPDATE job
     SET status = 'completed',
         result = ${JSON.stringify(result)},
         completed_at = now(),
         updated_at = now()
     WHERE id = ${jobId}
+      AND status = 'running'
+      AND claimed_by = ${workerId}
   `);
+  claimLost(affectedRowCount(updated), "complete", jobId, workerId);
 }
 
-export async function failJob(
-  jobId: number,
-  attemptCount: number,
-  maxAttempts: number,
-  error: string,
-  jobType?: string,
-): Promise<void> {
+export type FailJobArgs = {
+  jobId: number;
+  attemptCount: number;
+  maxAttempts: number;
+  error: string;
+  jobType?: string;
+  workerId: string;
+};
+
+export async function failJob(args: FailJobArgs): Promise<void> {
+  const { jobId, attemptCount, maxAttempts, error, jobType, workerId } = args;
   if (attemptCount < maxAttempts) {
-    await db.execute(sql`
+    const updated = await db.execute(sql`
       UPDATE job
       SET status = 'queued',
           retry_at = now() + interval '1 minute' * ${attemptCount},
           error_message = ${error},
           updated_at = now()
       WHERE id = ${jobId}
+        AND status = 'running'
+        AND claimed_by = ${workerId}
     `);
+    claimLost(affectedRowCount(updated), "fail", jobId, workerId);
   } else {
-    await db.execute(sql`
+    const updated = await db.execute(sql`
       UPDATE job
       SET status = 'dead_letter',
           failed_at = now(),
@@ -222,7 +251,12 @@ export async function failJob(
           error_message = ${error},
           updated_at = now()
       WHERE id = ${jobId}
+        AND status = 'running'
+        AND claimed_by = ${workerId}
     `);
+    if (claimLost(affectedRowCount(updated), "fail", jobId, workerId)) {
+      return;
+    }
     // Surface terminal rows immediately for ops alerting and log search.
     logger.error("worker.job.dead_letter", {
       jobId,
@@ -300,12 +334,15 @@ export async function runWorkerPollLoop(
 
           const heartbeat = setInterval(async () => {
             try {
-              await db.execute(sql`
+              const updated = await db.execute(sql`
                 UPDATE job
                 SET claimed_until = now() + interval '1 minute' * ${claimTtlMinutes},
                     updated_at = now()
                 WHERE id = ${job.id}
+                  AND status = 'running'
+                  AND claimed_by = ${workerId}
               `);
+              claimLost(affectedRowCount(updated), "heartbeat", job.id, workerId);
             } catch (err) {
               logger.error("worker.heartbeat_failed", {
                 jobId: job.id,
@@ -320,7 +357,7 @@ export async function runWorkerPollLoop(
               throw new Error(`No handler registered for job type: ${job.type}`);
             }
             const result = await handler(job);
-            await completeJob(job.id, result);
+            await completeJob(job.id, result, workerId);
             logger.info("worker.job.completed", { jobId: job.id });
           } catch (error) {
             const message =
@@ -331,7 +368,14 @@ export async function runWorkerPollLoop(
               jobType: job.type,
             });
             logger.error("worker.job.failed", { jobId: job.id, error: message });
-            await failJob(job.id, job.attempt_count, job.max_attempts, message, job.type);
+            await failJob({
+              jobId: job.id,
+              attemptCount: job.attempt_count,
+              maxAttempts: job.max_attempts,
+              error: message,
+              jobType: job.type,
+              workerId,
+            });
           } finally {
             clearInterval(heartbeat);
           }

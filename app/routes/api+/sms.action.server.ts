@@ -136,10 +136,16 @@ export const action = defineAction({
           },
         );
       case "dispatched":
-        return new Response(JSON.stringify({ responses: outcome.responses }), {
-          headers: { "Content-Type": "application/json" },
-          status: 200,
-        });
+        return new Response(
+          JSON.stringify({
+            responses: outcome.responses,
+            creditsExhausted: outcome.creditsExhausted,
+          }),
+          {
+            headers: { "Content-Type": "application/json" },
+            status: 200,
+          },
+        );
     }
   } catch (error) {
     logger.error("Error in action:", error);

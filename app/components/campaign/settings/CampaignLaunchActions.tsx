@@ -5,6 +5,8 @@ import {
   Copy,
   Pause,
   Play,
+  RefreshCw,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -166,6 +168,9 @@ export type CampaignLaunchActionsProps = {
   onSchedule: () => void;
   onArchive: () => void;
   onDuplicate: () => void;
+  onKickoff?: () => void;
+  /** Present only for campaign types that support one-number test sends. */
+  onSendTest?: () => void;
 };
 
 export function CampaignLaunchActions({
@@ -180,6 +185,8 @@ export function CampaignLaunchActions({
   onSchedule,
   onArchive,
   onDuplicate,
+  onKickoff,
+  onSendTest,
 }: CampaignLaunchActionsProps) {
   const buttonStates = getCampaignLaunchButtonStates(
     status as CampaignLifecycleState,
@@ -246,6 +253,26 @@ export function CampaignLaunchActions({
           role="group"
           aria-label="Campaign utilities"
         >
+          {onKickoff && (status === "running" || status === "paused") ? (
+            <LaunchActionButton
+              label="Kick off"
+              icon={<RefreshCw className="size-4" />}
+              state="Inactive"
+              busy={isBusy}
+              onClick={onKickoff}
+              data-testid="campaign-launch-kickoff"
+            />
+          ) : null}
+          {onSendTest ? (
+            <LaunchActionButton
+              label="Send test"
+              icon={<Send className="size-4" />}
+              state="Inactive"
+              busy={isBusy}
+              onClick={onSendTest}
+              data-testid="campaign-launch-send-test"
+            />
+          ) : null}
           <LaunchActionButton
             label="Archive"
             icon={<Archive className="size-4" />}

@@ -9,8 +9,8 @@ export const CREDIT_PRICE_CAD = 0.02;
 export const MIN_PURCHASE_CAD = 10;
 export const MIN_CREDITS = Math.ceil(MIN_PURCHASE_CAD / CREDIT_PRICE_CAD);
 
-export const SMS_SEGMENT_CREDITS = 1;
-export const MMS_CREDITS = 2;
+export const SMS_SEGMENT_CREDITS = 2;
+export const MMS_CREDITS = 4;
 
 export type MessageCreditEstimate = {
   /** Estimated credits this message will be billed. */
@@ -98,11 +98,7 @@ export const TERMINAL_BILLABLE_SMS_STATUSES = [
   "undelivered",
 ] as const;
 
-const IVR_CAMPAIGN_TYPES = new Set([
-  "robocall",
-  "simple_ivr",
-  "complex_ivr",
-]);
+const IVR_CAMPAIGN_TYPES = new Set(["robocall", "simple_ivr", "complex_ivr"]);
 
 export function voiceBillingKindFromCampaignType(
   type: string | null | undefined,
@@ -113,8 +109,13 @@ export function voiceBillingKindFromCampaignType(
   return "staffed";
 }
 
-export function startedMinutesFromDurationSeconds(durationSeconds: number): number {
-  const seconds = Math.max(0, Number.isFinite(durationSeconds) ? durationSeconds : 0);
+export function startedMinutesFromDurationSeconds(
+  durationSeconds: number,
+): number {
+  const seconds = Math.max(
+    0,
+    Number.isFinite(durationSeconds) ? durationSeconds : 0,
+  );
   return Math.max(1, Math.ceil(seconds / 60));
 }
 

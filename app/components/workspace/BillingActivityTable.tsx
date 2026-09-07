@@ -1,3 +1,5 @@
+import { browserTimeZone } from "@/lib/schedule-timezone";
+import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
 import {
   Accordion,
@@ -28,7 +30,16 @@ import { cn } from "@/lib/utils";
 type BillingActivityTableProps = {
   history: BillingActivityRow[];
   campaignNames?: Record<number, string>;
+  /** When set, Stripe purchases link to their hosted receipt (#1322). */
+  workspaceId?: string;
 };
+
+function receiptHrefFor(workspaceId: string | undefined, row: BillingActivityRow): string | null {
+  if (!workspaceId || row.type !== "CREDIT") return null;
+  const key = row.idempotency_key ?? "";
+  if (!key.startsWith("stripe_session:") && !key.startsWith("stripe_evt:")) return null;
+  return `/api/workspaces/${workspaceId}/billing/receipt?transaction=${encodeURIComponent(row.id)}`;
+}
 
 function SupportDetail({
   label,
@@ -56,15 +67,17 @@ function SupportDetail({
 }
 
 function amountClassName(direction: "credit" | "debit"): string {
-  return direction === "credit" ? "text-success" : "text-destructive";
+  return direction === "credit" ? "text-success-text" : "text-destructive-text";
 }
 
 function ActivityEntryRow({
   row,
   nested = false,
+  receiptHref = null,
 }: {
   row: BillingActivityRow;
   nested?: boolean;
+  receiptHref?: string | null;
 }) {
   const activity = projectBillingActivity(row);
 
@@ -75,6 +88,17 @@ function ActivityEntryRow({
       </TableCell>
       <TableCell className="min-w-64 align-top">
         <div className="font-medium">{activity.activity}</div>
+        {receiptHref ? (
+          <a
+            href={receiptHref}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-primary underline underline-offset-4"
+          >
+            Receipt
+            <span className="sr-only"> for {activity.activity} on {new Date(activity.occurredAt).toLocaleDateString()}</span>
+          </a>
+        ) : null}
         <Accordion type="single" collapsible>
           <AccordionItem value="advanced" className="border-0">
             <AccordionTrigger className="w-fit gap-1 py-1 text-xs font-normal text-muted-foreground hover:no-underline">
@@ -169,21 +193,74 @@ function ActivityGroupRows({ group }: { group: BillingActivityGroupItem }) {
   );
 }
 
+export type BillingActivityFilter = "all" | "purchases" | "usage";
+
+const ACTIVITY_FILTERS: ReadonlyArray<{ id: BillingActivityFilter; label: string }> = [
+  { id: "all", label: "All activity" },
+  { id: "purchases", label: "Purchases and credits" },
+  { id: "usage", label: "Usage" },
+];
+
+function matchesActivityFilter(row: BillingActivityRow, filter: BillingActivityFilter): boolean {
+  if (filter === "purchases") return row.type === "CREDIT";
+  if (filter === "usage") return row.type === "DEBIT";
+  return true;
+}
+
+function emptyCopyFor(filter: BillingActivityFilter): string {
+  if (filter === "purchases") return "No purchases or credits yet.";
+  if (filter === "usage") return "No usage yet.";
+  return "Purchases and campaign activity will appear here.";
+}
+
+/** Purchases vs usage split (#1322, first slice): a ledger with months of usage buries the receipts. */
+function ActivityFilterBar({
+  value,
+  onChange,
+}: {
+  value: BillingActivityFilter;
+  onChange: (next: BillingActivityFilter) => void;
+}) {
+  return (
+    <div role="group" aria-label="Filter activity" className="mb-3 flex flex-wrap gap-2">
+      {ACTIVITY_FILTERS.map((option) => (
+        <Button
+          key={option.id}
+          type="button"
+          size="sm"
+          variant={value === option.id ? "default" : "outline"}
+          aria-pressed={value === option.id}
+          onClick={() => onChange(option.id)}
+        >
+          {option.label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 export function BillingActivityTable({
   history,
   campaignNames,
+  workspaceId,
 }: BillingActivityTableProps) {
+  const [filter, setFilter] = useState<BillingActivityFilter>("all");
   const items = useMemo(
-    () => rollUpBillingActivity(history, { campaignNames }),
-    [history, campaignNames],
+    () =>
+      rollUpBillingActivity(
+        history.filter((row) => matchesActivityFilter(row, filter)),
+        { campaignNames },
+      ),
+    [history, campaignNames, filter],
   );
 
   return (
     <div className="overflow-x-auto">
+      <ActivityFilterBar value={filter} onChange={setFilter} />
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
+            <TableHead>Date ({browserTimeZone()})</TableHead>
             <TableHead>Activity</TableHead>
             <TableHead className="text-right">Amount</TableHead>
           </TableRow>
@@ -192,9 +269,7 @@ export function BillingActivityTable({
           {items.length === 0 ? (
             <TableRow>
               <TableCell colSpan={3} className="py-8 text-center">
-                <Text variant="muted">
-                  Purchases and campaign activity will appear here.
-                </Text>
+                <Text variant="muted">{emptyCopyFor(filter)}</Text>
               </TableCell>
             </TableRow>
           ) : null}
@@ -202,7 +277,11 @@ export function BillingActivityTable({
             item.kind === "group" ? (
               <ActivityGroupRows key={item.key} group={item} />
             ) : (
-              <ActivityEntryRow key={item.row.id} row={item.row} />
+              <ActivityEntryRow
+                key={item.row.id}
+                row={item.row}
+                receiptHref={receiptHrefFor(workspaceId, item.row)}
+              />
             ),
           )}
         </TableBody>

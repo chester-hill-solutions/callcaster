@@ -4,14 +4,9 @@ import { useFetcher } from "react-router";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { useFetcherOnIdle } from "@/hooks/utils";
+import { processTemplateTags, SAMPLE_TEMPLATE_CONTACT } from "@/lib/message-templates";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-
-// Helper function to generate survey links
-// const generateSurveyLink = (contactId: number, surveyId: string, baseUrl: string = window.location.origin) => {
-//   const encoded = btoa(`${contactId}:${surveyId}`);
-//   return `${baseUrl}/?q=${encoded}`;
-// };
 
 // Available template tags based on contact fields
 const TEMPLATE_TAGS = [
@@ -26,10 +21,32 @@ const TEMPLATE_TAGS = [
     { key: '{{postal}}', label: 'Postal Code', description: 'Contact\'s postal code' },
     { key: '{{country}}', label: 'Country', description: 'Contact\'s country' },
     { key: '{{external_id}}', label: 'External ID', description: 'Contact\'s external ID' },
-    { key: '{{contact_id}}', label: 'Contact ID', description: 'Contact\'s unique ID for survey links' },
+    { key: '{{contact_id}}', label: 'Contact ID', description: 'Contact\'s unique ID' },
 ];
 
-// Function-style template examples
+const TEMPLATE_SYNTAX = /\{|btoa\(/;
+
+function TemplatePreview({ body }: { body: string }) {
+    if (!body || !TEMPLATE_SYNTAX.test(body)) return null;
+    const rendered = processTemplateTags(body, SAMPLE_TEMPLATE_CONTACT);
+    return (
+        <div className="mt-3 rounded border border-secondary/60 bg-secondary/30 p-2">
+            <div className="mb-1 text-xs font-semibold text-foreground">
+                Preview for a sample contact ({SAMPLE_TEMPLATE_CONTACT.firstname} {SAMPLE_TEMPLATE_CONTACT.surname})
+            </div>
+            <p
+                data-testid="template-preview"
+                className="whitespace-pre-wrap text-sm text-foreground"
+            >
+                {rendered}
+            </p>
+            <div className="mt-1 text-xs text-muted-foreground">
+                Each recipient sees their own details in place of the tags.
+            </div>
+        </div>
+    );
+}
+
 
 interface CampaignDetails {
   body_text?: string | null;
@@ -38,16 +55,10 @@ interface CampaignDetails {
   message_media?: string[] | null;
 }
 
-interface Survey {
-  survey_id: string;
-  title: string;
-}
-
 interface MessageSettingsProps {
   mediaLinks: string[];
   details: CampaignDetails;
   onChange: (field: string, value: unknown) => void;
-  surveys: Survey[];
 }
 
 type MessageMediaActionData = {
@@ -64,7 +75,7 @@ function getErrorMessage(error: MessageMediaActionData["error"]) {
   return "Message media could not be updated";
 }
 
-export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: MessageSettingsProps) => {
+export const MessageSettings = ({ mediaLinks, details, onChange }: MessageSettingsProps) => {
     const displayText = details?.body_text || '';
     const [eraseVisible, setEraseVisible] = useState<Record<string, boolean>>({});
     const [tagsMenuOpen, setTagsMenuOpen] = useState(false);
@@ -95,16 +106,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
             example: 'btoa(Hello {{firstname|"there"}})',
             description: 'Encode a greeting with a fallback.'
         },
-        ...(Array.isArray(surveys) && surveys.length > 0
-            ? surveys.map(survey => ({
-                label: `Generate survey link for ${survey.title}`,
-                example: `survey({{contact_id}}, "${survey.survey_id}")`,
-                description: `Generate a personalized survey link for the contact. Click to insert the complete function.`,
-                surveyId: survey.survey_id,
-                surveyTitle: survey.title
-            }))
-            : []
-        )
     ];
 
 
@@ -208,22 +209,6 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
         setTagsMenuOpen(false);
     };
 
-    const insertSurveyFunction = (surveyId: string, _surveyTitle: string) => {
-        if (!textareaRef.current) return;
-        const textarea = textareaRef.current;
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const currentText = displayText;
-        const surveyFunction = `survey({{contact_id}}, "${surveyId}")`;
-        const newText = currentText.substring(0, start) + surveyFunction + currentText.substring(end);
-        onChange("body_text", newText);
-        setTimeout(() => {
-            textarea.focus();
-            textarea.setSelectionRange(start + surveyFunction.length, start + surveyFunction.length);
-        }, 0);
-        setTagsMenuOpen(false);
-    };
-
     const renderMediaContent = () => {
         if (!details.message_media || !resolvedMediaLinks.length) return null;
 
@@ -286,8 +271,17 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                     onChange={handleBodyTextChange}
                                 />
                             </div>
-                            <div className="flex justify-end my-2">
-                            </div>
+                            <p className="my-2 text-xs text-muted-foreground">
+                                Personalize with tags like{" "}
+                                <span className="font-mono">&#123;&#123;firstname&#125;&#125;</span>.{" "}
+                                <button
+                                    type="button"
+                                    className="underline underline-offset-2 hover:text-foreground"
+                                    onClick={() => setTagsMenuOpen(true)}
+                                >
+                                    Browse tags
+                                </button>
+                            </p>
                         </div>
                         {getErrorMessage(mediaFetcher.data?.error) && (
                             <Alert variant="destructive">
@@ -352,12 +346,8 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                                 You can combine tags, text, and functions. Try{" "}
                                                 <span className="font-mono">
                                                     btoa(&#123;&#123;phone&#125;&#125;:&#123;&#123;external_id&#125;&#125;)
-                                                </span>{" "}
-                                                or{" "}
-                                                <span className="font-mono">
-                                                    survey(&#123;&#123;contact_id&#125;&#125;, &quot;survey-name&quot;)
                                                 </span>
-                                                !
+                                                .
                                             </p>
                                         </div>
                                         <div className="p-1">
@@ -383,16 +373,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                                     <button
                                                         key={ex.example}
                                                         type="button"
-                                                        onClick={() => {
-                                                            if ("surveyId" in ex) {
-                                                                insertSurveyFunction(
-                                                                    (ex as { surveyId: string }).surveyId,
-                                                                    (ex as { surveyTitle?: string }).surveyTitle || "",
-                                                                );
-                                                            } else {
-                                                                insertFunctionExample(ex.example);
-                                                            }
-                                                        }}
+                                                        onClick={() => insertFunctionExample(ex.example)}
                                                         className="mb-1 w-full rounded border border-secondary/60 p-2 text-left text-xs transition-colors hover:bg-secondary/40"
                                                     >
                                                         <div className="font-mono text-primary">{ex.example}</div>
@@ -404,9 +385,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                                             <div className="mt-2 text-xs text-muted-foreground">
                                                 <span className="font-semibold">Tip:</span> You can use{" "}
                                                 <span className="font-mono">btoa(...)</span> to base64-encode any
-                                                combination of tags and text, or{" "}
-                                                <span className="font-mono">survey(...)</span> to generate
-                                                personalized survey links.
+                                                combination of tags and text.
                                             </div>
                                         </div>
                                     </PopoverContent>
@@ -431,106 +410,7 @@ export const MessageSettings = ({ mediaLinks, details, onChange, surveys }: Mess
                             </div>
                         )}
 
-                        {/* Template Tags Preview */}
-                        {displayText && (
-                            (() => {
-                                // Find all template tags in the text (including fallbacks)
-                                const foundTags: Array<{ key: string; label: string }> = [];
-
-                                // Check for simple tags
-                                TEMPLATE_TAGS.forEach(tag => {
-                                    if (displayText.includes(tag.key)) {
-                                        foundTags.push({ key: tag.key, label: tag.label });
-                                    }
-                                });
-
-                                // Check for fallback patterns
-                                const fallbackRegex = /\{\{\s*([a-zA-Z0-9_]+)\s*\|\s*"[^"]+"\s*\}\}/g;
-                                const fallbackMatches = displayText.match(fallbackRegex);
-                                if (fallbackMatches) {
-                                    fallbackMatches.forEach(match => {
-                                        const fieldMatch = match.match(/\{\{\s*([a-zA-Z0-9_]+)/);
-                                        if (fieldMatch) {
-                                            const fieldName = fieldMatch[1];
-                                            const tag = TEMPLATE_TAGS.find(t => t.key === `{{${fieldName}}}`);
-                                            if (tag && !foundTags.some(ft => ft.key === tag.key)) {
-                                                foundTags.push({ key: match, label: `${tag.label} (with fallback)` });
-                                            }
-                                        }
-                                    });
-                                }
-
-                                // Check for btoa function patterns
-                                const btoaRegex = /btoa\([^)]+\)/g;
-                                const btoaMatches = displayText.match(btoaRegex);
-                                if (btoaMatches) {
-                                    btoaMatches.forEach(match => {
-                                        if (!foundTags.some(ft => ft.key === match)) {
-                                            foundTags.push({ key: match, label: 'Base64 function' });
-                                        }
-                                    });
-                                }
-
-                                // Check for survey function patterns
-                                const surveyRegex = /survey\([^)]+\)/g;
-                                const surveyMatches = displayText.match(surveyRegex);
-                                if (surveyMatches) {
-                                    surveyMatches.forEach(match => {
-                                        if (!foundTags.some(ft => ft.key === match)) {
-                                            foundTags.push({ key: match, label: 'Survey link function' });
-                                        }
-                                    });
-                                }
-
-                                return foundTags.length > 0 ? (
-                                    <div className="mt-3 p-2 bg-secondary/30 rounded border border-secondary/60">
-                                        <div className="text-xs font-semibold text-foreground mb-1">Template Tags Found:</div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {foundTags.map((tag, index) => (
-                                                <span key={index} className="inline-block mr-2 mb-1 px-2 py-1 bg-secondary/60 rounded">
-                                                    {tag.key} → {tag.label}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <div className="text-xs text-success mt-2">
-                                            <span className="font-semibold">💡 Tip:</span> Survey links will be automatically generated when messages are sent!
-                                        </div>
-                                        {/* Survey Link Preview */}
-                                        {(() => {
-                                            const surveyMatches = displayText.match(/survey\([^)]+\)/g);
-                                            if (surveyMatches) {
-                                                return (
-                                                    (<div className="mt-3 p-2 bg-success/10 rounded border border-success/30">
-                                                        <div className="text-xs font-semibold text-success mb-1">Survey Links Preview:</div>
-                                                        <div className="text-xs text-success space-y-1">
-                                                            {surveyMatches.map((match, index) => {
-                                                                // Extract survey ID from the function
-                                                                const surveyIdMatch = match.match(/survey\([^,]+,\s*"([^"]+)"/);
-                                                                const surveyId = surveyIdMatch ? surveyIdMatch[1] : 'unknown';
-                                                                const previewLink = `${window.location.origin}/?q=btoa(contact_id:${surveyId})`;
-                                                                
-                                                                return (
-                                                                    <div key={index} className="flex items-center gap-2">
-                                                                        <span className="font-mono text-xs bg-success/20 px-1 rounded">
-                                                                            {match}
-                                                                        </span>
-                                                                        <span>→</span>
-                                                                        <span className="text-xs text-success">
-                                                                            {previewLink}
-                                                                        </span>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>)
-                                                );
-                                            }
-                                            return null;
-                                        })()}
-                                    </div>
-                                ) : null;
-                            })()
-                        )}
+                        <TemplatePreview body={displayText} />
                     </div>
             </div>
         </div>)

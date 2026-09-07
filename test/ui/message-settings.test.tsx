@@ -35,7 +35,6 @@ function baseProps(overrides?: Partial<React.ComponentProps<any>>) {
       campaign_id: 123,
       message_media: ["a.png", "b.png"],
     },
-    surveys: [],
     ...overrides,
   };
 }
@@ -90,7 +89,6 @@ describe("app/components/MessageSettings.tsx", () => {
         mediaLinks={["https://cdn.example/a.png"]}
         details={details}
         onChange={onChange}
-        surveys={[]}
       />,
     );
 
@@ -179,7 +177,7 @@ describe("app/components/MessageSettings.tsx", () => {
     );
   });
 
-  test("template tags dropdown inserts tags, function examples, and survey functions; closes after insert", async () => {
+  test("template tags dropdown inserts tags and function examples; closes after insert", async () => {
     vi.useFakeTimers();
     const { MessageSettings } = await import("@/components/MessageSettings");
     const onChange = vi.fn();
@@ -187,10 +185,6 @@ describe("app/components/MessageSettings.tsx", () => {
       onChange,
       mediaLinks: [],
       details: { ...baseProps().details, message_media: [], body_text: "" },
-      surveys: [
-        { survey_id: "s1", title: "S1" },
-        { survey_id: "s2", title: "" }, // cover surveyTitle || "" fallback
-      ],
     });
 
     function ControlledMessageSettings() {
@@ -232,7 +226,7 @@ describe("app/components/MessageSettings.tsx", () => {
 
     await vi.runAllTimersAsync(); // selection focus timeout
 
-    // reopen and insert a non-survey function example
+    // reopen and insert a function example
     fireEvent.click(tagBtn);
     const funcHeading = screen.getByText("Function Examples");
     const funcSection = funcHeading.closest("div")
@@ -249,37 +243,9 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(screen.queryByText("Template Tags")).toBeNull();
 
     await vi.runAllTimersAsync();
-
-    // reopen and insert survey function from surveys list
-    fireEvent.click(tagBtn);
-    fireEvent.click(
-      screen
-        .getByText("Generate survey link for S1")
-        .closest("button") as HTMLButtonElement,
-    );
-    expect(textarea.value).toContain('survey({{contact_id}}, "s1")');
-    expect(onChange).toHaveBeenCalledWith(
-      "body_text",
-      expect.stringContaining('survey({{contact_id}}, "s1")'),
-    );
-    expect(screen.queryByText("Template Tags")).toBeNull();
-
-    await vi.runAllTimersAsync(); // insertSurveyFunction focus/selection timeout
-
-    // reopen and insert survey function where surveyTitle is falsy (covers surveyTitle || "")
-    fireEvent.click(tagBtn);
-    const funcHeading2 = screen.getByText("Function Examples");
-    const funcSection2 = funcHeading2.closest("div")
-      ?.parentElement as HTMLElement;
-    const ex2 = within(funcSection2).getByText(
-      'survey({{contact_id}}, "s2")',
-    ) as HTMLElement;
-    fireEvent.click(ex2.closest("button") as HTMLButtonElement);
-    expect(textarea.value).toContain('survey({{contact_id}}, "s2")');
-    await vi.runAllTimersAsync();
   });
 
-  test("template tag preview detects simple tags, fallbacks, btoa, survey; dedupes and shows preview link + unknown survey id", async () => {
+  test("template preview renders the body for a sample contact and hides when there are no tags", async () => {
     const { MessageSettings } = await import("@/components/MessageSettings");
 
     const props = baseProps({
@@ -287,33 +253,35 @@ describe("app/components/MessageSettings.tsx", () => {
       details: {
         ...baseProps().details,
         message_media: [],
-        body_text:
-          '{{firstname}} {{firstname|"x"}} {{surname|"x"}} btoa({{phone}}:{{external_id}}) btoa({{phone}}:{{external_id}}) survey({{contact_id}}, "s1") survey({{contact_id}}, "s1") survey({{contact_id}}, surveyid)',
+        body_text: 'Hi {{firstname}}, {{address|"your street"}} in {{city}}. Code: {{contact_id}}',
       },
-      surveys: [],
     });
 
-    render(<MessageSettings {...props} />);
+    const { unmount } = render(<MessageSettings {...props} />);
 
-    expect(screen.getByText("Template Tags Found:")).toBeInTheDocument();
-    const preview = screen.getByText("Template Tags Found:").closest("div")
-      ?.parentElement as HTMLElement;
-    expect(within(preview).getByText(/{{firstname}}/)).toBeInTheDocument();
-    // firstname fallback should be detected but NOT added as a separate foundTag (already present)
-    expect(within(preview).queryByText(/{{firstname\|"x"}}/)).toBeNull();
-    expect(within(preview).getByText(/{{surname\|"x"}}/)).toBeInTheDocument();
-    expect(within(preview).getAllByText(/Base64 function/).length).toBe(1); // deduped
-    // two distinct survey() patterns (one quoted, one unquoted/unknown)
-    expect(within(preview).getAllByText(/Survey link function/).length).toBe(2);
+    expect(screen.getByText(/Preview for a sample contact/)).toBeInTheDocument();
+    expect(screen.getByTestId("template-preview").textContent).toBe(
+      "Hi Jordan, 100 Main St in Ottawa. Code: 1042",
+    );
+    expect(screen.queryByText("Template Tags Found:")).toBeNull();
+    unmount();
 
-    // Survey link preview exists and includes extracted + unknown survey id
-    const surveyPreview = screen
-      .getByText("Survey Links Preview:")
-      .closest("div")?.parentElement as HTMLElement;
-    expect(within(surveyPreview).getAllByText(/contact_id:s1/).length).toBe(2);
-    expect(
-      within(surveyPreview).getByText(/contact_id:unknown/),
-    ).toBeInTheDocument();
+    render(
+      <MessageSettings
+        {...baseProps({
+          mediaLinks: [],
+          details: { ...baseProps().details, message_media: [], body_text: "Plain text only" },
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("template-preview")).toBeNull();
+  });
+
+  test("hint text opens the template tag picker", async () => {
+    const { MessageSettings } = await import("@/components/MessageSettings");
+    render(<MessageSettings {...baseProps({ mediaLinks: [] })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Browse tags" }));
+    expect(screen.getByText("Template Tags")).toBeInTheDocument();
   });
 
   test("handleAddMedia no-ops when no file; submits multipart when file provided (campaignId nullish branch)", async () => {
@@ -347,7 +315,7 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(screen.getByText("1 / 160 units used")).toBeInTheDocument();
     expect(screen.getByText("1 segment (GSM-7)")).toBeInTheDocument();
     expect(screen.getByText("1 visible character")).toBeInTheDocument();
-    expect(screen.getByText("≈ 1 credit per recipient")).toBeInTheDocument();
+    expect(screen.getByText("≈ 2 credits per recipient")).toBeInTheDocument();
 
     unmount();
     const props2 = baseProps({
@@ -362,7 +330,7 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(screen.getByText("9 / 153 units used")).toBeInTheDocument();
     expect(screen.getByText("2 segments (GSM-7)")).toBeInTheDocument();
     expect(screen.getByText("81 visible characters")).toBeInTheDocument();
-    expect(screen.getByText("≈ 2 credits per recipient")).toBeInTheDocument();
+    expect(screen.getByText("≈ 4 credits per recipient")).toBeInTheDocument();
 
     r2.unmount();
   });
@@ -384,7 +352,7 @@ describe("app/components/MessageSettings.tsx", () => {
     expect(screen.getByText("8 / 67 characters used")).toBeInTheDocument();
     expect(screen.getByText("3 segments (UCS-2)")).toBeInTheDocument();
     expect(screen.getByText("71 visible characters")).toBeInTheDocument();
-    expect(screen.getByText("≈ 3 credits per recipient")).toBeInTheDocument();
+    expect(screen.getByText("≈ 6 credits per recipient")).toBeInTheDocument();
   });
 
   test("credit estimate flips to the flat MMS rate the instant media is attached, regardless of segment count", async () => {
@@ -395,9 +363,9 @@ describe("app/components/MessageSettings.tsx", () => {
     });
     render(<MessageSettings {...props} />);
     // baseProps() ships 2 mediaLinks, so this is an MMS. The body is 3
-    // segments' worth of text, but MMS bills a flat MMS_CREDITS (2), not
-    // per segment — the credit line must show 2, not 3.
+    // segments' worth of text, but MMS bills a flat MMS_CREDITS (4), not
+    // per segment — the credit line must show 4, not 6.
     expect(screen.getByText("3 segments (GSM-7)")).toBeInTheDocument();
-    expect(screen.getByText("≈ 2 credits per recipient (MMS)")).toBeInTheDocument();
+    expect(screen.getByText("≈ 4 credits per recipient (MMS)")).toBeInTheDocument();
   });
 });

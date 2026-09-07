@@ -481,14 +481,13 @@ export async function patchCampaignQueueApi(
     return { ok: false as const, error: "Campaign not found", status: 404 };
   }
 
-  const filters = normalizeQueueFilters(body.filters);
   const campaignIdNum = Number(campaignId);
 
   try {
     switch (body.action) {
       case "update_status": {
-        if (!body.status) return { ok: false as const, error: "status is required for update_status", status: 400 };
         if (body.all) {
+          const filters = normalizeQueueFilters(body.filters);
           const ids = await searchCampaignQueueIds({ campaignId: campaignIdNum, filters, workspaceId });
           await updateCampaignQueueStatusByIds(ids, body.status, workspaceId);
         } else if (body.ids?.length) {
@@ -497,7 +496,6 @@ export async function patchCampaignQueueApi(
         return { ok: true as const, success: true };
       }
       case "add_contact_ids": {
-        if (!body.contact_ids?.length) return { ok: false as const, error: "contact_ids is required for add_contact_ids", status: 400 };
         await enqueueContactsForCampaign(
           campaignIdNum,
           body.contact_ids,
@@ -506,7 +504,6 @@ export async function patchCampaignQueueApi(
         return { ok: true as const, success: true };
       }
       case "add_audience": {
-        if (body.audience_id == null) return { ok: false as const, error: "audience_id is required for add_audience", status: 400 };
         const contacts = await db
           .select({ contact_id: contactAudienceTable.contact_id })
           .from(contactAudienceTable)
@@ -527,7 +524,7 @@ export async function patchCampaignQueueApi(
         return { ok: true as const, success: true };
       }
       default: {
-        const _exhaustive: never = body.action;
+        const _exhaustive: never = body;
         return { ok: false as const, error: "Invalid action", status: 400 };
       }
     }

@@ -78,16 +78,49 @@ export const ENRICHMENT_RECORD_SCHEMA = z
  * issue numbers, schema violations, unknown blockedBy targets, or cycles.
  */
 export function loadEnrichment(dir) {
-  const records = [];
-  const byNumber = new Map();
-  for (const file of readdirSync(dir)) {
+  return validateEnrichmentFiles(readEnrichmentFiles(dir));
+}
+
+/**
+ * Read every lane file into memory without interpreting it: `{ file, path,
+ * records }` per file, where `records` is the raw parsed array. Malformed JSON
+ * or a non-array body throws here, naming the file, before anything else
+ * happens — so a broken file is reported, never rewritten (E4.1).
+ */
+export function readEnrichmentFiles(dir) {
+  const files = [];
+  for (const file of readdirSync(dir).sort()) {
     if (!file.endsWith(".json")) continue;
-    const parsed = JSON.parse(readFileSync(join(dir, file), "utf8"));
+    const path = join(dir, file);
+    let parsed;
+    try {
+      parsed = JSON.parse(readFileSync(path, "utf8"));
+    } catch (error) {
+      throw new Error(`issue-board: ${file} is not valid JSON: ${error.message}`);
+    }
     if (!Array.isArray(parsed)) {
       throw new Error(`issue-board: ${file} must contain an array of records`);
     }
+    files.push({ file, path, records: parsed });
+  }
+  return files;
+}
+
+/**
+ * Validate in-memory lane files (schema, cross-file uniqueness, blockedBy
+ * targets and cycles) and return the validated records in file order.
+ */
+export function validateEnrichmentFiles(files) {
+  const records = [];
+  const byNumber = new Map();
+  for (const { file, records: parsed } of files) {
     for (const raw of parsed) {
-      const record = ENRICHMENT_RECORD_SCHEMA.parse(raw);
+      const result = ENRICHMENT_RECORD_SCHEMA.safeParse(raw);
+      if (!result.success) {
+        const where = raw && typeof raw === "object" && "issueNumber" in raw ? ` #${raw.issueNumber}` : "";
+        throw new Error(`issue-board: ${file}${where}: ${result.error.message}`);
+      }
+      const record = result.data;
       if (byNumber.has(record.issueNumber)) {
         throw new Error(
           `issue-board: duplicate issueNumber ${record.issueNumber} across lane files`,
@@ -99,6 +132,26 @@ export function loadEnrichment(dir) {
   }
   validateBlockedBy(records, byNumber);
   return records;
+}
+
+/**
+ * Pure pruning: drop records whose issue is no longer open. Returns the new
+ * per-file contents plus which files changed and which numbers went; nothing
+ * is written. Records still referenced via blockedBy by a survivor are kept
+ * out on purpose so validation of the survivors reports the dangling edge.
+ */
+export function pruneClosedRecords(files, openNumbers) {
+  const pruned = [];
+  const next = files.map(({ file, path, records }) => {
+    const kept = records.filter((record) => {
+      const number = record && typeof record === "object" ? record.issueNumber : undefined;
+      if (openNumbers.has(number)) return true;
+      pruned.push(number);
+      return false;
+    });
+    return { file, path, records: kept, changed: kept.length !== records.length };
+  });
+  return { files: next, pruned: pruned.sort((a, b) => a - b) };
 }
 
 function validateBlockedBy(records, byNumber) {

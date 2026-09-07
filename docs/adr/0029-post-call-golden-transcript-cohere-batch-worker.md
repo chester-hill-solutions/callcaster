@@ -1,5 +1,17 @@
 # Post-call golden transcript via Cohere Transcribe batch (worker job)
 
+> **Status (2026-09): superseded by the shipped implementation.** The golden
+> transcript ships on **ElevenLabs Scribe**, not Cohere. The worker job type is
+> `elevenlabs_batch_transcribe`
+> (`app/lib/worker/handlers/elevenlabs-batch-transcribe.server.ts`), the model is
+> `scribe_v2` via `POST https://api.elevenlabs.io/v1/speech-to-text`, the stored
+> `call_transcript.provider` is `elevenlabs_scribe_v2`, and the API key is
+> `ELEVENLABS_API_KEY` (the handler throws and the job dead-letters if it is
+> unset). Live STT is also ElevenLabs (`scribe_v2_realtime`,
+> `services/media-stream/elevenlabs-realtime-client.ts`), not Deepgram. The
+> Cohere design below is retained as historical rationale only — do not
+> implement against it.
+
 After a call ends and the recording is persisted to Railway Buckets (`call.audioUrl`, written by the `/api/recording` Bun route per ADR-0027), a **Bun worker job** (`type='cohere_batch_transcribe'`, per ADR-0007) re-transcribes the recording with **Cohere Transcribe** (`cohere-transcribe-03-2026`, 2B Conformer, 14 languages, 5.42% WER on LibriSpeech, 3× faster than peers on clean audio). The result is stored as a second `call_transcript` row with `provider='cohere_batch'` and `call.transcriptId` is repointed at it, replacing the live Deepgram transcript in post-call views. Cohere is the **golden post-call transcript** because: (a) it's more accurate than Deepgram Nova-3 on clean post-call audio (Deepgram is tuned for telephony streaming, Cohere wins on the de-noised recording), (b) it's cheaper (Cohere API free tier for low-setup, Model Vault per-hour-instance for production without rate limits), (c) it's multilingual across 14 languages vs Deepgram's per-model language selection, and (d) batch transcription has no latency constraint so the file-upload multipart API (`POST /v2/audio/transcriptions`, 25MB limit, `flac/mp3/mpeg/mpga/ogg/wav`) is fine. The Deepgram live transcript remains the source for the in-call UI; Cohere replaces it in the call-detail view when available. The worker scheduler enqueues the job every 15 minutes for calls where `audioUrl IS NOT NULL AND transcriptId IS NULL AND createdAt > now() - interval '24 hours'`, with missed-cron catch-up on boot (ADR-0007). The job handler validates params with Zod (`{ callId: number }`), downloads from Railway Buckets, chunks with ffmpeg if >25MB (ffmpeg is in the worker Docker image), calls Cohere with `language` from `workspace.coachingConfig` (default `en`), inserts the `call_transcript` row, updates `call.transcriptId`, and debits 1 credit via the idempotent ledger (key `transcription_batch:${callId}`). Cohere Transcribe's limitations — no native streaming, no diarization, no timestamps — are acceptable for the post-call path because the recording is a complete file and the live Deepgram transcript already has speaker labels and timestamps for the in-call UI. This split (Deepgram live + Cohere batch) uses each provider where it wins and is why a single-provider approach was rejected.
 
 ## Considered Options

@@ -14,7 +14,7 @@
 import {
   messageCampaignRequiresCallerId,
 } from "@/lib/sms-send-resolve";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
+import { dequeueQueueEntry, recordQueueAttemptFailure } from "@/lib/campaign-queue-db.server";
 import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
 import { getCampaignQueueById } from "@/lib/database/campaign.server";
 import { getWorkspaceTwilioPortalConfig } from "@/lib/database/workspace.server";
@@ -23,11 +23,15 @@ import {
   claimBatchSizeForRate,
   configuredDispatcherSmsMps,
 } from "@/lib/throughput-config.server";
-import { isWithinSendWindow, nextSendWindowOpenAt, parseSendWindow } from "@/lib/campaign-send-window";
+import { isDispatchAllowedAt, nextDispatchOpenAt, smsSendPolicy } from "@/lib/campaign-dispatch-policy";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
+import { OUTBOUND_CREDIT_FLOOR } from "../../shared/credit-floor";
+import { estimateMessageCredits } from "../../shared/pricing";
+import { rpcFailExhaustedCampaignQueueContacts } from "@/lib/db-rpc.server";
+import { createTenantDb } from "@/server/tenant-db";
 import type { TwilioMessageIntent } from "@/lib/types";
 import {
   sendSingleCampaignSms,
@@ -63,13 +67,58 @@ export type CampaignSmsBatchOutcome =
         dequeued: number;
         /** Left queued for a later tick (recipient quiet hours). */
         deferred: number;
+        /** Left queued because the remaining balance could not cover the estimated cost. */
+        unaffordable: number;
+        /** Dead-lettered by the exhaustion sweep: failed rows at the attempt maximum. */
+        exhausted: number;
       };
       /**
        * Rows still queued after this batch: quiet-hours deferrals, failed
-       * sends (which stay queued), and contacts beyond `maxContacts`.
+       * sends that still have attempts left, unaffordable rows, and contacts
+       * beyond `maxContacts`.
        */
       queuedRemaining: number;
+      /**
+       * The balance ran out part-way through the batch and cannot cover
+       * another send: adapters treat this like the entry-level
+       * `insufficient_credits` outcome instead of scheduling a successor.
+       */
+      creditsExhausted: boolean;
     };
+
+/** Skip reason for a row left queued because the balance cannot cover its estimated cost. */
+export const INSUFFICIENT_CREDITS_SKIPPED_REASON = "Insufficient credits for the estimated message cost";
+
+/**
+ * Per-dispatch credit budget. The entry gate reads the balance once, but
+ * debits land asynchronously after delivery, so every send in the batch
+ * would otherwise pass on the same stale balance. Reservations are made
+ * synchronously right before a send starts (no await in between), so
+ * concurrent rows in one dispatch call cannot spend the same credits.
+ * Cross-worker reservation is #1271.
+ */
+export function createDispatchCreditBudget(balance: number) {
+  let remaining = balance - OUTBOUND_CREDIT_FLOOR;
+  let cheapestSeen = Number.POSITIVE_INFINITY;
+  return {
+    reserve(cost: number): boolean {
+      cheapestSeen = Math.min(cheapestSeen, cost);
+      if (cost > remaining) return false;
+      remaining -= cost;
+      return true;
+    },
+    /** A send that never reached Twilio will not be debited: give the credits back. */
+    release(cost: number): void {
+      remaining += cost;
+    },
+    /** True when a row was refused and the balance still cannot cover the cheapest one seen. */
+    get exhausted(): boolean {
+      return remaining < cheapestSeen;
+    },
+  };
+}
+
+export type DispatchCreditBudget = ReturnType<typeof createDispatchCreditBudget>;
 
 export async function dispatchCampaignSmsBatch(args: {
   workspaceId: string;
@@ -136,15 +185,15 @@ export async function dispatchCampaignSmsBatch(args: {
   // later in-window tick. A `null` window is unrestricted. The outcome
   // carries the exact next open so the durable adapter can schedule its
   // successor at the window boundary instead of a fixed poll interval.
-  const sendWindow = parseSendWindow(campaign.campaign?.sms_send_window ?? null);
-  if (!isWithinSendWindow(sendWindow)) {
+  const sendPolicy = smsSendPolicy(campaign.campaign);
+  if (!isDispatchAllowedAt(sendPolicy)) {
     return {
       kind: "deferred_send_window",
       // Defensive fallback: a parsed window with active intervals always has
       // an open instant within the week, but never hot-loop if that invariant
       // is somehow violated.
       nextOpenAt:
-        nextSendWindowOpenAt(sendWindow) ?? new Date(Date.now() + 15 * 60 * 1000),
+        nextDispatchOpenAt(sendPolicy) ?? new Date(Date.now() + 15 * 60 * 1000),
     };
   }
 
@@ -174,7 +223,8 @@ export async function dispatchCampaignSmsBatch(args: {
     typeof maxContacts === "number" ? allQueued.slice(0, maxContacts) : allQueued;
 
   const responses: ContactDispatchResult[] = [];
-  const counts = { sent: 0, failed: 0, dequeued: 0, deferred: 0 };
+  const counts = { sent: 0, failed: 0, dequeued: 0, deferred: 0, unaffordable: 0, exhausted: 0 };
+  const budget = createDispatchCreditBudget(credits.balance);
 
   // Start-rate cap: keep dispatch-loop starts under `configuredDispatcherSmsMps`.
   // We pace *starts*, not completions — Twilio's throttle is on new sends per
@@ -204,12 +254,56 @@ export async function dispatchCampaignSmsBatch(args: {
     campaign,
     counts,
     claimedNumbers,
+    budget,
   };
 
-  for (let i = 0; i < queueMembers.length; i += BATCH_SIZE) {
-    const batch = queueMembers.slice(i, i + BATCH_SIZE);
+  await runPacedSendBatches({ queueMembers, ctx, batchSize: BATCH_SIZE, minStartIntervalMs, responses });
+
+  // Rows that failed for the last time are dead-lettered now so a bad number
+  // cannot pin the chain to retries forever (#1513). Exhausted rows may also
+  // include failures from earlier ticks, so clamp the remaining count.
+  if (counts.failed > 0) {
+    counts.exhausted = await rpcFailExhaustedCampaignQueueContacts(
+      createTenantDb(workspaceId),
+      Number(campaignId),
+    );
+  }
+
+  const truncated = allQueued.length - queueMembers.length;
+  return {
+    kind: "dispatched",
+    responses,
+    counts,
+    queuedRemaining: Math.max(
+      0,
+      truncated + counts.deferred + counts.failed + counts.unaffordable - counts.exhausted,
+    ),
+    creditsExhausted: counts.unaffordable > 0 && budget.exhausted,
+  };
+}
+
+/**
+ * Start each batch's sends at the paced rate and collect the results in
+ * queue order per batch.
+ */
+async function runPacedSendBatches(args: {
+  queueMembers: QueueMember[];
+  ctx: HandleMemberCtx;
+  batchSize: number;
+  minStartIntervalMs: number;
+  responses: ContactDispatchResult[];
+}): Promise<void> {
+  const { queueMembers, ctx, batchSize, minStartIntervalMs, responses } = args;
+  for (let i = 0; i < queueMembers.length; i += batchSize) {
+    const batch = queueMembers.slice(i, i + batchSize);
     const startingPromises: Promise<ContactDispatchResult>[] = [];
     for (const [j, member] of batch.entries()) {
+      // Once a row has been refused for credits, later rows cannot afford a
+      // send either: account for them without lookups or pacing waits.
+      if (ctx.counts.unaffordable > 0 && ctx.budget.exhausted) {
+        responses.push(skipForInsufficientCredits(member, ctx.counts));
+        continue;
+      }
       startingPromises.push(handleMember(member, ctx));
       // Pause between starts but not after the final one: no reason to
       // waste a full interval waiting for nothing.
@@ -220,14 +314,6 @@ export async function dispatchCampaignSmsBatch(args: {
     const batchResults = await Promise.all(startingPromises);
     responses.push(...batchResults);
   }
-
-  const truncated = allQueued.length - queueMembers.length;
-  return {
-    kind: "dispatched",
-    responses,
-    counts,
-    queuedRemaining: truncated + counts.deferred + counts.failed,
-  };
 }
 
 type DispatchCounts = {
@@ -235,7 +321,24 @@ type DispatchCounts = {
   failed: number;
   dequeued: number;
   deferred: number;
+  unaffordable: number;
+  exhausted: number;
 };
+
+/** The row stays queued; a relaunch after a top-up picks it up. */
+function skipForInsufficientCredits(
+  member: { contact_id: number },
+  counts: DispatchCounts,
+): ContactDispatchResult {
+  counts.unaffordable += 1;
+  return {
+    [member.contact_id]: {
+      success: false,
+      skipped: true,
+      reason: INSUFFICIENT_CREDITS_SKIPPED_REASON,
+    },
+  };
+}
 
 type QueueMember = NonNullable<
   Awaited<ReturnType<typeof getCampaignQueueById>>
@@ -255,6 +358,7 @@ type HandleMemberCtx = {
   campaign: CampaignData;
   counts: DispatchCounts;
   claimedNumbers: Set<string>;
+  budget: DispatchCreditBudget;
 };
 
 async function handleMember(
@@ -370,6 +474,16 @@ async function handleMember(
     processedBody = processTemplateTags(ctx.campaign.body_text, member.contact);
   }
 
+  // Reserve synchronously (no await between the estimate and the send start)
+  // so sibling rows in this batch cannot spend the same credits.
+  const cost = estimateMessageCredits({
+    body: processedBody ?? "",
+    hasMedia: ctx.media.length > 0,
+  }).credits;
+  if (!ctx.budget.reserve(cost)) {
+    return skipForInsufficientCredits(member, counts);
+  }
+
   return sendSingleCampaignSms({
     body: processedBody,
     media: ctx.media,
@@ -389,14 +503,12 @@ async function handleMember(
       counts.sent += 1;
       return { [member.contact_id]: { success: true, ...result } };
     },
-    (error) => {
+    async (error) => {
+      ctx.budget.release(cost);
+      const message = error instanceof Error ? error.message : String(error);
       counts.failed += 1;
-      return {
-        [member.contact_id]: {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      };
+      await recordQueueAttemptFailure({ queueId: member.id, error: message, workspaceId });
+      return { [member.contact_id]: { success: false, error: message } };
     },
   );
 }

@@ -74,7 +74,7 @@ site:
 | Auto-dial conference start | `app/lib/auto-dial-start.server.ts` | 404, mapped to `jsonError(..., 404)` by the route caller |
 | 1:1 chat SMS | `app/routes/api+/chat_sms.action.server.ts` | 402, fail-closed (`outboundCreditsBlockedResponse`) |
 | Chat composer send | `app/routes/workspaces+/$id/chats.action.server.ts` | 402, fail-closed (`outboundCreditsBlockedResponse`) |
-| Campaign SMS batch send | `app/lib/campaign-sms-dispatch.server.ts` (via `app/routes/api+/sms.action.server.ts`) | 402, fail-closed (folded into the `"insufficient_credits"` outcome) |
+| Campaign SMS batch send | `app/lib/campaign-sms-dispatch.server.ts` (via `app/routes/api+/sms.action.server.ts`) | 402, fail-closed (folded into the `"insufficient_credits"` outcome). Inside a batch, a per-dispatch budget (`createDispatchCreditBudget`) reserves each message's estimated cost before its send starts; rows the balance cannot cover stay queued and the batch reports `creditsExhausted`, which the worker treats like the entry gate (#1483). |
 
 ### What is **not** blocked at the floor
 

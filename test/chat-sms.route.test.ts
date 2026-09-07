@@ -27,6 +27,9 @@ const webhookMocks = vi.hoisted(() => ({
 const tenantDbMocks = vi.hoisted(() => ({
   message: {
     insert: vi.fn(async () => [{ id: 1 }]),
+    // Intent-row resolve/cleanup (#1586).
+    update: vi.fn(async () => [{ id: 1 }]),
+    delete: vi.fn(async () => undefined),
   },
   contact: {
     findFirst: vi.fn(async () => null),
@@ -170,6 +173,8 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     webhookMocks.sendWorkspaceWebhookNotification.mockResolvedValue({ success: true });
     tenantDbMocks.message.insert.mockReset();
     tenantDbMocks.message.insert.mockResolvedValue([{ id: 1 }]);
+    tenantDbMocks.message.update.mockReset();
+    tenantDbMocks.message.update.mockResolvedValue([{ id: 1 }]);
     tenantDbMocks.contact.findFirst.mockReset();
     tenantDbMocks.contact.findFirst.mockResolvedValue(null);
     mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({
@@ -393,10 +398,32 @@ describe("app/routes/api+/chat_sms/route.tsx", () => {
     );
   });
 
-  test("sendMessage still returns the accepted message when the insert fails", async () => {
+  test("sendMessage does not call Twilio when the intent row cannot be written (#1586)", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
     const client = makeDbClientStub({ messageInsertError: { message: "db" }, webhookRows: [] });
     tenantDbMocks.message.insert.mockRejectedValueOnce(new Error("db"));
+    const create = vi.fn(async () => ({ sid: "SM1" }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ messages: { create } });
+    const mod = await import("../app/routes/api+/chat_sms.send.server");
+    await expect(
+      mod.sendMessage({
+        body: "hi",
+        to: "+15551234567",
+        from: "+15550000000",
+        media: "[]",
+        client: client as any,
+        workspace: "w1",
+        contact_id: "",
+        user: null,
+      }),
+    ).rejects.toThrow();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  test("sendMessage still returns the accepted message when the post-send resolve fails", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, text: async () => "x" })) as any);
+    const client = makeDbClientStub({ webhookRows: [] });
+    tenantDbMocks.message.update.mockRejectedValueOnce(new Error("db"));
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
       messages: { create: vi.fn(async () => ({ sid: "SM1" })) },
     });

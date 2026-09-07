@@ -25,8 +25,11 @@ import {
 } from "@/lib/database/workspace.server";
 import { getCampaignQueueById, checkSchedule } from "@/lib/database/campaign.server";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
-import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
+import { dequeueQueueEntry, recordQueueAttemptFailure } from "@/lib/campaign-queue-db.server";
+import {
+  rpcCreateOutreachAttempt,
+  rpcFailExhaustedCampaignQueueContacts,
+} from "@/lib/db-rpc.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
@@ -37,11 +40,12 @@ import {
 } from "@/lib/throughput-config.server";
 import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
-import { insertCallForWorkspace } from "@/lib/telephony-db.server";
+import { insertCallForWorkspace, hasDuplicateCampaignCall } from "@/lib/telephony-db.server";
 import { logger } from "@/lib/logger.server";
 
 export const IVR_CALL_DEQUEUED_REASON = "IVR call completed";
 export const OPTED_OUT_IVR_DEQUEUED_REASON = "Contact opted out";
+export const DUPLICATE_IVR_DEQUEUED_REASON = "Duplicate IVR call prevented";
 
 export type CampaignIvrBatchOutcome =
   | { kind: "insufficient_credits" }
@@ -52,6 +56,8 @@ export type CampaignIvrBatchOutcome =
       counts: {
         called: number;
         failed: number;
+        /** Dead-lettered by the exhaustion sweep: failed rows at the attempt maximum. */
+        exhausted: number;
         /** Dequeued without a call: opted out. */
         dequeued: number;
         /** Left queued for a later tick (recipient quiet hours). */
@@ -114,7 +120,7 @@ export async function dispatchCampaignIvrBatch(args: {
   if (queueMembers.length === 0) {
     return {
       kind: "dispatched",
-      counts: { called: 0, failed: 0, dequeued: 0, deferred: 0 },
+      counts: { called: 0, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 },
       queuedRemaining: 0,
     };
   }
@@ -123,7 +129,14 @@ export async function dispatchCampaignIvrBatch(args: {
   const ivrUrls = resolveIvrCallUrls(campaignId);
   const tdb = createTenantDb(workspaceId);
 
-  const counts = { called: 0, failed: 0, dequeued: 0, deferred: 0 };
+  const counts = { called: 0, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 };
+
+  // In-batch normalized-number reservation. hasDuplicateCampaignCall reads
+  // persisted call history and cannot see sibling rows still executing in this
+  // same Promise.all — two queue rows for one household phone would both pass
+  // and both dial. Reserve synchronously before the first await so the second
+  // occurrence dequeues as a duplicate.
+  const claimedNumbers = new Set<string>();
 
   // Claim size is CPS-derived (1–2 rows at legacy pacing), so a single
   // Promise.all per batch keeps us inside the workspace's call rate.
@@ -150,6 +163,39 @@ export async function dispatchCampaignIvrBatch(args: {
           by: { id: member.id },
           userId,
           reason: OPTED_OUT_IVR_DEQUEUED_REASON,
+        });
+        counts.dequeued += 1;
+        return;
+      }
+
+      // Never dial the same number twice in one campaign (household phones).
+      // Check + reserve synchronously before the first await; then confirm
+      // against persisted call history for cross-batch / prior dispatches.
+      if (phone && claimedNumbers.has(phone)) {
+        await dequeueQueueEntry({
+          by: { id: member.id },
+          userId,
+          reason: DUPLICATE_IVR_DEQUEUED_REASON,
+        });
+        counts.dequeued += 1;
+        return;
+      }
+      if (phone) {
+        claimedNumbers.add(phone);
+      }
+      if (
+        phone &&
+        (await hasDuplicateCampaignCall({
+          workspaceId,
+          campaignId,
+          to: phone,
+          tdb,
+        }))
+      ) {
+        await dequeueQueueEntry({
+          by: { id: member.id },
+          userId,
+          reason: DUPLICATE_IVR_DEQUEUED_REASON,
         });
         counts.dequeued += 1;
         return;
@@ -196,22 +242,30 @@ export async function dispatchCampaignIvrBatch(args: {
         });
         counts.called += 1;
       } catch (error) {
-        // Failed calls stay queued: the duplicate-free queue is the retry
-        // ledger, and the worker's all-failed guard escalates to job backoff.
+        // Failed calls stay queued with the attempt recorded: the queue is the
+        // retry ledger until the exhaustion sweep below dead-letters the row.
+        const message = error instanceof Error ? error.message : String(error);
         counts.failed += 1;
+        await recordQueueAttemptFailure({ queueId: member.id, error: message, workspaceId });
         logger.error("campaign_ivr_dispatch.call_failed", {
           campaignId,
           queueId: member.id,
-          error: error instanceof Error ? error.message : String(error),
+          error: message,
         });
       }
     }),
   );
 
+  // Dead-letter rows that failed for the last time so one bad number cannot
+  // pin the chain to retries forever (#1513); see the SMS twin for the clamp.
+  if (counts.failed > 0) {
+    counts.exhausted = await rpcFailExhaustedCampaignQueueContacts(tdb, Number(campaignId));
+  }
+
   const truncated = allQueued.length - queueMembers.length;
   return {
     kind: "dispatched",
     counts,
-    queuedRemaining: truncated + counts.deferred + counts.failed,
+    queuedRemaining: Math.max(0, truncated + counts.deferred + counts.failed - counts.exhausted),
   };
 }

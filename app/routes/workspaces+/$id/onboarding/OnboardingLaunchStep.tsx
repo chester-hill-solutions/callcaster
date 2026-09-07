@@ -74,7 +74,7 @@ export function OnboardingLaunchStep({
           <Badge variant={audienceCount > 0 ? "secondary" : "outline"}>
             {audienceCount > 0
               ? `${audienceCount} audience${audienceCount === 1 ? "" : "s"}`
-              : "Audience pending"}
+              : "Call list pending"}
           </Badge>
           {visibleStepIds.has("script") ? (
             <Badge variant={scriptCount > 0 ? "secondary" : "outline"}>

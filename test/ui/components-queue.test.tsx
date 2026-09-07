@@ -134,7 +134,7 @@ describe("app/components/queue/QueueTable.tsx", () => {
   test("each icon-only column sort control has an accessible name", async () => {
     const { QueueTable } = await import("@/components/queue/QueueTable");
     render(<QueueTable {...defaultQueueTableProps()} />);
-    for (const label of ["Name", "Phone", "Email", "Address", "Audiences", "Status"]) {
+    for (const label of ["Name", "Phone", "Email", "Address", "Call lists", "Status"]) {
       expect(
         screen.getByRole("button", { name: `Sort by ${label}` }),
       ).toBeInTheDocument();

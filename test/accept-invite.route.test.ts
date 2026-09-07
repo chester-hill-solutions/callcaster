@@ -3,6 +3,7 @@ import { describe, expect, test, vi } from "vitest";
 import { asRouteResponse } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
+  isSignupOpen: vi.fn(() => true),
   signUpEmail: vi.fn(),
   getInvitesByUserId: vi.fn(),
   getSession: vi.fn(),
@@ -27,12 +28,19 @@ vi.mock("@/lib/database/workspace.server", () => ({
   getInvitesByUserId: mocks.getInvitesByUserId,
 }));
 
+vi.mock("@/lib/env.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/env.server")>()),
+  isSignupOpen: () => mocks.isSignupOpen(),
+}));
+
 vi.mock("@/lib/logger.server", () => ({
   logger: { error: vi.fn(), info: vi.fn(), debug: vi.fn() },
 }));
 
 describe("app/routes/accept-invite.action.server.ts", () => {
   beforeEach(() => {
+    mocks.isSignupOpen.mockReturnValue(true);
+    mocks.signUpEmail.mockClear();
     mocks.getSession.mockResolvedValue({
       session: null,
       user: null,
@@ -83,6 +91,34 @@ describe("app/routes/accept-invite.action.server.ts", () => {
       returnHeaders: true,
     });
     expect(response.headers.get("Set-Cookie")).toBe("session=abc; Path=/");
+  });
+
+  test("refuses to create an account while signup is closed", async () => {
+    mocks.isSignupOpen.mockReturnValue(false);
+
+    const form = new FormData();
+    form.set("actionType", "updateUser");
+    form.set("email", "new@example.com");
+    form.set("password", "newPassword123");
+    form.set("confirmPassword", "newPassword123");
+    form.set("firstName", "First");
+    form.set("lastName", "Last");
+
+    const mod = await import("../app/routes/accept-invite.action.server");
+    const response = await asRouteResponse(mod.action({
+        request: new Request("http://localhost/accept-invite", {
+          method: "POST",
+          body: form,
+        }),
+      } as any),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      status: "error",
+      error: "Registration is closed.",
+    });
+    expect(mocks.signUpEmail).not.toHaveBeenCalled();
   });
 
   test("returns error when signUpEmail fails", async () => {

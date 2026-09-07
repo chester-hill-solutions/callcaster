@@ -6,16 +6,16 @@
 
 Canonical constants live in [`shared/pricing.ts`](../shared/pricing.ts):
 
-| Product | Credits | CAD (at $0.02/credit) |
-|---------|--------:|----------------------:|
-| Credit purchase minimum | 500 | $10.00 |
-| SMS segment | 1 | $0.02 |
-| MMS | 2 | $0.04 |
-| IVR / auto-dial (first minute) | 2 | $0.04 |
-| IVR / auto-dial (each additional minute) | 3 | $0.06 |
-| Staffed live (first minute) | 4 | $0.08 |
-| Staffed live (each additional minute) | 5 | $0.10 |
-| Phone number rental (monthly) | 100 | $2.00 |
+| Product                                  | Credits | CAD (at $0.02/credit) |
+| ---------------------------------------- | ------: | --------------------: |
+| Credit purchase minimum                  |     500 |                $10.00 |
+| SMS segment                              |       2 |                 $0.04 |
+| MMS                                      |       4 |                 $0.08 |
+| IVR / auto-dial (first minute)           |       2 |                 $0.04 |
+| IVR / auto-dial (each additional minute) |       3 |                 $0.06 |
+| Staffed live (first minute)              |       4 |                 $0.08 |
+| Staffed live (each additional minute)    |       5 |                 $0.10 |
+| Phone number rental (monthly)            |     100 |                 $2.00 |
 
 **Hard cut:** no grandfathering. Existing credit balances stay at face value; new purchases use the $0.02 peg.
 
@@ -23,13 +23,13 @@ Canonical constants live in [`shared/pricing.ts`](../shared/pricing.ts):
 
 All billable events write to `transaction_history` via `insertTransactionHistoryIdempotent`:
 
-| Event | Idempotency key | Amount |
-|-------|-----------------|--------|
-| SMS terminal status | `sms:<MessageSid>` | `-1` credit per segment (today: 1 segment assumed) |
-| Voice terminal status | `call:<CallSid>` | Campaign-type aware dial + minute formula |
-| Number purchase | `number_rent_purchase:<workspaceId>:<numberSid>` | `-100` credits |
-| Number monthly renewal | `number_rent:<workspaceNumberId>:<yyyy-mm>` | `-100` credits |
-| Stripe checkout | `stripe_evt:<eventId>` or `stripe_session:<sessionId>` | positive credits |
+| Event                  | Idempotency key                                        | Amount                                    |
+| ---------------------- | ------------------------------------------------------ | ----------------------------------------- |
+| SMS terminal status    | `sms:<MessageSid>`                                     | `-2` credits per segment                  |
+| Voice terminal status  | `call:<CallSid>`                                       | Campaign-type aware dial + minute formula |
+| Number purchase        | `number_rent_purchase:<workspaceId>:<numberSid>`       | `-100` credits                            |
+| Number monthly renewal | `number_rent:<workspaceNumberId>:<yyyy-mm>`            | `-100` credits                            |
+| Stripe checkout        | `stripe_evt:<eventId>` or `stripe_session:<sessionId>` | positive credits                          |
 
 The `transaction_history_update_credits` trigger updates `workspace.credits` on insert.
 
@@ -49,19 +49,19 @@ Shared logic: [`shared/billing-reconciliation.ts`](../shared/billing-reconciliat
 
 ## Launch blockers vs non-blockers
 
-| Blocker | Notes |
-|---------|-------|
-| Ledger writes on all billable paths | SMS, voice (incl. IVR Remix shim), number rental |
-| Credits trigger in production | Captured in migration `202606100001_*` |
-| pg_cron: `twilio-open-sync`, `number-rental-billing`, `twilio-billing-reconcile` | Requires `app.settings.*` GUCs |
-| `NUMBER_RENTAL_CRON_SECRET` | Must be set for number-rental-billing auth |
+| Blocker                                                                          | Notes                                            |
+| -------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Ledger writes on all billable paths                                              | SMS, voice (incl. IVR Remix shim), number rental |
+| Credits trigger in production                                                    | Captured in migration `202606100001_*`           |
+| pg_cron: `twilio-open-sync`, `number-rental-billing`, `twilio-billing-reconcile` | Requires `app.settings.*` GUCs                   |
+| `NUMBER_RENTAL_CRON_SECRET`                                                      | Must be set for number-rental-billing auth       |
 
-| Non-blocker (post-launch OK) | Notes |
-|------------------------------|-------|
-| Multi-segment SMS debits | Option B expects per-segment; Twilio `NumSegments` not wired yet |
-| Campaign cost estimates (#960) | UI transparency, not billing correctness |
-| Public pricing page alignment | In-app billing updated; marketing page may lag |
-| MMS distinct pricing in webhooks | Constants exist; MMS path may still debit 1 credit |
+| Non-blocker (post-launch OK)     | Notes                                                                      |
+| -------------------------------- | -------------------------------------------------------------------------- |
+| Multi-segment SMS debits         | Option B expects 2 credits per segment; Twilio `NumSegments` not wired yet |
+| Campaign cost estimates (#960)   | UI transparency, not billing correctness                                   |
+| Public pricing page alignment    | In-app billing updated; marketing page may lag                             |
+| MMS distinct pricing in webhooks | Constants exist; MMS path may still debit 1 credit                         |
 
 ## Customer-facing surfaces
 

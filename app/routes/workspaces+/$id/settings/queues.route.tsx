@@ -282,7 +282,7 @@ export default function QueueSettings() {
                   >
                     <span>{member.user_id.substring(0, 8)}...</span>
                     <button
-                      className="text-destructive hover:underline"
+                      className="text-destructive-text hover:underline"
                       onClick={() => {
                         removeMemberFetcher.submit(
                           {

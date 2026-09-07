@@ -15,6 +15,8 @@ export default mergeConfig(
         // Excluded here because test/setup.node.ts defaults DATABASE_URL to a
         // fake localhost URL, which would point those suites at nothing.
         "test/integration-db/**",
+        // Twilio test-credential tier — own config + env gate (vitest.integration-twilio.config.ts).
+        "test/integration-twilio/**",
         "test/server-runtime.test.ts",
         "test/twilio-webhook-prehandler.test.ts",
       ],

@@ -39,7 +39,7 @@ export default function Media() {
     <section id="form">
       <PageShell title="Add Audio" maxWidth="narrow">
         {actionData?.error != null ? (
-          <Text className="text-center text-destructive">
+          <Text className="text-center text-destructive-text">
             Error:{" "}
             {typeof actionData.error === "string"
               ? actionData.error

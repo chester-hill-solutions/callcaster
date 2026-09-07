@@ -37,7 +37,7 @@ export const SQL_BUILTINS = new Set([
   "unnest", "lower", "upper", "trim", "concat", "length", "cast", "exists",
   "row_number", "regexp_replace", "string_agg", "pg_sleep", "distinct", "case",
   "nextval", "currval", "setval", "gen_random_uuid", "uuid_generate_v4", "any",
-  "pg_notify", "pg_advisory_xact_lock", "pg_advisory_lock", "set_config",
+  "pg_notify", "pg_advisory_xact_lock", "pg_advisory_lock", "pg_advisory_unlock", "set_config",
   "current_setting", "pg_try_advisory_lock", "to_regclass",
 ]);
 

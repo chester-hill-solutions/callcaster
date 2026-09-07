@@ -13,13 +13,26 @@ const dbState = vi.hoisted(() => ({
   simpleApplied: [] as string[],
   factoryCalls: 0,
   failSimpleOnce: false,
+  events: [] as string[],
 }));
 
 vi.mock("postgres", () => {
   function sqlTag(strings: TemplateStringsArray, ...values: unknown[]) {
     const text = Array.isArray(strings) ? strings.join("?") : String(strings);
-    if (text.includes("pg_trigger")) return Promise.resolve(dbState.legacyTriggers);
+    if (text.includes("pg_advisory_unlock")) {
+      dbState.events.push("unlock");
+      return Promise.resolve([]);
+    }
+    if (text.includes("pg_advisory_lock")) {
+      dbState.events.push("lock");
+      return Promise.resolve([]);
+    }
+    if (text.includes("pg_trigger")) {
+      dbState.events.push("legacy-check");
+      return Promise.resolve(dbState.legacyTriggers);
+    }
     if (text.includes("from public.client_migration_bootstrap")) {
+      dbState.events.push("read-applied");
       return Promise.resolve(dbState.appliedRows);
     }
     if (text.includes("insert into public.client_migration_bootstrap")) {
@@ -43,7 +56,10 @@ vi.mock("postgres", () => {
     };
     return p;
   };
-  (sqlTag as unknown as { end: () => Promise<void> }).end = () => Promise.resolve();
+  (sqlTag as unknown as { end: () => Promise<void> }).end = () => {
+    dbState.events.push("end");
+    return Promise.resolve();
+  };
   return {
     default: vi.fn(() => {
       dbState.factoryCalls += 1;
@@ -69,6 +85,7 @@ describe("bootstrap-migrations.server", () => {
     dbState.simpleApplied = [];
     dbState.factoryCalls = 0;
     dbState.failSimpleOnce = false;
+    dbState.events = [];
   });
 
   test("bootstrapEnabled only true for explicit opt-in", () => {
@@ -95,6 +112,29 @@ describe("bootstrap-migrations.server", () => {
     });
     expect(result).toEqual({ ran: false, reason: "no-database-url" });
     expect(dbState.factoryCalls).toBe(0);
+  });
+
+  test("holds one advisory lock from before the first read until after the last file", async () => {
+    dbState.failSimpleOnce = true;
+    const result = await applyClientMigrationsOnBoot({
+      env: { RUN_CLIENT_MIGRATIONS_ON_BOOT: "1", DATABASE_URL: "postgres://x" },
+      rootDir: ROOT_DIR,
+    });
+    expect(result.ran).toBe(true);
+    expect(dbState.events[0]).toBe("lock");
+    expect(dbState.events.indexOf("lock")).toBeLessThan(dbState.events.indexOf("read-applied"));
+    expect(dbState.events.filter((e) => e === "lock")).toHaveLength(1);
+    // Released once, after everything, and before the connection closes.
+    expect(dbState.events.slice(-2)).toEqual(["unlock", "end"]);
+  });
+
+  test("releases the lock when it refuses a legacy database", async () => {
+    dbState.legacyTriggers = [{ tgname: "outreach_trigger" }];
+    await applyClientMigrationsOnBoot({
+      env: { RUN_CLIENT_MIGRATIONS_ON_BOOT: "1", DATABASE_URL: "postgres://x" },
+      rootDir: ROOT_DIR,
+    });
+    expect(dbState.events).toEqual(["lock", "legacy-check", "unlock", "end"]);
   });
 
   test("refuses to touch a legacy database and applies nothing", async () => {

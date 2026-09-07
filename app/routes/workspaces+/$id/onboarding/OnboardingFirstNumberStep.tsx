@@ -1,5 +1,5 @@
 import { Link, useFetcher, useRevalidator } from "react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 import { NumberSummaryList } from "@/components/phone-numbers/NumberSummaryList";
@@ -47,6 +47,34 @@ type OnboardingFirstNumberStepProps = Pick<
   creditsBalance: number;
   validationRequest?: CallerIdValidationRequest | null;
 };
+
+/**
+ * One of the two actions on the first-number step. A `fieldset`/`legend`
+ * pair drew the legend across the box's top edge, and `overflow-hidden`
+ * clipped it, so the title looked struck through (#1113). A labelled group
+ * keeps the accessible grouping with an ordinary in-flow heading.
+ */
+export function FirstNumberActionGroup({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  const headingId = useId();
+  return (
+    <section
+      role="group"
+      aria-labelledby={headingId}
+      className="min-w-0 space-y-4 rounded-md bg-muted/40 p-4"
+    >
+      <h3 id={headingId} className="text-sm font-medium">
+        {title}
+      </h3>
+      {children}
+    </section>
+  );
+}
 
 function presetOrderForGoal(
   goal: WorkspaceOnboardingGoal | null,
@@ -242,8 +270,7 @@ export function OnboardingFirstNumberStep({
           {/* Address first → then choose rent vs verify (#1114). */}
           {hasServiceAddress ? (
             <div className="grid min-w-0 grid-cols-1 gap-8">
-              <fieldset className="min-w-0 space-y-4 overflow-hidden rounded-md bg-muted/40 p-4">
-                <legend className="px-1 text-sm font-medium">Rent a Canadian number</legend>
+              <FirstNumberActionGroup title="Rent a Canadian number">
                 <p className="text-sm text-muted-foreground">
                   Best for inbound SMS, inbound calls, and full two-way messaging.
                 </p>
@@ -265,10 +292,9 @@ export function OnboardingFirstNumberStep({
                     onPurchaseComplete={handlePurchaseComplete}
                   />
                 )}
-              </fieldset>
+              </FirstNumberActionGroup>
 
-              <fieldset className="min-w-0 space-y-4 overflow-hidden rounded-md bg-muted/40 p-4">
-                <legend className="px-1 text-sm font-medium">Verify your own number</legend>
+              <FirstNumberActionGroup title="Verify your own number">
                 <p className="text-sm text-muted-foreground">
                   Outbound SMS and calls only. Rent a number for inbound traffic.
                 </p>
@@ -315,7 +341,7 @@ export function OnboardingFirstNumberStep({
                     isPending={isVerifying}
                   />
                 )}
-              </fieldset>
+              </FirstNumberActionGroup>
             </div>
           ) : (
             <Alert>

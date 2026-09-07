@@ -14,6 +14,8 @@ const membersDbMocks = vi.hoisted(() => ({
   listWorkspaceMembersEnriched: vi.fn(async () => [] as any[]),
   updateWorkspaceMemberRole: vi.fn(async () => ({ id: "u2" } as any)),
   removeWorkspaceMember: vi.fn(async () => ({ id: "u2" } as any)),
+  findUserIdByUsername: vi.fn(async () => null as string | null),
+  findWorkspaceInviteForUser: vi.fn(async () => null as unknown),
 }));
 
 const txDb = vi.hoisted(() => ({
@@ -39,6 +41,8 @@ vi.mock("@/lib/two-factor.server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/two-factor.server")>();
   return {
     ...actual,
+    isTwoFactorEnabled: (...args: unknown[]) =>
+      twoFactorMocks.isTwoFactorEnabled(...(args as [string])),
     requireTwoFactorForPrivilegedRoleAssignment: async (
       targetUserId: string,
       role: string,
@@ -212,6 +216,20 @@ describe("workspace member RBAC", () => {
     });
   });
 
+  describe("platform-members inviteWorkspaceMemberAsPlatformAdmin", () => {
+    test("lets the admin console mint an owner invite without a workspace membership", async () => {
+      const mod = await import("../app/lib/platform-members.server");
+      const result = await mod.inviteWorkspaceMemberAsPlatformAdmin(
+        "w1",
+        "new@example.com",
+        "owner",
+      );
+      expect(result).not.toMatchObject({ error: expect.stringContaining("higher than your own") });
+      expect(accessMocks.getUserRole).not.toHaveBeenCalled();
+      expect(accessMocks.getWorkspaceUsers).toHaveBeenCalled();
+    });
+  });
+
   describe("platform-members removeWorkspaceMember", () => {
     test("rejects callers", async () => {
       accessMocks.getUserRole.mockResolvedValue({ role: "caller" });
@@ -296,6 +314,21 @@ describe("workspace member RBAC", () => {
           newOwnerUserId: "u2",
         }),
       ).rejects.toThrow("new owner");
+    });
+
+    test("rejects when the new owner has not enrolled in 2FA (#1519)", async () => {
+      twoFactorMocks.isTwoFactorEnabled.mockResolvedValueOnce(false);
+      const actual = await vi.importActual<typeof import("../app/lib/workspace-members-db.server")>(
+        "../app/lib/workspace-members-db.server",
+      );
+      await expect(
+        actual.transferWorkspaceOwnership({
+          workspaceId: "w1",
+          currentOwnerUserId: "u1",
+          newOwnerUserId: "u2",
+        }),
+      ).rejects.toThrow("two-factor");
+      expect(dbMock.transaction).not.toHaveBeenCalled();
     });
 
     test("promotes the new owner and demotes the previous owner in a transaction", async () => {

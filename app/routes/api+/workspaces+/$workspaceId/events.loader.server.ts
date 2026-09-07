@@ -188,7 +188,15 @@ async function streamWorkspaceEvents(
           // postgres.js returns { state, unlisten } — using the wrong property
           // here leaks one listener closure per SSE connection for the
           // lifetime of the process.
-          listenUnsubscribe = (listenResult as unknown as { unlisten: () => Promise<void> }).unlisten;
+          const unlisten = (listenResult as unknown as { unlisten: () => Promise<void> }).unlisten;
+          if (closed) {
+            // The client aborted while listen() was in flight, so closeStream()
+            // already ran and saw listenUnsubscribe still undefined. Unsubscribe
+            // here or the registration leaks for the process lifetime.
+            void unlisten();
+            return;
+          }
+          listenUnsubscribe = unlisten;
         } catch {
           // LISTEN unavailable (e.g. pooled connection); polling fallback only.
         }

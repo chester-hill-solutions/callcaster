@@ -31,7 +31,7 @@ export default function NewAudience() {
 
   return (
     <section id="form">
-      <PageShell title="Add an Audience" maxWidth="narrow">
+      <PageShell title="Add a Call list" maxWidth="narrow">
         {actionData?.error != null ? (
           <Alert variant="destructive">
             <AlertDescription>Error: {String(actionData.error)}</AlertDescription>
@@ -90,7 +90,7 @@ export default function NewAudience() {
               </p>
             </div>
 
-            <Button type="submit">Add Audience</Button>
+            <Button type="submit">Add Call list</Button>
           </Form>
         </Section>
       </PageShell>

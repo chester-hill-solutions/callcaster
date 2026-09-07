@@ -47,6 +47,24 @@ export async function startWorkspaceCallerIdVerification({
   phoneNumber: string;
   friendlyName: string;
 }): Promise<StartWorkspaceCallerIdVerificationResult> {
+  const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
+  const tdb = createTenantDb(workspaceId);
+
+  const existing = await tdb.workspace_number.findFirst({
+    where: eq(workspaceNumberTable.phone_number, normalizedPhoneNumber),
+  });
+
+  // Never demote a rented number through the caller-ID flow. The upsert below
+  // rewrites the row to type "caller_id" with capabilities reset to false,
+  // which would strip voicemail/emergency eligibility and rented-number counts
+  // from a number the workspace actually owns. Guard before placing the Twilio
+  // validation call so we also don't trigger a pointless verification call.
+  if (existing && existing.type === "rented") {
+    throw new Error(
+      "That number is already rented in this workspace, so it does not need caller-ID verification.",
+    );
+  }
+
   const twilio = await createWorkspaceTwilioInstance({
     workspace_id: workspaceId,
   });
@@ -56,13 +74,7 @@ export async function startWorkspaceCallerIdVerification({
     phoneNumber,
     statusCallback: `${env.BASE_URL()}/api/caller-id/status`,
   });
-  const normalizedPhoneNumber = normalizePhoneNumber(phoneNumber);
-  const tdb = createTenantDb(workspaceId);
   const now = new Date().toISOString();
-
-  const existing = await tdb.workspace_number.findFirst({
-    where: eq(workspaceNumberTable.phone_number, normalizedPhoneNumber),
-  });
 
   const upsertValues = {
     friendly_name: friendlyName,

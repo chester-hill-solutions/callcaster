@@ -291,7 +291,9 @@ describe("runNumberRentalBilling", () => {
     ).not.toHaveBeenCalled();
   });
 
-  test("treats an unknown (null) balance as unaffordable, never debiting negative", async () => {
+  test("treats an unknown (null) balance as a technical failure: no debit, no escalation", async () => {
+    opsMocks.notifyOps.mockClear();
+    tdbMocks.workspace_number.update.mockClear();
     tdbMocks.workspace_number.findMany.mockResolvedValue([
       makeNumber({ created_at: "2026-04-10" }),
     ]);
@@ -303,10 +305,65 @@ describe("runNumberRentalBilling", () => {
       today: new Date("2026-05-12T00:00:00.000Z"),
     });
 
-    expect(result).toMatchObject({ charged: 0, unpaid: 1 });
+    expect(result).toMatchObject({ charged: 0, unpaid: 0, technicalFailures: 1, warned: 0 });
     expect(
       transactionHistoryMocks.insertTransactionHistoryIdempotent,
     ).not.toHaveBeenCalled();
+    expect(opsMocks.notifyOps).not.toHaveBeenCalled();
+    expect(tdbMocks.workspace_number.update).not.toHaveBeenCalled();
+  });
+
+  test("a ledger write error never warns, suspends, or releases the number", async () => {
+    opsMocks.notifyOps.mockClear();
+    lifecycleMocks.removeWorkspacePhoneNumber.mockClear();
+    tdbMocks.workspace_number.update.mockClear();
+    // Three elapsed renewal cycles with no ledger rows — enough to release if
+    // the failures were treated as non-payment.
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-03-01" }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(10_000);
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockRejectedValue(
+      new Error("connection reset"),
+    );
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-06-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({
+      charged: 0,
+      unpaid: 0,
+      technicalFailures: 1,
+      warned: 0,
+      suspended: 0,
+      released: 0,
+    });
+    // Stops at the first failing cycle rather than hammering the ledger.
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledTimes(1);
+    expect(opsMocks.notifyOps).not.toHaveBeenCalled();
+    expect(tdbMocks.workspace_number.update).not.toHaveBeenCalled();
+    expect(lifecycleMocks.removeWorkspacePhoneNumber).not.toHaveBeenCalled();
+  });
+
+  test("a balance lookup error skips only that number and keeps sweeping the rest", async () => {
+    opsMocks.notifyOps.mockClear();
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ id: 1, created_at: "2026-05-01" }),
+      makeNumber({ id: 2, created_at: "2026-05-01", phone_number: "+15557654321" }),
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance
+      .mockRejectedValueOnce(new Error("db timeout"))
+      .mockResolvedValue(10_000);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-06-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ processed: 2, charged: 1, unpaid: 0, technicalFailures: 1 });
+    expect(opsMocks.notifyOps).not.toHaveBeenCalled();
   });
 
   /**
@@ -630,6 +687,7 @@ describe("runNumberRentalBilling", () => {
       warned: 0,
       remindersSent: 0,
       remindersFailed: 0,
+      technicalFailures: 0,
       autoReleaseImplemented: true,
     });
   });

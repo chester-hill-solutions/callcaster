@@ -24,6 +24,8 @@ import {
   countRentedWorkspaceNumbers,
   countVerifiedCallerIdNumbers,
   isVerifiedCallerIdNumber,
+  BUSINESS_IDENTITY_REQUIRED_FIELDS,
+  findMissingBusinessProfileFields,
 } from "@/lib/messaging-onboarding/predicates";
 import type { WizardOnboardingStepId } from "@/lib/messaging-onboarding/wizard-steps";
 import {
@@ -80,17 +82,17 @@ function buildReadinessContext(
 }
 
 function isBusinessBasicsComplete(ctx: WorkspaceReadinessContext): boolean {
-  // Baseline profile fields only. Service address is collected at number rental
-  // (ServiceAddressGate), not as part of the business prefix milestone.
-  for (const field of BUSINESS_PROFILE_REQUIRED_FIELDS.a2p10dlc) {
-    const value = ctx.onboarding.businessProfile[field];
-    if (Array.isArray(value)) {
-      if (value.length === 0) return false;
-    } else if (typeof value === "string" ? !value.trim() : !value) {
-      return false;
-    }
-  }
-  return true;
+  // The Identity screen and this milestone must agree by construction (#1204):
+  // the screen saves with only the fields in BUSINESS_IDENTITY_REQUIRED_FIELDS,
+  // so judging the step by the full A2P list left it "in progress" forever.
+  // Channel-specific fields stay enforced by the per-channel predicates once a
+  // channel is selected. Service address is collected at number rental.
+  return (
+    findMissingBusinessProfileFields(
+      ctx.onboarding.businessProfile,
+      BUSINESS_IDENTITY_REQUIRED_FIELDS,
+    ).length === 0
+  );
 }
 
 function isEmergencyReady(

@@ -59,6 +59,21 @@ type RelationalConfig = { where?: SQL | ((aliases: unknown) => SQL | undefined) 
 type ScopedEntry = { table: PgTable; workspaceColumn: PgColumn };
 
 /**
+ * `ScopedUpdate` omits the tenancy column at compile time only; a caller
+ * holding a loosely typed object could still reassign a row to another
+ * workspace. Drop the column before the update reaches Drizzle.
+ */
+function withoutTenancyColumn(
+  values: Record<string, unknown>,
+  columnName: string,
+): Record<string, unknown> {
+  if (!(columnName in values)) return values;
+  const rest = { ...values };
+  delete rest[columnName];
+  return rest;
+}
+
+/**
  * Build a workspace-scoped Drizzle facade. Every read/write against a
  * workspace-column table is auto-filtered by `workspaceId` so route code can
  * never accidentally leak cross-tenant rows. Pass an optional `dbInstance` to
@@ -98,7 +113,7 @@ export function createTenantDb(workspaceId: string, dbInstance: Database = db): 
       update: (opts: { set: Record<string, unknown>; where?: SQL }) =>
         dbInstance
           .update(entry.table)
-          .set(opts.set)
+          .set(withoutTenancyColumn(opts.set, columnName))
           .where(mergePlainWhere(opts.where, workspaceFilter))
           .returning() as Promise<unknown[]>,
       delete: (opts: { where?: SQL }) =>

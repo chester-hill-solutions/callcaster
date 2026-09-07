@@ -373,6 +373,55 @@ describe("save_business_profile validation", () => {
     expect(mapped).toMatchObject({ kind: "ui_redirect", step: "audience" });
   });
 
+  test("advances the program save even when intake was already complete (#1471)", async () => {
+    // The Identity save completes intake before the Program step is reached.
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({
+        status: "collecting_business",
+        currentStep: "business_program",
+        selectedGoal: "sms_blast",
+        businessProfile: { ...EMPTY_BUSINESS_PROFILE, legalBusinessName: "Northgate Clinic" },
+      }),
+    );
+
+    const outcome = await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      programForm({
+        useCaseSummary: "Appointment reminders for booked clients.",
+        sampleMessages: "Northgate: your appointment is tomorrow at 9:30 AM.",
+      }),
+    );
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.result).toMatchObject({ kind: "redirect", step: "audience" });
+  });
+
+  test("a hint-less save after intake still returns to the capability surface", async () => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({
+        status: "collecting_business",
+        selectedGoal: "sms_blast",
+        businessProfile: { ...EMPTY_BUSINESS_PROFILE, legalBusinessName: "Northgate Clinic" },
+      }),
+    );
+    const form = programForm({
+      useCaseSummary: "Appointment reminders for booked clients.",
+      sampleMessages: "Northgate: your appointment is tomorrow at 9:30 AM.",
+    });
+    form.delete("wizardStep");
+    form.set("legalBusinessName", "Northgate Clinic");
+    form.set("returnTo", `/workspaces/${WORKSPACE_ID}/settings`);
+
+    const outcome = await runOnboardingAction(USER_ID, WORKSPACE_ID, "save_business_profile", form);
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+    expect(outcome.result).toMatchObject({ kind: "redirect_path", path: `/workspaces/${WORKSPACE_ID}/settings` });
+  });
+
   test("full baseline submit without wizardStep advances to audience", async () => {
     mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
       onboardingState({ selectedGoal: "live_call" }),

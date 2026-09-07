@@ -367,6 +367,19 @@ export async function inviteWorkspaceMemberAsApiKey(
   return inviteWorkspaceMemberWithActorRole("member", workspaceId, email, role);
 }
 
+/**
+ * Platform-admin invite path (admin console). The actor is not a workspace
+ * member, so there is no membership role to rank against; a platform admin
+ * may mint any role, including owner.
+ */
+export async function inviteWorkspaceMemberAsPlatformAdmin(
+  workspaceId: string,
+  email: string,
+  role: "owner" | "admin" | "member" | "caller",
+) {
+  return inviteWorkspaceMemberWithActorRole(MemberRole.Owner, workspaceId, email, role);
+}
+
 export async function updateWorkspaceMemberRole(
   userId: string,
   workspaceId: string,

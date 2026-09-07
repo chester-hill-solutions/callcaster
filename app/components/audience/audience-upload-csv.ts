@@ -1,6 +1,10 @@
 import { parse } from "csv-parse/sync";
 import { logger } from "@/lib/logger.client";
-import { CONTACT_IMPORT_TARGETS } from "../../../shared/contact-import-headers";
+import {
+  CONTACT_IMPORT_TARGETS,
+  csvFirstRowIsHeader,
+  generatedContactImportHeaders,
+} from "../../../shared/contact-import-headers";
 
 export const VALID_HEADERS = CONTACT_IMPORT_TARGETS.filter(
   (target) => target !== "name",
@@ -28,13 +32,20 @@ export const parseCSVData = (records: CSVRecord[], headers: string[]) => {
 /** Parse CSV with columns option for better mapping. */
 export const parseCSV = (csvString: string) => {
   try {
-    const records = parse(csvString, {
-      columns: true,
+    const rows = parse(csvString, {
+      columns: false,
       skip_empty_lines: true,
       trim: true,
-    });
+    }) as string[][];
 
-    const headers = parseCSVHeaders(Object.keys(records[0] || {}));
+    const firstRow = rows[0] ?? [];
+    const hasHeader = csvFirstRowIsHeader(firstRow);
+    const headers = hasHeader
+      ? parseCSVHeaders(firstRow)
+      : generatedContactImportHeaders(firstRow.length);
+    const records: CSVRecord[] = (hasHeader ? rows.slice(1) : rows).map((row) =>
+      Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])),
+    );
     const contacts = parseCSVData(records, headers);
     return { headers, contacts };
   } catch (error) {
@@ -101,29 +112,34 @@ export const parseCSVAsync = async (
     if (headerLine === undefined) {
       return { headers: [], contacts: [] };
     }
-    const [rawHeaderRow] = parse(headerLine, {
+    const [rawFirstRow] = parse(headerLine, {
       columns: false,
       skip_empty_lines: true,
       trim: true,
     }) as string[][];
+    const firstRow = rawFirstRow ?? [];
+    const hasHeader = csvFirstRowIsHeader(firstRow);
+    const headers = hasHeader
+      ? parseCSVHeaders(firstRow)
+      : generatedContactImportHeaders(firstRow.length);
+    const rowsToParse = hasHeader ? dataLines : lines;
 
     const records: CSVRecord[] = [];
-    for (let i = 0; i < dataLines.length; i += CSV_ASYNC_CHUNK_ROWS) {
-      const batch = dataLines.slice(i, i + CSV_ASYNC_CHUNK_ROWS);
+    for (let i = 0; i < rowsToParse.length; i += CSV_ASYNC_CHUNK_ROWS) {
+      const batch = rowsToParse.slice(i, i + CSV_ASYNC_CHUNK_ROWS);
       const batchRecords = parse(batch.join("\n"), {
-        columns: rawHeaderRow,
+        columns: headers,
         skip_empty_lines: true,
         trim: true,
       }) as CSVRecord[];
       records.push(...batchRecords);
       // Only yield when more batches remain — single-chunk files (the common
       // case) stay on the microtask queue and don't defer a frame needlessly.
-      if (i + CSV_ASYNC_CHUNK_ROWS < dataLines.length) {
+      if (i + CSV_ASYNC_CHUNK_ROWS < rowsToParse.length) {
         await yieldToMainThread();
       }
     }
 
-    const headers = parseCSVHeaders(rawHeaderRow ?? []);
     const contacts = parseCSVData(records, headers);
     return { headers, contacts };
   } catch (error) {

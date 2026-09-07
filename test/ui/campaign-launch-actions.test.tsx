@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 import {
@@ -99,5 +99,89 @@ describe("CampaignLaunchActions", () => {
 
     expect(screen.getByTestId("campaign-launch-play")).toBeDisabled();
     expect(screen.getByTestId("campaign-launch-schedule")).toBeDisabled();
+  });
+
+  test("offers Kick off only while running or paused, and only when wired", () => {
+    const onKickoff = vi.fn();
+    const { rerender } = render(
+      <CampaignLaunchActions
+        status="running"
+        startLabel="Start calling"
+        isMessageCampaign
+        startDisabledReason={null}
+        scheduleDisabled={false}
+        isBusy={false}
+        onPlay={vi.fn()}
+        onPause={vi.fn()}
+        onSchedule={vi.fn()}
+        onArchive={vi.fn()}
+        onDuplicate={vi.fn()}
+        onKickoff={onKickoff}
+      />,
+    );
+    const kickoff = screen.getByTestId("campaign-launch-kickoff");
+    expect(kickoff).toBeEnabled();
+    fireEvent.click(kickoff);
+    expect(onKickoff).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <CampaignLaunchActions
+        status="draft"
+        startLabel="Start calling"
+        isMessageCampaign
+        startDisabledReason={null}
+        scheduleDisabled={false}
+        isBusy={false}
+        onPlay={vi.fn()}
+        onPause={vi.fn()}
+        onSchedule={vi.fn()}
+        onArchive={vi.fn()}
+        onDuplicate={vi.fn()}
+        onKickoff={onKickoff}
+      />,
+    );
+    expect(screen.queryByTestId("campaign-launch-kickoff")).toBeNull();
+  });
+
+  test("shows a Send test button only when a handler is provided", () => {
+    const onSendTest = vi.fn();
+    const { rerender } = render(
+      <CampaignLaunchActions
+        status="draft"
+        startLabel="Start sending"
+        isMessageCampaign
+        startDisabledReason={null}
+        scheduleDisabled={false}
+        isBusy={false}
+        onPlay={vi.fn()}
+        onPause={vi.fn()}
+        onSchedule={vi.fn()}
+        onArchive={vi.fn()}
+        onDuplicate={vi.fn()}
+        onSendTest={onSendTest}
+      />,
+    );
+
+    const button = screen.getByTestId("campaign-launch-send-test");
+    expect(button).toHaveTextContent("Send test");
+    fireEvent.click(button);
+    expect(onSendTest).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <CampaignLaunchActions
+        status="draft"
+        startLabel="Start calling"
+        isMessageCampaign={false}
+        startDisabledReason={null}
+        scheduleDisabled={false}
+        isBusy={false}
+        onPlay={vi.fn()}
+        onPause={vi.fn()}
+        onSchedule={vi.fn()}
+        onArchive={vi.fn()}
+        onDuplicate={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("campaign-launch-send-test")).toBeNull();
   });
 });

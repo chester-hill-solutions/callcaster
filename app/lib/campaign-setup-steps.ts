@@ -25,16 +25,16 @@ import {
 /** Product default for new-campaign calling hours (CASL / Eastern Canada). */
 export const DEFAULT_CALLING_HOURS_TIMEZONE = "America/Toronto";
 
-import { wallClockToUtcHm } from "@/lib/schedule-timezone";
+import { DEFAULT_CALLING_HOURS, wallClockToUtcHm } from "@/lib/schedule-timezone";
 export { wallClockToUtcHm };
 
-/** Mon–Fri 09:00–17:00 in `timeZone`, stored as UTC clock times. */
+/** Mon–Fri DEFAULT_CALLING_HOURS in `timeZone`, stored as UTC clock times. */
 export function buildWeekdayCallingSchedule(
   timeZone: string = DEFAULT_CALLING_HOURS_TIMEZONE,
   at: Date = new Date(),
 ): Schedule {
-  const start = wallClockToUtcHm("09:00", timeZone, at);
-  const end = wallClockToUtcHm("17:00", timeZone, at);
+  const start = wallClockToUtcHm(DEFAULT_CALLING_HOURS.start, timeZone, at);
+  const end = wallClockToUtcHm(DEFAULT_CALLING_HOURS.end, timeZone, at);
   const weekday = (): ScheduleDay => ({
     active: true,
     intervals: [{ start, end }],

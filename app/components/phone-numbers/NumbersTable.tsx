@@ -256,7 +256,7 @@ const NumberRow = ({
       <TableCell className="mt-2 py-2">
         <Button
         variant={"ghost"}
-          className="text-destructive hover:text-destructive/80"
+          className="text-destructive-text hover:text-destructive-text/80"
           onClick={() => handleNumberRemoval(number.id)}
           disabled={isBusy}
           aria-label={`Release ${number.phone_number ?? "this number"}`}
@@ -425,8 +425,8 @@ const StatusIndicator = ({ status }: { status: string }) => {
     case "failed":
       return (
         <div className="flex items-center gap-2">
-          <p className="text-xs uppercase text-destructive">{status}</p>
-          <MdError className="text-destructive" size={24} />
+          <p className="text-xs uppercase text-destructive-text">{status}</p>
+          <MdError className="text-destructive-text" size={24} />
         </div>
       );
     case "pending":

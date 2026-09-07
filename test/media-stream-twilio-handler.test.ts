@@ -164,6 +164,72 @@ describe("twilio-handler", () => {
     expect(coachingEngineMocks.createCoachingState.mock.calls.length > 0).toBe(expectCreated);
   });
 
+  test("rejects a start frame whose callSid does not match the token (#1514)", async () => {
+    const { handleTwilioStreamMessage } = await import("../services/media-stream/twilio-handler");
+    const close = vi.fn();
+    const ws = {
+      data: {
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        userId: "user-1",
+        sessionId: "session-1",
+        callSid: "CA_token",
+        exp: Math.floor(Date.now() / 1000) + 60,
+        requestId: "req-1",
+      },
+      close,
+    } as unknown as import("bun").ServerWebSocket<MediaStreamSocketData>;
+
+    await handleTwilioStreamMessage(ws, {
+      event: "start",
+      streamSid: "MZstream",
+      start: {
+        streamSid: "MZstream",
+        accountSid: "AC123",
+        callSid: "CA_other_workspace",
+        tracks: ["inbound"],
+        mediaFormat: { encoding: "audio/x-mulaw", sampleRate: 8000, channels: 1 },
+        customParameters: { direction: "outbound" },
+      },
+    });
+
+    expect(close).toHaveBeenCalledWith(1008, "call_sid_mismatch");
+    expect(sttMocks.openElevenLabsRealtimeStream).not.toHaveBeenCalled();
+  });
+
+  test("accepts a start frame whose callSid matches the token (#1514)", async () => {
+    const { handleTwilioStreamMessage } = await import("../services/media-stream/twilio-handler");
+    const close = vi.fn();
+    const ws = {
+      data: {
+        workspaceId: "ws-1",
+        campaignId: "camp-1",
+        userId: "user-1",
+        sessionId: "session-1",
+        callSid: "CA_token",
+        exp: Math.floor(Date.now() / 1000) + 60,
+        requestId: "req-1",
+      },
+      close,
+    } as unknown as import("bun").ServerWebSocket<MediaStreamSocketData>;
+
+    await handleTwilioStreamMessage(ws, {
+      event: "start",
+      streamSid: "MZstream",
+      start: {
+        streamSid: "MZstream",
+        accountSid: "AC123",
+        callSid: "CA_token",
+        tracks: ["inbound"],
+        mediaFormat: { encoding: "audio/x-mulaw", sampleRate: 8000, channels: 1 },
+        customParameters: { direction: "outbound" },
+      },
+    });
+
+    expect(close).not.toHaveBeenCalled();
+    expect(sttMocks.openElevenLabsRealtimeStream).toHaveBeenCalled();
+  });
+
   test("start opens ElevenLabs STT and media forwards decoded mulaw audio", async () => {
     const { handleTwilioStreamMessage } = await import("../services/media-stream/twilio-handler");
     const ws = createMockWebSocket({

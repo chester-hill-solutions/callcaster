@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { wallClockToUtcHm, utcToWallClockHm } from "../app/lib/schedule-timezone";
+import { browserTimeZone, utcToWallClockHm, wallClockToUtcHm } from "../app/lib/schedule-timezone";
 
 /**
  * These tests use fixed dates so DST offsets in the test runner's timezone
@@ -108,5 +108,11 @@ describe("utcToWallClockHm", () => {
 
   test("returns input unchanged for invalid format", () => {
     expect(utcToWallClockHm("abc", TORONTO)).toBe("abc");
+  });
+});
+
+describe("browserTimeZone (#969)", () => {
+  test("returns the resolved IANA zone", () => {
+    expect(browserTimeZone()).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
   });
 });

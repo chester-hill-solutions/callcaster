@@ -63,7 +63,7 @@ function TabStatusMark({ item }: { item: CampaignRailItem }) {
   if (item.callStatus === "blocked" || item.health === "needs_attention") {
     return (
       <CircleAlert
-        className="h-3.5 w-3.5 shrink-0 text-destructive"
+        className="h-3.5 w-3.5 shrink-0 text-destructive-text"
         aria-hidden
       />
     );

@@ -29,7 +29,7 @@ describe("shared/pricing Option B", () => {
     expect(MIN_PURCHASE_CAD).toBe(10);
     expect(MIN_CREDITS).toBe(500);
     expect(NUMBER_RENTAL_MONTHLY_CREDITS).toBe(100);
-    expect(SMS_SEGMENT_CREDITS).toBe(1);
+    expect(SMS_SEGMENT_CREDITS).toBe(2);
   });
 
   test("voiceBillingKindFromCampaignType maps IVR campaign types", () => {
@@ -56,22 +56,28 @@ describe("shared/pricing Option B", () => {
 
 describe("shared/pricing estimateMessageCredits", () => {
   test("SMS (no media) charges SMS_SEGMENT_CREDITS per segment", () => {
-    expect(estimateMessageCredits({ body: "a".repeat(160), hasMedia: false })).toEqual({
-      credits: 1,
+    expect(
+      estimateMessageCredits({ body: "a".repeat(160), hasMedia: false }),
+    ).toEqual({
+      credits: 2,
       segments: 1,
       encoding: "GSM-7",
       isMms: false,
     });
 
-    expect(estimateMessageCredits({ body: "a".repeat(161), hasMedia: false })).toEqual({
-      credits: 2,
+    expect(
+      estimateMessageCredits({ body: "a".repeat(161), hasMedia: false }),
+    ).toEqual({
+      credits: 4,
       segments: 2,
       encoding: "GSM-7",
       isMms: false,
     });
 
-    expect(estimateMessageCredits({ body: "a".repeat(307), hasMedia: false })).toEqual({
-      credits: 3,
+    expect(
+      estimateMessageCredits({ body: "a".repeat(307), hasMedia: false }),
+    ).toEqual({
+      credits: 6,
       segments: 3,
       encoding: "GSM-7",
       isMms: false,
@@ -111,12 +117,19 @@ describe("shared/pricing estimateMessageCredits", () => {
     const withoutMedia = estimateMessageCredits({ body, hasMedia: false });
     const withMedia = estimateMessageCredits({ body, hasMedia: true });
 
-    expect(withoutMedia.credits).toBe(1);
+    expect(withoutMedia.credits).toBe(2);
     expect(withMedia.credits).toBe(MMS_CREDITS);
   });
 
   test("matches the real billing branch in app/routes/api+/sms/status.action.server.ts for every non-empty body", () => {
-    const bodies = ["hi", "a".repeat(160), "a".repeat(161), "a".repeat(306), "a".repeat(307), "🔥".repeat(40)];
+    const bodies = [
+      "hi",
+      "a".repeat(160),
+      "a".repeat(161),
+      "a".repeat(306),
+      "a".repeat(307),
+      "🔥".repeat(40),
+    ];
 
     for (const body of bodies) {
       for (const hasMedia of [false, true]) {

@@ -3,9 +3,12 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const tdbMocks = vi.hoisted(() => ({
   script: {
     insert: vi.fn(),
+    update: vi.fn(async () => [{ id: 1 }]),
   },
   campaign: {
     insert: vi.fn(),
+    findFirst: vi.fn(),
+    update: vi.fn(async () => [{ id: 1 }]),
   },
 }));
 
@@ -19,6 +22,9 @@ describe("app/lib/seed/seed-workspace-sample-data.server.ts", () => {
   beforeEach(() => {
     tdbMocks.script.insert.mockReset();
     tdbMocks.campaign.insert.mockReset();
+    tdbMocks.campaign.findFirst.mockReset();
+    tdbMocks.campaign.update.mockClear();
+    tdbMocks.script.update.mockClear();
     createTenantDbMock.mockClear();
   });
 
@@ -38,12 +44,14 @@ describe("app/lib/seed/seed-workspace-sample-data.server.ts", () => {
     expect(createTenantDbMock).toHaveBeenCalledWith("w1");
     expect(tdbMocks.script.insert).toHaveBeenCalledWith({
       name: "Sample script — customer check-in",
+      is_sample: true,
       type: "script",
       steps: SAMPLE_SCRIPT_STEPS,
       created_by: "u1",
     });
     expect(tdbMocks.campaign.insert).toHaveBeenCalledWith({
       title: "Sample campaign — explore CallCaster",
+      is_sample: true,
       status: "draft",
       type: "live_call",
       caller_id: null,
@@ -221,5 +229,41 @@ describe("app/lib/database/workspace-provisioning.server.ts createNewWorkspace +
     expect(result.provisioningWarning ?? "").not.toContain(
       "Sample data seeding failed",
     );
+  });
+});
+
+describe("retargetSampleCampaignForGoal (#1323)", async () => {
+  const { retargetSampleCampaignForGoal, SAMPLE_SMS_BODY } = await import(
+    "../app/lib/seed/seed-workspace-sample-data.server"
+  );
+
+  test("an SMS goal turns the draft sample into a message campaign with sample copy", async () => {
+    tdbMocks.campaign.findFirst.mockResolvedValue({ id: 9, status: "draft", script_id: 3 });
+    const result = await retargetSampleCampaignForGoal({ workspaceId: "w1", goal: "sms_blast" });
+    expect(result).toEqual({ retargeted: true, type: "message" });
+    expect(tdbMocks.campaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({ set: { type: "message", body_text: SAMPLE_SMS_BODY, script_id: null } }),
+    );
+    expect(tdbMocks.script.update).not.toHaveBeenCalled();
+  });
+
+  test("an automated-menu goal makes it an IVR campaign on the sample script", async () => {
+    tdbMocks.campaign.findFirst.mockResolvedValue({ id: 9, status: "draft", script_id: 3 });
+    const result = await retargetSampleCampaignForGoal({ workspaceId: "w1", goal: "ivr" });
+    expect(result).toEqual({ retargeted: true, type: "simple_ivr" });
+    expect(tdbMocks.campaign.update).toHaveBeenCalledWith(
+      expect.objectContaining({ set: { type: "simple_ivr", body_text: null, script_id: 3 } }),
+    );
+    expect(tdbMocks.script.update).toHaveBeenCalledWith(expect.objectContaining({ set: { type: "ivr" } }));
+  });
+
+  test("a sample that is no longer a draft, a missing sample, or a rent-a-number goal is left alone", async () => {
+    tdbMocks.campaign.findFirst.mockResolvedValue({ id: 9, status: "running", script_id: 3 });
+    expect(await retargetSampleCampaignForGoal({ workspaceId: "w1", goal: "sms_blast" })).toEqual({ retargeted: false, type: null });
+    tdbMocks.campaign.findFirst.mockResolvedValue(undefined);
+    expect(await retargetSampleCampaignForGoal({ workspaceId: "w1", goal: "sms_blast" })).toEqual({ retargeted: false, type: null });
+    tdbMocks.campaign.findFirst.mockResolvedValue({ id: 9, status: "draft", script_id: 3 });
+    expect(await retargetSampleCampaignForGoal({ workspaceId: "w1", goal: "rent_number" })).toEqual({ retargeted: false, type: null });
+    expect(tdbMocks.campaign.update).not.toHaveBeenCalled();
   });
 });

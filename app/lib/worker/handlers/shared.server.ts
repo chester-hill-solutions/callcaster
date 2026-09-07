@@ -1,4 +1,5 @@
 import { logger } from "@/lib/logger.server";
+import { notifyOps } from "@/lib/ops-alert.server";
 import { enqueueRegisteredJob, type JobParamsMap } from "@/lib/worker/job-params.server";
 
 /**
@@ -64,9 +65,20 @@ export async function rescheduleJob<Type extends keyof JobParamsMap & string>(
       },
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
     logger.error(`worker.handler.${type}.reschedule_failed`, {
       jobId: completedJobId,
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
+    });
+    // The chain has no future row now. The schedule watchdog re-seeds it, but
+    // a money-path schedule silently pausing is worth a page in the meantime.
+    void notifyOps({
+      event: "worker.reschedule_failed",
+      summary: `Self-scheduling job "${type}" could not enqueue its successor; the schedule watchdog will re-seed it`,
+      dedupeKey: `reschedule_failed:${type}`,
+      jobId: completedJobId,
+      jobType: type,
+      context: { error: message },
     });
   }
 }

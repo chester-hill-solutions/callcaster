@@ -25,7 +25,7 @@ export default function ResetPassword() {
         description="Set a new password for your account to complete recovery."
       >
         {actionData?.error ? (
-          <Text className="w-full text-center text-destructive">
+          <Text className="w-full text-center text-destructive-text">
             {actionData.error.message}
           </Text>
         ) : null}

@@ -1,3 +1,5 @@
+import { csvFirstRowIsHeader, generatedContactImportHeaders } from "./contact-import-headers";
+
 export interface AudienceUploadRequestBody {
   uploadId: number;
   audienceId: number;
@@ -137,10 +139,12 @@ export function parseCsvRecords(csvString: string): Record<string, string>[] {
 
   const firstLine = lines[0];
   if (!firstLine) return [];
-  const headers = parseCsvLine(firstLine);
+  const firstRow = parseCsvLine(firstLine);
+  const hasHeader = csvFirstRowIsHeader(firstRow);
+  const headers = hasHeader ? firstRow : generatedContactImportHeaders(firstRow.length);
   const records: Record<string, string>[] = [];
 
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = hasHeader ? 1 : 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line || !line.trim()) continue;
     const values = parseCsvLine(line);

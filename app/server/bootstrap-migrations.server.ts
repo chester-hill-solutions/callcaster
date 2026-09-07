@@ -34,6 +34,13 @@ import { logger } from "@/lib/logger.server";
 
 const MIGRATIONS_DIRNAME = path.join("client", "migrations");
 const TRACKING_TABLE = "client_migration_bootstrap";
+/**
+ * Session advisory lock key held for the whole bootstrap pass. Two instances
+ * booting at once (overlapping deploy, extra replica) would otherwise both
+ * read the same pending set and run the same DDL concurrently; the second
+ * waits here, then sees the first's tracking rows and skips them.
+ */
+const BOOTSTRAP_LOCK_KEY = 7264030120;
 
 /**
  * Presence of any of these legacy triggers means the target is a Supabase-era
@@ -94,8 +101,12 @@ export async function applyClientMigrationsOnBoot(options: {
   const dir = path.join(options.rootDir, MIGRATIONS_DIRNAME);
   const files = listMigrationFiles(dir);
   const sql = postgres(databaseUrl, { prepare: false, max: 1 });
+  let locked = false;
 
   try {
+    await sql`select pg_advisory_lock(${BOOTSTRAP_LOCK_KEY})`;
+    locked = true;
+
     const legacyTriggers = await sql<{ tgname: string }[]>`
       select tgname
       from pg_trigger
@@ -168,6 +179,15 @@ export async function applyClientMigrationsOnBoot(options: {
     });
     return { ran: true, applied, skipped };
   } finally {
+    if (locked) {
+      try {
+        await sql`select pg_advisory_unlock(${BOOTSTRAP_LOCK_KEY})`;
+      } catch (error) {
+        logger.warn("client-migration bootstrap could not release its lock", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
     await sql.end({ timeout: 5 });
   }
 }

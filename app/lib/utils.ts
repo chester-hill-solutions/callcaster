@@ -1,3 +1,4 @@
+import { AUTOMATED_PHONE_MENU_LABEL } from "@/lib/campaign-goals";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -111,7 +112,7 @@ export function campaignTypeText(campaignType: string): string {
     case "message":
       return "Message";
     case "robocall":
-      return "Robocall";
+      return AUTOMATED_PHONE_MENU_LABEL;
     case "simple_ivr":
       return "Simple IVR";
     case "complex_ivr":

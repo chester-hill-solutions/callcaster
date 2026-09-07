@@ -331,6 +331,28 @@ describe("createTenantDb — write auto-scoping", () => {
     expect(isSQL(last.where), "update with no where still gets workspace filter").toBe(true);
   });
 
+  test("update strips a `workspace` value from set so a row cannot change tenant", async () => {
+    const { captured } = hoisted;
+    const tdb = createTenantDb(WORKSPACE_ID);
+    await tdb.campaign.update({
+      set: { status: "paused", workspace: "ws_other" } as never,
+    });
+    const set = captured.update.at(-1)?.set as Record<string, unknown>;
+    expect(set.status).toBe("paused");
+    expect("workspace" in set).toBe(false);
+  });
+
+  test("update strips a `workspace_id` value from set for workspace_id-keyed tables", async () => {
+    const { captured } = hoisted;
+    const tdb = createTenantDb(WORKSPACE_ID);
+    await tdb.inbound_queue.update({
+      set: { name: "Renamed", workspace_id: "ws_other" } as never,
+    });
+    const set = captured.update.at(-1)?.set as Record<string, unknown>;
+    expect(set.name).toBe("Renamed");
+    expect("workspace_id" in set).toBe(false);
+  });
+
   test("delete AND-scopes where with the workspace filter", async () => {
     const { captured } = hoisted;
     const tdb = createTenantDb(WORKSPACE_ID);

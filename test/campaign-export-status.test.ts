@@ -29,9 +29,17 @@ let downloadThrows: unknown = null;
 const downloadObjectMock = vi.hoisted(() => vi.fn());
 const uploadObjectMock = vi.hoisted(() => vi.fn(async () => undefined));
 
+class ObjectNotFoundErrorMock extends Error {
+  constructor(message = "Object not found: campaign-exports/w1/e1.json") {
+    super(message);
+    this.name = "ObjectNotFoundError";
+  }
+}
+
 vi.mock("@/lib/object-storage.server", () => ({
   downloadObject: downloadObjectMock,
   uploadObject: uploadObjectMock,
+  ObjectNotFoundError: ObjectNotFoundErrorMock,
 }));
 
 function applyDualAuth() {
@@ -57,7 +65,7 @@ describe("api.campaign-export-status error handling", () => {
     downloadObjectMock.mockImplementation(async () => {
       if (downloadThrows != null) throw downloadThrows;
       if (downloadBehavior === "not_found") {
-        throw new Error("Object not found");
+        throw new ObjectNotFoundErrorMock();
       }
       if (downloadBehavior === "other_error") {
         throw new Error("Storage exploded");
@@ -139,6 +147,18 @@ describe("api.campaign-export-status error handling", () => {
     } as any)));
     expect(res2.status).toBe(500);
     await expect(res2.json()).resolves.toMatchObject({ error: expect.any(String) });
+  });
+
+  test("a raw S3 error whose message mentions 'not found' is still a 500, not a 404", async () => {
+    downloadThrows = new Error("Object not found in region (network)");
+    applyDualAuth();
+    const mod = await import("../app/routes/api+/campaign-export-status");
+    const res = await asRouteResponse(mod.loader(withRouteUrl({
+      request: new Request(
+        "http://localhost/api/campaign-export-status?exportId=e1&workspaceId=w1",
+      ),
+    } as any)));
+    expect(res.status).toBe(500);
   });
 
   test("returns 500 when download returns error that isn't Object not found", async () => {

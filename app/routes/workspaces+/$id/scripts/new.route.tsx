@@ -72,7 +72,7 @@ export default function NewScript() {
     <section id="form">
       <PageShell title="Add Script" maxWidth="narrow">
         {actionData?.error != null ? (
-          <Text className="text-center text-destructive">
+          <Text className="text-center text-destructive-text">
             Error:{" "}
             {actionData.error instanceof Error
               ? actionData.error.message

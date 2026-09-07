@@ -30,7 +30,7 @@ export function estimateCampaignCredits(
     return {
       perContactCredits: SMS_SEGMENT_CREDITS,
       totalCredits: count * SMS_SEGMENT_CREDITS,
-      rateDescription: "1 credit per SMS segment",
+      rateDescription: `${SMS_SEGMENT_CREDITS} credits per SMS segment`,
     };
   }
 

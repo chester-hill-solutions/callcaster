@@ -17,6 +17,7 @@ import {
   requeueCampaignQueueById,
 } from "@/lib/campaign-queue-db.server";
 import { updateCallBySid } from "@/lib/telephony-db.server";
+import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { db } from "@/server/db";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
@@ -266,6 +267,33 @@ export async function runAutoDialerTurn(
 
     if (contactRecord) {
       logger.debug("Contact record:", contactRecord);
+
+      // Re-check the credit floor on every turn, not just at conference start
+      // (auto-dial-start.server.ts). Each later contact is dialled from a Twilio
+      // webhook, so without this a session that started just above the floor
+      // keeps placing staffed calls into a negative balance until the queue
+      // empties. Out of credits: release the claim and stop the dialer (no new
+      // call means no status callback, so no further turn is triggered).
+      const credits = await requireOutboundCredits(workspace_id);
+      if (!credits.ok) {
+        logger.warn("auto_dial.insufficient_credits", {
+          campaignId: campaign_id,
+          workspaceId: workspace_id,
+          reason: credits.reason,
+        });
+        try {
+          await requeueCampaignQueueById(contactRecord.queue_id, workspace_id);
+        } catch (releaseError) {
+          logger.error(
+            "Failed to release claimed queue contact after credit stop:",
+            releaseError,
+          );
+        }
+        return {
+          success: true,
+          message: "Insufficient credits, stopping auto-dial",
+        };
+      }
 
       // Everything up through placing the Twilio call can fail without any
       // call having actually been placed. If it does, release the claimed

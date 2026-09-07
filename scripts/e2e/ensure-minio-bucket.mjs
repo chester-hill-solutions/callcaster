@@ -7,9 +7,11 @@ import {
   ListObjectsV2Command,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { assertLocalTarget } from "../lib/local-target-guard.mjs";
 
 const endpoint = process.env.S3_ENDPOINT ?? "http://127.0.0.1:9000";
 const bucket = process.env.S3_BUCKET ?? "callcaster";
+assertLocalTarget(endpoint, "S3_ENDPOINT");
 
 // --keep-objects: only ensure the bucket exists, don't purge. Used by server
 // boot paths (start-e2e-server) where wiping seeded fixtures would be wrong;

@@ -63,7 +63,7 @@ export const action = defineAction({
             );
           return routeData(bulkResult);
         } else {
-          const newContact = await createContact(data, data.audience_id, user.id, {
+          const newContact = await createContact({ ...data, workspace: workspaceId }, data.audience_id, user.id, {
             assignDefaultAudienceIfMissing: data.assign_default_sms_audience === "true",
           });
           return routeData(newContact);

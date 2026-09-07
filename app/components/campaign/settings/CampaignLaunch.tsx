@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { FetcherWithComponents, Form, Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@/lib/types";
 import { CampaignLaunchExtras } from "./detailed/CampaignLaunchExtras";
 import { CampaignLaunchActions } from "./CampaignLaunchActions";
+import { CampaignTestSendDialog } from "./CampaignTestSendDialog";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { CampaignCostPanel } from "./CampaignCostPanel";
@@ -65,6 +67,9 @@ export type CampaignLaunchProps = {
   phoneNumbers: WorkspaceNumbers[];
   handleInputChange: (name: string, value: unknown) => void;
   handleDuplicateButton: () => void;
+  handleKickoffButton: () => void;
+  /** One-number test send; omitted for campaign types that do not support it yet. */
+  handleTestSendButton?: (phone: string) => void;
   handleStatusButton: (type: "play" | "pause" | "archive" | "schedule") => void;
   handleScheduleButton: () => void;
   handleSave?: () => void;
@@ -104,6 +109,8 @@ export const CampaignLaunch = ({
   handleScheduleButton,
   handleStatusButton,
   handleDuplicateButton,
+  handleKickoffButton,
+  handleTestSendButton,
   formFetcher,
   scripts,
   startDisabledReason,
@@ -125,6 +132,8 @@ export const CampaignLaunch = ({
 }: CampaignLaunchProps) => {
   const startLabel =
     launchActionLabelOverride ?? launchActionLabel(campaignData.type);
+  const [testSendOpen, setTestSendOpen] = useState(false);
+  const canSendTest = campaignData.type === "message" && Boolean(handleTestSendButton);
 
   const confirmActionLabel =
     confirmStatus === "play"
@@ -261,8 +270,8 @@ export const CampaignLaunch = ({
       </p>
       {readinessIssues.length > 0 ? (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
-          <p className="text-sm font-medium text-destructive">Complete before launch</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-destructive">
+          <p className="text-sm font-medium text-destructive-text">Complete before launch</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-destructive-text">
             {readinessIssues.map((issue) => (
               <li key={issue}>{issue}</li>
             ))}
@@ -348,7 +357,7 @@ export const CampaignLaunch = ({
           <div
             className={`rounded-md border px-4 py-3 text-sm ${
               feedbackTone === "error"
-                ? "border-destructive/30 bg-destructive/5 text-destructive"
+                ? "border-destructive/30 bg-destructive/5 text-destructive-text"
                 : "border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300"
             }`}
             role={feedbackTone === "error" ? "alert" : "status"}
@@ -390,12 +399,22 @@ export const CampaignLaunch = ({
                 onSchedule={() => handleScheduleButton()}
                 onArchive={() => handleConfirmStatus("archive")}
                 onDuplicate={() => handleDuplicateButton()}
+                onKickoff={() => handleKickoffButton()}
+                onSendTest={canSendTest ? () => setTestSendOpen(true) : undefined}
               />
+              {canSendTest ? (
+                <CampaignTestSendDialog
+                  open={testSendOpen}
+                  busy={isBusy}
+                  onOpenChange={setTestSendOpen}
+                  onSend={(phone) => handleTestSendButton?.(phone)}
+                />
+              ) : null}
               {startDisabledReason ? (
                 <p className="text-sm text-muted-foreground">{startDisabledReason}</p>
               ) : null}
               {readinessIssues.length > 0 ? (
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive-text">
                   <div className="mb-2 flex items-center gap-2">
                     <AlertCircle className="h-4 w-4" />
                     <span className="font-medium">

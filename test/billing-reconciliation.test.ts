@@ -89,13 +89,13 @@ describe("billing-reconciliation", () => {
     const ledgerRows = [
       {
         type: "DEBIT",
-        amount: -1,
+        amount: -2,
         idempotency_key: "sms:SM1",
         created_at: "2026-05-10T12:00:00.000Z",
       },
       {
         type: "DEBIT",
-        amount: -1,
+        amount: -2,
         idempotency_key: "sms:SM2",
         created_at: "2026-05-11T12:00:00.000Z",
       },
@@ -155,20 +155,21 @@ describe("billing-reconciliation", () => {
   });
 
   test("SMS variance measures segments to segments, not rows to segments", () => {
-    // Regression: a multi-segment SMS creates a ledger row, so old code comparing
-    // event count (1 row) to Twilio segments (3) would report false drift even with
-    // perfect balance. New code compares credits (3, since SMS_SEGMENT_CREDITS is 1)
-    // to segments (3), which correctly shows variance of 0.
+    // Regression: a multi-segment SMS creates one ledger row, so comparing
+    // event count (1 row) to Twilio segments (3) reports false drift even with
+    // perfect balance. Comparing raw credits to segments is equally wrong at
+    // 2 credits per segment (8 credits vs 4 segments). The report must convert
+    // ledger credits back to segments (8 / 2 = 4) so the variance is 0.
     const ledgerRows = [
       {
         type: "DEBIT",
-        amount: -1, // one-segment SMS = 1 credit
+        amount: -2, // one-segment SMS at 2 credits per segment
         idempotency_key: "sms:SM1",
         created_at: "2026-05-10T12:00:00.000Z",
       },
       {
         type: "DEBIT",
-        amount: -3, // three-segment SMS = 3 credits
+        amount: -6, // three-segment SMS at 2 credits per segment
         idempotency_key: "sms:SM2",
         created_at: "2026-05-11T12:00:00.000Z",
       },
@@ -197,10 +198,10 @@ describe("billing-reconciliation", () => {
       },
     });
 
-    // Correct: variance is 0 (4 segments - 4 credits).
+    // Correct: variance is 0 (4 Twilio segments - 8 credits / 2 per segment).
     // Broken: would be 2 (4 segments - 2 rows) if using event count.
     expect(report.categories.sms.variance).toBe(0);
-    expect(report.categories.sms.ledgerCredits).toBe(4);
+    expect(report.categories.sms.ledgerCredits).toBe(8);
     expect(report.categories.sms.ledgerEvents).toBe(2);
   });
 

@@ -39,11 +39,16 @@ const membersDbMocks = vi.hoisted(() => ({
   upsertWorkspaceWebhookRow: vi.fn(async () => ({ id: 1 }) as any),
   getWorkspaceWebhookRow: vi.fn(async () => null as any),
   requireMemberManager: vi.fn(async () => ({ role: "owner" })),
+  inviteWorkspaceMember: vi.fn(async () => ({ ok: true, invite: { id: "inv1" } } as any)),
+  inviteWorkspaceMemberAsPlatformAdmin: vi.fn(async () => ({ ok: true, invite: { id: "inv1" } } as any)),
 }));
 
 vi.mock("@/lib/platform-members.server", () => ({
   updateWorkspaceMemberRole: (...args: unknown[]) => membersDbMocks.updateWorkspaceMemberRole(...args),
   removeWorkspaceMember: (...args: unknown[]) => membersDbMocks.removeWorkspaceMember(...args),
+  inviteWorkspaceMember: (...args: unknown[]) => membersDbMocks.inviteWorkspaceMember(...args),
+  inviteWorkspaceMemberAsPlatformAdmin: (...args: unknown[]) =>
+    membersDbMocks.inviteWorkspaceMemberAsPlatformAdmin(...args),
 }));
 vi.mock("@/lib/workspace-members-db.server", () => ({
   findUserIdByUsername: (...args: unknown[]) => membersDbMocks.findUserIdByUsername(...args),
@@ -74,6 +79,10 @@ function resetMembersDbMocks() {
   membersDbMocks.removeWorkspaceInviteForUser.mockReset();
   membersDbMocks.upsertWorkspaceWebhookRow.mockReset();
   membersDbMocks.getWorkspaceWebhookRow.mockReset();
+  membersDbMocks.inviteWorkspaceMember.mockReset();
+  membersDbMocks.inviteWorkspaceMemberAsPlatformAdmin.mockReset();
+  membersDbMocks.inviteWorkspaceMember.mockResolvedValue({ ok: true, invite: { id: "inv1" } });
+  membersDbMocks.inviteWorkspaceMemberAsPlatformAdmin.mockResolvedValue({ ok: true, invite: { id: "inv1" } });
 
   membersDbMocks.findUserIdByUsername.mockResolvedValue(null);
   membersDbMocks.findWorkspaceInviteForUser.mockResolvedValue(null);
@@ -97,43 +106,81 @@ describe("WorkspaceSettingUtils", () => {
     vi.spyOn(logger, "warn").mockImplementation(() => undefined);
   });
 
-  test("handleAddUser validates username and detects existing user", async () => {
+  const memberActor = { kind: "member", userId: "actor-1" } as const;
+
+  test("handleAddUser rejects a missing email and an unknown role before inviting", async () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
 
     const fdMissing = new FormData();
-    const resMissing = await asRouteResponse(mod.handleAddUser(fdMissing, "w1", headers));
+    const resMissing = await asRouteResponse(mod.handleAddUser(fdMissing, "w1", headers, memberActor));
     expect(resMissing.status).toBe(400);
 
-    getWorkspaceUsers.mockResolvedValueOnce({ data: [{ username: "a@b.com" }] });
-    const fd = new FormData();
-    fd.set("username", "A@B.COM ");
-    fd.set("new_user_workspace_role", "caller");
-    const resDup = await asRouteResponse(mod.handleAddUser(fd, "w1", headers));
-    expect(resDup.status).toBe(403);
+    const fdBadRole = new FormData();
+    fdBadRole.set("username", "a@b.com");
+    fdBadRole.set("new_user_workspace_role", "superuser");
+    const resBadRole = await asRouteResponse(mod.handleAddUser(fdBadRole, "w1", headers, memberActor));
+    expect(resBadRole.status).toBe(400);
+    expect(await resBadRole.json()).toMatchObject({ error: "Invalid workspace role" });
+
+    expect(membersDbMocks.inviteWorkspaceMember).not.toHaveBeenCalled();
+    expect(membersDbMocks.inviteWorkspaceMemberAsPlatformAdmin).not.toHaveBeenCalled();
   });
 
-  test("handleAddUser returns error when user not found, and success when invite created", async () => {
+  test("handleAddUser invites through the actor-aware path and surfaces its refusal", async () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
-    getWorkspaceUsers.mockResolvedValueOnce({ data: [] });
 
     const fd = new FormData();
-    fd.set("username", "USER@EXAMPLE.COM ");
-    fd.set("new_user_workspace_role", "member");
+    fd.set("username", " New@Example.COM ");
+    fd.set("new_user_workspace_role", "owner");
 
-    // findUserIdByUsername returns null by default → inviteUserByEmail returns user-not-found error
-    const resErr = await asRouteResponse(mod.handleAddUser(fd, "w1", headers));
-    expect(await resErr.json()).toMatchObject({
+    membersDbMocks.inviteWorkspaceMember.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      error: "You cannot grant a role higher than your own.",
+    });
+    const resDenied = await asRouteResponse(mod.handleAddUser(fd, "w1", headers, memberActor));
+    expect(resDenied.status).toBe(403);
+    expect(await resDenied.json()).toMatchObject({
       user: null,
-      error: "User not found. They must sign up before being invited to a workspace.",
+      error: "You cannot grant a role higher than your own.",
+    });
+    expect(membersDbMocks.inviteWorkspaceMember).toHaveBeenCalledWith(
+      "actor-1",
+      "w1",
+      "new@example.com",
+      "owner",
+    );
+
+    membersDbMocks.inviteWorkspaceMember.mockResolvedValueOnce({
+      ok: true,
+      warning: "An invite is already pending for this email.",
+    });
+    const resPending = await asRouteResponse(mod.handleAddUser(fd, "w1", headers, memberActor));
+    expect(await resPending.json()).toMatchObject({
+      success: true,
+      warning: "An invite is already pending for this email.",
     });
 
-    // Success path: user exists, no pending invite
-    membersDbMocks.findUserIdByUsername.mockResolvedValue("u1");
-    membersDbMocks.findWorkspaceInviteForUser.mockResolvedValue(null);
-    const resOk = await asRouteResponse(mod.handleAddUser(fd, "w1", headers));
-    expect(await resOk.json()).toMatchObject({ error: null, success: true });
+    const resOk = await asRouteResponse(mod.handleAddUser(fd, "w1", headers, memberActor));
+    expect(await resOk.json()).toMatchObject({ error: null, success: true, data: { id: "inv1" } });
+  });
+
+  test("handleAddUser uses the platform-admin path for the admin console", async () => {
+    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
+    const fd = new FormData();
+    fd.set("username", "new@example.com");
+    fd.set("new_user_workspace_role", "admin");
+
+    await asRouteResponse(mod.handleAddUser(fd, "w1", new Headers(), { kind: "platform-admin" }));
+
+    expect(membersDbMocks.inviteWorkspaceMemberAsPlatformAdmin).toHaveBeenCalledWith(
+      "w1",
+      "new@example.com",
+      "admin",
+    );
+    expect(membersDbMocks.inviteWorkspaceMember).not.toHaveBeenCalled();
   });
 
   test("handleUpdateUser and handleDeleteUser return json with error message when present", async () => {
