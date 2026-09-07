@@ -1,5 +1,10 @@
 import type { Schedule, ScheduleDay } from "@/lib/types";
-import { nextScheduleOpenMs, scheduleIntervalAt } from "@/lib/schedule-intervals";
+import {
+  nextScheduleOpenMs,
+  scheduleIntervalAt,
+  WEEKDAY_KEYS,
+  type WeekdayKey,
+} from "@/lib/schedule-intervals";
 
 /**
  * Phase F — per-campaign SMS send windows.
@@ -22,16 +27,8 @@ export type SendWindowPresetId = (typeof SEND_WINDOW_PRESET_IDS)[number];
 
 export const DEFAULT_SEND_WINDOW_PRESET: SendWindowPresetId = "custom";
 
-const DAY_KEYS = [
-  "sunday",
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-] as const;
-export type SendWindowDayKey = (typeof DAY_KEYS)[number];
+const DAY_KEYS = WEEKDAY_KEYS;
+export type SendWindowDayKey = WeekdayKey;
 
 const WEEKDAYS: SendWindowDayKey[] = [
   "monday",

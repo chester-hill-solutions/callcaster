@@ -13,6 +13,7 @@ import {
   user as userTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
+import { andConditions } from "@/lib/sql-conditions";
 import { createTenantDb } from "@/server/tenant-db";
 import { listWorkspaceMembersEnriched } from "@/lib/workspace-members-db.server";
 
@@ -55,14 +56,6 @@ export type CallLogLoaderResult = {
     pageSize: number;
   };
 };
-
-function andConditions(conditions: SQL[], context: string): SQL {
-  const joined = and(...conditions);
-  if (!joined) {
-    throw new Error(`${context} requires at least one SQL condition`);
-  }
-  return joined;
-}
 
 function escapeLikePattern(value: string): string {
   return `%${value.replace(/[%_\\]/g, "\\$&")}%`;
