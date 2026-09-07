@@ -34,7 +34,9 @@ describe("AudienceUploader CSV helpers", () => {
   });
 
   test("parseCSV returns headers + contacts", async () => {
-    mocks.parse.mockReturnValue([{ Name: "A", Phone: "1" }]);
+    // The parser now reads raw rows (columns: false) so it can decide whether
+    // the first row is a header (#1511).
+    mocks.parse.mockReturnValue([["Name", "Phone"], ["A", "1"]]);
     const mod = await import("@/components/audience/audience-upload-csv");
     const out = mod.parseCSV("x");
     expect(out.headers).toEqual(["name", "phone"]);

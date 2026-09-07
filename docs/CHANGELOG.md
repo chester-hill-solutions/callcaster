@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Fixed
+
+- Importing a CSV that has no header row keeps its first contact. The upload wizard and the server now agree on when a first row is data (a phone number, including one with an extension, an email, a street address, or a postal code) and both name the columns "Column 1", "Column 2", and so on ([#1481](https://github.com/chester-hill-solutions/callcaster/issues/1481), [#1511](https://github.com/chester-hill-solutions/callcaster/issues/1511)).
+
 ## 2026-09-05 — release dev → master
 
 ### Fixed

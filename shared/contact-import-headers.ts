@@ -84,6 +84,47 @@ export function matchContactImportHeader(header: string): ContactImportTarget | 
   return null;
 }
 
+/** True when any cell reads as a known contact column name (a header row). */
+export function hasContactImportHeader(headers: readonly string[]): boolean {
+  return headers.some((header) => matchContactImportHeader(header) !== null);
+}
+
+const PHONE_CELL = /^\+?[\d().\s-]{6,}(\s*(?:x|ext\.?|extension)\s*\d{1,6})?$/i;
+const EMAIL_CELL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** "123 Main St", "45-A Rue Principale": a civic number followed by a street word. */
+const STREET_ADDRESS_CELL = /^\d{1,6}[A-Za-z]?(?:-[A-Za-z0-9]+)?\s+[A-Za-z]/;
+/** Canadian postal code or US ZIP / ZIP+4. */
+const POSTAL_CELL = /^(?:[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d|\d{5}(?:-\d{4})?)$/;
+
+/**
+ * Whether a CSV row holds contact data rather than column names: a phone
+ * (extensions included), an email, a street address, or a postal code. Used
+ * to keep the first row of a headerless file instead of eating it as headers
+ * (#1481, #1511); a row that also names a known column is treated as a header.
+ */
+export function isLikelyContactDataRow(values: readonly string[]): boolean {
+  return values.some((value) => {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    return (
+      PHONE_CELL.test(trimmed) ||
+      EMAIL_CELL.test(trimmed) ||
+      STREET_ADDRESS_CELL.test(trimmed) ||
+      POSTAL_CELL.test(trimmed)
+    );
+  });
+}
+
+/** Whether the first row of a file is a header row. Known column names win; otherwise data-looking rows are data. */
+export function csvFirstRowIsHeader(firstRow: readonly string[]): boolean {
+  return hasContactImportHeader(firstRow) || !isLikelyContactDataRow(firstRow);
+}
+
+/** Column names the wizard and the server both use for a headerless file. */
+export function generatedContactImportHeaders(columnCount: number): string[] {
+  return Array.from({ length: columnCount }, (_, index) => `Column ${index + 1}`);
+}
+
 export function suggestContactImportMapping(
   headers: readonly string[],
 ): Record<string, ContactImportTarget> {

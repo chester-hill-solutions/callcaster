@@ -1,3 +1,7 @@
+import {
+  csvFirstRowIsHeader,
+  generatedContactImportHeaders,
+} from "../../shared/contact-import-headers";
 import { parse as parseSync } from "csv-parse/sync";
 
 export const CSV_UTF8_BOM = "\ufeff";
@@ -185,10 +189,14 @@ export function parseCSV(csvContent: string): CSVParseResult {
     return { headers: [], contacts: [] };
   }
 
-  const headers = firstRow.map((h) => String(h ?? "").trim());
+  // A headerless export keeps its first row as data under generated column
+  // names, the same names the upload wizard shows and maps (#1481, #1511).
+  const firstCells = firstRow.map((h) => String(h ?? "").trim());
+  const hasHeader = csvFirstRowIsHeader(firstCells);
+  const headers = hasHeader ? firstCells : generatedContactImportHeaders(firstCells.length);
   const contacts: Record<string, string>[] = [];
 
-  for (const row of records.slice(1)) {
+  for (const row of hasHeader ? records.slice(1) : records) {
     if (!Array.isArray(row)) continue;
     const obj: Record<string, string> = {};
     headers.forEach((h, idx) => {
