@@ -1,3 +1,4 @@
+import { countRealCampaigns, countRealScripts } from "@/lib/real-content-counts.server";
 import {
   getWorkspacePhoneNumbers,
 } from "@/lib/database/workspace.server";
@@ -192,8 +193,8 @@ export async function loadWorkspaceOnboardingView(
     getWorkspaceCredits(workspaceId),
     getWorkspaceRecentOutboundMessageCount({ workspaceId }),
     tdb.audience.count(),
-    tdb.campaign.count(),
-    tdb.script.count(),
+    countRealCampaigns(tdb),
+    countRealScripts(tdb),
   ]);
 
   const hydratedOnboarding = applyOnboardingStepsWithWorkspaceNumbers(

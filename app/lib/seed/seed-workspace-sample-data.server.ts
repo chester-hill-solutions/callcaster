@@ -20,6 +20,7 @@ export async function seedWorkspaceSampleData(
 
   const [script] = await tdb.script.insert({
     name: "Sample script — customer check-in",
+    is_sample: true,
     type: "script",
     steps: SAMPLE_SCRIPT_STEPS as unknown as Json,
     created_by: userId,
@@ -30,6 +31,7 @@ export async function seedWorkspaceSampleData(
 
   const [campaign] = await tdb.campaign.insert({
     title: "Sample campaign — explore CallCaster",
+    is_sample: true,
     status: "draft",
     type: "live_call",
     caller_id: null,
