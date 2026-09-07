@@ -78,6 +78,7 @@ Eighty-six commits on `dev` since the 2026-09-02 release. Manual verification st
 
 ### Added
 
+- SMS message editor: a hint below the message body explains personalization tags and opens the picker, and a live preview renders the body for a sample contact so users can check templates before sending ([#1640](https://github.com/chester-hill-solutions/callcaster/issues/1640)).
 - A "Kick off" button on the campaign launch page restarts automated dispatch for a running or paused message or automated-voice campaign whose sending stopped. Pressing it while dispatch is already running does nothing and says so. PR [#1635](https://github.com/chester-hill-solutions/callcaster/pull/1635).
 - Workspace admins can override the "large bulk send on a local number" safeguard for one campaign from the launch page, after acknowledging the deliverability risk. The safeguard stays on by default, the override is recorded on the campaign and shown while active, and it can be removed again ([#1482](https://github.com/chester-hill-solutions/callcaster/issues/1482)). PR [#1623](https://github.com/chester-hill-solutions/callcaster/pull/1623).
 - **Billing → Activity** shows a **Receipt** link on each credit purchase that opens the Stripe-hosted invoice or receipt. Receipts are looked up per workspace, and a purchase that has no receipt yet says so instead of failing ([#1322](https://github.com/chester-hill-solutions/callcaster/issues/1322)). PR [#1596](https://github.com/chester-hill-solutions/callcaster/pull/1596).
