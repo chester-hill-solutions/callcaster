@@ -76,12 +76,13 @@ jobs:
       - run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
-      # The app resolves @chester-hill-solutions/scriptkit-* to vendor/ via a
-      # node_modules symlink, and those packages' "main" points at their
-      # committed dist/. Nothing else builds them, so a src/ edit without a
-      # rebuild silently ships stale code. Build here; the `git diff
-      # --exit-code` at the end of this job then fails on a stale dist/.
-      - run: npm run vendor:build
+      # The app resolves the scriptkit-* packages via node_modules symlinks,
+      # and their "main" points at committed dist/. Nothing else builds them,
+      # so a src/ edit without a rebuild silently ships stale code. This
+      # rebuilds each one and fails, naming the files, if the committed dist/
+      # is not what the committed src/ produces (E7.1). shad-cc's tsup build
+      # is not deterministic and is excluded until it is.
+      - run: npm run check:vendor-dist
       # npm (package-lock.json) and bun (bun.lock, Railway Docker build) must
       # move together — a dep added with npm alone fails the Railway image
       # build minutes after push, far from the cause.
