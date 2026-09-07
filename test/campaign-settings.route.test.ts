@@ -108,6 +108,14 @@ vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
   };
 });
 
+const testSendMocks = vi.hoisted(() => ({
+  sendCampaignTestSms: vi.fn(),
+}));
+vi.mock("@/lib/campaign-test-send.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-test-send.server")>()),
+  sendCampaignTestSms: (...args: unknown[]) => testSendMocks.sendCampaignTestSms(...args),
+}));
+
 vi.mock("@/lib/survey-db.server", () => ({
   loadActiveSurveysForWorkspace: vi.fn(async () => []),
 }));
@@ -395,5 +403,84 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       "w1",
       expect.objectContaining({ script_id: null }),
     );
+  });
+
+  describe("test_send intent", () => {
+    beforeEach(() => {
+      testSendMocks.sendCampaignTestSms.mockReset();
+    });
+
+    test("sends a test for a message campaign and returns the recipient", async () => {
+      makeDbClientForSettingsRoute();
+      mocks.parseActionRequest.mockResolvedValue({ intent: "test_send", phone: "613 555 0199" });
+      testSendMocks.sendCampaignTestSms.mockResolvedValue({
+        ok: true,
+        to: "+16135550199",
+        sid: "SM1",
+        body: "Hi Jordan",
+        usedSampleContact: true,
+      });
+      const mod = await import(
+        "../app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server"
+      );
+
+      const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: new Request("http://x", { method: "POST" }),
+        params: { id: "w1", selected_id: "99" },
+      })));
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        success: true,
+        actionType: "test_send",
+        to: "+16135550199",
+        usedSampleContact: true,
+      });
+      expect(testSendMocks.sendCampaignTestSms).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: "w1", campaignId: "99", to: "613 555 0199" }),
+      );
+    });
+
+    test("rejects non-message campaigns without sending", async () => {
+      makeDbClientForSettingsRoute({ campaign: { id: 99, workspace: "w1", type: "robocall" } });
+      mocks.parseActionRequest.mockResolvedValue({ intent: "test_send", phone: "6135550199" });
+      const mod = await import(
+        "../app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server"
+      );
+
+      const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: new Request("http://x", { method: "POST" }),
+        params: { id: "w1", selected_id: "99" },
+      })));
+
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toMatchObject({ success: false, actionType: "test_send" });
+      expect(testSendMocks.sendCampaignTestSms).not.toHaveBeenCalled();
+    });
+
+    test("maps a credit failure to 402 and passes the helper message through", async () => {
+      makeDbClientForSettingsRoute();
+      mocks.parseActionRequest.mockResolvedValue({ intent: "test_send", phone: "6135550199" });
+      testSendMocks.sendCampaignTestSms.mockResolvedValue({
+        ok: false,
+        reason: "insufficient_credits",
+        message: "Not enough credits to send a test message.",
+      });
+      const mod = await import(
+        "../app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server"
+      );
+
+      const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+        request: new Request("http://x", { method: "POST" }),
+        params: { id: "w1", selected_id: "99" },
+      })));
+
+      expect(res.status).toBe(402);
+      await expect(res.json()).resolves.toEqual({
+        success: false,
+        actionType: "test_send",
+        error: "Not enough credits to send a test message.",
+      });
+    });
   });
 });

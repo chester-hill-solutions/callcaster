@@ -4,8 +4,7 @@ import { useFetcher } from "react-router";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { useFetcherOnIdle } from "@/hooks/utils";
-import { processTemplateTags } from "@/lib/message-templates";
-import type { Contact } from "@/lib/types";
+import { processTemplateTags, SAMPLE_TEMPLATE_CONTACT } from "@/lib/message-templates";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -25,30 +24,15 @@ const TEMPLATE_TAGS = [
     { key: '{{contact_id}}', label: 'Contact ID', description: 'Contact\'s unique ID' },
 ];
 
-// Sample contact used to render the editor preview.
-const SAMPLE_CONTACT = {
-    id: 1042,
-    firstname: "Jordan",
-    surname: "Lee",
-    phone: "+16135550142",
-    email: "jordan.lee@example.com",
-    address: "100 Main St",
-    city: "Ottawa",
-    province: "ON",
-    postal: "K1A 0B1",
-    country: "Canada",
-    external_id: "C-1042",
-} as unknown as Contact;
-
 const TEMPLATE_SYNTAX = /\{|btoa\(/;
 
 function TemplatePreview({ body }: { body: string }) {
     if (!body || !TEMPLATE_SYNTAX.test(body)) return null;
-    const rendered = processTemplateTags(body, SAMPLE_CONTACT);
+    const rendered = processTemplateTags(body, SAMPLE_TEMPLATE_CONTACT);
     return (
         <div className="mt-3 rounded border border-secondary/60 bg-secondary/30 p-2">
             <div className="mb-1 text-xs font-semibold text-foreground">
-                Preview for a sample contact ({SAMPLE_CONTACT.firstname} {SAMPLE_CONTACT.surname})
+                Preview for a sample contact ({SAMPLE_TEMPLATE_CONTACT.firstname} {SAMPLE_TEMPLATE_CONTACT.surname})
             </div>
             <p
                 data-testid="template-preview"

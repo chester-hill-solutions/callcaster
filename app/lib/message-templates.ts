@@ -1,5 +1,23 @@
 import type { Contact } from "@/lib/types";
 
+/**
+ * Stand-in contact for previews and test sends when the recipient is not a
+ * workspace contact. Neutral, obviously fictional values.
+ */
+export const SAMPLE_TEMPLATE_CONTACT = {
+  id: 1042,
+  firstname: "Jordan",
+  surname: "Lee",
+  phone: "+16135550142",
+  email: "jordan.lee@example.com",
+  address: "100 Main St",
+  city: "Ottawa",
+  province: "ON",
+  postal: "K1A 0B1",
+  country: "Canada",
+  external_id: "C-1042",
+} as unknown as Contact;
+
 const TAG_PATTERN = /\{\{?\s*([a-zA-Z0-9_]+)(?:\|([^}]+))?\s*\}\}?/g;
 
 const FIELD_READERS: Record<string, (contact: Contact) => string | number | null | undefined> = {

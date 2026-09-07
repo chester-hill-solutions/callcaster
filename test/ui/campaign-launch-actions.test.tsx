@@ -142,4 +142,46 @@ describe("CampaignLaunchActions", () => {
     );
     expect(screen.queryByTestId("campaign-launch-kickoff")).toBeNull();
   });
+
+  test("shows a Send test button only when a handler is provided", () => {
+    const onSendTest = vi.fn();
+    const { rerender } = render(
+      <CampaignLaunchActions
+        status="draft"
+        startLabel="Start sending"
+        isMessageCampaign
+        startDisabledReason={null}
+        scheduleDisabled={false}
+        isBusy={false}
+        onPlay={vi.fn()}
+        onPause={vi.fn()}
+        onSchedule={vi.fn()}
+        onArchive={vi.fn()}
+        onDuplicate={vi.fn()}
+        onSendTest={onSendTest}
+      />,
+    );
+
+    const button = screen.getByTestId("campaign-launch-send-test");
+    expect(button).toHaveTextContent("Send test");
+    fireEvent.click(button);
+    expect(onSendTest).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <CampaignLaunchActions
+        status="draft"
+        startLabel="Start calling"
+        isMessageCampaign={false}
+        startDisabledReason={null}
+        scheduleDisabled={false}
+        isBusy={false}
+        onPlay={vi.fn()}
+        onPause={vi.fn()}
+        onSchedule={vi.fn()}
+        onArchive={vi.fn()}
+        onDuplicate={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("campaign-launch-send-test")).toBeNull();
+  });
 });

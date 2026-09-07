@@ -31,6 +31,7 @@ export default function CampaignLaunchRoute() {
     launchLabel,
     handleDuplicate,
     handleKickoff,
+    handleTestSend,
     handleConfirmStatus,
     handleInputChange,
     handleSave,
@@ -51,6 +52,7 @@ export default function CampaignLaunchRoute() {
       handleInputChange={handleInputChange}
       handleDuplicateButton={handleDuplicate}
       handleKickoffButton={handleKickoff}
+      handleTestSendButton={handleTestSend}
       handleStatusButton={handleStatusButton}
       handleConfirmStatus={handleConfirmStatus}
       handleScheduleButton={handleScheduleButton}

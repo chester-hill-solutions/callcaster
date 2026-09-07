@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { FetcherWithComponents, Form, Link } from "react-router";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@/lib/types";
 import { CampaignLaunchExtras } from "./detailed/CampaignLaunchExtras";
 import { CampaignLaunchActions } from "./CampaignLaunchActions";
+import { CampaignTestSendDialog } from "./CampaignTestSendDialog";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { CampaignCostPanel } from "./CampaignCostPanel";
@@ -66,6 +68,8 @@ export type CampaignLaunchProps = {
   handleInputChange: (name: string, value: unknown) => void;
   handleDuplicateButton: () => void;
   handleKickoffButton: () => void;
+  /** One-number test send; omitted for campaign types that do not support it yet. */
+  handleTestSendButton?: (phone: string) => void;
   handleStatusButton: (type: "play" | "pause" | "archive" | "schedule") => void;
   handleScheduleButton: () => void;
   handleSave?: () => void;
@@ -106,6 +110,7 @@ export const CampaignLaunch = ({
   handleStatusButton,
   handleDuplicateButton,
   handleKickoffButton,
+  handleTestSendButton,
   formFetcher,
   scripts,
   startDisabledReason,
@@ -127,6 +132,8 @@ export const CampaignLaunch = ({
 }: CampaignLaunchProps) => {
   const startLabel =
     launchActionLabelOverride ?? launchActionLabel(campaignData.type);
+  const [testSendOpen, setTestSendOpen] = useState(false);
+  const canSendTest = campaignData.type === "message" && Boolean(handleTestSendButton);
 
   const confirmActionLabel =
     confirmStatus === "play"
@@ -393,7 +400,16 @@ export const CampaignLaunch = ({
                 onArchive={() => handleConfirmStatus("archive")}
                 onDuplicate={() => handleDuplicateButton()}
                 onKickoff={() => handleKickoffButton()}
+                onSendTest={canSendTest ? () => setTestSendOpen(true) : undefined}
               />
+              {canSendTest ? (
+                <CampaignTestSendDialog
+                  open={testSendOpen}
+                  busy={isBusy}
+                  onOpenChange={setTestSendOpen}
+                  onSend={(phone) => handleTestSendButton?.(phone)}
+                />
+              ) : null}
               {startDisabledReason ? (
                 <p className="text-sm text-muted-foreground">{startDisabledReason}</p>
               ) : null}
