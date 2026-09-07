@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Added
+
+- Chat: template tags typed in the conversation composer now fill in from the linked contact, or from the single contact matching the number; text with no match is sent as typed, and the composer says so when a contact is linked ([#1650](https://github.com/chester-hill-solutions/callcaster/issues/1650)).
+
 ## 2026-09-07 — release [#1638](https://github.com/chester-hill-solutions/callcaster/pull/1638)
 
 Ninety-three commits on `dev` since the 2026-09-02 release. Manual verification steps for every entry are in [the release test guide](./release-test-guide-2026-09-07.md).

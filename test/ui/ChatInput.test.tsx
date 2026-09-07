@@ -322,4 +322,19 @@ describe("ChatInput segment counter and credit estimate", () => {
     // ...but the credit estimate is the flat MMS rate (4), not 3x per-segment (6).
     expect(screen.getByText("≈ 4 credits")).toBeInTheDocument();
   });
+
+  test("explains template tags only when a contact is linked", () => {
+    const { unmount } = render(
+      <ChatInput
+        {...baseProps({
+          selectedContact: { id: 7, firstname: "Ada", surname: "Lovelace", phone: "+15551234567" } as unknown as Contact,
+        })}
+      />,
+    );
+    expect(screen.getByTestId("chat-template-hint")).toHaveTextContent("{{firstname}}");
+    unmount();
+
+    render(<ChatInput {...baseProps({ selectedContact: null })} />);
+    expect(screen.queryByTestId("chat-template-hint")).toBeNull();
+  });
 });

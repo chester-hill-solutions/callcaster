@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   linkContactToConversation: vi.fn(),
   getEffectivePortalConfig: vi.fn(),
   getWorkspaceCreditsBalance: vi.fn(async () => 100),
+  findMatchingContactIds: vi.fn(async () => [] as number[]),
 }));
 
 const tenantDbMocks = vi.hoisted(() => ({
@@ -47,7 +48,7 @@ vi.mock("@/lib/twilio-lookup.server", () => ({
 }));
 
 vi.mock("@/lib/inbound-sms-context.server", () => ({
-  findMatchingContactIds: vi.fn(async () => [] as number[]),
+  findMatchingContactIds: (...args: unknown[]) => mocks.findMatchingContactIds(...args),
 }));
 
 vi.mock("@/lib/workspace-credits.server", () => ({
@@ -248,5 +249,69 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     expect(mocks.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ from: "", messagingServiceSid: "MG123" }),
     );
+  });
+
+  describe("template tags", () => {
+    beforeEach(() => {
+      // The opt-out and line-type guards look contacts up on the same mocks
+      // before the renderer runs, so use persistent values, not one-shots.
+      mocks.findMatchingContactIds.mockReset().mockResolvedValue([]);
+      tenantDbMocks.contact.findFirst.mockReset().mockResolvedValue(null as never);
+    });
+
+    async function send(body: string, extra: Record<string, string> = {}) {
+      mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" } });
+      const { action } = await import(
+        "../app/routes/workspaces+/$id/chats.action.server"
+      );
+      const formData = new FormData();
+      formData.set("body", body);
+      formData.set("from", "+15550000000");
+      for (const [k, v] of Object.entries(extra)) formData.set(k, v);
+      const res = await asRouteResponse(action(await withWorkspaceRouteArgs({
+        request: new Request("http://x/workspaces/w1/chats/+15555550100", {
+          method: "POST",
+          body: formData,
+        }),
+        params: { id: "w1", contact_number: "+15555550100" },
+      })));
+      expect(res.status).toBe(200);
+      return mocks.sendMessage.mock.calls.at(-1)?.[0] as { body: string };
+    }
+
+    test("renders tags for the linked contact", async () => {
+      tenantDbMocks.contact.findFirst.mockResolvedValue({
+        id: 7,
+        firstname: "Ada",
+        city: "London",
+      } as never);
+      const sent = await send('Hi {{firstname}} from {{city|"nowhere"}}', { contact_id: "7" });
+      expect(sent.body).toBe("Hi Ada from London");
+    });
+
+    test("renders tags against the single contact matching the phone number", async () => {
+      mocks.findMatchingContactIds.mockResolvedValue([9]);
+      tenantDbMocks.contact.findFirst.mockResolvedValue({
+        id: 9,
+        firstname: "",
+        surname: "Lovelace",
+      } as never);
+      const sent = await send('Hi {{firstname|"there"}} {{surname}}');
+      expect(sent.body).toBe("Hi there Lovelace");
+    });
+
+    test("sends the text as typed when no contact matches or the match is ambiguous", async () => {
+      mocks.findMatchingContactIds.mockResolvedValue([1, 2]);
+      const sent = await send("Hi {{firstname}}");
+      expect(sent.body).toBe("Hi {{firstname}}");
+    });
+
+    test("skips the contact lookup entirely when the body has no tags", async () => {
+      const sent = await send("plain text");
+      expect(sent.body).toBe("plain text");
+      // The guards find no match, so the only remaining reason to load a
+      // contact row would be rendering, which must not happen here.
+      expect(tenantDbMocks.contact.findFirst).not.toHaveBeenCalled();
+    });
   });
 });
