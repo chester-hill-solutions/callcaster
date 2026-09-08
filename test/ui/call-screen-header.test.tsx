@@ -278,26 +278,42 @@ describe("app/components/call/CallScreen.Header.tsx", () => {
   });
 
   // Regression for #1338: settings-sheet buttons "all over the place".
-  // The mute button lived in a `flex items-end` div (bottom-aligned inside
-  // a taller sibling column), and the Add-Phone-Number button sat next to
-  // an un-labelled Select in a raw `flex items-center` — both read as
-  // stray buttons floating outside the field grid. Every button in the
-  // audio-devices row must now sit inside a FormField (label above) so
-  // baselines match its neighbouring Select.
-  test("#1338: mute + add-phone buttons align to the field grid (FormField wrappers)", async () => {
+  // Every control now lives inside the field for the device it acts on —
+  // the mute (and test) buttons under the Microphone select, Add Phone
+  // Number on the Calling device row — and the redundant headings that
+  // used to sit above each button ("Microphone control", "Add device",
+  // "Test microphone") are gone.
+  test("#1338: device buttons sit inside their device's field with no duplicate headings", async () => {
     const { CampaignHeader } = await import("@/components/call/CallScreen.Header");
 
-    render(<CampaignHeader {...baseProps({ settingsOnly: true })} />);
+    render(
+      <CampaignHeader
+        {...baseProps({ settingsOnly: true, onToggleMicMonitor: vi.fn() })}
+      />,
+    );
 
-    // The old layout put the mute button directly under a bare div; the
-    // fix wraps it in a FormField whose label doubles as an accessible
-    // header for the control column. The label is the observable proof.
-    expect(screen.getByText("Microphone control")).toBeInTheDocument();
+    expect(screen.queryByText("Microphone control")).toBeNull();
+    expect(screen.queryByText("Add device")).toBeNull();
+    // Exactly one "Test microphone" on the page: the button, not a label.
+    expect(screen.getAllByText(/Test microphone/i)).toHaveLength(1);
 
-    // Same for the calling-device row: Select + Add Phone Number now
-    // share the grid with labels above, no more freeform flex row.
+    const micSelect = screen.getByText("Mic 1").closest("select");
+    const micField = micSelect?.closest("div.space-y-2");
+    expect(micField).not.toBeNull();
+    expect(micField).toContainElement(
+      screen.getByRole("button", { name: /Mute Microphone/i }),
+    );
+    expect(micField).toContainElement(
+      screen.getByRole("button", { name: /Test microphone/i }),
+    );
+
+    const deviceSelect = screen.getByText("Computer Audio").closest("select");
+    const deviceField = deviceSelect?.closest("div.space-y-2");
+    expect(deviceField).not.toBeNull();
+    expect(deviceField).toContainElement(
+      screen.getByRole("button", { name: /Add Phone Number/i }),
+    );
     expect(screen.getByText("Calling device")).toBeInTheDocument();
-    expect(screen.getByText("Add device")).toBeInTheDocument();
   });
 
   // #1339: settings-sheet gets a Test microphone / Test speaker row so
