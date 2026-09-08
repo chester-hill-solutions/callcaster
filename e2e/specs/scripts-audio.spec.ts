@@ -21,13 +21,25 @@ ownerTest.describe("Scripts and audio @authenticated", () => {
     await expect(page.getByLabel("Title").last()).toHaveValue(/^Block \d+$/);
   });
 
-  ownerTest("SCR-04 recorded IVR blocks offer inline audio upload", async ({ page }) => {
+  ownerTest("SCR-04 an IVR step switched to a recording offers the library picker and inline upload", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.ready.id, `scripts/${E2E_IVR_SCRIPT.id}`));
 
-    await page.getByLabel("IVR block type").click();
-    await page.getByRole("option", { name: "Recorded audio" }).click();
+    await page.getByRole("button", { name: "Play a recording" }).first().click();
 
-    await expect(page.getByRole("button", { name: /upload audio/i })).toBeVisible();
+    await expect(page.getByText("Recording step").first()).toBeVisible();
+    await expect(page.getByLabel("Recording").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /upload audio/i }).first()).toBeVisible();
+  });
+
+  ownerTest("SCR-05 IVR scripts add audio steps, not form blocks", async ({ page }) => {
+    await page.goto(workspacePath(E2E_WORKSPACES.ready.id, `scripts/${E2E_IVR_SCRIPT.id}`));
+
+    await expect(page.getByLabel("Add block")).toHaveCount(0);
+    await page.getByRole("button", { name: "Add spoken step" }).click();
+
+    await expect(page.getByLabel("Step name").last()).toHaveValue(/^Step \d+$/);
+    await expect(page.getByLabel("Speech text").last()).toBeVisible();
+    await expect(page.getByLabel("Voice").last()).toBeVisible();
   });
 
   ownerTest("AUD-06 audios list", async ({ page }) => {
