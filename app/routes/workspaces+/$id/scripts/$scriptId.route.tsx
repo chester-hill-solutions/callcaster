@@ -6,6 +6,7 @@ import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { Button } from "@/components/ui/button";
 import { Heading, Text } from "@/components/ui/typography";
 import { useWorkspaceAudioUpload } from "@/hooks/media/useWorkspaceAudioUpload";
+import { workspaceAudioPreviewPath } from "@/lib/ivr-script-editor";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
 import { SaveBar } from "@/components/shared/SaveBar";
@@ -121,6 +122,9 @@ export default function ScriptEditor() {
             script={script}
             onChange={setScript}
             mediaNames={mediaNames}
+            audioPreviewUrl={(fileName) =>
+              workspaceAudioPreviewPath(workspace_id, fileName)
+            }
             onUploadAudio={uploadAudio}
           />
         ) : (

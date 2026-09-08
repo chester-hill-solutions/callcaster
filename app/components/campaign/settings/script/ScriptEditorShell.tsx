@@ -15,8 +15,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  createEditorId,
+  createIvrResponseOption,
+  createIvrStepBlock,
+  nextIvrStepTitle,
+  type IvrPlaybackMode,
+} from "@/lib/ivr-script-editor";
 import { cn } from "@/lib/utils";
-import { ScriptBlockEditor } from "./ScriptBlockEditor";
+import { ScriptBlockEditor, isIvrStepBlock } from "./ScriptBlockEditor";
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   instruction: "Instruction",
@@ -29,7 +36,10 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
 export type ScriptEditorShellProps = {
   document: ScriptDocument;
   onChange: (doc: ScriptDocument) => void;
+  /** Author audio steps for a caller instead of form blocks for an agent. */
+  audioFlow?: boolean;
   mediaNames?: string[];
+  audioPreviewUrl?: (fileName: string) => string;
   onUploadAudio?: (file: File) => Promise<string | null>;
   readOnly?: boolean;
   className?: string;
@@ -38,7 +48,9 @@ export type ScriptEditorShellProps = {
 export function ScriptEditorShell({
   document,
   onChange,
+  audioFlow = false,
   mediaNames = [],
+  audioPreviewUrl,
   onUploadAudio,
   readOnly = false,
   className,
@@ -59,6 +71,41 @@ export function ScriptEditorShell({
   const pageCount = editor.orderedPages.length;
   const isStartPage =
     editor.activePageId === editor.document.startPageId;
+
+  // The hook's addBlock only knows the agent-form palette, and a follow-up
+  // patch in the same tick would read a stale document. Build the audio step
+  // whole and hand the hook the finished document instead.
+  const addIvrStep = (mode: IvrPlaybackMode) => {
+    const page = editor.activePage;
+    if (!page) return;
+    const blockId = createEditorId("block");
+    const block = createIvrStepBlock(
+      mode,
+      blockId,
+      nextIvrStepTitle(editor.document.blocks),
+    );
+    editor.setDocument({
+      ...editor.document,
+      pages: {
+        ...editor.document.pages,
+        [page.id]: { ...page, blockIds: [...page.blockIds, blockId] },
+      },
+      blocks: { ...editor.document.blocks, [blockId]: block },
+    });
+    editor.setActiveBlockId(blockId);
+  };
+
+  // A step migrated from an older editor may have no `options` key at all,
+  // which the hook's addOption treats as "this block takes no options".
+  const addResponse = (blockId: string, block: ScriptBlock) => {
+    if (isIvrStepBlock(block, audioFlow) && !("options" in block)) {
+      editor.updateBlock(blockId, {
+        options: [createIvrResponseOption()],
+      } as Partial<ScriptBlock>);
+      return;
+    }
+    editor.addOption(blockId);
+  };
 
   return (
     <div className={cn("space-y-4", className)}>
@@ -212,7 +259,31 @@ export function ScriptEditorShell({
                   </div>
                 </div>
 
-                {!readOnly && (
+                {!readOnly && audioFlow && (
+                  <div
+                    role="group"
+                    aria-label="Add step"
+                    className="flex flex-wrap gap-2"
+                  >
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => addIvrStep("synthetic")}
+                    >
+                      Add spoken step
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => addIvrStep("recorded")}
+                    >
+                      Add recording step
+                    </Button>
+                  </div>
+                )}
+                {!readOnly && !audioFlow && (
                   <FormField label="Add block" htmlFor={addBlockSelectId}>
                     <Select
                       key={addBlockKey}
@@ -239,7 +310,9 @@ export function ScriptEditorShell({
               <div className="space-y-3">
                 {editor.activePage.blockIds.length === 0 ? (
                   <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
-                    Add a block to this page.
+                    {audioFlow
+                      ? "Add a step to this page. Callers hear steps in order."
+                      : "Add a block to this page."}
                   </p>
                 ) : (
                   editor.activePage.blockIds.map((blockId, index) => {
@@ -262,7 +335,9 @@ export function ScriptEditorShell({
                         <ScriptBlockEditor
                           block={block}
                           readOnly={readOnly}
+                          audioFlow={audioFlow}
                           mediaNames={mediaNames}
+                          audioPreviewUrl={audioPreviewUrl}
                           onUploadAudio={onUploadAudio}
                           routingTargets={editor.routingTargets}
                           onChange={(patch) =>
@@ -276,7 +351,7 @@ export function ScriptEditorShell({
                           onMoveDown={() =>
                             editor.moveBlock(blockId, index + 1)
                           }
-                          onOptionAdd={() => editor.addOption(blockId)}
+                          onOptionAdd={() => addResponse(blockId, block)}
                           onOptionChange={(optionId, patch) =>
                             editor.updateOption(blockId, optionId, patch)
                           }

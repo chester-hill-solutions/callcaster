@@ -11,6 +11,7 @@
 :contactNumber
 :contact_number
 :fileName/edit
+:fileName/preview
 :id
 :number
 :numberId

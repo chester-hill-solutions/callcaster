@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useHasChanges } from "@/hooks/utils/useHasChanges";
 import { useUnsavedChangesGuard } from "@/hooks/utils/useUnsavedChangesGuard";
 import { useWorkspaceAudioUpload } from "@/hooks/media/useWorkspaceAudioUpload";
+import { workspaceAudioPreviewPath } from "@/lib/ivr-script-editor";
 import { SaveBar } from "@/components/shared/SaveBar";
 
 import { MessageSettings } from "@/components/MessageSettings";
@@ -189,7 +190,12 @@ export default function ScriptEditor() {
     });
   };
 
-  const renderCampaignSettingsScript = (scriptMediaNames: string[] = []) => {
+  // Robocall and phone-menu campaigns play whatever script is attached, so the
+  // editor authors audio steps for them even when the script row says "script".
+  const renderCampaignSettingsScript = (
+    scriptMediaNames: string[] = [],
+    audioFlow = false,
+  ) => {
     const script = pageData.campaignDetails.script;
     if (!script) {
       return (
@@ -228,7 +234,11 @@ export default function ScriptEditor() {
               },
             });
           }}
+          audioFlow={audioFlow}
           mediaNames={scriptMediaNames}
+          audioPreviewUrl={(fileName) =>
+            workspaceAudioPreviewPath(workspace_id, fileName)
+          }
           onUploadAudio={uploadAudio}
           readOnly={!isEditingScript}
         />
@@ -268,11 +278,11 @@ export default function ScriptEditor() {
               />
             </div>
           ) : null}
-          {pageData.type === "live_call" && renderCampaignSettingsScript([])}
+          {pageData.type === "live_call" && renderCampaignSettingsScript([], false)}
           {(pageData.type === "robocall" ||
             pageData.type === "simple_ivr" ||
             pageData.type === "complex_ivr") &&
-            renderCampaignSettingsScript(mediaNames)}
+            renderCampaignSettingsScript(mediaNames, true)}
           {pageData.type === "message" && (
             <div id="campaign-setup-content">
               <MessageSettings
