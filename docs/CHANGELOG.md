@@ -7,9 +7,6 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Added
 
 - Automated phone menu and advanced IVR scripts are edited as audio steps. Each step is a spoken step or a recording step and shows exactly what the caller hears: the text and voice to speak, or a library recording you can play back in the editor. Caller responses are keypad presses or any spoken reply, and adding a step no longer creates a silent form block. A step with no audio is flagged before you save ([#1325](https://github.com/chester-hill-solutions/callcaster/issues/1325)).
-- Robocall and phone menu campaigns: the launch page's test control places a **Test call** to one number through the campaign's real flow, so you can hear it and walk the menu. The call carries no outreach attempt, so it stays out of results, exports, and analytics; the voicemail drop still plays on a test call that reaches voicemail ([#1653](https://github.com/chester-hill-solutions/callcaster/issues/1653), slice 2 of [#1645](https://github.com/chester-hill-solutions/callcaster/issues/1645)).
-- Chat: template tags typed in the conversation composer now fill in from the linked contact, or from the single contact matching the number; text with no match is sent as typed, and the composer says so when a contact is linked ([#1650](https://github.com/chester-hill-solutions/callcaster/issues/1650)).
-- Admin: a **Re-authenticate Twilio** button on the workspace Twilio Health panel repairs a subaccount stuck in an authentication failure — it mints a fresh API Key from the subaccount's Auth Token, and refetches that Auth Token from our master Twilio account first if it too has been rejected ([#1655](https://github.com/chester-hill-solutions/callcaster/issues/1655)).
 
 ### Fixed
 
@@ -21,7 +18,19 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Call screen: the coloured header strip on each panel now meets the panel's rounded border cleanly. The strip previously drew its own smaller curve, which left a visible sliver at the corners, most noticeably in dark mode ([#1344](https://github.com/chester-hill-solutions/callcaster/issues/1344)).
 - Primary action buttons (Upload Audio, Next, Create, Sign up, Save) no longer turn light blue with white text on hover. They use the shared primary button style, so the label stays legible in both themes ([#1319](https://github.com/chester-hill-solutions/callcaster/issues/1319)).
 - Number search: the Ajax–Pickering rate centre now reads **Ajax-Pickering, ON** in the number picker and the onboarding wizard. Twilio returns it as "Ajaxpickering" with a single capital, so the earlier CamelCase split never applied; known run-together rate-centre names are now mapped by name ([#1321](https://github.com/chester-hill-solutions/callcaster/issues/1321)).
-- A workspace whose Twilio credentials are actually invalid no longer sees "add credits, then try again" — Twilio's authentication-failure code (20003) now surfaces its own message pointing at re-authenticating the subaccount, instead of being mislabeled as an insufficient-credits error ([#1656](https://github.com/chester-hill-solutions/callcaster/issues/1656)).
+## 2026-09-08 — release [#1661](https://github.com/chester-hill-solutions/callcaster/pull/1661)
+
+Four PRs on `dev` since the 2026-09-07 release.
+
+### Added
+
+- Robocall and phone menu campaigns: the launch page's test control places a **Test call** to one number through the campaign's real flow, so you can hear it and walk the menu. The call carries no outreach attempt, so it stays out of results, exports, and analytics; the voicemail drop still plays on a test call that reaches voicemail ([#1653](https://github.com/chester-hill-solutions/callcaster/issues/1653), slice 2 of [#1645](https://github.com/chester-hill-solutions/callcaster/issues/1645)). PR [#1654](https://github.com/chester-hill-solutions/callcaster/pull/1654).
+- Chat: template tags typed in the conversation composer now fill in from the linked contact, or from the single contact matching the number; text with no match is sent as typed, and the composer says so when a contact is linked ([#1650](https://github.com/chester-hill-solutions/callcaster/issues/1650)). PR [#1651](https://github.com/chester-hill-solutions/callcaster/pull/1651).
+- Admin: a **Re-authenticate Twilio** button on the workspace Twilio Health panel repairs a subaccount stuck in an authentication failure — it mints a fresh API Key from the subaccount's Auth Token, and refetches that Auth Token from our master Twilio account first if it too has been rejected ([#1655](https://github.com/chester-hill-solutions/callcaster/issues/1655)). PR [#1660](https://github.com/chester-hill-solutions/callcaster/pull/1660).
+
+### Fixed
+
+- A workspace whose Twilio credentials are actually invalid no longer sees "add credits, then try again" — Twilio's authentication-failure code (20003) now surfaces its own message pointing at re-authenticating the subaccount, instead of being mislabeled as an insufficient-credits error ([#1656](https://github.com/chester-hill-solutions/callcaster/issues/1656)). PR [#1658](https://github.com/chester-hill-solutions/callcaster/pull/1658).
 
 ## 2026-09-07 — release [#1638](https://github.com/chester-hill-solutions/callcaster/pull/1638)
 
