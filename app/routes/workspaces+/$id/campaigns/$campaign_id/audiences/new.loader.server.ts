@@ -2,6 +2,7 @@ import { workspaceRouteAuth } from "@/lib/workspace-route.server";
 import { data as routeData, redirect } from "react-router";
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { defineLoader } from "@/lib/handler.server";
+import { requirePositiveIntegerParam } from "@/lib/route-params";
 
 export const loader = defineLoader({
   auth: workspaceRouteAuth,
@@ -21,7 +22,10 @@ export const loader = defineLoader({
       );
     }
 
-    const campaignData = await findCampaignInWorkspace(workspaceId, parseInt(campaignId, 10));
+    const campaignData = await findCampaignInWorkspace(
+      workspaceId,
+      requirePositiveIntegerParam(campaignId, headers),
+    );
 
     if (!campaignData) {
       return routeData({ campaign: null, error: "Campaign not found" }, { headers, status: 404 });

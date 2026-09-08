@@ -14,6 +14,7 @@ import {
 import { redirect } from "react-router";
 import { MemberRole } from "@/lib/member-role";
 import { defineLoader } from "@/lib/handler.server";
+import { requirePositiveIntegerParam } from "@/lib/route-params";
 import { getCallCoachingHydration } from "@/lib/call-coaching-hydration.server";
 import { liveMediaCapabilities } from "@/lib/live-media-capabilities";
 
@@ -24,6 +25,7 @@ export const loader = defineLoader({
     const { campaign_id: id } = params;
     const { user, workspaceId, userRole } = auth;
     if (!user || !workspaceId || !id) throw redirect("/signin");
+    requirePositiveIntegerParam(id, auth.headers);
 
     const [verifiedNumbers, callScreenData] = await Promise.all([
       getVerifiedNumbers(user.id),

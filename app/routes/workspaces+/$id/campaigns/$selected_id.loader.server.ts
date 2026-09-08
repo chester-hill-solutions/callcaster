@@ -18,6 +18,7 @@ import { getCampaignReadiness, resolveReadinessQueueCount } from "@/lib/campaign
 import { findCampaignInWorkspace } from "@/lib/campaign-ivr.server";
 import { MemberRole } from "@/lib/member-role";
 import { defineLoader } from "@/lib/handler.server";
+import { requirePositiveIntegerParam } from "@/lib/route-params";
 
 export const loader = defineLoader({
   auth: ({ params, context }) => {
@@ -25,6 +26,7 @@ export const loader = defineLoader({
     if (!workspace_id || !selected_id) {
       return redirect(`/workspaces/${workspace_id}/campaigns`);
     }
+    requirePositiveIntegerParam(selected_id);
     return { ...getWorkspaceRouteContext(context), workspace_id, selected_id };
   },
   sideEffects: ["db-read"],

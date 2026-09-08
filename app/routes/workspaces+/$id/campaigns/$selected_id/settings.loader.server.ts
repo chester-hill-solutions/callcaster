@@ -25,6 +25,7 @@ import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
 import { defineLoader } from "@/lib/handler.server";
+import { requirePositiveIntegerParam } from "@/lib/route-params";
 
 export const loader = defineLoader({
   auth: workspaceRouteAuth,
@@ -34,6 +35,7 @@ export const loader = defineLoader({
   const { user } = auth;
 
   if (!selected_id || !workspace_id) return redirect("/");
+  requirePositiveIntegerParam(selected_id, auth.headers);
 
   const tdb = createTenantDb(workspace_id);
 
