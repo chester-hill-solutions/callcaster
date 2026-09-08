@@ -160,6 +160,8 @@ export async function findWorkspaceNumberVoicemailContextByPhone(phoneNumber: st
       workspaceId: workspaceNumberTable.workspace,
       workspaceName: workspaceTable.name,
       workspaceTwilioData: workspaceTable.twilio_data,
+      workspaceKey: workspaceTable.key,
+      workspaceToken: workspaceTable.token,
     })
     .from(workspaceNumberTable)
     .innerJoin(
@@ -185,6 +187,8 @@ export async function findWorkspaceNumberVoicemailContextByPhone(phoneNumber: st
       id: row.workspaceId,
       name: row.workspaceName,
       twilio_data: row.workspaceTwilioData,
+      key: row.workspaceKey,
+      token: row.workspaceToken,
       webhook: webhooks,
     },
   };

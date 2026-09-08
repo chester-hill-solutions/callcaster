@@ -1,7 +1,7 @@
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
+import { resolveTwilioRestBasicAuth } from "@/lib/twilio-workspace-credentials";
 import { Resend } from "resend";
 import { sendWebhookNotification } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
@@ -139,8 +139,14 @@ export const action = defineAction({
         });
       }
 
-      const vmTwilioCreds = readTwilioWorkspaceCredentials(number.workspace.twilio_data);
-      if (!vmTwilioCreds) {
+      // API Key first, Auth Token fallback (ADR-0011). Fetching the media
+      // with only the subaccount Auth Token meant a token that had gone
+      // stale in twilio_data — the failure mode behind the workspace-wide
+      // authentication errors in #1655 — silently killed every voicemail
+      // email for that workspace while live calls, which auth with the
+      // API Key, kept working (#1224).
+      const restAuth = resolveTwilioRestBasicAuth(number.workspace);
+      if (!restAuth) {
         throw new Error("Workspace twilio data not found");
       }
 
@@ -158,13 +164,15 @@ export const action = defineAction({
         `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Recordings/${recordingSid}.mp3`,
         {
           headers: {
-            Authorization: `Basic ${Buffer.from(`${vmTwilioCreds.sid}:${vmTwilioCreds.authToken}`).toString("base64")}`,
+            Authorization: `Basic ${Buffer.from(`${restAuth.username}:${restAuth.password}`).toString("base64")}`,
           },
         },
       );
 
       if (!recordingResponse.ok) {
-        throw new Error(`Failed to fetch recording: ${recordingResponse.statusText}`);
+        throw new Error(
+          `Failed to fetch recording (${recordingResponse.status} ${recordingResponse.statusText}) with ${restAuth.source} credentials for workspace ${number.workspace.id}`,
+        );
       }
 
       const recording = await recordingResponse.blob();

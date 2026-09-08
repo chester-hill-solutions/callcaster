@@ -36,3 +36,33 @@ export function readTwilioWorkspaceCredentials(
   if (!sid || !authToken) return null;
   return { sid, authToken };
 }
+
+export type TwilioRestBasicAuth = {
+  username: string;
+  password: string;
+  source: "api-key" | "auth-token";
+};
+
+/**
+ * Credentials for a direct HTTPS call to api.twilio.com (recording media,
+ * anything the SDK client does not wrap). ADR-0011: REST traffic uses the
+ * workspace API Key (`workspace.key` / `workspace.token`) when one exists,
+ * the same pair `createWorkspaceTwilioInstance` hands the SDK, so a
+ * subaccount Auth Token that has gone stale in `twilio_data` does not take
+ * these calls down with it. The Auth Token remains the fallback for
+ * workspaces provisioned before API Keys.
+ */
+export function resolveTwilioRestBasicAuth(workspace: {
+  key?: unknown;
+  token?: unknown;
+  twilio_data: unknown;
+}): TwilioRestBasicAuth | null {
+  const apiKey = typeof workspace.key === "string" ? workspace.key.trim() : "";
+  const apiSecret = typeof workspace.token === "string" ? workspace.token.trim() : "";
+  if (apiKey && apiSecret) {
+    return { username: apiKey, password: apiSecret, source: "api-key" };
+  }
+  const creds = readTwilioWorkspaceCredentials(workspace.twilio_data);
+  if (!creds) return null;
+  return { username: creds.sid, password: creds.authToken, source: "auth-token" };
+}
