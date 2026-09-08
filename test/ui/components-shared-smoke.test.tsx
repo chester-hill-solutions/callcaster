@@ -149,6 +149,33 @@ describe("app/components/shared/QueryParamBanner.tsx", () => {
 });
 
 describe("app/components/shared/RouteErrorBoundary.tsx", () => {
+  test("renders Page not found with a Go back action for a thrown 404 (#1397)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { RouteErrorBoundary } = await import(
+      "@/components/shared/RouteErrorBoundary"
+    );
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/",
+          loader: () => {
+            throw new Response(null, { status: 404, statusText: "Not Found" });
+          },
+          element: <div>never</div>,
+          errorElement: <RouteErrorBoundary />,
+        },
+      ],
+      { initialEntries: ["/"] },
+    );
+    render(<RouterProvider router={router} />);
+    expect(await screen.findByText("Page not found")).toBeInTheDocument();
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+    expect(screen.queryByText("404 Not Found")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Go back" }));
+    expect(back).toHaveBeenCalledTimes(1);
+  });
+
   test("shows the message from a legit user-facing Error", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { RouteErrorBoundary } = await import(
@@ -216,9 +243,9 @@ describe("app/components/shared/RouteErrorBoundary.tsx", () => {
         {
           path: "/",
           loader: () => {
-            throw new Response("missing", {
-              status: 404,
-              statusText: "Not Found",
+            throw new Response("denied", {
+              status: 403,
+              statusText: "Forbidden",
             });
           },
           element: <div>never shown</div>,
@@ -228,7 +255,7 @@ describe("app/components/shared/RouteErrorBoundary.tsx", () => {
       { initialEntries: ["/"] },
     );
     render(<RouterProvider router={router} />);
-    expect(await screen.findByText("404 Not Found")).toBeInTheDocument();
+    expect(await screen.findByText("403 Forbidden")).toBeInTheDocument();
   });
 });
 

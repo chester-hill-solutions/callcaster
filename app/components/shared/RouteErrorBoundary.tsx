@@ -9,6 +9,28 @@ const FALLBACK_MESSAGE =
 /** Route-module ErrorBoundary compatible with React Router 7 typegen. */
 export function RouteErrorBoundary() {
   const error = useRouteError();
+
+  if (isRouteErrorResponse(error) && error.status === 404) {
+    return (
+      <div className="min-h-[12rem] flex items-center justify-center p-6">
+        <div className="max-w-md w-full text-center">
+          <h3 className="text-lg font-medium text-foreground">Page not found</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The page you're looking for doesn't exist or may have moved.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => window.history.back()}
+            className="mt-4"
+          >
+            Go back
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const message = isRouteErrorResponse(error)
     ? `${error.status} ${error.statusText}`
     : toUserMessage(error, FALLBACK_MESSAGE);

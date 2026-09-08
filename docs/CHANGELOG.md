@@ -13,6 +13,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- A mistyped or stale link under a workspace now shows **Page not found** inside the workspace, with the sidebar and your theme intact, instead of a bare light-mode page. The full-page error document also keeps dark mode after it loads; it previously lost the theme class during hydration ([#1397](https://github.com/chester-hill-solutions/callcaster/issues/1397)).
 - Call screen: the coloured header strip on each panel now meets the panel's rounded border cleanly. The strip previously drew its own smaller curve, which left a visible sliver at the corners, most noticeably in dark mode ([#1344](https://github.com/chester-hill-solutions/callcaster/issues/1344)).
 - Primary action buttons (Upload Audio, Next, Create, Sign up, Save) no longer turn light blue with white text on hover. They use the shared primary button style, so the label stays legible in both themes ([#1319](https://github.com/chester-hill-solutions/callcaster/issues/1319)).
 - Number search: the Ajax–Pickering rate centre now reads **Ajax-Pickering, ON** in the number picker and the onboarding wizard. Twilio returns it as "Ajaxpickering" with a single capital, so the earlier CamelCase split never applied; known run-together rate-centre names are now mapped by name ([#1321](https://github.com/chester-hill-solutions/callcaster/issues/1321)).
