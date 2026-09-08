@@ -93,7 +93,7 @@ describe("ScriptBlockEditor audio upload (#1346)", () => {
     // The non-recorded types get an inline hint about the side effect of
     // uploading — the previous UX silently changed the block behavior.
     expect(
-      screen.getByText("Uploading switches this block to Recorded audio."),
+      screen.getByText("Uploading switches this step to a recording."),
     ).toBeInTheDocument();
   });
 

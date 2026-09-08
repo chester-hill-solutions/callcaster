@@ -27,6 +27,16 @@ export class AudioUploadError extends Error {
   }
 }
 
+/**
+ * A route param arrives URL-decoded, so `%2F` and `%2E%2E` become real path
+ * separators. These are concatenated into an object key, and while S3 treats
+ * keys as opaque strings today, that is a property of the store rather than a
+ * check we perform — so reject the traversal characters outright.
+ */
+export function isSafeObjectName(name: string): boolean {
+  return !name.includes("/") && !name.includes("\\") && !name.includes("..");
+}
+
 export function getAudioUploadAcceptValue() {
   return [
     ".aac",

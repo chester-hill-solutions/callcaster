@@ -2,7 +2,7 @@
   "_comment": "Ratchet baseline for check:lint-ratchet — per-rule warning counts from the scoped eslint run. Growth fails CI; rewrite with npm run tools:lint-ratchet:baseline.",
   "counts": {
     "max-lines-per-function": 59,
-    "complexity": 86,
+    "complexity": 85,
     "@typescript-eslint/no-non-null-assertion": 125,
     "max-params": 9,
     "max-depth": 21,
