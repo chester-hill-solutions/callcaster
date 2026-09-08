@@ -52,10 +52,15 @@ vi.mock("@/lib/object-storage.server", () => ({
   uploadObject: (...args: any[]) => objectStorageMocks.uploadObject(...args),
   createSignedObjectUrl: (...args: any[]) => objectStorageMocks.createSignedObjectUrl(...args),
 }));
-vi.mock("@/lib/twilio-workspace-credentials", () => ({
-  readTwilioWorkspaceCredentials: (...args: any[]) =>
-    credentialsMocks.readTwilioWorkspaceCredentials(...args),
-}));
+vi.mock("@/lib/twilio-workspace-credentials", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/twilio-workspace-credentials")>();
+  return {
+    ...actual,
+    readTwilioWorkspaceCredentials: (...args: any[]) =>
+      credentialsMocks.readTwilioWorkspaceCredentials(...args),
+  };
+});
 vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: vi.fn(async () => (null)),
 }));
@@ -200,6 +205,99 @@ describe("app/routes/api+/email-vm/route.tsx", () => {
         payload: expect.objectContaining({ duration: "12" }),
       }),
     );
+  });
+
+  function basicAuth(username: string, password: string) {
+    return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  }
+
+  test("fetches the recording with the workspace API Key when one exists (#1224, ADR-0011)", async () => {
+    setupEmailVmMocks({
+      workspace: {
+        id: "w1",
+        name: "W",
+        twilio_data: { sid: "tsid", authToken: "stale-token" },
+        key: "SKkey",
+        token: "secret",
+        webhook: [],
+      },
+    });
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
+    } as any);
+    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({
+        RecordingUrl: "https://tw/rec",
+        CallSid: "CA1",
+        AccountSid: "AC1",
+        RecordingSid: "RE1",
+      }),
+      params: {},
+    } as any));
+    expect(res.status).toBe(200);
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      "https://api.twilio.com/2010-04-01/Accounts/AC1/Recordings/RE1.mp3",
+      { headers: { Authorization: basicAuth("SKkey", "secret") } },
+    );
+    expect(mocks.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  test("falls back to the subaccount Auth Token when the workspace has no API Key", async () => {
+    mocks.fetch.mockResolvedValueOnce({
+      ok: true,
+      statusText: "OK",
+      blob: async () => new Blob(["abc"], { type: "audio/mpeg" }),
+    } as any);
+    mocks.sendEmail.mockResolvedValueOnce({ id: "em1" });
+
+    const mod = await import("../app/routes/api+/email-vm");
+    await asRouteResponse(mod.action({
+      request: makeReq({
+        RecordingUrl: "https://tw/rec",
+        CallSid: "CA1",
+        AccountSid: "AC1",
+        RecordingSid: "RE1",
+      }),
+      params: {},
+    } as any));
+    expect(mocks.fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      { headers: { Authorization: basicAuth("tsid", "ttok") } },
+    );
+  });
+
+  test("a rejected recording fetch is a retryable 500 and the log names the status and credential source (#1224)", async () => {
+    mocks.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+    } as any);
+
+    const mod = await import("../app/routes/api+/email-vm");
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({
+        RecordingUrl: "https://tw/rec",
+        CallSid: "CA1",
+        AccountSid: "AC1",
+        RecordingSid: "RE1",
+      }),
+      params: {},
+    } as any));
+    expect(res.status).toBe(500);
+    expect(mocks.sendEmail).not.toHaveBeenCalled();
+    // Not stamped as processed: Twilio's retry must reach the fetch again.
+    expect(telephonyDbMocks.updateCallRecordingUrlBySid).not.toHaveBeenCalled();
+    const logged = mocks.logger.error.mock.calls.find(
+      ([msg]) => msg === "Error processing voicemail:",
+    );
+    expect(logged?.[1]).toBeInstanceOf(Error);
+    expect((logged?.[1] as Error).message).toMatch(/401 Unauthorized/);
+    expect((logged?.[1] as Error).message).toMatch(/auth-token credentials/);
   });
 
   test("success path with no matching webhook does not call sendWebhookNotification", async () => {
