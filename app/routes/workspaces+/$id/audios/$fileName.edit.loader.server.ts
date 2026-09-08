@@ -1,5 +1,6 @@
 import { data as routeData } from "react-router";
 
+import { isSafeObjectName } from "@/lib/audio-upload";
 import { findAudioUsage } from "@/lib/database/audio-usage.server";
 import { getAudioMetadata } from "@/lib/database/workspace-audio-metadata.server";
 import { defineLoader } from "@/lib/handler.server";
@@ -7,16 +8,6 @@ import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { workspaceLoaderAuth } from "@/lib/workspace-route.server";
 
 const SIGNED_URL_TTL_SECONDS = 3600;
-
-/**
- * A route param arrives URL-decoded, so `%2F` and `%2E%2E` become real path
- * separators. These are concatenated into an object key, and while S3 treats
- * keys as opaque strings today, that is a property of the store rather than a
- * check we perform — so reject the traversal characters outright.
- */
-function isSafeObjectName(name: string): boolean {
-  return !name.includes("/") && !name.includes("\\") && !name.includes("..");
-}
 
 export const loader = defineLoader({
   auth: workspaceLoaderAuth,

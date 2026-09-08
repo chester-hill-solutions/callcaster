@@ -169,7 +169,7 @@ export default function CampaignsNew() {
           <div className="flex flex-col gap-2">
             <Button
               size="lg"
-              className="w-full bg-brand-primary font-Zilla-Slab text-white hover:bg-brand-secondary"
+              className="w-full font-Zilla-Slab"
               type="submit"
             >
               Create campaign

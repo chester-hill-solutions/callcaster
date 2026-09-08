@@ -17,6 +17,7 @@ import {
   type ScriptEditLoaderData,
 } from "./edit.types";
 import { defineLoader } from "@/lib/handler.server";
+import { requirePositiveIntegerParam } from "@/lib/route-params";
 
 type LoaderData = ScriptEditLoaderData;
 
@@ -27,6 +28,7 @@ export const loader = defineLoader({
     if (!workspace_id || !selected_id) {
       throw new Response("Missing required parameters", { status: 400 });
     }
+    requirePositiveIntegerParam(selected_id);
 
     return { ...getWorkspaceRouteContext(context), workspace_id, selected_id };
   },

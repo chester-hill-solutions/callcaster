@@ -73,7 +73,6 @@ export default function Media() {
             <Button
               type="submit"
               disabled={state !== "idle"}
-              className="bg-brand-primary text-white hover:bg-brand-secondary"
             >
               Upload Audio
             </Button>

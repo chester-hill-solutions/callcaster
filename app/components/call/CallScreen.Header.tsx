@@ -7,27 +7,9 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { FormField } from "@/components/ui/form-field";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { DeviceSettingsPanel } from "@/components/call/CallScreen.DeviceSettings";
 import { cn } from "@/lib/utils";
-import { AUDIO_DEVICE_UNAVAILABLE_VALUE } from "@/hooks/call/audio-device-selection";
-import {
-  Mic,
-  MicOff,
-  PhoneOff,
-  AlertTriangle,
-  Headphones,
-  Phone,
-  Monitor,
-  Plus,
-  MoreHorizontal,
-} from "lucide-react";
+import { PhoneOff, AlertTriangle, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -91,121 +73,6 @@ const creditLabel: Record<CampaignHeaderProps["creditState"], string> = {
   BAD: "Critical",
 };
 
-const deviceSelectClass =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
-
-/**
- * #1339 test-mic / test-speaker row for the settings sheet. Own component
- * so its state-driven ternaries stay out of CampaignHeader's cyclomatic
- * budget (lint-ratchet caps that at 20). Rendered inline right under the
- * audio-device selects so the settings sheet reads as one grouped audio
- * block.
- */
-function AudioDeviceTestRow({
-  onTestSpeaker,
-  onToggleMicMonitor,
-  micLevel = 0,
-  isMicMonitoring = false,
-  isSpeakerPlaying = false,
-  audioTestError = null,
-}: {
-  onTestSpeaker?: () => void;
-  onToggleMicMonitor?: () => void;
-  micLevel?: number;
-  isMicMonitoring?: boolean;
-  isSpeakerPlaying?: boolean;
-  audioTestError?: string | null;
-}) {
-  const hasAnyTest = Boolean(onTestSpeaker || onToggleMicMonitor);
-  if (!hasAnyTest && !audioTestError) return null;
-
-  const micDescription = isMicMonitoring
-    ? "Speak — the meter reflects your input level."
-    : "Click to sample your mic for a few seconds.";
-  const micButtonLabel = isMicMonitoring ? "Stop test" : "Test microphone";
-  const micButtonVariant = isMicMonitoring ? "destructive" : "outline";
-  const meterPercent = Math.min(100, Math.round(micLevel * 100));
-
-  const speakerDescription = isSpeakerPlaying
-    ? "Playing a short tone through the selected speaker."
-    : "Plays a short tone so you can confirm your speaker.";
-  const speakerButtonLabel = isSpeakerPlaying ? "Playing tone…" : "Test speaker";
-
-  return (
-    <>
-      {hasAnyTest ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {onToggleMicMonitor ? (
-            <FormField label="Test microphone" description={micDescription}>
-              <div className="space-y-2">
-                <Button
-                  type="button"
-                  variant={micButtonVariant}
-                  onClick={onToggleMicMonitor}
-                  className="flex w-full items-center justify-center gap-2"
-                  aria-pressed={isMicMonitoring}
-                >
-                  <Mic size={16} />
-                  {micButtonLabel}
-                </Button>
-                {isMicMonitoring ? (
-                  <div
-                    className="h-2 w-full overflow-hidden rounded-full bg-muted"
-                    role="meter"
-                    aria-label="Microphone input level"
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={meterPercent}
-                  >
-                    <div
-                      data-testid="mic-level-fill"
-                      className="h-full rounded-full bg-success transition-[width] duration-75"
-                      style={{ width: `${meterPercent}%` }}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            </FormField>
-          ) : (
-            <div />
-          )}
-
-          {onTestSpeaker ? (
-            <FormField label="Test speaker" description={speakerDescription}>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onTestSpeaker}
-                disabled={isSpeakerPlaying}
-                className="flex w-full items-center justify-center gap-2"
-              >
-                <Headphones size={16} />
-                {speakerButtonLabel}
-              </Button>
-            </FormField>
-          ) : (
-            <div />
-          )}
-
-          {/* Third column intentionally empty to align with the mute
-              button on the row above (3-col grid). */}
-          <div />
-        </div>
-      ) : null}
-
-      {audioTestError ? (
-        <p
-          role="alert"
-          className="text-sm text-destructive-text"
-          data-testid="audio-test-error"
-        >
-          {audioTestError}
-        </p>
-      ) : null}
-    </>
-  );
-}
-
 export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   className,
   settingsOnly = false,
@@ -244,9 +111,6 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
   isSpeakerPlaying = false,
   audioTestError = null,
 }) => {
-  const microphoneSelectId = "campaign-microphone-select";
-  const speakerSelectId = "campaign-speaker-select";
-
   return (
     <div className={cn("flex w-full flex-col gap-4 p-4", className)}>
       {!settingsOnly ? (
@@ -311,229 +175,34 @@ export const CampaignHeader: React.FC<CampaignHeaderProps> = ({
           >
             Audio & phone settings
           </AccordionTrigger>
-          <AccordionContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <FormField
-                htmlFor={microphoneSelectId}
-                label={
-                  <span className="flex items-center gap-2">
-                    <Mic size={16} /> Microphone
-                  </span>
-                }
-              >
-                <Select
-                  value={selectedMicrophone ?? AUDIO_DEVICE_UNAVAILABLE_VALUE}
-                  onValueChange={(value) =>
-                    handleMicrophoneChange({
-                      target: { value },
-                    } as React.ChangeEvent<HTMLSelectElement>)
-                  }
-                >
-                  <SelectTrigger
-                    id={microphoneSelectId}
-                    className={deviceSelectClass}
-                  >
-                    <SelectValue placeholder="Select microphone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableMicrophones.map((microphone) => (
-                      <SelectItem
-                        key={microphone.deviceId}
-                        value={microphone.deviceId}
-                      >
-                        {microphone.label}
-                      </SelectItem>
-                    ))}
-                    {availableMicrophones.length === 0 ? (
-                      <SelectItem
-                        value={AUDIO_DEVICE_UNAVAILABLE_VALUE}
-                        disabled
-                      >
-                        Microphone unavailable
-                      </SelectItem>
-                    ) : null}
-                  </SelectContent>
-                </Select>
-              </FormField>
-
-              <FormField
-                htmlFor={speakerSelectId}
-                label={
-                  <span className="flex items-center gap-2">
-                    <Headphones size={16} /> Speaker
-                  </span>
-                }
-              >
-                <Select
-                  value={selectedSpeaker ?? AUDIO_DEVICE_UNAVAILABLE_VALUE}
-                  onValueChange={(value) =>
-                    handleSpeakerChange({
-                      target: { value },
-                    } as React.ChangeEvent<HTMLSelectElement>)
-                  }
-                >
-                  <SelectTrigger
-                    id={speakerSelectId}
-                    className={deviceSelectClass}
-                  >
-                    <SelectValue placeholder="Select speaker" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableSpeakers.map((speaker) => (
-                      <SelectItem
-                        key={speaker.deviceId}
-                        value={speaker.deviceId}
-                      >
-                        {speaker.label}
-                      </SelectItem>
-                    ))}
-                    {availableSpeakers.length === 0 ? (
-                      <SelectItem
-                        value={AUDIO_DEVICE_UNAVAILABLE_VALUE}
-                        disabled
-                      >
-                        Speaker unavailable
-                      </SelectItem>
-                    ) : null}
-                  </SelectContent>
-                </Select>
-              </FormField>
-
-              {/*
-                #1338: wrap the mute button in a FormField with a matching
-                label so its baseline aligns with the Microphone/Speaker
-                selects. Previously `flex items-end` bottom-aligned the
-                button inside a taller sibling column, which read as a
-                stray button floating below the row on the settings sheet.
-              */}
-              <FormField label="Microphone control">
-                <Button
-                  onClick={handleMuteMicrophone}
-                  variant={isMicrophoneMuted ? "destructive" : "outline"}
-                  className="flex w-full items-center justify-center gap-2"
-                >
-                  {isMicrophoneMuted ? <MicOff size={16} /> : <Mic size={16} />}
-                  {isMicrophoneMuted ? "Unmute Microphone" : "Mute Microphone"}
-                </Button>
-              </FormField>
-            </div>
-
-            <AudioDeviceTestRow
-              onTestSpeaker={onTestSpeaker}
+          <AccordionContent>
+            <DeviceSettingsPanel
+              availableMicrophones={availableMicrophones}
+              selectedMicrophone={selectedMicrophone}
+              handleMicrophoneChange={handleMicrophoneChange}
+              handleMuteMicrophone={handleMuteMicrophone}
+              isMicrophoneMuted={isMicrophoneMuted}
               onToggleMicMonitor={onToggleMicMonitor}
               micLevel={micLevel}
               isMicMonitoring={isMicMonitoring}
+              availableSpeakers={availableSpeakers}
+              selectedSpeaker={selectedSpeaker}
+              handleSpeakerChange={handleSpeakerChange}
+              onTestSpeaker={onTestSpeaker}
               isSpeakerPlaying={isSpeakerPlaying}
               audioTestError={audioTestError}
+              phoneStatus={phoneStatus}
+              selectedDevice={selectedDevice}
+              onDeviceSelect={onDeviceSelect}
+              verifiedNumbers={verifiedNumbers}
+              isAddingNumber={isAddingNumber}
+              onAddNumberClick={onAddNumberClick}
+              onAddNumberCancel={onAddNumberCancel}
+              newPhoneNumber={newPhoneNumber}
+              onNewPhoneNumberChange={onNewPhoneNumberChange}
+              onVerifyNewNumber={onVerifyNewNumber}
+              verificationPhoneNumber={verificationPhoneNumber}
             />
-
-            {/*
-              #1338: give the calling-device row proper FormField wrappers
-              so the Select trigger and the Add Phone Number button share
-              a baseline (both anchored to a label above), replacing the
-              old freeform `flex items-center` that left the button
-              vertically off-centered from the Select.
-            */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              <FormField
-                label={
-                  <span className="flex items-center gap-2">
-                    <Phone size={16} /> Calling device
-                  </span>
-                }
-                description={
-                  phoneStatus === "connecting" ? "Connecting..." : undefined
-                }
-                className="md:col-span-2"
-              >
-                <div className="relative">
-                  <Select
-                    value={selectedDevice}
-                    onValueChange={onDeviceSelect}
-                  >
-                    <SelectTrigger
-                      className={cn(deviceSelectClass, "w-full cursor-pointer pr-8")}
-                    >
-                      <SelectValue placeholder="Select device" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="computer">Computer Audio</SelectItem>
-                      {verifiedNumbers.map((number) => (
-                        <SelectItem key={number} value={number}>
-                          {number}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2">
-                    {selectedDevice === "computer" ? (
-                      <Monitor size={16} />
-                    ) : (
-                      <Phone size={16} />
-                    )}
-                  </div>
-                </div>
-              </FormField>
-
-              {!isAddingNumber && !verificationPhoneNumber ? (
-                <FormField label="Add device">
-                  <Button
-                    variant="outline"
-                    onClick={onAddNumberClick}
-                    className="flex w-full items-center justify-center gap-2"
-                  >
-                    <Plus size={16} />
-                    Add Phone Number
-                  </Button>
-                </FormField>
-              ) : null}
-            </div>
-
-            {isAddingNumber ? (
-              <div
-                className="mt-4 space-y-3 rounded-md border border-border bg-muted/30 p-4"
-                data-testid="add-phone-inline"
-              >
-                <div>
-                  <p className="text-sm font-medium">Add Phone Number</p>
-                  <p className="text-sm text-muted-foreground">
-                    Enter your phone number to verify it for making calls.
-                  </p>
-                </div>
-                <input
-                  type="tel"
-                  value={newPhoneNumber}
-                  onChange={(e) => onNewPhoneNumberChange(e.target.value)}
-                  placeholder="+1234567890"
-                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-foreground"
-                />
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" onClick={onVerifyNewNumber}>
-                    Verify Number
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={onAddNumberCancel}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            {verificationPhoneNumber ? (
-              <div
-                className="mt-4 space-y-2 rounded-md border border-border bg-muted/30 p-4"
-                data-testid="verify-phone-inline"
-              >
-                <p className="text-sm font-medium">Verify by calling in</p>
-                <p className="text-sm text-muted-foreground">
-                  Call {verificationPhoneNumber} from {newPhoneNumber} within 10
-                  minutes. Your number will be verified when the call connects.
-                </p>
-              </div>
-            ) : null}
           </AccordionContent>
         </AccordionItem>
       </Accordion>

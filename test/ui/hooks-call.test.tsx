@@ -284,6 +284,47 @@ describe("call hooks", () => {
     act(() => noDevice.result.current.answer());
   });
 
+  // #1292: the SDK can drop the agent leg without the disconnect listener
+  // firing, leaving callState "connected" with no activeCall. Hang Up then
+  // had nothing to disconnect and only logged — the button never left.
+  test("useCallHandling hangUp converges a stale connected state when no call is left", async () => {
+    const { useCallHandling } = await import("@/hooks/call/useCallHandling");
+    const onError = vi.fn();
+    const onDeviceBusyChange = vi.fn();
+
+    const { result } = renderHook(() =>
+      useCallHandling({
+        device: mockTwilioDevice as any,
+        workspaceId: "ws",
+        incomingCall: null,
+        onError,
+        onDeviceBusyChange,
+      }),
+    );
+
+    const active = createMockTwilioCall({ parameters: { CallSid: "CA-stale" } });
+    act(() => result.current.setActiveCall(active));
+    act(() => active.emit("accept"));
+    expect(result.current.callState).toBe("connected");
+
+    // Simulate the leg vanishing underneath the hook.
+    act(() => result.current.setActiveCall(null));
+    expect(result.current.callState).toBe("connected");
+
+    await act(async () => {
+      await result.current.hangUp();
+    });
+    expect(result.current.callState).toBe("completed");
+    expect(onDeviceBusyChange).toHaveBeenLastCalledWith(false);
+    expect(onError).not.toHaveBeenCalled();
+
+    // Idle with nothing to hang up is still reported as before.
+    await act(async () => {
+      await result.current.hangUp();
+    });
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
+
   test("mic mute does not set hold; resume respects mic state", async () => {
     const { useCallHandling } = await import("@/hooks/call/useCallHandling");
     const active = createMockTwilioCall({ parameters: { CallSid: "CA-mic-hold" } });

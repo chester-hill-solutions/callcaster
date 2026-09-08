@@ -4,6 +4,25 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-09-08 — release [#1684](https://github.com/chester-hill-solutions/callcaster/pull/1684)
+
+Nine PRs on `dev` since the earlier 2026-09-08 release ([#1661](https://github.com/chester-hill-solutions/callcaster/pull/1661)): the 2026-09-08 retest batch from #1319/#1321/#1397/#1344/#1224/#1338/#1292 plus #1682 and the IVR audio-step editor.
+
+### Added
+
+- Automated phone menu and advanced IVR scripts are edited as audio steps. Each step is a spoken step or a recording step and shows exactly what the caller hears: the text and voice to speak, or a library recording you can play back in the editor. Caller responses are keypad presses or any spoken reply, and adding a step no longer creates a silent form block. A step with no audio is flagged before you save ([#1325](https://github.com/chester-hill-solutions/callcaster/issues/1325)). PR [#1672](https://github.com/chester-hill-solutions/callcaster/pull/1672).
+
+### Fixed
+
+- A campaign URL with a malformed id (for example `/campaigns/blah`) now shows **Page not found** inside the workspace instead of "Something went wrong · Unexpected Server Error". The campaign, queue, settings, script editor, call screen and audience-upload loaders reject a non-numeric id before querying ([#1682](https://github.com/chester-hill-solutions/callcaster/issues/1682)). PR [#1683](https://github.com/chester-hill-solutions/callcaster/pull/1683).
+- Voicemail notification emails: the recording is now fetched from Twilio with the workspace's API Key, the same credentials live calls use, falling back to the subaccount Auth Token only when no key exists. A workspace whose stored Auth Token had gone stale lost every voicemail email while its calls kept working; the failure is also logged with the HTTP status and which credentials were used ([#1224](https://github.com/chester-hill-solutions/callcaster/issues/1224)). PR [#1681](https://github.com/chester-hill-solutions/callcaster/pull/1681).
+- Call settings sheet: controls are grouped under the device they belong to (test and mute under Microphone, test under Speaker, Add Phone Number beside Calling device) and no longer overflow the sheet at either edge. The duplicate headings above each button are gone ([#1338](https://github.com/chester-hill-solutions/callcaster/issues/1338)). PR [#1680](https://github.com/chester-hill-solutions/callcaster/pull/1680).
+- Call screen: when the contact hangs up first, the agent's own leg is dropped as soon as the status reads Call Completed, so the Dial button returns instead of a Hang Up button that only cycles its confirmation. Hang Up with no live call now clears the stale in-call state as well ([#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292)). PR [#1679](https://github.com/chester-hill-solutions/callcaster/pull/1679).
+- A mistyped or stale link under a workspace now shows **Page not found** inside the workspace, with the sidebar and your theme intact, instead of a bare light-mode page. The full-page error document also keeps dark mode after it loads; it previously lost the theme class during hydration ([#1397](https://github.com/chester-hill-solutions/callcaster/issues/1397)). PR [#1678](https://github.com/chester-hill-solutions/callcaster/pull/1678).
+- Call screen: the coloured header strip on each panel now meets the panel's rounded border cleanly. The strip previously drew its own smaller curve, which left a visible sliver at the corners, most noticeably in dark mode ([#1344](https://github.com/chester-hill-solutions/callcaster/issues/1344)). PR [#1677](https://github.com/chester-hill-solutions/callcaster/pull/1677).
+- Primary action buttons (Upload Audio, Next, Create, Sign up, Save) no longer turn light blue with white text on hover. They use the shared primary button style, so the label stays legible in both themes ([#1319](https://github.com/chester-hill-solutions/callcaster/issues/1319)). PR [#1676](https://github.com/chester-hill-solutions/callcaster/pull/1676).
+- Number search: the Ajax–Pickering rate centre now reads **Ajax-Pickering, ON** in the number picker and the onboarding wizard. Twilio returns it as "Ajaxpickering" with a single capital, so the earlier CamelCase split never applied; known run-together rate-centre names are now mapped by name ([#1321](https://github.com/chester-hill-solutions/callcaster/issues/1321)). PR [#1675](https://github.com/chester-hill-solutions/callcaster/pull/1675).
+
 ## 2026-09-08 — release [#1661](https://github.com/chester-hill-solutions/callcaster/pull/1661)
 
 Four PRs on `dev` since the 2026-09-07 release.

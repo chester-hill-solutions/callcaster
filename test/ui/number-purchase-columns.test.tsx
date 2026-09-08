@@ -48,8 +48,8 @@ describe("app/components/phone-numbers/NumberPurchase.columns.tsx", () => {
     // Twilio returns some Canadian rate-centre names as concatenated CamelCase
     // (e.g. "AjaxPickering", "MarkhamRichmondHill"). Split them on the
     // lower→upper boundary so the UI reads a sensible city name.
-    renderLocationCell({ locality: "AjaxPickering", region: "ON" });
-    expect(screen.getByText("Ajax Pickering, ON")).toBeInTheDocument();
+    renderLocationCell({ locality: "MarkhamRichmondHill", region: "ON" });
+    expect(screen.getByText("Markham Richmond Hill, ON")).toBeInTheDocument();
   });
 
   test("leaves plain single-word localities untouched (#1321)", () => {
@@ -59,6 +59,14 @@ describe("app/components/phone-numbers/NumberPurchase.columns.tsx", () => {
 
   test("leaves already-punctuated localities untouched (#1321)", () => {
     renderLocationCell({ locality: "Ajax-Pickering", region: "ON" });
+    expect(screen.getByText("Ajax-Pickering, ON")).toBeInTheDocument();
+  });
+
+  test("renders Twilio's title-cased 'Ajaxpickering' as Ajax-Pickering (#1321)", () => {
+    // What Twilio actually returns for the 289/905 Ajax–Pickering rate
+    // centre: one leading capital, so the CamelCase split never fired and
+    // the picker still read "Ajaxpickering, ON" after the first fix.
+    renderLocationCell({ locality: "Ajaxpickering", region: "ON" });
     expect(screen.getByText("Ajax-Pickering, ON")).toBeInTheDocument();
   });
 });

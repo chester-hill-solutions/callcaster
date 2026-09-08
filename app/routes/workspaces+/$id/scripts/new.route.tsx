@@ -150,7 +150,7 @@ export default function NewScript() {
           </Section>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button
-              className="rounded-md bg-brand-primary font-Zilla-Slab text-lg font-bold tracking-[1px] text-white transition-colors duration-150 ease-in-out hover:bg-brand-secondary"
+              className="rounded-md font-Zilla-Slab text-lg font-bold tracking-[1px]"
               type="submit"
             >
               Save

@@ -284,5 +284,27 @@ describe("root.tsx", () => {
     const head = await renderErrorBoundary();
     expect(head.querySelector('script[src="/buffer-polyfill.mjs"]')).not.toBeNull();
   });
+
+  // #1397: React 19 strips every attribute from <html> when it hydrates the
+  // singleton, so the inline theme script's `dark` class never survives to
+  // the interactive page. The error document must re-apply the stored theme
+  // after mount, the same way App does through ThemeProvider.
+  test("404 error document re-applies the stored dark theme after mount", async () => {
+    mocks.routeError = { status: 404, statusText: "Not Found", data: null };
+    mocks.isRouteErrorResponse.mockReturnValue(true);
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => (key === "callcaster-theme" ? "dark" : null),
+      setItem: () => {},
+      removeItem: () => {},
+    });
+    document.documentElement.classList.remove("dark");
+    try {
+      await renderErrorBoundary();
+      expect(document.documentElement.classList.contains("dark")).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      document.documentElement.classList.remove("dark");
+    }
+  });
 });
 
