@@ -13,6 +13,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Call screen: when the contact hangs up first, the agent's own leg is dropped as soon as the status reads Call Completed, so the Dial button returns instead of a Hang Up button that only cycles its confirmation. Hang Up with no live call now clears the stale in-call state as well ([#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292)).
 - A mistyped or stale link under a workspace now shows **Page not found** inside the workspace, with the sidebar and your theme intact, instead of a bare light-mode page. The full-page error document also keeps dark mode after it loads; it previously lost the theme class during hydration ([#1397](https://github.com/chester-hill-solutions/callcaster/issues/1397)).
 - Call screen: the coloured header strip on each panel now meets the panel's rounded border cleanly. The strip previously drew its own smaller curve, which left a visible sliver at the corners, most noticeably in dark mode ([#1344](https://github.com/chester-hill-solutions/callcaster/issues/1344)).
 - Primary action buttons (Upload Audio, Next, Create, Sign up, Save) no longer turn light blue with white text on hover. They use the shared primary button style, so the label stays legible in both themes ([#1319](https://github.com/chester-hill-solutions/callcaster/issues/1319)).

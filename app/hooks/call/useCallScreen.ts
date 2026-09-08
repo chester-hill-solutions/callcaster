@@ -53,6 +53,10 @@ function buildAudioTestGroup(
 import { useCampaignQueueFlow } from "@/hooks/call/useCampaignQueueFlow";
 import { useCampaignCallFlow } from "@/hooks/call/useCampaignCallFlow";
 import {
+  TERMINAL_DISPLAY_STATES,
+  useRemoteHangupReconcile,
+} from "@/hooks/call/useRemoteHangupReconcile";
+import {
   useCampaignDequeueActions,
   useCampaignDialActions,
 } from "@/hooks/call/useCampaignDialActions";
@@ -273,13 +277,18 @@ export function useCallScreen() {
   // billable call — converge on the server balance within 30s (#1234).
   useCreditReconciliation({
     workspaceId,
-    isTerminal:
-      displayState === "completed" ||
-      displayState === "failed" ||
-      displayState === "no-answer" ||
-      displayState === "voicemail",
+    isTerminal: TERMINAL_DISPLAY_STATES.has(displayState),
     credits: availableCredits,
     reconcile: reconcileCredits,
+  });
+
+  // If the contact hangs up first the agent leg can linger connected while
+  // the strip already reads "Call Completed"; drop it so Dial returns (#1292).
+  useRemoteHangupReconcile({
+    displayState,
+    callState,
+    isPredictive: campaign?.dial_type === "predictive",
+    hangUp,
   });
 
   const { begin, conference, setConference, creditsError: conferenceCreditsError } = useStartConferenceAndDial(
