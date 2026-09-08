@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**116** documented / **118** total effects (2 grandfathered, ratcheting to 0).
+**117** documented / **119** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -59,6 +59,7 @@
 | `app/hooks/call/usePhoneVerification.ts` | Reset handset selection to computer when the previously chosen | selectedDevice, verifiedNumbers | setSelectedDevice, setPhoneConnectionStatus, | Device selection is live client state reconciled |
 | `app/hooks/call/usePhoneVerification.ts` | Surface call-in verification results from the verify fetcher: | verifyFetcher.data | toast + setVerificationPhoneNumber, setIsAddingNumber | Reacts to fetcher submission outcomes after the user |
 | `app/hooks/call/usePredictiveCallSync.ts` | Bridge predictive-dialer room state (pushed via the workspace SSE | predictiveState, queue, nextRecipient?.contact_id, send, | none (dispatches to state setters/reducer passed in; | predictiveState already arrives via a realtime SSE |
+| `app/hooks/call/useRemoteHangupReconcile.ts` | Hang up the lingering agent leg when the display state newly | displayState, callState, isPredictive, hangUp — re-evaluates | network (hangUp → /api/hangup + SDK disconnect), | Reconciles two live client-side call states; |
 | `app/hooks/call/useSoftphoneAudioDevices.ts` | On mount, enumerate audio devices, request microphone permission | refreshDevices (stable callback; state reconciliation uses | subscription (mediaDevices "devicechange" listener, | Browser hardware device enumeration and permission |
 | `app/hooks/call/useSoftphoneAudioDevices.ts` | When a call becomes active (or the selected mic/speaker changes | activeCall, device, selectedMicId, selectedSpeakerId (reacts | dom (imperative Device.audio.setInputDevice / | Imperative SDK/audio-hardware binding tied to an |
 | `app/hooks/call/useSoftphoneController.ts` | Mirror the latest `callHandling.receiveIncoming` handler into a ref | callHandling.receiveIncoming (only re-syncs the ref when the | none (plain ref assignment) | Not data fetching; this is the "latest ref" pattern |

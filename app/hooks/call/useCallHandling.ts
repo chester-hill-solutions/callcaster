@@ -89,6 +89,8 @@ export function useCallHandling({
     externalIncomingCall ?? null,
   );
   const [callState, setCallState] = useState<string>("idle");
+  const callStateRef = useRef(callState);
+  callStateRef.current = callState;
   const [isActiveCallOnLocalHold, setIsActiveCallOnLocalHold] = useState(false);
   const [isMicMuted, setIsMicMuted] = useState(false);
 
@@ -404,6 +406,20 @@ export function useCallHandling({
       callGenerationRef.current += 1;
       const target = call ?? activeCallRef.current;
       if (!target) {
+        // The SDK can drop the agent leg without this hook hearing about
+        // it (#1292): `callState` still reads connected, the Hang Up
+        // button stays, and every click lands here. Nothing is left to
+        // disconnect, so converge the state instead of only reporting.
+        const stale =
+          callStateRef.current === "connected" ||
+          callStateRef.current === "dialing";
+        if (stale) {
+          logger.debug("No call to hang up; clearing stale in-call state");
+          onStatusChange?.("Registered");
+          updateCallState("completed");
+          onDeviceBusyChange?.(false);
+          return;
+        }
         logger.error("No call to hang up");
         onError?.(new Error("No call to hang up"));
         return;
