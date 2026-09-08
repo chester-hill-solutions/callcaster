@@ -22,7 +22,10 @@ import {
 } from "@/lib/types";
 import { CampaignLaunchExtras } from "./detailed/CampaignLaunchExtras";
 import { CampaignLaunchActions } from "./CampaignLaunchActions";
-import { CampaignTestSendDialog } from "./CampaignTestSendDialog";
+import {
+  CampaignTestSendDialog,
+  type CampaignTestKind,
+} from "./CampaignTestSendDialog";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { CampaignCostPanel } from "./CampaignCostPanel";
@@ -55,6 +58,14 @@ function launchActionLabel(type: Campaign["type"] | null | undefined): string {
       return _exhaustive;
     }
   }
+}
+
+const VOICE_TEST_TYPES = new Set<string>(["robocall", "simple_ivr", "complex_ivr"]);
+
+function campaignTestKind(type: string | null | undefined): CampaignTestKind | null {
+  if (type === "message") return "message";
+  if (type && VOICE_TEST_TYPES.has(type)) return "call";
+  return null;
 }
 
 export type CampaignLaunchProps = {
@@ -133,7 +144,8 @@ export const CampaignLaunch = ({
   const startLabel =
     launchActionLabelOverride ?? launchActionLabel(campaignData.type);
   const [testSendOpen, setTestSendOpen] = useState(false);
-  const canSendTest = campaignData.type === "message" && Boolean(handleTestSendButton);
+  const testKind = campaignTestKind(campaignData.type);
+  const canSendTest = testKind !== null && Boolean(handleTestSendButton);
 
   const confirmActionLabel =
     confirmStatus === "play"
@@ -401,11 +413,13 @@ export const CampaignLaunch = ({
                 onDuplicate={() => handleDuplicateButton()}
                 onKickoff={() => handleKickoffButton()}
                 onSendTest={canSendTest ? () => setTestSendOpen(true) : undefined}
+                sendTestLabel={testKind === "call" ? "Test call" : "Send test"}
               />
-              {canSendTest ? (
+              {canSendTest && testKind ? (
                 <CampaignTestSendDialog
                   open={testSendOpen}
                   busy={isBusy}
+                  kind={testKind}
                   onOpenChange={setTestSendOpen}
                   onSend={(phone) => handleTestSendButton?.(phone)}
                 />

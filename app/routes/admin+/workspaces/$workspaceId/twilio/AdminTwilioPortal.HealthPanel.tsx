@@ -1,5 +1,5 @@
 import { Form } from "react-router";
-import { Activity, RefreshCw, Wrench } from "lucide-react";
+import { Activity, KeyRound, RefreshCw, Wrench } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,13 @@ export function HealthPanel({ onboarding, syncSnapshot }: HealthPanelProps) {
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Form method="post">
+              <input type="hidden" name="_action" value="reauthenticate_twilio_subaccount" />
+              <Button variant="outline" type="submit" size="sm">
+                <KeyRound className="mr-2 h-4 w-4" />
+                Re-authenticate Twilio
+              </Button>
+            </Form>
             <Form method="post">
               <input type="hidden" name="_action" value="audit_twilio_webhooks" />
               <Button variant="outline" type="submit" size="sm">

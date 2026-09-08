@@ -4,7 +4,7 @@ import { useFetcher } from "react-router";
 import { getSmsSegmentInfo } from "@/lib/sms-segments";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { useFetcherOnIdle } from "@/hooks/utils";
-import { processTemplateTags, SAMPLE_TEMPLATE_CONTACT } from "@/lib/message-templates";
+import { hasTemplateSyntax, processTemplateTags, SAMPLE_TEMPLATE_CONTACT } from "@/lib/message-templates";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -24,10 +24,8 @@ const TEMPLATE_TAGS = [
     { key: '{{contact_id}}', label: 'Contact ID', description: 'Contact\'s unique ID' },
 ];
 
-const TEMPLATE_SYNTAX = /\{|btoa\(/;
-
 function TemplatePreview({ body }: { body: string }) {
-    if (!body || !TEMPLATE_SYNTAX.test(body)) return null;
+    if (!body || !hasTemplateSyntax(body)) return null;
     const rendered = processTemplateTags(body, SAMPLE_TEMPLATE_CONTACT);
     return (
         <div className="mt-3 rounded border border-secondary/60 bg-secondary/30 p-2">

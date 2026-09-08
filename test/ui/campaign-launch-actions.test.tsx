@@ -164,6 +164,24 @@ describe("CampaignLaunchActions", () => {
 
     const button = screen.getByTestId("campaign-launch-send-test");
     expect(button).toHaveTextContent("Send test");
+    rerender(
+      <CampaignLaunchActions
+        status="draft"
+        startLabel="Start calling"
+        isMessageCampaign={false}
+        startDisabledReason={null}
+        scheduleDisabled={false}
+        isBusy={false}
+        onPlay={vi.fn()}
+        onPause={vi.fn()}
+        onSchedule={vi.fn()}
+        onArchive={vi.fn()}
+        onDuplicate={vi.fn()}
+        onSendTest={onSendTest}
+        sendTestLabel="Test call"
+      />,
+    );
+    expect(screen.getByTestId("campaign-launch-send-test")).toHaveTextContent("Test call");
     fireEvent.click(button);
     expect(onSendTest).toHaveBeenCalledTimes(1);
 

@@ -7,8 +7,13 @@ import { linkContactToConversation } from "@/lib/database/chat-contact-link.serv
 import { getEffectiveWorkspaceTwilioPortalConfigForWorkspace } from "@/lib/database/workspace.server";
 import { parseChatSenderSelection } from "@/lib/sms-campaign-send-mode";
 import { eq } from "drizzle-orm";
-import { workspace_number as workspaceNumberTable } from "@/db/schema";
-import { createTenantDb } from "@/server/tenant-db";
+import {
+  contact as contactTable,
+  workspace_number as workspaceNumberTable,
+} from "@/db/schema";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { findMatchingContactIds } from "@/lib/inbound-sms-context.server";
+import { hasTemplateSyntax, processTemplateTags } from "@/lib/message-templates";
 import { logger } from "@/lib/logger.server";
 import {
   isOptedOutRecipient,
@@ -20,7 +25,7 @@ import {
 } from "@/lib/outbound-credit-gate.server";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { OUTBOUND_CREDIT_FLOOR } from "../../../../shared/credit-floor";
-import type { BaseUser, WorkspaceTwilioOpsConfig } from "@/lib/types";
+import type { BaseUser, WorkspaceTwilioOpsConfig, Contact } from "@/lib/types";
 import { defineAction } from "@/lib/handler.server";
 import { toUserMessage } from "@/lib/user-message";
 
@@ -32,6 +37,44 @@ function parseMediaList(raw: FormDataEntryValue | undefined): unknown[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * Fill template tags from the conversation's contact: the linked contact when
+ * the composer sent one, otherwise the single contact that matches the phone
+ * number. Text with no tags, or no matching contact, is sent as typed.
+ */
+async function renderChatBody(args: {
+  body: string;
+  workspaceId: string;
+  contactId: string | undefined;
+  phone: string;
+}): Promise<string> {
+  const { body, workspaceId, contactId, phone } = args;
+  if (!hasTemplateSyntax(body)) return body;
+  const contact = await resolveTemplateContact(
+    createTenantDb(workspaceId),
+    workspaceId,
+    contactId,
+    phone,
+  );
+  return contact ? processTemplateTags(body, contact) : body;
+}
+
+async function resolveTemplateContact(
+  tdb: TenantDb,
+  workspaceId: string,
+  contactId: string | undefined,
+  phone: string,
+): Promise<Contact | null> {
+  let id = Number(contactId);
+  if (!Number.isFinite(id) || id <= 0) {
+    const matches = await findMatchingContactIds(workspaceId, phone);
+    if (matches.length !== 1) return null;
+    id = matches[0] as number;
+  }
+  const row = await tdb.contact.findFirst({ where: eq(contactTable.id, id) });
+  return (row as Contact | undefined) ?? null;
 }
 
 export const action = defineAction({
@@ -225,9 +268,16 @@ export const action = defineAction({
 
   const sendAt = typeof data["send_at"] === "string" ? data["send_at"] : undefined;
 
+  const body = await renderChatBody({
+    body: String(data["body"] ?? ""),
+    workspaceId,
+    contactId,
+    phone: contact_number,
+  });
+
   try {
     const responseData = await sendMessage({
-      body: data["body"] as string,
+      body,
       to: contact_number as string,
       from: fromNumber,
       media: data["media"] as string,
@@ -244,7 +294,7 @@ export const action = defineAction({
     if (!params.contact_number) return redirect(contact_number);
     const mediaList = parseMediaList(data["media"]);
     const estimatedCredits = estimateMessageCredits({
-      body: String(data["body"] ?? ""),
+      body,
       hasMedia: mediaList.length > 0,
     }).credits;
     return routeData({
