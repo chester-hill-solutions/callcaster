@@ -13,6 +13,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Number search: the Ajax–Pickering rate centre now reads **Ajax-Pickering, ON** in the number picker and the onboarding wizard. Twilio returns it as "Ajaxpickering" with a single capital, so the earlier CamelCase split never applied; known run-together rate-centre names are now mapped by name ([#1321](https://github.com/chester-hill-solutions/callcaster/issues/1321)).
 - A workspace whose Twilio credentials are actually invalid no longer sees "add credits, then try again" — Twilio's authentication-failure code (20003) now surfaces its own message pointing at re-authenticating the subaccount, instead of being mislabeled as an insufficient-credits error ([#1656](https://github.com/chester-hill-solutions/callcaster/issues/1656)).
 
 ## 2026-09-07 — release [#1638](https://github.com/chester-hill-solutions/callcaster/pull/1638)
