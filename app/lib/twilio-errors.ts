@@ -49,7 +49,7 @@ export function presentTwilioError(error: unknown): TwilioErrorPresentation {
   const httpStatus = readHttpStatus(error);
   const lower = message.toLowerCase();
 
-  if (lower.includes("credit") || code === 20003) {
+  if (lower.includes("credit")) {
     return {
       userMessage: "Your workspace does not have enough credits for this action.",
       adminDetail: message,
@@ -57,6 +57,18 @@ export function presentTwilioError(error: unknown): TwilioErrorPresentation {
       httpStatus,
       retryable: false,
       suggestedAction: "Add credits in workspace billing, then try again.",
+    };
+  }
+
+  if (code === 20003) {
+    return {
+      userMessage:
+        "There's a problem with this workspace's phone provider connection. Contact support.",
+      adminDetail: message,
+      twilioCode: code,
+      httpStatus,
+      retryable: false,
+      suggestedAction: "Re-authenticate the workspace's Twilio subaccount in the admin portal.",
     };
   }
 

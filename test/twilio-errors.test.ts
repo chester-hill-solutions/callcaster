@@ -15,8 +15,16 @@ describe("twilio-errors", () => {
   });
 
   test("maps credit errors to user-friendly copy", () => {
-    const presented = presentTwilioError({ code: 20003, message: "Insufficient credits" });
+    const presented = presentTwilioError(new Error("Insufficient credits"));
     expect(presented.userMessage).toContain("credits");
+    expect(presented.retryable).toBe(false);
+  });
+
+  test("maps 20003 to an authentication failure, not a credits error", () => {
+    const presented = presentTwilioError({ code: 20003, message: "Authenticate" });
+    expect(presented.userMessage).not.toContain("credits");
+    expect(presented.userMessage).toContain("phone provider connection");
+    expect(presented.suggestedAction).toContain("Re-authenticate");
     expect(presented.retryable).toBe(false);
   });
 
