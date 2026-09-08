@@ -81,7 +81,7 @@ export function StatusBar({
   return (
     <div
       className={cn(
-        "flex items-center justify-center rounded-t-[14px] px-4 py-3 font-Tabac-Slab text-xl text-white",
+        "flex items-center justify-center px-4 py-3 font-Tabac-Slab text-xl text-white",
         statusBarClass(displayState),
       )}
       role="status"
