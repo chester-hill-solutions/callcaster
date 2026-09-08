@@ -175,7 +175,6 @@ export function AudienceUploadMapStep({
           type="button"
           onClick={onContinue}
           disabled={hasBlockingMappingIssue}
-          className="bg-brand-primary text-white hover:bg-brand-secondary"
         >
           Continue
         </Button>
