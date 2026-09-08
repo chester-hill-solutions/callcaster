@@ -19,6 +19,7 @@ import {
   syncWorkspaceTwilioBootstrapState,
 } from "@/lib/twilio-bootstrap.server";
 import { auditWorkspaceTwilioWebhooks } from "@/lib/twilio-webhook-audit.server";
+import { reauthenticateWorkspaceTwilioSubaccount } from "@/lib/twilio-subaccount-reauth.server";
 import { syncWorkspaceA2pStatus } from "@/lib/twilio-a2p-status-sync.server";
 import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
 import {
@@ -103,6 +104,25 @@ export const action = defineAction({
         } catch (error) {
             logger.error("Twilio webhook audit failed:", error);
             return routeData({ error: twilioErrorUserMessage(error) }, { status: 500 });
+        }
+    }
+
+    if (actionName === "reauthenticate_twilio_subaccount") {
+        try {
+            const result = await reauthenticateWorkspaceTwilioSubaccount({ workspaceId });
+            const syncMessage =
+                result.syncSnapshot.lastSyncStatus === "healthy"
+                    ? "sync is healthy again"
+                    : `sync still reports: ${result.syncSnapshot.lastSyncError ?? "unknown error"}`;
+            return routeData({
+                success: `Re-authenticated (new API key ${result.newApiKeySid}${result.authTokenRefreshedFromMaster ? ", Auth Token refreshed from master" : ""}) — ${syncMessage}`,
+            });
+        } catch (error) {
+            logger.error("Twilio subaccount re-authentication failed:", error);
+            return routeData(
+                { error: error instanceof Error ? error.message : "Failed to re-authenticate Twilio subaccount" },
+                { status: 500 },
+            );
         }
     }
 
