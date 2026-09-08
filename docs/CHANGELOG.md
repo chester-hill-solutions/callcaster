@@ -13,6 +13,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Fixed
 
 - A workspace whose Twilio credentials are actually invalid no longer sees "add credits, then try again" — Twilio's authentication-failure code (20003) now surfaces its own message pointing at re-authenticating the subaccount, instead of being mislabeled as an insufficient-credits error ([#1656](https://github.com/chester-hill-solutions/callcaster/issues/1656)).
+- Twilio sync no longer fails with "the provided key does not have the permissions to access this endpoint" for workspaces that authenticate with an API Key: fetching the Twilio Account resource now always uses the Account SID/Auth Token directly, since Standard API Keys can never be granted that permission.
 
 ## 2026-09-07 — release [#1638](https://github.com/chester-hill-solutions/callcaster/pull/1638)
 
