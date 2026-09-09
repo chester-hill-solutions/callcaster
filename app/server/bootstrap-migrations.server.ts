@@ -135,6 +135,183 @@ function runE2eSeed(rootDir: string): Promise<number> {
   });
 }
 
+type BootstrapSql = ReturnType<typeof postgres>;
+type SeedOutcome = {
+  seedApplied: boolean | null;
+  seedSkippedReason?: "not-requested" | "managed-environment" | "already-applied";
+};
+
+/**
+ * Replay the drizzle baseline (app schema) when `workspace` is missing. Managed
+ * environments already have the schema and skip this. psql-only meta-command
+ * lines (e.g. pg_dump's `\restrict` header) are stripped — they are not valid
+ * SQL over the wire protocol.
+ */
+async function applyDrizzleBaseline(
+  sql: BootstrapSql,
+  rootDir: string,
+): Promise<string[]> {
+  const schemaCells = await sql<{ t: string | null }[]>`
+    select to_regclass('public.workspace') as t
+  `;
+  if (schemaCells[0]?.t) return [];
+
+  const baselineDir = path.join(rootDir, BASELINE_DIRNAME);
+  const baselineFiles = readdirSync(baselineDir)
+    .filter((file) => file.endsWith(".sql"))
+    .sort();
+
+  await sql.unsafe(`
+    create table if not exists public.${BASELINE_TRACKING_TABLE} (
+      filename text primary key,
+      applied_at timestamptz not null default now()
+    )
+  `);
+  const baselineRows = await sql<{ filename: string }[]>`
+    select filename from public.drizzle_baseline_bootstrap
+  `;
+  const baselineAppliedSet = new Set(baselineRows.map((row) => row.filename));
+
+  const baselineApplied: string[] = [];
+  for (const file of baselineFiles) {
+    if (baselineAppliedSet.has(file)) continue;
+    const raw = readFileSync(path.join(baselineDir, file), "utf8");
+    const content = raw
+      .split("\n")
+      .filter((line) => !/^\s*\\/.test(line))
+      .join("\n");
+    try {
+      await sql.unsafe(content).simple();
+      await sql`
+        insert into public.drizzle_baseline_bootstrap (filename)
+        values (${file})
+        on conflict (filename) do nothing
+      `;
+      baselineApplied.push(file);
+      logger.info("drizzle baseline applied", { file });
+    } catch (error) {
+      try {
+        await sql.unsafe("ROLLBACK").simple();
+      } catch {
+        // No open transaction — connection already idle.
+      }
+      logger.error("drizzle baseline skipped a file", {
+        file,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return baselineApplied;
+}
+
+/** Apply any not-yet-recorded client migrations (idempotent per filename). */
+async function applyClientMigrations(
+  sql: BootstrapSql,
+  files: string[],
+  dir: string,
+): Promise<{ applied: string[]; skipped: string[] }> {
+  await sql.unsafe(`
+    create table if not exists public.${TRACKING_TABLE} (
+      filename text primary key,
+      applied_at timestamptz not null default now()
+    )
+  `);
+
+  const appliedRows = await sql<{ filename: string }[]>`
+    select filename from public.client_migration_bootstrap
+  `;
+  const alreadyApplied = new Set(appliedRows.map((row) => row.filename));
+
+  const applied: string[] = [];
+  const skipped: string[] = [];
+
+  for (const file of files) {
+    if (alreadyApplied.has(file)) {
+      skipped.push(file);
+      continue;
+    }
+    const content = readFileSync(path.join(dir, file), "utf8");
+    try {
+      // Simple-protocol so multi-statement files with their own BEGIN/COMMIT
+      // and dollar-quoted function bodies execute as written.
+      await sql.unsafe(content).simple();
+      await sql`
+        insert into public.client_migration_bootstrap (filename)
+        values (${file})
+        on conflict (filename) do nothing
+      `;
+      applied.push(file);
+      logger.info("client-migration bootstrap applied", { file });
+    } catch (error) {
+      // Migration SQL often opens its own BEGIN. A mid-file error leaves this
+      // shared connection (max: 1) in "aborted transaction" until ROLLBACK —
+      // without that, every later file fails with 25P02.
+      try {
+        await sql.unsafe("ROLLBACK").simple();
+      } catch {
+        // No open transaction — connection already idle.
+      }
+      // A file that conflicts with the drizzle baseline (already present) or
+      // otherwise fails is logged and skipped, not recorded. The db-health
+      // guard downstream is the hard gate on whether boot proceeds.
+      skipped.push(file);
+      logger.error("client-migration bootstrap skipped a file", {
+        file,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  logger.info("client-migration bootstrap complete", {
+    appliedCount: applied.length,
+    skippedCount: skipped.length,
+  });
+  return { applied, skipped };
+}
+
+/**
+ * Opt-in E2E fixture seeding for ephemeral previews. Never for local, dev,
+ * staging, or production; idempotent via the marker table; a failed seed does
+ * not block boot (no marker is written so a later boot retries).
+ */
+async function decideSeed(
+  env: NodeJS.ProcessEnv,
+  sql: BootstrapSql,
+  rootDir: string,
+): Promise<SeedOutcome> {
+  if (!e2eSeedEnabled(env)) {
+    return { seedApplied: null, seedSkippedReason: "not-requested" };
+  }
+  if (isManagedEnvironment(env)) {
+    return { seedApplied: null, seedSkippedReason: "managed-environment" };
+  }
+
+  const seedTable = await sql<{ t: string | null }[]>`
+    select to_regclass('public.e2e_seed_bootstrap') as t
+  `;
+  if (seedTable[0]?.t) {
+    return { seedApplied: null, seedSkippedReason: "already-applied" };
+  }
+
+  const exitCode = await runE2eSeed(rootDir);
+  if (exitCode !== 0) {
+    return { seedApplied: false };
+  }
+
+  await sql.unsafe(`
+    create table if not exists public.e2e_seed_bootstrap (
+      version text not null,
+      applied_at timestamptz not null default now()
+    )
+  `);
+  await sql`
+    insert into public.e2e_seed_bootstrap (version)
+    values ('1')
+    on conflict (version) do nothing
+  `;
+  return { seedApplied: true };
+}
+
 /**
  * Apply any not-yet-recorded client migrations to DATABASE_URL. Keyed by
  * filename (not version) so the three grandfathered files that share version
@@ -183,178 +360,22 @@ export async function applyClientMigrationsOnBoot(options: {
       return { ran: false, reason: "legacy-database", triggers };
     }
 
-    // ── Drizzle baseline (app schema) ─────────────────────────────────
-    // Fresh ephemeral DBs (PR previews) start with NO app schema — not even
-    // auth_user — so sign-in fails before any user precedes it. When the
-    // schema is absent, replay the drizzle baseline FIRST: the client
-    // migrations below ALTER tables the baseline creates, so order matters.
-    // Managed environments (dev/staging/prod) already have the schema and
-    // skip this entirely.
-    const baselineApplied: string[] = [];
-    const schemaCells = await sql<{ t: string | null }[]>`
-      select to_regclass('public.workspace') as t
-    `;
-    const schemaPresent = Boolean(schemaCells[0]?.t);
-    if (!schemaPresent) {
-      const baselineDir = path.join(options.rootDir, BASELINE_DIRNAME);
-      const baselineFiles = readdirSync(baselineDir)
-        .filter((file) => file.endsWith(".sql"))
-        .sort();
+    // Baseline (app schema) first — the client migrations ALTER baseline
+    // tables, so order matters. No-op where the schema already exists.
+    const baselineApplied = await applyDrizzleBaseline(sql, options.rootDir);
 
-      await sql.unsafe(`
-        create table if not exists public.${BASELINE_TRACKING_TABLE} (
-          filename text primary key,
-          applied_at timestamptz not null default now()
-        )
-      `);
-      const baselineRows = await sql<{ filename: string }[]>`
-        select filename from public.drizzle_baseline_bootstrap
-      `;
-      const baselineAppliedSet = new Set(baselineRows.map((row) => row.filename));
+    const { applied, skipped } = await applyClientMigrations(sql, files, dir);
 
-      for (const file of baselineFiles) {
-        if (baselineAppliedSet.has(file)) continue;
-        // psql meta-commands (pg_dump emits a `\restrict` header line) are not
-        // valid SQL — strip any line whose first non-space char is a backslash
-        // before sending the file over the wire protocol.
-        const raw = readFileSync(path.join(baselineDir, file), "utf8");
-        const content = raw
-          .split("\n")
-          .filter((line) => !/^\s*\\/.test(line))
-          .join("\n");
-        try {
-          await sql.unsafe(content).simple();
-          await sql`
-            insert into public.drizzle_baseline_bootstrap (filename)
-            values (${file})
-            on conflict (filename) do nothing
-          `;
-          baselineApplied.push(file);
-          logger.info("drizzle baseline applied", { file });
-        } catch (error) {
-          try {
-            await sql.unsafe("ROLLBACK").simple();
-          } catch {
-            // No open transaction — connection already idle.
-          }
-          logger.error("drizzle baseline skipped a file", {
-            file,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
-    }
-
-    await sql.unsafe(`
-      create table if not exists public.${TRACKING_TABLE} (
-        filename text primary key,
-        applied_at timestamptz not null default now()
-      )
-    `);
-
-    const appliedRows = await sql<{ filename: string }[]>`
-      select filename from public.client_migration_bootstrap
-    `;
-    const alreadyApplied = new Set(appliedRows.map((row) => row.filename));
-
-    const applied: string[] = [];
-    const skipped: string[] = [];
-
-    for (const file of files) {
-      if (alreadyApplied.has(file)) {
-        skipped.push(file);
-        continue;
-      }
-      const content = readFileSync(path.join(dir, file), "utf8");
-      try {
-        // Simple-protocol so multi-statement files with their own BEGIN/COMMIT
-        // and dollar-quoted function bodies execute as written.
-        await sql.unsafe(content).simple();
-        await sql`
-          insert into public.client_migration_bootstrap (filename)
-          values (${file})
-          on conflict (filename) do nothing
-        `;
-        applied.push(file);
-        logger.info("client-migration bootstrap applied", { file });
-      } catch (error) {
-        // Migration SQL often opens its own BEGIN. A mid-file error leaves this
-        // shared connection (max: 1) in "aborted transaction" until ROLLBACK —
-        // without that, every later file fails with 25P02.
-        try {
-          await sql.unsafe("ROLLBACK").simple();
-        } catch {
-          // No open transaction — connection already idle.
-        }
-        // A file that conflicts with the drizzle baseline (already present) or
-        // otherwise fails is logged and skipped, not recorded. The db-health
-        // guard downstream is the hard gate on whether boot proceeds.
-        skipped.push(file);
-        logger.error("client-migration bootstrap skipped a file", {
-          file,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    logger.info("client-migration bootstrap complete", {
-      appliedCount: applied.length,
-      skippedCount: skipped.length,
-    });
-
-    // ── E2E seed (ephemeral previews only) ────────────────────────────
-    // Opt-in E2E_SEED_ON_BOOT layered on the ephemeral bootstrap. A preview
-    // with fixtures is directly testable (known accounts, workspace, IVR
-    // campaign); a preview without them is exactly the bare-schema sign-in
-    // failure this whole module exists to prevent. Never runs for managed
-    // environments or where the fixtures already applied.
-    let seedApplied: boolean | null = null;
-    let seedSkippedReason:
-      | "not-requested"
-      | "managed-environment"
-      | "already-applied"
-      | undefined;
-    if (e2eSeedEnabled(env) && !isManagedEnvironment(env)) {
-      const seedTable = await sql<{ t: string | null }[]>`
-        select to_regclass('public.e2e_seed_bootstrap') as t
-      `;
-      if (seedTable[0]?.t) {
-        seedSkippedReason = "already-applied";
-      } else {
-        const exitCode = await runE2eSeed(options.rootDir);
-        if (exitCode === 0) {
-          await sql.unsafe(`
-            create table if not exists public.e2e_seed_bootstrap (
-              version text not null,
-              applied_at timestamptz not null default now()
-            )
-          `);
-          await sql`
-            insert into public.e2e_seed_bootstrap (version)
-            values ('1')
-            on conflict (version) do nothing
-          `;
-          seedApplied = true;
-        } else {
-          // Seeding is best-effort: a failed seed must not block the app boot
-          // (the preview stays usable via signup). Leave no marker so a later
-          // boot retries it.
-          seedApplied = false;
-        }
-      }
-    } else if (e2eSeedEnabled(env)) {
-      seedSkippedReason = "managed-environment";
-    } else {
-      seedSkippedReason = "not-requested";
-    }
+    // Opt-in E2E fixtures for ephemeral previews only.
+    const seed = await decideSeed(env, sql, options.rootDir);
 
     return {
       ran: true,
       applied,
       skipped,
       baselineApplied,
-      seedApplied,
-      ...(seedSkippedReason ? { seedSkippedReason } : {}),
+      seedApplied: seed.seedApplied,
+      ...(seed.seedSkippedReason ? { seedSkippedReason: seed.seedSkippedReason } : {}),
     };
   } finally {
     if (locked) {
