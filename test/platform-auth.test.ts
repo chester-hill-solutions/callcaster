@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   updateUser: vi.fn(),
   changePassword: vi.fn(),
   signUpEmail: vi.fn(),
+  signInEmail: vi.fn(),
   isSignupOpen: vi.fn(() => true),
   getUserById: vi.fn(),
   updateOwnUserProfile: vi.fn(),
@@ -20,6 +21,7 @@ vi.mock("@/server/auth-instance", () => ({
       updateUser: mocks.updateUser,
       changePassword: mocks.changePassword,
       signUpEmail: mocks.signUpEmail,
+      signInEmail: mocks.signInEmail,
     },
   },
 }));
@@ -77,6 +79,39 @@ describe("platform-auth.server.ts", () => {
         status: 403,
       });
       expect(mocks.signUpEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("loginWithPassword", () => {
+    test("surfaces a generic message, never a raw backend error", async () => {
+      const mod = await import("../app/lib/platform-auth.server");
+      mocks.signInEmail.mockRejectedValue(
+        new Error("Failed query: relation auth_user does not exist"),
+      );
+
+      const result = await mod.loginWithPassword(
+        new Request("http://localhost/signin", { headers: new Headers() }),
+        "nobody@example.test",
+        "password123",
+      );
+
+      expect(result.ok).toBe(false);
+      expect(result.error).toBe("We couldn't sign you in. Try again shortly.");
+      expect(result.error).not.toContain("relation");
+      expect(result.error).not.toContain("Failed query");
+    });
+
+    test("invalid credentials stay a generic message", async () => {
+      const mod = await import("../app/lib/platform-auth.server");
+      mocks.signInEmail.mockResolvedValue({ user: undefined, token: undefined });
+
+      const result = await mod.loginWithPassword(
+        new Request("http://localhost/signin", { headers: new Headers() }),
+        "nobody@example.test",
+        "wrong-password",
+      );
+
+      expect(result).toEqual({ ok: false, error: "Invalid credentials" });
     });
   });
 
