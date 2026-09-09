@@ -70,26 +70,27 @@
   }
 }
 
-/* Baseline for raw form controls that don't use the ui/ primitives.
-   :where() keeps specificity at zero so Tailwind utilities always win. */
-:where(
-  input:not(
-      [type="hidden"],
-      [type="checkbox"],
-      [type="radio"],
-      [type="range"],
-      [type="file"]
-    ),
-  select,
-  textarea
-) {
-  border: 1px solid var(--input);
-  border-radius: calc(var(--radius) * 0.75);
-  background-color: var(--background);
-  color: var(--foreground);
-  padding: 4px 8px;
-}
+/* Keep raw-control defaults in the base layer so component utilities can override them. */
+@layer base {
+  :where(
+    input:not(
+        [type="hidden"],
+        [type="checkbox"],
+        [type="radio"],
+        [type="range"],
+        [type="file"]
+      ),
+    select,
+    textarea
+  ) {
+    border: 1px solid var(--input);
+    border-radius: calc(var(--radius) * 0.75);
+    background-color: var(--background);
+    color: var(--foreground);
+    padding: 4px 8px;
+  }
 
-:where(textarea)::placeholder {
-  color: var(--muted-foreground);
+  :where(textarea)::placeholder {
+    color: var(--muted-foreground);
+  }
 }
