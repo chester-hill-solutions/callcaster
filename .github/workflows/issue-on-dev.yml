@@ -1,0 +1,106 @@
+name: Issue on dev
+
+# GitHub closes an issue from `Closes #N` only when the pull request merges
+# into the default branch (`master`), which is the production promotion.
+# Nothing marks the issue when its fix lands on `dev`, so the kanban cannot
+# tell "fixed, waiting to be tested on dev" from "not started" (#1162).
+#
+# This workflow fires when a pull request merges into `dev`, reads the
+# closing keywords from its body, and for each referenced issue:
+#
+#   * adds the `on-dev` label (created on first use),
+#   * posts one comment naming the pull request and the merge commit,
+#   * optionally moves the issue's item on a GitHub Project to a status
+#     column, when the repository variable ON_DEV_PROJECT_NUMBER and the
+#     secret PROJECT_TOKEN are both set. GITHUB_TOKEN cannot write to
+#     organisation projects, so the project step needs a fine-grained
+#     token with Projects read/write; without it the step is skipped and
+#     the label and comment still land.
+#
+# Repository variables (optional, for the project move):
+#
+#   ON_DEV_PROJECT_NUMBER  — the project number from its URL
+#   ON_DEV_STATUS_VALUE    — the Status option to move to (default "On dev")
+#
+# The release promotion keeps closing the issue on `master`, so "closed"
+# still means "in production".
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [dev]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  mark-on-dev:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find issues closed by this pull request
+        id: issues
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Same keyword set GitHub uses for auto-close; `#N` in this repo only.
+          numbers=$(printf '%s' "$BODY" \
+            | grep -oiE '\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b[[:space:]]*:?[[:space:]]*#[0-9]+' \
+            | grep -oE '[0-9]+$' | sort -un | tr '\n' ' ')
+          echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
+          echo "Issues: ${numbers:-none}"
+
+      - name: Label and comment
+        if: steps.issues.outputs.numbers != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          NUMBERS: ${{ steps.issues.outputs.numbers }}
+        run: |
+          gh label create on-dev --repo "$REPO" --color 1d76db \
+            --description "Fix merged to dev; test it on the review environment" --force
+          for n in $NUMBERS; do
+            state=$(gh issue view "$n" --repo "$REPO" --json state --jq .state 2>/dev/null || echo "MISSING")
+            if [ "$state" = "MISSING" ]; then echo "#$n: not an issue, skipping"; continue; fi
+            gh issue edit "$n" --repo "$REPO" --add-label on-dev
+            gh issue comment "$n" --repo "$REPO" --body "On dev: merged in $PR_URL (\`${SHA:0:8}\`). Retest on the review environment; this issue closes when the fix is promoted to master."
+            echo "#$n: labelled and commented"
+          done
+
+      - name: Move project items
+        if: steps.issues.outputs.numbers != '' && vars.ON_DEV_PROJECT_NUMBER != ''
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.repository }}
+          PROJECT: ${{ vars.ON_DEV_PROJECT_NUMBER }}
+          STATUS_VALUE: ${{ vars.ON_DEV_STATUS_VALUE || 'On dev' }}
+          NUMBERS: ${{ steps.issues.outputs.numbers }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "PROJECT_TOKEN secret not set; skipping the project move"
+            exit 0
+          fi
+          fields=$(gh project field-list "$PROJECT" --owner "$OWNER" --format json)
+          project_id=$(gh project view "$PROJECT" --owner "$OWNER" --format json --jq .id)
+          status_field=$(printf '%s' "$fields" | jq -r '.fields[] | select(.name == "Status") | .id')
+          option_id=$(printf '%s' "$fields" | jq -r --arg v "$STATUS_VALUE" \
+            '.fields[] | select(.name == "Status") | .options[] | select(.name == $v) | .id')
+          if [ -z "$status_field" ] || [ -z "$option_id" ]; then
+            echo "Status option '$STATUS_VALUE' not found on project $PROJECT; skipping"
+            exit 0
+          fi
+          items=$(gh project item-list "$PROJECT" --owner "$OWNER" --format json --limit 1000)
+          for n in $NUMBERS; do
+            item_id=$(printf '%s' "$items" | jq -r --arg repo "$REPO" --argjson n "$n" \
+              '.items[] | select(.content.repository == $repo and .content.number == $n) | .id' | head -n1)
+            if [ -z "$item_id" ]; then echo "#$n: not on project $PROJECT, skipping"; continue; fi
+            gh project item-edit --project-id "$project_id" --id "$item_id" \
+              --field-id "$status_field" --single-select-option-id "$option_id"
+            echo "#$n: moved to '$STATUS_VALUE'"
+          done
