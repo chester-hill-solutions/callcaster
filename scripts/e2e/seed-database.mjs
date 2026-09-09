@@ -215,7 +215,8 @@ async function seed() {
           type: "synthetic",
           title: "Welcome",
           content: "Press 1 for yes",
-          options: [{ digit: "1", next: "page2" }],
+          audioFile: "Press 1 for yes",
+          options: [{ value: "1", content: "Yes", next: "hangup" }],
         },
       },
     };
