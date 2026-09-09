@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Fixed
+
+- Sign-in failures no longer show a raw database error — the browser gets a generic message and the real error stays in the logs ([#1734](https://github.com/chester-hill-solutions/callcaster/issues/1734)).
+
 ## 2026-09-09 — release [#1693](https://github.com/chester-hill-solutions/callcaster/pull/1693)
 
 ### Fixed
