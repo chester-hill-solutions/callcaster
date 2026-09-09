@@ -49,7 +49,7 @@ fi
   echo "path_check node=$(command -v node || echo MISSING) bun=$(command -v bun || echo MISSING) opencode=$(command -v opencode || echo MISSING)"
   command -v opencode >/dev/null || { echo "ERROR: opencode not on PATH" >&2; exit 1; }
   command -v node >/dev/null    || { echo "ERROR: node not on PATH" >&2; exit 1; }
-  [[ -d .git ]]                 || { echo "ERROR: not a git repo: $ROOT" >&2; exit 1; }
+  [[ -d .git ]] || [[ -f .git ]] || { echo "ERROR: not a git repo: $ROOT" >&2; exit 1; }
 
   current="$(git rev-parse --abbrev-ref HEAD)"
   if [[ "$current" != "$AUTORESEARCH_BRANCH" ]]; then
