@@ -1,4 +1,4 @@
-import { Link, useFetcher, useRevalidator } from "react-router";
+import { Link, useFetcher, useRevalidator, useSearchParams } from "react-router";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { NumberPurchase } from "@/components/phone-numbers/NumberPurchase";
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
@@ -15,13 +15,7 @@ import {
 } from "@/components/phone-numbers/ServiceAddressGate";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Section, SectionHeader } from "@/components/shared/Section";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { goalNeedsSmsCompliance } from "@/lib/messaging-onboarding/goals";
+import { Button } from "@/components/ui/button";
 import {
   countRentedWorkspaceNumbers,
   countVerifiedCallerIdNumbers,
@@ -57,16 +51,18 @@ type OnboardingFirstNumberStepProps = Pick<
 export function FirstNumberActionGroup({
   title,
   children,
+  flat = false,
 }: {
   title: string;
   children: ReactNode;
+  flat?: boolean;
 }) {
   const headingId = useId();
   return (
     <section
       role="group"
       aria-labelledby={headingId}
-      className="min-w-0 space-y-4 rounded-md bg-muted/40 p-4"
+      className={`min-w-0 space-y-4 ${flat ? "" : "rounded-md bg-muted/40 p-4"}`}
     >
       <h3 id={headingId} className="text-sm font-medium">
         {title}
@@ -109,6 +105,7 @@ export function OnboardingFirstNumberStep({
   pending,
   validationRequest,
 }: OnboardingFirstNumberStepProps) {
+  const [searchParams] = useSearchParams();
   const purchaseFetcher = useFetcher<NumbersSearchFetcherData>();
   const revalidator = useRevalidator();
   const {
@@ -154,12 +151,22 @@ export function OnboardingFirstNumberStep({
     revalidator.revalidate();
   };
 
-  const smsGoal = goalNeedsSmsCompliance(onboarding.selectedGoal);
   const callerIdNumbers = numbers.filter((number) => number?.type === "caller_id");
   const hasServiceAddress = isServiceAddressComplete(
     onboarding.emergencyVoice.address,
   );
   const firstNumberReturnTo = `/workspaces/${workspaceId}/onboarding?step=first_number`;
+
+  const requestedStep = searchParams.get("numberStep");
+  // Saved resources take precedence over an old URL after purchase or verification.
+  const numberStep = hasFirstNumber
+    ? "complete"
+    : requestedStep === "verify" || (!requestedStep && callerIdNumbers.length > 0)
+      ? "verify"
+      : requestedStep === "rent"
+        ? hasServiceAddress ? "rent" : "address"
+        : requestedStep === "address" ? "address" : "choose";
+  const rentReturnTo = `${firstNumberReturnTo}&numberStep=rent`;
 
   if (!messagingReady) {
     // Distinguish "still working on it" from "we gave up". The compliance job
@@ -220,37 +227,62 @@ export function OnboardingFirstNumberStep({
         <SectionHeader
           compact
           title="Phone number"
-          description="Set a service address, then rent a number or verify one you already own. Configure inbound routing after a number is on the workspace."
+          description={hasFirstNumber
+            ? rentedCount > 0
+              ? "Your number is added. Review how incoming calls are handled, then continue setup."
+              : "Your caller ID is verified. Incoming calls stay with your current provider. Continue setup when you are ready."
+            : "Get a new number, or verify a number your organization already owns."}
         />
-        <div className="space-y-8">
-          <ServiceAddressGate
-            workspaceId={workspaceId}
-            onboarding={onboarding}
-            isReadOnly={isReadOnly}
-            returnTo={firstNumberReturnTo}
-          />
-          {smsGoal ? (
-            <TooltipProvider>
-              <div className="rounded-md bg-muted/40 p-3 text-sm text-muted-foreground">
-                <p>
-                  Toll-free numbers support higher SMS volume after verification, and that
-                  path requires a Canadian business number (BN). A local number works for
-                  lighter texting without BN verification.
+        <div className="space-y-6">
+          <nav aria-label="Phone number setup" className="flex flex-wrap items-center gap-2 text-sm">
+            {hasFirstNumber ? <span>1. Choose a method</span> : <Link
+              className="underline underline-offset-4"
+              to={`${firstNumberReturnTo}&numberStep=choose`}
+              aria-current={numberStep === "choose" ? "step" : undefined}
+            >
+              1. Choose a method
+            </Link>}
+            <span aria-hidden="true">/</span>
+            <span aria-current={numberStep === "address" || numberStep === "rent" || numberStep === "verify" ? "step" : undefined}>
+              2. {numberStep === "verify" ? "Verify your number" : "Add your number"}
+            </span>
+            <span aria-hidden="true">/</span>
+            <span aria-current={numberStep === "complete" ? "step" : undefined}>3. Review your number</span>
+          </nav>
+          {numberStep === "choose" ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <FirstNumberActionGroup title="Get a new number">
+                <p className="text-sm text-muted-foreground">
+                  Rent a Canadian number for calls and text messages. You will need a service address and credits.
                 </p>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button type="button" className="mt-2 text-xs font-medium underline">
-                      Number choice tip
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs">
-                    Choose toll-free when you have a BN ready for carrier verification and
-                    expect higher daily volume. Choose local for regional presence and lighter
-                    sending.
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </TooltipProvider>
+                <Button asChild>
+                  <Link to={`${firstNumberReturnTo}&numberStep=address`}>Get a new number</Link>
+                </Button>
+              </FirstNumberActionGroup>
+              <FirstNumberActionGroup title="Use an existing number">
+                <p className="text-sm text-muted-foreground">
+                  Verify a number you own to use as caller ID. Incoming calls stay with your current provider.
+                </p>
+                <Button variant="outline" asChild>
+                  <Link to={`${firstNumberReturnTo}&numberStep=verify`}>Use an existing number</Link>
+                </Button>
+              </FirstNumberActionGroup>
+            </div>
+          ) : null}
+          {numberStep === "address" ? (
+            <div className="space-y-4">
+              <ServiceAddressGate
+                workspaceId={workspaceId}
+                onboarding={onboarding}
+                isReadOnly={isReadOnly}
+                returnTo={rentReturnTo}
+              />
+              {hasServiceAddress ? (
+                <Button asChild>
+                  <Link to={rentReturnTo}>Continue to number search</Link>
+                </Button>
+              ) : null}
+            </div>
           ) : null}
           {hasFirstNumber ? (
             <Alert>
@@ -262,15 +294,13 @@ export function OnboardingFirstNumberStep({
                 {verifiedCallerIdCount > 0
                   ? `${verifiedCallerIdCount} verified caller ID${verifiedCallerIdCount === 1 ? "" : "s"} ready for outbound.`
                   : null}{" "}
-                Continue when you are ready, or add another number below.
+                Continue when you are ready. You can add more numbers in Settings.
               </AlertDescription>
             </Alert>
           ) : null}
 
-          {/* Address first → then choose rent vs verify (#1114). */}
-          {hasServiceAddress ? (
-            <div className="grid min-w-0 grid-cols-1 gap-8">
-              <FirstNumberActionGroup title="Rent a Canadian number">
+          {numberStep === "rent" ? (
+              <FirstNumberActionGroup title="Rent a Canadian number" flat>
                 <p className="text-sm text-muted-foreground">
                   Best for inbound SMS, inbound calls, and full two-way messaging.
                 </p>
@@ -288,15 +318,16 @@ export function OnboardingFirstNumberStep({
                     // without it the customer lands on /billing, goes to
                     // Stripe, returns to /billing, and has to find their way
                     // back into setup unaided.
-                    billingLink={`/workspaces/${workspaceId}/billing?returnTo=${encodeURIComponent(firstNumberReturnTo)}`}
+                    billingLink={`/workspaces/${workspaceId}/billing?returnTo=${encodeURIComponent(rentReturnTo)}`}
                     onPurchaseComplete={handlePurchaseComplete}
                   />
                 )}
               </FirstNumberActionGroup>
-
+          ) : null}
+          {numberStep === "verify" ? (
               <FirstNumberActionGroup title="Verify your own number">
                 <p className="text-sm text-muted-foreground">
-                  Outbound SMS and calls only. Rent a number for inbound traffic.
+                  Keep your phone nearby for the verification call. This does not move your number to CallCaster.
                 </p>
                 {callerIdNumbers.length > 0 ? (
                   <ul className="space-y-2" data-testid="onboarding-caller-id-list">
@@ -342,24 +373,20 @@ export function OnboardingFirstNumberStep({
                   />
                 )}
               </FirstNumberActionGroup>
-            </div>
-          ) : (
-            <Alert>
-              <AlertDescription>
-                Save a service address above before searching for numbers to rent or verifying a
-                caller ID.
-              </AlertDescription>
-            </Alert>
-          )}
+          ) : null}
+          {numberStep === "rent" ? (
+            <Button variant="outline" asChild>
+              <Link to={`${firstNumberReturnTo}&numberStep=address`}>Back to service address</Link>
+            </Button>
+          ) : null}
 
           {/* Routing only after a rented number exists (#1114). */}
           {rentedNumbers.length > 0 && !isReadOnly ? (
             <div className="space-y-2 border-t border-border/60 pt-6">
               <div>
-                <h3 className="font-medium">Inbound routing</h3>
+                <h3 className="font-medium">When someone calls your number</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Choose a routing preset for each rented number. Advanced settings include
-                  handset behavior, ring count, voicemail greetings, and individual routing fields.
+                  Choose where incoming calls go for each rented number. You can change this later in Settings.
                 </p>
               </div>
               <NumberSummaryList

@@ -28,7 +28,7 @@ export const WIZARD_STEP_META: Array<{
   { id: "script", label: "Script", shortLabel: "Script" },
   { id: "campaign_info", label: "Campaign info", shortLabel: "Campaign" },
   { id: "credits", label: "Credits", shortLabel: "Credits" },
-  { id: "launch_checks", label: "Ready to launch", shortLabel: "Launch" },
+  { id: "launch_checks", label: "Review your setup", shortLabel: "Review" },
 ];
 
 export const GOAL_OPTIONS = ONBOARDING_GOAL_OPTIONS;
