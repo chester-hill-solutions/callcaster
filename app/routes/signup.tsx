@@ -203,7 +203,7 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
           <Button
             disabled={isBusy}
             type="submit"
-            className="w-full bg-brand-primary text-white transition-all duration-300 hover:bg-brand-secondary"
+            className="w-full"
           >
             Send Message
           </Button>

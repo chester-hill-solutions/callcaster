@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Text } from "@/components/ui/typography";
 import { numberRentalPriceLabel } from "@/lib/number-rental";
+import { formatNumberLocation } from "@/lib/number-locality";
 import type { AvailableNumber } from "@/components/phone-numbers/NumberPurchase.constants";
 import type { ColumnDef } from "@tanstack/react-table";
 
@@ -52,18 +53,13 @@ export function buildNumberPurchaseColumns(
       id: "location",
       header: "Location",
       cell: ({ row }) => {
-        // Twilio returns combined-city rate-center names concatenated in
-        // CamelCase (e.g. "AjaxPickering" for the Ajax/Pickering ON rate
-        // centre). Insert a space at every lower→upper boundary so the
-        // UI reads "Ajax Pickering" instead of the unpunctuated blob
-        // Sai flagged in #1321.
-        const locality = row.original.locality
-          ? row.original.locality.replace(/([a-z])([A-Z])/g, "$1 $2")
-          : row.original.locality;
-        const parts = [locality, row.original.region].filter(Boolean);
+        const location = formatNumberLocation(
+          row.original.locality,
+          row.original.region,
+        );
         return (
           <span className="text-sm text-muted-foreground">
-            {parts.length > 0 ? parts.join(", ") : "—"}
+            {location || "—"}
           </span>
         );
       },

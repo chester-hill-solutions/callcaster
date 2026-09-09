@@ -16,6 +16,7 @@ import type { AppError } from "@/lib/errors.server";
 // eslint-disable-next-line no-restricted-imports
 import { db } from "@/server/db";
 import { defineLoader } from "@/lib/handler.server";
+import { requirePositiveIntegerParam } from "@/lib/route-params";
 
 interface QueueResponse {
   queueData: (QueueItem & { contact: Contact; audiences: Audience[] })[] | null;
@@ -48,7 +49,7 @@ export const loader = defineLoader({
 
     if (!selected_id) throw redirect(campaignsListUrl);
 
-    const campaignIdNum = Number(selected_id);
+    const campaignIdNum = requirePositiveIntegerParam(selected_id, auth.ctx.headers);
 
     // This loader must verify the campaign belongs to the workspace itself: the
     // parent layout loader's guard can be bypassed under single-fetch route

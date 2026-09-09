@@ -120,7 +120,6 @@ export default function AudiencesNew() {
                     type="submit"
                     data-testid="audience-next-upload"
                     disabled={!audienceName.trim()}
-                    className="bg-brand-primary text-white hover:bg-brand-secondary"
                   >
                     Next: Select File <MdArrowForward className="ml-2" />
                   </Button>
@@ -151,7 +150,6 @@ export default function AudiencesNew() {
                   <div className="flex justify-end">
                     <Button
                       type="button"
-                      className="bg-brand-primary text-white hover:bg-brand-secondary"
                       onClick={() => {
                         if (!workspaceId) return;
                         navigate(

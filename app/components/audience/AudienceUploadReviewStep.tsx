@@ -53,7 +53,6 @@ export function AudienceUploadReviewStep({
         <Button
           type="button"
           onClick={onStartUpload}
-          className="bg-brand-primary text-white hover:bg-brand-secondary"
         >
           Start Upload
         </Button>

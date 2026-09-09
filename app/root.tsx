@@ -153,8 +153,12 @@ function ErrorShell({
           Error boundary renders a whole separate <html>, so the theme init
           from App doesn't run here — leaving the page in light-mode tokens
           during the FOUC ("flash bang" per #1397). Duplicate the same theme
-          bootstrap so the error page respects the user's dark preference
-          synchronously.
+          bootstrap so the first paint respects the user's dark preference.
+          This script alone is not enough: React 19 strips every attribute
+          from <html> when it hydrates the singleton, so the class it adds
+          is gone by the time the page is interactive. The ThemeProvider
+          below re-applies it after hydration, the same way App gets its
+          class back.
         */}
         <script
           dangerouslySetInnerHTML={{
@@ -164,58 +168,64 @@ function ErrorShell({
         <Links />
       </head>
       <body className="min-h-screen bg-background">
-        <main className="flex min-h-screen items-center justify-center p-6">
-          <div className="w-full max-w-md text-center">
-            <p className="font-Tabac-Slab text-2xl font-black text-brand-primary">
-              CallCaster
-            </p>
-            <h1 className="mt-6 text-3xl font-semibold text-foreground">
-              {heading}
-            </h1>
-            <p className="mt-3 text-base text-muted-foreground">
-              {body}
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <a
-                href="/"
-                className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
-              >
-                Go home
-              </a>
-              {/*
-                Go back — the common landing case here is a stale link or a
-                mistyped URL where the user just wants to step back one entry
-                (#1398). window.history.back() is safe from inside the root
-                ErrorBoundary; useNavigate() would require this tree to be
-                inside the RouterProvider, which the ErrorShell intentionally
-                is not.
-              */}
-              <button
-                type="button"
-                onClick={() => window.history.back()}
-                className="inline-flex items-center rounded-md border border-input px-4 py-2 text-foreground hover:bg-accent hover:text-accent-foreground"
-              >
-                Go back
-              </button>
-              <button
-                type="button"
-                onClick={() => window.location.reload()}
-                className="inline-flex items-center rounded-md border border-input px-4 py-2 text-foreground hover:bg-accent hover:text-accent-foreground"
-              >
-                Try again
-              </button>
+        <ThemeProvider
+          defaultTheme="system"
+          storageKey="callcaster-theme"
+          attribute="class"
+        >
+          <main className="flex min-h-screen items-center justify-center p-6">
+            <div className="w-full max-w-md text-center">
+              <p className="font-Tabac-Slab text-2xl font-black text-brand-primary">
+                CallCaster
+              </p>
+              <h1 className="mt-6 text-3xl font-semibold text-foreground">
+                {heading}
+              </h1>
+              <p className="mt-3 text-base text-muted-foreground">
+                {body}
+              </p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                <a
+                  href="/"
+                  className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-primary-foreground hover:bg-primary/90"
+                >
+                  Go home
+                </a>
+                {/*
+                  Go back — the common landing case here is a stale link or a
+                  mistyped URL where the user just wants to step back one entry
+                  (#1398). window.history.back() is safe from inside the root
+                  ErrorBoundary; useNavigate() would require this tree to be
+                  inside the RouterProvider, which the ErrorShell intentionally
+                  is not.
+                */}
+                <button
+                  type="button"
+                  onClick={() => window.history.back()}
+                  className="inline-flex items-center rounded-md border border-input px-4 py-2 text-foreground hover:bg-accent hover:text-accent-foreground"
+                >
+                  Go back
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="inline-flex items-center rounded-md border border-input px-4 py-2 text-foreground hover:bg-accent hover:text-accent-foreground"
+                >
+                  Try again
+                </button>
+              </div>
+              <p className="mt-6 text-sm text-muted-foreground">
+                Still stuck?{" "}
+                <a
+                  href={`mailto:${SUPPORT_EMAIL}`}
+                  className="text-brand-primary underline"
+                >
+                  Contact support
+                </a>
+              </p>
             </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              Still stuck?{" "}
-              <a
-                href={`mailto:${SUPPORT_EMAIL}`}
-                className="text-brand-primary underline"
-              >
-                Contact support
-              </a>
-            </p>
-          </div>
-        </main>
+          </main>
+        </ThemeProvider>
         <Scripts />
       </body>
     </html>
