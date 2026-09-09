@@ -60,7 +60,7 @@ Common fields (see [Script JSON format](script-json-format.md) for the full tabl
 | **`type`** | Drives UI and runtime (e.g. `textarea`, `select`, `radio`, `checkbox` for conversational scripts; IVR often uses `synthetic` or `recorded`). |
 | **`title`**, **`content`** | Labels and main text. |
 | **`options`** | For interactive types: choices with **`next`** targets (see below). |
-| **`audioFile`** | IVR / audio-backed flows: text for `synthetic` or storage path for `recorded` (see [`api.ivr.$campaignId.$pageId.$blockId`](../app/routes/api.ivr.$campaignId.$pageId.$blockId.tsx)). |
+| **`audioFile`** | IVR / audio-backed flows: text for `synthetic` or storage path for `recorded`. A synthetic block with an empty `audioFile` speaks `content`, then `prompt`, then `title` instead of playing silence (see [`api.ivr.$campaignId.$pageId.$blockId`](../app/routes/api.ivr.$campaignId.$pageId.$blockId.tsx)). |
 
 Interactive options also carry a **`value`** for IVR (DTMF or speech mapping), including the sentinel **`vx-any`** for “any voice input” (see [`api.ivr.$campaignId.$pageId.$blockId.response`](../app/routes/api.ivr.$campaignId.$pageId.$blockId.response.tsx)).
 

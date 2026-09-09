@@ -14,6 +14,9 @@ interface Script {
     id: string;
     type: string;
     audioFile: string;
+    title?: string;
+    content?: string;
+    prompt?: string;
     // Present on synthetic-speech blocks that opted into a specific Polly
     // voice via the roster in app/lib/tts-voices.ts. `wireExtras` is
     // scriptkit's pass-through slot; the roster module is the allowlist for
@@ -23,9 +26,33 @@ interface Script {
   }>;
 }
 
+type AudioBlock = {
+  type: string;
+  audioFile: string;
+  title?: string;
+  content?: string;
+  prompt?: string;
+  wireExtras?: Record<string, unknown> | null;
+};
+
+/**
+ * Text a synthetic block speaks. `audioFile` is the wire field the editor
+ * writes speech into; blocks authored before that (every text-only script,
+ * including the seeded sample) carry their words in `content`, so fall
+ * back through the script text rather than emit an empty <Say> that plays
+ * as silence (#1673).
+ */
+export function synthesizedSpeechText(block: AudioBlock): string {
+  for (const candidate of [block.audioFile, block.content, block.prompt, block.title]) {
+    const text = typeof candidate === "string" ? candidate.trim() : "";
+    if (text) return text;
+  }
+  return "";
+}
+
 const handleAudio = async (
   twiml: TwimlResponse,
-  block: { type: string; audioFile: string; wireExtras?: Record<string, unknown> | null },
+  block: AudioBlock,
   workspace: string,
 ) => {
   const { type, audioFile } = block;
@@ -45,9 +72,11 @@ const handleAudio = async (
     // just because `as const satisfies readonly TtsVoice[]` on the
     // roster still surfaces `.id` as `string`. Verified against the
     // twilio SDK's SayVoice enum on module import above.
+    const speech = synthesizedSpeechText(block);
+    if (!speech) return;
     twiml.say(
       { voice: resolveVoiceForBlock(block) as Parameters<typeof twiml.say>[0]["voice"] },
-      audioFile,
+      speech,
     );
   }
 };
@@ -119,7 +148,7 @@ const handleOptions = (
 
 const handleBlock = async (
     twiml: TwimlResponse,
-  block: { type: string; audioFile: string; options?: Array<{ value: string; next?: string }> },
+  block: AudioBlock & { options?: Array<{ value: string; next?: string }> },
   campaignId: string,
   pageId: string,
   blockId: string,

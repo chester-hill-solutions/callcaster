@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Fixed
+
+- Automated phone menu calls no longer play silence for a step whose speech text is empty. A spoken step with nothing in its speech field now reads the step's script text (then its prompt, then its title), so text-only scripts, including the sample phone menu every new workspace starts with, are audible again ([#1673](https://github.com/chester-hill-solutions/callcaster/issues/1673)).
+
 ## 2026-09-08 — release [#1684](https://github.com/chester-hill-solutions/callcaster/pull/1684)
 
 Nine PRs on `dev` since the earlier 2026-09-08 release ([#1661](https://github.com/chester-hill-solutions/callcaster/pull/1661)): the 2026-09-08 retest batch from #1319/#1321/#1397/#1344/#1224/#1338/#1292 plus #1682 and the IVR audio-step editor.
