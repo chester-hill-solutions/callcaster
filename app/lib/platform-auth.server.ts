@@ -137,10 +137,12 @@ export async function loginWithPassword(
     };
   } catch (error) {
     logger.error("loginWithPassword failed", error);
-    return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Invalid credentials",
-    };
+    // Never surface the underlying error to the browser: a DB/network failure
+    // can otherwise leak schema details (e.g. "relation auth_user does not
+    // exist" on an un-bootstrapped preview DB) as a plain "Failed query"
+    // message. Wrong credentials are already handled by the success-path check
+    // above, so reaching here means the server failed — say so generically.
+    return { ok: false, error: "We couldn't sign you in. Try again shortly." };
   }
 }
 
