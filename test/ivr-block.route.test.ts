@@ -232,6 +232,95 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     expect(await res.text()).toContain('<Say voice="Polly.Salli-Neural">Hello.</Say>');
   });
 
+  // #1673: every text-only script (including the seeded sample phone menu)
+  // stores its words in `content` with `audioFile: ""`; the runtime read
+  // only `audioFile` and emitted an empty <Say>, so the caller heard
+  // silence and the queue row still completed.
+  test("synthetic block with empty audioFile speaks the block's content (#1673)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: {
+        b1: {
+          id: "b1",
+          type: "textarea",
+          title: "Greeting",
+          content: "Hello, thanks for calling. How are you today?",
+          audioFile: "",
+        },
+      },
+    };
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({
+      workspace: "w1",
+      script: { steps: script },
+    } as any);
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: ivrBlockRequest(),
+    } as any);
+    const text = await res.text();
+    expect(text).toContain(">Hello, thanks for calling. How are you today?</Say>");
+    expect(text).not.toContain("<Say></Say>");
+  });
+
+  test("synthetic block falls back to prompt, then title, and keeps audioFile first (#1673)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1", "b2", "b3"] } },
+      blocks: {
+        b1: { id: "b1", type: "say", audioFile: "  ", content: "", prompt: "Press one.", title: "Menu" },
+        b2: { id: "b2", type: "say", audioFile: "", title: "Closing" },
+        b3: { id: "b3", type: "say", audioFile: "Spoken text wins.", content: "not this" },
+      },
+    };
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const say = async (blockId: string) => {
+      campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({
+        workspace: "w1",
+        script: { steps: script },
+      } as any);
+      const res = await mod.action({
+        params: { campaignId: "1", pageId: "page_1", blockId },
+        request: ivrBlockRequest(),
+      } as any);
+      return res.text();
+    };
+    expect(await say("b1")).toContain(">Press one.</Say>");
+    expect(await say("b2")).toContain(">Closing</Say>");
+    expect(await say("b3")).toContain(">Spoken text wins.</Say>");
+  });
+
+  test("synthetic block with no text at all emits no <Say> and still advances (#1673)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1", "b2"] } },
+      blocks: {
+        b1: { id: "b1", type: "say", audioFile: "", content: "", title: "" },
+        b2: { id: "b2", type: "say", audioFile: "next" },
+      },
+    };
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({
+      workspace: "w1",
+      script: { steps: script },
+    } as any);
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: ivrBlockRequest(),
+    } as any);
+    const text = await res.text();
+    expect(text).not.toContain("<Say");
+    expect(text).toContain("/api/ivr/1/page_1/b2</Redirect>");
+  });
+
+  test("every step of the seeded sample script has something to say (#1673)", async () => {
+    const { synthesizedSpeechText } = await import(
+      "../app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server"
+    );
+    const { SAMPLE_SCRIPT_STEPS } = await import("../app/lib/seed/sample-script.server");
+    for (const block of Object.values(SAMPLE_SCRIPT_STEPS.blocks)) {
+      expect(synthesizedSpeechText(block as any), block.id).not.toBe("");
+    }
+  });
+
   test("no options redirects to next block/page or hangs up; missing block says error", async () => {
     const script = {
       pages: { page_1: { blocks: ["b1", "b2"] }, page_2: { blocks: ["b3"] } },
