@@ -79,8 +79,8 @@
   {
     "issueNumber": 1162,
     "verdict": "verify-close",
-    "summary": "The default branch remains master. #1686 now labels closing issues on-dev when their PR merges to dev. Optional project movement still needs project setup.",
-    "resolution": "Verify on-dev labels on the next merge. Preserve master as release branch; do not introduce a qa branch.",
+    "summary": "The default branch remains master. Sai rejected the label/comment workflow in #1697; merge tracking must use the project Status field.",
+    "resolution": "Verify project status on-dev after a dev merge and configure the workflow project credential. Preserve master as release branch; do not introduce a qa branch.",
     "lookIn": [
       ".github/workflows/issue-on-dev.yml"
     ],

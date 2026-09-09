@@ -38,6 +38,7 @@ Use `gh auth refresh -s <scope>` only when the operation requires an additional 
 
 ## Changelog
 
+- Every issue-fixing commit and PR body must include `Closes #N` (or another GitHub closing keyword). A dev merge updates the issue's **project Status** to `on-dev`; do not add an `on-dev` label, post a status comment, or manually close the issue. Verify the board status after merge. The release into `master` closes the issue.
 - Every PR that changes app behavior adds one line under `## [Unreleased]` in `docs/CHANGELOG.md` (Added / Changed / Fixed / Removed / Security), phrased for a customer or operator, linking the PR and the issue. Do this in the same PR as the change.
 - A dev → master release PR renames the Unreleased section to `## YYYY-MM-DD — release #<PR>` and adds a fresh empty `## [Unreleased]` above it. CI enforces this on pull requests into `master` (`npm run check:changelog -- --base origin/master` locally); PRs into `dev` are not gated.
 

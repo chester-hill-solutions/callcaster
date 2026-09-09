@@ -295,3 +295,9 @@ Database errors on startup
 Email or billing features fail locally
 - `RESEND_API_KEY` and `STRIPE_SECRET_KEY` can be placeholders for general app boot
 - Use real values only when you need to exercise those integrations
+
+## Issue project status after a dev merge
+
+The `Issue on dev` workflow reads closing references from the merged PR body and its commits, then sets each open issue to `on-dev` in CHS backlog (project 9). It adds missing project items and does not label, comment on, or close issues. The default branch stays `master`; the release closes issues.
+
+Configure repository secret `PROJECT_TOKEN` with repository read access and organization Projects write access. The standard Actions token cannot update organization projects. Missing access or a missing status option fails the workflow so an incomplete update is visible. Optional variables `ON_DEV_PROJECT_NUMBER` and `ON_DEV_STATUS_VALUE` override project 9 and `on-dev`. A manual workflow run can retry a merged PR by number once access is repaired. Until then, update the board with `gh project item-edit` and verify the issue project status.
