@@ -9,6 +9,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - M4A/MOV audio uploads (including campaign and voicemail audio) now transcode to a playable MP3 instead of silently producing empty, unplayable audio ([#1730](https://github.com/chester-hill-solutions/callcaster/issues/1730)).
 - Sign-in failures no longer show a raw database error — the browser gets a generic message and the real error stays in the logs ([#1734](https://github.com/chester-hill-solutions/callcaster/issues/1734)).
 - PR-preview environments now bootstrap the full app schema (drizzle baseline) at boot and can seed the E2E fixtures (`E2E_SEED_ON_BOOT`), so a preview DB has working sign-in and known test accounts instead of a bare schema ([#1735](https://github.com/chester-hill-solutions/callcaster/issues/1735)).
+- IVR campaigns now run scripts created in the script editor: the first call step resolves to the script's actual first page instead of a hard-coded `page_1`, so editor-created scripts no longer play "There was an error in the IVR flow" ([#1743](https://github.com/chester-hill-solutions/callcaster/issues/1743)).
 
 ## 2026-09-09 — release [#1693](https://github.com/chester-hill-solutions/callcaster/pull/1693)
 
