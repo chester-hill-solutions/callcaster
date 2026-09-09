@@ -1,34 +1,13 @@
 import { Link } from "react-router";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Section, SectionHeader } from "@/components/shared/Section";
-import { formatCredits } from "@/lib/billing-format";
+import { buildWorkspaceLaunchChecklist } from "@/lib/workspace-launch-checklist";
 import {
-  countRentedWorkspaceNumbers,
-  countVerifiedCallerIdNumbers,
-  workspaceHasFirstNumber,
+  BUSINESS_IDENTITY_REQUIRED_FIELDS,
+  findMissingBusinessProfileFields,
 } from "@/lib/messaging-onboarding/predicates";
-import { wizardStepsForGoal } from "@/lib/messaging-onboarding/goals";
-import { productGoalForOnboardingGoal } from "@/lib/campaign-goals";
-import { WIZARD_STEP_META } from "./constants";
 import type { OnboardingStepProps } from "./types";
-
-function formatPhoneNumberBadge(
-  rentedCount: number,
-  verifiedCallerIdCount: number,
-): string {
-  if (rentedCount > 0 && verifiedCallerIdCount > 0) {
-    return `${rentedCount} rented, ${verifiedCallerIdCount} verified`;
-  }
-  if (rentedCount > 0) {
-    return `${rentedCount} rented number${rentedCount === 1 ? "" : "s"}`;
-  }
-  if (verifiedCallerIdCount > 0) {
-    return `${verifiedCallerIdCount} verified number${verifiedCallerIdCount === 1 ? "" : "s"}`;
-  }
-  return "Phone number pending";
-}
 
 type OnboardingLaunchStepProps = Pick<
   OnboardingStepProps,
@@ -50,93 +29,98 @@ export function OnboardingLaunchStep({
   scriptCount,
   creditsBalance,
 }: OnboardingLaunchStepProps) {
-  const numbers = phoneNumbers ?? [];
-  const rentedCount = countRentedWorkspaceNumbers(numbers);
-  const verifiedCallerIdCount = countVerifiedCallerIdNumbers(numbers);
-  const hasFirstNumber = workspaceHasFirstNumber(numbers);
-  const visibleStepIds = new Set(wizardStepsForGoal(onboarding.selectedGoal));
-  const campaignGoal = onboarding.selectedGoal
-    ? productGoalForOnboardingGoal(onboarding.selectedGoal)
-    : null;
+  const checklist = buildWorkspaceLaunchChecklist({
+    workspaceId,
+    onboarding,
+    workspaceNumbers: phoneNumbers ?? [],
+    audienceCount,
+    campaignCount,
+    scriptCount,
+    creditsBalance,
+  }).filter((item) => item.id !== "launch_review" && (
+    onboarding.selectedGoal !== "rent_number" ||
+    item.id === "goal" || item.id === "phone_number" || item.id === "credits"
+  ));
+  const items = [
+    ...checklist.filter((item) => item.id === "goal"),
+    {
+      id: "business_identity",
+      label: "Business identity",
+      description: "Check the organization details used for this workspace.",
+      complete: findMissingBusinessProfileFields(
+        onboarding.businessProfile, BUSINESS_IDENTITY_REQUIRED_FIELDS,
+      ).length === 0,
+      href: `/workspaces/${workspaceId}/onboarding?step=business_identity`,
+    },
+    ...checklist.filter((item) => item.id !== "goal"),
+  ];
+  const nextItem = items.find((item) => !item.complete);
+  const completeCount = items.filter((item) => item.complete).length;
 
   return (
     <Section variant="flat">
       <SectionHeader
         compact
-        title="Ready to launch"
-        description="Review your setup progress, then open the workspace to start your campaign."
+        title="Review your setup"
+        description="See what is complete and choose your next step. You can return to setup from your workspace."
       />
-      <div className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={hasFirstNumber ? "secondary" : "outline"}>
-            {formatPhoneNumberBadge(rentedCount, verifiedCallerIdCount)}
-          </Badge>
-          <Badge variant={audienceCount > 0 ? "secondary" : "outline"}>
-            {audienceCount > 0
-              ? `${audienceCount} audience${audienceCount === 1 ? "" : "s"}`
-              : "Call list pending"}
-          </Badge>
-          {visibleStepIds.has("script") ? (
-            <Badge variant={scriptCount > 0 ? "secondary" : "outline"}>
-              {scriptCount > 0
-                ? `${scriptCount} script${scriptCount === 1 ? "" : "s"}`
-                : "Script pending"}
-            </Badge>
-          ) : null}
-          <Badge variant={campaignCount > 0 ? "secondary" : "outline"}>
-            {campaignCount > 0
-              ? `${campaignCount} campaign${campaignCount === 1 ? "" : "s"}`
-              : "Campaign pending"}
-          </Badge>
-          <Badge variant={creditsBalance > 0 ? "secondary" : "outline"}>
-            {creditsBalance > 0
-              ? `${formatCredits(creditsBalance)} credits`
-              : "0 credits"}
-          </Badge>
-        </div>
-        {readiness.warnings.length > 0 ? (
-          <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-            {readiness.warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            This workspace meets the current readiness checks for launch.
-          </p>
-        )}
-        <div className="grid gap-3 sm:grid-cols-2">
-          {onboarding.steps
-            .filter((step) => visibleStepIds.has(step.id as never))
-            .map((step) => {
-              const meta = WIZARD_STEP_META.find((item) => item.id === step.id);
-              return (
-                <div key={step.id} className="rounded-md bg-muted/40 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">{meta?.label ?? step.label}</span>
-                    <StatusBadge status={step.status} />
-                  </div>
-                </div>
-              );
-            })}
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="font-medium">{completeCount} of {items.length} setup items complete</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {nextItem
+                ? `Next: ${nextItem.label}.`
+                : "Your setup checklist is complete. Check any notices below before you start."}
+            </p>
+          </div>
           <Button asChild>
-            <Link to={`/workspaces/${workspaceId}`}>Go to workspace</Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link
-              to={`/workspaces/${workspaceId}/campaigns/new${
-                campaignGoal ? `?goal=${encodeURIComponent(campaignGoal)}` : ""
-              }`}
-            >
-              Create campaign
+            <Link to={nextItem?.href ?? `/workspaces/${workspaceId}`}>
+              {nextItem ? "Continue setup" : "Go to workspace"}
             </Link>
           </Button>
-          <Button variant="outline" asChild>
-            <Link to={`/workspaces/${workspaceId}/settings/numbers`}>Manage numbers</Link>
-          </Button>
         </div>
+
+        {readiness.warnings.length > 0 ? (
+          <section aria-labelledby="setup-notices" className="space-y-2 rounded-md bg-muted/40 p-4">
+            <h3 id="setup-notices" className="text-sm font-medium">Before you start</h3>
+            <p className="text-sm text-muted-foreground">
+              These notices can affect calling or messaging even when the setup items are complete.
+            </p>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+              {readiness.warnings.map((warning) => <li key={warning}>{warning}</li>)}
+            </ul>
+          </section>
+        ) : null}
+
+        <ul aria-label="Setup checklist" className="divide-y divide-border">
+          {items.map((item) => (
+            <li key={item.id} className="flex flex-col items-start justify-between gap-3 py-4 sm:flex-row sm:items-center">
+              <div className="w-full min-w-0 sm:flex-1">
+                <p className="text-sm font-medium">{item.label}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <StatusBadge status={item.complete ? "complete" : "pending"} label={item.complete ? "Complete" : "To do"} />
+                <Button variant="outline" size="sm" asChild>
+                  <Link to={item.href} aria-label={`${item.complete ? "Review" : "Set up"}: ${item.label}`}>
+                    {item.complete ? "Review" : "Set up"}
+                  </Link>
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <p className="text-sm text-muted-foreground">
+          {onboarding.selectedGoal === "rent_number"
+            ? "You can create a campaign later if you need one."
+            : "Before launching, open your campaign and check its contacts, content, and sending settings."}
+        </p>
+        {nextItem ? (
+          <Button variant="ghost" asChild>
+            <Link to={`/workspaces/${workspaceId}`}>Go to workspace and finish later</Link>
+          </Button>
+        ) : null}
       </div>
     </Section>
   );

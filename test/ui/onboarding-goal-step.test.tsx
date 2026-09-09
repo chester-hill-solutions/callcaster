@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { createElement, type ReactElement } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
+import { onboardingFixture as minimalOnboarding } from "../fixtures/onboarding";
 import { OnboardingGoalStep } from "@/routes/workspaces+/$id/onboarding/OnboardingGoalStep";
 import { OnboardingCreditsStep } from "@/routes/workspaces+/$id/onboarding/OnboardingCreditsStep";
 import { OnboardingProgressStrip } from "@/routes/workspaces+/$id/onboarding/OnboardingProgressStrip";
@@ -18,131 +18,6 @@ const pending = {
   isVerifyingCallerId: false,
 };
 
-function minimalOnboarding(
-  overrides: Partial<WorkspaceMessagingOnboardingState> = {},
-): WorkspaceMessagingOnboardingState {
-  return {
-    version: 3,
-    status: "not_started",
-    currentStep: "path_selection",
-    operatingCountry: "CA",
-    selectedChannels: [],
-    selectedGoal: null,
-    steps: [],
-    businessProfile: {
-      legalBusinessName: "Acme",
-      businessType: "",
-      websiteUrl: "",
-      privacyPolicyUrl: "",
-      termsOfServiceUrl: "",
-      supportEmail: "",
-      supportPhone: "",
-      useCaseSummary: "",
-      optInWorkflow: "",
-      optInKeywords: "",
-      optOutKeywords: "",
-      helpKeywords: "",
-      sampleMessages: [],
-      doingBusinessAs: "",
-      businessRegistrationNumber: "",
-      ageGatedContent: false,
-      ein: "",
-      industry: "",
-      authorizedRepName: "",
-      authorizedRepEmail: "",
-      authorizedRepPhone: "",
-      authorizedRepTitle: "",
-    },
-    messagingService: {
-      desiredSendMode: "messaging_service",
-      serviceSid: null,
-      friendlyName: null,
-      provisioningStatus: "not_started",
-      attachedSenderPhoneNumbers: [],
-      supportedChannels: [],
-      stickySenderEnabled: true,
-      advancedOptOutEnabled: false,
-      lastProvisionedAt: null,
-      lastError: null,
-    },
-    subaccountBootstrap: {
-      status: "not_started",
-      authMode: "mixed",
-      callbackBaseUrl: null,
-      inboundVoiceUrl: null,
-      inboundSmsUrl: null,
-      statusCallbackUrl: null,
-      createdResources: [],
-      featureFlags: [],
-      driftMessages: [],
-      lastSyncedAt: null,
-      lastError: null,
-    },
-    emergencyVoice: {
-      status: "not_started",
-      enabled: false,
-      emergencyEligiblePhoneNumbers: [],
-      ineligibleCallerIds: [],
-      allowedCallerIdTypes: ["rented"],
-      complianceNotes: "",
-      address: {
-        addressSid: null,
-        customerName: "",
-        street: "",
-        city: "",
-        region: "",
-        postalCode: "",
-        countryCode: "CA",
-        status: "not_started",
-        validationError: null,
-        lastValidatedAt: null,
-      },
-      lastReviewedAt: null,
-    },
-    a2p10dlc: {
-      status: "not_started",
-      brandSid: null,
-      campaignSid: null,
-      trustProductSid: null,
-      customerProfileBundleSid: null,
-      brandType: null,
-      tcrId: null,
-      rejectionReason: null,
-      lastSubmittedAt: null,
-      lastSyncedAt: null,
-    },
-    rcs: {
-      status: "not_started",
-      provider: null,
-      agentId: null,
-      senderId: null,
-      displayName: "",
-      publicDescription: "",
-      logoImageUrl: "",
-      bannerImageUrl: "",
-      accentColor: "",
-      optInPolicyImageUrl: "",
-      useCaseVideoUrl: "",
-      representativeName: "",
-      representativeTitle: "",
-      representativeEmail: "",
-      notificationEmail: "",
-      regions: [],
-      prerequisites: [],
-      notes: "",
-      lastSubmittedAt: null,
-      lastSyncedAt: null,
-    },
-    reviewState: {
-      blockingIssues: [],
-      lastError: null,
-      lastUpdatedAt: null,
-    },
-    lastUpdatedAt: null,
-    lastUpdatedBy: null,
-    ...overrides,
-  };
-}
 
 function renderWithRouter(ui: ReactElement, initialEntry = "/") {
   const router = createMemoryRouter(
