@@ -96,17 +96,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1662,
-    "verdict": "fix-now",
-    "summary": "The sole open PR #1663 fixes the Standard API Key restriction on the Twilio Account endpoint. Its changelog conflict has been resolved locally.",
-    "resolution": "Finish full ci:local, push the conflict resolution, require green PR checks, merge to dev, and release.",
-    "lookIn": [
-      "app/lib/database/workspace-twilio-sync.server.ts",
-      "test/workspace-twilio-sync.server.test.ts"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1665,
     "verdict": "fix-now",
     "summary": "Submitting the audio form without a file shows plain red error text. The request asks for the shared error style.",
@@ -146,17 +135,6 @@
     "resolution": "Put the action outside the scrolling results area and verify a long workspace list.",
     "lookIn": [
       "app/components/layout/Navbar.tsx"
-    ],
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1674,
-    "verdict": "fix-now",
-    "summary": "The E2E IVR script has no audioFile, uses digit instead of value, and points to nonexistent page2. The fixture is in seed-database.mjs, not seed-data.mjs as the report says.",
-    "resolution": "Set speech text, keypad value 1, answer label Yes, and destination hangup. Verify the seeded editor shows all four fields.",
-    "lookIn": [
-      "scripts/e2e/seed-database.mjs",
-      "e2e/specs/scripts-audio.spec.ts"
     ],
     "blockedBy": []
   },
