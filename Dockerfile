@@ -46,6 +46,10 @@ COPY --from=builder --chown=bun:bun /app/shared ./shared
 COPY --from=builder --chown=bun:bun /app/services ./services
 # Needed when RUN_CLIENT_MIGRATIONS_ON_BOOT=true (ephemeral PR DBs).
 COPY --from=builder --chown=bun:bun /app/client/migrations ./client/migrations
+# Ephemeral PR DBs also need the drizzle baseline (drizzle/*.sql — the app
+# schema) and the E2E fixture seed (scripts/e2e, optional E2E_SEED_ON_BOOT).
+COPY --from=builder --chown=bun:bun /app/drizzle ./drizzle
+COPY --from=builder --chown=bun:bun /app/scripts/e2e ./scripts/e2e
 COPY --from=builder --chown=bun:bun /app/node_modules ./node_modules
 COPY --from=builder --chown=bun:bun /app/package.json ./package.json
 # Bun resolves the "@/*" import alias from tsconfig paths at runtime
