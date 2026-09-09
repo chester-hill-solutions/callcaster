@@ -4,9 +4,9 @@
 #
 # Safe to invoke frequently (cron). It shares the batch lock so it never
 # rebases under a running batch, and it only force-pushes a head that
-# rebased cleanly AND passes typecheck. If rebase or typecheck fails it
-# resets the local branch to the last-known-good remote tip and posts a
-# PR comment instead of pushing a broken head.
+# rebased cleanly AND passes typecheck AND check:bun-lock. If any gate
+# fails it resets the local branch to the last-known-good remote tip and
+# posts a PR comment instead of pushing a broken head.
 #
 # Usage:
 #   bash autoresearch/sync-devd.sh run                 # one sync attempt (cron)
@@ -113,6 +113,15 @@ run() {
     log "TYPECHECK FAILED after rebase; reset to last-good remote ($before), remote untouched"
     if command -v gh >/dev/null; then
       gh pr comment "$AUTORESEARCH_PR_NUMBER" --body "⚠️ Auto-sync skipped: the rebased tree fails \`npm run typecheck\`. The branch was reset to the last-known-good head ($before). Fix the type errors in the worktree, then force-push with lease." 2>/dev/null || true
+    fi
+    exit 1
+  fi
+
+  if ! npm run check:bun-lock >/dev/null 2>&1; then
+    git reset -q --hard "$AUTORESEARCH_REMOTE/$AUTORESEARCH_BRANCH"
+    log "BUN-LOCK DRIFT after rebase; reset to last-good remote ($before), remote untouched"
+    if command -v gh >/dev/null; then
+      gh pr comment "$AUTORESEARCH_PR_NUMBER" --body "⚠️ Auto-sync skipped: \`bun.lock\` drifted from \`package.json\` (check:bun-lock failed). The branch was reset to the last-known-good head ($before). Run \`bun install\` and commit \`bun.lock\` with the dependency change, then force-push with lease." 2>/dev/null || true
     fi
     exit 1
   fi
