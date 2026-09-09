@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Fixed
+
+- M4A/MOV audio uploads (including campaign and voicemail audio) now transcode to a playable MP3 instead of silently producing empty, unplayable audio ([#1730](https://github.com/chester-hill-solutions/callcaster/issues/1730)).
+
 ## 2026-09-09 — release [#1693](https://github.com/chester-hill-solutions/callcaster/pull/1693)
 
 ### Fixed
