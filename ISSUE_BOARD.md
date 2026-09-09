@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@5a15663d` · 84 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@f1e14fc2` · 84 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 10
+## Fix now — 8
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -59,16 +59,10 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Tracker: Coordinate with #1345/#1311/#1122.
 
 ### [#1690](https://github.com/chester-hill-solutions/callcaster/issues/1690) Refresh the open issue board for the September release
-- Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-09-09
+- **IN PROGRESS** · Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-09-09
 - Refresh all live issue records for this release, with shipped PR evidence and explicit pending user tests.
 - Resolution: Generate the full board, verify all references, and merge the board-only PR after full local checks.
 - Look in: `ISSUE_BOARD.md`, `scripts/issue-board-enrichment`
-
-### [#1674](https://github.com/chester-hill-solutions/callcaster/issues/1674) E2E seed IVR script does not match the fields the IVR runtime reads
-- Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-09-08
-- The E2E IVR script has no audioFile, uses digit instead of value, and points to nonexistent page2. The fixture is in seed-database.mjs, not seed-data.mjs as the report says.
-- Resolution: Set speech text, keypad value 1, answer label Yes, and destination hangup. Verify the seeded editor shows all four fields.
-- Look in: `scripts/e2e/seed-database.mjs`, `e2e/specs/scripts-audio.spec.ts`
 
 ### [#1669](https://github.com/chester-hill-solutions/callcaster/issues/1669) all workspaces option should be sticky to the bottom of the dropdown
 - Verdict: **Fix now** · Labels: ux · Assignee: none · Updated: 2026-09-08
@@ -94,17 +88,23 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Resolution: Use the existing shared form-error primitive, then inspect other audio upload entry points for the same mismatch.
 - Look in: `app/routes/workspaces+/$id/audios/new.route.tsx`, `app/components/ui/form-field.tsx`
 
-### [#1662](https://github.com/chester-hill-solutions/callcaster/issues/1662) Twilio sync fetches Account resource through the workspace's API Key — Standard keys can never have that permission
-- Verdict: **Fix now** · Labels: none · Assignee: none · Updated: 2026-09-08
-- The sole open PR #1663 fixes the Standard API Key restriction on the Twilio Account endpoint. Its changelog conflict has been resolved locally.
-- Resolution: Finish full ci:local, push the conflict resolution, require green PR checks, merge to dev, and release.
-- Look in: `app/lib/database/workspace-twilio-sync.server.ts`, `test/workspace-twilio-sync.server.test.ts`
-
 ---
 
-## Verify and close — 49
+## Verify and close — 51
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#1674](https://github.com/chester-hill-solutions/callcaster/issues/1674) E2E seed IVR script does not match the fields the IVR runtime reads
+- **IN PROGRESS** · Verdict: **Verify and close** · Labels: on-dev · Assignee: none · Updated: 2026-09-09
+- PR #1691 is merged to dev. The IVR fixture now has explicit speech text and a Press 1 → Yes → Hang up response. Its browser check passed.
+- Resolution: Include the fixture fix in release #1693. Keep the seeded editor browser check in the compose suite.
+- Look in: `scripts/e2e/seed-database.mjs`, `e2e/specs/scripts-audio.spec.ts`
+
+### [#1662](https://github.com/chester-hill-solutions/callcaster/issues/1662) Twilio sync fetches Account resource through the workspace's API Key — Standard keys can never have that permission
+- **IN PROGRESS** · Verdict: **Verify and close** · Labels: on-dev · Assignee: none · Updated: 2026-09-09
+- PR #1663 is merged to dev. Full local CI, GitHub quality/E2E checks and both preview deployments passed.
+- Resolution: Release the Account SID/Auth Token fix, then verify Twilio health sync in the deployed workspace.
+- Look in: `app/lib/database/workspace-twilio-sync.server.ts`, `test/workspace-twilio-sync.server.test.ts`
 
 ### [#1348](https://github.com/chester-hill-solutions/callcaster/issues/1348) IVR campaign is running yet no call to the recipient
 - **IN PROGRESS** · Verdict: **Verify and close** · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09

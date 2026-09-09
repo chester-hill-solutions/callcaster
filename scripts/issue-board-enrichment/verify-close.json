@@ -784,12 +784,34 @@
     "trackerRecommendation": "PR #1648 merge f1c4509b is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
   },
   {
+    "issueNumber": 1662,
+    "verdict": "verify-close",
+    "summary": "PR #1663 is merged to dev. Full local CI, GitHub quality/E2E checks and both preview deployments passed.",
+    "resolution": "Release the Account SID/Auth Token fix, then verify Twilio health sync in the deployed workspace.",
+    "lookIn": [
+      "app/lib/database/workspace-twilio-sync.server.ts",
+      "test/workspace-twilio-sync.server.test.ts"
+    ],
+    "blockedBy": []
+  },
+  {
     "issueNumber": 1664,
     "verdict": "verify-close",
     "summary": "The GitHub issue skill distinguishes COMPLETED, NOT_PLANNED and DUPLICATE. API verification on 2026-09-09 still reports #1314 as closed/not_planned.",
     "resolution": "Verify the canonical duplicate timeline, then correct the closed reason for #1314. Keep the existing closed state and avoid a false completed classification.",
     "lookIn": [
       ".agents/skills/github-issues/SKILL.md"
+    ],
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1674,
+    "verdict": "verify-close",
+    "summary": "PR #1691 is merged to dev. The IVR fixture now has explicit speech text and a Press 1 → Yes → Hang up response. Its browser check passed.",
+    "resolution": "Include the fixture fix in release #1693. Keep the seeded editor browser check in the compose suite.",
+    "lookIn": [
+      "scripts/e2e/seed-database.mjs",
+      "e2e/specs/scripts-audio.spec.ts"
     ],
     "blockedBy": []
   }
