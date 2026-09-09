@@ -3,10 +3,10 @@
     "issueNumber": 1148,
     "verdict": "fix-now",
     "recommendedTitle": "ux(onboarding): move SMS compliance identity fields out of Goal and bound help popovers",
-    "summary": "Goal page repeats SMS text in an InfoPopover, toll-free compliance fields live on Goal, and InfoPopover has no max-width/height/scroll.",
-    "currentBehavior": "OnboardingGoalStep shows long SMS copy + tooltip; SMS toll-free fields on Goal; InfoPopover unbounded.",
-    "rootCause": "Content layout on Goal + unbounded popover primitive.",
-    "resolution": "Extend InfoPopover with bounded wrap/scroll props (reusable), shorten Goal copy, move SMS compliance fields to Identity/Program shown only for SMS goal.",
+    "summary": "Tooltip bounds are already implemented, and Goal renders its descriptions without a duplicate InfoPopover. Toll-free business identity fields still render on Goal.",
+    "currentBehavior": "InfoPopover forwards max-width and max-height settings; OnboardingGoalStep still renders TollFreeVerificationFields after SMS number-path selection.",
+    "rootCause": "The remaining issue is placement of SMS identity fields, not the tooltip primitive.",
+    "resolution": "Move SMS business identity fields into the identity step while preserving validation and channel-specific visibility. Do not reimplement tooltip bounds.",
     "lookIn": [
       "app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx",
       "app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx",
@@ -69,8 +69,8 @@
     "recommendedTitle": "design(mfa): polish enrollment steps, status layout, and secure code-copy controls",
     "summary": "MFA change-log polish: cramped sublines (move status top-right), password-step action should be 'Next', icon copy controls with checkmark success, backup-code copy + secure-storage prompt, error-toast consistency.",
     "currentBehavior": "account.tsx renders SectionHeader with 'Save' button for the password step, status below header, plain text copy control, no backup-code copy/guidance; account.security.tsx + two-factor.tsx use plain red text.",
-    "rootCause": "Unpolished enrollment UI; some generic feedback overlaps #1335.",
-    "resolution": "Scope to /account and /account/security: rename Save->Next, add accessible icon copy buttons with temporary check states, add backup-code copy + secure-storage guidance, move generic feedback conversion to #1335. Do not change session/logout behavior.",
+    "rootCause": "Enrollment layout and copy still need the requested polish.",
+    "resolution": "Scope the remaining enrollment controls first. Keep session behavior unchanged; shared toast spacing is tracked in #1668.",
     "lookIn": [
       "app/routes/account.tsx",
       "app/routes/account.security.tsx",
@@ -92,7 +92,7 @@
     ],
     "size": "M",
     "risk": "medium",
-    "trackerRecommendation": "Redirect work stays under #1317, not here.",
+    "trackerRecommendation": "Treat enrollment polish as a separate PR from global toast spacing.",
     "blockedBy": []
   },
   {

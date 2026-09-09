@@ -786,8 +786,8 @@
   {
     "issueNumber": 1664,
     "verdict": "verify-close",
-    "summary": "The GitHub issue skill already distinguishes COMPLETED, NOT_PLANNED and DUPLICATE. The report also requests correction of issue #1314.",
-    "resolution": "Read the closed reason and duplicate timeline for #1314. Correct only if still wrong; do not classify other issues from title similarity alone.",
+    "summary": "The GitHub issue skill distinguishes COMPLETED, NOT_PLANNED and DUPLICATE. API verification on 2026-09-09 still reports #1314 as closed/not_planned.",
+    "resolution": "Verify the canonical duplicate timeline, then correct the closed reason for #1314. Keep the existing closed state and avoid a false completed classification.",
     "lookIn": [
       ".agents/skills/github-issues/SKILL.md"
     ],

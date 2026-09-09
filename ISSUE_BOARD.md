@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@3a1c28b9` · 84 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@5a15663d` · 84 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -24,13 +24,13 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Recommended title: **design(mfa): polish enrollment steps, status layout, and secure code-copy controls**
 - MFA change-log polish: cramped sublines (move status top-right), password-step action should be 'Next', icon copy controls with checkmark success, backup-code copy + secure-storage prompt, error-toast consistency.
 - Current behavior: account.tsx renders SectionHeader with 'Save' button for the password step, status below header, plain text copy control, no backup-code copy/guidance; account.security.tsx + two-factor.tsx use plain red text.
-- Root cause: Unpolished enrollment UI; some generic feedback overlaps #1335.
-- Resolution: Scope to /account and /account/security: rename Save->Next, add accessible icon copy buttons with temporary check states, add backup-code copy + secure-storage guidance, move generic feedback conversion to #1335. Do not change session/logout behavior.
+- Root cause: Enrollment layout and copy still need the requested polish.
+- Resolution: Scope the remaining enrollment controls first. Keep session behavior unchanged; shared toast spacing is tracked in #1668.
 - Look in: `app/routes/account.tsx`, `app/routes/account.security.tsx`, `app/routes/two-factor.tsx`
 - Existing tests: test/two-factor.server.test.ts (server gates only)
 - Missing tests: button labels; clipboard success/failure; enrollment keeps session
 - Done when: Password step says Next; Copy buttons accessible with check states; Backup codes have secure-storage prompt; Session behavior unchanged
-- Tracker: Redirect work stays under #1317, not here.
+- Tracker: Treat enrollment polish as a separate PR from global toast spacing.
 
 ### [#1205](https://github.com/chester-hill-solutions/callcaster/issues/1205) "Number" onboarding is confusing
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-08-10
@@ -48,10 +48,10 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 ### [#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148) SMS Onboarding Changes
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-08-07
 - Recommended title: **ux(onboarding): move SMS compliance identity fields out of Goal and bound help popovers**
-- Goal page repeats SMS text in an InfoPopover, toll-free compliance fields live on Goal, and InfoPopover has no max-width/height/scroll.
-- Current behavior: OnboardingGoalStep shows long SMS copy + tooltip; SMS toll-free fields on Goal; InfoPopover unbounded.
-- Root cause: Content layout on Goal + unbounded popover primitive.
-- Resolution: Extend InfoPopover with bounded wrap/scroll props (reusable), shorten Goal copy, move SMS compliance fields to Identity/Program shown only for SMS goal.
+- Tooltip bounds are already implemented, and Goal renders its descriptions without a duplicate InfoPopover. Toll-free business identity fields still render on Goal.
+- Current behavior: InfoPopover forwards max-width and max-height settings; OnboardingGoalStep still renders TollFreeVerificationFields after SMS number-path selection.
+- Root cause: The remaining issue is placement of SMS identity fields, not the tooltip primitive.
+- Resolution: Move SMS business identity fields into the identity step while preserving validation and channel-specific visibility. Do not reimplement tooltip bounds.
 - Look in: `app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx`, `app/components/shared/InfoPopover.tsx`
 - Existing tests: test/ui/onboarding-goal-step.test.tsx (expects toll-free on Goal — must move)
 - Missing tests: popover bounds; SMS-only identity fields
@@ -142,8 +142,8 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ### [#1664](https://github.com/chester-hill-solutions/callcaster/issues/1664) AI agents interacting with GH should properly mark items as duplicate or not planned
 - Verdict: **Verify and close** · Labels: devops/admin · Assignee: none · Updated: 2026-09-08
-- The GitHub issue skill already distinguishes COMPLETED, NOT_PLANNED and DUPLICATE. The report also requests correction of issue #1314.
-- Resolution: Read the closed reason and duplicate timeline for #1314. Correct only if still wrong; do not classify other issues from title similarity alone.
+- The GitHub issue skill distinguishes COMPLETED, NOT_PLANNED and DUPLICATE. API verification on 2026-09-09 still reports #1314 as closed/not_planned.
+- Resolution: Verify the canonical duplicate timeline, then correct the closed reason for #1314. Keep the existing closed state and avoid a false completed classification.
 - Look in: `.agents/skills/github-issues/SKILL.md`
 
 ### [#1647](https://github.com/chester-hill-solutions/callcaster/issues/1647) Message campaigns: "Send test" to a phone number from the launch page
