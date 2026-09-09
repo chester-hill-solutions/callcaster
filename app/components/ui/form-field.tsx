@@ -45,7 +45,13 @@ export function FormField({
             {required ? <span className="ml-1 text-destructive-text">*</span> : null}
           </Label>
         ) : null}
-        {children}
+        {React.Children.map(children, (child) =>
+          htmlFor &&
+          React.isValidElement<{ id?: string }>(child) &&
+          child.props.id === htmlFor ? (
+            <FormFieldControl>{child}</FormFieldControl>
+          ) : child,
+        )}
         {description ? (
           <p id={descriptionId} className="text-sm text-muted-foreground">
             {description}
@@ -67,19 +73,30 @@ export interface FormFieldControlProps {
 }
 
 /**
- * Wraps the field's control and forwards `aria-describedby` / `aria-invalid`
+ * Direct children with an id matching FormField's htmlFor are connected
+ * automatically. Use this wrapper around nested or compound controls.
+ * Merges `aria-describedby` and forwards `aria-invalid`
  * onto it. This merges onto the control itself rather than a wrapper element:
  * both attributes are only meaningful on the focusable control, so a wrapping
  * <div> would announce nothing.
  */
 export function FormFieldControl({ children }: FormFieldControlProps) {
   const { descriptionId, errorId, invalid } = React.useContext(FormFieldContext);
-  const describedBy =
-    [descriptionId, errorId].filter(Boolean).join(" ") || undefined;
+  if (!React.isValidElement<React.AriaAttributes>(children)) {
+    return <Slot>{children}</Slot>;
+  }
+  const describedBy = [...new Set(
+    [children.props["aria-describedby"], descriptionId, errorId]
+      .filter(Boolean)
+      .join(" ")
+      .split(/\s+/)
+      .filter(Boolean),
+  )].join(" ") || undefined;
 
-  return (
-    <Slot aria-describedby={describedBy} aria-invalid={invalid || undefined}>
-      {children}
-    </Slot>
-  );
+  // Slot gives child props precedence. Merge on the child so a custom hint
+  // cannot hide the field's help or error, and a visible error remains invalid.
+  return React.cloneElement(children, {
+    "aria-describedby": describedBy,
+    "aria-invalid": invalid || children.props["aria-invalid"],
+  });
 }

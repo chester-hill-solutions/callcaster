@@ -6,6 +6,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Form help and errors now stay connected to their inputs for screen readers, including inputs with their own help text. Invalid fields use the shared error styling ([#1748](https://github.com/chester-hill-solutions/callcaster/issues/1748)).
+
 - M4A/MOV audio uploads (including campaign and voicemail audio) now transcode to a playable MP3 instead of silently producing empty, unplayable audio ([#1730](https://github.com/chester-hill-solutions/callcaster/issues/1730)).
 - Sign-in failures no longer show a raw database error — the browser gets a generic message and the real error stays in the logs ([#1734](https://github.com/chester-hill-solutions/callcaster/issues/1734)).
 - PR-preview environments now bootstrap the full app schema (drizzle baseline) at boot and can seed the E2E fixtures (`E2E_SEED_ON_BOOT`), so a preview DB has working sign-in and known test accounts instead of a bare schema ([#1735](https://github.com/chester-hill-solutions/callcaster/issues/1735)).

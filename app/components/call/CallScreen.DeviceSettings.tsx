@@ -1,7 +1,7 @@
 import React from "react";
 import { Headphones, Mic, MicOff, Monitor, Phone, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FormField } from "@/components/ui/form-field";
+import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import {
   Select,
   SelectContent,
@@ -41,9 +41,11 @@ function AudioDeviceSelect({
       value={selected ?? AUDIO_DEVICE_UNAVAILABLE_VALUE}
       onValueChange={(value) => onChange(toChangeEvent(value))}
     >
-      <SelectTrigger id={id} className={deviceSelectClass}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
+      <FormFieldControl>
+        <SelectTrigger id={id} className={deviceSelectClass}>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+      </FormFieldControl>
       <SelectContent>
         {devices.map((device) => (
           <SelectItem key={device.deviceId} value={device.deviceId}>
