@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Fixed
+
+- PR-preview environments now bootstrap the full app schema (drizzle baseline) at boot and can seed the E2E fixtures (`E2E_SEED_ON_BOOT`), so a preview DB has working sign-in and known test accounts instead of a bare schema ([#1735](https://github.com/chester-hill-solutions/callcaster/issues/1735)).
+
 ## 2026-09-09 — release [#1693](https://github.com/chester-hill-solutions/callcaster/pull/1693)
 
 ### Fixed

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
@@ -14,6 +15,20 @@ const dbState = vi.hoisted(() => ({
   factoryCalls: 0,
   failSimpleOnce: false,
   events: [] as string[],
+  // App schema present by default (managed DBs) — existing tests keep their
+  // exact event sequences; baseline tests flip this to simulate a PR preview.
+  schemaPresent: true,
+  seedTableExists: false,
+  spawnCalls: [] as unknown[][],
+}));
+
+vi.mock("node:child_process", () => ({
+  spawn: (...args: unknown[]) => {
+    dbState.spawnCalls.push(args);
+    const proc = new EventEmitter();
+    setTimeout(() => proc.emit("exit", 0), 0);
+    return proc;
+  },
 }));
 
 vi.mock("postgres", () => {
@@ -30,6 +45,16 @@ vi.mock("postgres", () => {
     if (text.includes("pg_trigger")) {
       dbState.events.push("legacy-check");
       return Promise.resolve(dbState.legacyTriggers);
+    }
+    if (text.includes("to_regclass('public.workspace')")) {
+      dbState.events.push("schema-check");
+      return Promise.resolve([{ t: dbState.schemaPresent ? "workspace" : null }]);
+    }
+    if (text.includes("to_regclass('public.e2e_seed_bootstrap')")) {
+      dbState.events.push("seed-check");
+      return Promise.resolve([
+        { t: dbState.seedTableExists ? "e2e_seed_bootstrap" : null },
+      ]);
     }
     if (text.includes("from public.client_migration_bootstrap")) {
       dbState.events.push("read-applied");
@@ -75,6 +100,7 @@ vi.mock("@/lib/logger.server", () => ({
 import {
   applyClientMigrationsOnBoot,
   bootstrapEnabled,
+  e2eSeedEnabled,
 } from "../app/server/bootstrap-migrations.server";
 
 describe("bootstrap-migrations.server", () => {
@@ -86,6 +112,9 @@ describe("bootstrap-migrations.server", () => {
     dbState.factoryCalls = 0;
     dbState.failSimpleOnce = false;
     dbState.events = [];
+    dbState.schemaPresent = true;
+    dbState.seedTableExists = false;
+    dbState.spawnCalls = [];
   });
 
   test("bootstrapEnabled only true for explicit opt-in", () => {
@@ -94,6 +123,13 @@ describe("bootstrap-migrations.server", () => {
     expect(bootstrapEnabled({ RUN_CLIENT_MIGRATIONS_ON_BOOT: "0" })).toBe(false);
     expect(bootstrapEnabled({ RUN_CLIENT_MIGRATIONS_ON_BOOT: "yes" })).toBe(false);
     expect(bootstrapEnabled({})).toBe(false);
+  });
+
+  test("e2eSeedEnabled only true for explicit opt-in", () => {
+    expect(e2eSeedEnabled({ E2E_SEED_ON_BOOT: "1" })).toBe(true);
+    expect(e2eSeedEnabled({ E2E_SEED_ON_BOOT: "true" })).toBe(true);
+    expect(e2eSeedEnabled({ E2E_SEED_ON_BOOT: "0" })).toBe(false);
+    expect(e2eSeedEnabled({})).toBe(false);
   });
 
   test("does nothing (never connects) when the flag is off", async () => {
@@ -203,5 +239,106 @@ describe("bootstrap-migrations.server", () => {
     expect(dbState.simpleApplied).toContain("ROLLBACK");
     // First migration failed + rolled back; later files still recorded.
     expect(dbState.inserted.length).toBe(result.applied.length);
+  });
+
+  test("bootstraps the drizzle baseline when the app schema is missing", async () => {
+    dbState.schemaPresent = false;
+    const result = await applyClientMigrationsOnBoot({
+      env: { RUN_CLIENT_MIGRATIONS_ON_BOOT: "1", DATABASE_URL: "postgres://x" },
+      rootDir: ROOT_DIR,
+    });
+    expect(result.ran).toBe(true);
+    if (!result.ran) return;
+    // Every drizzle baseline file applied (fresh schema)…
+    expect(result.baselineApplied.length).toBeGreaterThan(0);
+    // …and the client migrations still applied on top.
+    expect(result.applied.length).toBeGreaterThan(0);
+  });
+
+  test("does not re-apply the baseline when the schema already exists", async () => {
+    dbState.schemaPresent = true;
+    const result = await applyClientMigrationsOnBoot({
+      env: { RUN_CLIENT_MIGRATIONS_ON_BOOT: "1", DATABASE_URL: "postgres://x" },
+      rootDir: ROOT_DIR,
+    });
+    expect(result.ran).toBe(true);
+    if (!result.ran) return;
+    expect(result.baselineApplied).toEqual([]);
+  });
+
+  test("seeds E2E fixtures on an ephemeral preview when requested", async () => {
+    dbState.schemaPresent = false;
+    const result = await applyClientMigrationsOnBoot({
+      env: {
+        RUN_CLIENT_MIGRATIONS_ON_BOOT: "1",
+        E2E_SEED_ON_BOOT: "true",
+        RAILWAY_ENVIRONMENT_NAME: "callcaster-pr-1731",
+        DATABASE_URL: "postgres://x",
+      },
+      rootDir: ROOT_DIR,
+    });
+    expect(result.ran).toBe(true);
+    if (!result.ran) return;
+    expect(result.seedApplied).toBe(true);
+    // The seed script was spawned with bun and the seed path.
+    expect(dbState.spawnCalls).toHaveLength(1);
+    const [command, args] = dbState.spawnCalls[0] as [string, string[]];
+    expect(command).toBe("bun");
+    expect(args[0]).toBe("run");
+    expect(args[1]).toContain("scripts/e2e/seed-database.mjs");
+  });
+
+  test("skips the seed once its marker exists", async () => {
+    dbState.seedTableExists = true;
+    const result = await applyClientMigrationsOnBoot({
+      env: {
+        RUN_CLIENT_MIGRATIONS_ON_BOOT: "1",
+        E2E_SEED_ON_BOOT: "true",
+        RAILWAY_ENVIRONMENT_NAME: "callcaster-pr-1731",
+        DATABASE_URL: "postgres://x",
+      },
+      rootDir: ROOT_DIR,
+    });
+    expect(result.ran).toBe(true);
+    if (!result.ran) return;
+    expect(result.seedApplied).toBeNull();
+    expect(result.seedSkippedReason).toBe("already-applied");
+    expect(dbState.spawnCalls).toHaveLength(0);
+  });
+
+  test("never seeds dev/staging/production environments", async () => {
+    for (const name of ["production", "staging", "dev"]) {
+      dbState.spawnCalls = [];
+      const result = await applyClientMigrationsOnBoot({
+        env: {
+          RUN_CLIENT_MIGRATIONS_ON_BOOT: "1",
+          E2E_SEED_ON_BOOT: "true",
+          RAILWAY_ENVIRONMENT_NAME: name,
+          DATABASE_URL: "postgres://x",
+        },
+        rootDir: ROOT_DIR,
+      });
+      expect(result.ran).toBe(true);
+      if (!result.ran) continue;
+      expect(result.seedSkippedReason).toBe("managed-environment");
+      expect(result.seedApplied).toBeNull();
+      expect(dbState.spawnCalls).toHaveLength(0);
+    }
+  });
+
+  test("does not seed unless requested", async () => {
+    const result = await applyClientMigrationsOnBoot({
+      env: {
+        RUN_CLIENT_MIGRATIONS_ON_BOOT: "1",
+        RAILWAY_ENVIRONMENT_NAME: "callcaster-pr-1731",
+        DATABASE_URL: "postgres://x",
+      },
+      rootDir: ROOT_DIR,
+    });
+    expect(result.ran).toBe(true);
+    if (!result.ran) return;
+    expect(result.seedApplied).toBeNull();
+    expect(result.seedSkippedReason).toBe("not-requested");
+    expect(dbState.spawnCalls).toHaveLength(0);
   });
 });
