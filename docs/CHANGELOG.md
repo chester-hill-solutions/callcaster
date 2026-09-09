@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixes merged to dev are tracked with the GitHub project status, without extra issue labels or comments ([#1697](https://github.com/chester-hill-solutions/callcaster/issues/1697)).
+
 ### Fixed
 
 - Form help and errors now stay connected to their inputs for screen readers, including inputs with their own help text. Invalid fields use the shared error styling, and plain-control defaults no longer override component borders and spacing ([#1748](https://github.com/chester-hill-solutions/callcaster/issues/1748)).
