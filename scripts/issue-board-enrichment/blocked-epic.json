@@ -75,11 +75,7 @@
     "resolution": "Refresh milestone status in docs/interactive-sms-build-tracking.md; create missing child issues (consent, flags/observability, correlation); keep #1272 blocked until Phase A integrity gates pass.",
     "lookIn": [
       "docs/interactive-sms-delivery-plan.md",
-      "docs/interactive-sms-build-tracking.md",
-      "#1269",
-      "#1270",
-      "#1271",
-      "#1272"
+      "docs/interactive-sms-build-tracking.md"
     ],
     "existingTests": [
       "n/a"
@@ -198,7 +194,6 @@
     "trackerRecommendation": "Keep blocked until all Phase A gates pass.",
     "blockedBy": [
       1269,
-      1270,
       1271
     ]
   },
@@ -235,9 +230,7 @@
     "size": "XL",
     "risk": "high",
     "trackerRecommendation": "Split: factory+SMS, voice, rental. Dependencies #1157/#1192/#1193.",
-    "blockedBy": [
-      1270
-    ]
+    "blockedBy": []
   },
   {
     "issueNumber": 1329,
@@ -270,6 +263,46 @@
     "size": "XL",
     "risk": "high",
     "trackerRecommendation": "Split; first slice is M/medium. #1195 overlaps its testing section.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1356,
+    "verdict": "blocked-epic",
+    "summary": "The dev custom domain was attached in Railway; DNS and IaC ownership were still missing at the last verified report.",
+    "resolution": "Inspect current DNS and the Railway target. DNS changes need access to the domain zone, then codify the live mapping.",
+    "lookIn": [
+      ".railway/environments/dev.ts"
+    ],
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1357,
+    "verdict": "blocked-epic",
+    "summary": "The qa custom domain depends on the environment naming decision and DNS access. Staging continues to track master.",
+    "resolution": "Resolve the naming decision, attach the domain through IaC, set DNS, and verify readyz externally.",
+    "lookIn": [
+      ".railway/environments/staging.ts"
+    ],
+    "blockedBy": [
+      1355
+    ]
+  },
+  {
+    "issueNumber": 1498,
+    "verdict": "blocked-epic",
+    "summary": "The export report needs toplines, inbound replies, contact grouping, attribution and tenant-safe filtering. This is a feature program, not a release cleanup.",
+    "resolution": "Split metrics and conversation projection from artifact presentation; establish scope and fixtures before implementation.",
+    "lookIn": [
+      "app/lib/campaign-export.server.ts"
+    ],
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1645,
+    "verdict": "blocked-epic",
+    "summary": "Message tests shipped in #1648 and voice/IVR tests in #1654. The remaining slice is live-call rehearsal.",
+    "resolution": "Scope a separate live-call issue with isolation from queue, results and normal campaign metrics. Do not rebuild the shipped test-send paths.",
+    "lookIn": [],
     "blockedBy": []
   }
 ]

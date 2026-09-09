@@ -4,6 +4,12 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-09-09 — release [#1693](https://github.com/chester-hill-solutions/callcaster/pull/1693)
+
+### Fixed
+
+- Twilio health sync uses the Account SID and Auth Token for account details, so workspaces with a Standard API Key can sync successfully ([#1662](https://github.com/chester-hill-solutions/callcaster/issues/1662), PR [#1663](https://github.com/chester-hill-solutions/callcaster/pull/1663)).
+
 ## 2026-09-08 — release [#1688](https://github.com/chester-hill-solutions/callcaster/pull/1688)
 
 One PR on `dev` since release [#1684](https://github.com/chester-hill-solutions/callcaster/pull/1684).

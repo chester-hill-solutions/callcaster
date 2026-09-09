@@ -46,4 +46,13 @@ ownerTest.describe("Scripts and audio @authenticated", () => {
     await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "audios"));
     await expect(page.getByText(/audio|upload/i).first()).toBeVisible();
   });
+
+  ownerTest("SCR-06 seeded IVR speech and keypad response are ready to use", async ({ page }) => {
+    await page.goto(workspacePath(E2E_WORKSPACES.ready.id, `scripts/${E2E_IVR_SCRIPT.id}`));
+
+    await expect(page.getByLabel("Speech text").first()).toHaveValue("Press 1 for yes");
+    await expect(page.getByLabel("Caller answers with").first()).toHaveText("Press 1");
+    await expect(page.getByLabel("Answer label").first()).toHaveValue("Yes");
+    await expect(page.getByLabel("Then go to").first()).toHaveText("Hang up");
+  });
 });

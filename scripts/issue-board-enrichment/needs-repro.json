@@ -27,125 +27,47 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1224,
+    "issueNumber": 1615,
     "verdict": "needs-repro",
-    "recommendedTitle": "ops(voicemail): diagnose why CHS workspace voicemail email still fails while another workspace works",
-    "summary": "The SigV4 7-day presign fix is deployed, yet voicemail email works on Heino's workspace but not CHS. The app marks the call processed as soon as Resend accepts, so delivery failures are invisible.",
-    "currentBehavior": "email-vm route: global sender, checks only result.error, writes processed marker immediately, no Resend delivery/bounce/suppression tracking. Per-number inbound_action holds the recipient.",
-    "rootCause": "Likely Resend accepted but recipient suppressed/bounced/delayed/filtered; also possible: stale per-number inbound_action, conflicting higher-priority routing (queue/IVR/handset win over voicemail), wrong-environment Twilio callback, or workspace credential mismatch.",
-    "resolution": "Diagnostic: trace one fresh CallSid -> is voicemail visible in the app? (yes -> Resend delivery state; no -> routing/callback/credentials). Check inbound_action per CHS number, routing precedence, Twilio request inspector, and Resend events. Then persist the Resend email id + delivery state and reject invalid inbound_action at callback time.",
+    "summary": "PR #1621 added a warn-only shad-cc rebuild check. The latest report found 12 identical builds, but enforcement is still disabled.",
+    "resolution": "Gather clean CI build evidence, then make enforcement its own PR. Do not close based only on the diagnostic PR.",
     "lookIn": [
-      "app/routes/api+/email-vm.action.server.ts",
-      "app/lib/inbound-voicemail-twiml.server.ts",
-      "app/routes/workspaces+/$id/voicemails/setup.action.server.ts",
-      "app/routes/api+/inbound.action.server.ts",
-      "shared/inbound-routing-presets.ts"
+      "scripts/check-vendor-dist-drift.mjs"
     ],
-    "existingTests": [
-      "test/email-vm.route.test.ts (acceptance/retry/SigV4)"
-    ],
-    "missingTests": [
-      "delivery vs accepted states",
-      "suppressed/bounced/delayed",
-      "invalid inbound_action rejected (currently allows to:'')",
-      "setup clears higher-priority routing"
-    ],
-    "acceptanceCriteria": [
-      "Fresh voicemail tracked end-to-end",
-      "Delivery state persisted",
-      "Invalid inbound_action rejected",
-      "Routing precedence visible"
-    ],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Do not close; production incident with a defined diagnostic tree.",
     "blockedBy": []
   },
   {
-    "issueNumber": 1321,
+    "issueNumber": 1666,
     "verdict": "needs-repro",
-    "recommendedTitle": "test(numbers): reproduce and normalize malformed Twilio locality labels",
-    "summary": "City search showed 'Ajaxpickering'. CallCaster does not concatenate that: search passes Twilio friendlyName/region/locality through unchanged and joins locality + region with ', '.",
-    "currentBehavior": "numbers-search.server.ts passes provider fields through; Name column shows friendlyName; Location joins locality, region.",
-    "rootCause": "Provider data, not CallCaster concatenation.",
-    "resolution": "Capture the exact Twilio payload and confirm whether the screenshot shows friendlyName or locality; normalize narrowly, never alter valid locality names.",
+    "summary": "A successful audio upload is reported as an error toast.",
+    "resolution": "Capture the action response and redirect flash, then verify the success/error discriminator. Keep independent from toast layout changes.",
     "lookIn": [
-      "app/components/phone-numbers/NumberPurchase.columns.tsx",
-      "app/lib/numbers-search.server.ts",
-      "app/components/phone-numbers/NumberPurchase.constants.ts"
+      "app/routes/workspaces+/$id/audios/new.action.server.ts",
+      "app/routes/workspaces+/$id/audios/new.route.tsx",
+      "app/lib/audio-upload.ts"
     ],
-    "existingTests": [
-      "test/numbers-search.server.test.ts"
-    ],
-    "missingTests": [
-      "fixture reproducing the reported payload",
-      "location display test"
-    ],
-    "acceptanceCriteria": [
-      "Fixture reproduces the value",
-      "UI separates provider name from locality/region"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Reproduce with a captured payload before changing anything.",
     "blockedBy": []
   },
   {
-    "issueNumber": 1341,
+    "issueNumber": 1670,
     "verdict": "needs-repro",
-    "recommendedTitle": "Keep dialing feedback active until the customer leg connects or ends",
-    "summary": "The tone heard while dialing cuts off early. DTMF code is unrelated — the likely source is the Twilio Voice SDK outgoing sound or customer-leg ringback, which can stop when the agent leg accepts while the customer still rings.",
-    "currentBehavior": "Agent leg connects first, then the customer child leg rings; SDK outgoing sound may stop at agent-leg accept. Suspicious: device.audio.outgoing(muted) is wired to microphone mute.",
-    "rootCause": "Unknown without browser/Twilio reproduction; plausible misuse of device.audio.outgoing.",
-    "resolution": "Identify the sound source with SDK event logging; remove any device.audio.outgoing misuse; if needed, add controlled ringback keyed to customer-leg dialing that stops on connect/terminal.",
+    "summary": "Searching Pickering does not find South Pickering. PR #1675 changed rate-centre display names; it did not prove search matching.",
+    "resolution": "Compare the submitted locality with provider results and determine whether the provider supports partial matching before changing the search contract.",
     "lookIn": [
-      "app/hooks/call/useCallHandling.ts",
-      "app/hooks/call/useCampaignCallFlow.ts",
-      "app/lib/dtmf.ts"
+      "app/components/phone-numbers/NumberPurchase.tsx",
+      "app/lib/number-locality.ts"
     ],
-    "existingTests": [
-      "test/ui/campaign-call-flow-display-state.test.ts"
-    ],
-    "missingTests": [
-      "outgoing-feedback lifecycle",
-      "teardown on cancel/fail/connect/unmount"
-    ],
-    "acceptanceCriteria": [
-      "Feedback starts once per attempt",
-      "Continues while queued/ringing",
-      "Stops on connect/terminal",
-      "No nodes remain after teardown"
-    ],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Reproduce with real Twilio audio before changing audio code; shares infra with #1339.",
     "blockedBy": []
   },
   {
-    "issueNumber": 1344,
+    "issueNumber": 1671,
     "verdict": "needs-repro",
-    "recommendedTitle": "Verify call-panel border clipping in dark mode",
-    "summary": "Reported outline-curve mismatch in the call area, extra visible in dark mode. Static radius arithmetic is actually correct: outer 16px radius + 2px border matches a 14px inner radius.",
-    "currentBehavior": "call-panel-classes.ts rounded-2xl border-2; status bar rounded-[14px]; the math lines up.",
-    "rootCause": "Cannot confirm a defect from code; likely border color/anti-aliasing/seam or a stale screenshot.",
-    "resolution": "Reproduce in Chromium + Safari dark mode at 1x and 2x. If visible, adjust only callPanelShellClass or status-bar background clipping.",
+    "summary": "A new report shows campaign date boundaries at 20:00 and says the boundaries are not enforced. This is separate from weekly calling-hours defaults, already shipped in #1590.",
+    "resolution": "Reproduce date-only serialization and display in the campaign timezone, then check dispatch against exact start/end instants before selecting a fix.",
     "lookIn": [
-      "app/components/call/call-panel-classes.ts",
-      "app/components/call/CallScreen.CallArea.tsx"
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx",
+      "app/lib/campaign-schedule-sync.server.ts"
     ],
-    "existingTests": [
-      "test/ui/call-screen-callarea.test.tsx"
-    ],
-    "missingTests": [
-      "dark-mode screenshot test"
-    ],
-    "acceptanceCriteria": [
-      "No visible corner seam",
-      "Light/dark at 1x and 2x checked"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Needs a screenshot reproduction before styling changes; coordinate with #1338/#1313.",
     "blockedBy": []
   }
 ]

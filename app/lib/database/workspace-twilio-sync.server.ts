@@ -173,9 +173,19 @@ export async function syncWorkspaceTwilioSnapshot({
   try {
     const twilio = await createWorkspaceTwilioInstance({       workspace_id: workspaceId,
     });
+    // Fetching the Account resource itself (GET /Accounts/{Sid}) is an
+    // account-management operation that Twilio only grants to a Main API
+    // Key or the plain Account SID/Auth Token — never a Standard API Key,
+    // which `twilio` above uses whenever the workspace has one (ADR-0011).
+    // Use the Auth Token directly for just this call so a workspace whose
+    // Twilio REST auth otherwise runs on a Standard key doesn't fail sync
+    // with "the provided key does not have the permissions to access this
+    // endpoint".
+    const { default: TwilioSdk } = await import("twilio");
+    const accountLevelTwilio = new TwilioSdk.Twilio(sid, authToken);
     const { startDate, endDate } = getTwilioUsageDateRange();
     const [account, numbers, usageRecords] = await Promise.all([
-      twilio.api.v2010.accounts(sid).fetch(),
+      accountLevelTwilio.api.v2010.accounts(sid).fetch(),
       twilio.incomingPhoneNumbers.list({ limit: 200 }),
       twilio.usage.records.list({
         startDate: new Date(startDate),

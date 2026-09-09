@@ -1,60 +1,89 @@
 [
   {
-    "issueNumber": 1069,
+    "issueNumber": 969,
     "verdict": "verify-close",
-    "recommendedTitle": "Rename the numbered E2E 'Empty Workspace' fixture and close the superseded redirect gap",
-    "summary": "The claimed coverage gap no longer exists: a separate onboarding fixture seeds a truly empty workspace and rbac.spec.ts covers the owner/admin redirect. The numbered 'Empty Workspace' is intentionally used by voicemail E2E.",
-    "currentBehavior": "seed-data.mjs has a fresh onboarding fixture; rbac.spec.ts asserts the redirect; the numbered empty fixture is used by voicemail tests.",
-    "rootCause": "Superseded; misleading fixture name remains.",
-    "resolution": "Close the redirect gap; optionally rename empty -> numberedEmpty/zeroCampaign to remove the misleading name.",
+    "summary": "Shipped on master in PR #1593: feat(ux): disclose the browser time zone on every time control and timestamp. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
     "lookIn": [
-      "scripts/e2e/seed-data.mjs",
-      "scripts/e2e/seed-database.mjs",
-      "e2e/specs/rbac.spec.ts"
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx",
+      "app/components/sms-ui/ChatInput.tsx",
+      "app/components/workspace/BillingActivityTable.tsx",
+      "app/lib/schedule-timezone.ts"
     ],
     "existingTests": [
-      "e2e/specs/rbac.spec.ts (redirect coverage)"
+      "test/schedule-timezone.test.ts",
+      "test/ui/ChatInput.test.tsx",
+      "test/ui/billing-activity-table.test.tsx"
     ],
-    "missingTests": [
-      "fixture-contract test for accurate names"
+    "trackerRecommendation": "PR #1593 merge 7c3b66c3 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1067,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1591: fix(ux): say \"Call list\" instead of \"Audience\" on the remaining user-facing surfaces. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/components/contact/ContactDetails.tsx",
+      "app/components/queue/QueueHeader.tsx",
+      "app/components/queue/QueueTable.tsx",
+      "app/routes/workspaces+/$id/campaigns/$campaign_id/audiences/new.route.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingLaunchStep.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx"
     ],
-    "acceptanceCriteria": [
-      "Redirect tests remain",
-      "Fixture renamed accurately",
-      "Voicemail tests keep using it"
+    "existingTests": [
+      "test/ui/components-queue.test.tsx",
+      "test/ui/queue-add-audience-feedback.test.tsx"
     ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close; old enrichment pointed at the wrong middleware.",
+    "trackerRecommendation": "PR #1591 merge eadc67d3 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1113,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1592: fix(onboarding): stop the box edge striking through the Number step's action titles. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-first-number-groups.test.tsx"
+    ],
+    "trackerRecommendation": "PR #1592 merge 558cb4f1 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1127,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1590: feat(campaigns): default calling hours to 09:00–21:00 local from one shared constant. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx",
+      "app/lib/campaign-setup-steps.ts",
+      "app/lib/schedule-timezone.ts"
+    ],
+    "existingTests": [
+      "test/campaign-setup-steps.test.ts",
+      "test/ui/components-campaign.test.tsx"
+    ],
+    "trackerRecommendation": "PR #1590 merge 1879ce60 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1152,
+    "verdict": "verify-close",
+    "summary": "A global two-factor kill switch shipped in #1569. The earlier statement that owners always require MFA is stale.",
+    "resolution": "Verify the desired deployed kill-switch setting and privileged-role behavior before closure.",
+    "lookIn": [
+      "app/lib/two-factor.server.ts"
+    ],
     "blockedBy": []
   },
   {
-    "issueNumber": 1150,
+    "issueNumber": 1162,
     "verdict": "verify-close",
-    "recommendedTitle": "chore(security): verify and close completed call-screen tenant-isolation audit",
-    "summary": "Both gap classes are fixed by PR #1151: webhook routes now fail closed on missing CallSid, and dequeue_contact / create_outreach_attempt gained workspace predicates (migration 20260807120000). Audio-drop lookup is workspace-scoped.",
-    "currentBehavior": "acd-router routes reject missing CallSid; RPCs require workspace; audiodrop scoped.",
-    "rootCause": "Resolved; issue left open because Closes # did not fire on dev merge.",
-    "resolution": "Link PR #1151 and close. No code change.",
+    "summary": "The default branch remains master. #1686 now labels closing issues on-dev when their PR merges to dev. Optional project movement still needs project setup.",
+    "resolution": "Verify on-dev labels on the next merge. Preserve master as release branch; do not introduce a qa branch.",
     "lookIn": [
-      "app/routes/api+/acd-router.action.server.ts",
-      "client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql",
-      "app/routes/api+/audiodrop.action.server.ts"
+      ".github/workflows/issue-on-dev.yml"
     ],
-    "existingTests": [
-      "test/scope-dequeue-and-outreach-attempt.integration.test.ts",
-      "test/audiodrop.test.ts"
-    ],
-    "missingTests": [
-      "none"
-    ],
-    "acceptanceCriteria": [
-      "Security/DB regression tests pass",
-      "Issue closed with PR linked"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close.",
     "blockedBy": []
   },
   {
@@ -117,97 +146,75 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1222,
+    "issueNumber": 1204,
     "verdict": "verify-close",
-    "recommendedTitle": "Prove manual dial persists the campaign queue ID",
-    "summary": "call.queue_id is now persisted on the manual dial path: startCall appends the queue row id, /api/dial requires and writes it into both the outreach attempt and the call row.",
-    "currentBehavior": "Client requires nextRecipient.contact; dial route requires queue_id and persists it.",
-    "rootCause": "Resolved during #1218/#1223 work.",
-    "resolution": "Optionally add direct assertions for submitted and persisted queue_id, then close.",
+    "summary": "Shipped on master in PR #1589: fix(onboarding): judge the Identity step by the fields the Identity screen collects. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
     "lookIn": [
-      "app/lib/callscreenActions.ts",
-      "app/routes/api+/dial.action.server.ts"
+      "app/lib/messaging-onboarding/readiness.server.ts"
     ],
     "existingTests": [
-      "test/ui/callscreenActions.test.ts",
-      "test/dial.route.test.ts"
+      "test/messaging-onboarding.server.test.ts"
     ],
-    "missingTests": [
-      "FormData carries queue_id",
-      "saveCallToDatabase receives queue_id",
-      "outreach attempt receives queue_id"
+    "trackerRecommendation": "PR #1589 merge f39daa3f is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1322,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1596: feat(billing): link each credit purchase to its Stripe-hosted receipt. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/components/workspace/BillingActivityTable.tsx",
+      "app/lib/api-surface-annotations.ts",
+      "app/lib/api-surface-generated.ts",
+      "app/lib/platform-billing.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/billing/receipt.loader.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx",
+      "app/routes/workspaces+/$id/billing.route.tsx",
+      "scripts/baselines/route-tree.txt"
     ],
-    "acceptanceCriteria": [
-      "Client submits queue id",
-      "Both writes receive same id",
-      "Missing id stays 400"
+    "existingTests": [
+      "test/billing-receipt.route.test.ts",
+      "test/platform-billing-receipt.test.ts",
+      "test/ui/billing-activity-table.test.tsx"
     ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close; enrichment was stale.",
+    "trackerRecommendation": "PR #1596 merge 317dd679 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1325,
+    "verdict": "verify-close",
+    "summary": "The audio-step editor shipped in #1672/release #1684; the residual empty-speech runtime gap shipped in #1687/release #1688.",
+    "resolution": "Verify both recording upload and spoken text on the deployed app; this reopened issue remains pending user testing.",
+    "lookIn": [
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx",
+      "test/ui/script-block-editor-ivr.test.tsx"
+    ],
     "blockedBy": []
   },
   {
-    "issueNumber": 1278,
+    "issueNumber": 1327,
     "verdict": "verify-close",
-    "recommendedTitle": "Close #1278: surfaced guarded dequeue no-op is complete; new flash is a separate symptom",
-    "summary": "The silent no-op is fixed by PR #1279 (merge 66f1446c): dequeue_contact reports rows affected, the wrapper explains the no-op (assigned_elsewhere 409 vs already_dequeued 200), and PostgreSQL tests preserve the race guard.",
-    "currentBehavior": "Cross-agent dequeue returns 409 and leaves the row; already-dequeued is idempotent 200. Latest reporter comment 'still get the flash once dialing' is NOT this issue — dequeue is triggered by Save and Next, not Dial.",
-    "rootCause": "Original defect resolved. The new flash is ambiguous: stale outcome (#1286), dial claim refusal (409 from /api/dial), or delayed dequeue toast.",
-    "resolution": "Close #1278. For the flash, identify exact text/area: top-bar stale status -> #1286 (needs repro); toast 'assigned to another agent' after Save and Next -> delayed #1278 feedback; other toasts -> dial claim refusal. Use flash telemetry.",
+    "summary": "Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.",
+    "currentBehavior": "Script editor routes consume flattened campaign/script fields; no campaignDetails accessor remains. Sai cannot see this on the stale review env.",
+    "rootCause": "Internal refactor, invisible without a redeploy.",
+    "resolution": "Verify on dev: rg campaignDetails in app/ has no editor hits, script editor routes render and save (covered by test/ui/script-editor-*.test.tsx), then close.",
     "lookIn": [
-      "app/routes/api+/queues.action.server.ts",
-      "app/lib/campaign-queue-db.server.ts",
-      "client/migrations/20260815130000_dequeue_contact_returns_rows_affected.sql",
-      "app/lib/flash-telemetry.client.ts"
+      "app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx",
+      "app/routes/workspaces+/$id/scripts/"
     ],
     "existingTests": [
-      "test/queues.route.test.ts (409/idempotent)",
-      "test/integration-db/dequeue-contact-assigned.test.ts"
+      "test/ui/script-editor-route.test.tsx",
+      "test/ui/script-editor-adapter.test.tsx",
+      "test/ui/campaign-script-edit-route.test.tsx"
     ],
-    "missingTests": [
-      "integrated remote-hangup asserts Hang Up disappears",
-      "flash classification test"
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
-      "Cross-agent dequeue 409 leaves row",
-      "Retries idempotent 200",
-      "Race guard preserved in real PG"
+      "No campaignDetails references in editor code on dev",
+      "Editor tests green on dev"
     ],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Close original; file a new issue for the flash once reproduced with text/area.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1286,
-    "verdict": "verify-close",
-    "recommendedTitle": "Close #1286: synchronous dial lifecycle reset is covered",
-    "summary": "The stale-frame defect is fixed by PR #1288 (merge a1fb10f3): beginDial resets the lifecycle in the same batch as START_DIALING and the live FSM outranks the previous disposition. Render-by-render regression tests exist.",
-    "currentBehavior": "beginDial() resets provider state and lifecycle synchronously; dial click calls FSM action + beginDial in one batch; live FSM outranks old disposition.",
-    "rootCause": "Resolved; open state is project/default-branch bookkeeping (Closes # does not fire on dev merges).",
-    "resolution": "Verify CI is green and close. No production change indicated.",
-    "lookIn": [
-      "app/hooks/call/useCampaignCallFlow.ts",
-      "app/hooks/call/useCampaignDialActions.ts",
-      "test/ui/use-campaign-call-flow.test.tsx",
-      "test/ui/campaign-call-flow-display-state.test.ts"
-    ],
-    "existingTests": [
-      "use-campaign-call-flow render-history tests",
-      "campaign-call-flow-display-state terminal tests"
-    ],
-    "missingTests": [
-      "none required; optional Playwright frame test"
-    ],
-    "acceptanceCriteria": [
-      "No-stale-frame tests pass",
-      "New dial never renders prior outcome",
-      "No extra production change"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close after verification; do not reopen on the #1278 flash without a confirmed stale frame.",
+    "trackerRecommendation": "Verification only; no new code.",
     "blockedBy": []
   },
   {
@@ -242,225 +249,570 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1336,
+    "issueNumber": 1334,
     "verdict": "verify-close",
-    "recommendedTitle": "docs(csv): explain spreadsheet-safety prefix on exported phone numbers",
-    "summary": "The leading apostrophe on +phone numbers is intentional CSV-injection protection (sanitizeCsvInjection). Not a bug unless a strictly validated E.164-only export strategy is approved.",
-    "currentBehavior": "Strings starting with + are prefixed with '; campaign exports enable protection for every row; contract tests require neutralization.",
-    "rootCause": "Working as designed.",
-    "resolution": "Close as working-as-designed, or add help text explaining the prefix. Only exempt phone cells if E.164 normalization is proven and a malicious-value regression test is added.",
+    "summary": "Shipped on master in PR #1633: fix(results): separate message totals from contact progress. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
     "lookIn": [
-      "app/lib/csv.ts",
-      "app/lib/campaign-export.server.ts",
-      "test/csv.test.ts"
+      "app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.tsx",
+      "app/components/campaign/home/CampaignHomeScreen/MessageResultsScreen.tsx",
+      "app/components/campaign/home/CampaignHomeScreen/ResultsScreen.TotalCalls.tsx",
+      "app/lib/database/campaign-stats.server.ts"
     ],
     "existingTests": [
-      "test/csv.test.ts",
-      "test/campaign-export-contract.test.ts"
+      "test/ui/campaign-result-display.test.tsx"
     ],
-    "missingTests": [
-      "E.164 round-trip/import test if exempting phones"
+    "trackerRecommendation": "PR #1633 merge 420e49bc is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1347,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1594: fix(ux): one customer-facing name for the automated phone menu goal. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx",
+      "app/lib/campaign-goals.ts",
+      "app/lib/messaging-onboarding/goals.ts",
+      "app/lib/utils.ts"
     ],
-    "acceptanceCriteria": [
-      "Protection remains for untrusted strings",
-      "Help text explains the apostrophe"
+    "existingTests": [
+      "test/campaign-terminology.test.ts",
+      "test/ui/onboarding-goal-step.test.tsx",
+      "test/utils.test.ts"
     ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close or document; removing the prefix is a security regression risk.",
+    "trackerRecommendation": "PR #1594 merge 8334dcda is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1348,
+    "verdict": "verify-close",
+    "summary": "The latest retest found an audible-script failure rather than absent dispatch. #1687 shipped the text fallback in release #1688.",
+    "resolution": "Retest a sample phone menu on the deployed app. Keep open for a separate dispatch defect if no call arrives.",
+    "lookIn": [
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts",
+      "test/ivr-block.route.test.ts"
+    ],
     "blockedBy": []
   },
   {
-    "issueNumber": 1325,
+    "issueNumber": 1472,
     "verdict": "verify-close",
-    "summary": "Sai asks how to add audio to an IVR script. Both paths exist: the Audio page Add Audio form, and the per-block upload button on recorded blocks in the script editor.",
-    "currentBehavior": "Both audio paths are fixed on dev: the Add Audio zone (#1359) and the script-editor recorded-block upload (#1353). Sai's reopen may reflect a pre-deploy screenshot or findability.",
-    "rootCause": "Support question; the Add Audio zone was genuinely broken on all envs until #1359.",
-    "resolution": "On the current dev deploy: confirm Add Audio upload works end-to-end and the recorded-block Upload audio button opens the picker; answer on the issue with both paths, then close.",
+    "summary": "Shipped on master in PR #1489: fix(queue): make Add from Audience report every outcome. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
     "lookIn": [
-      "app/routes/workspaces+/$id/audios/new.route.tsx",
-      "app/components/campaign/settings/script/ScriptBlockEditor.tsx"
+      "app/components/queue/QueueContent.tsx",
+      "app/components/queue/QueueHeader.tsx",
+      "app/components/queue/audience-link-feedback.ts",
+      "app/hooks/utils/useActionFeedback.ts",
+      "app/routes/api+/campaign_audience.action.server.ts",
+      "app/routes/workspaces+/$id/campaigns/$selected_id/queue.route.tsx"
     ],
     "existingTests": [
-      "test/ui/audios-new-upload.test.tsx (#1359)"
+      "test/campaign-audience.route.test.ts",
+      "test/ui/queue-add-audience-feedback.test.tsx"
     ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Both audio paths verified working on a deployed env",
-      "Issue answered with the two paths"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Deploy-gated verification on latest dev; blocked by nothing once dev redeploys.",
-    "blockedBy": [
-      1346
-    ]
+    "trackerRecommendation": "PR #1489 merge 832958e9 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
   },
   {
-    "issueNumber": 1332,
+    "issueNumber": 1474,
     "verdict": "verify-close",
-    "summary": "Dark-mode opt-out info box rendered black text on a dark surface. The hand-built box was migrated to the shared Alert with semantic tokens in #1353 (7f11a230, scoped #1332/#1312/#1335).",
-    "currentBehavior": "The migrated banner (shared warning Alert, semantic tokens; dark theme defines --warning-foreground) is on dev since 7f11a230. Sai's reopen screenshot was taken ~17 min after the merge, so it may predate the deploy finishing — visual-asset-review does run dev.",
-    "rootCause": "Either a pre-deploy screenshot or a different unmigrated box; not yet re-verified on the current dev deploy.",
-    "resolution": "Re-verify the opt-out banner in dark mode on the current dev deploy. If black text still shows, identify the exact component (likely a different unmigrated box or a token gap) and split a fix-now.",
+    "summary": "Shipped on master in PR #1490: fix(twilio): send complete geo permission updates. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
     "lookIn": [
-      "app/components/chats/ChatOptOutBanner.tsx"
+      "app/lib/twilio-geo-permissions.server.ts"
     ],
     "existingTests": [
-      "test/ui/components-chats-contact.test.tsx"
+      "test/twilio-geo-permissions.server.test.ts"
     ],
-    "missingTests": [
-      "Dark-mode token assertion (visual; verify manually)"
+    "trackerRecommendation": "PR #1490 merge 5c0d618d is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1476,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1491: fix(db): add 'waiting' to campaign_status enum in every lineage. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      ".github/workflows/ci.yml",
+      "client/migrations/20260901000000_campaign_status_add_waiting.sql",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/db/check-schema-enums.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs",
+      "scripts/lib/schema-enums.mjs"
     ],
-    "acceptanceCriteria": [
-      "Opt-out box uses the shared info Alert tokens in dark mode on a deployed env"
+    "existingTests": [
+      "test/schema-enum-values.test.ts"
     ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Deploy-gated verification, not new code.",
+    "trackerRecommendation": "PR #1491 merge 76fdff4e is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1486,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1635: feat(campaign): idempotent Kick off action restarts stopped dispatch. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/components/campaign/settings/CampaignLaunch.tsx",
+      "app/components/campaign/settings/CampaignLaunchActions.tsx",
+      "app/components/campaign/settings/useCampaignSettingsController.ts",
+      "app/lib/campaign-execution.server.ts",
+      "app/routes/workspaces+/$id/campaigns/$selected_id/launch.route.tsx",
+      "app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-dispatch-worker.test.ts",
+      "test/ui/campaign-launch-actions.test.tsx"
+    ],
+    "trackerRecommendation": "PR #1635 merge 804b9c73 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1533,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1540: feat(billing): double SMS/MMS credit rates (1→2, 2→4). The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/billing.route.tsx",
+      "shared/billing-reconciliation.ts",
+      "shared/campaign-billing.ts",
+      "shared/pricing.ts"
+    ],
+    "existingTests": [
+      "test/billing-reconciliation.test.ts",
+      "test/campaign-billing.test.ts",
+      "test/chats-action.server.test.ts",
+      "test/pricing.test.ts",
+      "test/ui/ChatInput.test.tsx",
+      "test/ui/message-settings.test.tsx",
+      "test/ui/pricing-calculator.test.tsx"
+    ],
+    "trackerRecommendation": "PR #1540 merge 1e1a7e43 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1534,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1537: chore(eng): document agent pitfalls and ignore local agent state. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [],
+    "existingTests": [],
+    "trackerRecommendation": "PR #1537 merge 14791c87 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1535,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1538: docs(roadmap): add CI load-reduction, code-quality, and lint-ratchet plans. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [],
+    "existingTests": [],
+    "trackerRecommendation": "PR #1538 merge f975b91a is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1536,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1539: docs(handoff): add Supabase-exit hardening handoff for pickup. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [],
+    "existingTests": [],
+    "trackerRecommendation": "PR #1539 merge 1c29c191 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1541,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1545: fix(contacts): bind new contacts to the authorized workspace. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/routes/api+/contacts.action.server.ts"
+    ],
+    "existingTests": [
+      "test/contacts-action.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #1545 merge fc0e1a86 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1542,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1544: fix(tenant-db): strip the tenancy column from update payloads at runtime. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/server/tenant-db.ts"
+    ],
+    "existingTests": [
+      "test/tenant-db.test.ts"
+    ],
+    "trackerRecommendation": "PR #1544 merge 87bc000d is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1543,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1546: fix(members): validate invite roles and enforce the escalation guard on settings invites. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/member-role.ts",
+      "app/lib/platform-members.server.ts",
+      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts",
+      "app/routes/workspaces+/$id/settings.action.server.ts"
+    ],
+    "existingTests": [
+      "test/workspace-members-rbac.test.ts",
+      "test/workspace-setting-utils.test.ts",
+      "test/workspace-settings-rbac.test.ts"
+    ],
+    "trackerRecommendation": "PR #1546 merge a7ee1443 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1547,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1549: fix(boot): hold an advisory lock for the whole client-migration bootstrap pass. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/server/bootstrap-migrations.server.ts",
+      "scripts/lib/app-db-objects.mjs"
+    ],
+    "existingTests": [
+      "test/bootstrap-migrations.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #1549 merge 2b9ec9a0 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1548,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1551: fix(worker): fence complete, fail, and heartbeat writes to the claiming worker. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/worker/poll-jobs.server.ts",
+      "worker/index.ts"
+    ],
+    "existingTests": [
+      "test/worker.test.ts"
+    ],
+    "trackerRecommendation": "PR #1551 merge f945c9cc is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1550,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1552: fix(auth): refuse accept-invite account creation while signup is closed. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/routes/accept-invite.action.server.ts"
+    ],
+    "existingTests": [
+      "test/accept-invite.route.test.ts"
+    ],
+    "trackerRecommendation": "PR #1552 merge eea74189 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1553,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1554: fix(e2e): refuse non-local targets in the compose reset and purge scripts. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "scripts/e2e/bootstrap-compose-db.mjs",
+      "scripts/e2e/ensure-minio-bucket.mjs",
+      "scripts/e2e/run-compose-e2e.mjs",
+      "scripts/lib/local-target-guard.mjs"
+    ],
+    "existingTests": [
+      "test/local-target-guard.test.ts"
+    ],
+    "trackerRecommendation": "PR #1554 merge b46b3ada is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1555,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1556: fix(billing): keep number-rental technical failures out of the non-payment ladder. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/number-rental-billing.server.ts"
+    ],
+    "existingTests": [
+      "test/number-rental-billing.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #1556 merge dd17d741 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1557,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1558: fix(chat): sign inbound MMS attachments so they render in the conversation view. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/chats/fetch-message-page.server.ts"
+    ],
+    "existingTests": [
+      "test/fetch-message-page.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #1558 merge b1bb8967 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1559,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1562: fix(auth): surface a rejected password reset and stop trimming the new password. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/routes/reset-password.action.server.ts"
+    ],
+    "existingTests": [
+      "test/reset-password.route.test.ts"
+    ],
+    "trackerRecommendation": "PR #1562 merge dcf6ed12 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1560,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1568: fix(auth): make the JSON password-reset endpoint public and carry the reset token. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/api-surface-annotations.ts",
+      "app/lib/api-surface-generated.ts",
+      "app/lib/platform-auth.server.ts",
+      "app/lib/schemas/api/platform-auth.ts",
+      "app/routes/api+/auth/reset-password.action.server.ts"
+    ],
+    "existingTests": [
+      "test/api-reset-password.route.test.ts"
+    ],
+    "trackerRecommendation": "PR #1568 merge 0e8870eb is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1561,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1565: fix(auth): revoke existing sessions when a password is reset. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/server/auth-instance.ts"
+    ],
+    "existingTests": [
+      "test/auth-instance.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #1565 merge 4ca0ff77 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1563,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1566: fix(auth): revoke the bearer session on sign-out, not only the cookie. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/auth.server.ts",
+      "app/lib/platform-auth.server.ts"
+    ],
+    "existingTests": [
+      "test/signout.route.test.ts"
+    ],
+    "trackerRecommendation": "PR #1566 merge 8e6f7095 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1564,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1573: fix(auth): forward the two-factor cookies Better Auth sets on account security verification. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/routes/account.security.loader.server.ts"
+    ],
+    "existingTests": [
+      "test/account-security.route.test.ts"
+    ],
+    "trackerRecommendation": "PR #1573 merge 5b80a080 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1567,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1569: feat(auth): turn two-factor authentication off behind a TWO_FACTOR_ENABLED kill switch. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/env.server.ts",
+      "app/lib/two-factor.server.ts",
+      "app/routes/account.loader.server.ts",
+      "app/routes/account.security.loader.server.ts",
+      "app/routes/account.security.tsx",
+      "app/routes/account.tsx",
+      "app/routes/two-factor.loader.server.ts",
+      "app/server/auth-instance.ts"
+    ],
+    "existingTests": [
+      "test/account.route.test.ts",
+      "test/auth-instance.server.test.ts",
+      "test/setup.node.ts",
+      "test/two-factor-kill-switch.route.test.ts",
+      "test/two-factor.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #1569 merge 27277319 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1570,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1572: fix(worker): re-seed self-scheduling chains on a watchdog and page when a successor enqueue fails. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/worker/ensure-scheduled-jobs.server.ts",
+      "app/lib/worker/handlers/shared.server.ts",
+      "worker/index.ts"
+    ],
+    "existingTests": [
+      "test/ensure-scheduled-jobs.test.ts",
+      "test/worker-reschedule.test.ts"
+    ],
+    "trackerRecommendation": "PR #1572 merge dedda4c0 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1571,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1574: fix(billing): queue the SMS side-effects job before open-sync writes a terminal status. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/twilio-open-sync.server.ts"
+    ],
+    "existingTests": [
+      "test/twilio-open-sync.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #1574 merge 7a41ff40 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1575,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1576: fix(media): delete a campaign media object only when no other campaign references it. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/campaign-ivr.server.ts",
+      "app/routes/api+/message_media.action.server.ts"
+    ],
+    "existingTests": [
+      "test/message-media.route.test.ts"
+    ],
+    "trackerRecommendation": "PR #1576 merge 843389ea is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1577,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1579: fix(storage): normalize a missing S3 key into ObjectNotFoundError so status polls answer 404. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/object-storage.server.ts",
+      "app/routes/api+/campaign-export-status.loader.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-export-status.test.ts",
+      "test/object-storage-not-found.test.ts"
+    ],
+    "trackerRecommendation": "PR #1579 merge e5bab511 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1578,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1585: feat(sms): reconcile stale pending message intents in the Twilio open sync. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/twilio-open-sync.server.ts"
+    ],
+    "existingTests": [
+      "test/twilio-open-sync.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #1585 merge 814bfcf1 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1581,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1583: fix(sms): alert when a sent campaign text's message row cannot be written. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/campaign-sms-send.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-sms-send.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #1583 merge b5f9d49d is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1582,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1584: feat(sms): write the message intent row before calling Twilio and resolve it by client reference. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/db/schema.ts",
+      "app/lib/campaign-sms-send.server.ts",
+      "app/lib/message-db.server.ts",
+      "app/lib/sms-send.server.ts",
+      "app/routes/api+/sms/status.action.server.ts",
+      "client/migrations/20260905120000_message_client_ref.sql",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs"
+    ],
+    "existingTests": [
+      "test/campaign-sms-dispatch-contract.test.ts",
+      "test/campaign-sms-send.server.test.ts",
+      "test/helpers/tenant-db-stub.ts",
+      "test/sms-action.route.test.ts",
+      "test/sms-status.route.test.ts",
+      "test/sms.route.test.ts"
+    ],
+    "trackerRecommendation": "PR #1584 merge 3a507a6f is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1586,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1587: feat(sms): write the intent row before Twilio for chat sends and match from-less intents on to alone. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/lib/message-db.server.ts",
+      "app/lib/sms-send.server.ts",
+      "app/lib/twilio-open-sync.server.ts"
+    ],
+    "existingTests": [
+      "test/chat-sms.route.test.ts",
+      "test/helpers/tenant-db-stub.ts",
+      "test/sms-send-intent.server.test.ts",
+      "test/twilio-open-sync.server.test.ts"
+    ],
+    "trackerRecommendation": "PR #1587 merge 9088d9c5 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1647,
+    "verdict": "verify-close",
+    "summary": "Shipped on master in PR #1648: feat(campaign): send a test message to one number from the launch page. The open state does not prove the fix is absent.",
+    "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
+    "lookIn": [
+      "app/components/campaign/settings/CampaignLaunch.tsx",
+      "app/components/campaign/settings/CampaignLaunchActions.tsx",
+      "app/components/campaign/settings/CampaignTestSendDialog.tsx",
+      "app/components/campaign/settings/MessageSettings.tsx",
+      "app/components/campaign/settings/useCampaignSettingsController.ts",
+      "app/lib/campaign-test-send.server.ts",
+      "app/lib/message-templates.ts",
+      "app/routes/workspaces+/$id/campaigns/$selected_id/launch.route.tsx"
+    ],
+    "existingTests": [
+      "test/campaign-settings.route.test.ts",
+      "test/campaign-test-send.test.ts",
+      "test/ui/campaign-launch-actions.test.tsx",
+      "test/ui/campaign-test-send-dialog.test.tsx"
+    ],
+    "trackerRecommendation": "PR #1648 merge f1c4509b is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
+  },
+  {
+    "issueNumber": 1662,
+    "verdict": "verify-close",
+    "summary": "PR #1663 is merged to dev. Full local CI, GitHub quality/E2E checks and both preview deployments passed.",
+    "resolution": "Release the Account SID/Auth Token fix, then verify Twilio health sync in the deployed workspace.",
+    "lookIn": [
+      "app/lib/database/workspace-twilio-sync.server.ts",
+      "test/workspace-twilio-sync.server.test.ts"
+    ],
     "blockedBy": []
   },
   {
-    "issueNumber": 1231,
+    "issueNumber": 1664,
     "verdict": "verify-close",
-    "summary": "Delete dead Supabase-era app code (shims, stale types, PostgREST constants). Removed in #1353 (6c724292); Sai reopened asking wra-sol to double-check the closure.",
-    "currentBehavior": "Tree has no supabase client imports, PostgREST constants, or compatibility shims; the visual-asset-review env Sai tests still runs the pre-#1353 build, so old code is expected there.",
-    "rootCause": "Closure was correct on dev but unverifiable from the env Sai uses.",
-    "resolution": "Verify: rg for supabase|postgrest|SUPABASE across app/ returns nothing, CI structural guards pass on dev, then close with the grep output linked.",
+    "summary": "The GitHub issue skill distinguishes COMPLETED, NOT_PLANNED and DUPLICATE. API verification on 2026-09-09 still reports #1314 as closed/not_planned.",
+    "resolution": "Verify the canonical duplicate timeline, then correct the closed reason for #1314. Keep the existing closed state and avoid a false completed classification.",
     "lookIn": [
-      "app/",
-      ".eslintrc.cjs"
+      ".agents/skills/github-issues/SKILL.md"
     ],
-    "existingTests": [
-      "CI quality job (typecheck + guards) on dev"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "rg sweep clean on dev",
-      "CI green after merge",
-      "Closure comment links the proof"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Verification only; no new code.",
     "blockedBy": []
   },
   {
-    "issueNumber": 1327,
+    "issueNumber": 1674,
     "verdict": "verify-close",
-    "summary": "Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.",
-    "currentBehavior": "Script editor routes consume flattened campaign/script fields; no campaignDetails accessor remains. Sai cannot see this on the stale review env.",
-    "rootCause": "Internal refactor, invisible without a redeploy.",
-    "resolution": "Verify on dev: rg campaignDetails in app/ has no editor hits, script editor routes render and save (covered by test/ui/script-editor-*.test.tsx), then close.",
+    "summary": "PR #1691 is merged to dev. The IVR fixture now has explicit speech text and a Press 1 → Yes → Hang up response. Its browser check passed.",
+    "resolution": "Include the fixture fix in release #1693. Keep the seeded editor browser check in the compose suite.",
     "lookIn": [
-      "app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx",
-      "app/routes/workspaces+/$id/scripts/"
+      "scripts/e2e/seed-database.mjs",
+      "e2e/specs/scripts-audio.spec.ts"
     ],
-    "existingTests": [
-      "test/ui/script-editor-route.test.tsx",
-      "test/ui/script-editor-adapter.test.tsx",
-      "test/ui/campaign-script-edit-route.test.tsx"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "No campaignDetails references in editor code on dev",
-      "Editor tests green on dev"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Verification only; no new code.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1346,
-    "verdict": "verify-close",
-    "recommendedTitle": "fix(audios): Add Audio upload zone opens the file picker",
-    "summary": "The /audios/new upload zone is inert: clicking the + never opens a file picker, so no file can be attached and Upload Audio always fails with \"Uploaded audio file is empty\". (Corrects the earlier record, which misattributed this to the campaign script editor; Sai reopened with a /audios/new screenshot.)",
-    "currentBehavior": "new.route.tsx renders a bare div around a className=hidden file input — no label htmlFor, no click handler. It is the only upload surface in the app without a label/button activation path.",
-    "rootCause": "Zone is decoration only; the picker is unreachable by mouse or keyboard. E2E missed it because setInputFiles(#media) writes files directly to the hidden input, bypassing the click.",
-    "resolution": "Fixed by #1359 (merged to dev as 2627e498). Verify on a current dev deploy: clicking the + zone opens the picker, the chosen name shows, Upload completes end-to-end; then close.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/audios/new.route.tsx",
-      "test/ui/audios-new-upload.test.tsx",
-      "app/components/campaign/settings/AddAudioSheet.tsx (reference pattern)"
-    ],
-    "existingTests": [
-      "test/workspace-audios-new.route.test.ts (action only)"
-    ],
-    "missingTests": [
-      "UI test for zone activation (added in #1359)"
-    ],
-    "acceptanceCriteria": [
-      "Clicking the + zone opens the file picker",
-      "Chosen filename shows in the zone",
-      "Upload completes end-to-end on a deployed env"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1335,
-    "verdict": "verify-close",
-    "recommendedTitle": "fix(ui): render remaining page-level errors through the shared destructive Alert",
-    "summary": "Sai reopened with the Create campaign page showing the duplicate-name error as bare red text. The #1353 migration covered banners (credits, chats, call screen, message settings) but page/section-level form errors still render as <Text className=text-destructive> on ~12 surfaces.",
-    "currentBehavior": "campaigns/new, campaigns/:id/audiences/new, audios/:name/edit, audios/record, signup, two-factor, admin dead-letters, account.security, AgentDesktop, ApiKeysSection, OutboundDialer, WorkspaceOverview render action/fetch errors as plain red text.",
-    "rootCause": "The Alert migration was scoped to hand-built banner boxes; actionData error texts kept their legacy markup. Field-level errors inside FormField are the design system and stay.",
-    "resolution": "Remaining scope fixed by #1361 (merged to dev as eafbd2d5) - ten surfaces now render the shared destructive Alert. Verify the Create-campaign duplicate-name error (and dark mode) on a current dev deploy; then close.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/campaigns/new.route.tsx:79",
-      "app/routes/workspaces+/$id/campaigns/$campaign_id/audiences/new.route.tsx:36",
-      "app/routes/workspaces+/$id/audios/$fileName.edit.route.tsx:57",
-      "app/routes/workspaces+/$id/audios/record.route.tsx:40",
-      "app/routes/signup.tsx:95",
-      "app/routes/two-factor.tsx:26",
-      "app/routes/admin+/dead-letters.route.tsx:47",
-      "app/routes/account.security.tsx:45",
-      "app/components/agent/AgentDesktop.tsx:384",
-      "app/components/workspace/ApiKeysSection.tsx:133",
-      "app/components/calls/OutboundDialer.tsx:83",
-      "app/components/workspace/WorkspaceOverview.tsx:141"
-    ],
-    "existingTests": [
-      "test/ui/message-settings.test.tsx (Alert pattern reference)"
-    ],
-    "missingTests": [
-      "Per-surface error rendering assertions where suites exist"
-    ],
-    "acceptanceCriteria": [
-      "No page-level error renders as bare red text",
-      "Dark mode uses semantic destructive tokens",
-      "Copy unchanged"
-    ],
-    "size": "M",
-    "risk": "low",
-    "trackerRecommendation": "One atomic PR; exclude FormField inline errors by design.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1362,
-    "verdict": "verify-close",
-    "summary": "On the call screen, when the AGENT hangs up the contact name clears, but when the CONTACT hangs up it stays. Behavior should be identical for both hang-up directions, and the code paths should not be divergent enough to allow this.",
-    "currentBehavior": "Fix merged; awaiting deployed verification.",
-    "rootCause": "Confirmed by trace: runCallStatusSideEffects billed and stamped a disposition but never dequeued the campaign_queue row, while /api/hangup always did - so only the agent-side hang-up collapsed nextRecipient.",
-    "resolution": "Fixed by #1368 (merged to dev as f696b3fa) - the webhook path now dequeues with the queue-row assignee, idempotent under the guarded RPC. Verify both hang-up orders collapse the contact name on a current dev deploy; then close.",
-    "lookIn": [
-      "app/components/call/",
-      "app/routes/api+/workspaces+/$workspaceId/events.loader.server.ts (SSE)",
-      "call status webhook handlers"
-    ],
-    "existingTests": [
-      "test/ui/call-screen-dialogs.test.tsx"
-    ],
-    "missingTests": [
-      "Contact-hangup clears/preserves name identically to agent-hangup (UI test per decision)"
-    ],
-    "acceptanceCriteria": [
-      "Both hang-up directions produce the same contact-name behavior",
-      "Shared teardown path or documented reason for divergence"
-    ],
-    "size": "M",
-    "risk": "medium",
     "blockedBy": []
   }
 ]
