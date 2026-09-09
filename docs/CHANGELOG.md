@@ -6,7 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
-- Form help and errors now stay connected to their inputs for screen readers, including inputs with their own help text. Invalid fields use the shared error styling ([#1748](https://github.com/chester-hill-solutions/callcaster/issues/1748)).
+- Form help and errors now stay connected to their inputs for screen readers, including inputs with their own help text. Invalid fields use the shared error styling, and plain-control defaults no longer override component borders and spacing ([#1748](https://github.com/chester-hill-solutions/callcaster/issues/1748)).
 - Phone setup now guides you through rental or caller ID verification, keeps your place when adding credits, and shows incoming-call settings after a number is added ([#1205](https://github.com/chester-hill-solutions/callcaster/issues/1205)).
 
 - M4A/MOV audio uploads (including campaign and voicemail audio) now transcode to a playable MP3 instead of silently producing empty, unplayable audio ([#1730](https://github.com/chester-hill-solutions/callcaster/issues/1730)).

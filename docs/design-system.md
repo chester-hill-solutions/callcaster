@@ -59,6 +59,7 @@ For a nested control, or a compound component such as `Select`, wrap the focusab
 - Existing `aria-describedby` IDs are retained and merged with the field's IDs. A field error takes precedence over `aria-invalid={false}` on the control. When the error is removed, the control's own invalid state is retained.
 - Custom control components must forward ARIA attributes to their focusable input or trigger. The field does not search through arbitrary component trees or assign feedback to adjacent actions.
 - `required` on `FormField` displays the label marker. Set `required` on a native input or use the control's validation API to enforce a required value.
+- Keep plain-control CSS fallbacks in `@layer base`. Unlayered rules override Tailwind utilities, even with a zero-specificity `:where()` selector, and can hide invalid borders or replace component spacing.
 - Use the shared field contract for new forms. Do not rebuild the description and error association in each route. The app adapter owns this behavior; shad-cc owns the underlying control visuals and tokens.
 
 ## Page structure
