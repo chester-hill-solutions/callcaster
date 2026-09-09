@@ -172,25 +172,58 @@ describe("app/lib/audio.server.ts", () => {
 
   test("transcodes buffer on ffmpeg success", async () => {
     const proc = createSpawnMock();
-    vi.doMock("node:child_process", () => ({ spawn: vi.fn(() => proc) }));
+    const spawn = vi.fn(() => proc);
+    vi.doMock("node:child_process", () => ({ spawn }));
 
     const mod = await import("../app/lib/audio.server");
     const pending = mod.transcodeAudioBuffer(Buffer.from("in"));
+
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
 
     proc.stdout.emit("data", "a");
     proc.stdout.emit("data", Buffer.from("b"));
     proc.emit("close", 0);
 
     await expect(pending).resolves.toEqual(Buffer.from("ab"));
-    expect(proc.stdin.end).toHaveBeenCalledWith(Buffer.from("in"));
+  });
+
+  test("stages input to a seekable temp file so moov-at-end M4A transcodes", async () => {
+    const proc = createSpawnMock();
+    const spawn = vi.fn(() => proc);
+    vi.doMock("node:child_process", () => ({ spawn }));
+
+    const mod = await import("../app/lib/audio.server");
+    const pending = mod.transcodeAudioBuffer(Buffer.from("fake-m4a"));
+
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
+
+    proc.stdout.emit("data", Buffer.from("real-mp3"));
+    proc.emit("close", 0);
+
+    await expect(pending).resolves.toEqual(Buffer.from("real-mp3"));
+
+    // ffmpeg must receive a seekable file path, never a pipe:0 — a pipe cannot
+    // be re-seeked to the trailing `moov` atom on non-faststart M4A/MOV.
+    const args = spawn.mock.calls[0][1] as string[];
+    const inputFlagAt = args.indexOf("-i");
+    expect(inputFlagAt).toBeGreaterThan(-1);
+    const inputTarget = args[inputFlagAt + 1];
+    expect(inputTarget).not.toBe("pipe:0");
+    expect(inputTarget).toMatch(/callcaster-transcode-.*\.mp3$/);
+
+    // Reading happens from the staging file, so stdin carries no input bytes.
+    expect(proc.stdin.end).toHaveBeenCalledWith(Buffer.alloc(0));
   });
 
   test("returns detailed ffmpeg close error when available", async () => {
     const proc = createSpawnMock();
-    vi.doMock("node:child_process", () => ({ spawn: vi.fn(() => proc) }));
+    const spawn = vi.fn(() => proc);
+    vi.doMock("node:child_process", () => ({ spawn }));
 
     const mod = await import("../app/lib/audio.server");
     const pending = mod.transcodeAudioBuffer(Buffer.from("in"));
+
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
 
     proc.stderr.emit("data", "decode failed");
     proc.stderr.emit("data", Buffer.from(" details"));
@@ -204,10 +237,13 @@ describe("app/lib/audio.server.ts", () => {
 
   test("returns generic ffmpeg close error when stderr is empty", async () => {
     const proc = createSpawnMock();
-    vi.doMock("node:child_process", () => ({ spawn: vi.fn(() => proc) }));
+    const spawn = vi.fn(() => proc);
+    vi.doMock("node:child_process", () => ({ spawn }));
 
     const mod = await import("../app/lib/audio.server");
     const pending = mod.transcodeAudioBuffer(Buffer.from("in"));
+
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
 
     proc.emit("close", 2);
 
@@ -219,10 +255,13 @@ describe("app/lib/audio.server.ts", () => {
 
   test("returns unavailable error when ffmpeg process emits error", async () => {
     const proc = createSpawnMock();
-    vi.doMock("node:child_process", () => ({ spawn: vi.fn(() => proc) }));
+    const spawn = vi.fn(() => proc);
+    vi.doMock("node:child_process", () => ({ spawn }));
 
     const mod = await import("../app/lib/audio.server");
     const pending = mod.transcodeAudioBuffer(Buffer.from("in"));
+
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
 
     proc.emit("error", new Error("spawn ENOENT"));
 
@@ -234,10 +273,13 @@ describe("app/lib/audio.server.ts", () => {
 
   test("ignores stdin EPIPE and still resolves from close code", async () => {
     const proc = createSpawnMock();
-    vi.doMock("node:child_process", () => ({ spawn: vi.fn(() => proc) }));
+    const spawn = vi.fn(() => proc);
+    vi.doMock("node:child_process", () => ({ spawn }));
 
     const mod = await import("../app/lib/audio.server");
     const pending = mod.transcodeAudioBuffer(Buffer.from("in"));
+
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalled());
 
     proc.stdin.emit("error", new Error("EPIPE"));
     proc.stdout.emit("data", Buffer.from("ok"));
