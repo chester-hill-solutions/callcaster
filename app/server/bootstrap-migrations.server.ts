@@ -214,7 +214,14 @@ export async function applyClientMigrationsOnBoot(options: {
 
       for (const file of baselineFiles) {
         if (baselineAppliedSet.has(file)) continue;
-        const content = readFileSync(path.join(baselineDir, file), "utf8");
+        // psql meta-commands (pg_dump emits a `\restrict` header line) are not
+        // valid SQL — strip any line whose first non-space char is a backslash
+        // before sending the file over the wire protocol.
+        const raw = readFileSync(path.join(baselineDir, file), "utf8");
+        const content = raw
+          .split("\n")
+          .filter((line) => !/^\s*\\/.test(line))
+          .join("\n");
         try {
           await sql.unsafe(content).simple();
           await sql`

@@ -253,6 +253,11 @@ describe("bootstrap-migrations.server", () => {
     expect(result.baselineApplied.length).toBeGreaterThan(0);
     // …and the client migrations still applied on top.
     expect(result.applied.length).toBeGreaterThan(0);
+    // psql-only meta commands (the pg_dump `\restrict` header) are stripped
+    // before sending — they are not valid SQL over the wire protocol.
+    const sentBaseline = dbState.simpleApplied.join("\n");
+    expect(sentBaseline).not.toContain("\\restrict");
+    expect(sentBaseline).not.toContain("\n\\");
   });
 
   test("does not re-apply the baseline when the schema already exists", async () => {
