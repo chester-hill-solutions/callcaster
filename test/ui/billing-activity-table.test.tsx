@@ -1,26 +1,28 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, test } from "vitest";
 
 import { BillingActivityTable } from "../../app/components/workspace/BillingActivityTable";
+import type { BillingActivityRow } from "../../app/lib/billing-activity-projection";
 
-const history = [
+const history: BillingActivityRow[] = [
   {
     id: "purchase-1",
     created_at: "2026-07-16T12:00:00.000Z",
-    type: "CREDIT" as const,
+    type: "CREDIT",
     amount: 500,
     note: "Added 500 credits, stripe_session:cs_test_123",
     idempotency_key: "stripe_session:cs_test_123",
   },
 ];
 
-const campaignHistory = [
+const campaignHistory: BillingActivityRow[] = [
   ...history,
   {
     id: "sms-1",
     created_at: "2026-08-20T12:00:00.000Z",
-    type: "DEBIT" as const,
+    type: "DEBIT",
     amount: -1,
     note: "SMS SM1 delivered (1 segment)",
     idempotency_key: "sms:SM1",
@@ -29,7 +31,7 @@ const campaignHistory = [
   {
     id: "call-1",
     created_at: "2026-08-18T12:00:00.000Z",
-    type: "DEBIT" as const,
+    type: "DEBIT",
     amount: -2,
     note: "Call CA1, Contact 5, Outreach Attempt 9",
     idempotency_key: "call:CA1",
@@ -38,7 +40,7 @@ const campaignHistory = [
   {
     id: "sms-2",
     created_at: "2026-08-03T12:00:00.000Z",
-    type: "DEBIT" as const,
+    type: "DEBIT",
     amount: -1,
     note: "SMS SM2 delivered (1 segment)",
     idempotency_key: "sms:SM2",
@@ -47,7 +49,7 @@ const campaignHistory = [
   {
     id: "rent-1",
     created_at: "2026-08-01T12:00:00.000Z",
-    type: "DEBIT" as const,
+    type: "DEBIT",
     amount: -100,
     note: "Monthly rental for +14165550123",
     idempotency_key: "number_rent:42:2026-08",
@@ -55,9 +57,46 @@ const campaignHistory = [
   },
 ];
 
+function renderTable(props: Partial<React.ComponentProps<typeof BillingActivityTable>> = {}) {
+  render(
+    <BillingActivityTable
+      history={props.history ?? history}
+      campaignNames={props.campaignNames}
+      workspaceId={props.workspaceId}
+      filter={props.filter ?? "all"}
+      onFilterChange={props.onFilterChange ?? (() => undefined)}
+      currentPage={props.currentPage}
+      totalPages={props.totalPages}
+      totalCount={props.totalCount}
+      pageSize={props.pageSize}
+      onPageChange={props.onPageChange}
+    />,
+  );
+}
+
+/** Mirrors the server-side filter the loader applies, so the client filter bar
+ *  tests the real data path (history arrives already filtered by type). */
+function FilterHarness({ full }: { full: BillingActivityRow[] }) {
+  const [filter, setFilter] = useState<"all" | "purchases" | "usage">("all");
+  const shown =
+    filter === "purchases"
+      ? full.filter((row) => row.type === "CREDIT")
+      : filter === "usage"
+        ? full.filter((row) => row.type === "DEBIT")
+        : full;
+  return (
+    <BillingActivityTable
+      history={shown}
+      campaignNames={{ 12: "Fall drive" }}
+      filter={filter}
+      onFilterChange={setFilter}
+    />
+  );
+}
+
 describe("BillingActivityTable", () => {
   test("shows only the customer-facing columns by default", () => {
-    render(<BillingActivityTable history={history} />);
+    renderTable();
 
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     expect(screen.getByRole("columnheader", { name: `Date (${zone})` })).toBeInTheDocument();
@@ -81,7 +120,7 @@ describe("BillingActivityTable", () => {
 
   test("reveals support details through an accessible Advanced disclosure", async () => {
     const user = userEvent.setup();
-    render(<BillingActivityTable history={history} />);
+    renderTable();
 
     const trigger = screen.getByRole("button", {
       name: "Advanced details for Credit purchase",
@@ -100,7 +139,7 @@ describe("BillingActivityTable", () => {
   });
 
   test("preserves the activity empty state", () => {
-    render(<BillingActivityTable history={[]} />);
+    renderTable({ history: [] });
 
     expect(
       screen.getByText("Purchases and campaign activity will appear here."),
@@ -108,12 +147,7 @@ describe("BillingActivityTable", () => {
   });
 
   test("rolls a campaign's usage for one period into a single summary row", () => {
-    render(
-      <BillingActivityTable
-        history={campaignHistory}
-        campaignNames={{ 12: "Fall outreach" }}
-      />,
-    );
+    renderTable({ history: campaignHistory, campaignNames: { 12: "Fall outreach" } });
 
     const rows = screen.getAllByRole("row").slice(1);
     expect(rows).toHaveLength(3);
@@ -135,12 +169,7 @@ describe("BillingActivityTable", () => {
 
   test("expands a summary row to the underlying ledger entries", async () => {
     const user = userEvent.setup();
-    render(
-      <BillingActivityTable
-        history={campaignHistory}
-        campaignNames={{ 12: "Fall outreach" }}
-      />,
-    );
+    renderTable({ history: campaignHistory, campaignNames: { 12: "Fall outreach" } });
 
     const toggle = screen.getByRole("button", {
       name: "Show 3 entries for Fall outreach, August 2026",
@@ -166,7 +195,7 @@ describe("BillingActivityTable", () => {
 
   test("filters to purchases and credits, or to usage, and back to all (#1322)", async () => {
     const user = userEvent.setup();
-    render(<BillingActivityTable history={campaignHistory} campaignNames={{ 12: "Fall drive" }} />);
+    render(<FilterHarness full={campaignHistory} />);
     const bar = screen.getByRole("group", { name: "Filter activity" });
     expect(within(bar).getByRole("button", { name: "All activity", pressed: true })).toBeInTheDocument();
     expect(screen.getByText("Credit purchase")).toBeInTheDocument();
@@ -187,13 +216,13 @@ describe("BillingActivityTable", () => {
 
   test("an empty filtered view says what is missing", async () => {
     const user = userEvent.setup();
-    render(<BillingActivityTable history={history} />);
+    render(<FilterHarness full={history} />);
     await user.click(screen.getByRole("button", { name: "Usage" }));
     expect(screen.getByText("No usage yet.")).toBeInTheDocument();
   });
 
   test("links Stripe purchases to their hosted receipt when a workspace id is given (#1322)", () => {
-    render(<BillingActivityTable history={campaignHistory} workspaceId="ws-1" />);
+    renderTable({ history: campaignHistory, workspaceId: "ws-1" });
     const link = screen.getByRole("link", { name: /^Receipt/ });
     expect(link).toHaveAttribute("href", "/api/workspaces/ws-1/billing/receipt?transaction=purchase-1");
     expect(link).toHaveAttribute("target", "_blank");
@@ -202,13 +231,34 @@ describe("BillingActivityTable", () => {
   });
 
   test("shows no receipt link without a workspace id", () => {
-    render(<BillingActivityTable history={history} />);
+    renderTable();
     expect(screen.queryByRole("link", { name: /^Receipt/ })).toBeNull();
   });
 
   test("names an untitled campaign by its id", () => {
-    render(<BillingActivityTable history={campaignHistory} />);
+    renderTable({ history: campaignHistory });
 
     expect(screen.getByText("Campaign 12")).toBeInTheDocument();
+  });
+
+  test("renders a pager when total pages exceed one", () => {
+    renderTable({
+      history: campaignHistory,
+      currentPage: 1,
+      totalPages: 3,
+      totalCount: 1_234,
+      pageSize: 500,
+      onPageChange: () => undefined,
+    });
+
+    expect(screen.getByRole("button", { name: "Go to page 2" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Go to next page" })).toBeInTheDocument();
+  });
+
+  test("hides the pager when there is a single page", () => {
+    renderTable({ currentPage: 1, totalPages: 1, totalCount: 10, pageSize: 500 });
+
+    expect(screen.queryByRole("button", { name: /Go to next/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Go to previous/ })).toBeNull();
   });
 });

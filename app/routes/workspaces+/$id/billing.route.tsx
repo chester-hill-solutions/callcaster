@@ -20,6 +20,7 @@ export const meta: MetaFunction = () => [{ title: "Billing — CallCaster" }];
 
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { BillingActivityTable } from "@/components/workspace/BillingActivityTable";
+import type { BillingActivityFilter } from "@/lib/billing-activity-projection";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Accordion,
@@ -53,6 +54,11 @@ type LoaderData = {
   credits: {
     balance: number;
     history: TransactionRow[];
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totals: { usage: number; purchased: number };
+    filter: BillingActivityFilter;
   };
   campaignNames: Record<number, string>;
   stripeKeyMode: "test" | "live" | "unknown";
@@ -66,7 +72,7 @@ export default function Credits() {
   // the page's own content for anyone who lands here directly, so the write
   // form isn't shown to a role that will always get a 403 on submit.
   const canPurchase = hasMinRole(userRole ?? undefined, MemberRole.Admin);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const params = useParams();
   const navigation = useNavigation();
   const [selectedAmount, setSelectedAmount] = useState<number>(MIN_CREDITS);
@@ -302,10 +308,43 @@ export default function Credits() {
 
       <Section variant="flat">
         <SectionHeader branded={false} compact title="Activity" />
+        <div className="text-muted-foreground mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+          <span>
+            Total usage:{" "}
+            <span className="font-medium text-foreground">
+              {formatCredits(credits.totals.usage)} credits
+            </span>
+          </span>
+          <span>
+            Total purchased:{" "}
+            <span className="font-medium text-foreground">
+              {formatCredits(credits.totals.purchased)} credits
+            </span>
+          </span>
+        </div>
         <BillingActivityTable
           history={credits.history}
           campaignNames={campaignNames}
           workspaceId={params.id}
+          filter={credits.filter}
+          onFilterChange={(filter) => {
+            const next = new URLSearchParams(searchParams);
+            next.set("filter", filter);
+            next.delete("page");
+            setSearchParams(next);
+          }}
+          currentPage={credits.page}
+          totalPages={Math.max(
+            1,
+            Math.ceil(credits.totalCount / Math.max(1, credits.pageSize)),
+          )}
+          totalCount={credits.totalCount}
+          pageSize={credits.pageSize}
+          onPageChange={(page) => {
+            const next = new URLSearchParams(searchParams);
+            next.set("page", String(page));
+            setSearchParams(next);
+          }}
         />
       </Section>
     </div>

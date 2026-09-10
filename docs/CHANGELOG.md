@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- The workspace Credits screen no longer hides activity beyond the most recent 500 ledger rows. The ledger is now paginated (with a page count and previous/next controls), and the Activity section shows full workspace usage and purchase totals that reconcile with reporting regardless of the page being viewed ([#1753](https://github.com/chester-hill-solutions/callcaster/issues/1753)).
 - Form help and errors now stay connected to their inputs for screen readers, including inputs with their own help text. Invalid fields use the shared error styling, and plain-control defaults no longer override component borders and spacing ([#1748](https://github.com/chester-hill-solutions/callcaster/issues/1748)).
 - Phone setup now guides you through rental or caller ID verification, keeps your place when adding credits, and shows incoming-call settings after a number is added ([#1205](https://github.com/chester-hill-solutions/callcaster/issues/1205)).
 

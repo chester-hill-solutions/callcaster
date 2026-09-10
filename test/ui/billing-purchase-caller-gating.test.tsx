@@ -28,7 +28,15 @@ async function renderBilling(userRole?: string) {
             path: "billing",
             Component: mod.default,
             loader: () => ({
-              credits: { balance: 100, history: [] },
+              credits: {
+                balance: 100,
+                history: [],
+                page: 1,
+                pageSize: 500,
+                totalCount: 0,
+                totals: { usage: 0, purchased: 0 },
+                filter: "all",
+              },
               stripeKeyMode: "test",
             }),
           },
