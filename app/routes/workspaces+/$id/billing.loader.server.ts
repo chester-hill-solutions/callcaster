@@ -7,11 +7,20 @@ import { defineLoader } from "@/lib/handler.server";
 export const loader = defineLoader({
   auth: workspaceLoaderAuth,
   sideEffects: ["db-read"],
-  handler: async ({ auth: result }) => {
+  handler: async ({ auth: result, url }) => {
     if (!result.ok) return result.response;
     const { user, workspaceId } = result.ctx;
 
-    const billing = await getWorkspaceBillingActivity(user.id, workspaceId);
+    const filterParam = url.searchParams.get("filter");
+    const filter =
+      filterParam === "purchases" || filterParam === "usage"
+        ? filterParam
+        : "all";
+
+    const billing = await getWorkspaceBillingActivity(user.id, workspaceId, {
+      page: Number(url.searchParams.get("page") ?? "1"),
+      filter,
+    });
     if (!billing.ok) {
       throw new Error(billing.error);
     }
@@ -22,6 +31,11 @@ export const loader = defineLoader({
       credits: {
         balance: billing.balance,
         history: billing.history,
+        page: billing.page,
+        pageSize: billing.pageSize,
+        totalCount: billing.totalCount,
+        totals: billing.totals,
+        filter,
       },
       campaignNames: billing.campaignNames,
       stripeKeyMode,

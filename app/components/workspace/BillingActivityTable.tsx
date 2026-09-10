@@ -16,9 +16,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Text } from "@/components/ui/typography";
+import TablePagination from "@/components/shared/TablePagination";
 import {
   formatSignedCreditAmount,
   projectBillingActivity,
+  type BillingActivityFilter,
   type BillingActivityRow,
 } from "@/lib/billing-activity-projection";
 import {
@@ -32,6 +34,15 @@ type BillingActivityTableProps = {
   campaignNames?: Record<number, string>;
   /** When set, Stripe purchases link to their hosted receipt (#1322). */
   workspaceId?: string;
+  /** Active activity filter, owned by the route so pages and counts agree. */
+  filter: BillingActivityFilter;
+  onFilterChange: (filter: BillingActivityFilter) => void;
+  /** Server-side ledger pagination; omitted hides the pager. */
+  currentPage?: number;
+  totalPages?: number;
+  totalCount?: number;
+  pageSize?: number;
+  onPageChange?: (page: number) => void;
 };
 
 function receiptHrefFor(workspaceId: string | undefined, row: BillingActivityRow): string | null {
@@ -193,19 +204,13 @@ function ActivityGroupRows({ group }: { group: BillingActivityGroupItem }) {
   );
 }
 
-export type BillingActivityFilter = "all" | "purchases" | "usage";
+export type { BillingActivityFilter } from "@/lib/billing-activity-projection";
 
 const ACTIVITY_FILTERS: ReadonlyArray<{ id: BillingActivityFilter; label: string }> = [
   { id: "all", label: "All activity" },
   { id: "purchases", label: "Purchases and credits" },
   { id: "usage", label: "Usage" },
 ];
-
-function matchesActivityFilter(row: BillingActivityRow, filter: BillingActivityFilter): boolean {
-  if (filter === "purchases") return row.type === "CREDIT";
-  if (filter === "usage") return row.type === "DEBIT";
-  return true;
-}
 
 function emptyCopyFor(filter: BillingActivityFilter): string {
   if (filter === "purchases") return "No purchases or credits yet.";
@@ -243,49 +248,66 @@ export function BillingActivityTable({
   history,
   campaignNames,
   workspaceId,
+  filter,
+  onFilterChange,
+  currentPage,
+  totalPages,
+  totalCount,
+  pageSize,
+  onPageChange,
 }: BillingActivityTableProps) {
-  const [filter, setFilter] = useState<BillingActivityFilter>("all");
   const items = useMemo(
-    () =>
-      rollUpBillingActivity(
-        history.filter((row) => matchesActivityFilter(row, filter)),
-        { campaignNames },
-      ),
-    [history, campaignNames, filter],
+    () => rollUpBillingActivity(history, { campaignNames }),
+    [history, campaignNames],
   );
 
   return (
-    <div className="overflow-x-auto">
-      <ActivityFilterBar value={filter} onChange={setFilter} />
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Date ({browserTimeZone()})</TableHead>
-            <TableHead>Activity</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.length === 0 ? (
+    <div className="space-y-3">
+      <ActivityFilterBar value={filter} onChange={onFilterChange} />
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={3} className="py-8 text-center">
-                <Text variant="muted">{emptyCopyFor(filter)}</Text>
-              </TableCell>
+              <TableHead>Date ({browserTimeZone()})</TableHead>
+              <TableHead>Activity</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
             </TableRow>
-          ) : null}
-          {items.map((item) =>
-            item.kind === "group" ? (
-              <ActivityGroupRows key={item.key} group={item} />
-            ) : (
-              <ActivityEntryRow
-                key={item.row.id}
-                row={item.row}
-                receiptHref={receiptHrefFor(workspaceId, item.row)}
-              />
-            ),
-          )}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {items.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="py-8 text-center">
+                  <Text variant="muted">{emptyCopyFor(filter)}</Text>
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {items.map((item) =>
+              item.kind === "group" ? (
+                <ActivityGroupRows key={item.key} group={item} />
+              ) : (
+                <ActivityEntryRow
+                  key={item.row.id}
+                  row={item.row}
+                  receiptHref={receiptHrefFor(workspaceId, item.row)}
+                />
+              ),
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      {currentPage != null &&
+      totalPages != null &&
+      totalPages > 1 &&
+      onPageChange ? (
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          totalCount={totalCount}
+          pageSize={pageSize}
+          showSummary
+        />
+      ) : null}
     </div>
   );
 }
