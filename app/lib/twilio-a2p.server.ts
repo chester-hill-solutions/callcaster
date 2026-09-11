@@ -128,7 +128,11 @@ export async function provisionWorkspaceA2P({
   });
 
   try {
-    const messagingApi = (twilio as any).messaging?.v1;
+    // Twilio SDK typings don't expose the full messaging.v1 surface
+    const messagingApi = (twilio as unknown as { messaging?: { v1?: {
+      brandRegistrations?: { create?: (opts: Record<string, unknown>) => Promise<{ sid?: string }> };
+      campaigns?: { create?: (opts: Record<string, unknown>) => Promise<{ sid?: string }> };
+    } } }).messaging?.v1;
     let brandSid = nextOnboarding.a2p10dlc.brandSid;
     let campaignSid = nextOnboarding.a2p10dlc.campaignSid;
 

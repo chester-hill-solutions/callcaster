@@ -18,29 +18,35 @@ export type SessionResult = {
 };
 
 export async function getSession(request: Request): Promise<SessionResult> {
-  const result = await auth.api.getSession({
+  const result = (await auth.api.getSession({
     headers: request.headers,
     returnHeaders: true,
-  });
+  })) as {
+    response?: {
+      session?: { token: string; expiresAt: Date | string | number; userId: string };
+      user?: { id: string; email?: string | null; name?: string | null };
+    };
+    headers?: Headers;
+  };
+  const headers = mergeBetterAuthSetCookieHeaders(result?.headers);
+  const payload = result?.response;
+  const session = payload?.session;
+  const user = payload?.user;
 
-  const resultAny = result as any;
-  const headers = mergeBetterAuthSetCookieHeaders(resultAny?.headers);
-  const payload = resultAny?.response ?? resultAny;
-
-  if (!payload?.session || !payload?.user) {
+  if (!session || !user) {
     return { session: null, user: null, headers };
   }
 
   return {
     session: {
-      token: payload.session.token,
-      expiresAt: new Date(payload.session.expiresAt),
-      userId: payload.session.userId,
+      token: session.token,
+      expiresAt: new Date(session.expiresAt),
+      userId: session.userId,
     },
     user: {
-      id: payload.user.id,
-      email: payload.user.email ?? undefined,
-      name: payload.user.name ?? undefined,
+      id: user.id,
+      email: user.email ?? undefined,
+      name: user.name ?? undefined,
     },
     headers,
   };

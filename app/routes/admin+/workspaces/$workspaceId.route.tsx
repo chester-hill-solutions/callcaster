@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 import { ArrowLeft, Phone, MessageSquare, RefreshCw, Image, FileText } from "lucide-react";
 import WorkspaceOverview from "@/components/workspace/WorkspaceOverview";
+import type { Tables } from "@/lib/db-types";
 
 interface TwilioPhoneNumber {
     sid: string;
@@ -108,7 +109,7 @@ export default function WorkspaceDetails() {
                 </TabsList>
                 {getActiveTab() === "overview" ? (
                  <WorkspaceOverview 
-                    workspace={workspace as any} 
+                    workspace={workspace as ( Tables<"workspace"> & { campaign?: unknown[] }) | null} 
                     workspaceUsers={workspaceUsers} 
                     phoneNumbers={phoneNumbers}
                     twilioSnapshot={twilioPortalSnapshot}

@@ -176,8 +176,11 @@ export const action = defineAction({
         cacheControl: "60",
         contentType: (mediaToUpload as File).type || undefined,
       });
-    } catch (uploadError: any) {
-      if (uploadError?.statusCode !== "409") {
+    } catch (uploadError: unknown) {
+      const statusCode = typeof uploadError === "object" && uploadError !== null && "statusCode" in uploadError
+        ? String((uploadError as { statusCode: unknown }).statusCode)
+        : undefined;
+      if (statusCode !== "409") {
         logger.error("Message media upload error:", uploadError);
         return routeData({ success: false, error: uploadError }, { headers });
       }

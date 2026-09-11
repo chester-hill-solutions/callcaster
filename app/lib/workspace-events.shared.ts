@@ -19,23 +19,42 @@ export const WorkspaceEventRecord = z.object({
 
 export type WorkspaceEventRecord = z.infer<typeof WorkspaceEventRecord>;
 
-export type RealtimeChangePayload<T extends Record<string, unknown> = Record<string, unknown>> =
+export type RealtimeChangePayload<T extends object = Record<string, unknown>> =
   PostgresChangePayload & {
     new: T | null;
     old: T | null;
   };
 
+/** Envelope shape with a caller-named payload contract. */
+export interface WorkspaceEventData<TPayload = Record<string, unknown>> {
+  id: number;
+  workspace_id: string;
+  event_type: string;
+  payload: TPayload;
+  created_at: string;
+}
+
 /**
  * Parse an SSE `data:` frame. Throws on malformed JSON *or* a frame that is not
  * a workspace-event envelope; existing callers already wrap this in try/catch.
  * Prefer {@link safeParseWorkspaceEventData} in handlers that must never throw.
+ *
+ * Pass a payload type to name the wire contract at the call site
+ * (`parseWorkspaceEventData<{ status: string }>(raw)`) instead of double-casting
+ * the loosely-typed `record.payload` afterwards.
  */
-export function parseWorkspaceEventData(raw: string): WorkspaceEventRecord {
-  return WorkspaceEventRecord.parse(JSON.parse(raw));
+export function parseWorkspaceEventData<TPayload = Record<string, unknown>>(
+  raw: string,
+): WorkspaceEventData<TPayload> {
+  const rec = WorkspaceEventRecord.parse(JSON.parse(raw));
+  const payload: unknown = rec.payload;
+  return { ...rec, payload: payload as TPayload };
 }
 
 /** Non-throwing variant: returns `null` for anything that is not a valid envelope. */
-export function safeParseWorkspaceEventData(raw: string): WorkspaceEventRecord | null {
+export function safeParseWorkspaceEventData<TPayload = Record<string, unknown>>(
+  raw: string,
+): WorkspaceEventData<TPayload> | null {
   let decoded: unknown;
   try {
     decoded = JSON.parse(raw);
@@ -43,7 +62,9 @@ export function safeParseWorkspaceEventData(raw: string): WorkspaceEventRecord |
     return null;
   }
   const result = WorkspaceEventRecord.safeParse(decoded);
-  return result.success ? result.data : null;
+  if (!result.success) return null;
+  const payload: unknown = result.data.payload;
+  return { ...result.data, payload: payload as TPayload };
 }
 
 export function matchesPostgresChangeFilter(

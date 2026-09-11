@@ -103,9 +103,10 @@ const useCallRoom = ({
 
     const onWorkspaceEvent = (message: MessageEvent<string>) => {
       try {
-        const record = parseWorkspaceEventData(message.data);
+        const record =
+          parseWorkspaceEventData<{ contact_id?: number | null; status?: string }>(message.data);
         if (record.event_type === "predictive_broadcast") {
-          const payload = record.payload as unknown as PredictiveState;
+          const payload = record.payload;
           // Broadcasts carry raw Twilio statuses (see runCallStatusSideEffects);
           // translate them to the dialer vocabulary the consumers switch on.
           setPredictiveState({

@@ -66,15 +66,15 @@ async function handleTokenVerification(
   headers: Headers,
 ) {
   try {
-    const result = await auth.api.verifyEmail({
+    const result = (await auth.api.verifyEmail({
       query: { token: token_hash },
       headers: request.headers,
       returnHeaders: true,
-    });
+    })) as { response?: { user?: { id: string; email?: string | null } }; headers?: Headers };
     const mergedHeaders = mergeBetterAuthSetCookieHeaders(result?.headers, headers);
-    const payload = (result?.response ?? result) as any;
+    const user = result?.response?.user ?? (result as { user?: { id: string; email?: string | null } })?.user;
 
-    if (!payload?.user) {
+    if (!user) {
       return routeData<LoaderData>(
         {
           status: "invalid_link",
@@ -85,14 +85,14 @@ async function handleTokenVerification(
       );
     }
 
-    const profile = await getUserById(payload.user.id);
+    const profile = await getUserById(user.id);
     const isNewUser = profile
       ? isDefaultNewUserProfile(profile)
       : false;
 
     if (isNewUser) {
       const invites =
-        ((await getInvitesByUserId(payload.user.id)) as
+        ((await getInvitesByUserId(user.id)) as
           | WorkspaceInviteRow[]
           | null) ?? [];
       return routeData<LoaderData>(
@@ -105,7 +105,7 @@ async function handleTokenVerification(
       );
     }
 
-    const invites = await fetchInvitesWithWorkspace(payload.user.id);
+    const invites = await fetchInvitesWithWorkspace(user.id);
 
     return routeData<LoaderData>(
       {
