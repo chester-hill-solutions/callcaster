@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Toasts now use consistent spacing defaults (vertical padding + row gap) app-wide, fixing cramped bottom spacing around upload errors ([#1668](https://github.com/chester-hill-solutions/callcaster/issues/1668)).
 - Upload failures no longer leak raw storage/server messages — every upload path returns a friendly message and keeps the raw detail in the logs ([#1769](https://github.com/chester-hill-solutions/callcaster/issues/1769)).
 - Number verification now updates the numbers page live — no refresh needed to see a number flip to verified — and the verification sheet shows a pending state with the confirmation token while the call is in flight ([#1740](https://github.com/chester-hill-solutions/callcaster/issues/1740)).
 - Adding an audio without selecting a file now shows the standard error style instead of a plain red text line ([#1665](https://github.com/chester-hill-solutions/callcaster/issues/1665)).
