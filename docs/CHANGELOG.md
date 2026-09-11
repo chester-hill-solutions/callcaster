@@ -7,6 +7,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Fixed
 
 - Number verification now updates the numbers page live — no refresh needed to see a number flip to verified — and the verification sheet shows a pending state with the confirmation token while the call is in flight ([#1740](https://github.com/chester-hill-solutions/callcaster/issues/1740)).
+- Adding an audio without selecting a file now shows the standard error style instead of a plain red text line ([#1665](https://github.com/chester-hill-solutions/callcaster/issues/1665)).
 
 ## 2026-09-11 — release [#1761](https://github.com/chester-hill-solutions/callcaster/pull/1761)
 
