@@ -983,5 +983,35 @@
     "size": "S-M",
     "risk": "medium",
     "trackerRecommendation": "Co-ordinate with #1770."
+  },
+  {
+    "issueNumber": 1773,
+    "verdict": "needs-decision",
+    "recommendedTitle": "feature(backup): daily lossless per-workspace CSV snapshots + manifest + retention",
+    "summary": "No data backup today. Adopt quick-canvass backup.workspace_csv pattern: daily self-scheduling job snapshots workspace-scoped core tables to a backup bucket with manifest.json, date-keyed retention pruning (BACKUP_RETENTION_DAYS, default 30), per-workspace failure isolation.",
+    "currentBehavior": "No daily data backup exists; worker only does job-row retention.",
+    "rootCause": "Gap — no snapshot job.",
+    "resolution": "Register a schedule:true worker job; reuse uploadObject/listObjects/deleteObject; phase-1 coverage from app/db/workspace-scoped-tables.ts; BACKUP_S3_BUCKET/BACKUP_RETENTION_DAYS env; docs restore procedure.",
+    "lookIn": [
+      "app/lib/worker/handlers.server.ts",
+      "app/lib/object-storage.server.ts",
+      "app/db/workspace-scoped-tables.ts",
+      "app/lib/env.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "daily snapshot + manifest appear",
+      "retention pruned",
+      "one failing workspace does not stop others"
+    ],
+    "acceptanceCriteria": [
+      "per-workspace snapshot + manifest daily",
+      "older-than-retention pruned",
+      "failure isolation + errored job",
+      "restore documented"
+    ],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "Phase-1: core tables; document coverage in the manifest format."
   }
 ]
