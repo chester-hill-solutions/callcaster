@@ -103,6 +103,7 @@ const WorkspacePicker = ({
           <CommandList
             id="navbar-workspace-picker-list"
             aria-label="Workspaces"
+            className="max-h-64 overflow-y-auto"
             renderEmptyState={() => <CommandEmpty>No workspaces found.</CommandEmpty>}
           >
             <CommandGroup heading="Workspaces">
@@ -121,11 +122,18 @@ const WorkspacePicker = ({
                 </CommandItem>
               ))}
             </CommandGroup>
-            <CommandSeparator />
-            <CommandItem id="all-workspaces" textValue="All workspaces" onAction={() => go("/workspaces")}>
-              All workspaces
-            </CommandItem>
           </CommandList>
+          {/* Pinned footer: OUTSIDE the scrollable list so it is always visible,
+              even with many workspaces (#1669). */}
+          <CommandSeparator />
+          <CommandItem
+            id="all-workspaces"
+            textValue="All workspaces"
+            onAction={() => go("/workspaces")}
+            className="border-t border-border/60"
+          >
+            All workspaces
+          </CommandItem>
         </Command>
       </PopoverContent>
     </Popover>
