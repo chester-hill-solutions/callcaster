@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@fbc11658` · 135 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@b85f8e02` · 135 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 9
+## Fix now — 3
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -58,88 +58,44 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Goal has short non-duplicated guidance; Help content wraps/scrolls within bounds; SMS compliance fields only for SMS goal; Saved data unchanged
 - Tracker: Coordinate with #1345/#1311/#1122.
 
-### [#1669](https://github.com/chester-hill-solutions/callcaster/issues/1669) all workspaces option should be sticky to the bottom of the dropdown
-- Verdict: **Fix now** · Labels: ux · Assignee: none · Updated: 2026-09-08
-- The All workspaces action should remain visible at the bottom while workspace results scroll.
-- Resolution: Put the action outside the scrolling results area and verify a long workspace list.
-- Look in: `app/components/layout/Navbar.tsx`
-
-### [#1668](https://github.com/chester-hill-solutions/callcaster/issues/1668) Error toasts should have sensible defaults for spacing. Adding an audio reveals lacking bottom spacing
-- Verdict: **Fix now** · Labels: design · Assignee: none · Updated: 2026-09-08
-- Error toast content lacks bottom spacing. The request requires a shared correction.
-- Resolution: Reproduce in the root Toaster and fix shared toast spacing. Verify success/error messages and light/dark themes.
-- Look in: `app/components/ui/sonner.tsx`, `app/root.tsx`
-
-### [#1667](https://github.com/chester-hill-solutions/callcaster/issues/1667) audio upload toast text should all be inline no? just with a space?
-- Verdict: **Fix now** · Labels: design · Assignee: none · Updated: 2026-09-08
-- Audio upload toast text should read as one sentence with a space.
-- Resolution: Inspect title and description values; make the upload message one coherent sentence without changing global error semantics.
-- Look in: `app/routes/workspaces+/$id/audios/new.route.tsx`, `app/lib/audio-upload.ts`
-
-### [#1665](https://github.com/chester-hill-solutions/callcaster/issues/1665) Adding an audio but not having a file gives the plain red text error when it should use the standardized error style
-- Verdict: **Fix now** · Labels: design · Assignee: none · Updated: 2026-09-08
-- Submitting the audio form without a file shows plain red error text. The request asks for the shared error style.
-- Resolution: Use the existing shared form-error primitive, then inspect other audio upload entry points for the same mismatch.
-- Look in: `app/routes/workspaces+/$id/audios/new.route.tsx`, `app/components/ui/form-field.tsx`
-
-### [#1769](https://github.com/chester-hill-solutions/callcaster/issues/1769) Upload actions leak raw storage/DB errors — route failures through toUserMessage
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-11
-- Recommended title: **fix(upload): route every upload failure through toUserMessage**
-- audios/new returns raw S3 messages (uploadError?.message); audience-upload returns raw error.message in two paths. Route through toUserMessage + log via getErrorDetail.
-- Current behavior: Raw S3/DB messages reach upload error UI.
-- Root cause: Upload actions return error.message instead of toUserMessage.
-- Resolution: Wrap every upload failure return in toUserMessage; keep AppError short-circuits; log raw detail.
-- Look in: `app/routes/workspaces+/$id/audios/new.action.server.ts`, `app/routes/api+/audience-upload.action.server.ts`, `app/lib/user-message.ts`
-- Existing tests: test/ui/audios-new-upload.test.tsx
-- Missing tests: an S3 failure returns the friendly fallback, not the raw message
-- Done when: no upload path returns raw S3/Postgres text; intentional copy unchanged; detail logged
-- Tracker: Standalone small PR.
-
-### [#1740](https://github.com/chester-hill-solutions/callcaster/issues/1740) Number verification: status does not update until refresh; sheet lacks a pending state with the confirmation token
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: on-dev · Assignee: none · Updated: 2026-09-11
-- Recommended title: **fix(call-settings): refetch number verification status after verify + show pending with the confirmation token**
-- After verifying a number, the row status does not update until a page refresh; the sheet has no pending state showing the issued confirmation token.
-- Current behavior: CallerIdVerificationForm starts the flow; NumbersTable shows capabilities.verification_status only after reload.
-- Root cause: No refetch/revalidate wired to the verification completion in the numbers sheet.
-- Resolution: Refetch verification status after the verification action resolves; render a pending row in the sheet with the confirmation token.
-- Look in: `app/components/phone-numbers/NumbersTable.tsx`, `app/components/phone-numbers/CallerIdVerificationForm.tsx`, `app/components/phone-numbers/CallerIdVerificationDialog.tsx`, `app/hooks/call/usePhoneVerification.ts`
-- Existing tests: test/ui/* (numbers)
-- Missing tests: status updates after verify without reload; pending + token shown while verifying
-- Done when: verification updates in place, no reload; sheet shows pending state + confirmation token
-- Tracker: Small standalone PR.
-
 ---
 
-## Verify and close — 50
+## Verify and close — 56
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
-### [#1224](https://github.com/chester-hill-solutions/callcaster/issues/1224) Voicemail gets captured but not sent to email address
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
-- Recommended title: **verify-close: voicemail email sends (presign TTL + auth token)**
-- Verified end-to-end on dev: fired a signed RecordingStatusCallback (real Twilio recording, real call) and the route fetched the recording, uploaded to S3, presigned (7-day) and Resend sent the email (message id 6e55aadd...).
-- Current behavior: email-vm: fetch recording (API key/auth token), upload, presign 7d, resend.emails.send; recording_url persists only after a successful send.
-- Root cause: Original: presign 100d over SigV4 cap (#1223) + stale subaccount auth (#1655).
-- Resolution: #1223 presign clamp + API-key-first auth; verified live.
-- Look in: `app/routes/api+/email-vm.action.server.ts`, `app/lib/object-storage.server.ts`
-- Existing tests: test/ivr-status.route.test.ts (voicemail)
-- Done when: Voicemail webhook -> email arrives; recording_url persisted after send
-- Tracker: Close as verified; residual eyeball = leave a real voicemail.
+### [#1668](https://github.com/chester-hill-solutions/callcaster/issues/1668) Error toasts should have sensible defaults for spacing. Adding an audio reveals lacking bottom spacing
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design, on-dev · Assignee: none · Updated: 2026-09-11
+- Recommended title: **Toast spacing defaults (padding + gap)**
+- Merged to dev (#1778); UI tests green; awaiting Sai/user retest on dev.
+- Current behavior: Shipped on dev.
+- Root cause: Fixed; see the PR.
+- Resolution: No further code expected unless retest finds a gap.
+- Done when: retest on dev
+- Tracker: Close once confirmed on dev.
 
-### [#1168](https://github.com/chester-hill-solutions/callcaster/issues/1168) Campaign states aren't clear
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux, business-logic · Assignee: @wra-sol · Updated: 2026-09-09
-- Recommended title: **verify-close: campaign shows waiting when out of sending hours**
-- waiting status + schedule-sweep running<->waiting implemented (#1236). Verified locally: a running voice campaign with no in-window schedule flips running->waiting via campaign_schedule_sync.
-- Current behavior: campaign_schedule_sync flips active voice campaigns to waiting outside calling hours; UI shows amber Waiting.
-- Root cause: None — behaviour implemented; needed verification.
-- Resolution: Confirmed via direct sync run (scanned 3, transitioned 1) + campaign_schedule_sync.server.test.ts.
-- Look in: `app/lib/campaign-schedule-sync.server.ts`, `app/lib/campaign-dispatch-policy.ts`
-- Existing tests: test/campaign-schedule-sync.server.test.ts
-- Done when: running->waiting outside window; waiting->running inside window
-- Tracker: Close as verified; naming (waiting vs stopped) tracked separately if needed.
+### [#1667](https://github.com/chester-hill-solutions/callcaster/issues/1667) audio upload toast text should all be inline no? just with a space?
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design, on-dev · Assignee: none · Updated: 2026-09-11
+- Recommended title: **Audio upload toast stays one inline line**
+- Merged to dev (#1777); UI tests green; awaiting Sai/user retest on dev.
+- Current behavior: Shipped on dev.
+- Root cause: Fixed; see the PR.
+- Resolution: No further code expected unless retest finds a gap.
+- Done when: retest on dev
+- Tracker: Close once confirmed on dev.
+
+### [#1669](https://github.com/chester-hill-solutions/callcaster/issues/1669) all workspaces option should be sticky to the bottom of the dropdown
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux, on-dev · Assignee: none · Updated: 2026-09-11
+- Recommended title: **All workspaces pinned in workspace picker**
+- Merged to dev (#1776); UI tests green; awaiting Sai/user retest on dev.
+- Current behavior: Shipped on dev.
+- Root cause: Fixed; see the PR.
+- Resolution: No further code expected unless retest finds a gap.
+- Done when: retest on dev
+- Tracker: Close once confirmed on dev.
 
 ### [#1338](https://github.com/chester-hill-solutions/callcaster/issues/1338) Call Settings buttons are all over the place needs better alignment and padding
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-09-09
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: none · Updated: 2026-09-11
 - Recommended title: **verify-close: call settings sheet laid out by device, no redundant labels**
 - #1680 laid the sheet out by device (single label per field, buttons say what they do, flex gap), removing the redundant headings flagged in the issue. UI green; visual eyeball pending.
 - Current behavior: Microphone/Speaker/Output fields each carry one label with their controls beneath.
@@ -151,7 +107,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Tracker: Close after the eyeball.
 
 ### [#1292](https://github.com/chester-hill-solutions/callcaster/issues/1292) if the call recipient hangs up, I get call completed but still the option to hang up
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-11
 - Recommended title: **verify-close: call screen shows Hang Up in-call, Dial (with confirm) after**
 - Dial control (#1408) flips to Dial and requires a second click after a call ends; Hang Up has its own two-step confirm. CallControls state machine verified by code + call-screen UI tests.
 - Current behavior: in-call -> Hang Up (two-step); after end -> armed Dial ('Click again to call back') that disarms on first click.
@@ -161,6 +117,72 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/ui/call-screen-callarea.test.tsx
 - Done when: active call -> Hang Up; ended call -> Dial with confirm; no hang-up confirm loop
 - Tracker: Close after the eyeball.
+
+### [#1224](https://github.com/chester-hill-solutions/callcaster/issues/1224) Voicemail gets captured but not sent to email address
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-11
+- Recommended title: **verify-close: voicemail email sends (presign TTL + auth token)**
+- Verified end-to-end on dev: fired a signed RecordingStatusCallback (real Twilio recording, real call) and the route fetched the recording, uploaded to S3, presigned (7-day) and Resend sent the email (message id 6e55aadd...).
+- Current behavior: email-vm: fetch recording (API key/auth token), upload, presign 7d, resend.emails.send; recording_url persists only after a successful send.
+- Root cause: Original: presign 100d over SigV4 cap (#1223) + stale subaccount auth (#1655).
+- Resolution: #1223 presign clamp + API-key-first auth; verified live.
+- Look in: `app/routes/api+/email-vm.action.server.ts`, `app/lib/object-storage.server.ts`
+- Existing tests: test/ivr-status.route.test.ts (voicemail)
+- Done when: Voicemail webhook -> email arrives; recording_url persisted after send
+- Tracker: Close as verified; residual eyeball = leave a real voicemail.
+
+### [#1168](https://github.com/chester-hill-solutions/callcaster/issues/1168) Campaign states aren't clear
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux, business-logic · Assignee: @wra-sol · Updated: 2026-09-11
+- Recommended title: **verify-close: campaign shows waiting when out of sending hours**
+- waiting status + schedule-sweep running<->waiting implemented (#1236). Verified locally: a running voice campaign with no in-window schedule flips running->waiting via campaign_schedule_sync.
+- Current behavior: campaign_schedule_sync flips active voice campaigns to waiting outside calling hours; UI shows amber Waiting.
+- Root cause: None — behaviour implemented; needed verification.
+- Resolution: Confirmed via direct sync run (scanned 3, transitioned 1) + campaign_schedule_sync.server.test.ts.
+- Look in: `app/lib/campaign-schedule-sync.server.ts`, `app/lib/campaign-dispatch-policy.ts`
+- Existing tests: test/campaign-schedule-sync.server.test.ts
+- Done when: running->waiting outside window; waiting->running inside window
+- Tracker: Close as verified; naming (waiting vs stopped) tracked separately if needed.
+
+### [#1325](https://github.com/chester-hill-solutions/callcaster/issues/1325) How do I add audio to an IVR script
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-11
+- Recommended title: **verify-close: add audio to an IVR script (editor upload + M4A playback)**
+- Editor UI shipped in #1672; the M4A silent-upload bug fixed in #1731 (transcode from a seekable temp file). Verified on preview and dev: same file went from a 278-byte stub to a 1.6 MB / 200 s playable MP3.
+- Current behavior: IVR step editor exposes Speak text / Play a recording + Upload audio; M4A uploads now normalize to playable MP3.
+- Root cause: M4A/MOV moov-at-end cannot be read from a non-seekable stdin pipe: ffmpeg emitted a header-only stub and exited 0.
+- Resolution: transcodeAudioBuffer stages input to a temp file (mirrors probeAudioDurationMs). Merged via #1731.
+- Look in: `app/lib/audio.server.ts`, `app/lib/audio.server.test.ts (moov-at-end regression)`, `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`
+- Existing tests: test/audio.server.test.ts
+- Done when: Upload non-faststart M4A -> real playable MP3; Regression test proves file input, not pipe:0
+- Tracker: Close with #1730 (M4A bug) via #1731.
+
+### [#1769](https://github.com/chester-hill-solutions/callcaster/issues/1769) Upload actions leak raw storage/DB errors — route failures through toUserMessage
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: on-dev · Assignee: none · Updated: 2026-09-11
+- Recommended title: **Upload actions route failures through toUserMessage**
+- Merged to dev (#1775); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.
+- Current behavior: Shipped on dev.
+- Root cause: Fixed; see the PR.
+- Resolution: No further code expected unless retest finds a gap.
+- Done when: retest on dev
+- Tracker: Close once Sai/user confirms on dev.
+
+### [#1665](https://github.com/chester-hill-solutions/callcaster/issues/1665) Adding an audio but not having a file gives the plain red text error when it should use the standardized error style
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design, on-dev · Assignee: none · Updated: 2026-09-11
+- Recommended title: **Standardized Alert for a file-less upload error**
+- Merged to dev (#1768); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.
+- Current behavior: Shipped on dev.
+- Root cause: Fixed; see the PR.
+- Resolution: No further code expected unless retest finds a gap.
+- Done when: retest on dev
+- Tracker: Close once Sai/user confirms on dev.
+
+### [#1740](https://github.com/chester-hill-solutions/callcaster/issues/1740) Number verification: status does not update until refresh; sheet lacks a pending state with the confirmation token
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: on-dev · Assignee: none · Updated: 2026-09-11
+- Recommended title: **Live number-verification status + pending sheet with confirmation token**
+- Merged to dev (#1767); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.
+- Current behavior: Shipped on dev.
+- Root cause: Fixed; see the PR.
+- Resolution: No further code expected unless retest finds a gap.
+- Done when: retest on dev
+- Tracker: Close once Sai/user confirms on dev.
 
 ### [#1334](https://github.com/chester-hill-solutions/callcaster/issues/1334) Results numbers are off?
 - Verdict: **Verify and close** · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
@@ -177,18 +199,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/components/campaign/settings/CampaignLaunch.tsx`, `app/components/campaign/settings/CampaignLaunchActions.tsx`, `app/components/campaign/settings/useCampaignSettingsController.ts`, `app/lib/campaign-execution.server.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id/launch.route.tsx`, `app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts`
 - Existing tests: test/campaign-dispatch-worker.test.ts; test/ui/campaign-launch-actions.test.tsx
 - Tracker: PR #1635 merge 804b9c73 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items.
-
-### [#1325](https://github.com/chester-hill-solutions/callcaster/issues/1325) How do I add audio to an IVR script
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
-- Recommended title: **verify-close: add audio to an IVR script (editor upload + M4A playback)**
-- Editor UI shipped in #1672; the M4A silent-upload bug fixed in #1731 (transcode from a seekable temp file). Verified on preview and dev: same file went from a 278-byte stub to a 1.6 MB / 200 s playable MP3.
-- Current behavior: IVR step editor exposes Speak text / Play a recording + Upload audio; M4A uploads now normalize to playable MP3.
-- Root cause: M4A/MOV moov-at-end cannot be read from a non-seekable stdin pipe: ffmpeg emitted a header-only stub and exited 0.
-- Resolution: transcodeAudioBuffer stages input to a temp file (mirrors probeAudioDurationMs). Merged via #1731.
-- Look in: `app/lib/audio.server.ts`, `app/lib/audio.server.test.ts (moov-at-end regression)`, `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`
-- Existing tests: test/audio.server.test.ts
-- Done when: Upload non-faststart M4A -> real playable MP3; Regression test proves file input, not pipe:0
-- Tracker: Close with #1730 (M4A bug) via #1731.
 
 ### [#1664](https://github.com/chester-hill-solutions/callcaster/issues/1664) AI agents interacting with GH should properly mark items as duplicate or not planned
 - Verdict: **Verify and close** · Labels: devops/admin · Assignee: none · Updated: 2026-09-08
