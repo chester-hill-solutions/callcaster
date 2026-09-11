@@ -157,4 +157,40 @@ describe("app/routes/workspaces++_.$id.audios_.new.tsx action", () => {
     expect(mocks.logger.error).toHaveBeenCalled();
     expect(vi.mocked(uploadObject)).not.toHaveBeenCalled();
   });
+
+  test("falls back to a friendly message when S3 upload throws a raw error", async () => {
+    mocks.verifyAuth.mockResolvedValueOnce({
+      headers: new Headers(),
+    });
+    mocks.normalizeUploadedAudio.mockResolvedValueOnce({
+      buffer: Buffer.from("mp3"),
+      contentType: "audio/mpeg",
+      extension: "mp3",
+    });
+    vi.mocked(uploadObject).mockRejectedValueOnce(
+      new Error("AccessDenied: requestId=abc, host=callcaster.s3…"),
+    );
+
+    const mod = await import("../app/routes/workspaces+/$id/audios/new.route");
+    const formData = new FormData();
+    formData.set("media-name", "Greeting");
+    formData.set(
+      "media",
+      new File(["audio"], "greeting.mp3", { type: "audio/mpeg" }),
+    );
+
+    const response = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+      request: new Request("http://localhost/workspaces/w1/audios/new", {
+        method: "POST",
+        body: formData,
+      }),
+      params: { id: "w1" },
+    })));
+
+    // The raw S3 message never reaches the user (#1769).
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: "Upload failed",
+    });
+  });
 });

@@ -134,7 +134,7 @@ export const action = defineAction({
       );
     } catch (error) {
       return routeData(
-        { error: error instanceof Error ? error.message : "Header mapping is invalid" },
+        { error: toUserMessage(error, "Header mapping is invalid") },
         { status: 400, headers },
       );
     }
