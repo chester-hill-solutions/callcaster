@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-09-11 — release [#1761](https://github.com/chester-hill-solutions/callcaster/pull/1761)
+
 ### Fixed
 
 - The Credits screen's activity table no longer breaks its columns when rows expand. Campaign groups now open into an aligned nested sub-table, and per-entry support details unfold as a row below the entry instead of an accordion inside a table cell ([#1759](https://github.com/chester-hill-solutions/callcaster/issues/1759)).
