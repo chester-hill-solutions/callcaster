@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Toasts now use consistent spacing defaults (vertical padding + row gap) app-wide, fixing cramped bottom spacing around upload errors ([#1668](https://github.com/chester-hill-solutions/callcaster/issues/1668)).
 - Upload success toasts keep the audio file name on a single inline line ([#1667](https://github.com/chester-hill-solutions/callcaster/issues/1667)).
 - The workspace picker keeps **All workspaces** pinned at the bottom of the dropdown, always visible even with many workspaces ([#1669](https://github.com/chester-hill-solutions/callcaster/issues/1669)).
 - Upload failures no longer leak raw storage/server messages — every upload path returns a friendly message and keeps the raw detail in the logs ([#1769](https://github.com/chester-hill-solutions/callcaster/issues/1769)).
