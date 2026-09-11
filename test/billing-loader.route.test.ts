@@ -55,11 +55,10 @@ describe("workspaces+/$id/billing loader", () => {
     mocks.getWorkspaceBillingActivity.mockResolvedValue({
       ok: true,
       balance: 802,
-      history: [{ id: "1", type: "DEBIT", amount: -2 }],
-      campaignNames: { 12: "Reminder" },
+      items: [{ kind: "entry", row: { id: "1", type: "DEBIT", amount: -2 } }],
       page: 1,
-      pageSize: 500,
-      totalCount: 1_861,
+      pageSize: 50,
+      totalCount: 24,
       totals: { usage: 3_798, purchased: 4_600 },
     });
   });
@@ -86,12 +85,11 @@ describe("workspaces+/$id/billing loader", () => {
       credits: {
         balance: 802,
         page: 1,
-        pageSize: 500,
-        totalCount: 1_861,
+        pageSize: 50,
+        totalCount: 24,
         totals: { usage: 3_798, purchased: 4_600 },
         filter: "usage",
       },
-      campaignNames: { 12: "Reminder" },
     });
   });
 

@@ -1,12 +1,7 @@
 import { browserTimeZone } from "@/lib/schedule-timezone";
 import { Button } from "@/components/ui/button";
-import { useMemo, useState } from "react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -23,21 +18,18 @@ import {
   type BillingActivityFilter,
   type BillingActivityRow,
 } from "@/lib/billing-activity-projection";
-import {
-  rollUpBillingActivity,
-  type BillingActivityGroupItem,
-} from "@/lib/billing-activity-rollup";
+import type { BillingActivityGroupItem, BillingActivityItem } from "@/lib/billing-activity-rollup";
 import { cn } from "@/lib/utils";
 
 type BillingActivityTableProps = {
-  history: BillingActivityRow[];
-  campaignNames?: Record<number, string>;
+  /** Pre-rolled ledger items for this page (groups + lone entries). */
+  items: BillingActivityItem[];
   /** When set, Stripe purchases link to their hosted receipt (#1322). */
   workspaceId?: string;
   /** Active activity filter, owned by the route so pages and counts agree. */
   filter: BillingActivityFilter;
   onFilterChange: (filter: BillingActivityFilter) => void;
-  /** Server-side ledger pagination; omitted hides the pager. */
+  /** Server-side pagination over rolled-up items; omitted hides the pager. */
   currentPage?: number;
   totalPages?: number;
   totalCount?: number;
@@ -81,74 +73,87 @@ function amountClassName(direction: "credit" | "debit"): string {
   return direction === "credit" ? "text-success-text" : "text-destructive-text";
 }
 
+/**
+ * One ledger entry row plus an inline disclosure row. The details are a
+ * colSpan row directly below — never an accordion inside the Activity cell,
+ * which used to distort the table columns when expanded.
+ */
 function ActivityEntryRow({
   row,
-  nested = false,
   receiptHref = null,
 }: {
   row: BillingActivityRow;
-  nested?: boolean;
   receiptHref?: string | null;
 }) {
+  const [open, setOpen] = useState(false);
   const activity = projectBillingActivity(row);
 
   return (
-    <TableRow className={nested ? "bg-muted/20" : undefined}>
-      <TableCell className={cn("whitespace-nowrap align-top", nested && "pl-8")}>
-        {new Date(activity.occurredAt).toLocaleString()}
-      </TableCell>
-      <TableCell className="min-w-64 align-top">
-        <div className="font-medium">{activity.activity}</div>
-        {receiptHref ? (
-          <a
-            href={receiptHref}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs text-primary underline underline-offset-4"
-          >
-            Receipt
-            <span className="sr-only"> for {activity.activity} on {new Date(activity.occurredAt).toLocaleDateString()}</span>
-          </a>
-        ) : null}
-        <Accordion type="single" collapsible>
-          <AccordionItem value="advanced" className="border-0">
-            <AccordionTrigger className="w-fit gap-1 py-1 text-xs font-normal text-muted-foreground hover:no-underline">
-              <span aria-hidden="true">Advanced</span>
-              <span className="sr-only">
-                Advanced details for {activity.activity}
-              </span>
-            </AccordionTrigger>
-            <AccordionContent className="pt-2">
-              <dl className="grid gap-3 rounded-md bg-muted/30 p-3 text-xs sm:grid-cols-2">
-                <SupportDetail
-                  label="Provider"
-                  value={activity.advanced.provider}
-                />
-                <SupportDetail
-                  label="Reference"
-                  value={activity.advanced.reference}
-                  monospaced
-                />
-                <SupportDetail
-                  label="Idempotency key"
-                  value={activity.advanced.idempotencyKey}
-                  monospaced
-                />
-                <SupportDetail label="Raw note" value={activity.advanced.rawNote} />
-              </dl>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </TableCell>
-      <TableCell
-        className={cn(
-          "whitespace-nowrap text-right align-top font-medium",
-          amountClassName(activity.direction),
-        )}
-      >
-        {activity.amount}
-      </TableCell>
-    </TableRow>
+    <>
+      <TableRow>
+        <TableCell className="whitespace-nowrap align-top">
+          {new Date(activity.occurredAt).toLocaleString()}
+        </TableCell>
+        <TableCell className="min-w-64 align-top">
+          <div className="flex items-start justify-between gap-1">
+            <div className="min-w-0">
+              <div className="font-medium">{activity.activity}</div>
+              {receiptHref ? (
+                <a
+                  href={receiptHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-primary underline underline-offset-4"
+                >
+                  Receipt
+                  <span className="sr-only"> for {activity.activity} on {new Date(activity.occurredAt).toLocaleDateString()}</span>
+                </a>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-label={open ? "Hide details" : "Show details"}
+              onClick={() => setOpen((value) => !value)}
+              className="rounded p-0.5 text-muted-foreground hover:text-foreground"
+            >
+              {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+          </div>
+        </TableCell>
+        <TableCell
+          className={cn(
+            "whitespace-nowrap text-right align-top font-medium",
+            amountClassName(activity.direction),
+          )}
+        >
+          {activity.amount}
+        </TableCell>
+      </TableRow>
+      {open ? (
+        <TableRow className="bg-muted/20">
+          <TableCell colSpan={3} className="py-2 pl-8 pr-4">
+            <dl className="grid gap-3 text-xs sm:grid-cols-2">
+              <SupportDetail
+                label="Provider"
+                value={activity.advanced.provider}
+              />
+              <SupportDetail
+                label="Reference"
+                value={activity.advanced.reference}
+                monospaced
+              />
+              <SupportDetail
+                label="Idempotency key"
+                value={activity.advanced.idempotencyKey}
+                monospaced
+              />
+              <SupportDetail label="Raw note" value={activity.advanced.rawNote} />
+            </dl>
+          </TableCell>
+        </TableRow>
+      ) : null}
+    </>
   );
 }
 
@@ -158,6 +163,11 @@ function formatDateRange(firstAt: string, lastAt: string): string {
   return first === last ? first : `${first} – ${last}`;
 }
 
+/**
+ * A campaign/period summary row plus a nested sub-table (own header columns)
+ * holding the underlying entries. The sub-table lives inside one colSpan row,
+ * so expanding never injects rows into the parent grid or moves its columns.
+ */
 function ActivityGroupRows({ group }: { group: BillingActivityGroupItem }) {
   const [open, setOpen] = useState(false);
   const entryLabel = `${group.entryCount} entries`;
@@ -177,8 +187,9 @@ function ActivityGroupRows({ group }: { group: BillingActivityGroupItem }) {
             type="button"
             aria-expanded={open}
             onClick={() => setOpen((value) => !value)}
-            className="mt-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
+            className="mt-1 flex items-center gap-0.5 text-xs text-muted-foreground underline-offset-4 hover:underline"
           >
+            {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
             {open ? "Hide" : "Show"} {entryLabel}
             <span className="sr-only">
               {" "}
@@ -195,11 +206,28 @@ function ActivityGroupRows({ group }: { group: BillingActivityGroupItem }) {
           {formatSignedCreditAmount("DEBIT", group.totalAmount)}
         </TableCell>
       </TableRow>
-      {open
-        ? group.entries.map((row) => (
-            <ActivityEntryRow key={row.id} row={row} nested />
-          ))
-        : null}
+      {open ? (
+        <TableRow>
+          <TableCell colSpan={3} className="bg-muted/20 p-0">
+            <div className="max-h-96 overflow-auto">
+              <Table className="min-w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date ({browserTimeZone()})</TableHead>
+                    <TableHead>Activity</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {group.entries.map((row) => (
+                    <ActivityEntryRow key={row.id} row={row} />
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </TableCell>
+        </TableRow>
+      ) : null}
     </>
   );
 }
@@ -245,8 +273,7 @@ function ActivityFilterBar({
 }
 
 export function BillingActivityTable({
-  history,
-  campaignNames,
+  items,
   workspaceId,
   filter,
   onFilterChange,
@@ -256,11 +283,6 @@ export function BillingActivityTable({
   pageSize,
   onPageChange,
 }: BillingActivityTableProps) {
-  const items = useMemo(
-    () => rollUpBillingActivity(history, { campaignNames }),
-    [history, campaignNames],
-  );
-
   return (
     <div className="space-y-3">
       <ActivityFilterBar value={filter} onChange={onFilterChange} />

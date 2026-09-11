@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 
 import { BillingActivityTable } from "../../app/components/workspace/BillingActivityTable";
 import type { BillingActivityRow } from "../../app/lib/billing-activity-projection";
+import { rollUpBillingActivity } from "../../app/lib/billing-activity-rollup";
 
 const history: BillingActivityRow[] = [
   {
@@ -57,11 +58,15 @@ const campaignHistory: BillingActivityRow[] = [
   },
 ];
 
+/** Pre-rolled items, mirroring what the loader now returns. */
+function rolled(rows: BillingActivityRow[], campaignNames?: Record<number, string>) {
+  return rollUpBillingActivity(rows, { campaignNames });
+}
+
 function renderTable(props: Partial<React.ComponentProps<typeof BillingActivityTable>> = {}) {
   render(
     <BillingActivityTable
-      history={props.history ?? history}
-      campaignNames={props.campaignNames}
+      items={props.items ?? rolled(history)}
       workspaceId={props.workspaceId}
       filter={props.filter ?? "all"}
       onFilterChange={props.onFilterChange ?? (() => undefined)}
@@ -74,8 +79,8 @@ function renderTable(props: Partial<React.ComponentProps<typeof BillingActivityT
   );
 }
 
-/** Mirrors the server-side filter the loader applies, so the client filter bar
- *  tests the real data path (history arrives already filtered by type). */
+/** Mirrors the server-side filter + rollup, so the client filter bar tests the
+ *  real data path (the loader filters the ledger and rolls it up first). */
 function FilterHarness({ full }: { full: BillingActivityRow[] }) {
   const [filter, setFilter] = useState<"all" | "purchases" | "usage">("all");
   const shown =
@@ -86,8 +91,7 @@ function FilterHarness({ full }: { full: BillingActivityRow[] }) {
         : full;
   return (
     <BillingActivityTable
-      history={shown}
-      campaignNames={{ 12: "Fall drive" }}
+      items={rolled(shown, { 12: "Fall drive" })}
       filter={filter}
       onFilterChange={setFilter}
     />
@@ -118,28 +122,32 @@ describe("BillingActivityTable", () => {
     expect(screen.queryByText(history[0].note)).toBeNull();
   });
 
-  test("reveals support details through an accessible Advanced disclosure", async () => {
+  test("reveals support details through an accessible per-entry disclosure", async () => {
     const user = userEvent.setup();
     renderTable();
 
-    const trigger = screen.getByRole("button", {
-      name: "Advanced details for Credit purchase",
-    });
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    const toggle = screen.getByRole("button", { name: "Show details" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
 
-    await user.click(trigger);
+    await user.click(toggle);
 
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAccessibleName("Hide details");
     expect(screen.getByText("Stripe")).toBeInTheDocument();
     expect(screen.getByText("cs_test_123")).toBeInTheDocument();
     expect(
       screen.getByText("stripe_session:cs_test_123"),
     ).toBeInTheDocument();
     expect(screen.getByText(history[0].note)).toBeInTheDocument();
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(history[0].note)).toBeNull();
   });
 
   test("preserves the activity empty state", () => {
-    renderTable({ history: [] });
+    renderTable({ items: [] });
 
     expect(
       screen.getByText("Purchases and campaign activity will appear here."),
@@ -147,7 +155,9 @@ describe("BillingActivityTable", () => {
   });
 
   test("rolls a campaign's usage for one period into a single summary row", () => {
-    renderTable({ history: campaignHistory, campaignNames: { 12: "Fall outreach" } });
+    renderTable({
+      items: rolled(campaignHistory, { 12: "Fall outreach" }),
+    });
 
     const rows = screen.getAllByRole("row").slice(1);
     expect(rows).toHaveLength(3);
@@ -167,9 +177,11 @@ describe("BillingActivityTable", () => {
     expect(screen.getByText("Credit purchase")).toBeInTheDocument();
   });
 
-  test("expands a summary row to the underlying ledger entries", async () => {
+  test("expands a summary row into a nested sub-table of the underlying entries", async () => {
     const user = userEvent.setup();
-    renderTable({ history: campaignHistory, campaignNames: { 12: "Fall outreach" } });
+    renderTable({
+      items: rolled(campaignHistory, { 12: "Fall outreach" }),
+    });
 
     const toggle = screen.getByRole("button", {
       name: "Show 3 entries for Fall outreach, August 2026",
@@ -182,15 +194,42 @@ describe("BillingActivityTable", () => {
     expect(toggle).toHaveAccessibleName(
       "Hide 3 entries for Fall outreach, August 2026",
     );
-    expect(screen.getAllByText("SMS messaging")).toHaveLength(2);
-    expect(screen.getByText("Voice calling")).toBeInTheDocument();
+    // The entries now live in a nested sub-table, not the outer grid.
+    const tables = screen.getAllByRole("table");
+    expect(tables).toHaveLength(2);
+    const nested = tables[1];
+    expect(within(nested).getAllByText("SMS messaging")).toHaveLength(2);
+    expect(within(nested).getByText("Voice calling")).toBeInTheDocument();
     expect(
-      screen.getAllByRole("button", { name: /Advanced details for SMS messaging/ }),
-    ).toHaveLength(2);
+      within(nested).getAllByRole("button", { name: "Show details" }),
+    ).toHaveLength(3);
 
     await user.click(toggle);
 
     expect(screen.queryByText("SMS messaging")).toBeNull();
+    // The nested table is gone; only the outer table remains.
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+  });
+
+  test("a nested entry discloses its support details as a row, not an accordion", async () => {
+    const user = userEvent.setup();
+    renderTable({
+      items: rolled(campaignHistory, { 12: "Fall outreach" }),
+    });
+
+    await user.click(screen.getByRole("button", {
+      name: "Show 3 entries for Fall outreach, August 2026",
+    }));
+
+    const nestedDetails = within(screen.getAllByRole("table")[1]).getAllByRole(
+      "button",
+      { name: "Show details" },
+    );
+    await user.click(nestedDetails[0]);
+
+    expect(nestedDetails[0]).toHaveAccessibleName("Hide details");
+    expect(screen.getByText("sms:SM1")).toBeInTheDocument();
+    expect(screen.getByText("SMS SM1 delivered (1 segment)")).toBeInTheDocument();
   });
 
   test("filters to purchases and credits, or to usage, and back to all (#1322)", async () => {
@@ -222,7 +261,7 @@ describe("BillingActivityTable", () => {
   });
 
   test("links Stripe purchases to their hosted receipt when a workspace id is given (#1322)", () => {
-    renderTable({ history: campaignHistory, workspaceId: "ws-1" });
+    renderTable({ items: rolled(campaignHistory), workspaceId: "ws-1" });
     const link = screen.getByRole("link", { name: /^Receipt/ });
     expect(link).toHaveAttribute("href", "/api/workspaces/ws-1/billing/receipt?transaction=purchase-1");
     expect(link).toHaveAttribute("target", "_blank");
@@ -236,18 +275,18 @@ describe("BillingActivityTable", () => {
   });
 
   test("names an untitled campaign by its id", () => {
-    renderTable({ history: campaignHistory });
+    renderTable({ items: rolled(campaignHistory) });
 
     expect(screen.getByText("Campaign 12")).toBeInTheDocument();
   });
 
   test("renders a pager when total pages exceed one", () => {
     renderTable({
-      history: campaignHistory,
+      items: rolled(campaignHistory),
       currentPage: 1,
       totalPages: 3,
       totalCount: 1_234,
-      pageSize: 500,
+      pageSize: 50,
       onPageChange: () => undefined,
     });
 
@@ -256,7 +295,7 @@ describe("BillingActivityTable", () => {
   });
 
   test("hides the pager when there is a single page", () => {
-    renderTable({ currentPage: 1, totalPages: 1, totalCount: 10, pageSize: 500 });
+    renderTable({ currentPage: 1, totalPages: 1, totalCount: 10, pageSize: 50 });
 
     expect(screen.queryByRole("button", { name: /Go to next/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Go to previous/ })).toBeNull();

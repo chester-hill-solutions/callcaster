@@ -30,9 +30,9 @@ async function renderBilling(userRole?: string) {
             loader: () => ({
               credits: {
                 balance: 100,
-                history: [],
+                items: [],
                 page: 1,
-                pageSize: 500,
+                pageSize: 50,
                 totalCount: 0,
                 totals: { usage: 0, purchased: 0 },
                 filter: "all",
