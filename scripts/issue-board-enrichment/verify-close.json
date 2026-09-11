@@ -77,43 +77,28 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1162,
-    "verdict": "verify-close",
-    "summary": "The default branch remains master. #1686 now labels closing issues on-dev when their PR merges to dev. Optional project movement still needs project setup.",
-    "resolution": "Verify on-dev labels on the next merge. Preserve master as release branch; do not introduce a qa branch.",
-    "lookIn": [
-      ".github/workflows/issue-on-dev.yml"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1168,
     "verdict": "verify-close",
-    "recommendedTitle": "Verify and close campaign Running/Waiting state clarity",
-    "summary": "The 'waiting' status and automatic running<->waiting transitions around calling hours are implemented (PR #1236 / commit fca7f872). UI shows amber Waiting; scheduler flips voice campaigns in/out of window.",
-    "currentBehavior": "campaign-status-rail + status-badge show waiting; campaign-schedule-sync.server.ts runs every minute and transitions running<->waiting; tests cover transitions.",
-    "rootCause": "Implemented; uses 'Archived' instead of proposed 'Stopped'.",
-    "resolution": "Visual/product QA; close if 'Archived' is accepted, else file a naming-only decision.",
+    "recommendedTitle": "verify-close: campaign shows waiting when out of sending hours",
+    "summary": "waiting status + schedule-sweep running<->waiting implemented (#1236). Verified locally: a running voice campaign with no in-window schedule flips running->waiting via campaign_schedule_sync.",
+    "currentBehavior": "campaign_schedule_sync flips active voice campaigns to waiting outside calling hours; UI shows amber Waiting.",
+    "rootCause": "None — behaviour implemented; needed verification.",
+    "resolution": "Confirmed via direct sync run (scanned 3, transitioned 1) + campaign_schedule_sync.server.test.ts.",
     "lookIn": [
-      "app/lib/campaign-status-rail.ts",
-      "app/components/ui/status-badge.tsx",
       "app/lib/campaign-schedule-sync.server.ts",
-      "app/lib/worker/handlers/cron.server.ts"
+      "app/lib/campaign-dispatch-policy.ts"
     ],
     "existingTests": [
       "test/campaign-schedule-sync.server.test.ts"
     ],
-    "missingTests": [
-      "integrated UI test shows Waiting after transition"
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
-      "Outside-hours voice shows Waiting",
-      "Returns to Running in window",
-      "Product approves Archived vs Stopped"
+      "running->waiting outside window",
+      "waiting->running inside window"
     ],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Close after QA; stale enrichment described a proposal.",
+    "trackerRecommendation": "Close as verified; naming (waiting vs stopped) tracked separately if needed.",
     "blockedBy": []
   },
   {
@@ -183,13 +168,28 @@
   {
     "issueNumber": 1325,
     "verdict": "verify-close",
-    "summary": "The audio-step editor shipped in #1672/release #1684; the residual empty-speech runtime gap shipped in #1687/release #1688.",
-    "resolution": "Verify both recording upload and spoken text on the deployed app; this reopened issue remains pending user testing.",
+    "summary": "Editor UI shipped in #1672; the M4A silent-upload bug fixed in #1731 (transcode from a seekable temp file). Verified on preview and dev: same file went from a 278-byte stub to a 1.6 MB / 200 s playable MP3.",
+    "resolution": "transcodeAudioBuffer stages input to a temp file (mirrors probeAudioDurationMs). Merged via #1731.",
     "lookIn": [
-      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx",
-      "test/ui/script-block-editor-ivr.test.tsx"
+      "app/lib/audio.server.ts",
+      "app/lib/audio.server.test.ts (moov-at-end regression)",
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx"
     ],
-    "blockedBy": []
+    "blockedBy": [],
+    "recommendedTitle": "verify-close: add audio to an IVR script (editor upload + M4A playback)",
+    "currentBehavior": "IVR step editor exposes Speak text / Play a recording + Upload audio; M4A uploads now normalize to playable MP3.",
+    "rootCause": "M4A/MOV moov-at-end cannot be read from a non-seekable stdin pipe: ffmpeg emitted a header-only stub and exited 0.",
+    "existingTests": [
+      "test/audio.server.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Upload non-faststart M4A -> real playable MP3",
+      "Regression test proves file input, not pipe:0"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Close with #1730 (M4A bug) via #1731."
   },
   {
     "issueNumber": 1327,
@@ -281,17 +281,6 @@
       "test/utils.test.ts"
     ],
     "trackerRecommendation": "PR #1594 merge 8334dcda is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
-  },
-  {
-    "issueNumber": 1348,
-    "verdict": "verify-close",
-    "summary": "The latest retest found an audible-script failure rather than absent dispatch. #1687 shipped the text fallback in release #1688.",
-    "resolution": "Retest a sample phone menu on the deployed app. Keep open for a separate dispatch defect if no call arrives.",
-    "lookIn": [
-      "app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts",
-      "test/ivr-block.route.test.ts"
-    ],
-    "blockedBy": []
   },
   {
     "issueNumber": 1472,
@@ -784,17 +773,6 @@
     "trackerRecommendation": "PR #1648 merge f1c4509b is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
   },
   {
-    "issueNumber": 1662,
-    "verdict": "verify-close",
-    "summary": "PR #1663 is merged to dev. Full local CI, GitHub quality/E2E checks and both preview deployments passed.",
-    "resolution": "Release the Account SID/Auth Token fix, then verify Twilio health sync in the deployed workspace.",
-    "lookIn": [
-      "app/lib/database/workspace-twilio-sync.server.ts",
-      "test/workspace-twilio-sync.server.test.ts"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1664,
     "verdict": "verify-close",
     "summary": "The GitHub issue skill distinguishes COMPLETED, NOT_PLANNED and DUPLICATE. API verification on 2026-09-09 still reports #1314 as closed/not_planned.",
@@ -805,14 +783,76 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1674,
+    "issueNumber": 1224,
     "verdict": "verify-close",
-    "summary": "PR #1691 is merged to dev. The IVR fixture now has explicit speech text and a Press 1 → Yes → Hang up response. Its browser check passed.",
-    "resolution": "Include the fixture fix in release #1693. Keep the seeded editor browser check in the compose suite.",
+    "recommendedTitle": "verify-close: voicemail email sends (presign TTL + auth token)",
+    "summary": "Verified end-to-end on dev: fired a signed RecordingStatusCallback (real Twilio recording, real call) and the route fetched the recording, uploaded to S3, presigned (7-day) and Resend sent the email (message id 6e55aadd...).",
+    "currentBehavior": "email-vm: fetch recording (API key/auth token), upload, presign 7d, resend.emails.send; recording_url persists only after a successful send.",
+    "rootCause": "Original: presign 100d over SigV4 cap (#1223) + stale subaccount auth (#1655).",
+    "resolution": "#1223 presign clamp + API-key-first auth; verified live.",
     "lookIn": [
-      "scripts/e2e/seed-database.mjs",
-      "e2e/specs/scripts-audio.spec.ts"
+      "app/routes/api+/email-vm.action.server.ts",
+      "app/lib/object-storage.server.ts"
     ],
-    "blockedBy": []
+    "existingTests": [
+      "test/ivr-status.route.test.ts (voicemail)"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Voicemail webhook -> email arrives",
+      "recording_url persisted after send"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Close as verified; residual eyeball = leave a real voicemail."
+  },
+  {
+    "issueNumber": 1292,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: call screen shows Hang Up in-call, Dial (with confirm) after",
+    "summary": "Dial control (#1408) flips to Dial and requires a second click after a call ends; Hang Up has its own two-step confirm. CallControls state machine verified by code + call-screen UI tests.",
+    "currentBehavior": "in-call -> Hang Up (two-step); after end -> armed Dial ('Click again to call back') that disarms on first click.",
+    "rootCause": "Errors not reproduced; #1408 implemented the guard.",
+    "resolution": "No new code; run the idle-state eyeball on dev.",
+    "lookIn": [
+      "app/components/call/CallScreen.CallArea.tsx"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-callarea.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "active call -> Hang Up",
+      "ended call -> Dial with confirm",
+      "no hang-up confirm loop"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Close after the eyeball."
+  },
+  {
+    "issueNumber": 1338,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: call settings sheet laid out by device, no redundant labels",
+    "summary": "#1680 laid the sheet out by device (single label per field, buttons say what they do, flex gap), removing the redundant headings flagged in the issue. UI green; visual eyeball pending.",
+    "currentBehavior": "Microphone/Speaker/Output fields each carry one label with their controls beneath.",
+    "rootCause": "Original layout clipped/misaligned; #1680 restructured.",
+    "resolution": "No new code; eyeball on dev.",
+    "lookIn": [
+      "app/components/call/CallScreen.DeviceSettings.tsx",
+      "app/components/call/CallScreen.Layout.tsx"
+    ],
+    "existingTests": [
+      "test/ui/audio-device-lifecycle.test.tsx",
+      "test/ui/call-screen-header.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "no clipping left/right",
+      "no redundant labels"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Close after the eyeball."
   }
 ]

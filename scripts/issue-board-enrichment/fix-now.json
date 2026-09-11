@@ -139,14 +139,32 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1690,
+    "issueNumber": 1740,
     "verdict": "fix-now",
-    "summary": "Refresh all live issue records for this release, with shipped PR evidence and explicit pending user tests.",
-    "resolution": "Generate the full board, verify all references, and merge the board-only PR after full local checks.",
+    "recommendedTitle": "fix(call-settings): refetch number verification status after verify + show pending with the confirmation token",
+    "summary": "After verifying a number, the row status does not update until a page refresh; the sheet has no pending state showing the issued confirmation token.",
+    "currentBehavior": "CallerIdVerificationForm starts the flow; NumbersTable shows capabilities.verification_status only after reload.",
+    "rootCause": "No refetch/revalidate wired to the verification completion in the numbers sheet.",
+    "resolution": "Refetch verification status after the verification action resolves; render a pending row in the sheet with the confirmation token.",
     "lookIn": [
-      "ISSUE_BOARD.md",
-      "scripts/issue-board-enrichment"
+      "app/components/phone-numbers/NumbersTable.tsx",
+      "app/components/phone-numbers/CallerIdVerificationForm.tsx",
+      "app/components/phone-numbers/CallerIdVerificationDialog.tsx",
+      "app/hooks/call/usePhoneVerification.ts"
     ],
-    "blockedBy": []
+    "existingTests": [
+      "test/ui/* (numbers)"
+    ],
+    "missingTests": [
+      "status updates after verify without reload",
+      "pending + token shown while verifying"
+    ],
+    "acceptanceCriteria": [
+      "verification updates in place, no reload",
+      "sheet shows pending state + confirmation token"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Small standalone PR."
   }
 ]
