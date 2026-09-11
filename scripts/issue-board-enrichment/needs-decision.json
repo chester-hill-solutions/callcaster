@@ -926,5 +926,62 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Triage sweep."
+  },
+  {
+    "issueNumber": 1770,
+    "verdict": "needs-decision",
+    "recommendedTitle": "feature(audience): client-side preview + column-mapping step (gocanvass parity)",
+    "summary": "Add a preview/map step to the audience uploader: parse client-side, show headers + rows, guess and edit the mapping, then start. Server validation stays the gate.",
+    "currentBehavior": "AudienceUploader is fire-and-forget: server parses + validates, job starts.",
+    "rootCause": "UX gap vs gocanvass's import wizard.",
+    "resolution": "Wizard: file -> preview/map -> start; browser-safe CSV parser; reuse shared/contact-import-headers types.",
+    "lookIn": [
+      "app/components/audience/AudienceUploader.tsx",
+      "app/lib/csv.ts",
+      "shared/contact-import-headers.ts",
+      "app/routes/api+/audience-upload.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ui/audience-uploader.test.tsx"
+    ],
+    "missingTests": [
+      "preview renders parsed headers/rows",
+      "mapping submitted with upload"
+    ],
+    "acceptanceCriteria": [
+      "parsed preview before start",
+      "columns mappable",
+      "server validation still gates"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Scope with #1771 (can ship together or split)."
+  },
+  {
+    "issueNumber": 1771,
+    "verdict": "needs-decision",
+    "recommendedTitle": "feature(audience): per-row import error report + original CSV artifact",
+    "summary": "Persist per-row failures (rowNumber + field + reason) during the audience import job and expose a reviewable list; store the original CSV at a workspace-scoped artifact path.",
+    "currentBehavior": "Only aggregate counts (skipped invalid/duplicate) are surfaced; original file not retained.",
+    "rootCause": "No per-row capture or artifact retention, unlike gocanvass.",
+    "resolution": "Record per-row errors in the job; surface in the progress/completion panel; upload original.csv under {ws}/{importId}/ with existing guards.",
+    "lookIn": [
+      "app/lib/audience-upload-process.server.ts",
+      "app/components/audience/AudienceUploader.tsx",
+      "app/lib/object-storage.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "per-row errors persisted + listed",
+      "original retained under workspace prefix"
+    ],
+    "acceptanceCriteria": [
+      "reviewable per-row failure list or download",
+      "original CSV retained safely",
+      "aggregate counts unchanged"
+    ],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Co-ordinate with #1770."
   }
 ]
