@@ -854,5 +854,113 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Close after the eyeball."
+  },
+  {
+    "issueNumber": 1665,
+    "verdict": "verify-close",
+    "recommendedTitle": "Standardized Alert for a file-less upload error",
+    "summary": "Merged to dev (#1768); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once Sai/user confirms on dev."
+  },
+  {
+    "issueNumber": 1740,
+    "verdict": "verify-close",
+    "recommendedTitle": "Live number-verification status + pending sheet with confirmation token",
+    "summary": "Merged to dev (#1767); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once Sai/user confirms on dev."
+  },
+  {
+    "issueNumber": 1769,
+    "verdict": "verify-close",
+    "recommendedTitle": "Upload actions route failures through toUserMessage",
+    "summary": "Merged to dev (#1775); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once Sai/user confirms on dev."
+  },
+  {
+    "issueNumber": 1667,
+    "verdict": "verify-close",
+    "recommendedTitle": "Audio upload toast stays one inline line",
+    "summary": "Merged to dev (#1777); UI tests green; awaiting Sai/user retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once confirmed on dev."
+  },
+  {
+    "issueNumber": 1668,
+    "verdict": "verify-close",
+    "recommendedTitle": "Toast spacing defaults (padding + gap)",
+    "summary": "Merged to dev (#1778); UI tests green; awaiting Sai/user retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once confirmed on dev."
+  },
+  {
+    "issueNumber": 1669,
+    "verdict": "verify-close",
+    "recommendedTitle": "All workspaces pinned in workspace picker",
+    "summary": "Merged to dev (#1776); UI tests green; awaiting Sai/user retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once confirmed on dev."
   }
 ]
