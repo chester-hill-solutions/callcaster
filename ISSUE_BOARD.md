@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@789287bd` · 131 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@9538e037` · 134 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 8
+## Fix now — 9
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -82,8 +82,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Resolution: Use the existing shared form-error primitive, then inspect other audio upload entry points for the same mismatch.
 - Look in: `app/routes/workspaces+/$id/audios/new.route.tsx`, `app/components/ui/form-field.tsx`
 
+### [#1769](https://github.com/chester-hill-solutions/callcaster/issues/1769) Upload actions leak raw storage/DB errors — route failures through toUserMessage
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-11
+- Recommended title: **fix(upload): route every upload failure through toUserMessage**
+- audios/new returns raw S3 messages (uploadError?.message); audience-upload returns raw error.message in two paths. Route through toUserMessage + log via getErrorDetail.
+- Current behavior: Raw S3/DB messages reach upload error UI.
+- Root cause: Upload actions return error.message instead of toUserMessage.
+- Resolution: Wrap every upload failure return in toUserMessage; keep AppError short-circuits; log raw detail.
+- Look in: `app/routes/workspaces+/$id/audios/new.action.server.ts`, `app/routes/api+/audience-upload.action.server.ts`, `app/lib/user-message.ts`
+- Existing tests: test/ui/audios-new-upload.test.tsx
+- Missing tests: an S3 failure returns the friendly fallback, not the raw message
+- Done when: no upload path returns raw S3/Postgres text; intentional copy unchanged; detail logged
+- Tracker: Standalone small PR.
+
 ### [#1740](https://github.com/chester-hill-solutions/callcaster/issues/1740) Number verification: status does not update until refresh; sheet lacks a pending state with the confirmation token
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-09
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: on-dev · Assignee: none · Updated: 2026-09-11
 - Recommended title: **fix(call-settings): refetch number verification status after verify + show pending with the confirmation token**
 - After verifying a number, the row status does not update until a page refresh; the sheet has no pending state showing the issued confirmation token.
 - Current behavior: CallerIdVerificationForm starts the flow; NumbersTable shows capabilities.verification_status only after reload.
@@ -569,9 +582,34 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 55
+## Needs decision — 57
 
 Product, security, or operations decision required before implementation can be scoped.
+
+### [#1771](https://github.com/chester-hill-solutions/callcaster/issues/1771) Audience import: per-row error report + retain the original CSV artifact
+- Verdict: **Needs decision** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-11
+- Recommended title: **feature(audience): per-row import error report + original CSV artifact**
+- Persist per-row failures (rowNumber + field + reason) during the audience import job and expose a reviewable list; store the original CSV at a workspace-scoped artifact path.
+- Current behavior: Only aggregate counts (skipped invalid/duplicate) are surfaced; original file not retained.
+- Root cause: No per-row capture or artifact retention, unlike gocanvass.
+- Resolution: Record per-row errors in the job; surface in the progress/completion panel; upload original.csv under {ws}/{importId}/ with existing guards.
+- Look in: `app/lib/audience-upload-process.server.ts`, `app/components/audience/AudienceUploader.tsx`, `app/lib/object-storage.server.ts`
+- Missing tests: per-row errors persisted + listed; original retained under workspace prefix
+- Done when: reviewable per-row failure list or download; original CSV retained safely; aggregate counts unchanged
+- Tracker: Co-ordinate with #1770.
+
+### [#1770](https://github.com/chester-hill-solutions/callcaster/issues/1770) Audience CSV import: client-side preview + column-mapping step (gocanvass parity)
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-11
+- Recommended title: **feature(audience): client-side preview + column-mapping step (gocanvass parity)**
+- Add a preview/map step to the audience uploader: parse client-side, show headers + rows, guess and edit the mapping, then start. Server validation stays the gate.
+- Current behavior: AudienceUploader is fire-and-forget: server parses + validates, job starts.
+- Root cause: UX gap vs gocanvass's import wizard.
+- Resolution: Wizard: file -> preview/map -> start; browser-safe CSV parser; reuse shared/contact-import-headers types.
+- Look in: `app/components/audience/AudienceUploader.tsx`, `app/lib/csv.ts`, `shared/contact-import-headers.ts`, `app/routes/api+/audience-upload.action.server.ts`
+- Existing tests: test/ui/audience-uploader.test.tsx
+- Missing tests: preview renders parsed headers/rows; mapping submitted with upload
+- Done when: parsed preview before start; columns mappable; server validation still gates
+- Tracker: Scope with #1771 (can ship together or split).
 
 ### [#1765](https://github.com/chester-hill-solutions/callcaster/issues/1765) Onboarding steps shouldn't have the credit warning after renting a number
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-11

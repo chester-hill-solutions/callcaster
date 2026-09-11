@@ -166,5 +166,33 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Small standalone PR."
+  },
+  {
+    "issueNumber": 1769,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(upload): route every upload failure through toUserMessage",
+    "summary": "audios/new returns raw S3 messages (uploadError?.message); audience-upload returns raw error.message in two paths. Route through toUserMessage + log via getErrorDetail.",
+    "currentBehavior": "Raw S3/DB messages reach upload error UI.",
+    "rootCause": "Upload actions return error.message instead of toUserMessage.",
+    "resolution": "Wrap every upload failure return in toUserMessage; keep AppError short-circuits; log raw detail.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/audios/new.action.server.ts",
+      "app/routes/api+/audience-upload.action.server.ts",
+      "app/lib/user-message.ts"
+    ],
+    "existingTests": [
+      "test/ui/audios-new-upload.test.tsx"
+    ],
+    "missingTests": [
+      "an S3 failure returns the friendly fallback, not the raw message"
+    ],
+    "acceptanceCriteria": [
+      "no upload path returns raw S3/Postgres text",
+      "intentional copy unchanged",
+      "detail logged"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Standalone small PR."
   }
 ]
