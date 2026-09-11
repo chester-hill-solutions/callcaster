@@ -7,6 +7,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Fixed
 
 - Upload success toasts keep the audio file name on a single inline line ([#1667](https://github.com/chester-hill-solutions/callcaster/issues/1667)).
+- The workspace picker keeps **All workspaces** pinned at the bottom of the dropdown, always visible even with many workspaces ([#1669](https://github.com/chester-hill-solutions/callcaster/issues/1669)).
 - Upload failures no longer leak raw storage/server messages — every upload path returns a friendly message and keeps the raw detail in the logs ([#1769](https://github.com/chester-hill-solutions/callcaster/issues/1769)).
 - Number verification now updates the numbers page live — no refresh needed to see a number flip to verified — and the verification sheet shows a pending state with the confirmation token while the call is in flight ([#1740](https://github.com/chester-hill-solutions/callcaster/issues/1740)).
 - Adding an audio without selecting a file now shows the standard error style instead of a plain red text line ([#1665](https://github.com/chester-hill-solutions/callcaster/issues/1665)).

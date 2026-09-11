@@ -38,8 +38,8 @@ vi.mock("@/components/ui/command", () => ({
   CommandInput: ({ placeholder }: { placeholder?: string }) => (
     <input placeholder={placeholder} />
   ),
-  CommandList: ({ children }: { children: React.ReactNode }) => (
-    <div role="menu">{children}</div>
+  CommandList: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div role="menu" className={className}>{children}</div>
   ),
   CommandGroup: ({
     children,
@@ -131,6 +131,20 @@ describe("Navbar workspace picker", () => {
     expect(activeLabel.className).toContain("truncate");
 
     expect(screen.getByPlaceholderText("Search workspaces…")).toBeInTheDocument();
+
+    // The workspace list scrolls inside the popover; "All workspaces" is pinned
+    // as a footer OUTSIDE the scroll container so it is always visible (#1669).
+    const listEl = screen
+      .getAllByRole("menu")
+      .find((el) => el.className.includes("max-h-64"));
+    expect(listEl).toBeTruthy();
+    if (!listEl) throw new Error("workspace picker list not found");
+    expect(listEl.className).toContain("overflow-y-auto");
+    expect(within(listEl).getByText("Alpha Workspace")).toBeInTheDocument();
+    expect(within(listEl).queryByText("All workspaces")).toBeNull();
+    expect(
+      screen.getByRole("menuitem", { name: "All workspaces" }).className,
+    ).toContain("border-t");
 
     const longName = screen.getByRole("menuitem", {
       name: "A Very Long Workspace Name That Should Truncate In The Trigger",
