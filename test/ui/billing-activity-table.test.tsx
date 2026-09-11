@@ -5,6 +5,7 @@ import { describe, expect, test } from "vitest";
 
 import { BillingActivityTable } from "../../app/components/workspace/BillingActivityTable";
 import type { BillingActivityRow } from "../../app/lib/billing-activity-projection";
+import { rollUpBillingActivity } from "../../app/lib/billing-activity-rollup";
 
 const history: BillingActivityRow[] = [
   {
@@ -57,11 +58,15 @@ const campaignHistory: BillingActivityRow[] = [
   },
 ];
 
+/** Pre-rolled items, mirroring what the loader now returns. */
+function rolled(rows: BillingActivityRow[], campaignNames?: Record<number, string>) {
+  return rollUpBillingActivity(rows, { campaignNames });
+}
+
 function renderTable(props: Partial<React.ComponentProps<typeof BillingActivityTable>> = {}) {
   render(
     <BillingActivityTable
-      history={props.history ?? history}
-      campaignNames={props.campaignNames}
+      items={props.items ?? rolled(history)}
       workspaceId={props.workspaceId}
       filter={props.filter ?? "all"}
       onFilterChange={props.onFilterChange ?? (() => undefined)}
@@ -74,8 +79,8 @@ function renderTable(props: Partial<React.ComponentProps<typeof BillingActivityT
   );
 }
 
-/** Mirrors the server-side filter the loader applies, so the client filter bar
- *  tests the real data path (history arrives already filtered by type). */
+/** Mirrors the server-side filter + rollup, so the client filter bar tests the
+ *  real data path (the loader filters the ledger and rolls it up first). */
 function FilterHarness({ full }: { full: BillingActivityRow[] }) {
   const [filter, setFilter] = useState<"all" | "purchases" | "usage">("all");
   const shown =
@@ -86,8 +91,7 @@ function FilterHarness({ full }: { full: BillingActivityRow[] }) {
         : full;
   return (
     <BillingActivityTable
-      history={shown}
-      campaignNames={{ 12: "Fall drive" }}
+      items={rolled(shown, { 12: "Fall drive" })}
       filter={filter}
       onFilterChange={setFilter}
     />
@@ -139,7 +143,7 @@ describe("BillingActivityTable", () => {
   });
 
   test("preserves the activity empty state", () => {
-    renderTable({ history: [] });
+    renderTable({ items: [] });
 
     expect(
       screen.getByText("Purchases and campaign activity will appear here."),
@@ -147,7 +151,9 @@ describe("BillingActivityTable", () => {
   });
 
   test("rolls a campaign's usage for one period into a single summary row", () => {
-    renderTable({ history: campaignHistory, campaignNames: { 12: "Fall outreach" } });
+    renderTable({
+      items: rolled(campaignHistory, { 12: "Fall outreach" }),
+    });
 
     const rows = screen.getAllByRole("row").slice(1);
     expect(rows).toHaveLength(3);
@@ -169,7 +175,9 @@ describe("BillingActivityTable", () => {
 
   test("expands a summary row to the underlying ledger entries", async () => {
     const user = userEvent.setup();
-    renderTable({ history: campaignHistory, campaignNames: { 12: "Fall outreach" } });
+    renderTable({
+      items: rolled(campaignHistory, { 12: "Fall outreach" }),
+    });
 
     const toggle = screen.getByRole("button", {
       name: "Show 3 entries for Fall outreach, August 2026",
@@ -222,7 +230,7 @@ describe("BillingActivityTable", () => {
   });
 
   test("links Stripe purchases to their hosted receipt when a workspace id is given (#1322)", () => {
-    renderTable({ history: campaignHistory, workspaceId: "ws-1" });
+    renderTable({ items: rolled(campaignHistory), workspaceId: "ws-1" });
     const link = screen.getByRole("link", { name: /^Receipt/ });
     expect(link).toHaveAttribute("href", "/api/workspaces/ws-1/billing/receipt?transaction=purchase-1");
     expect(link).toHaveAttribute("target", "_blank");
@@ -236,18 +244,18 @@ describe("BillingActivityTable", () => {
   });
 
   test("names an untitled campaign by its id", () => {
-    renderTable({ history: campaignHistory });
+    renderTable({ items: rolled(campaignHistory) });
 
     expect(screen.getByText("Campaign 12")).toBeInTheDocument();
   });
 
   test("renders a pager when total pages exceed one", () => {
     renderTable({
-      history: campaignHistory,
+      items: rolled(campaignHistory),
       currentPage: 1,
       totalPages: 3,
       totalCount: 1_234,
-      pageSize: 500,
+      pageSize: 50,
       onPageChange: () => undefined,
     });
 

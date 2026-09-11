@@ -1,6 +1,6 @@
 import { browserTimeZone } from "@/lib/schedule-timezone";
 import { Button } from "@/components/ui/button";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -23,21 +23,18 @@ import {
   type BillingActivityFilter,
   type BillingActivityRow,
 } from "@/lib/billing-activity-projection";
-import {
-  rollUpBillingActivity,
-  type BillingActivityGroupItem,
-} from "@/lib/billing-activity-rollup";
+import type { BillingActivityGroupItem, BillingActivityItem } from "@/lib/billing-activity-rollup";
 import { cn } from "@/lib/utils";
 
 type BillingActivityTableProps = {
-  history: BillingActivityRow[];
-  campaignNames?: Record<number, string>;
+  /** Pre-rolled ledger items for this page (groups + lone entries). */
+  items: BillingActivityItem[];
   /** When set, Stripe purchases link to their hosted receipt (#1322). */
   workspaceId?: string;
   /** Active activity filter, owned by the route so pages and counts agree. */
   filter: BillingActivityFilter;
   onFilterChange: (filter: BillingActivityFilter) => void;
-  /** Server-side ledger pagination; omitted hides the pager. */
+  /** Server-side pagination over rolled-up items; omitted hides the pager. */
   currentPage?: number;
   totalPages?: number;
   totalCount?: number;
@@ -245,8 +242,7 @@ function ActivityFilterBar({
 }
 
 export function BillingActivityTable({
-  history,
-  campaignNames,
+  items,
   workspaceId,
   filter,
   onFilterChange,
@@ -256,11 +252,6 @@ export function BillingActivityTable({
   pageSize,
   onPageChange,
 }: BillingActivityTableProps) {
-  const items = useMemo(
-    () => rollUpBillingActivity(history, { campaignNames }),
-    [history, campaignNames],
-  );
-
   return (
     <div className="space-y-3">
       <ActivityFilterBar value={filter} onChange={onFilterChange} />

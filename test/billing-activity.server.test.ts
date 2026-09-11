@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
   getWorkspaceCreditsBalance: vi.fn(async (): Promise<number | null> => 250),
   ledgerFindMany: vi.fn(async (): Promise<LedgerActivityRow[]> => []),
-  ledgerCount: vi.fn(async (): Promise<number> => 0),
   execute: vi.fn(async (): Promise<unknown[]> => []),
   messageFindMany: vi.fn(async (): Promise<unknown[]> => []),
   callFindMany: vi.fn(async (): Promise<unknown[]> => []),
@@ -32,7 +31,6 @@ vi.mock("@/server/tenant-db", async (importOriginal) => ({
   createTenantDb: vi.fn(() => ({
     transaction_history: {
       findMany: mocks.ledgerFindMany,
-      count: mocks.ledgerCount,
     },
     message: { findMany: mocks.messageFindMany },
     call: { findMany: mocks.callFindMany },
@@ -90,7 +88,6 @@ describe("getWorkspaceBillingActivity", () => {
     vi.clearAllMocks();
     mocks.getWorkspaceCreditsBalance.mockResolvedValue(250);
     mocks.ledgerFindMany.mockResolvedValue([]);
-    mocks.ledgerCount.mockResolvedValue(0);
     mocks.execute.mockResolvedValue([]);
     mocks.messageFindMany.mockResolvedValue([]);
     mocks.callFindMany.mockResolvedValue([]);
@@ -119,15 +116,52 @@ describe("getWorkspaceBillingActivity", () => {
       user: { id: "u1" },
       workspaceId: "w1",
     });
-    expect(result).toMatchObject({
-      ok: true,
-      balance: 250,
-      campaignNames: { 3: "Fall outreach", 7: "Reminder" },
-    });
     if (!result.ok) throw new Error("expected ok");
-    expect(result.history.map((row) => row.campaign_id)).toEqual([3, 7, 3]);
+    expect(result.balance).toBe(250);
+    // Campaign 3's two usage debits roll into one group; campaign 7's lone
+    // debit (attributed via message SID) stays an entry.
+    const group = result.items.find((item) => item.kind === "group");
+    expect(group?.kind).toBe("group");
+    if (group?.kind !== "group") throw new Error("expected a group");
+    expect(group.campaignName).toBe("Fall outreach");
+    expect(group.entryCount).toBe(2);
+    expect(group.totalAmount).toBe(-2);
+    const entry = result.items.find((item) => item.kind === "entry");
+    expect(entry?.kind).toBe("entry");
+    if (entry?.kind !== "entry") throw new Error("expected an entry");
+    expect(entry.row.campaign_id).toBe(7);
     expect(mocks.messageFindMany).toHaveBeenCalledOnce();
     expect(mocks.callFindMany).toHaveBeenCalledOnce();
+  });
+
+  test("keeps a campaign whole — a campaign spanning many rows is one group", async () => {
+    // 60 SMS debits for one campaign in the same month: a legacy 500-row page
+    // cap would have split these across pages; the pre-rollup must not.
+    const rows = Array.from({ length: 60 }, (_, i) =>
+      ledgerRow({
+        id: i + 1,
+        campaign_id: 12,
+        message_sid: `SM${i + 1}`,
+        created_at: "2026-08-10T12:00:00.000Z",
+        idempotency_key: `sms:SM${i + 1}`,
+      }),
+    );
+    mocks.ledgerFindMany.mockResolvedValue(rows);
+    mocks.campaignFindMany.mockResolvedValue([{ id: 12, title: "Reminder" }]);
+
+    const { getWorkspaceBillingActivity } = await import(
+      "../app/lib/billing-activity.server"
+    );
+    const result = await getWorkspaceBillingActivity("u1", "w1");
+
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.items).toHaveLength(1);
+    const [item] = result.items;
+    expect(item.kind).toBe("group");
+    if (item.kind !== "group") throw new Error("expected a group");
+    expect(item.entryCount).toBe(60);
+    expect(item.totalAmount).toBe(-60);
+    expect(result.totalCount).toBe(1);
   });
 
   test("skips SID and campaign lookups when nothing needs attributing", async () => {
@@ -161,25 +195,32 @@ describe("getWorkspaceBillingActivity", () => {
     expect(mocks.ledgerFindMany).not.toHaveBeenCalled();
   });
 
-  test("pages the ledger with offset and returns the total count", async () => {
-    mocks.ledgerCount.mockResolvedValue(1_234);
-
-    const { getWorkspaceBillingActivity, BILLING_ACTIVITY_LIMIT } = await import(
-      "../app/lib/billing-activity.server"
+  test("pages the rolled-up items and reports the total item count", async () => {
+    // 60 lone-entry credits (no campaign) across two months, so the rollup
+    // emits 60 entries (no groups) and slicing applies to the items.
+    const rows = Array.from({ length: 60 }, (_, i) =>
+      ledgerRow({
+        id: i + 1,
+        type: "CREDIT",
+        amount: 500,
+        campaign_id: null,
+        message_sid: null,
+        idempotency_key: `stripe_evt:e${i + 1}`,
+      }),
     );
-    const result = await getWorkspaceBillingActivity("u1", "w1", { page: 2 });
+    mocks.ledgerFindMany.mockResolvedValue(rows);
 
-    const config = mocks.ledgerFindMany.mock.calls[0][0];
-    expect(config.limit).toBe(BILLING_ACTIVITY_LIMIT);
-    expect(config.offset).toBe(BILLING_ACTIVITY_LIMIT);
-    expect(config.where).toBeUndefined();
-    expect(mocks.ledgerCount).toHaveBeenCalledWith({ where: undefined });
-    if (!result.ok) throw new Error("expected ok");
-    expect(result).toMatchObject({
-      page: 2,
-      pageSize: BILLING_ACTIVITY_LIMIT,
-      totalCount: 1_234,
-    });
+    const { getWorkspaceBillingActivity, BILLING_ACTIVITY_ITEM_PAGE_SIZE } =
+      await import("../app/lib/billing-activity.server");
+    const page2 = await getWorkspaceBillingActivity("u1", "w1", { page: 2 });
+    const page1 = await getWorkspaceBillingActivity("u1", "w1", { page: 1 });
+
+    if (!page1.ok || !page2.ok) throw new Error("expected ok");
+    expect(page2.page).toBe(2);
+    expect(page2.pageSize).toBe(BILLING_ACTIVITY_ITEM_PAGE_SIZE);
+    expect(page2.totalCount).toBe(60);
+    expect(page1.items).toHaveLength(BILLING_ACTIVITY_ITEM_PAGE_SIZE);
+    expect(page2.items).toHaveLength(10);
   });
 
   test("clamps page to 1 for missing, zero, and negative values", async () => {
@@ -192,13 +233,9 @@ describe("getWorkspaceBillingActivity", () => {
       if (!result.ok) throw new Error("expected ok");
       expect(result.page).toBe(1);
     }
-
-    for (const config of mocks.ledgerFindMany.mock.calls) {
-      expect(config[0].offset).toBe(0);
-    }
   });
 
-  test("passes the activity filter into the ledger query and count", async () => {
+  test("passes the activity filter into the ledger query", async () => {
     const { getWorkspaceBillingActivity } = await import(
       "../app/lib/billing-activity.server"
     );
@@ -207,9 +244,10 @@ describe("getWorkspaceBillingActivity", () => {
 
     const config = mocks.ledgerFindMany.mock.calls[0][0];
     expect(config.where).toBeDefined();
-    expect(mocks.ledgerCount).toHaveBeenCalledWith({
-      where: expect.anything(),
-    });
+    // No limit/offset: the full filtered ledger is fetched so the rollup can
+    // keep campaigns whole before item pagination slices them.
+    expect(config.limit).toBeUndefined();
+    expect(config.offset).toBeUndefined();
   });
 
   test("reports full-ledger usage and purchase totals", async () => {
