@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-09-10 — release [#1755](https://github.com/chester-hill-solutions/callcaster/pull/1755)
+
 ### Fixed
 
 - The workspace Credits screen no longer hides activity beyond the most recent 500 ledger rows. The ledger is now paginated (with a page count and previous/next controls), and the Activity section shows full workspace usage and purchase totals that reconcile with reporting regardless of the page being viewed ([#1753](https://github.com/chester-hill-solutions/callcaster/issues/1753)).
