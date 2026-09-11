@@ -155,12 +155,7 @@ export async function updateWorkspaceNumberCapabilitiesByPhone(
   // verification flip without a reload (#1740). Best-effort: a failed emission
   // must not convert an already-committed callback into a webhook retry.
   if (rows.length > 0) {
-    await emitWorkspaceNumberEvent(
-      workspaceId,
-      "UPDATE",
-      rows[0] as unknown as Record<string, unknown>,
-      null,
-    );
+    await emitWorkspaceNumberEvent(workspaceId, "UPDATE", rows[0], null);
   }
 
   return rows;

@@ -202,8 +202,10 @@ const WorkspaceSettings = () => {
     : null;
   const rawStatus = verifyingNumber?.capabilities
     ? (
-        verifyingNumber.capabilities as unknown as Record<string, unknown>
-      ).verification_status
+        verifyingNumber.capabilities as {
+          verification_status?: unknown;
+        } | null
+      )?.verification_status
     : null;
   const verificationStatus =
     rawStatus === "success" || rawStatus === "failed" || rawStatus === "pending"

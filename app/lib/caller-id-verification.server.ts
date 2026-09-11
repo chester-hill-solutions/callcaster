@@ -107,7 +107,7 @@ export async function startWorkspaceCallerIdVerification({
   await emitWorkspaceNumberEvent(
     workspaceId,
     emitEventType,
-    numberRequest[0] as unknown as Record<string, unknown>,
+    numberRequest[0],
     null,
   );
 

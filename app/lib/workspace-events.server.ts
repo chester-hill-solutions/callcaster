@@ -138,16 +138,26 @@ export async function emitCampaignStatusEvent(
 export async function emitWorkspaceNumberEvent(
   workspaceId: string,
   eventType: "INSERT" | "UPDATE" | "DELETE",
-  newRow: RealtimeRow | null,
-  oldRow?: RealtimeRow | null,
+  newRow: unknown,
+  oldRow?: unknown,
 ): Promise<WorkspaceEventRow | null> {
   return emitPostgresChangeEvent(workspaceId, {
     eventType,
     table: "workspace_number",
     schema: "public",
-    new: toRealtimeRow(newRow),
-    old: toRealtimeRow(oldRow ?? null),
+    new: serializeUnknownRow(newRow),
+    old: serializeUnknownRow(oldRow ?? null),
   });
+}
+
+/** Serialize any DB row (drizzle select/infer) into a JSON-safe RealtimeRow. */
+function serializeUnknownRow(row: unknown): RealtimeRow | null {
+  if (row == null) return null;
+  const out: RealtimeRow = {};
+  for (const [key, value] of Object.entries(row as Record<string, unknown>)) {
+    out[key] = value instanceof Date ? value.toISOString() : value;
+  }
+  return out;
 }
 
 /**
