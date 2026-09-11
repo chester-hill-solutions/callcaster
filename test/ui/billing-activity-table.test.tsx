@@ -122,24 +122,28 @@ describe("BillingActivityTable", () => {
     expect(screen.queryByText(history[0].note)).toBeNull();
   });
 
-  test("reveals support details through an accessible Advanced disclosure", async () => {
+  test("reveals support details through an accessible per-entry disclosure", async () => {
     const user = userEvent.setup();
     renderTable();
 
-    const trigger = screen.getByRole("button", {
-      name: "Advanced details for Credit purchase",
-    });
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    const toggle = screen.getByRole("button", { name: "Show details" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
 
-    await user.click(trigger);
+    await user.click(toggle);
 
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAccessibleName("Hide details");
     expect(screen.getByText("Stripe")).toBeInTheDocument();
     expect(screen.getByText("cs_test_123")).toBeInTheDocument();
     expect(
       screen.getByText("stripe_session:cs_test_123"),
     ).toBeInTheDocument();
     expect(screen.getByText(history[0].note)).toBeInTheDocument();
+
+    await user.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(history[0].note)).toBeNull();
   });
 
   test("preserves the activity empty state", () => {
@@ -173,7 +177,7 @@ describe("BillingActivityTable", () => {
     expect(screen.getByText("Credit purchase")).toBeInTheDocument();
   });
 
-  test("expands a summary row to the underlying ledger entries", async () => {
+  test("expands a summary row into a nested sub-table of the underlying entries", async () => {
     const user = userEvent.setup();
     renderTable({
       items: rolled(campaignHistory, { 12: "Fall outreach" }),
@@ -190,15 +194,42 @@ describe("BillingActivityTable", () => {
     expect(toggle).toHaveAccessibleName(
       "Hide 3 entries for Fall outreach, August 2026",
     );
-    expect(screen.getAllByText("SMS messaging")).toHaveLength(2);
-    expect(screen.getByText("Voice calling")).toBeInTheDocument();
+    // The entries now live in a nested sub-table, not the outer grid.
+    const tables = screen.getAllByRole("table");
+    expect(tables).toHaveLength(2);
+    const nested = tables[1];
+    expect(within(nested).getAllByText("SMS messaging")).toHaveLength(2);
+    expect(within(nested).getByText("Voice calling")).toBeInTheDocument();
     expect(
-      screen.getAllByRole("button", { name: /Advanced details for SMS messaging/ }),
-    ).toHaveLength(2);
+      within(nested).getAllByRole("button", { name: "Show details" }),
+    ).toHaveLength(3);
 
     await user.click(toggle);
 
     expect(screen.queryByText("SMS messaging")).toBeNull();
+    // The nested table is gone; only the outer table remains.
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+  });
+
+  test("a nested entry discloses its support details as a row, not an accordion", async () => {
+    const user = userEvent.setup();
+    renderTable({
+      items: rolled(campaignHistory, { 12: "Fall outreach" }),
+    });
+
+    await user.click(screen.getByRole("button", {
+      name: "Show 3 entries for Fall outreach, August 2026",
+    }));
+
+    const nestedDetails = within(screen.getAllByRole("table")[1]).getAllByRole(
+      "button",
+      { name: "Show details" },
+    );
+    await user.click(nestedDetails[0]);
+
+    expect(nestedDetails[0]).toHaveAccessibleName("Hide details");
+    expect(screen.getByText("sms:SM1")).toBeInTheDocument();
+    expect(screen.getByText("SMS SM1 delivered (1 segment)")).toBeInTheDocument();
   });
 
   test("filters to purchases and credits, or to usage, and back to all (#1322)", async () => {
@@ -264,7 +295,7 @@ describe("BillingActivityTable", () => {
   });
 
   test("hides the pager when there is a single page", () => {
-    renderTable({ currentPage: 1, totalPages: 1, totalCount: 10, pageSize: 500 });
+    renderTable({ currentPage: 1, totalPages: 1, totalCount: 10, pageSize: 50 });
 
     expect(screen.queryByRole("button", { name: /Go to next/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Go to previous/ })).toBeNull();
