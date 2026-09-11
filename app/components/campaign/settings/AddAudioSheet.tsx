@@ -72,7 +72,9 @@ export function AddAudioSheet({
       return;
     }
     if (isUploadSuccess(data)) {
-      toast.success(`Uploaded ${data.audio.name}`);
+      // Keep the toast on one inline line — names can arrive with stray
+      // whitespace/newlines (#1667).
+      toast.success(`Uploaded ${data.audio.name.replace(/\s+/g, " ").trim()}`);
       resetForm();
       onOpenChange(false);
       revalidator.revalidate();
