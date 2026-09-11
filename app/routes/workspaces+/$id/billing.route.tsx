@@ -21,6 +21,7 @@ export const meta: MetaFunction = () => [{ title: "Billing — CallCaster" }];
 import { Section, SectionHeader } from "@/components/shared/Section";
 import { BillingActivityTable } from "@/components/workspace/BillingActivityTable";
 import type { BillingActivityFilter } from "@/lib/billing-activity-projection";
+import type { BillingActivityItem } from "@/lib/billing-activity-rollup";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Accordion,
@@ -40,32 +41,21 @@ import {
   formatUnitPrice,
 } from "@/lib/billing-format";
 
-type TransactionRow = {
-  id: string;
-  created_at: string;
-  type: "CREDIT" | "DEBIT";
-  amount: number;
-  note?: string | null;
-  idempotency_key?: string | null;
-  campaign_id?: number | null;
-};
-
 type LoaderData = {
   credits: {
     balance: number;
-    history: TransactionRow[];
+    items: BillingActivityItem[];
     page: number;
     pageSize: number;
     totalCount: number;
     totals: { usage: number; purchased: number };
     filter: BillingActivityFilter;
   };
-  campaignNames: Record<number, string>;
   stripeKeyMode: "test" | "live" | "unknown";
 };
 
 export default function Credits() {
-  const { credits, campaignNames, stripeKeyMode } = useLoaderData<LoaderData>();
+  const { credits, stripeKeyMode } = useLoaderData<LoaderData>();
   const { userRole } = useOutletContext<{ userRole?: string | null }>();
   // The purchase action is gated to Admin+ server-side (billing.action.server.ts).
   // Nav already hides the "Credits" link from callers/members; this gate covers
@@ -323,8 +313,7 @@ export default function Credits() {
           </span>
         </div>
         <BillingActivityTable
-          history={credits.history}
-          campaignNames={campaignNames}
+          items={credits.items}
           workspaceId={params.id}
           filter={credits.filter}
           onFilterChange={(filter) => {

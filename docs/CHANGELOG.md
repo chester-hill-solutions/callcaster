@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Fixed
+
+- Campaign usage on the Credits screen no longer splits into partial rows across pages. The ledger is now rolled up into full campaign groups before pagination, so each campaign shows one entry with its true count and total no matter which page is open ([#1757](https://github.com/chester-hill-solutions/callcaster/issues/1757)).
+
 ## 2026-09-10 — release [#1755](https://github.com/chester-hill-solutions/callcaster/pull/1755)
 
 ### Fixed

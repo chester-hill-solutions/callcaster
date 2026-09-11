@@ -1,4 +1,9 @@
-import { eq, inArray, sql, type SQL } from "drizzle-orm";
+import {
+  eq,
+  inArray,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import {
   call as callTable,
   campaign as campaignTable,
@@ -6,13 +11,21 @@ import {
   transaction_history as transactionHistoryTable,
 } from "@/db/schema";
 import type { BillingActivityFilter, BillingActivityRow } from "@/lib/billing-activity-projection";
+import {
+  rollUpBillingActivity,
+  type BillingActivityItem,
+} from "@/lib/billing-activity-rollup";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import type { TransactionType } from "@/lib/transaction-history-display";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
-/** Page size for the billing activity ledger feed. */
-export const BILLING_ACTIVITY_LIMIT = 500;
+/**
+ * Rolled-up items per page. The ledger is rolled up in full first, then the
+ * rolled-up items are paginated, so a campaign's usage is never split across
+ * pages (each group is one row with its true entry count and total).
+ */
+export const BILLING_ACTIVITY_ITEM_PAGE_SIZE = 50;
 
 export type BillingActivityTotals = {
   /** Total debits (sum of all DEBIT amounts), as a positive magnitude. */
@@ -38,10 +51,11 @@ export type SidCampaignLookup = ReadonlyMap<string, number | null>;
 export type WorkspaceBillingActivity = {
   ok: true;
   balance: number;
-  history: BillingActivityRow[];
-  campaignNames: Record<number, string>;
+  /** Rolled-up items for the requested page (groups + lone entries). */
+  items: BillingActivityItem[];
   page: number;
   pageSize: number;
+  /** Total rolled-up items across the whole filtered ledger. */
   totalCount: number;
   totals: BillingActivityTotals;
 };
@@ -190,11 +204,13 @@ export async function getWorkspaceBillingActivity(
 
   const page = Math.max(1, Math.trunc(Number(query.page ?? 1)) || 1);
   const filter = query.filter ?? "all";
-  const offset = (page - 1) * BILLING_ACTIVITY_LIMIT;
   const where = ledgerWhereFor(filter);
 
   const tdb = createTenantDb(workspaceId);
-  const [ledger, totalCount, totals] = await Promise.all([
+  // Fetch the whole filtered ledger, then roll up in memory. Pagination slices
+  // the rolled-up items afterwards, so a campaign's debits are never split
+  // across pages — every group is one row with its true entry count and total.
+  const [ledgerRows, totals] = await Promise.all([
     tdb.transaction_history.findMany({
       columns: {
         id: true,
@@ -209,27 +225,28 @@ export async function getWorkspaceBillingActivity(
       },
       where,
       orderBy: (row, { desc }) => [desc(row.created_at)],
-      limit: BILLING_ACTIVITY_LIMIT,
-      offset,
     }),
-    tdb.transaction_history.count({ where }),
     loadLedgerTotals(tdb, workspaceId),
   ]);
 
   const [messages, calls] = await Promise.all([
-    lookupMessageCampaigns(tdb, unattributedSids(ledger, "message_sid")),
-    lookupCallCampaigns(tdb, unattributedSids(ledger, "call_sid")),
+    lookupMessageCampaigns(tdb, unattributedSids(ledgerRows, "message_sid")),
+    lookupCallCampaigns(tdb, unattributedSids(ledgerRows, "call_sid")),
   ]);
-  const history = attributeLedgerCampaigns(ledger, { messages, calls });
+  const history = attributeLedgerCampaigns(ledgerRows, { messages, calls });
   const campaignNames = await lookupCampaignNames(tdb, history);
+
+  const items = rollUpBillingActivity(history, { campaignNames });
+  const totalCount = items.length;
+  const start = (page - 1) * BILLING_ACTIVITY_ITEM_PAGE_SIZE;
+  const pageItems = items.slice(start, start + BILLING_ACTIVITY_ITEM_PAGE_SIZE);
 
   return {
     ok: true,
     balance,
-    history,
-    campaignNames,
+    items: pageItems,
     page,
-    pageSize: BILLING_ACTIVITY_LIMIT,
+    pageSize: BILLING_ACTIVITY_ITEM_PAGE_SIZE,
     totalCount,
     totals,
   };

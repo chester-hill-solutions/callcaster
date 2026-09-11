@@ -30,14 +30,13 @@ export const loader = defineLoader({
     return routeData({
       credits: {
         balance: billing.balance,
-        history: billing.history,
+        items: billing.items,
         page: billing.page,
         pageSize: billing.pageSize,
         totalCount: billing.totalCount,
         totals: billing.totals,
         filter,
       },
-      campaignNames: billing.campaignNames,
       stripeKeyMode,
     });
   },
