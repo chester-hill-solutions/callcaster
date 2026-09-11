@@ -135,6 +135,31 @@ export async function emitCampaignStatusEvent(
   });
 }
 
+export async function emitWorkspaceNumberEvent(
+  workspaceId: string,
+  eventType: "INSERT" | "UPDATE" | "DELETE",
+  newRow: unknown,
+  oldRow?: unknown,
+): Promise<WorkspaceEventRow | null> {
+  return emitPostgresChangeEvent(workspaceId, {
+    eventType,
+    table: "workspace_number",
+    schema: "public",
+    new: serializeUnknownRow(newRow),
+    old: serializeUnknownRow(oldRow ?? null),
+  });
+}
+
+/** Serialize any DB row (drizzle select/infer) into a JSON-safe RealtimeRow. */
+function serializeUnknownRow(row: unknown): RealtimeRow | null {
+  if (row == null) return null;
+  const out: RealtimeRow = {};
+  for (const [key, value] of Object.entries(row as Record<string, unknown>)) {
+    out[key] = value instanceof Date ? value.toISOString() : value;
+  }
+  return out;
+}
+
 /**
  * Emit a workspace SSE postgres_change for a newly inserted ledger row.
  * Callers must only invoke this when the ledger RPC returned `inserted: true`.

@@ -32,6 +32,13 @@ vi.mock("@/server/tenant-db", () => ({
   }),
 }));
 
+const emitMock = vi.hoisted(() => ({ emit: vi.fn(async () => null) }));
+vi.mock("@/lib/workspace-events.server", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/workspace-events.server")>();
+  return { ...actual, emitWorkspaceNumberEvent: emitMock.emit };
+});
+
 import { startWorkspaceCallerIdVerification } from "../app/lib/caller-id-verification.server";
 
 describe("startWorkspaceCallerIdVerification", () => {
@@ -68,6 +75,7 @@ describe("startWorkspaceCallerIdVerification", () => {
 
   test("verifies a non-rented existing caller-id row", async () => {
     tdbMock.findFirst.mockResolvedValue({ id: 9, type: "caller_id" });
+    tdbMock.update.mockResolvedValue([{ id: 9, workspace: "w1" }]);
 
     const result = await startWorkspaceCallerIdVerification({
       workspaceId: "w1",
@@ -78,5 +86,31 @@ describe("startWorkspaceCallerIdVerification", () => {
     expect(twilioMock.validationCreate).toHaveBeenCalled();
     expect(tdbMock.update).toHaveBeenCalled();
     expect(result.validationRequest.validationCode).toBe("123456");
+
+    // Live-update the numbers page to "pending" so no reload is needed (#1740).
+    expect(emitMock.emit).toHaveBeenCalledWith(
+      "w1",
+      "UPDATE",
+      expect.objectContaining({ id: 9 }),
+      null,
+    );
+  });
+
+  test("emits an INSERT workspace-number event when the caller id is new", async () => {
+    tdbMock.findFirst.mockResolvedValue(null);
+    tdbMock.insert.mockResolvedValue([{ id: 11, workspace: "w1" }]);
+
+    await startWorkspaceCallerIdVerification({
+      workspaceId: "w1",
+      phoneNumber: "+15555550100",
+      friendlyName: "Cell",
+    });
+
+    expect(emitMock.emit).toHaveBeenCalledWith(
+      "w1",
+      "INSERT",
+      expect.objectContaining({ id: 11 }),
+      null,
+    );
   });
 });
