@@ -168,15 +168,31 @@ export async function runAudioTool(
 }
 
 export async function transcodeAudioBuffer(inputBuffer: Buffer) {
-  return await runAudioTool(
-    "ffmpeg",
-    ["-hide_banner", "-loglevel", "error", "-i", "pipe:0", ...MP3_ENCODE_ARGS, "pipe:1"],
-    inputBuffer,
-    {
-      unavailable: "Audio transcoding is unavailable",
-      failed: "Audio transcoding failed",
-    },
+  // Stage the source to a seekable temp file, not a stdin pipe. MP4/M4A carry
+  // their `moov` atom at the end (non-faststart), and ffmpeg cannot seek a pipe
+  // to find it — it demuxes a "partial file", writes a header-only stub, and
+  // still exits 0, so the stub would be stored as a "successful" upload.
+  const filePath = path.join(
+    os.tmpdir(),
+    `callcaster-transcode-${randomUUID()}.${NORMALIZED_AUDIO_EXTENSION}`,
   );
+
+  try {
+    await writeFile(filePath, inputBuffer);
+    return await runAudioTool(
+      "ffmpeg",
+      ["-hide_banner", "-loglevel", "error", "-i", filePath, ...MP3_ENCODE_ARGS, "pipe:1"],
+      Buffer.alloc(0),
+      {
+        unavailable: "Audio transcoding is unavailable",
+        failed: "Audio transcoding failed",
+      },
+    );
+  } finally {
+    await rm(filePath, { force: true }).catch(() => {
+      // Best effort: a stranded temp file must not fail the upload.
+    });
+  }
 }
 
 /**

@@ -59,10 +59,15 @@ export const action = defineAction({
     if (!script || !script.pages) {
       throw new Error("Invalid script structure");
     }
-    const currentPage = script.pages[pageId];
+    const pageIds = Object.keys(script.pages);
+    // The dispatch URL hard-codes `page_1`, but editor-created scripts use
+    // generated page ids (e.g. `page_mtugk9ys_1`). Fall back to the script's
+    // first page so any script's first hop works; an empty script still errors.
+    const effectivePageId = script.pages[pageId] ? pageId : pageIds[0];
+    const currentPage = effectivePageId ? script.pages[effectivePageId] : undefined;
     if (currentPage && currentPage.blocks.length > 0) {
       const firstBlockId = currentPage.blocks[0];
-      twiml.redirect(`/api/ivr/${campaignId}/${pageId}/${firstBlockId}`);
+      twiml.redirect(`/api/ivr/${campaignId}/${effectivePageId}/${firstBlockId}`);
     } else {
       twiml.say("There was an error in the IVR flow. Goodbye.");
       twiml.hangup();

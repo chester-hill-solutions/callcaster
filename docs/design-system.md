@@ -26,6 +26,42 @@ Neutral CHS apps that own their own theme should use [`@chester-hill-solutions/u
 
 - **Use `FormField`** from [app/components/ui/form-field.tsx](app/components/ui/form-field.tsx) for every form field. It provides label, optional description, optional error message, and consistent spacing. Put the control (Input, Select, Textarea, Switch, etc.) as the child of `FormField`.
 
+### Field accessibility contract
+
+For a direct control, set `FormField.htmlFor` and the control's `id` to the same value. `FormField` connects its help and error text to that control and sets `aria-invalid` while a field error is present.
+
+```tsx
+<FormField
+  htmlFor="organization-email"
+  label="Organization email"
+  description="Use an address your team can access."
+  error={errors.email}
+>
+  <Input id="organization-email" name="email" type="email" required />
+</FormField>
+```
+
+For a nested control, or a compound component such as `Select`, wrap the focusable control with `FormFieldControl`. Keep the wrapper inside the compound component, around its trigger:
+
+```tsx
+<FormField htmlFor="country" label="Country" error={errors.country}>
+  <Select name="country">
+    <FormFieldControl>
+      <SelectTrigger id="country">
+        <SelectValue placeholder="Choose a country" />
+      </SelectTrigger>
+    </FormFieldControl>
+    <SelectContent>{countryOptions}</SelectContent>
+  </Select>
+</FormField>
+```
+
+- Existing `aria-describedby` IDs are retained and merged with the field's IDs. A field error takes precedence over `aria-invalid={false}` on the control. When the error is removed, the control's own invalid state is retained.
+- Custom control components must forward ARIA attributes to their focusable input or trigger. The field does not search through arbitrary component trees or assign feedback to adjacent actions.
+- `required` on `FormField` displays the label marker. Set `required` on a native input or use the control's validation API to enforce a required value.
+- Keep plain-control CSS fallbacks in `@layer base`. Unlayered rules override Tailwind utilities, even with a zero-specificity `:where()` selector, and can hide invalid borders or replace component spacing.
+- Use the shared field contract for new forms. Do not rebuild the description and error association in each route. The app adapter owns this behavior; shad-cc owns the underlying control visuals and tokens.
+
 ## Page structure
 
 - **Auth flows:** Use `AuthCard` from [app/components/shared/AuthCard.tsx](app/components/shared/AuthCard.tsx) for signin, signup, password reset, and invite acceptance. It provides a centered card with branded title and description slot.

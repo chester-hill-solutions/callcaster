@@ -1,16 +1,25 @@
-import { inArray } from "drizzle-orm";
+import { eq, inArray, sql, type SQL } from "drizzle-orm";
 import {
   call as callTable,
   campaign as campaignTable,
   message as messageTable,
+  transaction_history as transactionHistoryTable,
 } from "@/db/schema";
-import type { BillingActivityRow } from "@/lib/billing-activity-projection";
+import type { BillingActivityFilter, BillingActivityRow } from "@/lib/billing-activity-projection";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import type { TransactionType } from "@/lib/transaction-history-display";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
+/** Page size for the billing activity ledger feed. */
 export const BILLING_ACTIVITY_LIMIT = 500;
+
+export type BillingActivityTotals = {
+  /** Total debits (sum of all DEBIT amounts), as a positive magnitude. */
+  usage: number;
+  /** Total credits added (sum of all CREDIT amounts). */
+  purchased: number;
+};
 
 export type LedgerActivityRow = {
   id: number;
@@ -31,6 +40,10 @@ export type WorkspaceBillingActivity = {
   balance: number;
   history: BillingActivityRow[];
   campaignNames: Record<number, string>;
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totals: BillingActivityTotals;
 };
 
 export type WorkspaceBillingActivityError = {
@@ -38,6 +51,20 @@ export type WorkspaceBillingActivityError = {
   error: string;
   status: number;
 };
+
+export type BillingActivityQuery = {
+  /** 1-based ledger page; clamped to >= 1. */
+  page?: number;
+  /** Restrict the ledger rows and totals to a view (default "all"). */
+  filter?: BillingActivityFilter;
+};
+
+/** Type filter mapped from the activity view; undefined for "all". */
+function ledgerWhereFor(filter: BillingActivityFilter): SQL | undefined {
+  if (filter === "purchases") return eq(transactionHistoryTable.type, "CREDIT");
+  if (filter === "usage") return eq(transactionHistoryTable.type, "DEBIT");
+  return undefined;
+}
 
 function toTransactionType(type: string): TransactionType {
   return type === "CREDIT" ? "CREDIT" : "DEBIT";
@@ -124,9 +151,35 @@ async function lookupCampaignNames(
   return Object.fromEntries(rows.map((row) => [row.id, row.title]));
 }
 
+export type LedgerTotalsRow = { usage: string | number; purchased: string | number };
+
+/**
+ * Full-ledger usage and purchase totals for a workspace. Sums the raw amount
+ * column (DEBITs are negative) so the numbers reconcile with everything that
+ * was ever charged, independent of which activity page is being viewed.
+ */
+async function loadLedgerTotals(
+  tdb: TenantDb,
+  workspaceId: string,
+): Promise<BillingActivityTotals> {
+  const rows = (await tdb.execute(sql`
+    select
+      coalesce(sum(amount) filter (where type = 'DEBIT'), 0) as usage,
+      coalesce(sum(amount) filter (where type = 'CREDIT'), 0) as purchased
+    from transaction_history
+    where workspace = ${workspaceId}::uuid
+  `)) as LedgerTotalsRow[];
+  const first = rows[0] ?? { usage: 0, purchased: 0 };
+  return {
+    usage: Math.abs(Number(first.usage) || 0),
+    purchased: Number(first.purchased) || 0,
+  };
+}
+
 export async function getWorkspaceBillingActivity(
   userId: string,
   workspaceId: string,
+  query: BillingActivityQuery = {},
 ): Promise<WorkspaceBillingActivity | WorkspaceBillingActivityError> {
   await requireWorkspaceAccess({ user: { id: userId }, workspaceId });
 
@@ -135,22 +188,33 @@ export async function getWorkspaceBillingActivity(
     return { ok: false, error: "Workspace not found", status: 404 };
   }
 
+  const page = Math.max(1, Math.trunc(Number(query.page ?? 1)) || 1);
+  const filter = query.filter ?? "all";
+  const offset = (page - 1) * BILLING_ACTIVITY_LIMIT;
+  const where = ledgerWhereFor(filter);
+
   const tdb = createTenantDb(workspaceId);
-  const ledger = (await tdb.transaction_history.findMany({
-    columns: {
-      id: true,
-      created_at: true,
-      type: true,
-      amount: true,
-      note: true,
-      idempotency_key: true,
-      campaign_id: true,
-      message_sid: true,
-      call_sid: true,
-    },
-    orderBy: (row, { desc }) => [desc(row.created_at)],
-    limit: BILLING_ACTIVITY_LIMIT,
-  })) as LedgerActivityRow[];
+  const [ledger, totalCount, totals] = await Promise.all([
+    tdb.transaction_history.findMany({
+      columns: {
+        id: true,
+        created_at: true,
+        type: true,
+        amount: true,
+        note: true,
+        idempotency_key: true,
+        campaign_id: true,
+        message_sid: true,
+        call_sid: true,
+      },
+      where,
+      orderBy: (row, { desc }) => [desc(row.created_at)],
+      limit: BILLING_ACTIVITY_LIMIT,
+      offset,
+    }),
+    tdb.transaction_history.count({ where }),
+    loadLedgerTotals(tdb, workspaceId),
+  ]);
 
   const [messages, calls] = await Promise.all([
     lookupMessageCampaigns(tdb, unattributedSids(ledger, "message_sid")),
@@ -159,5 +223,14 @@ export async function getWorkspaceBillingActivity(
   const history = attributeLedgerCampaigns(ledger, { messages, calls });
   const campaignNames = await lookupCampaignNames(tdb, history);
 
-  return { ok: true, balance, history, campaignNames };
+  return {
+    ok: true,
+    balance,
+    history,
+    campaignNames,
+    page,
+    pageSize: BILLING_ACTIVITY_LIMIT,
+    totalCount,
+    totals,
+  };
 }

@@ -4,6 +4,20 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-09-10 — release [#1755](https://github.com/chester-hill-solutions/callcaster/pull/1755)
+
+### Fixed
+
+- The workspace Credits screen no longer hides activity beyond the most recent 500 ledger rows. The ledger is now paginated (with a page count and previous/next controls), and the Activity section shows full workspace usage and purchase totals that reconcile with reporting regardless of the page being viewed ([#1753](https://github.com/chester-hill-solutions/callcaster/issues/1753)).
+- Form help and errors now stay connected to their inputs for screen readers, including inputs with their own help text. Invalid fields use the shared error styling, and plain-control defaults no longer override component borders and spacing ([#1748](https://github.com/chester-hill-solutions/callcaster/issues/1748)).
+- Phone setup now guides you through rental or caller ID verification, keeps your place when adding credits, and shows incoming-call settings after a number is added ([#1205](https://github.com/chester-hill-solutions/callcaster/issues/1205)).
+
+- M4A/MOV audio uploads (including campaign and voicemail audio) now transcode to a playable MP3 instead of silently producing empty, unplayable audio ([#1730](https://github.com/chester-hill-solutions/callcaster/issues/1730)).
+- Sign-in failures no longer show a raw database error — the browser gets a generic message and the real error stays in the logs ([#1734](https://github.com/chester-hill-solutions/callcaster/issues/1734)).
+- PR-preview environments now bootstrap the full app schema (drizzle baseline) at boot and can seed the E2E fixtures (`E2E_SEED_ON_BOOT`), so a preview DB has working sign-in and known test accounts instead of a bare schema ([#1735](https://github.com/chester-hill-solutions/callcaster/issues/1735)).
+- IVR campaigns now run scripts created in the script editor: the first call step resolves to the script's actual first page instead of a hard-coded `page_1`, so editor-created scripts no longer play "There was an error in the IVR flow" ([#1743](https://github.com/chester-hill-solutions/callcaster/issues/1743)).
+- Setup review now shows remaining tasks with direct links, a clear next action, and calling or messaging notices instead of saying every workspace is ready to launch ([#1745](https://github.com/chester-hill-solutions/callcaster/issues/1745)).
+
 ## 2026-09-09 — release [#1693](https://github.com/chester-hill-solutions/callcaster/pull/1693)
 
 ### Fixed

@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   requireWorkspaceAccess: vi.fn(async () => undefined),
   getWorkspaceCreditsBalance: vi.fn(async (): Promise<number | null> => 250),
   ledgerFindMany: vi.fn(async (): Promise<LedgerActivityRow[]> => []),
+  ledgerCount: vi.fn(async (): Promise<number> => 0),
+  execute: vi.fn(async (): Promise<unknown[]> => []),
   messageFindMany: vi.fn(async (): Promise<unknown[]> => []),
   callFindMany: vi.fn(async (): Promise<unknown[]> => []),
   campaignFindMany: vi.fn(async (): Promise<unknown[]> => []),
@@ -28,10 +30,14 @@ vi.mock("@/lib/workspace-credits.server", async (importOriginal) => ({
 vi.mock("@/server/tenant-db", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/server/tenant-db")>()),
   createTenantDb: vi.fn(() => ({
-    transaction_history: { findMany: mocks.ledgerFindMany },
+    transaction_history: {
+      findMany: mocks.ledgerFindMany,
+      count: mocks.ledgerCount,
+    },
     message: { findMany: mocks.messageFindMany },
     call: { findMany: mocks.callFindMany },
     campaign: { findMany: mocks.campaignFindMany },
+    execute: mocks.execute,
   })),
 }));
 
@@ -84,6 +90,8 @@ describe("getWorkspaceBillingActivity", () => {
     vi.clearAllMocks();
     mocks.getWorkspaceCreditsBalance.mockResolvedValue(250);
     mocks.ledgerFindMany.mockResolvedValue([]);
+    mocks.ledgerCount.mockResolvedValue(0);
+    mocks.execute.mockResolvedValue([]);
     mocks.messageFindMany.mockResolvedValue([]);
     mocks.callFindMany.mockResolvedValue([]);
     mocks.campaignFindMany.mockResolvedValue([]);
@@ -151,5 +159,81 @@ describe("getWorkspaceBillingActivity", () => {
       status: 404,
     });
     expect(mocks.ledgerFindMany).not.toHaveBeenCalled();
+  });
+
+  test("pages the ledger with offset and returns the total count", async () => {
+    mocks.ledgerCount.mockResolvedValue(1_234);
+
+    const { getWorkspaceBillingActivity, BILLING_ACTIVITY_LIMIT } = await import(
+      "../app/lib/billing-activity.server"
+    );
+    const result = await getWorkspaceBillingActivity("u1", "w1", { page: 2 });
+
+    const config = mocks.ledgerFindMany.mock.calls[0][0];
+    expect(config.limit).toBe(BILLING_ACTIVITY_LIMIT);
+    expect(config.offset).toBe(BILLING_ACTIVITY_LIMIT);
+    expect(config.where).toBeUndefined();
+    expect(mocks.ledgerCount).toHaveBeenCalledWith({ where: undefined });
+    if (!result.ok) throw new Error("expected ok");
+    expect(result).toMatchObject({
+      page: 2,
+      pageSize: BILLING_ACTIVITY_LIMIT,
+      totalCount: 1_234,
+    });
+  });
+
+  test("clamps page to 1 for missing, zero, and negative values", async () => {
+    const { getWorkspaceBillingActivity } = await import(
+      "../app/lib/billing-activity.server"
+    );
+
+    for (const page of [undefined, 0, -3, 1]) {
+      const result = await getWorkspaceBillingActivity("u1", "w1", { page });
+      if (!result.ok) throw new Error("expected ok");
+      expect(result.page).toBe(1);
+    }
+
+    for (const config of mocks.ledgerFindMany.mock.calls) {
+      expect(config[0].offset).toBe(0);
+    }
+  });
+
+  test("passes the activity filter into the ledger query and count", async () => {
+    const { getWorkspaceBillingActivity } = await import(
+      "../app/lib/billing-activity.server"
+    );
+
+    await getWorkspaceBillingActivity("u1", "w1", { page: 1, filter: "purchases" });
+
+    const config = mocks.ledgerFindMany.mock.calls[0][0];
+    expect(config.where).toBeDefined();
+    expect(mocks.ledgerCount).toHaveBeenCalledWith({
+      where: expect.anything(),
+    });
+  });
+
+  test("reports full-ledger usage and purchase totals", async () => {
+    mocks.execute.mockResolvedValue([
+      { usage: "-3798", purchased: "4600" },
+    ]);
+
+    const { getWorkspaceBillingActivity } = await import(
+      "../app/lib/billing-activity.server"
+    );
+    const result = await getWorkspaceBillingActivity("u1", "w1");
+
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.totals).toEqual({ usage: 3798, purchased: 4600 });
+  });
+
+  test("defaults totals to zero when the ledger summary returns no row", async () => {
+    const { getWorkspaceBillingActivity } = await import(
+      "../app/lib/billing-activity.server"
+    );
+
+    const result = await getWorkspaceBillingActivity("u1", "w1");
+
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.totals).toEqual({ usage: 0, purchased: 0 });
   });
 });

@@ -166,15 +166,7 @@ export function OnboardingWizard({
         }
         return null;
       case "launch_checks":
-        return (
-          <Button
-            type="button"
-            variant="default"
-            onClick={() => navigate(`/workspaces/${workspaceId}`)}
-          >
-            Go to workspace
-          </Button>
-        );
+        return null;
       case "audience":
       case "script":
       case "campaign_info":

@@ -108,6 +108,29 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     vi.useRealTimers();
   });
 
+  test("falls back to the script's first page when the requested page id is missing", async () => {
+    // Dispatch always dials `/api/ivr/{campaignId}/page_1/`, but editor-created
+    // scripts use generated page ids (e.g. page_mtugk9ys_1). The first hop must
+    // resolve to the real first page instead of erroring (#1730-era #1348).
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    const callData = {
+      workspace: "w1",
+      campaign_id: 1,
+      campaign: { script: { steps: { pages: { page_mtugk9ys_1: { blocks: ["b1"] } } } } },
+    };
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(callData as any);
+
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1" },
+      request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
+    } as never);
+    const text = await res.text();
+    expect(text).toContain("<Redirect>/api/ivr/1/page_mtugk9ys_1/b1</Redirect>");
+    expect(text).not.toContain("There was an error in the IVR flow");
+  });
+
   test("returns hangup when campaign_id does not match URL or call is missing", async () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const fd = new FormData();

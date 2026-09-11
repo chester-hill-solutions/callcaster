@@ -11,6 +11,9 @@ export type BillingActivityRow = {
   campaign_id?: number | null;
 };
 
+/** Activity view filter, shared between the server query and the table UI. */
+export type BillingActivityFilter = "all" | "purchases" | "usage";
+
 export type BillingReference = {
   provider: "Stripe" | "Twilio" | "CallCaster" | "Other";
   reference: string | null;
