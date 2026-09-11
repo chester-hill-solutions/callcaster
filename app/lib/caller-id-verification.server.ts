@@ -4,6 +4,7 @@ import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { createTenantDb } from "@/server/tenant-db";
+import { emitWorkspaceNumberEvent } from "@/lib/workspace-events.server";
 import { INBOUND_RING_COUNT_DEFAULT } from "../../shared/inbound-rings";
 
 export type CallerIdValidationRequest = {
@@ -99,6 +100,16 @@ export async function startWorkspaceCallerIdVerification({
   if (!numberRequest[0]) {
     throw new Error("Error inserting workspace number");
   }
+
+  // Live-update the numbers page: the row just flipped to verification_status
+  // "pending", which the accounts settings page should show without a reload.
+  const emitEventType = existing ? "UPDATE" : "INSERT";
+  await emitWorkspaceNumberEvent(
+    workspaceId,
+    emitEventType,
+    numberRequest[0] as unknown as Record<string, unknown>,
+    null,
+  );
 
   // Plain POJO for action/fetcher JSON — Twilio SDK instances are unreliable once
   // serialized. Prefer the submitted number when the API omits phone_number.

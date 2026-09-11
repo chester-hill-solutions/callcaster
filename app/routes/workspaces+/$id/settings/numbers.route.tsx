@@ -192,6 +192,24 @@ const WorkspaceSettings = () => {
     setNumberPendingRemoval(numberId);
   };
 
+  // Live verification status of the number the dialog is showing, so the sheet
+  // reflects the Twilio callback without a page reload (#1740).
+  const validationPhone = actionData?.validationRequest?.phoneNumber?.trim();
+  const verifyingNumber = validationPhone
+    ? phoneNumbers?.find(
+        (n) => n !== null && n.phone_number === validationPhone,
+      )
+    : null;
+  const rawStatus = verifyingNumber?.capabilities
+    ? (
+        verifyingNumber.capabilities as unknown as Record<string, unknown>
+      ).verification_status
+    : null;
+  const verificationStatus =
+    rawStatus === "success" || rawStatus === "failed" || rawStatus === "pending"
+      ? (rawStatus as "success" | "failed" | "pending")
+      : null;
+
   const confirmNumberRemoval = () => {
     if (numberPendingRemoval == null) return;
     onNumberRemoval(numberPendingRemoval);
@@ -204,6 +222,7 @@ const WorkspaceSettings = () => {
         isOpen={isDialogOpen}
         onOpenChange={setDialog}
         validationRequest={actionData?.validationRequest}
+        status={verificationStatus}
       />
       <Dialog
         open={numberPendingRemoval != null}

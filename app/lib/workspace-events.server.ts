@@ -135,6 +135,21 @@ export async function emitCampaignStatusEvent(
   });
 }
 
+export async function emitWorkspaceNumberEvent(
+  workspaceId: string,
+  eventType: "INSERT" | "UPDATE" | "DELETE",
+  newRow: RealtimeRow | null,
+  oldRow?: RealtimeRow | null,
+): Promise<WorkspaceEventRow | null> {
+  return emitPostgresChangeEvent(workspaceId, {
+    eventType,
+    table: "workspace_number",
+    schema: "public",
+    new: toRealtimeRow(newRow),
+    old: toRealtimeRow(oldRow ?? null),
+  });
+}
+
 /**
  * Emit a workspace SSE postgres_change for a newly inserted ledger row.
  * Callers must only invoke this when the ledger RPC returned `inserted: true`.
