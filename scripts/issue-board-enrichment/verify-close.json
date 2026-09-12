@@ -1060,5 +1060,26 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1726,
+    "verdict": "verify-close",
+    "recommendedTitle": "Contact search creates a missing contact from the results list",
+    "summary": "Merged to dev (#1785); full local e2e gate green (118 passed). Awaiting user/QA retest.",
+    "currentBehavior": "Bottom Add row creates + queues the contact inline.",
+    "rootCause": "Feature gap; implemented.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [
+      "test/ui/contact-search-dialog.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "no-match search offers an Add row",
+      "created contact queued in the same dialog"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Close once confirmed on dev."
   }
 ]

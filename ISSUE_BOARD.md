@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@37b76d0b` · 138 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@801a71e4` · 138 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -19,6 +19,19 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
+### [#1316](https://github.com/chester-hill-solutions/callcaster/issues/1316) MFA Change Log
+- Verdict: **Fix now** · Size: M · Risk: medium · Labels: design, on-dev · Assignee: @wra-sol · Updated: 2026-09-12
+- Recommended title: **design(mfa): polish enrollment steps, status layout, and secure code-copy controls**
+- MFA change-log polish: cramped sublines (move status top-right), password-step action should be 'Next', icon copy controls with checkmark success, backup-code copy + secure-storage prompt, error-toast consistency.
+- Current behavior: account.tsx renders SectionHeader with 'Save' button for the password step, status below header, plain text copy control, no backup-code copy/guidance; account.security.tsx + two-factor.tsx use plain red text.
+- Root cause: Enrollment layout and copy still need the requested polish.
+- Resolution: Scope the remaining enrollment controls first. Keep session behavior unchanged; shared toast spacing is tracked in #1668.
+- Look in: `app/routes/account.tsx`, `app/routes/account.security.tsx`, `app/routes/two-factor.tsx`
+- Existing tests: test/two-factor.server.test.ts (server gates only)
+- Missing tests: button labels; clipboard success/failure; enrollment keeps session
+- Done when: Password step says Next; Copy buttons accessible with check states; Backup codes have secure-storage prompt; Session behavior unchanged
+- Tracker: Treat enrollment polish as a separate PR from global toast spacing.
+
 ### [#1205](https://github.com/chester-hill-solutions/callcaster/issues/1205) "Number" onboarding is confusing
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: ux, on-dev · Assignee: @wra-sol · Updated: 2026-09-09
 - Recommended title: **ux(onboarding): split Number into guided rent-or-verify substeps**
@@ -31,19 +44,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: both branches; back navigation; billing return; completed-number resume
 - Done when: Choose method first; Rent requires address before search; Verify bypasses rental; Routing appears only after a number exists
 - Tracker: Overlaps #1110/#1113/#1318; keep as its own issue.
-
-### [#1316](https://github.com/chester-hill-solutions/callcaster/issues/1316) MFA Change Log
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: design · Assignee: @wra-sol · Updated: 2026-08-25
-- Recommended title: **design(mfa): polish enrollment steps, status layout, and secure code-copy controls**
-- MFA change-log polish: cramped sublines (move status top-right), password-step action should be 'Next', icon copy controls with checkmark success, backup-code copy + secure-storage prompt, error-toast consistency.
-- Current behavior: account.tsx renders SectionHeader with 'Save' button for the password step, status below header, plain text copy control, no backup-code copy/guidance; account.security.tsx + two-factor.tsx use plain red text.
-- Root cause: Enrollment layout and copy still need the requested polish.
-- Resolution: Scope the remaining enrollment controls first. Keep session behavior unchanged; shared toast spacing is tracked in #1668.
-- Look in: `app/routes/account.tsx`, `app/routes/account.security.tsx`, `app/routes/two-factor.tsx`
-- Existing tests: test/two-factor.server.test.ts (server gates only)
-- Missing tests: button labels; clipboard success/failure; enrollment keeps session
-- Done when: Password step says Next; Copy buttons accessible with check states; Backup codes have secure-storage prompt; Session behavior unchanged
-- Tracker: Treat enrollment polish as a separate PR from global toast spacing.
 
 ### [#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148) SMS Onboarding Changes
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-08-07
@@ -134,9 +134,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 63
+## Verify and close — 64
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#1726](https://github.com/chester-hill-solutions/callcaster/issues/1726) Contact search: allow creating a new contact from the bottom of the results list
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: on-dev · Assignee: none · Updated: 2026-09-12
+- Recommended title: **Contact search creates a missing contact from the results list**
+- Merged to dev (#1785); full local e2e gate green (118 passed). Awaiting user/QA retest.
+- Current behavior: Bottom Add row creates + queues the contact inline.
+- Root cause: Feature gap; implemented.
+- Resolution: No further code expected unless retest finds a gap.
+- Existing tests: test/ui/contact-search-dialog.test.tsx
+- Done when: no-match search offers an Add row; created contact queued in the same dialog
+- Tracker: Close once confirmed on dev.
 
 ### [#1668](https://github.com/chester-hill-solutions/callcaster/issues/1668) Error toasts should have sensible defaults for spacing. Adding an audio reveals lacking bottom spacing
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design, on-dev · Assignee: none · Updated: 2026-09-11
@@ -775,7 +786,7 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 29
+## Needs decision — 28
 
 Product, security, or operations decision required before implementation can be scoped.
 
@@ -863,18 +874,6 @@ Product, security, or operations decision required before implementation can be 
 - Campaign completes on queue drain (completeCampaignsDrainedByDequeue) while the dial fires async seconds later — behavior confirmed. What 'complete' means for IVR is a product decision that blocks the fix.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1726](https://github.com/chester-hill-solutions/callcaster/issues/1726) Contact search: allow creating a new contact from the bottom of the results list
-- Verdict: **Needs decision** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-09
-- Recommended title: **feature(contacts): add-new-contact row at the bottom of contact search results**
-- When a contact search finds no match, users should be able to scroll to the bottom of the list and choose 'Add' to create the contact inline instead of leaving the search.
-- Current behavior: ContactSearchDialog only renders Add per existing match; no create affordance in the list.
-- Root cause: Feature gap.
-- Resolution: Render a bottom-of-list Add row (typed query) reusing the workspace create-contact path; decide placement/no-match UX.
-- Look in: `app/components/queue/ContactSearchDialog.tsx`, `app/routes/api+/contacts.action.server.ts`
-- Missing tests: no-match Add row; create then select in same dialog
-- Done when: no-match search offers an Add row; created contact selectable in the same dialog
-- Tracker: Confirm scope (queue builder vs chat) then implement.
 
 ### [#1722](https://github.com/chester-hill-solutions/callcaster/issues/1722) What does "kick off" on campaign launch pane do
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
