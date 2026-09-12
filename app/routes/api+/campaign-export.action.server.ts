@@ -11,6 +11,7 @@ import {
 import { defineAction } from "@/lib/handler.server";
 import { trackBackgroundFailure } from "@/lib/background-task.server";
 import { toUserMessage } from "@/lib/user-message";
+import { isMachineDispatchedVoiceCampaignType } from "@/lib/campaign-execution.server";
 
 const unauthorized = () =>
   new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -65,7 +66,10 @@ export const action = defineAction({
         "campaign_export.background_failed",
         { exportId, campaignId, workspaceId },
       );
-    } else if (campaignRow.type === "live_call" || campaignRow.type === "robocall") {
+    } else if (
+      campaignRow.type === "live_call" ||
+      isMachineDispatchedVoiceCampaignType(campaignRow.type)
+    ) {
       trackBackgroundFailure(
         processCallCampaignExport(
           Number(campaignId),

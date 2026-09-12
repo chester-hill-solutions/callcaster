@@ -22,6 +22,7 @@ import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { downloadObject, listObjects } from "@/lib/object-storage.server";
 import { trackBackgroundFailure } from "@/lib/background-task.server";
+import { isMachineDispatchedVoiceCampaignType } from "@/lib/campaign-execution.server";
 
 export type SerializedExportItem = {
   id: string;
@@ -209,7 +210,10 @@ export async function startCampaignExportApi(
       "campaign_export.background_failed",
       { exportId, campaignId, workspaceId },
     );
-  } else if (campaignRow.type === "live_call" || campaignRow.type === "robocall") {
+  } else if (
+    campaignRow.type === "live_call" ||
+    isMachineDispatchedVoiceCampaignType(campaignRow.type)
+  ) {
     trackBackgroundFailure(
       processCallCampaignExport(
         campaignId,
