@@ -15,6 +15,10 @@ import {
 } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
 import {
+  voiceBillingKindFromCampaignType,
+  voiceCreditsFromDurationSeconds,
+} from "@/lib/pricing";
+import {
   castExportScript,
   createInitialExportStatus,
   extractScriptQuestions,
@@ -54,6 +58,11 @@ async function appendDequeuedRowsToCsv(args: {
   }
   const dequeuedRows = await findDequeuedQueueRowsForCampaign(campaignId, workspaceId);
   for (const dequeuedRow of dequeuedRows) {
+    // A successful SMS is dequeued after Twilio accepts it. The message row
+    // above is the canonical export row; adding a synthesized skipped row for
+    // the same queue entry would make one send appear twice (#1788).
+    if (dequeuedRow.dequeued_reason === "SMS message sent") continue;
+
     const contact = contactById.get(String(dequeuedRow.contact_id));
     if (!contact) continue;
     const cleanPhone = (contact.phone ?? "").replace(/[^0-9]/g, "");
@@ -353,6 +362,7 @@ export async function processCallCampaignExport(
 
     const script = castExportScript(campaignWithScript.script);
     const campaign = campaignWithScript as ExportCampaign;
+    const billingKind = voiceBillingKindFromCampaignType(campaign.type);
     const scriptQuestions = extractScriptQuestions(script);
     const pages = Object.entries(script?.steps?.pages ?? {}).map(([pageId, pageData]) => ({
       id: pageId,
@@ -424,8 +434,17 @@ export async function processCallCampaignExport(
       }
 
       for (const item of matchedAttempts) {
-        const durationSeconds = item.call.duration ? parseInt(item.call.duration) : 0;
-        const creditsUsed = Math.max(1, Math.ceil(durationSeconds / 60));
+        const rawDurationSeconds = item.call.duration == null ? 0 : Number(item.call.duration);
+        const durationSeconds =
+          Number.isFinite(rawDurationSeconds) && rawDurationSeconds > 0
+            ? rawDurationSeconds
+            : 0;
+        // A missing, zero, negative, or invalid duration means the call did
+        // not connect and has no billable usage. Connected calls use the same
+        // campaign-aware rate card as the billing path (#1789).
+        const creditsUsed = durationSeconds > 0
+          ? voiceCreditsFromDurationSeconds(durationSeconds, billingKind)
+          : 0;
 
         // Track visited pages and responses
         const visitedPages = new Set<string>();

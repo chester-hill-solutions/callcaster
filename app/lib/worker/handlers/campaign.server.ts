@@ -146,7 +146,10 @@ export async function campaignExportHandler(
       exportId,
       campaignName,
     );
-  } else if (campaignType === "live_call" || campaignType === "robocall") {
+  } else if (
+    campaignType === "live_call" ||
+    isMachineDispatchedVoiceCampaignType(campaignType)
+  ) {
     await processCallCampaignExport(
       campaignId,
       workspaceId,
