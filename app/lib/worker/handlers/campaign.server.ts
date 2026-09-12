@@ -22,6 +22,7 @@ import {
 import { rpcTryCompleteCampaignIfDrained } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { DISPATCH_TICK_MS } from "@/lib/throughput-config";
+import { ivrCallingPolicy, nextDispatchOpenAt } from "@/lib/campaign-dispatch-policy";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 import type { VoterListSource } from "@/lib/audience-upload-process.server";
@@ -314,12 +315,16 @@ export async function campaignDispatchHandler(
       campaignRecord.type !== "message" &&
       campaignRecord.status === "waiting"
     ) {
+      const nextOpenAt = nextDispatchOpenAt(ivrCallingPolicy(campaignRecord));
+      const exactDelayMs = nextOpenAt
+        ? Math.max(0, nextOpenAt.getTime() - Date.now())
+        : SEND_WINDOW_RETRY_MS;
       await enqueueDispatchSuccessor({
         workspaceId,
         campaignId,
         userId,
         completedJobId: job.id,
-        delayMs: SEND_WINDOW_RETRY_MS,
+        delayMs: Math.min(exactDelayMs, SEND_WINDOW_MAX_DEFER_MS),
       });
       return { ok: true, campaignId, deferred: "waiting_for_schedule" };
     }
@@ -464,15 +469,17 @@ async function runMachineVoiceDispatch(
       // Config error — retrying cannot fix it; surface loudly and stop.
       logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
       return { ok: true, campaignId, blocked: "caller_id_required" };
-    case "deferred_send_window":
+    case "deferred_send_window": {
+      const exactDelayMs = Math.max(0, outcome.nextOpenAt.getTime() - Date.now());
       await enqueueDispatchSuccessor({
         workspaceId,
         campaignId,
         userId,
         completedJobId: job.id,
-        delayMs: SEND_WINDOW_RETRY_MS,
+        delayMs: Math.min(exactDelayMs, SEND_WINDOW_MAX_DEFER_MS),
       });
       return { ok: true, campaignId, deferred: "send_window" };
+    }
     case "dispatched": {
       const { counts, queuedRemaining } = outcome;
 

@@ -42,15 +42,18 @@ import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { insertCallForWorkspace, hasDuplicateCampaignCall } from "@/lib/telephony-db.server";
 import { logger } from "@/lib/logger.server";
+import { selectEligibleCampaignQueueMembers } from "@/lib/campaign-dispatch-queue.server";
+import { ivrCallingPolicy, nextDispatchOpenAt } from "@/lib/campaign-dispatch-policy";
 
 export const IVR_CALL_DEQUEUED_REASON = "IVR call completed";
 export const OPTED_OUT_IVR_DEQUEUED_REASON = "Contact opted out";
 export const DUPLICATE_IVR_DEQUEUED_REASON = "Duplicate IVR call prevented";
+const IVR_WINDOW_RETRY_MS = 15 * 60 * 1000;
 
 export type CampaignIvrBatchOutcome =
   | { kind: "insufficient_credits" }
   | { kind: "caller_id_required" }
-  | { kind: "deferred_send_window" }
+  | { kind: "deferred_send_window"; nextOpenAt: Date }
   | {
       kind: "dispatched";
       counts: {
@@ -99,7 +102,12 @@ export async function dispatchCampaignIvrBatch(args: {
   // Campaign calling-hours gate. Outside the configured schedule nothing is
   // dialled and nothing is dequeued; the successor chain retries later.
   if (!checkSchedule(campaign)) {
-    return { kind: "deferred_send_window" };
+    return {
+      kind: "deferred_send_window",
+      nextOpenAt:
+        nextDispatchOpenAt(ivrCallingPolicy(campaign)) ??
+        new Date(Date.now() + IVR_WINDOW_RETRY_MS),
+    };
   }
 
   const portalConfig = await getWorkspaceTwilioPortalConfig({ workspaceId });
@@ -112,16 +120,24 @@ export async function dispatchCampaignIvrBatch(args: {
     campaign_id: campaignId,
     onlyQueued: true,
   });
-  const queueMembers =
-    typeof args.maxContacts === "number"
-      ? allQueued.slice(0, Math.min(args.maxContacts, claimSize))
-      : allQueued.slice(0, claimSize);
+  const queueSelection = selectEligibleCampaignQueueMembers(
+    allQueued,
+    typeof args.maxContacts === "number" ? Math.min(args.maxContacts, claimSize) : claimSize,
+  );
+  const queueMembers = queueSelection.selected;
 
   if (queueMembers.length === 0) {
     return {
       kind: "dispatched",
-      counts: { called: 0, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 },
-      queuedRemaining: 0,
+      counts: {
+        called: 0,
+        failed: 0,
+        dequeued: 0,
+        deferred: queueSelection.deferredCount,
+        exhausted: 0,
+      },
+      queuedRemaining:
+        queueSelection.deferredCount + queueSelection.unselectedEligibleCount,
     };
   }
 
@@ -129,7 +145,13 @@ export async function dispatchCampaignIvrBatch(args: {
   const ivrUrls = resolveIvrCallUrls(campaignId);
   const tdb = createTenantDb(workspaceId);
 
-  const counts = { called: 0, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 };
+  const counts = {
+    called: 0,
+    failed: 0,
+    dequeued: 0,
+    deferred: queueSelection.deferredCount,
+    exhausted: 0,
+  };
 
   // In-batch normalized-number reservation. hasDuplicateCampaignCall reads
   // persisted call history and cannot see sibling rows still executing in this
@@ -262,7 +284,7 @@ export async function dispatchCampaignIvrBatch(args: {
     counts.exhausted = await rpcFailExhaustedCampaignQueueContacts(tdb, Number(campaignId));
   }
 
-  const truncated = allQueued.length - queueMembers.length;
+  const truncated = queueSelection.unselectedEligibleCount;
   return {
     kind: "dispatched",
     counts,
