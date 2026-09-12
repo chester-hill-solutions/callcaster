@@ -1,12 +1,46 @@
 export { loader, action } from "./account.security.loader.server";
 
+import { useState } from "react";
+import { Check, Copy } from "lucide-react";
 import { Form, Link, useActionData, useLoaderData } from "react-router";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Text } from "@/components/ui/typography";
+
+/**
+ * Icon-only copy button: copy icon → success checkmark for a moment (#1316).
+ * Clipboard can be unavailable (non-secure contexts, jsdom); fail silently.
+ */
+function SecretCopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard?.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable — keep the button inert rather than erroring.
+    }
+  };
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="size-8 shrink-0 px-0"
+      onClick={copy}
+      aria-label={copied ? `${label} copied` : `Copy ${label}`}
+      title={copied ? `${label} copied` : `Copy ${label}`}
+      aria-pressed={copied}
+    >
+      {copied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+    </Button>
+  );
+}
 
 export default function AccountSecurity() {
   const data = useLoaderData<{
@@ -41,15 +75,26 @@ export default function AccountSecurity() {
             ? "Two-factor authentication is required for owner and admin roles."
             : "Manage two-factor authentication for your account."
         }
+        headerContent={
+          data.twoFactorAvailable ? (
+            <div className="flex justify-end pt-1">
+              <Badge variant={enabled ? "default" : "outline"}>
+                {enabled ? "Enabled" : "Not enabled"}
+              </Badge>
+            </div>
+          ) : undefined
+        }
         id="account-security"
       >
         {actionData?.error ? (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="py-3">
             <AlertDescription>{actionData.error}</AlertDescription>
           </Alert>
         ) : null}
         {actionData?.success ? (
-          <Text className="text-green-600">{actionData.success}</Text>
+          <Alert variant="default" className="py-3">
+            <AlertDescription>{actionData.success}</AlertDescription>
+          </Alert>
         ) : null}
 
         {!data.twoFactorAvailable ? (
@@ -59,31 +104,44 @@ export default function AccountSecurity() {
           </Text>
         ) : null}
 
-        {data.twoFactorAvailable ? (
-          <Text className="text-sm text-muted-foreground">
-            Status: {enabled ? "Enabled" : "Not enabled"}
-          </Text>
-        ) : null}
-
         {data.twoFactorAvailable && !enabled && !showVerify ? (
           <Form method="POST" className="flex flex-col gap-4">
             <input type="hidden" name="intent" value="enable" />
             <FormField htmlFor="password" label="Current password">
               <Input id="password" name="password" type="password" autoComplete="current-password" />
             </FormField>
-            <Button type="submit">Set up authenticator app</Button>
+            <Button type="submit" className="ml-auto min-w-[8rem]">
+              Next
+            </Button>
           </Form>
         ) : null}
 
         {showVerify ? (
           <div className="flex flex-col gap-4">
             {actionData?.totpURI ? (
-              <Text className="break-all text-xs">{actionData.totpURI}</Text>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                  <code className="min-w-0 break-all text-xs">{actionData.totpURI}</code>
+                  <SecretCopyButton value={actionData.totpURI} label="secret" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Scan this with your authenticator app, or copy it into one that
+                  accepts a manual secret.
+                </p>
+              </div>
             ) : null}
             {actionData?.backupCodes?.length ? (
-              <Text className="text-sm">
-                Backup codes: {actionData.backupCodes.join(", ")}
-              </Text>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                  <span className="min-w-0 break-all font-mono text-sm">
+                    {actionData.backupCodes.join("  ")}
+                  </span>
+                  <SecretCopyButton value={actionData.backupCodes.join("\n")} label="backup codes" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Save this in a secure place. Each code can only be used once.
+                </p>
+              </div>
             ) : null}
             <Form method="POST" className="flex flex-col gap-4">
               <input type="hidden" name="intent" value="verify" />
@@ -91,7 +149,9 @@ export default function AccountSecurity() {
               <FormField htmlFor="code" label="Verification code">
                 <Input id="code" name="code" inputMode="numeric" autoComplete="one-time-code" />
               </FormField>
-              <Button type="submit">Confirm setup</Button>
+              <Button type="submit" className="ml-auto min-w-[8rem]">
+                Confirm setup
+              </Button>
             </Form>
           </div>
         ) : null}

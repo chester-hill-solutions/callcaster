@@ -24,7 +24,7 @@ export default function TwoFactorVerify() {
         id="two-factor-hero"
       >
         {actionData?.error ? (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="py-3">
             <AlertDescription>{actionData.error}</AlertDescription>
           </Alert>
         ) : null}
