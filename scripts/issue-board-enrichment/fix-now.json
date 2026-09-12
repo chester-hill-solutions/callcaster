@@ -94,5 +94,175 @@
     "risk": "medium",
     "trackerRecommendation": "Treat enrollment polish as a separate PR from global toast spacing.",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 1696,
+    "verdict": "fix-now",
+    "summary": "Confirmed root cause: IVR recording preview uses <audio preload=\"none\"> so duration shows 0:00 until playback; switch to preload=\"metadata\". Exact file+line, single-file change.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1701,
+    "verdict": "fix-now",
+    "summary": "Well-scoped layout change: move the Upload audio button (rendered in IvrStepFields) adjacent to the 'Select a recording' control (RecordingStepFields).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1702,
+    "verdict": "fix-now",
+    "summary": "Exact change: convert the Answer label description into a hover tooltip.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1703,
+    "verdict": "fix-now",
+    "summary": "Exact change: replace the full-width 'Remove response' button with an inline trash icon in each response row.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1704,
+    "verdict": "fix-now",
+    "summary": "Confirmed gap: script table has no unique index on (workspace,name) (schema + migrations), yet campaign.server.ts already maps isUniqueViolation to a friendly 'already exists' error — the guard is unreachable. Add the constraint and surface the existing error.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1715,
+    "verdict": "fix-now",
+    "summary": "Precise change list with an exact target component (profile dropdown): remove padding/info/first-name/workspace settings, rename invitations line + icon.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1716,
+    "verdict": "fix-now",
+    "summary": "Navbar order shifts because NavbarCredits/WorkspacePicker render conditionally; issue specifies the exact desired order. Fix is a stable nav-shell order.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1727,
+    "verdict": "fix-now",
+    "summary": "Explicit ordering spec (reverse chrono + status grouping running→waiting→draft→complete); campaigns list renders without that ordering. Well-scoped change at the source.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1739,
+    "verdict": "fix-now",
+    "summary": "Well-scoped template change with example copy: inject the workspace name into the low-credit email subject/body (workspace is in the notify context).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1764,
+    "verdict": "fix-now",
+    "summary": "Confirmed gap: the rent path has a real address substep but the substep nav collapses address/rent/verify into one crumb. Add an address crumb to the nav state machine.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1781,
+    "verdict": "fix-now",
+    "recommendedTitle": "Unique index for script names (duplicate-name error has no DB constraint)",
+    "summary": "No unique index on script(workspace,name) — the friendly duplicate error (campaign.server.ts:556/619) is unenforceable. Add citext/lower unique index + map violations to the friendly message.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Implement per ticket"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Filed 2026-09-12 from board triage."
+  },
+  {
+    "issueNumber": 1783,
+    "verdict": "fix-now",
+    "recommendedTitle": "Theme bootstrap <html> hydration mismatch",
+    "summary": "root.tsx inline theme script mutates documentElement pre-hydration; React logs mismatch every boot. Use narrow suppressHydrationWarning or server-rendered theme, keep the anti-flash script.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Implement per ticket"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Filed 2026-09-12 from board triage."
   }
 ]

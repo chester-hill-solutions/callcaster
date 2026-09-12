@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@b85f8e02` · 135 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@37b76d0b` · 138 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 3
+## Fix now — 15
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -58,9 +58,83 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Goal has short non-duplicated guidance; Help content wraps/scrolls within bounds; SMS compliance fields only for SMS goal; Saved data unchanged
 - Tracker: Coordinate with #1345/#1311/#1122.
 
+### [#1781](https://github.com/chester-hill-solutions/callcaster/issues/1781) Duplicate script names are allowed: friendly error exists but no DB constraint enforces it
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
+- Recommended title: **Unique index for script names (duplicate-name error has no DB constraint)**
+- No unique index on script(workspace,name) — the friendly duplicate error (campaign.server.ts:556/619) is unenforceable. Add citext/lower unique index + map violations to the friendly message.
+- Done when: Implement per ticket
+- Tracker: Filed 2026-09-12 from board triage.
+
+### [#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764) "Number" onboarding breadcrumbs missing address step
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-09-11
+- Confirmed gap: the rent path has a real address substep but the substep nav collapses address/rent/verify into one crumb. Add an address crumb to the nav state machine.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1739](https://github.com/chester-hill-solutions/callcaster/issues/1739) Workspace notification emails should mention the workspace name in the email
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
+- Well-scoped template change with example copy: inject the workspace name into the low-credit email subject/body (workspace is in the notify context).
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727) Campaign List should be sorted
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
+- Explicit ordering spec (reverse chrono + status grouping running→waiting→draft→complete); campaigns list renders without that ordering. Well-scoped change at the source.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1716](https://github.com/chester-hill-solutions/callcaster/issues/1716) workspace drop down shouldn't move
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
+- Navbar order shifts because NavbarCredits/WorkspacePicker render conditionally; issue specifies the exact desired order. Fix is a stable nav-shell order.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1715](https://github.com/chester-hill-solutions/callcaster/issues/1715) Profile drop down changes
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
+- Precise change list with an exact target component (profile dropdown): remove padding/info/first-name/workspace settings, rename invitations line + icon.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1704](https://github.com/chester-hill-solutions/callcaster/issues/1704) Shouldn't allow scripts with same name
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
+- Confirmed gap: script table has no unique index on (workspace,name) (schema + migrations), yet campaign.server.ts already maps isUniqueViolation to a friendly 'already exists' error — the guard is unreachable. Add the constraint and surface the existing error.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1703](https://github.com/chester-hill-solutions/callcaster/issues/1703) IVR Script: Remove response for IVR script should be a trash can icon in line with the fields on the right
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
+- Exact change: replace the full-width 'Remove response' button with an inline trash icon in each response row.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702) IVR Script: Answer label description should be in an on hover tool tip after "Answer Label" not underneath the field
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
+- Exact change: convert the Answer label description into a hover tooltip.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1701](https://github.com/chester-hill-solutions/callcaster/issues/1701) IVR Script: Upload Audio button should be closer to the select a recording option since they are options of the same choice: "What audio do you want to use"
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-09-09
+- Well-scoped layout change: move the Upload audio button (rendered in IvrStepFields) adjacent to the 'Select a recording' control (RecordingStepFields).
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1696](https://github.com/chester-hill-solutions/callcaster/issues/1696) Audio preview in IVR script shows 0:00 until you hit play
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
+- Confirmed root cause: IVR recording preview uses <audio preload="none"> so duration shows 0:00 until playback; switch to preload="metadata". Exact file+line, single-file change.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1783](https://github.com/chester-hill-solutions/callcaster/issues/1783) Dev/theme bootstrap mutates <html> before React hydrates (hydration mismatch, #1750)
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-12
+- Recommended title: **Theme bootstrap <html> hydration mismatch**
+- root.tsx inline theme script mutates documentElement pre-hydration; React logs mismatch every boot. Use narrow suppressHydrationWarning or server-rendered theme, keep the anti-flash script.
+- Done when: Implement per ticket
+- Tracker: Filed 2026-09-12 from board triage.
+
 ---
 
-## Verify and close — 56
+## Verify and close — 63
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -183,6 +257,48 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Resolution: No further code expected unless retest finds a gap.
 - Done when: retest on dev
 - Tracker: Close once Sai/user confirms on dev.
+
+### [#1759](https://github.com/chester-hill-solutions/callcaster/issues/1759) Billing activity: group expansion and entry details break the table layout
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-11
+- Bot comment 2026-09-11: merged in PR #1760 (1d961fed); PR state MERGED (nested sub-table + row disclosure). Retest on review env.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1757](https://github.com/chester-hill-solutions/callcaster/issues/1757) Billing: campaign usage rollup splits across pages — roll up then paginate
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-11
+- Bot comment 2026-09-11: merged in PR #1758 (db7e9b32); PR state MERGED (roll up before pagination). Retest on review env.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1753](https://github.com/chester-hill-solutions/callcaster/issues/1753) Billing: activity screen truncates usage at 500 ledger rows — add pagination and full totals
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-10
+- Bot comment 2026-09-10: merged in PR #1754 (2de36426); PR state MERGED (pagination + full totals). Retest on review env.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1748](https://github.com/chester-hill-solutions/callcaster/issues/1748) Connect shared form help and errors to their controls by default
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-09
+- Bot comment 2026-09-09: merged in PR #1749 (2febfa74); PR state MERGED. Retest on review env.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1745](https://github.com/chester-hill-solutions/callcaster/issues/1745) Make the onboarding review show actionable setup progress
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-09
+- Bot comment 2026-09-09: merged in PR #1747 (0d4ead79); PR state MERGED. Retest on review env; closes when promoted to master.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1682](https://github.com/chester-hill-solutions/callcaster/issues/1682) Campaign URLs with a non-numeric id show "Unexpected Server Error" instead of Page not found
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-09
+- Fixed by PR #1683 (merged 2026-09-08, commit 03923185, same title as the issue); requirePositiveIntegerParam now guards the campaigns loaders so malformed ids 404. Sai's later comment is only a design nit on the 404 page styling, not a defect.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1708](https://github.com/chester-hill-solutions/callcaster/issues/1708) Leave a voicemail?
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-09-09
+- Voicemail-drop capability is largely shipped (campaign.voicemail_file, audiodrop route, auto-detection + dispose on VM, 'Voicemail Left' UI). Remaining asks are acceptance-style (play/pause, attach UI, smart drop) — a verification pass on dev, not new architecture.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1334](https://github.com/chester-hill-solutions/callcaster/issues/1334) Results numbers are off?
 - Verdict: **Verify and close** · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
@@ -549,15 +665,82 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 5
+## Needs reproduction — 16
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
+
+### [#1782](https://github.com/chester-hill-solutions/callcaster/issues/1782) Verify send-window boundary timing for voice campaigns on dev (#1351/#1352)
+- Verdict: **Needs reproduction** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-12
+- Recommended title: **Verify send-window boundary timing for voice campaigns on dev**
+- Fixes #1374/#1375 shipped; #1351/#1352 need one evidence-backed verification pass at window boundaries (waiting->running->waiting, no early complete).
+- Done when: Implement per ticket
+- Tracker: Filed 2026-09-12 from board triage.
+
+### [#1765](https://github.com/chester-hill-solutions/callcaster/issues/1765) Onboarding steps shouldn't have the credit warning after renting a number
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-11
+- The specific 'credit warning after renting' could not be located in the onboarding source; screenshot unverifiable here. Needs the step + exact warning text to pin the component.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1750](https://github.com/chester-hill-solutions/callcaster/issues/1750) Fix the existing sign-in page hydration mismatch
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-09
+- Confirmed symptom (React #418 args=[HTML] on every /signin load per the 4-case protocol) but root cause unproven. Fastest check: the pre-hydration theme script mutating <html> vs React 19 singleton hydration (issue itself hints at the theme bootstrap).
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1733](https://github.com/chester-hill-solutions/callcaster/issues/1733) IVR error
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
+- Generic catch-all IVR error with only a URL — no steps. Known IVR page-id bug #1348 was fixed via #1744; needs repro + logs to tell stale vs new cause.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1352](https://github.com/chester-hill-solutions/callcaster/issues/1352) Campaign window opens at 3:05 yet the singular contact got the message at 3:15
+- **IN PROGRESS** · Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
+- Fix #1374 (nextSendWindowOpenAt exact-boundary scheduling) shipped, but Sai 2026-09-09 gives a 12-step repro: window widened to 12:47 yet the message fired 1:12 — likely a periodic sweep floor or opt-in edge; same subsystem as 1351, verify together on dev.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1351](https://github.com/chester-hill-solutions/callcaster/issues/1351) SMS Window set to 3:05PM yet estimate says 3pm it'll be done
+- **IN PROGRESS** · Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
+- Fix #1375 (estimateOutboundCompletion, window-aware) shipped to dev, but Sai 2026-09-09 reports the estimate still tracks wall clock and suggests a cron-interval minimum; claim vs counter-claim needs an on-dev check before coding.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1719](https://github.com/chester-hill-solutions/callcaster/issues/1719) messages page should fit within VH
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-09-09
+- Visual layout complaint that cannot be verified from code; sidebar already uses min-h-0 flex-1 overflow so a screenshot/steps on dev are required to identify the overflow.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1718](https://github.com/chester-hill-solutions/callcaster/issues/1718) contact has opted out messager should be dynamic
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
+- Screenshot only, no repro or expected copy; generic opt-out banner is intentional per #1333 evidence. Needs the specific scenario before coding.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1714](https://github.com/chester-hill-solutions/callcaster/issues/1714) Get an error when inviting a user
+- **IN PROGRESS** · Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
+- Error matches the 'User not found' path; findUserIdByUsername resolves against the auth users table. The invited account was supposedly created first, so why the miss needs the exact error text and steps; review-env DB resets muddy evidence.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1671](https://github.com/chester-hill-solutions/callcaster/issues/1671) Campaign setup start and end set to 20:00:00 ? but also not adhered to at all
 - Verdict: **Needs reproduction** · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-09
 - A new report shows campaign date boundaries at 20:00 and says the boundaries are not enforced. This is separate from weekly calling-hours defaults, already shipped in #1590.
 - Resolution: Reproduce date-only serialization and display in the campaign timezone, then check dispatch against exact start/end instants before selecting a fix.
 - Look in: `app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx`, `app/lib/campaign-schedule-sync.server.ts`
+
+### [#1707](https://github.com/chester-hill-solutions/callcaster/issues/1707) Audo > Add Audio > Upload button doesn't have the on mouse hover
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
+- The Upload Audio submit is a standard primary Button that has hover:bg-primary/90, so the claimed missing hover cannot be confirmed from code; needs on-dev repro. May share the too-subtle-hover root cause with 1705, which the issue's investigation directive implies.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1698](https://github.com/chester-hill-solutions/callcaster/issues/1698) every keypress in the "Answer label" field in the script maker unfocuses the input
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-09
+- Focus loss on each keystroke in Answer label is reproduced but root cause unproven; candidates are the option row key with id regeneration on document round-trip (documentToScript) and block onFocusCapture wrappers. Issue explicitly demands a systemic component-level fix, so evidence-first.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1670](https://github.com/chester-hill-solutions/callcaster/issues/1670) phone number search is too string
 - Verdict: **Needs reproduction** · Labels: ux · Assignee: none · Updated: 2026-09-08
@@ -592,7 +775,7 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 58
+## Needs decision — 29
 
 Product, security, or operations decision required before implementation can be scoped.
 
@@ -633,75 +816,11 @@ Product, security, or operations decision required before implementation can be 
 - Done when: parsed preview before start; columns mappable; server validation still gates
 - Tracker: Scope with #1771 (can ship together or split).
 
-### [#1765](https://github.com/chester-hill-solutions/callcaster/issues/1765) Onboarding steps shouldn't have the credit warning after renting a number
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-11
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764) "Number" onboarding breadcrumbs missing address step
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-09-11
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
 ### [#1763](https://github.com/chester-hill-solutions/callcaster/issues/1763) "Number" onboarding sub breadcrumbs don't work
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-11
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1759](https://github.com/chester-hill-solutions/callcaster/issues/1759) Billing activity: group expansion and entry details break the table layout
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-11
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1757](https://github.com/chester-hill-solutions/callcaster/issues/1757) Billing: campaign usage rollup splits across pages — roll up then paginate
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-11
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1753](https://github.com/chester-hill-solutions/callcaster/issues/1753) Billing: activity screen truncates usage at 500 ledger rows — add pagination and full totals
-- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-10
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752) Standardize campaign completion exports (SMS report format)
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-10
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1748](https://github.com/chester-hill-solutions/callcaster/issues/1748) Connect shared form help and errors to their controls by default
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1750](https://github.com/chester-hill-solutions/callcaster/issues/1750) Fix the existing sign-in page hydration mismatch
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1745](https://github.com/chester-hill-solutions/callcaster/issues/1745) Make the onboarding review show actionable setup progress
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Verify path never advances past sub-step 2 (caller-ID sets no hasFirstNumber so numberStep stays 'verify' and crumb 3 is unreachable for caller-ID). What progression means on the verify path is a product decision; overlaps #1205 (already Fix now).
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1742](https://github.com/chester-hill-solutions/callcaster/issues/1742) IVR script editor: preview Speak (TTS) steps
 - Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-09
@@ -727,47 +846,23 @@ Product, security, or operations decision required before implementation can be 
 - Done when: campaign setup asks IVR once; no behavioural difference to lose
 - Tracker: Product decision first; storage/UI change after.
 
-### [#1739](https://github.com/chester-hill-solutions/callcaster/issues/1739) Workspace notification emails should mention the workspace name in the email
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
 ### [#1729](https://github.com/chester-hill-solutions/callcaster/issues/1729) Auto selected disposition
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727) Campaign List should be sorted
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Auto-disposition mapping needs a spec (which outcome → which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1732](https://github.com/chester-hill-solutions/callcaster/issues/1732) Campaign queue statuses
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1733](https://github.com/chester-hill-solutions/callcaster/issues/1733) IVR error
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Umbrella queue status-model redesign (completion vs outreach status; missing opted-out/dialing/failed states). Big product decision; 1720 is a subset.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728) IVR was marked as complete before the recipient actually received their dial
 - **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Campaign completes on queue drain (completeCampaignsDrainedByDequeue) while the dial fires async seconds later — behavior confirmed. What 'complete' means for IVR is a product decision that blocks the fix.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1726](https://github.com/chester-hill-solutions/callcaster/issues/1726) Contact search: allow creating a new contact from the bottom of the results list
 - Verdict: **Needs decision** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-09
@@ -781,208 +876,77 @@ Product, security, or operations decision required before implementation can be 
 - Done when: no-match search offers an Add row; created contact selectable in the same dialog
 - Tracker: Confirm scope (queue builder vs chat) then implement.
 
-### [#1352](https://github.com/chester-hill-solutions/callcaster/issues/1352) Campaign window opens at 3:05 yet the singular contact got the message at 3:15
-- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
 ### [#1722](https://github.com/chester-hill-solutions/callcaster/issues/1722) What does "kick off" on campaign launch pane do
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- 'Kick off' button (running/paused) has no explanation and Sai 2026-09-09 confirms confusion; product decides label/tooltip/placement.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1725](https://github.com/chester-hill-solutions/callcaster/issues/1725) should template tags allow for no closing bracket? the preview renderer and the parser seems to think so
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: question · Assignee: @wra-sol · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Parser tolerance of missing braces is intentional legacy support (single-brace bodies) — product decides whether to keep it or lint strict double-brace tags.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1724](https://github.com/chester-hill-solutions/callcaster/issues/1724) What happens if we use template tags on a contact that doesn't have that piece of information?
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: question · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Current behavior: missing contact fields render empty string or the fallback (code answers the question). Product decides the desired UX (placeholder/flagging).
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1723](https://github.com/chester-hill-solutions/callcaster/issues/1723) template tags should let you click the contact name it's rendering for and open a combo box to use someone else
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1351](https://github.com/chester-hill-solutions/callcaster/issues/1351) SMS Window set to 3:05PM yet estimate says 3pm it'll be done
-- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1720](https://github.com/chester-hill-solutions/callcaster/issues/1720) Contacts that have opted out should be marked as such in the queue instead of completed
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1719](https://github.com/chester-hill-solutions/callcaster/issues/1719) messages page should fit within VH
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1718](https://github.com/chester-hill-solutions/callcaster/issues/1718) contact has opted out messager should be dynamic
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Feature request (template-tag → contact picker) whose scope depends on the tag UX decisions in 1724/1725; product decision first.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1717](https://github.com/chester-hill-solutions/callcaster/issues/1717) Page not found should take you to workspace not home
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1682](https://github.com/chester-hill-solutions/callcaster/issues/1682) Campaign URLs with a non-numeric id show "Unexpected Server Error" instead of Page not found
-- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1716](https://github.com/chester-hill-solutions/callcaster/issues/1716) workspace drop down shouldn't move
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1715](https://github.com/chester-hill-solutions/callcaster/issues/1715) Profile drop down changes
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1714](https://github.com/chester-hill-solutions/callcaster/issues/1714) Get an error when inviting a user
-- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- 404 'Go back' is context-free history.back(); issue proposes URL-shape-dependent targets. Behavior policy decision first, then a small change.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1713](https://github.com/chester-hill-solutions/callcaster/issues/1713) Needing a user to have an account before invite makes no sense.
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Requiring an existing user before invite is documented current design ('They must sign up before being invited'); email delivery TBD in module comment. Pre-account (email-first) invites are a feature decision plus auth/email work.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1710](https://github.com/chester-hill-solutions/callcaster/issues/1710) Should surveys be separate from scripts instead of integrated?
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Architecture question whether surveys should merge into scripts. Surveys exist as a separate module with public & workspace routes; consolidation scope needs a decision.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1709](https://github.com/chester-hill-solutions/callcaster/issues/1709) Workspace Sidebar
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1708](https://github.com/chester-hill-solutions/callcaster/issues/1708) Leave a voicemail?
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1707](https://github.com/chester-hill-solutions/callcaster/issues/1707) Audo > Add Audio > Upload button doesn't have the on mouse hover
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Major UX redesign of the workspace/campaign sidebar; interaction model (per-campaign sidebar with status/completion/quick controls) needs a product decision before scoping.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1705](https://github.com/chester-hill-solutions/callcaster/issues/1705) Primary button hover darkening isn't strong enough. should be a bit darker
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1704](https://github.com/chester-hill-solutions/callcaster/issues/1704) Shouldn't allow scripts with same name
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1703](https://github.com/chester-hill-solutions/callcaster/issues/1703) IVR Script: Remove response for IVR script should be a trash can icon in line with the fields on the right
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702) IVR Script: Answer label description should be in an on hover tool tip after "Answer Label" not underneath the field
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1701](https://github.com/chester-hill-solutions/callcaster/issues/1701) IVR Script: Upload Audio button should be closer to the select a recording option since they are options of the same choice: "What audio do you want to use"
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Default primary hover is hover:bg-primary/90 (shad-cc); the exact darker token/shade is a design-system decision the issue does not specify.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1700](https://github.com/chester-hill-solutions/callcaster/issues/1700) Why have a distinction between recording step and spoken step if you can also change "Speak text" to "play a recording"
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Proposal to collapse Speak/recording block types into one 'Add block'. The editor already treats them as one block with a playback-mode toggle, so the change is a product/scope decision.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1699](https://github.com/chester-hill-solutions/callcaster/issues/1699) IVR script refers to the recipient as the "caller" in "caller response"
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1698](https://github.com/chester-hill-solutions/callcaster/issues/1698) every keypress in the "Answer label" field in the script maker unfocuses the input
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1697](https://github.com/chester-hill-solutions/callcaster/issues/1697) Overwrite PR #1686 and add workflow to properly set project status
 - **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
-
-### [#1696](https://github.com/chester-hill-solutions/callcaster/issues/1696) Audio preview in IVR script shows 0:00 until you hit play
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Unevaluated — triage required (no audit record yet).
-- Resolution: Triage: read the issue, decide lane and resolution path.
-- Done when: lane + resolution decided
-- Tracker: Triage sweep.
+- PR #1686 already merged (2026-09-09) and working (on-dev label + 'On dev: merged in' comments). Remaining is how the project status should be set (needs ON_DEV_PROJECT_NUMBER/PROJECT_TOKEN config) and whether to keep the label behaviour — ops/product decision, not code.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1659](https://github.com/chester-hill-solutions/callcaster/issues/1659) Admin: Twilio cost breakdown per workspace/account
 - Verdict: **Needs decision** · Labels: none · Assignee: none · Updated: 2026-09-08
@@ -1050,9 +1014,15 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 12
+## Blocked / split first — 13
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
+
+### [#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752) Standardize campaign completion exports (SMS report format)
+- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-10
+- Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket — split PDF pipeline, CSV, and aggregation layers first.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1329](https://github.com/chester-hill-solutions/callcaster/issues/1329) Twilio environment program - consolidated roadmap (IaC controller, accounts, cost, testing)
 - Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: enhancement, devops/admin · Assignee: none · Updated: 2026-09-09
@@ -1187,9 +1157,15 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 
 ---
 
-## Duplicates — 1
+## Duplicates — 2
 
 Same root cause as the linked canonical issue. Do not implement separately — fold scope in and close.
+
+### [#1720](https://github.com/chester-hill-solutions/callcaster/issues/1720) Contacts that have opted out should be marked as such in the queue instead of completed
+- Verdict: **Duplicates** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
+- Same root cause as 1732: queue_status enum only has queued/dequeued and opted-out entries display as 'completed'. 1732's outreach-status model is the canonical ticket; 1720 is one of its observable symptoms.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1193](https://github.com/chester-hill-solutions/callcaster/issues/1193) Test a campaign with controlled recipients
 - Verdict: **Duplicates** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-08-08

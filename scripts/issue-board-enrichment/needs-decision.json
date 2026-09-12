@@ -208,726 +208,6 @@
     "trackerRecommendation": "Confirm provider (Polly vs ElevenLabs) then implement."
   },
   {
-    "issueNumber": 1765,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Onboarding steps shouldn't have the credit warning after renting a number",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1764,
-    "verdict": "needs-decision",
-    "recommendedTitle": "\"Number\" onboarding breadcrumbs missing address step",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1763,
-    "verdict": "needs-decision",
-    "recommendedTitle": "\"Number\" onboarding sub breadcrumbs don't work",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1759,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Billing activity: group expansion and entry details break the table layout",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1757,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Billing: campaign usage rollup splits across pages — roll up then paginate",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1753,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Billing: activity screen truncates usage at 500 ledger rows — add pagination and full totals",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1752,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Standardize campaign completion exports (SMS report format)",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1748,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Connect shared form help and errors to their controls by default",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1750,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Fix the existing sign-in page hydration mismatch",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1745,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Make the onboarding review show actionable setup progress",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1739,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Workspace notification emails should mention the workspace name in the email",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1729,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Auto selected disposition",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1727,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Campaign List should be sorted",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1732,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Campaign queue statuses",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1733,
-    "verdict": "needs-decision",
-    "recommendedTitle": "IVR error",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1728,
-    "verdict": "needs-decision",
-    "recommendedTitle": "IVR was marked as complete before the recipient actually received their dial",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1352,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Campaign window opens at 3:05 yet the singular contact got the message at 3:15",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1722,
-    "verdict": "needs-decision",
-    "recommendedTitle": "What does \"kick off\" on campaign launch pane do",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1725,
-    "verdict": "needs-decision",
-    "recommendedTitle": "should template tags allow for no closing bracket? the preview renderer and the parser seems to think so",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1724,
-    "verdict": "needs-decision",
-    "recommendedTitle": "What happens if we use template tags on a contact that doesn't have that piece of information?",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1723,
-    "verdict": "needs-decision",
-    "recommendedTitle": "template tags should let you click the contact name it's rendering for and open a combo box to use someone else",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1351,
-    "verdict": "needs-decision",
-    "recommendedTitle": "SMS Window set to 3:05PM yet estimate says 3pm it'll be done",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1720,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Contacts that have opted out should be marked as such in the queue instead of completed",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1719,
-    "verdict": "needs-decision",
-    "recommendedTitle": "messages page should fit within VH",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1718,
-    "verdict": "needs-decision",
-    "recommendedTitle": "contact has opted out messager should be dynamic",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1717,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Page not found should take you to workspace not home",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1682,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Campaign URLs with a non-numeric id show \"Unexpected Server Error\" instead of Page not found",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1716,
-    "verdict": "needs-decision",
-    "recommendedTitle": "workspace drop down shouldn't move",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1715,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Profile drop down changes",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1714,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Get an error when inviting a user",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1713,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Needing a user to have an account before invite makes no sense.",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1710,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Should surveys be separate from scripts instead of integrated?",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1709,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Workspace Sidebar",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1708,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Leave a voicemail?",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1707,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Audo > Add Audio > Upload button doesn't have the on mouse hover",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1705,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Primary button hover darkening isn't strong enough. should be a bit darker",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1704,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Shouldn't allow scripts with same name",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1703,
-    "verdict": "needs-decision",
-    "recommendedTitle": "IVR Script: Remove response for IVR script should be a trash can icon in line with the fields on the right",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1702,
-    "verdict": "needs-decision",
-    "recommendedTitle": "IVR Script: Answer label description should be in an on hover tool tip after \"Answer Label\" not underneath the field",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1701,
-    "verdict": "needs-decision",
-    "recommendedTitle": "IVR Script: Upload Audio button should be closer to the select a recording option since they are options of the same choice: \"What audio do you want to use\"",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1700,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Why have a distinction between recording step and spoken step if you can also change \"Speak text\" to \"play a recording\"",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1699,
-    "verdict": "needs-decision",
-    "recommendedTitle": "IVR script refers to the recipient as the \"caller\" in \"caller response\"",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1698,
-    "verdict": "needs-decision",
-    "recommendedTitle": "every keypress in the \"Answer label\" field in the script maker unfocuses the input",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1697,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Overwrite PR #1686 and add workflow to properly set project status",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
-    "issueNumber": 1696,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Audio preview in IVR script shows 0:00 until you hit play",
-    "summary": "Unevaluated — triage required (no audit record yet).",
-    "resolution": "Triage: read the issue, decide lane and resolution path.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "lane + resolution decided"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Triage sweep."
-  },
-  {
     "issueNumber": 1770,
     "verdict": "needs-decision",
     "recommendedTitle": "feature(audience): client-side preview + column-mapping step (gocanvass parity)",
@@ -1013,5 +293,229 @@
     "size": "L",
     "risk": "medium",
     "trackerRecommendation": "Phase-1: core tables; document coverage in the manifest format."
+  },
+  {
+    "issueNumber": 1697,
+    "verdict": "needs-decision",
+    "summary": "PR #1686 already merged (2026-09-09) and working (on-dev label + 'On dev: merged in' comments). Remaining is how the project status should be set (needs ON_DEV_PROJECT_NUMBER/PROJECT_TOKEN config) and whether to keep the label behaviour — ops/product decision, not code.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1699,
+    "verdict": "needs-decision",
+    "summary": "Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1700,
+    "verdict": "needs-decision",
+    "summary": "Proposal to collapse Speak/recording block types into one 'Add block'. The editor already treats them as one block with a playback-mode toggle, so the change is a product/scope decision.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1705,
+    "verdict": "needs-decision",
+    "summary": "Default primary hover is hover:bg-primary/90 (shad-cc); the exact darker token/shade is a design-system decision the issue does not specify.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1709,
+    "verdict": "needs-decision",
+    "summary": "Major UX redesign of the workspace/campaign sidebar; interaction model (per-campaign sidebar with status/completion/quick controls) needs a product decision before scoping.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1710,
+    "verdict": "needs-decision",
+    "summary": "Architecture question whether surveys should merge into scripts. Surveys exist as a separate module with public & workspace routes; consolidation scope needs a decision.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1713,
+    "verdict": "needs-decision",
+    "summary": "Requiring an existing user before invite is documented current design ('They must sign up before being invited'); email delivery TBD in module comment. Pre-account (email-first) invites are a feature decision plus auth/email work.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1717,
+    "verdict": "needs-decision",
+    "summary": "404 'Go back' is context-free history.back(); issue proposes URL-shape-dependent targets. Behavior policy decision first, then a small change.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1722,
+    "verdict": "needs-decision",
+    "summary": "'Kick off' button (running/paused) has no explanation and Sai 2026-09-09 confirms confusion; product decides label/tooltip/placement.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1723,
+    "verdict": "needs-decision",
+    "summary": "Feature request (template-tag → contact picker) whose scope depends on the tag UX decisions in 1724/1725; product decision first.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1724,
+    "verdict": "needs-decision",
+    "summary": "Current behavior: missing contact fields render empty string or the fallback (code answers the question). Product decides the desired UX (placeholder/flagging).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1725,
+    "verdict": "needs-decision",
+    "summary": "Parser tolerance of missing braces is intentional legacy support (single-brace bodies) — product decides whether to keep it or lint strict double-brace tags.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1728,
+    "verdict": "needs-decision",
+    "summary": "Campaign completes on queue drain (completeCampaignsDrainedByDequeue) while the dial fires async seconds later — behavior confirmed. What 'complete' means for IVR is a product decision that blocks the fix.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1729,
+    "verdict": "needs-decision",
+    "summary": "Auto-disposition mapping needs a spec (which outcome → which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1732,
+    "verdict": "needs-decision",
+    "summary": "Umbrella queue status-model redesign (completion vs outreach status; missing opted-out/dialing/failed states). Big product decision; 1720 is a subset.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1763,
+    "verdict": "needs-decision",
+    "summary": "Verify path never advances past sub-step 2 (caller-ID sets no hasFirstNumber so numberStep stays 'verify' and crumb 3 is unreachable for caller-ID). What progression means on the verify path is a product decision; overlaps #1205 (already Fix now).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   }
 ]
