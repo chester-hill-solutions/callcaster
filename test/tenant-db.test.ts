@@ -290,7 +290,8 @@ describe("createTenantDb — write auto-scoping", () => {
     const { captured } = hoisted;
     const tdb = createTenantDb(WORKSPACE_ID);
     await tdb.campaign.insert({ title: "GOTV", status: "draft" } as never);
-    const last = captured.insert.at(-1)!;
+    const last = captured.insert.at(-1);
+if (last == null) throw new Error("expected captured row");
     expect((last.values as Record<string, unknown>).workspace).toBe(WORKSPACE_ID);
     expect((last.values as Record<string, unknown>).title).toBe("GOTV");
   });
@@ -299,7 +300,8 @@ describe("createTenantDb — write auto-scoping", () => {
     const { captured } = hoisted;
     const tdb = createTenantDb(WORKSPACE_ID);
     await tdb.inbound_queue.insert({ name: "Main" } as never);
-    const last = captured.insert.at(-1)!;
+    const last = captured.insert.at(-1);
+if (last == null) throw new Error("expected captured row");
     expect((last.values as Record<string, unknown>).workspace_id).toBe(WORKSPACE_ID);
   });
 
@@ -317,7 +319,8 @@ describe("createTenantDb — write auto-scoping", () => {
     const tdb = createTenantDb(WORKSPACE_ID);
     const userWhere = sql`c.id = 9`;
     await tdb.campaign.update({ set: { status: "paused" } as never, where: userWhere });
-    const last = captured.update.at(-1)!;
+    const last = captured.update.at(-1);
+if (last == null) throw new Error("expected captured row");
     expect(isSQL(last.where)).toBe(true);
     expect(chunksContain(last.where, userWhere), "update where contains user clause").toBe(true);
     expect((last.set as Record<string, unknown>).status).toBe("paused");
@@ -327,7 +330,8 @@ describe("createTenantDb — write auto-scoping", () => {
     const { captured } = hoisted;
     const tdb = createTenantDb(WORKSPACE_ID);
     await tdb.campaign.update({ set: { status: "archived" } as never });
-    const last = captured.update.at(-1)!;
+    const last = captured.update.at(-1);
+if (last == null) throw new Error("expected captured row");
     expect(isSQL(last.where), "update with no where still gets workspace filter").toBe(true);
   });
 
@@ -358,7 +362,8 @@ describe("createTenantDb — write auto-scoping", () => {
     const tdb = createTenantDb(WORKSPACE_ID);
     const userWhere = sql`c.id = 3`;
     await tdb.campaign.delete({ where: userWhere });
-    const last = captured.delete.at(-1)!;
+    const last = captured.delete.at(-1);
+if (last == null) throw new Error("expected captured row");
     expect(isSQL(last.where)).toBe(true);
     expect(chunksContain(last.where, userWhere)).toBe(true);
   });
@@ -367,7 +372,8 @@ describe("createTenantDb — write auto-scoping", () => {
     const { captured } = hoisted;
     const tdb = createTenantDb(WORKSPACE_ID);
     const n = await tdb.campaign.count();
-    const last = captured.select.at(-1)!;
+    const last = captured.select.at(-1);
+if (last == null) throw new Error("expected captured row");
     expect(isSQL(last.where)).toBe(true);
     expect(n).toBe(7);
   });
