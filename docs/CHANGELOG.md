@@ -7,6 +7,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Security
 
 - Updated the Nano ID dependency to remove affected 3.x versions from both installation lockfiles ([#1805](https://github.com/chester-hill-solutions/callcaster/issues/1805)).
+- Updated query serialization dependencies to prevent known input handling failures ([#1809](https://github.com/chester-hill-solutions/callcaster/issues/1809)).
 
 ### Fixed
 
