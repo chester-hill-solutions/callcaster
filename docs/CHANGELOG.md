@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Contact search lets you create a missing contact from the bottom of the results list — no dead-end searches ([#1726](https://github.com/chester-hill-solutions/callcaster/issues/1726)).
 - MFA enrollment polish: the status shows as a top-right badge, the password step advances with a right-aligned "Next" action, the secret and backup codes get copy buttons (with a success checkmark), backup codes carry a secure-storage prompt, and verification errors use consistent themed padding ([#1316](https://github.com/chester-hill-solutions/callcaster/issues/1316)).
 - Toasts now use consistent spacing defaults (vertical padding + row gap) app-wide, fixing cramped bottom spacing around upload errors ([#1668](https://github.com/chester-hill-solutions/callcaster/issues/1668)).
 - Upload success toasts keep the audio file name on a single inline line ([#1667](https://github.com/chester-hill-solutions/callcaster/issues/1667)).
