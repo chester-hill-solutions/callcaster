@@ -1,0 +1,62 @@
+[
+  {
+    "task": "check:route-server-leaks",
+    "exit": 0,
+    "output": "\n> check:route-server-leaks\n> node scripts/check-route-server-leaks.mjs\n\nRoute server leak check passed.\n"
+  },
+  {
+    "task": "check:twilio-webhooks",
+    "exit": 0,
+    "output": "\n> check:twilio-webhooks\n> node scripts/check-twilio-webhook-coverage.mjs\n\nTwilio webhook routes scanned: 26\nDerived from api-surface registry: 26 entries\nconnect-campaign-conference loader validated: yes\n\nWARNING: 2 route(s) validate Twilio signatures but are not registered as authClass \"twilioSignature\":\n  - twilio/a2p/events.action.server.ts (still validated)\n  - twilio/trusthub/status.action.server.ts (still validated)\nAll inventoried Twilio webhook routes include signature or auth validation.\n"
+  },
+  {
+    "task": "check:request-body-consumption",
+    "exit": 0,
+    "output": "\n> check:request-body-consumption\n> node scripts/check-request-body-consumption.mjs\n\nRequest body-consumption guard passed.\n"
+  },
+  {
+    "task": "check:middleware",
+    "exit": 0,
+    "output": "\n> check:middleware\n> node scripts/check-middleware-adoption.mjs\n\nMiddleware adoption check passed.\n"
+  },
+  {
+    "task": "check:credit-writes",
+    "exit": 0,
+    "output": "\n> check:credit-writes\n> node scripts/check-credit-write-paths.mjs\n\nCredit write path check passed.\n"
+  },
+  {
+    "task": "check:route-authz",
+    "exit": 0,
+    "output": "\n> check:route-authz\n> node scripts/check-route-authz.mjs\n\nRoute authz check passed: every workspace write action gates on role (3 caller-open by design).\n"
+  },
+  {
+    "task": "check:workspace-projection",
+    "exit": 0,
+    "output": "\n> check:workspace-projection\n> node scripts/check-workspace-projection.mjs\n\nWorkspace projection check passed.\n"
+  },
+  {
+    "task": "check:relative-redirects",
+    "exit": 0,
+    "output": "\n> check:relative-redirects\n> node scripts/check-relative-redirects.mjs\n\nRelative-redirect gate passed: 0 allowed at baseline.\n"
+  },
+  {
+    "task": "check:queue-rpc-contract",
+    "exit": 0,
+    "output": "\n> check:queue-rpc-contract\n> node scripts/check-queue-rpc-contract.mjs\n\ncheck-queue-rpc-contract: 23 campaign_queue RPC(s) against 5 QueueEntry transition(s).\n  lifecycle column vocabulary: assigned_to_user_id, dequeued_at, dequeued_by, dequeued_reason, provider_status, queue_state\n  checked (a)+(b)+(c): 16   partial: 7\n\n  per-RPC coverage —\n    (a+b) claim_queue_entry_for_dial  — queue_state is computed, not a literal — no single target state to check coverage against\n    (a+b) create_outreach_attempt  — writes campaign_queue but never queue_state\n    (b) get_basic_results  — reads campaign_queue only\n    (b) get_campaign_messages  — reads campaign_queue only\n    (b) get_campaign_messages_count  — reads campaign_queue only\n    (b) get_campaign_stats  — reads campaign_queue only\n    (b) get_conversation_summary_by_campaign  — reads campaign_queue only\n  known drift carried in the baseline: 5\ncheck-queue-rpc-contract: no new drift.\n"
+  },
+  {
+    "task": "check:db-rpcs",
+    "exit": 0,
+    "output": "\n> check:db-rpcs\n> node scripts/check-db-rpcs.mjs\n\ncheck-db-rpcs: 33 app-invoked database function(s), all created by migrations.\n"
+  },
+  {
+    "task": "check:dual-auth",
+    "exit": 0,
+    "output": "\n> check:dual-auth\n> node scripts/check-dual-auth-exposure.mjs\n\nDual-auth exposure check passed: 16 route(s) using requireDualAuth all handle API-key callers.\n"
+  },
+  {
+    "task": "check:route-membership",
+    "exit": 0,
+    "output": "\n> check:route-membership\n> node scripts/check-route-membership.mjs\n\nRoute membership check passed: 164 tenant-data route(s), all prove membership.\n"
+  }
+]

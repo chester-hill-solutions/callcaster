@@ -264,5 +264,81 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Filed 2026-09-12 from board triage."
+  },
+  {
+    "issueNumber": 1788,
+    "verdict": "fix-now",
+    "summary": "SMS exports can list the same contact as delivered and skipped. This makes skip totals and contact outcomes incorrect.",
+    "resolution": "Filter synthetic skip rows by queue outcome or send evidence; preserve genuine opt-out, landline, and duplicate skips.",
+    "lookIn": ["app/lib/campaign-export.server.ts", "app/lib/campaign-queue-db.server.ts"],
+    "missingTests": ["sent message plus its successfully dequeued queue entry"],
+    "risk": "medium",
+    "trackerRecommendation": "2026-09-12 scan. See the issue for reproduction and source links. Keep each fix in its own PR.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1789,
+    "verdict": "fix-now",
+    "summary": "The CSV credits_used column does not match the current voice rate card. It can also claim a charge for an attempt with no connected call.",
+    "resolution": "Define actual versus estimated credits; use the ledger or shared voice billing rate with a zero-duration gate.",
+    "lookIn": ["app/lib/campaign-export.server.ts", "shared/pricing.ts"],
+    "missingTests": ["90-second IVR and staffed calls", "zero-duration and absent calls"],
+    "risk": "medium",
+    "trackerRecommendation": "2026-09-12 scan. See the issue for reproduction and source links. Keep each fix in its own PR.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1790,
+    "verdict": "fix-now",
+    "summary": "Valid IVR campaign types cannot be exported through the campaign export endpoint.",
+    "resolution": "Use the supported voice campaign-type predicate across the legacy action, workspace API, and durable handler.",
+    "lookIn": ["app/routes/api+/campaign-export.action.server.ts", "app/lib/platform-analytics.server.ts", "app/lib/worker/handlers/campaign.server.ts"],
+    "missingTests": ["simple_ivr export", "complex_ivr export"],
+    "risk": "medium",
+    "trackerRecommendation": "2026-09-12 scan. See the issue for reproduction and source links. Keep each fix in its own PR.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1791,
+    "verdict": "fix-now",
+    "summary": "New SMS requests can start after the configured send window has closed.",
+    "resolution": "Recheck the campaign send window immediately before each outbound request; keep deferred rows queued.",
+    "lookIn": ["app/lib/campaign-sms-dispatch.server.ts"],
+    "missingTests": ["paced batch crosses the closing boundary"],
+    "risk": "high",
+    "trackerRecommendation": "2026-09-12 scan. See the issue for reproduction and source links. Keep each fix in its own PR.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1792,
+    "verdict": "fix-now",
+    "summary": "The SMS sender can exceed the configured message-start rate.",
+    "resolution": "Preserve the next allowed send-start time across all batches in a dispatch call.",
+    "lookIn": ["app/lib/campaign-sms-dispatch.server.ts"],
+    "missingTests": ["one-MPS one-row batch boundaries", "multi-row batch boundaries"],
+    "risk": "high",
+    "trackerRecommendation": "2026-09-12 scan. See the issue for reproduction and source links. Keep each fix in its own PR.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1794,
+    "verdict": "fix-now",
+    "summary": "A schedule sweep can change a paused or completed campaign back to running after a concurrent status change.",
+    "resolution": "Apply a conditional status update; preserve a concurrent pause or completion and emit only a successful transition.",
+    "lookIn": ["app/lib/campaign-schedule-sync.server.ts", "app/lib/campaign-ivr.server.ts"],
+    "missingTests": ["database interleaving: pause or completion after candidate selection"],
+    "risk": "high",
+    "trackerRecommendation": "2026-09-12 scan. See the issue for reproduction and source links. Keep each fix in its own PR.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1782,
+    "verdict": "fix-now",
+    "summary": "Local worker test sets a waiting IVR successor to 14:15 when its window opens at 14:05.",
+    "resolution": "Schedule the next voice wake at the window boundary while preserving schedule-sweep ownership; deployed verification remains pending.",
+    "lookIn": ["app/lib/worker/handlers/campaign.server.ts", "app/lib/campaign-schedule-sync.server.ts"],
+    "missingTests": ["voice next-open instant", "sweep and dispatch order at the window boundary"],
+    "trackerRecommendation": "Local evidence added on 2026-09-12; deployed verification remains pending.",
+    "blockedBy": []
   }
 ]

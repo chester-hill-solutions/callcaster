@@ -1,0 +1,165 @@
+
+ RUN  v4.1.10 /Users/ladmin/WebProjects/callcaster
+
+stdout | test/scan-audit-dispatch.test.ts > SCAN: missed dispatch boundaries > SCAN: stops new sends when the window closes during a paced batch
+SCAN boundary {"sendTimes":["2026-09-09T20:59:59.750Z","2026-09-09T21:00:00.250Z"],"result":{"kind":"dispatched","responses":[{"30":{"success":true,"message":{"sid":"SM1","body":"Hello One","to":"+15551110001","statusCallback":"https://app.example/api/sms/status","from":"+15550000000"},"persisted":true}},{"31":{"success":true,"message":{"sid":"SM2","body":"Hello Two","to":"+15551110002","statusCallback":"https://app.example/api/sms/status","from":"+15550000000"},"persisted":true}}],"counts":{"sent":2,"failed":0,"dequeued":0,"deferred":0,"unaffordable":0,"exhausted":0},"queuedRemaining":0,"creditsExhausted":false}}
+
+stdout | test/scan-audit-dispatch.test.ts > SCAN: missed dispatch boundaries > SCAN: an eligible row behind a deferred head must receive a turn
+SCAN starvation [{"kind":"dispatched","responses":[{"30":{"success":true,"skipped":true,"deferred":true,"reason":"Outside recipient quiet-hours window"}}],"counts":{"sent":0,"failed":0,"dequeued":0,"deferred":1,"unaffordable":0,"exhausted":0},"queuedRemaining":2,"creditsExhausted":false},{"kind":"dispatched","responses":[{"30":{"success":true,"skipped":true,"deferred":true,"reason":"Outside recipient quiet-hours window"}}],"counts":{"sent":0,"failed":0,"dequeued":0,"deferred":1,"unaffordable":0,"exhausted":0},"queuedRemaining":2,"creditsExhausted":false}]
+
+stdout | test/scan-audit-dispatch.test.ts > SCAN: missed dispatch boundaries > SCAN: a one-MPS target spaces sends across one-row batch boundaries
+SCAN one-MPS gaps 0
+
+ ❯ |node| test/scan-audit-dispatch.test.ts (18 tests | 3 failed | 15 skipped) 511ms
+     × SCAN: stops new sends when the window closes during a paced batch 505ms
+     × SCAN: an eligible row behind a deferred head must receive a turn 3ms
+     × SCAN: a one-MPS target spaces sends across one-row batch boundaries 3ms
+stdout | test/scan-audit-worker.test.ts > SCAN: voice successor reaches a window five minutes away
+SCAN voice wake 2026-09-09T14:15:00.000Z
+
+ ❯ |node| test/scan-audit-worker.test.ts (38 tests | 1 failed | 37 skipped) 8ms
+   × SCAN: voice successor reaches a window five minutes away 7ms
+stdout | test/scan-audit-export.test.ts > api.campaign-export CSV contract checks > SCAN: a sent contact must not get a second skipped export row
+SCAN sent CSV body,direction,status,error_code,error_message,line_type,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date,dequeued_reason
+hello,outbound-api,delivered,,,,2026-01-01T00:00:00.000Z,1,'=1+1,Smith,+15555550101,a@example.com,1 Main St,Town,false,2026-01-01T00:00:00.000Z,w1,,,,,,,15555550101,TestCampaign,2026-01-01T00:00:00.000Z,2026-01-02T00:00:00.000Z,
+,,skipped,,,,,1,'=1+1,Smith,+15555550101,a@example.com,1 Main St,Town,false,2026-01-01T00:00:00.000Z,w1,,,,,,,15555550101,TestCampaign,2026-01-01T00:00:00.000Z,2026-01-02T00:00:00.000Z,SMS message sent
+
+
+stdout | test/scan-audit-export.test.ts > api.campaign-export CSV contract checks > SCAN: IVR export credits must match the shared rate for a 90-second call
+SCAN voice credits 2
+
+stdout | test/scan-audit-export.test.ts > api.campaign-export CSV contract checks > SCAN: simple_ivr campaign export is supported
+SCAN IVR export simple_ivr 400
+
+stdout | test/scan-audit-export.test.ts > api.campaign-export CSV contract checks > SCAN: complex_ivr campaign export is supported
+SCAN IVR export complex_ivr 400
+
+ ❯ |node| test/scan-audit-export.test.ts (7 tests | 4 failed | 3 skipped) 785ms
+     × SCAN: a sent contact must not get a second skipped export row 409ms
+     × SCAN: IVR export credits must match the shared rate for a 90-second call 2ms
+     × SCAN: simple_ivr campaign export is supported 373ms
+     × SCAN: complex_ivr campaign export is supported 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |node| test/scan-audit-dispatch.test.ts > SCAN: missed dispatch boundaries > SCAN: stops new sends when the window closes during a paced batch
+AssertionError: expected [ '2026-09-09T20:59:59.750Z', …(1) ] to deeply equal [ '2026-09-09T20:59:59.750Z' ]
+
+- Expected
++ Received
+
+  [
+    "2026-09-09T20:59:59.750Z",
++   "2026-09-09T21:00:00.250Z",
+  ]
+
+ ❯ test/scan-audit-dispatch.test.ts:705:25
+    703|       const result = await running;
+    704|       console.log("SCAN boundary", JSON.stringify({sendTimes, result})…
+    705|       expect(sendTimes).toEqual(["2026-09-09T20:59:59.750Z"]);
+       |                         ^
+    706|     } finally { vi.useRealTimers(); }
+    707|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  |node| test/scan-audit-dispatch.test.ts > SCAN: missed dispatch boundaries > SCAN: an eligible row behind a deferred head must receive a turn
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ test/scan-audit-dispatch.test.ts:720:44
+    718|     for (let i=0;i<2;i++) outcomes.push(await dispatchCampaignSmsBatch…
+    719|     console.log("SCAN starvation", JSON.stringify(outcomes));
+    720|     expect(mocks.rpcCreateOutreachAttempt).toHaveBeenCalledTimes(1);
+       |                                            ^
+    721|   });
+    722|   test("SCAN: a one-MPS target spaces sends across one-row batch bound…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  |node| test/scan-audit-dispatch.test.ts > SCAN: missed dispatch boundaries > SCAN: a one-MPS target spaces sends across one-row batch boundaries
+AssertionError: expected 0 to be greater than or equal to 1000
+ ❯ test/scan-audit-dispatch.test.ts:735:41
+    733|       await vi.advanceTimersByTimeAsync(2000); await running;
+    734|       console.log("SCAN one-MPS gaps", sendTimes[1]-sendTimes[0]);
+    735|       expect(sendTimes[1]-sendTimes[0]).toBeGreaterThanOrEqual(1000);
+       |                                         ^
+    736|     } finally {vi.useRealTimers();}
+    737|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  |node| test/scan-audit-export.test.ts > api.campaign-export CSV contract checks > SCAN: a sent contact must not get a second skipped export row
+AssertionError: expected 'body,direction,status,error_code,erro…' not to contain ',skipped,'
+
+- Expected
++ Received
+
+- ,skipped,
++ body,direction,status,error_code,error_message,line_type,message_date,id,firstname,surname,phone,email,address,city,opt_out,created_at,workspace,external_id,address_id,postal,carrier,province,country,contact_phone,campaign_name,campaign_start_date,campaign_end_date,dequeued_reason
++ hello,outbound-api,delivered,,,,2026-01-01T00:00:00.000Z,1,'=1+1,Smith,+15555550101,a@example.com,1 Main St,Town,false,2026-01-01T00:00:00.000Z,w1,,,,,,,15555550101,TestCampaign,2026-01-01T00:00:00.000Z,2026-01-02T00:00:00.000Z,
++ ,,skipped,,,,,1,'=1+1,Smith,+15555550101,a@example.com,1 Main St,Town,false,2026-01-01T00:00:00.000Z,w1,,,,,,,15555550101,TestCampaign,2026-01-01T00:00:00.000Z,2026-01-02T00:00:00.000Z,SMS message sent
++
+
+ ❯ test/scan-audit-export.test.ts:368:27
+    366|     const csv = objectStorageUploads.find(u => u.path.endsWith(".csv")…
+    367|     console.log("SCAN sent CSV", csv?.text);
+    368|     expect(csv?.text).not.toContain(",skipped,");
+       |                           ^
+    369|   });
+    370|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  |node| test/scan-audit-export.test.ts > api.campaign-export CSV contract checks > SCAN: IVR export credits must match the shared rate for a 90-second call
+AssertionError: expected '2' to be '5' // Object.is equality
+
+Expected: "5"
+Received: "2"
+
+ ❯ test/scan-audit-export.test.ts:382:40
+    380|     const index = lines[0].split(",").indexOf("credits_used");
+    381|     console.log("SCAN voice credits", lines[1].split(",")[index]);
+    382|     expect(lines[1].split(",")[index]).toBe("5");
+       |                                        ^
+    383|   });
+    384|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  |node| test/scan-audit-export.test.ts > api.campaign-export CSV contract checks > SCAN: simple_ivr campaign export is supported
+ FAIL  |node| test/scan-audit-export.test.ts > api.campaign-export CSV contract checks > SCAN: complex_ivr campaign export is supported
+AssertionError: expected 400 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 400
+
+ ❯ test/scan-audit-export.test.ts:391:24
+    389|     const res = await asRouteResponse(mod.action({request: new Request…
+    390|     console.log("SCAN IVR export", type, res.status);
+    391|     expect(res.status).toBe(200);
+       |                        ^
+    392|   });
+    393|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  |node| test/scan-audit-worker.test.ts > SCAN: voice successor reaches a window five minutes away
+AssertionError: expected 1788963300000 to be less than or equal to 1788962700000
+ ❯ test/scan-audit-worker.test.ts:719:34
+    717|     const call = mocks.enqueueJob.mock.calls.at(-1)?.[0] as {runAt: Da…
+    718|     console.log("SCAN voice wake", call.runAt.toISOString());
+    719|     expect(call.runAt.getTime()).toBeLessThanOrEqual(new Date("2026-09…
+       |                                  ^
+    720|   } finally {vi.useRealTimers();}
+    721| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+
+ Test Files  3 failed (3)
+      Tests  8 failed | 55 skipped (63)
+   Start at  07:27:30
+   Duration  998ms (transform 682ms, setup 153ms, import 952ms, tests 1.30s, environment 0ms)
+
