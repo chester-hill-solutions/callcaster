@@ -26,5 +26,19 @@
       1328,
       1192
     ]
+  },
+  {
+    "issueNumber": 1720,
+    "verdict": "duplicate",
+    "summary": "Same root cause as 1732: queue_status enum only has queued/dequeued and opted-out entries display as 'completed'. 1732's outreach-status model is the canonical ticket; 1720 is one of its observable symptoms.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   }
 ]
