@@ -160,24 +160,46 @@ export async function updateCampaignStatusInWorkspace(
   workspaceId: string,
   campaignId: number,
   update: { status: string },
+  options: { expectedStatus?: string } = {},
 ) {
   const tdb = createTenantDb(workspaceId);
-  const existingRows = await tdb.campaign.findMany({
-    where: eq(campaignTable.id, campaignId),
-    limit: 1,
-  });
-  const existing = existingRows[0] ?? null;
+  // A schedule sweep can be working from a stale candidate row. When it
+  // supplies the status it observed, make that observation part of the
+  // UPDATE predicate so a newer pause/completion wins the race.
+  const existing = options.expectedStatus === undefined
+    ? ((await tdb.campaign.findMany({
+        where: eq(campaignTable.id, campaignId),
+        limit: 1,
+      }))[0] ?? null)
+    : null;
+  const where = options.expectedStatus === undefined
+    ? eq(campaignTable.id, campaignId)
+    : and(
+        eq(campaignTable.id, campaignId),
+        eq(campaignTable.status, options.expectedStatus),
+      );
   const [row] = await tdb.campaign.update({
     set: update,
-    where: eq(campaignTable.id, campaignId),
+    where,
   });
   if (!row) {
+    // A conditional miss means another writer changed the status after the
+    // sweep read it. Preserve that newer status and let the next sweep retry.
+    if (options.expectedStatus !== undefined) return null;
     throw new Error("Campaign not found");
   }
+
+  // The conditional path has no preceding read. Reconstruct the old status
+  // from the predicate so the realtime event still carries the transition.
+  const oldRow = existing ?? {
+    ...(row as Record<string, unknown>),
+    status: options.expectedStatus,
+  };
+  if (oldRow.status === row.status) return row;
   await emitCampaignStatusEvent(
     workspaceId,
     row as Record<string, unknown>,
-    (existing ?? null) as Record<string, unknown> | null,
+    oldRow as Record<string, unknown>,
   );
   return row;
 }

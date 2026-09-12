@@ -56,9 +56,19 @@ export async function runCampaignScheduleSync(): Promise<CampaignScheduleSyncRes
     if (row.status === target) continue;
 
     try {
-      await updateCampaignStatusInWorkspace(row.workspace, row.id, {
-        status: target,
-      });
+      const updated = await updateCampaignStatusInWorkspace(
+        row.workspace,
+        row.id,
+        { status: target },
+        // `status` is nullable in the generated row type, but the candidate
+        // query only returns active statuses. Keep the conditional update
+        // disabled for an impossible null row rather than widening the DB
+        // predicate to `status IS NULL`.
+        { expectedStatus: row.status ?? undefined },
+      );
+      // A concurrent pause or completion makes the conditional UPDATE return
+      // no row. The newer status wins; count and report only real transitions.
+      if (!updated) continue;
       transitioned += 1;
       logger.info("campaign_schedule_sync.transitioned", {
         campaignId: row.id,
