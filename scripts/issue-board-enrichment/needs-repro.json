@@ -209,20 +209,5 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1782,
-    "verdict": "needs-repro",
-    "recommendedTitle": "Verify send-window boundary timing for voice campaigns on dev",
-    "summary": "Fixes #1374/#1375 shipped; #1351/#1352 need one evidence-backed verification pass at window boundaries (waiting->running->waiting, no early complete).",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Implement per ticket"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Filed 2026-09-12 from board triage."
   }
 ]

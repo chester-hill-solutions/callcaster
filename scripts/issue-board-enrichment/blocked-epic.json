@@ -318,5 +318,29 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1802,
+    "verdict": "blocked-epic",
+    "summary": "Runtime dependency remediation spans separate packages. Nano ID shipped to dev in PR #1807; qs is in progress under #1809. csv-parse and provider-utils remain to be assessed.",
+    "resolution": "Use one package concern per ticket and PR. Keep this umbrella open until all runtime findings are resolved or have reviewed exceptions; confirm alerts after default-branch promotion.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "trackerRecommendation": "Do not duplicate Nano ID #1805 or the active qs #1809 work."
+  },
+  {
+    "issueNumber": 1803,
+    "verdict": "blocked-epic",
+    "summary": "The development-scope dependency findings span multiple package families and need separate remediation slices.",
+    "resolution": "Recheck each advisory against current dev, then split by package concern. Preserve both lockfiles and run full ci:local for each slice.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "trackerRecommendation": "The live ticket lists development packages only; do not pull runtime Nano ID or csv-parse into this scope."
   }
 ]
