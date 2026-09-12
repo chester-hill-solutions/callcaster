@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Security
+
+- Updated the Nano ID dependency to remove affected 3.x versions from both installation lockfiles ([#1805](https://github.com/chester-hill-solutions/callcaster/issues/1805)).
+
 ### Fixed
 
 - IVR recording previews load the audio duration before you press Play ([#1696](https://github.com/chester-hill-solutions/callcaster/issues/1696)).
