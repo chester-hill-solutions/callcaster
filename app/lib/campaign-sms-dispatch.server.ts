@@ -32,6 +32,7 @@ import { OUTBOUND_CREDIT_FLOOR } from "../../shared/credit-floor";
 import { estimateMessageCredits } from "../../shared/pricing";
 import { rpcFailExhaustedCampaignQueueContacts } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
+import { selectEligibleCampaignQueueMembers } from "@/lib/campaign-dispatch-queue.server";
 import type { TwilioMessageIntent } from "@/lib/types";
 import {
   sendSingleCampaignSms,
@@ -219,11 +220,18 @@ export async function dispatchCampaignSmsBatch(args: {
     : MAX_CONCURRENCY;
 
   const allQueued = audience ?? [];
-  const queueMembers =
-    typeof maxContacts === "number" ? allQueued.slice(0, maxContacts) : allQueued;
+  const queueSelection = selectEligibleCampaignQueueMembers(allQueued, maxContacts);
+  const queueMembers = queueSelection.selected;
 
   const responses: ContactDispatchResult[] = [];
-  const counts = { sent: 0, failed: 0, dequeued: 0, deferred: 0, unaffordable: 0, exhausted: 0 };
+  const counts = {
+    sent: 0,
+    failed: 0,
+    dequeued: 0,
+    deferred: queueSelection.deferredCount,
+    unaffordable: 0,
+    exhausted: 0,
+  };
   const budget = createDispatchCreditBudget(credits.balance);
 
   // Start-rate cap: keep dispatch-loop starts under `configuredDispatcherSmsMps`.
@@ -255,9 +263,19 @@ export async function dispatchCampaignSmsBatch(args: {
     counts,
     claimedNumbers,
     budget,
+    sendPolicy,
   };
 
-  await runPacedSendBatches({ queueMembers, ctx, batchSize: BATCH_SIZE, minStartIntervalMs, responses });
+  const deferredAt = await runPacedSendBatches({
+    queueMembers,
+    ctx,
+    batchSize: BATCH_SIZE,
+    minStartIntervalMs,
+    responses,
+  });
+  if (deferredAt) {
+    return { kind: "deferred_send_window", nextOpenAt: deferredAt };
+  }
 
   // Rows that failed for the last time are dead-lettered now so a bad number
   // cannot pin the chain to retries forever (#1513). Exhausted rows may also
@@ -269,7 +287,7 @@ export async function dispatchCampaignSmsBatch(args: {
     );
   }
 
-  const truncated = allQueued.length - queueMembers.length;
+  const truncated = queueSelection.unselectedEligibleCount;
   return {
     kind: "dispatched",
     responses,
@@ -292,28 +310,40 @@ async function runPacedSendBatches(args: {
   batchSize: number;
   minStartIntervalMs: number;
   responses: ContactDispatchResult[];
-}): Promise<void> {
+}): Promise<Date | null> {
   const { queueMembers, ctx, batchSize, minStartIntervalMs, responses } = args;
+  // Keep the pacing clock across queue batches. At low configured rates the
+  // claim size is intentionally one row (for example, one MPS with the
+  // one-second dispatch tick), so resetting the clock at each batch would
+  // start adjacent sends back-to-back.
+  let lastStartAt: number | null = null;
   for (let i = 0; i < queueMembers.length; i += batchSize) {
     const batch = queueMembers.slice(i, i + batchSize);
-    const startingPromises: Promise<ContactDispatchResult>[] = [];
-    for (const [j, member] of batch.entries()) {
+    const startingPromises: Promise<HandleMemberResult>[] = [];
+    for (const member of batch) {
       // Once a row has been refused for credits, later rows cannot afford a
       // send either: account for them without lookups or pacing waits.
       if (ctx.counts.unaffordable > 0 && ctx.budget.exhausted) {
         responses.push(skipForInsufficientCredits(member, ctx.counts));
         continue;
       }
-      startingPromises.push(handleMember(member, ctx));
-      // Pause between starts but not after the final one: no reason to
-      // waste a full interval waiting for nothing.
-      if (j < batch.length - 1) {
-        await new Promise((resolve) => setTimeout(resolve, minStartIntervalMs));
+
+      if (lastStartAt !== null) {
+        const elapsedMs = Date.now() - lastStartAt;
+        const waitMs = Math.max(0, minStartIntervalMs - elapsedMs);
+        if (waitMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, waitMs));
+        }
       }
+      startingPromises.push(handleMember(member, ctx));
+      lastStartAt = Date.now();
     }
     const batchResults = await Promise.all(startingPromises);
-    responses.push(...batchResults);
+    const deferredAt = batchResults.find((result) => result.deferredSendWindow)?.deferredSendWindow;
+    if (deferredAt) return deferredAt;
+    responses.push(...batchResults.map((result) => result.response));
   }
+  return null;
 }
 
 type DispatchCounts = {
@@ -359,12 +389,30 @@ type HandleMemberCtx = {
   counts: DispatchCounts;
   claimedNumbers: Set<string>;
   budget: DispatchCreditBudget;
+  sendPolicy: ReturnType<typeof smsSendPolicy>;
 };
+
+type HandleMemberResult = {
+  response: ContactDispatchResult;
+  deferredSendWindow?: Date;
+};
+
+function memberResponse(response: ContactDispatchResult): HandleMemberResult {
+  return { response };
+}
+
+function deferredSendWindowResponse(policy: ReturnType<typeof smsSendPolicy>): HandleMemberResult {
+  return {
+    response: {},
+    deferredSendWindow:
+      nextDispatchOpenAt(policy) ?? new Date(Date.now() + 15 * 60 * 1000),
+  };
+}
 
 async function handleMember(
   member: QueueMember,
   ctx: HandleMemberCtx,
-): Promise<ContactDispatchResult> {
+): Promise<HandleMemberResult> {
   const { counts, claimedNumbers, workspaceId, campaignId, userId } = ctx;
   const normalizedPhone = normalizePhoneNumber(member.contact?.phone || "");
 
@@ -374,14 +422,14 @@ async function handleMember(
   const windowStatus = recipientCallingWindowStatus(normalizedPhone);
   if (!windowStatus.allowed) {
     counts.deferred += 1;
-    return {
+    return memberResponse({
       [member.contact_id]: {
         success: true,
         skipped: true,
         deferred: true,
         reason: "Outside recipient quiet-hours window",
       },
-    };
+    });
   }
 
   if (member.contact?.opt_out) {
@@ -391,13 +439,13 @@ async function handleMember(
       reason: OPTED_OUT_SMS_DEQUEUED_REASON,
     });
     counts.dequeued += 1;
-    return {
+    return memberResponse({
       [member.contact_id]: {
         success: true,
         skipped: true,
         reason: OPTED_OUT_SMS_DEQUEUED_REASON,
       },
-    };
+    });
   }
 
   // In-batch dedup — check + reserve BEFORE the first async gate so a
@@ -411,13 +459,13 @@ async function handleMember(
       reason: DUPLICATE_SMS_DEQUEUED_REASON,
     });
     counts.dequeued += 1;
-    return {
+    return memberResponse({
       [member.contact_id]: {
         success: true,
         skipped: true,
         reason: DUPLICATE_SMS_DEQUEUED_REASON,
       },
-    };
+    });
   }
   if (normalizedPhone) {
     claimedNumbers.add(normalizedPhone);
@@ -438,13 +486,13 @@ async function handleMember(
       reason: LANDLINE_SMS_DEQUEUED_REASON,
     });
     counts.dequeued += 1;
-    return {
+    return memberResponse({
       [member.contact_id]: {
         success: true,
         skipped: true,
         reason: LANDLINE_SMS_DEQUEUED_REASON,
       },
-    };
+    });
   }
 
   const duplicateExists = await hasDuplicateCampaignSms({
@@ -460,13 +508,13 @@ async function handleMember(
       reason: DUPLICATE_SMS_DEQUEUED_REASON,
     });
     counts.dequeued += 1;
-    return {
+    return memberResponse({
       [member.contact_id]: {
         success: true,
         skipped: true,
         reason: DUPLICATE_SMS_DEQUEUED_REASON,
       },
-    };
+    });
   }
 
   let processedBody = ctx.campaign.body_text;
@@ -481,7 +529,16 @@ async function handleMember(
     hasMedia: ctx.media.length > 0,
   }).credits;
   if (!ctx.budget.reserve(cost)) {
-    return skipForInsufficientCredits(member, counts);
+    return memberResponse(skipForInsufficientCredits(member, counts));
+  }
+
+  // The initial gate protects an idle batch, but pacing and the per-contact
+  // lookup gates can keep a row here long enough for the campaign window to
+  // close. Check again immediately before starting the provider call so rows
+  // that have not started remain queued for the next window.
+  if (!isDispatchAllowedAt(ctx.sendPolicy)) {
+    ctx.budget.release(cost);
+    return deferredSendWindowResponse(ctx.sendPolicy);
   }
 
   return sendSingleCampaignSms({
@@ -501,14 +558,14 @@ async function handleMember(
   }).then(
     (result) => {
       counts.sent += 1;
-      return { [member.contact_id]: { success: true, ...result } };
+      return memberResponse({ [member.contact_id]: { success: true, ...result } });
     },
     async (error) => {
       ctx.budget.release(cost);
       const message = error instanceof Error ? error.message : String(error);
       counts.failed += 1;
       await recordQueueAttemptFailure({ queueId: member.id, error: message, workspaceId });
-      return { [member.contact_id]: { success: false, error: message } };
+      return memberResponse({ [member.contact_id]: { success: false, error: message } });
     },
   );
 }
