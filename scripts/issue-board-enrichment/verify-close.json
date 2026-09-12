@@ -1081,5 +1081,188 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Close once confirmed on dev."
+  },
+  {
+    "issueNumber": 1205,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify guided phone rental and caller-ID setup on dev",
+    "summary": "Guided rental and caller-ID substeps shipped to dev in PR #1746 (3a37310a). Both paths, address saving, billing return, and saved-number recovery were verified.",
+    "currentBehavior": "Choose a method first; rental collects a service address before number search; caller-ID verification opens directly. Saved numbers resume at review.",
+    "rootCause": "The original single-page flow was replaced in PR #1746.",
+    "resolution": "Retest the shipped flow. The missing address breadcrumb is the separate remaining issue #1764; do not rebuild the substeps.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx",
+      "app/routes/workspaces+/$id/onboarding/wizard-step-resolution.ts"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-first-number-flow.test.tsx"
+    ],
+    "missingTests": [
+      "Live number purchase and carrier verification were not exercised in PR #1746."
+    ],
+    "acceptanceCriteria": [
+      "Choose method first",
+      "Rent requires address before search",
+      "Verify bypasses rental",
+      "Routing appears only after a number exists"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1696,
+    "verdict": "verify-close",
+    "summary": "Recording metadata preload shipped to dev in PR #1806 (270680d8). A real Chrome check showed a one-second duration before Play, with the audio paused at time zero.",
+    "lookIn": [
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx"
+    ],
+    "existingTests": [
+      "test/ui/script-block-editor-ivr.test.tsx",
+      "PR #1806: real Chrome before/after component check"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A selected recording shows its duration before Play.",
+      "Loading metadata does not start playback."
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "currentBehavior": "The IVR recording preview uses preload=\"metadata\".",
+    "resolution": "Retest a selected recording on dev before playback. No further code is expected unless that check finds a gap."
+  },
+  {
+    "issueNumber": 1782,
+    "verdict": "verify-close",
+    "summary": "PR #1796 (0188cea8) now wakes waiting voice work at the next calling-hours boundary. The four deployed boundary checks requested by this issue remain pending.",
+    "resolution": "Collect deployed evidence for future start, exact open, mid-run close, and no premature completion. Preserve #1351/#1352 until that evidence is assessed.",
+    "lookIn": [
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/lib/campaign-schedule-sync.server.ts"
+    ],
+    "missingTests": [
+      "DB rows plus screenshots or API results for all four deployed boundary cases."
+    ],
+    "trackerRecommendation": "Verification work remains; do not repeat the next-window scheduling patch from PR #1796.",
+    "blockedBy": [],
+    "currentBehavior": "The waiting voice successor uses the next window opening; schedule-sweep ownership of waiting-to-running remains intact.",
+    "existingTests": [
+      "test/campaign-dispatch-worker.test.ts"
+    ]
+  },
+  {
+    "issueNumber": 1788,
+    "verdict": "verify-close",
+    "summary": "PR #1798 (a80b3f9c) shipped the filter that removes synthetic SMS skipped rows for sent contacts.",
+    "resolution": "Verify delivered and genuine skipped contact rows on a dev export.",
+    "lookIn": [
+      "app/lib/campaign-export.server.ts",
+      "app/lib/campaign-queue-db.server.ts"
+    ],
+    "missingTests": [],
+    "risk": "medium",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": [],
+    "currentBehavior": "Successful-send dequeues do not add a second skipped CSV row; genuine suppression reasons remain eligible for skip rows.",
+    "existingTests": [
+      "test/campaign-export-sms-dequeued.test.ts"
+    ]
+  },
+  {
+    "issueNumber": 1790,
+    "verdict": "verify-close",
+    "summary": "PR #1798 (a80b3f9c) added supported machine-dispatched IVR types to the HTTP, workspace API, and durable export paths.",
+    "resolution": "Verify an export for each IVR type on dev.",
+    "lookIn": [
+      "app/routes/api+/campaign-export.action.server.ts",
+      "app/lib/platform-analytics.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts"
+    ],
+    "missingTests": [],
+    "risk": "medium",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": [],
+    "currentBehavior": "simple_ivr and complex_ivr reach the voice CSV exporter through the shared campaign-type predicate.",
+    "existingTests": [
+      "test/campaign-export-ivr-adapters.test.ts"
+    ]
+  },
+  {
+    "issueNumber": 1791,
+    "verdict": "verify-close",
+    "summary": "PR #1796 (0188cea8) added campaign-window checks before provider requests, including after asynchronous preparation.",
+    "resolution": "Verify the closing-boundary behavior on dev without sending outside the test window.",
+    "lookIn": [
+      "app/lib/campaign-sms-dispatch.server.ts"
+    ],
+    "missingTests": [
+      "Deployed closing-boundary verification."
+    ],
+    "risk": "high",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": [],
+    "currentBehavior": "When the campaign window closes mid-batch, new sends stop and unsent contacts remain queued.",
+    "existingTests": [
+      "test/campaign-sms-dispatch-window.test.ts"
+    ]
+  },
+  {
+    "issueNumber": 1792,
+    "verdict": "verify-close",
+    "summary": "PR #1796 (0188cea8) preserves the configured SMS send-start interval across dispatch batches.",
+    "resolution": "Verify configured pacing across batch boundaries on dev.",
+    "lookIn": [
+      "app/lib/campaign-sms-dispatch.server.ts"
+    ],
+    "missingTests": [
+      "Deployed pacing verification."
+    ],
+    "risk": "high",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": [],
+    "currentBehavior": "A one-MPS target retains its delay between one-row batches.",
+    "existingTests": [
+      "test/campaign-sms-dispatch-pacing.test.ts"
+    ]
+  },
+  {
+    "issueNumber": 1794,
+    "verdict": "verify-close",
+    "summary": "PR #1797 (88f73343) made schedule writes conditional on the status read by the sweep. The requested real database interleaving check is still missing.",
+    "resolution": "Verify pause/completion interleaving against a real database. The existing sweep test mocks the status helper, so it does not prove the SQL concurrency behavior.",
+    "lookIn": [
+      "app/lib/campaign-schedule-sync.server.ts",
+      "app/lib/campaign-ivr.server.ts"
+    ],
+    "missingTests": [
+      "Real database pause/completion after candidate selection; confirm state and emitted events."
+    ],
+    "risk": "high",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": [],
+    "currentBehavior": "A concurrent status change causes the guarded update to return no transition; events follow successful updates only.",
+    "existingTests": [
+      "test/campaign-schedule-sync.server.test.ts (sweep orchestration with mocked status helper)"
+    ]
+  },
+  {
+    "issueNumber": 1805,
+    "verdict": "verify-close",
+    "summary": "PR #1807 (814d804f) shipped Nano ID 3.3.19 in both lockfiles. Unaffected 5.1.16 consumers remain unchanged.",
+    "resolution": "Verify default-branch promotion and Dependabot alert #209 after release. No further Nano ID change is expected unless a new affected version is found.",
+    "lookIn": [
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "existingTests": [
+      "PR #1807: both package-manager installs, frozen Bun check, full ci:local"
+    ],
+    "missingTests": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix."
   }
 ]

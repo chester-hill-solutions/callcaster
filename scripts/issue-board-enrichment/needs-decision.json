@@ -492,5 +492,58 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1316,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide session behavior after MFA enrollment",
+    "summary": "MFA enrollment UI polish shipped to dev in PR #1780 (cb05869d). That PR explicitly left the issue’s logout-after-save question as a product decision.",
+    "currentBehavior": "Status badge, Next action, copy success controls, secure-storage prompt, and themed feedback are implemented. Session behavior was not changed.",
+    "rootCause": "The remaining question is whether MFA enrollment should retain the current session.",
+    "resolution": "Decide the intended session behavior after MFA enrollment. Retest the shipped controls; do not implement the UI polish again.",
+    "lookIn": [
+      "app/routes/account.security.tsx",
+      "app/routes/two-factor.tsx"
+    ],
+    "existingTests": [
+      "test/ui/account-security.test.tsx",
+      "test/two-factor.server.test.ts"
+    ],
+    "missingTests": [
+      "Acceptance check for the chosen enrollment/session behavior."
+    ],
+    "acceptanceCriteria": [
+      "Decide whether enrollment keeps the current session.",
+      "Verify the chosen session behavior and the shipped enrollment controls."
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Keep open while the session decision remains unresolved; UI-only PR #1780 does not settle it.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1789,
+    "verdict": "needs-decision",
+    "summary": "PR #1798 (a80b3f9c) fixed voice export rate math and zero-duration gating. The issue’s estimate-versus-ledger contract and estimate label remain unresolved.",
+    "resolution": "Decide the credits_used contract. If it remains an estimate, label it clearly; if actual debits are required, source it from the ledger. Preserve the corrected rates.",
+    "lookIn": [
+      "app/lib/campaign-export.server.ts",
+      "shared/pricing.ts"
+    ],
+    "missingTests": [
+      "Acceptance check for the selected actual-versus-estimated contract."
+    ],
+    "risk": "medium",
+    "trackerRecommendation": "Keep this contract decision open. Do not repeat the rate calculation fix from PR #1798.",
+    "blockedBy": [],
+    "currentBehavior": "The CSV credits_used value is calculated from duration and shared pricing, not read from ledger debits. The column remains named credits_used.",
+    "rootCause": "The arithmetic fix does not establish whether the field promises actual debits or an estimate.",
+    "existingTests": [
+      "test/campaign-export-voice-credits.test.ts"
+    ],
+    "acceptanceCriteria": [
+      "Define actual ledger debits versus estimated credits.",
+      "Label an estimate clearly, or source actual debits from the ledger."
+    ]
   }
 ]

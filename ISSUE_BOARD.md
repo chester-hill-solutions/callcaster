@@ -1,6 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@801a71e4` · 138 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+> GitHub Projects status was unavailable during this refresh because the token lacks `read:project`. Issue metadata is current; verdicts use the recorded audit evidence. Prior **IN PROGRESS (unverified)** badges are retained from the previous board. Other issues can also have active work.
+
+Reviewed at `dev@814d804f` · 150 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -19,32 +21,6 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
-### [#1316](https://github.com/chester-hill-solutions/callcaster/issues/1316) MFA Change Log
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: design, on-dev · Assignee: @wra-sol · Updated: 2026-09-12
-- Recommended title: **design(mfa): polish enrollment steps, status layout, and secure code-copy controls**
-- MFA change-log polish: cramped sublines (move status top-right), password-step action should be 'Next', icon copy controls with checkmark success, backup-code copy + secure-storage prompt, error-toast consistency.
-- Current behavior: account.tsx renders SectionHeader with 'Save' button for the password step, status below header, plain text copy control, no backup-code copy/guidance; account.security.tsx + two-factor.tsx use plain red text.
-- Root cause: Enrollment layout and copy still need the requested polish.
-- Resolution: Scope the remaining enrollment controls first. Keep session behavior unchanged; shared toast spacing is tracked in #1668.
-- Look in: `app/routes/account.tsx`, `app/routes/account.security.tsx`, `app/routes/two-factor.tsx`
-- Existing tests: test/two-factor.server.test.ts (server gates only)
-- Missing tests: button labels; clipboard success/failure; enrollment keeps session
-- Done when: Password step says Next; Copy buttons accessible with check states; Backup codes have secure-storage prompt; Session behavior unchanged
-- Tracker: Treat enrollment polish as a separate PR from global toast spacing.
-
-### [#1205](https://github.com/chester-hill-solutions/callcaster/issues/1205) "Number" onboarding is confusing
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: ux, on-dev · Assignee: @wra-sol · Updated: 2026-09-09
-- Recommended title: **ux(onboarding): split Number into guided rent-or-verify substeps**
-- The Number onboarding step is one long page (service address, rent/verify, inbound routing) with no internal navigation.
-- Current behavior: OnboardingFirstNumberStep renders all sections on one page; outer wizard treats it as one first_number step.
-- Root cause: No internal state machine or substeps.
-- Resolution: Add substeps: choose Rent vs Verify -> service address (rent path) -> purchase/verify -> inbound routing. Preserve server actions and billing return URL.
-- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx`, `app/routes/workspaces+/$id/onboarding/wizard-step-resolution.ts`
-- Existing tests: none for the step UI
-- Missing tests: both branches; back navigation; billing return; completed-number resume
-- Done when: Choose method first; Rent requires address before search; Verify bypasses rental; Routing appears only after a number exists
-- Tracker: Overlaps #1110/#1113/#1318; keep as its own issue.
-
 ### [#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148) SMS Onboarding Changes
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-08-07
 - Recommended title: **ux(onboarding): move SMS compliance identity fields out of Goal and bound help popovers**
@@ -57,6 +33,13 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: popover bounds; SMS-only identity fields
 - Done when: Goal has short non-duplicated guidance; Help content wraps/scrolls within bounds; SMS compliance fields only for SMS goal; Saved data unchanged
 - Tracker: Coordinate with #1345/#1311/#1122.
+
+### [#1809](https://github.com/chester-hill-solutions/callcaster/issues/1809) security(deps): patch qs across runtime dependency paths
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-09-12
+- PR #1811 contains the qs override and lockfile remediation and is awaiting review/checks. The two advisory inputs, actual Twilio/Stripe serialization, and full local CI passed; the PR has not merged.
+- Resolution: Finish the active qs-only change and full checks. Keep parent SDK versions unchanged; verify default-branch alerts after promotion.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Tracker: Active PR #1811 owns this remediation; do not start a competing lockfile change.
 
 ### [#1781](https://github.com/chester-hill-solutions/callcaster/issues/1781) Duplicate script names are allowed: friendly error exists but no DB constraint enforces it
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
@@ -119,11 +102,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
-### [#1696](https://github.com/chester-hill-solutions/callcaster/issues/1696) Audio preview in IVR script shows 0:00 until you hit play
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
-- Confirmed root cause: IVR recording preview uses <audio preload="none"> so duration shows 0:00 until playback; switch to preload="metadata". Exact file+line, single-file change.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+### [#1810](https://github.com/chester-hill-solutions/callcaster/issues/1810) docs(issues): refresh board after verified dev fixes
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-12
+- This tracking-only refresh updates stale verdicts from live issue states and merged PR evidence.
+- Resolution: Review and merge the active board refresh after full local checks.
+- Look in: `ISSUE_BOARD.md`, `scripts/issue-board-enrichment/`
+- Tracker: This board-refresh PR owns the ticket; do not duplicate it.
+
+### [#1804](https://github.com/chester-hill-solutions/callcaster/issues/1804) docs(changelog): restore audit fix entries under Unreleased
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-12
+- The audit release-note correction is in progress in PR #1808; it was not merged at this review.
+- Resolution: Finish the existing PR and verify each audit fix appears once under Unreleased, with the schedule entry restored.
+- Look in: `docs/CHANGELOG.md`
+- Tracker: Active PR #1808 owns this change; do not create a duplicate.
 
 ### [#1783](https://github.com/chester-hill-solutions/callcaster/issues/1783) Dev/theme bootstrap mutates <html> before React hydrates (hydration mismatch, #1750)
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-12
@@ -134,9 +125,85 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 64
+## Verify and close — 73
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#1805](https://github.com/chester-hill-solutions/callcaster/issues/1805) security(deps): patch nanoid 3.x lockfile resolutions
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: on-dev · Assignee: @wra-sol · Updated: 2026-09-12
+- PR #1807 (814d804f) shipped Nano ID 3.3.19 in both lockfiles. Unaffected 5.1.16 consumers remain unchanged.
+- Resolution: Verify default-branch promotion and Dependabot alert #209 after release. No further Nano ID change is expected unless a new affected version is found.
+- Look in: `package-lock.json`, `bun.lock`
+- Existing tests: PR #1807: both package-manager installs, frozen Bun check, full ci:local
+- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
+
+### [#1696](https://github.com/chester-hill-solutions/callcaster/issues/1696) Audio preview in IVR script shows 0:00 until you hit play
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux, on-dev · Assignee: @wra-sol · Updated: 2026-09-12
+- Recording metadata preload shipped to dev in PR #1806 (270680d8). A real Chrome check showed a one-second duration before Play, with the audio paused at time zero.
+- Current behavior: The IVR recording preview uses preload="metadata".
+- Resolution: Retest a selected recording on dev before playback. No further code is expected unless that check finds a gap.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`
+- Existing tests: test/ui/script-block-editor-ivr.test.tsx; PR #1806: real Chrome before/after component check
+- Done when: A selected recording shows its duration before Play.; Loading metadata does not start playback.
+- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
+
+### [#1788](https://github.com/chester-hill-solutions/callcaster/issues/1788) SMS export adds a false skipped row for each sent contact
+- Verdict: **Verify and close** · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
+- PR #1798 (a80b3f9c) shipped the filter that removes synthetic SMS skipped rows for sent contacts.
+- Current behavior: Successful-send dequeues do not add a second skipped CSV row; genuine suppression reasons remain eligible for skip rows.
+- Resolution: Verify delivered and genuine skipped contact rows on a dev export.
+- Look in: `app/lib/campaign-export.server.ts`, `app/lib/campaign-queue-db.server.ts`
+- Existing tests: test/campaign-export-sms-dequeued.test.ts
+- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
+
+### [#1794](https://github.com/chester-hill-solutions/callcaster/issues/1794) Campaign schedule sync can overwrite a concurrent pause or completion
+- Verdict: **Verify and close** · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-12
+- PR #1797 (88f73343) made schedule writes conditional on the status read by the sweep. The requested real database interleaving check is still missing.
+- Current behavior: A concurrent status change causes the guarded update to return no transition; events follow successful updates only.
+- Resolution: Verify pause/completion interleaving against a real database. The existing sweep test mocks the status helper, so it does not prove the SQL concurrency behavior.
+- Look in: `app/lib/campaign-schedule-sync.server.ts`, `app/lib/campaign-ivr.server.ts`
+- Existing tests: test/campaign-schedule-sync.server.test.ts (sweep orchestration with mocked status helper)
+- Missing tests: Real database pause/completion after candidate selection; confirm state and emitted events.
+- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
+
+### [#1792](https://github.com/chester-hill-solutions/callcaster/issues/1792) SMS rate pacing is skipped between batches, including all waits at one MPS
+- Verdict: **Verify and close** · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-12
+- PR #1796 (0188cea8) preserves the configured SMS send-start interval across dispatch batches.
+- Current behavior: A one-MPS target retains its delay between one-row batches.
+- Resolution: Verify configured pacing across batch boundaries on dev.
+- Look in: `app/lib/campaign-sms-dispatch.server.ts`
+- Existing tests: test/campaign-sms-dispatch-pacing.test.ts
+- Missing tests: Deployed pacing verification.
+- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
+
+### [#1791](https://github.com/chester-hill-solutions/callcaster/issues/1791) SMS dispatch continues sending after the campaign window closes mid-batch
+- Verdict: **Verify and close** · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-12
+- PR #1796 (0188cea8) added campaign-window checks before provider requests, including after asynchronous preparation.
+- Current behavior: When the campaign window closes mid-batch, new sends stop and unsent contacts remain queued.
+- Resolution: Verify the closing-boundary behavior on dev without sending outside the test window.
+- Look in: `app/lib/campaign-sms-dispatch.server.ts`
+- Existing tests: test/campaign-sms-dispatch-window.test.ts
+- Missing tests: Deployed closing-boundary verification.
+- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
+
+### [#1782](https://github.com/chester-hill-solutions/callcaster/issues/1782) Verify send-window boundary timing for voice campaigns on dev (#1351/#1352)
+- Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-09-12
+- PR #1796 (0188cea8) now wakes waiting voice work at the next calling-hours boundary. The four deployed boundary checks requested by this issue remain pending.
+- Current behavior: The waiting voice successor uses the next window opening; schedule-sweep ownership of waiting-to-running remains intact.
+- Resolution: Collect deployed evidence for future start, exact open, mid-run close, and no premature completion. Preserve #1351/#1352 until that evidence is assessed.
+- Look in: `app/lib/worker/handlers/campaign.server.ts`, `app/lib/campaign-schedule-sync.server.ts`
+- Existing tests: test/campaign-dispatch-worker.test.ts
+- Missing tests: DB rows plus screenshots or API results for all four deployed boundary cases.
+- Tracker: Verification work remains; do not repeat the next-window scheduling patch from PR #1796.
+
+### [#1790](https://github.com/chester-hill-solutions/callcaster/issues/1790) Campaign exports reject simple_ivr and complex_ivr campaigns
+- Verdict: **Verify and close** · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
+- PR #1798 (a80b3f9c) added supported machine-dispatched IVR types to the HTTP, workspace API, and durable export paths.
+- Current behavior: simple_ivr and complex_ivr reach the voice CSV exporter through the shared campaign-type predicate.
+- Resolution: Verify an export for each IVR type on dev.
+- Look in: `app/routes/api+/campaign-export.action.server.ts`, `app/lib/platform-analytics.server.ts`, `app/lib/worker/handlers/campaign.server.ts`
+- Existing tests: test/campaign-export-ivr-adapters.test.ts
+- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
 
 ### [#1726](https://github.com/chester-hill-solutions/callcaster/issues/1726) Contact search: allow creating a new contact from the bottom of the results list
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: on-dev · Assignee: none · Updated: 2026-09-12
@@ -282,7 +349,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1753](https://github.com/chester-hill-solutions/callcaster/issues/1753) Billing: activity screen truncates usage at 500 ledger rows — add pagination and full totals
-- **IN PROGRESS** · Verdict: **Verify and close** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-10
+- **IN PROGRESS (unverified)** · Verdict: **Verify and close** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-10
 - Bot comment 2026-09-10: merged in PR #1754 (2de36426); PR state MERGED (pagination + full totals). Retest on review env.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
@@ -299,8 +366,21 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
+### [#1205](https://github.com/chester-hill-solutions/callcaster/issues/1205) "Number" onboarding is confusing
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: ux, on-dev · Assignee: @wra-sol · Updated: 2026-09-09
+- Recommended title: **Verify guided phone rental and caller-ID setup on dev**
+- Guided rental and caller-ID substeps shipped to dev in PR #1746 (3a37310a). Both paths, address saving, billing return, and saved-number recovery were verified.
+- Current behavior: Choose a method first; rental collects a service address before number search; caller-ID verification opens directly. Saved numbers resume at review.
+- Root cause: The original single-page flow was replaced in PR #1746.
+- Resolution: Retest the shipped flow. The missing address breadcrumb is the separate remaining issue #1764; do not rebuild the substeps.
+- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx`, `app/routes/workspaces+/$id/onboarding/wizard-step-resolution.ts`
+- Existing tests: test/ui/onboarding-first-number-flow.test.tsx
+- Missing tests: Live number purchase and carrier verification were not exercised in PR #1746.
+- Done when: Choose method first; Rent requires address before search; Verify bypasses rental; Routing appears only after a number exists
+- Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
+
 ### [#1682](https://github.com/chester-hill-solutions/callcaster/issues/1682) Campaign URLs with a non-numeric id show "Unexpected Server Error" instead of Page not found
-- **IN PROGRESS** · Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-09
+- **IN PROGRESS (unverified)** · Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-09
 - Fixed by PR #1683 (merged 2026-09-08, commit 03923185, same title as the issue); requirePositiveIntegerParam now guards the campaigns loaders so malformed ids 404. Sai's later comment is only a design nit on the 404 page styling, not a defect.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
@@ -576,7 +656,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Tracker: PR #1491 merge 76fdff4e is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items.
 
 ### [#1327](https://github.com/chester-hill-solutions/callcaster/issues/1327) chore(scripts): collapse vestigial pageData.campaignDetails nesting
-- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-27
+- **IN PROGRESS (unverified)** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-27
 - Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.
 - Current behavior: Script editor routes consume flattened campaign/script fields; no campaignDetails accessor remains. Sai cannot see this on the stale review env.
 - Root cause: Internal refactor, invisible without a redeploy.
@@ -587,7 +667,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Tracker: Verification only; no new code.
 
 ### [#1113](https://github.com/chester-hill-solutions/callcaster/issues/1113) Onboarding Number | No space between action titles
-- **IN PROGRESS** · Verdict: **Verify and close** · Labels: design · Assignee: none · Updated: 2026-08-26
+- **IN PROGRESS (unverified)** · Verdict: **Verify and close** · Labels: design · Assignee: none · Updated: 2026-08-26
 - Shipped on master in PR #1592: fix(onboarding): stop the box edge striking through the Number step's action titles. The open state does not prove the fix is absent.
 - Resolution: Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.
 - Look in: `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx`
@@ -603,7 +683,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Tracker: PR #1594 merge 8334dcda is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items.
 
 ### [#1204](https://github.com/chester-hill-solutions/callcaster/issues/1204) "Identity" step in onboarding breadcrumbs is always marked as red (unfinished) even once completed
-- **IN PROGRESS** · Verdict: **Verify and close** · Labels: design · Assignee: none · Updated: 2026-08-26
+- **IN PROGRESS (unverified)** · Verdict: **Verify and close** · Labels: design · Assignee: none · Updated: 2026-08-26
 - Shipped on master in PR #1589: fix(onboarding): judge the Identity step by the fields the Identity screen collects. The open state does not prove the fix is absent.
 - Resolution: Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.
 - Look in: `app/lib/messaging-onboarding/readiness.server.ts`
@@ -676,16 +756,9 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 16
+## Needs reproduction — 15
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
-
-### [#1782](https://github.com/chester-hill-solutions/callcaster/issues/1782) Verify send-window boundary timing for voice campaigns on dev (#1351/#1352)
-- Verdict: **Needs reproduction** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-12
-- Recommended title: **Verify send-window boundary timing for voice campaigns on dev**
-- Fixes #1374/#1375 shipped; #1351/#1352 need one evidence-backed verification pass at window boundaries (waiting->running->waiting, no early complete).
-- Done when: Implement per ticket
-- Tracker: Filed 2026-09-12 from board triage.
 
 ### [#1765](https://github.com/chester-hill-solutions/callcaster/issues/1765) Onboarding steps shouldn't have the credit warning after renting a number
 - Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-11
@@ -706,13 +779,13 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1352](https://github.com/chester-hill-solutions/callcaster/issues/1352) Campaign window opens at 3:05 yet the singular contact got the message at 3:15
-- **IN PROGRESS** · Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
+- **IN PROGRESS (unverified)** · Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
 - Fix #1374 (nextSendWindowOpenAt exact-boundary scheduling) shipped, but Sai 2026-09-09 gives a 12-step repro: window widened to 12:47 yet the message fired 1:12 — likely a periodic sweep floor or opt-in edge; same subsystem as 1351, verify together on dev.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1351](https://github.com/chester-hill-solutions/callcaster/issues/1351) SMS Window set to 3:05PM yet estimate says 3pm it'll be done
-- **IN PROGRESS** · Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
+- **IN PROGRESS (unverified)** · Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
 - Fix #1375 (estimateOutboundCompletion, window-aware) shipped to dev, but Sai 2026-09-09 reports the estimate still tracks wall clock and suggests a cron-interval minimum; claim vs counter-claim needs an on-dev check before coding.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
@@ -730,7 +803,7 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1714](https://github.com/chester-hill-solutions/callcaster/issues/1714) Get an error when inviting a user
-- **IN PROGRESS** · Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
+- **IN PROGRESS (unverified)** · Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-09
 - Error matches the 'User not found' path; findUserIdByUsername resolves against the auth users table. The invited account was supposedly created first, so why the miss needs the exact error text and steps; review-env DB resets muddy evidence.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
@@ -786,9 +859,34 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 28
+## Needs decision — 30
 
 Product, security, or operations decision required before implementation can be scoped.
+
+### [#1789](https://github.com/chester-hill-solutions/callcaster/issues/1789) Voice campaign exports calculate credits with the retired one-credit-per-minute rate
+- Verdict: **Needs decision** · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
+- PR #1798 (a80b3f9c) fixed voice export rate math and zero-duration gating. The issue’s estimate-versus-ledger contract and estimate label remain unresolved.
+- Current behavior: The CSV credits_used value is calculated from duration and shared pricing, not read from ledger debits. The column remains named credits_used.
+- Root cause: The arithmetic fix does not establish whether the field promises actual debits or an estimate.
+- Resolution: Decide the credits_used contract. If it remains an estimate, label it clearly; if actual debits are required, source it from the ledger. Preserve the corrected rates.
+- Look in: `app/lib/campaign-export.server.ts`, `shared/pricing.ts`
+- Existing tests: test/campaign-export-voice-credits.test.ts
+- Missing tests: Acceptance check for the selected actual-versus-estimated contract.
+- Done when: Define actual ledger debits versus estimated credits.; Label an estimate clearly, or source actual debits from the ledger.
+- Tracker: Keep this contract decision open. Do not repeat the rate calculation fix from PR #1798.
+
+### [#1316](https://github.com/chester-hill-solutions/callcaster/issues/1316) MFA Change Log
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: design, on-dev · Assignee: @wra-sol · Updated: 2026-09-12
+- Recommended title: **Decide session behavior after MFA enrollment**
+- MFA enrollment UI polish shipped to dev in PR #1780 (cb05869d). That PR explicitly left the issue’s logout-after-save question as a product decision.
+- Current behavior: Status badge, Next action, copy success controls, secure-storage prompt, and themed feedback are implemented. Session behavior was not changed.
+- Root cause: The remaining question is whether MFA enrollment should retain the current session.
+- Resolution: Decide the intended session behavior after MFA enrollment. Retest the shipped controls; do not implement the UI polish again.
+- Look in: `app/routes/account.security.tsx`, `app/routes/two-factor.tsx`
+- Existing tests: test/ui/account-security.test.tsx; test/two-factor.server.test.ts
+- Missing tests: Acceptance check for the chosen enrollment/session behavior.
+- Done when: Decide whether enrollment keeps the current session.; Verify the chosen session behavior and the shipped enrollment controls.
+- Tracker: Keep open while the session decision remains unresolved; UI-only PR #1780 does not settle it.
 
 ### [#1773](https://github.com/chester-hill-solutions/callcaster/issues/1773) Daily lossless data backup per workspace (CSV snapshots + manifest + retention)
 - Verdict: **Needs decision** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-11
@@ -870,7 +968,7 @@ Product, security, or operations decision required before implementation can be 
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728) IVR was marked as complete before the recipient actually received their dial
-- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
+- **IN PROGRESS (unverified)** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
 - Campaign completes on queue drain (completeCampaignsDrainedByDequeue) while the dial fires async seconds later — behavior confirmed. What 'complete' means for IVR is a product decision that blocks the fix.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
@@ -942,7 +1040,7 @@ Product, security, or operations decision required before implementation can be 
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1697](https://github.com/chester-hill-solutions/callcaster/issues/1697) Overwrite PR #1686 and add workflow to properly set project status
-- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-09
+- **IN PROGRESS (unverified)** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-09
 - PR #1686 already merged (2026-09-09) and working (on-dev label + 'On dev: merged in' comments). Remaining is how the project status should be set (needs ON_DEV_PROJECT_NUMBER/PROJECT_TOKEN config) and whether to keep the label behaviour — ops/product decision, not code.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
@@ -1013,9 +1111,23 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 13
+## Blocked / split first — 15
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
+
+### [#1803](https://github.com/chester-hill-solutions/callcaster/issues/1803) security(deps): remediate open development dependency alerts
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-09-12
+- The development-scope dependency findings span multiple package families and need separate remediation slices.
+- Resolution: Recheck each advisory against current dev, then split by package concern. Preserve both lockfiles and run full ci:local for each slice.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Tracker: The live ticket lists development packages only; do not pull runtime Nano ID or csv-parse into this scope.
+
+### [#1802](https://github.com/chester-hill-solutions/callcaster/issues/1802) security(deps): remediate open runtime dependency alerts
+- Verdict: **Blocked / split first** · Labels: none · Assignee: none · Updated: 2026-09-12
+- Runtime dependency remediation spans separate packages. Nano ID shipped to dev in PR #1807; qs is in progress under #1809. csv-parse and provider-utils remain to be assessed.
+- Resolution: Use one package concern per ticket and PR. Keep this umbrella open until all runtime findings are resolved or have reviewed exceptions; confirm alerts after default-branch promotion.
+- Look in: `package.json`, `package-lock.json`, `bun.lock`
+- Tracker: Do not duplicate Nano ID #1805 or the active qs #1809 work.
 
 ### [#1752](https://github.com/chester-hill-solutions/callcaster/issues/1752) Standardize campaign completion exports (SMS report format)
 - Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-10
