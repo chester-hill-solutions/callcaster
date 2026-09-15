@@ -228,16 +228,27 @@
   {
     "issueNumber": 1816,
     "verdict": "fix-now",
-    "recommendedTitle": "TBD",
-    "summary": "Added to fix-now on the 2026-09-15 board refresh (pending deeper triage).",
-    "lookIn": [],
+    "recommendedTitle": "fix(dispatch): reschedule a parked campaign_dispatch successor when the campaign window is edited",
+    "summary": "Child of #1352 (window widened to include 12:47, send landed 1:12). Deferrals post-#1796 enqueue successors exactly at the boundary computed at defer time (nextDispatchOpenAt, campaign.server.ts waiting/deferred_send_window branches), but editing the calling-hours/send-window of a running or waiting campaign (`$selected_id/settings.action.server.ts` case 'save') never rewrites the queued successor's retry_at, so the campaign keeps sleeping to the stale boundary.",
+    "currentBehavior": "A deferred campaign_dispatch successor is enqueued at min(nextOpenAt, now+60min). A schedule edit updates the campaign row only; rescheduleQueuedJob (enqueue-job.server.ts:133) is called from the launch path only (campaign-execution.server.ts:129).",
+    "rootCause": "The successor parked at defer time is not rescheduled when the window is later widened/opened.",
+    "resolution": "On settings save of `schedule`/`sms_send_window` for a running/waiting/scheduled machine campaign, reschedule the live campaign_dispatch row (same live-dedupe predicate) to min(nextOpenAt, now+60min) via rescheduleQueuedJob.",
+    "lookIn": [
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/lib/campaign-dispatch-policy.ts",
+      "app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts",
+      "app/lib/worker/enqueue-job.server.ts"
+    ],
     "existingTests": [],
-    "missingTests": [],
+    "missingTests": [
+      "Campaign dispatched to a deferred successor -> window edited to open now -> queued job retry_at is pulled forward"
+    ],
     "acceptanceCriteria": [
-      "Triage + confirm"
+      "Editing the window to open now moves the parked successor forward",
+      "Far-future cap (now+60min) still applies on the reschedule"
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Added 2026-09-15 board refresh."
+    "trackerRecommendation": "Parent #1352 still open needs-repro; this is the actionable child."
   }
 ]

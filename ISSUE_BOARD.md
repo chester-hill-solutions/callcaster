@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@342d1a4a` · 154 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@015428ff` · 154 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -34,10 +34,15 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ### [#1816](https://github.com/chester-hill-solutions/callcaster/issues/1816) Campaign window opens at 12:00pm but IVR got sent at 12:39pm
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-13
-- Recommended title: **TBD**
-- Added to fix-now on the 2026-09-15 board refresh (pending deeper triage).
-- Done when: Triage + confirm
-- Tracker: Added 2026-09-15 board refresh.
+- Recommended title: **fix(dispatch): reschedule a parked campaign_dispatch successor when the campaign window is edited**
+- Child of #1352 (window widened to include 12:47, send landed 1:12). Deferrals post-#1796 enqueue successors exactly at the boundary computed at defer time (nextDispatchOpenAt, campaign.server.ts waiting/deferred_send_window branches), but editing the calling-hours/send-window of a running or waiting campaign (`$selected_id/settings.action.server.ts` case 'save') never rewrites the queued successor's retry_at, so the campaign keeps sleeping to the stale boundary.
+- Current behavior: A deferred campaign_dispatch successor is enqueued at min(nextOpenAt, now+60min). A schedule edit updates the campaign row only; rescheduleQueuedJob (enqueue-job.server.ts:133) is called from the launch path only (campaign-execution.server.ts:129).
+- Root cause: The successor parked at defer time is not rescheduled when the window is later widened/opened.
+- Resolution: On settings save of `schedule`/`sms_send_window` for a running/waiting/scheduled machine campaign, reschedule the live campaign_dispatch row (same live-dedupe predicate) to min(nextOpenAt, now+60min) via rescheduleQueuedJob.
+- Look in: `app/lib/worker/handlers/campaign.server.ts`, `app/lib/campaign-dispatch-policy.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts`, `app/lib/worker/enqueue-job.server.ts`
+- Missing tests: Campaign dispatched to a deferred successor -> window edited to open now -> queued job retry_at is pulled forward
+- Done when: Editing the window to open now moves the parked successor forward; Far-future cap (now+60min) still applies on the reschedule
+- Tracker: Parent #1352 still open needs-repro; this is the actionable child.
 
 ### [#1809](https://github.com/chester-hill-solutions/callcaster/issues/1809) security(deps): patch qs across runtime dependency paths
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: on-dev · Assignee: @wra-sol · Updated: 2026-09-12
@@ -761,7 +766,7 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 16
+## Needs reproduction — 15
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
 
@@ -770,13 +775,6 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Generic catch-all IVR error with only a URL — no steps. Known IVR page-id bug #1348 was fixed via #1744; needs repro + logs to tell stale vs new cause.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1815](https://github.com/chester-hill-solutions/callcaster/issues/1815) MFA is turned off?
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-13
-- Recommended title: **TBD**
-- Added to needs-repro on the 2026-09-15 board refresh (pending deeper triage).
-- Done when: Triage + confirm
-- Tracker: Added 2026-09-15 board refresh.
 
 ### [#1765](https://github.com/chester-hill-solutions/callcaster/issues/1765) Onboarding steps shouldn't have the credit warning after renting a number
 - Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-11
@@ -871,27 +869,46 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 32
+## Needs decision — 33
 
 Product, security, or operations decision required before implementation can be scoped.
 
+### [#1815](https://github.com/chester-hill-solutions/callcaster/issues/1815) MFA is turned off?
+- Verdict: **Needs decision** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-13
+- Recommended title: **Decide TWO_FACTOR_ENABLED kill-switch state per environment**
+- Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 — the #1569 kill-switch default.
+- Current behavior: Better Auth twoFactor plugin is not registered; no code prompt at sign-in for enrolled users. Enrollment rows are kept (two-factor.server.ts:59) so setting the flag turns it all back on.
+- Root cause: None — MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.
+- Resolution: Decide the intended state. To enable 2FA, set TWO_FACTOR_ENABLED=true|1 on dev + production and retest. Otherwise keep the kill switch and close with the explanation.
+- Look in: `app/lib/env.server.ts`, `app/lib/two-factor.server.ts`
+- Existing tests: test/two-factor-kill-switch.route.test.ts; test/two-factor.server.test.ts
+- Done when: Decide whether 2FA should be on; If on, set TWO_FACTOR_ENABLED and verify the plugin registers
+- Tracker: Keeps blocking #1316 until the state is decided.
+
 ### [#1814](https://github.com/chester-hill-solutions/callcaster/issues/1814) agent is referencing M4A bug on an issue that isn't talking about it and was already marked "tested-on-dev"
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-09-13
-- Recommended title: **TBD**
-- Added to needs-decision on the 2026-09-15 board refresh (pending deeper triage).
-- Done when: Triage + confirm
-- Tracker: Added 2026-09-15 board refresh.
+- Verdict: **Needs decision** · Size: XS · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-09-13
+- Recommended title: **Decide agent verbosity when quoting resolved sibling issues**
+- Report: an agent comment on #1325 (M4A upload bug, already verified/closed-tracked) pasted a wra-sol snippet pointing to PR #1731 as if the issue were still open. The M4A bug fix (#1731, merged) is real and verified; the complaint is process/verbosity — referencing a resolved fix on a non-matching context reads as noise.
+- Current behavior: Issue comments may restate resolved fixes from sibling issues; #1325's record (verify-close) already points at #1731 and #1730.
+- Root cause: None in code — comment placement/copy discipline for agents.
+- Resolution: Decide the agent guideline: do not re-post resolution snippets from another issue's thread; prefer a one-line pointer and check whether the issue is already marked tested/on-dev before commenting.
+- Done when: Issue comments avoid restating resolved sibling fixes; Agent checks issue state/labels before commenting
+- Tracker: Process decision; overlaps #1813 (on-dev marking) and the agent-skills guidance.
 
 ### [#1813](https://github.com/chester-hill-solutions/callcaster/issues/1813) issues should be marked on-dev when commits are merged into dev.
-- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-09-13
-- Recommended title: **TBD**
-- Added to needs-decision on the 2026-09-15 board refresh (pending deeper triage).
-- Done when: Triage + confirm
-- Tracker: Added 2026-09-15 board refresh.
+- Verdict: **Needs decision** · Size: XS · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-09-13
+- Recommended title: **Decide the on-dev Status move: configure PROJECT vars or keep label+comment**
+- The on-dev automation ALREADY exists: .github/workflows/issue-on-dev.yml labels + comments each issue when a PR merges into dev, and moves the project Status only when vars.ON_DEV_PROJECT_NUMBER and secrets.PROJECT_TOKEN are set. Repo state: no repo variables are set (gh variable list empty; only NODE_AUTH_TOKEN secret), so the Status move step is skipped — label and comment land, the kanban Status never moves. That is the reported confusion (some issues on backlog, others on-dev).
+- Current behavior: issue-on-dev.yml: label + comment on dev merge; Status move gated on ON_DEV_PROJECT_NUMBER + PROJECT_TOKEN, both unset.
+- Root cause: None — the requested automation exists; the optional Status column move is unconfigured.
+- Resolution: Set ON_DEV_PROJECT_NUMBER (repo variable) + PROJECT_TOKEN (fine-grained secret with Projects read/write) so the Status option moves; or explicitly decide the label+comment path is the process and close with that documented.
+- Look in: `.github/workflows/issue-on-dev.yml`
+- Done when: Issues merged to dev are visibly on-dev without manual intervention; Chosen mechanism is either the project Status move (configured vars) or label+comment documented as enough
+- Tracker: Ops config decision, not code; overlaps #1697/#1686 decisions.
 
 ### [#1789](https://github.com/chester-hill-solutions/callcaster/issues/1789) Voice campaign exports calculate credits with the retired one-credit-per-minute rate
 - Verdict: **Needs decision** · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
-- PR #1798 (a80b3f9c) fixed voice export rate math and zero-duration gating. The issue’s estimate-versus-ledger contract and estimate label remain unresolved.
+- PR #1798 (a80b3f9c) fixed voice export rate math and zero-duration gating: exports now use voiceCreditsFromDurationSeconds (shared/pricing.ts:122; IVR 2+3, staffed 4+5) and gate zero-duration attempts to 0 (campaign-export.server.ts:436-447). CONFIRMED in current dev; test/campaign-export-voice-credits.test.ts pins it. The only open item is the estimate-versus-ledger contract and the credits_used label.
 - Current behavior: The CSV credits_used value is calculated from duration and shared pricing, not read from ledger debits. The column remains named credits_used.
 - Root cause: The arithmetic fix does not establish whether the field promises actual debits or an estimate.
 - Resolution: Decide the credits_used contract. If it remains an estimate, label it clearly; if actual debits are required, source it from the ledger. Preserve the corrected rates.

@@ -82,12 +82,12 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1352,
     "verdict": "needs-repro",
-    "summary": "Fix #1374 (nextSendWindowOpenAt exact-boundary scheduling) shipped, but Sai 2026-09-09 gives a 12-step repro: window widened to 12:47 yet the message fired 1:12 — likely a periodic sweep floor or opt-in edge; same subsystem as 1351, verify together on dev.",
+    "summary": "Fix #1374 (nextSendWindowOpenAt exact-boundary scheduling) shipped, but Sai 2026-09-09 gives a 12-step repro: window widened to 12:47 yet the message fired 1:12 \u2014 likely a periodic sweep floor or opt-in edge; same subsystem as 1351, verify together on dev.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -96,7 +96,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1698,
@@ -110,7 +110,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1707,
@@ -124,7 +124,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1714,
@@ -138,7 +138,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1718,
@@ -152,7 +152,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1719,
@@ -166,12 +166,12 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1733,
     "verdict": "needs-repro",
-    "summary": "Generic catch-all IVR error with only a URL — no steps. Known IVR page-id bug #1348 was fixed via #1744; needs repro + logs to tell stale vs new cause.",
+    "summary": "Generic catch-all IVR error with only a URL \u2014 no steps. Known IVR page-id bug #1348 was fixed via #1744; needs repro + logs to tell stale vs new cause.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -180,7 +180,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1750,
@@ -194,7 +194,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1765,
@@ -208,21 +208,6 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1815,
-    "verdict": "needs-repro",
-    "recommendedTitle": "TBD",
-    "summary": "Added to needs-repro on the 2026-09-15 board refresh (pending deeper triage).",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Triage + confirm"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Added 2026-09-15 board refresh."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   }
 ]
