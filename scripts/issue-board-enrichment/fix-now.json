@@ -224,5 +224,20 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "This board-refresh PR owns the ticket; do not duplicate it."
+  },
+  {
+    "issueNumber": 1816,
+    "verdict": "fix-now",
+    "recommendedTitle": "TBD",
+    "summary": "Added to fix-now on the 2026-09-15 board refresh (pending deeper triage).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Triage + confirm"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Added 2026-09-15 board refresh."
   }
 ]

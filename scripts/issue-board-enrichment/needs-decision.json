@@ -545,5 +545,35 @@
       "Define actual ledger debits versus estimated credits.",
       "Label an estimate clearly, or source actual debits from the ledger."
     ]
+  },
+  {
+    "issueNumber": 1813,
+    "verdict": "needs-decision",
+    "recommendedTitle": "TBD",
+    "summary": "Added to needs-decision on the 2026-09-15 board refresh (pending deeper triage).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Triage + confirm"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Added 2026-09-15 board refresh."
+  },
+  {
+    "issueNumber": 1814,
+    "verdict": "needs-decision",
+    "recommendedTitle": "TBD",
+    "summary": "Added to needs-decision on the 2026-09-15 board refresh (pending deeper triage).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Triage + confirm"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Added 2026-09-15 board refresh."
   }
 ]
