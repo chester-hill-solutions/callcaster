@@ -1,10 +1,16 @@
 import type { EnqueueJobResult } from "@/lib/worker/enqueue-job.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
-import { rescheduleQueuedJob } from "@/lib/worker/enqueue-job.server";
+import { findLiveJobId, rescheduleQueuedJob } from "@/lib/worker/enqueue-job.server";
 import { getCampaignReadiness, type CampaignReadinessIssue } from "@/lib/campaign-readiness";
 import { updateCampaignStatusInWorkspace } from "@/lib/campaign-ivr.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
 import { CAMPAIGN_DISPATCH_JOB_TYPE } from "@/lib/worker/job-types.server";
+import {
+  ivrCallingPolicy,
+  nextDispatchOpenAt,
+  smsSendPolicy,
+} from "@/lib/campaign-dispatch-policy";
+import { SEND_WINDOW_MAX_DEFER_MS } from "@/lib/throughput-config";
 import type { Campaign, LiveCampaign, MessageCampaign, IVRCampaign } from "@/lib/types";
 
 type CampaignDetails = LiveCampaign | MessageCampaign | IVRCampaign | null | undefined;
@@ -187,4 +193,75 @@ export async function kickoffCampaign(args: {
   });
 
   return { ok: true, status: "running", job };
+}
+
+/**
+ * After a campaign's calling-hours / SMS send-window is edited while the
+ * campaign is live, pull a parked `campaign_dispatch` successor forward to
+ * the exact new boundary (#1816). A deferred successor carries the boundary
+ * computed at defer time, so editing the window to open earlier (or now)
+ * must not leave the chain sleeping at the stale time.
+ *
+ * Only machine-dispatched campaigns (message, robocall, simple_ivr,
+ * complex_ivr) run a dispatch chain. `live_call` is human-dialled and has no
+ * successor to reschedule. No live job row means the chain already ended or
+ * is mid-tick; the next successor re-reads the campaign fresh, so there is
+ * nothing to pull forward.
+ *
+ * Returns whether a queued successor was rescheduled.
+ */
+export async function rescheduleDispatchAfterWindowEdit(args: {
+  workspaceId: string;
+  campaignId: number;
+  campaign: Pick<
+    Campaign,
+    | "type"
+    | "status"
+    | "schedule"
+    | "sms_send_window"
+    | "start_date"
+    | "end_date"
+  >;
+  now?: Date;
+}): Promise<boolean> {
+  const { workspaceId, campaignId, campaign } = args;
+  const now = args.now ?? new Date();
+
+  if (
+    campaign.type !== "message" &&
+    !isMachineDispatchedVoiceCampaignType(campaign.type)
+  ) {
+    return false;
+  }
+
+  // A live chain exists only for running / waiting (waiting = voice parked
+  // by the sweep) / scheduled-start campaigns. Draft, paused, complete, and
+  // archived campaigns have no successor worth pulling.
+  if (
+    campaign.status !== "running" &&
+    campaign.status !== "waiting" &&
+    campaign.status !== "scheduled"
+  ) {
+    return false;
+  }
+
+  const policy =
+    campaign.type === "message"
+      ? smsSendPolicy(campaign)
+      : ivrCallingPolicy(campaign);
+  const nextOpenAt = nextDispatchOpenAt(policy, now);
+  // Unrestricted (null window) means "send anytime" — wake the chain now so
+  // it re-reads the campaign rather than sleeping to a stale boundary.
+  const targetMs = nextOpenAt
+    ? Math.min(nextOpenAt.getTime(), now.getTime() + SEND_WINDOW_MAX_DEFER_MS)
+    : now.getTime();
+
+  const jobId = await findLiveJobId({
+    type: CAMPAIGN_DISPATCH_JOB_TYPE,
+    workspaceId,
+    campaignId,
+  });
+  if (jobId == null) return false;
+
+  return rescheduleQueuedJob(jobId, new Date(targetMs));
 }

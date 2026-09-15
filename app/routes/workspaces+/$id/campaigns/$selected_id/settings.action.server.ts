@@ -39,6 +39,7 @@ import {
   launchCampaign,
   kickoffCampaign,
   isMachineDispatchedVoiceCampaignType,
+  rescheduleDispatchAfterWindowEdit,
 } from "@/lib/campaign-execution.server";
 import { getWorkspacePhoneNumbers } from "@/lib/database/workspace.server";
 import { getWorkspaceMessagingOnboardingFromTwilioData } from "@/lib/messaging-onboarding.server";
@@ -138,6 +139,25 @@ export const action = defineAction({
             workspace: workspace_id,
           },
         });
+
+        // #1816: a live machine campaign whose window was just edited may
+        // have a parked dispatch successor sleeping at the old boundary.
+        // Pull it forward to the new next-open (or wake it now when the
+        // window is unrestricted) so the edit takes effect within one hop.
+        // Best-effort: a reschedule failure must not fail an already-saved
+        // campaign edit.
+        try {
+          await rescheduleDispatchAfterWindowEdit({
+            workspaceId: workspace_id,
+            campaignId: Number(selected_id),
+            campaign: result.campaign,
+          });
+        } catch (error) {
+          logger.warn("campaign_settings.reschedule_after_window_edit_failed", {
+            campaignId: Number(selected_id),
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
 
         return routeData({
           success: true,
