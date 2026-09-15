@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => {
         job: { enqueued: true, jobId: 1 },
       };
     }),
+    rescheduleDispatchAfterWindowEdit: vi.fn(async () => true),
     enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 1 })),
     logger: {
       debug: vi.fn(),
@@ -93,6 +94,8 @@ vi.mock("@/lib/campaign-execution.server", async (importOriginal) => {
   return {
     ...actual,
     launchCampaign: (...args: any[]) => mocks.launchCampaign(...args),
+    rescheduleDispatchAfterWindowEdit: (...args: unknown[]) =>
+      mocks.rescheduleDispatchAfterWindowEdit(...args),
   };
 });
 vi.mock("@/lib/campaign-ivr.server", async (importOriginal) => {
@@ -186,6 +189,7 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     mocks.getSignedUrls.mockReset();
     mocks.getCampaignQueueContactIds.mockReset();
     mocks.enqueueContactsForCampaign.mockReset();
+    mocks.rescheduleDispatchAfterWindowEdit.mockReset();
     campaignIvrMocks.findCampaignInWorkspace.mockReset();
     campaignIvrMocks.updateCampaignStatusInWorkspace.mockReset();
     campaignIvrMocks.insertCampaignForWorkspace.mockReset();
@@ -312,6 +316,58 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       actionType: "save",
       error: "Campaign changes could not be saved",
     });
+  });
+
+  test("save on a live message campaign pulls a parked dispatch successor forward (#1816)", async () => {
+    mocks.updateCampaign.mockResolvedValue({
+      campaign: {
+        id: 99,
+        workspace: "w1",
+        type: "message",
+        status: "running",
+        schedule: null,
+        sms_send_window: {},
+        start_date: "2026-03-10T10:00:00.000Z",
+        end_date: "2026-03-11T10:00:00.000Z",
+      },
+      campaignDetails: { campaign_id: 99 },
+    });
+    mocks.verifyAuth.mockResolvedValueOnce({
+      user: { id: "u1" },
+    });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "save",
+      campaignData: JSON.stringify({
+        title: "Edited window",
+        type: "message",
+        schedule: null,
+        sms_send_window: "{}",
+      }),
+      campaignDetails: JSON.stringify({}),
+    });
+
+    const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+      request: new Request("http://x", { method: "POST" }),
+      params: { id: "w1", selected_id: "99" },
+    })));
+
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({
+      success: true,
+      actionType: "save",
+    });
+    // The edited window must wake (or re-bound) the parked successor.
+    expect(mocks.rescheduleDispatchAfterWindowEdit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspaceId: "w1",
+        campaignId: 99,
+        campaign: expect.objectContaining({
+          type: "message",
+          status: "running",
+        }),
+      }),
+    );
   });
 
   test("returns a duplicate-specific, non-technical error when cloning fails", async () => {
