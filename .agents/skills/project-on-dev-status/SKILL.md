@@ -1,0 +1,125 @@
+---
+name: project-on-dev-status
+description: "Use when a PR that references issue(s) (via 'Fixes #N' / 'Closes #N' OR this repo's bare 'Issues: #N, #N' convention) merges into dev and the linked issues need their CHS backlog (project 9) Status moved to 'on-dev' from the CLI. Trigger words: mark issues on-dev, move issue status, on-dev Status, kanban idea, why is this still on Backlog."
+---
+
+# Move merged-to-dev issues to the on-dev Status (CLI)
+
+The repo workflow [`.github/workflows/issue-on-dev.yml`](../../.github/workflows/issue-on-dev.yml)
+already labels + comments every issue a dev-merge PR closes, and moves the CHS backlog
+Status **only when** `vars.ON_DEV_PROJECT_NUMBER` and `secrets.PROJECT_TOKEN` are set.
+They are not configured (repo has no variables; only the `NODE_AUTH_TOKEN` secret), so the
+Status column never moves and issues stay on "Backlog" after their fix lands on dev. This
+skill is the CLI fallback that moves the Status without a fine-grained Project token.
+
+Extends `github-cli` and `github-issues` — apply their auth/repo rules first.
+
+## Prerequisites
+
+- `gh` authenticated with a token that has the **`project` scope** (verified: current
+  token has it). A GITHUB_TOKEN from Actions cannot write org projects — do NOT run this
+  in a workflow with `github.token`.
+- Target project facts (verified 2026-09-15, project re-verifiable below):
+  - Project: **CHS backlog**, number **9** (org `chester-hill-solutions`)
+  - Status field id: `PVTSSF_lADOCNShUM4BeArizhYeBKI`
+  - `on-dev` option id: `9fd67429` · `Backlog` option id: `f75ad846` ·
+    `tested-on-dev` option id: `eaff2ab1`
+
+Re-verify if the project or options change:
+
+```bash
+gh project list --owner chester-hill-solutions --format json
+gh project field-list 9 --owner chester-hill-solutions --format json \
+  | jq -r '.fields[] | select(.name=="Status") | "field \(.id)\n" + ([.options[].name] | join(", "))'
+```
+
+## When to use
+
+A PR has **merged into `dev`** (not master), its body or commit references issue(s) with
+a closing keyword, and the issues still sit on Backlog. Typical trigger: the user asks
+"why is this still on the backlog" or you see the `on-dev` label comment but no Status move.
+
+## Steps
+
+1. Find the merged PR and its issues (repo: `chester-hill-solutions/callcaster`).
+
+   This repo's merged PRs usually reference issues two ways — either a closing keyword
+   (`Fixes #N` / `Closes #N`, handled) or a bare **`Issues: #N, #N`** line (the common
+   convention in codex-sourced fixes, which GitHub's auto-close and the workflow's
+   keyword regex do NOT catch). Parse both. Note: keep the final `sort` INSIDE the
+   `$(...)` — writing `issues=$(...) | sort` forks the assignment into a subshell and
+   leaves `issues` empty in the current shell.
+
+```bash
+pr=1798   # the merged PR into dev
+body=$(gh pr view "$pr" --json body --jq .body 2>/dev/null | tr -d '\r' | tr '[:upper:]' '[:lower:]')
+issues=$(
+  { printf '%s' "$body" \
+      | grep -oE '\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b[[:space:]]*:?[[:space:]]*#[0-9]+' \
+      | grep -oE '[0-9]+$'; \
+    printf '%s\n' "$body" \
+      | grep -oE '\bissues?[[:space:]]*:?[[:space:]]*#[0-9]+([[:space:],]+#?[0-9]+)*' \
+      | grep -oE '#[0-9]+' \
+      | grep -oE '[0-9]+$'; } \
+  | sort -un
+)
+echo "$issues"
+```
+
+   Verify each issue is still open (a closed one already finished promotion):
+
+```bash
+for n in $issues; do gh issue view "$n" --json state --jq '.state'; done
+```
+
+2. Resolve each issue's item id on project 9. **Use GraphQL, not `item-list`**:
+   `item-list --limit 1000` inconsistently drops items based on `content.number`,
+   even for issues that ARE on the project (observed 2026-09-15: 4 of 6 target items
+   returned "no item" via item-list; all resolved via projectItems GraphQL). One
+   issue → one item id (first project-9 item; multi-item issues are not expected here):
+
+```bash
+gh api graphql -f query='query { repository(owner: "chester-hill-solutions", name: "callcaster") { issue(number: <n>) { projectItems(first: 5) { nodes { id project { number } } } } } }' \
+  | jq -r '[.data.repository.issue.projectItems.nodes[] | select(.project.number == 9) | .id][0]'
+```
+
+   Issues not on project 9 return nothing — skip them (they have no Status to move).
+
+3. Move each item to `on-dev`:
+
+```bash
+gh project item-edit --project-id PVT_kwDOCNShUM4BeAri \
+  --id '<item-id>' --field-id PVTSSF_lADOCNShUM4BeArizhYeBKI \
+  --single-select-option-id 9fd67429
+```
+
+## Verification
+
+- Via GraphQL (authoritative — same route as the lookup):
+
+```bash
+gh api graphql -f query='query { repository(owner: "chester-hill-solutions", name: "callcaster") { issue(number: <n>) { projectItems(first: 5) { nodes { project { number } fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } } } } } } }'
+```
+
+  Expect `fieldValueByName(name:"Status").name == "on-dev"` on the project-9 node.
+- `gh project item-list 9 ... --limit 1000` is fine as a cross-check but can report
+  "no item" for issues that ARE on the project — treat a miss as inconclusive.
+
+## Hazards
+
+- **Never use this to set Status to a terminal lane** (`archive`, or any "closed/live"
+  meaning). Its only job is the transient `on-dev` state during review.
+- Only move after the PR is **actually merged to dev** (check `gh pr view --json state` ==
+  MERGED). A draft or unmerged PR that merely *references* an issue must not move it.
+- Reinstate `Backlog` if the change is reverted off dev (`f75ad846`).
+- Do not hand-edit the `on-dev` label — the workflow owns labels; this skill only moves
+  the project Status, which the workflow cannot do without `PROJECT_TOKEN`.
+- One logical concern per run: move only the issues referenced by the merged PR in
+  question. Do not sweep unrelated issues you happen to notice on Backlog.
+
+## Related
+
+- Next states: `tested-on-dev` (`eaff2ab1`) when QA confirms on the review env, then
+  GitHub closes the issue on master promotion (see `github-issues` Closed Reasons).
+- The upstream fix (#1813) is to set `ON_DEV_PROJECT_NUMBER` + `PROJECT_TOKEN` so the
+  workflow does this automatically — this skill is the fallback until then.
