@@ -209,5 +209,20 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1815,
+    "verdict": "needs-repro",
+    "recommendedTitle": "TBD",
+    "summary": "Added to needs-repro on the 2026-09-15 board refresh (pending deeper triage).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Triage + confirm"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Added 2026-09-15 board refresh."
   }
 ]
