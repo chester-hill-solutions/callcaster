@@ -105,7 +105,9 @@ async function runCallExport(args: {
   const csvUpload = mocks.uploads.find((upload) => upload.path.endsWith(".csv"));
   if (!csvUpload) throw new Error("expected a .csv upload from the export");
   const rows = csvUpload.text.replace(/^\uFEFF/, "").trim().split("\r\n");
-  const creditsIndex = rows[0].split(",").indexOf("credits_used");
+  // #1789: the column is explicitly an estimate derived from duration and the
+  // shared rate card — not a ledger read — so the header says so.
+  const creditsIndex = rows[0].split(",").indexOf("credits_used_estimated");
   return rows[1].split(",")[creditsIndex];
 }
 
@@ -119,6 +121,33 @@ describe("voice campaign export credits", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  test("labels the credits column as an estimate (#1789)", async () => {
+    mocks.uploads.length = 0;
+    mocks.campaignExportDb.findCampaignWithScriptForExport.mockResolvedValue({
+      id: 123,
+      type: "simple_ivr",
+      title: "Test campaign",
+      workspace: "w1",
+      start_date: "2026-01-01T00:00:00.000Z",
+      end_date: "2026-01-02T00:00:00.000Z",
+      status: "completed",
+      script: { steps: { pages: {}, blocks: {} } },
+    });
+    mocks.campaignExportDb.countExportOutreachAttempts.mockResolvedValue(1);
+    mocks.campaignExportDb.listExportOutreachAttempts.mockResolvedValue([attempt]);
+    mocks.campaignExportDb.findExportContactsByIds.mockResolvedValue([contact]);
+    mocks.campaignExportDb.findExportCallsByOutreachAttemptIds.mockResolvedValue([]);
+
+    const { processCallCampaignExport } = await import("@/lib/campaign-export.server");
+    await processCallCampaignExport(123, "w1", "export-label", "Test campaign");
+
+    const csvUpload = mocks.uploads.find((upload) => upload.path.endsWith(".csv"));
+    if (!csvUpload) throw new Error("expected a .csv upload from the export");
+    const header = csvUpload.text.replace(/^\uFEFF/, "").trim().split("\r\n")[0];
+    expect(header.split(",")).toContain("credits_used_estimated");
+    expect(header.split(",")).not.toContain("credits_used");
   });
 
   test("uses IVR first-plus-additional-minute pricing", async () => {
