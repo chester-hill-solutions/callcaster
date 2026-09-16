@@ -17,7 +17,6 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Check, ChevronDown, Menu, User as UserIcon, LogOut } from "lucide-react";
@@ -123,17 +122,15 @@ const WorkspacePicker = ({
               ))}
             </CommandGroup>
           </CommandList>
-          {/* Pinned footer: OUTSIDE the scrollable list so it is always visible,
-              even with many workspaces (#1669). */}
-          <CommandSeparator />
-          <CommandItem
+          <div role="separator" className="my-1 h-px bg-border/50" />
+          <button
+            type="button"
             id="all-workspaces"
-            textValue="All workspaces"
-            onAction={() => go("/workspaces")}
-            className="border-t border-border/60"
+            onClick={() => go("/workspaces")}
+            className="flex min-h-7 w-full items-center rounded-md border-t border-border/60 px-2 py-1.5 text-left text-sm outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
           >
             All workspaces
-          </CommandItem>
+          </button>
         </Command>
       </PopoverContent>
     </Popover>
