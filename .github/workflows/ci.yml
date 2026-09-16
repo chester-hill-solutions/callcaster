@@ -8,6 +8,7 @@ on:
       - AGENTS.md
       - .agents/**
       - .opencode/**
+      - .github/projects.yaml
       - .gitignore
   pull_request:
     paths-ignore:
@@ -15,6 +16,7 @@ on:
       - AGENTS.md
       - .agents/**
       - .opencode/**
+      - .github/projects.yaml
       - .gitignore
   # Nightly full-signal run (the coverage job only runs here now — per-PR
   # coverage duplicated both test suites on every push for marginal signal).
@@ -45,6 +47,7 @@ jobs:
     outputs:
       app: ${{ steps.changes.outputs.app }}
       e2e: ${{ steps.changes.outputs.e2e }}
+      quality: ${{ steps.changes.outputs.quality }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,6 +64,9 @@ jobs:
 
   quality:
     needs: changes
+    # Typecheck, lint, tests, and structural checks only run when one of their
+    # inputs or this workflow changes.
+    if: needs.changes.outputs.quality == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

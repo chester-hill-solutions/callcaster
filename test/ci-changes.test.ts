@@ -42,27 +42,36 @@ describe("classify", () => {
     expect(classify(["ISSUE_BOARD.md", "scripts/generate-open-issues-board.mjs"])).toEqual({
       app: false,
       e2e: false,
+      quality: false,
     });
   });
 
   test("an app source change scopes both jobs in", () => {
-    expect(classify(["app/lib/foo.server.ts"])).toEqual({ app: true, e2e: true });
+    expect(classify(["app/lib/foo.server.ts"])).toEqual({ app: true, e2e: true, quality: true });
   });
 
   test("e2e-only infra scopes only e2e in", () => {
-    expect(classify(["e2e/specs/x.spec.ts"])).toEqual({ app: false, e2e: true });
-    expect(classify(["drizzle/0001_migration.sql"])).toEqual({ app: false, e2e: true });
-    expect(classify(["docker-compose.dev.yml"])).toEqual({ app: false, e2e: true });
+    expect(classify(["e2e/specs/x.spec.ts"])).toEqual({ app: false, e2e: true, quality: false });
+    expect(classify(["drizzle/0001_migration.sql"])).toEqual({ app: false, e2e: true, quality: true });
+    expect(classify(["docker-compose.dev.yml"])).toEqual({ app: false, e2e: true, quality: false });
   });
 
   test("workflow edits scope their own workflow in", () => {
-    expect(classify([".github/workflows/ci.yml"])).toEqual({ app: true, e2e: true });
-    expect(classify([".github/workflows/e2e.yml"])).toEqual({ app: false, e2e: true });
+    expect(classify([".github/workflows/ci.yml"])).toEqual({ app: true, e2e: true, quality: true });
+    expect(classify([".github/workflows/e2e.yml"])).toEqual({ app: false, e2e: true, quality: false });
   });
 
   test("lockfile and config churn scopes both jobs in", () => {
-    expect(classify(["package-lock.json"])).toEqual({ app: true, e2e: true });
-    expect(classify(["tsconfig.json"])).toEqual({ app: true, e2e: true });
+    expect(classify(["package-lock.json"])).toEqual({ app: true, e2e: true, quality: true });
+    expect(classify(["tsconfig.json"])).toEqual({ app: true, e2e: true, quality: true });
+  });
+
+  test("agent and project metadata changes scope no jobs in", () => {
+    expect(classify(["AGENTS.md", ".agents/skills/git/SKILL.md", ".github/projects.yaml"])).toEqual({
+      app: false,
+      e2e: false,
+      quality: false,
+    });
   });
 });
 

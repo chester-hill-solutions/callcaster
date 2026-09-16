@@ -3,9 +3,8 @@
  *
  * The E2E patterns are a superset of the app patterns: the compose gate boots
  * the built app, the bun server, the job worker, and the schema — so anything
- * that can change the client bundle can also change e2e. `app` scopes
- * bundle-guard; `e2e` scopes the E2E workflow. The quality job runs
- * unconditionally.
+ * that can change the client bundle can also change e2e. Each scope is kept
+ * separate so a job runs only when its tested inputs or workflow change.
  *
  * Fail-safe policy lives in the CLI: a filter may skip a job only on real
  * evidence (a resolved diff), never on uncertainty.
@@ -47,6 +46,43 @@ export const E2E_PATTERNS = [
   ".github/workflows/e2e.yml",
 ];
 
+/** Files exercised by the typecheck, lint, unit, route, API, and DB gates. */
+export const QUALITY_PATTERNS = [
+  "app/**",
+  "server/**",
+  "worker/**",
+  "services/**",
+  "shared/**",
+  "vendor/**",
+  "test/**",
+  "scripts/check-*.mjs",
+  "scripts/check-*.ts",
+  "scripts/ci-changes.mjs",
+  "scripts/lib/**",
+  "scripts/db/**",
+  "scripts/verify-route-tree.mjs",
+  "scripts/generate-api-surface*",
+  "scripts/export-openapi-spec.ts",
+  "scripts/*baseline.json",
+  "client/**",
+  "drizzle/**",
+  "package.json",
+  "package-lock.json",
+  "bun.lock",
+  "tsconfig.json",
+  "vite.config.*",
+  "vitest.*",
+  "react-router.config.*",
+  "openapi-ts.config.ts",
+  "drizzle.config.ts",
+  ".eslintrc.*",
+  ".prettierrc",
+  ".npmrc",
+  ".bun-version",
+  ".env.example",
+  ".github/workflows/ci.yml",
+];
+
 /** Glob -> RegExp. `**` crosses directories, `*` stays within one. */
 export function globToRegExp(pattern) {
   const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&");
@@ -60,6 +96,7 @@ export function globToRegExp(pattern) {
 
 const APP_RX = APP_PATTERNS.map(globToRegExp);
 const E2E_RX = E2E_PATTERNS.map(globToRegExp);
+const QUALITY_RX = QUALITY_PATTERNS.map(globToRegExp);
 
 /**
  * Classify a changed-file list (repo-relative paths) into job scopes.
@@ -70,6 +107,7 @@ export function classify(files) {
   return {
     app: files.some((file) => APP_RX.some((rx) => rx.test(file))),
     e2e: files.some((file) => E2E_RX.some((rx) => rx.test(file))),
+    quality: files.some((file) => QUALITY_RX.some((rx) => rx.test(file))),
   };
 }
 
