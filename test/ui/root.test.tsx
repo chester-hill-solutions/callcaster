@@ -256,6 +256,31 @@ describe("root.tsx", () => {
     expect(mocks.navigate).toHaveBeenCalledWith("/");
   });
 
+  // #1783/#1750: the inline theme bootstrap mutates documentElement before
+  // React hydrates, so the server-rendered <html> (no class) differs from the
+  // hydrated one — a React #418 mismatch on every load with a stored theme.
+  // suppressHydrationWarning is the narrow, next-themes-blessed escape hatch:
+  // the anti-flash script and the post-hydration ThemeProvider re-apply keep
+  // working, and React stops logging the transient attribute diff. React
+  // consumes the prop (no DOM attribute is emitted), so assert via the
+  // element's internal React props — the same value hydration consults.
+  test("App renders <html> with suppressHydrationWarning (#1783)", async () => {
+    mocks.loaderData = {
+      isSignedIn: false,
+      workspaces: null,
+      user: null,
+      params: {},
+    };
+    const mod = await import("../../app/root");
+    document.documentElement.innerHTML = "";
+    render(<mod.default />, { container: document.documentElement });
+    const html = document.documentElement;
+    const propsKey = Object.keys(html).find((k) => k.includes("reactProps"));
+    expect((html as Record<string, unknown>)[propsKey ?? ""]).toMatchObject({
+      suppressHydrationWarning: true,
+    });
+  });
+
   async function renderErrorBoundary() {
     const mod = await import("../../app/root");
     document.documentElement.innerHTML = "";
@@ -301,6 +326,11 @@ describe("root.tsx", () => {
     try {
       await renderErrorBoundary();
       expect(document.documentElement.classList.contains("dark")).toBe(true);
+      const html = document.documentElement;
+      const propsKey = Object.keys(html).find((k) => k.includes("reactProps"));
+      expect((html as Record<string, unknown>)[propsKey ?? ""]).toMatchObject({
+        suppressHydrationWarning: true,
+      });
     } finally {
       vi.unstubAllGlobals();
       document.documentElement.classList.remove("dark");
