@@ -16,8 +16,8 @@ Treat it as the repository-local record of the project name, field IDs, option
 IDs, and option names. If it is missing or stale, refresh it from GitHub before
 mutating the project. Do not guess opaque GitHub IDs.
 
-For project `9` in this repository, use the `project` entry in
-`.github/projects.yaml` and keep its `fields` as a subkey of that entry.
+For project `9` in this repository, use the list element with `id: 9` in
+`.github/projects.yaml` and keep its `fields` as a subkey of that element.
 
 ## Safe Workflow
 

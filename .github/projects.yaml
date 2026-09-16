@@ -1,19 +1,19 @@
-project:
-  name: CHS Backlog
-  id: 9
-  fields:
-    - name: Status
-      id: PVTSSF_lADOCNShUM4BeArizhYeBKI
-      options:
-        - id: f75ad846
-          name: Backlog
-        - id: 47fc9ee4
-          name: In progress
-        - id: 9fd67429
-          name: on-dev
-        - id: eaff2ab1
-          name: tested-on-dev
-        - id: 98236657
-          name: on-qa
-        - id: 2441cbb1
-          name: archive
+projects:
+  - id: 9
+    name: CHS Backlog
+    fields:
+      - name: Status
+        id: PVTSSF_lADOCNShUM4BeArizhYeBKI
+        options:
+          - id: f75ad846
+            name: Backlog
+          - id: 47fc9ee4
+            name: In progress
+          - id: 9fd67429
+            name: on-dev
+          - id: eaff2ab1
+            name: tested-on-dev
+          - id: 98236657
+            name: on-qa
+          - id: 2441cbb1
+            name: archive
