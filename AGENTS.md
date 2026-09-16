@@ -15,7 +15,8 @@ Always talk to me like I have ADHD.
 - For broad bug, typecheck, test, or coverage sweeps, keep iterating until the issue list is exhausted or a real blocker is reached.
 - When implementing from an attached plan whose todos already exist, update the existing todos instead of recreating them and work through the full list before stopping.
 - Do not modify, overwrite, or reset the user's existing `.env` or environment variables during setup work.
-- When work reveals a repeatable task, always assess whether to document it: use a `.agents/skills/` skill for reusable guided workflows, a `.opencode/tools/` tool for deterministic commands or automation, or a `.opencode/agents/` agent for delegable multi-step work. Add the smallest useful artifact when it will prevent future rediscovery.
+- When work reveals a repeatable task or a reusable error-prevention rule, document it in the smallest suitable artifact: use a `.agents/skills/` skill for guided workflows, a `.opencode/tools/` tool for deterministic commands or automation, or a `.opencode/agents/` agent for delegable multi-step work. Update the relevant skill in the same task when an error exposes missing guidance. Do not add one-off incident logs.
+- Always load the relevant repository skill before a specialized task; use the GitHub skills for GitHub CLI, pull request, issue, or project-board work, and use the `git` skill for branch and commit work. When an error reveals missing reusable guidance, update the relevant skill in the same task. Do not create one-off incident logs.
 
 ## Design System
 
