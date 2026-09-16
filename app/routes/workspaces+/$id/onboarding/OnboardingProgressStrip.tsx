@@ -71,7 +71,13 @@ export function OnboardingProgressStrip({
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           {visibleSteps.map((stepId, index) => {
             const meta = WIZARD_STEP_META.find((step) => step.id === stepId);
-            const stored = onboarding.steps.find((item) => item.id === stepId);
+            // The wizard calls this step "business_identity"; readiness keeps
+            // the legacy persisted ID "business_profile".
+            const persistedStepId =
+              stepId === "business_identity" ? "business_profile" : stepId;
+            const stored = onboarding.steps.find(
+              (item) => item.id === persistedStepId,
+            );
             const isActive = stepId === activeStep;
             const isComplete = stored?.status === "complete";
             const variant = isActive ? "default" : isComplete ? "secondary" : "outline";
