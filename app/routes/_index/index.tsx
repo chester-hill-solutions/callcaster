@@ -1,6 +1,8 @@
 export { loader } from "./index.loader.server";
+export type { IndexLoaderData } from "./index.loader.server";
 
-import { Form, Link, NavLink, useNavigation } from "react-router";
+import type { IndexLoaderData } from "./index.loader.server";
+import { Form, Link, NavLink, useLoaderData, useNavigation } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
@@ -16,7 +18,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 
-const HeroSection = () => (
+const HeroSection = ({ signedIn }: { signedIn: boolean }) => (
   <section className="grid items-center gap-10 py-16 md:grid-cols-2 md:gap-12 md:py-20">
     <div className="animate-fade-in-up space-y-6 text-center md:text-left">
       <h1 className="font-Zilla-Slab text-5xl font-bold tracking-tight text-foreground md:text-6xl">
@@ -27,9 +29,15 @@ const HeroSection = () => (
         more people and spends more time talking.
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3 md:justify-start">
-        <Button asChild size="lg">
-          <NavLink to="./signup">Sign Up</NavLink>
-        </Button>
+        {signedIn ? (
+          <Button asChild size="lg">
+            <NavLink to="/workspaces">Go to Workspaces</NavLink>
+          </Button>
+        ) : (
+          <Button asChild size="lg">
+            <NavLink to="./signup">Sign Up</NavLink>
+          </Button>
+        )}
         <Button asChild size="lg" variant="outline">
           <NavLink to="./pricing">View Pricing</NavLink>
         </Button>
@@ -169,19 +177,27 @@ const BenefitsSection = () => (
   </section>
 );
 
-const CtaSection = () => (
+const CtaSection = ({ signedIn }: { signedIn: boolean }) => (
   <section className="py-16 md:py-20">
     <div className="rounded-xl bg-brand-secondary/40 px-6 py-12 text-center dark:bg-brand-secondary/15">
       <h2 className="mb-3 font-Zilla-Slab text-3xl font-bold tracking-tight md:text-4xl">
         Start reaching your audience
       </h2>
       <p className="mb-8 text-lg text-muted-foreground">
-        Create your account and launch your first campaign today.
+        {signedIn
+          ? "Jump back into your workspaces and launch your next campaign."
+          : "Create your account and launch your first campaign today."}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <Button asChild size="lg">
-          <NavLink to="./signup">Sign Up</NavLink>
-        </Button>
+        {signedIn ? (
+          <Button asChild size="lg">
+            <NavLink to="/workspaces">Go to Workspaces</NavLink>
+          </Button>
+        ) : (
+          <Button asChild size="lg">
+            <NavLink to="./signup">Sign Up</NavLink>
+          </Button>
+        )}
         <Button asChild size="lg" variant="outline">
           <NavLink to="./pricing">View Pricing</NavLink>
         </Button>
@@ -314,16 +330,18 @@ const Footer = () => (
 );
 
 export default function Index() {
+  const { user } = useLoaderData<IndexLoaderData>();
   const { state } = useNavigation();
   const isBusy = state !== "idle";
+  const signedIn = user != null;
   return (
     <>
       <main className="flex min-h-screen flex-col items-center bg-background px-4 sm:px-6 lg:px-8">
         <div className="z-10 w-full max-w-6xl">
-          <HeroSection />
+          <HeroSection signedIn={signedIn} />
           <ChannelsSection />
           <BenefitsSection />
-          <CtaSection />
+          <CtaSection signedIn={signedIn} />
           <ContactForm isBusy={isBusy} />
         </div>
       </main>
