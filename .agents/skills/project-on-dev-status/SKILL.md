@@ -6,11 +6,12 @@ description: "Use when a PR that references issue(s) (via 'Fixes #N' / 'Closes #
 # Move merged-to-dev issues to the on-dev Status (CLI)
 
 The repo workflow [`.github/workflows/issue-on-dev.yml`](../../.github/workflows/issue-on-dev.yml)
-already labels + comments every issue a dev-merge PR closes, and moves the CHS backlog
-Status **only when** `vars.ON_DEV_PROJECT_NUMBER` and `secrets.PROJECT_TOKEN` are set.
-They are not configured (repo has no variables; only the `NODE_AUTH_TOKEN` secret), so the
-Status column never moves and issues stay on "Backlog" after their fix lands on dev. This
-skill is the CLI fallback that moves the Status without a fine-grained Project token.
+moves the CHS backlog Status to "On dev" via `gh project item-edit` on every dev-merge
+PR, and comments on each referenced issue (no label — #1822). Its project move runs
+**only when** `vars.ON_DEV_PROJECT_NUMBER` and `secrets.PROJECT_TOKEN` are set; otherwise
+it logs and just comments. This skill is the CLI fallback that does the Status move when
+the workflow's `PROJECT_TOKEN` isn't configured (or when you want to backfill a merge the
+automation missed).
 
 Extends `github-cli` and `github-issues` — apply their auth/repo rules first.
 
@@ -112,8 +113,9 @@ gh api graphql -f query='query { repository(owner: "chester-hill-solutions", nam
 - Only move after the PR is **actually merged to dev** (check `gh pr view --json state` ==
   MERGED). A draft or unmerged PR that merely *references* an issue must not move it.
 - Reinstate `Backlog` if the change is reverted off dev (`f75ad846`).
-- Do not hand-edit the `on-dev` label — the workflow owns labels; this skill only moves
-  the project Status, which the workflow cannot do without `PROJECT_TOKEN`.
+- **Do not add any "on-dev" label** — the project Status is the only mechanism for
+  signalling "fix on dev" (#1822). The workflow comments only; it sets Status when
+  configured, and this skill backfills it. A label adds noise with no kanban effect.
 - One logical concern per run: move only the issues referenced by the merged PR in
   question. Do not sweep unrelated issues you happen to notice on Backlog.
 

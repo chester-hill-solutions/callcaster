@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@015428ff` · 154 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@57cc50df` · 155 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 16
+## Fix now — 17
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -33,7 +33,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Tracker: Coordinate with #1345/#1311/#1122.
 
 ### [#1816](https://github.com/chester-hill-solutions/callcaster/issues/1816) Campaign window opens at 12:00pm but IVR got sent at 12:39pm
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-13
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: on-dev · Assignee: none · Updated: 2026-09-15
 - Recommended title: **fix(dispatch): reschedule a parked campaign_dispatch successor when the campaign window is edited**
 - Child of #1352 (window widened to include 12:47, send landed 1:12). Deferrals post-#1796 enqueue successors exactly at the boundary computed at defer time (nextDispatchOpenAt, campaign.server.ts waiting/deferred_send_window branches), but editing the calling-hours/send-window of a running or waiting campaign (`$selected_id/settings.action.server.ts` case 'save') never rewrites the queued successor's retry_at, so the campaign keeps sleeping to the stale boundary.
 - Current behavior: A deferred campaign_dispatch successor is enqueued at min(nextOpenAt, now+60min). A schedule edit updates the campaign row only; rescheduleQueuedJob (enqueue-job.server.ts:133) is called from the launch path only (campaign-execution.server.ts:129).
@@ -132,6 +132,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - root.tsx inline theme script mutates documentElement pre-hydration; React logs mismatch every boot. Use narrow suppressHydrationWarning or server-rendered theme, keep the anti-flash script.
 - Done when: Implement per ticket
 - Tracker: Filed 2026-09-12 from board triage.
+
+### [#1822](https://github.com/chester-hill-solutions/callcaster/issues/1822) agents are labelling issues "on-dev" instead of setting the project status to on-dev
+- Verdict: **Fix now** · Size: XS · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-09-16
+- Recommended title: **ops(ci): mint PROJECT_TOKEN so issue-on-dev.yml moves the kanban Status**
+- Sai: agents add the `on-dev` label instead of setting the project Status; `gh project item-edit` is the correct command. Root cause: issue-on-dev.yml always labelled and only moved Status when ON_DEV_PROJECT_NUMBER + PROJECT_TOKEN were set — the variable was unset and the secret missing, so every dev merge produced label-only. The workflow has been rewritten to be Status-only (no label) with the variable set to 9; the only remaining gap is minting the PROJECT_TOKEN secret.
+- Current behavior: issue-on-dev.yml: finds referenced issues (closing keywords AND `Issues: #N` line), moves them to 'On dev' via gh project item-edit, then comments. Without PROJECT_TOKEN it logs the skip and still comments.
+- Root cause: GITHUB_TOKEN cannot write org projects; without the fine-grained PROJECT_TOKEN secret the Status move step was silently skipped and the label was the visible proxy.
+- Resolution: Mint a fine-grained PAT with Projects read/write scoped to the CHS backlog project and set it as the repo secret PROJECT_TOKEN. Until then the project-on-dev-status skill backfills merges.
+- Look in: `.github/workflows/issue-on-dev.yml`
+- Done when: A dev-merge PR moves its referenced issues to the 'On dev' Status; No on-dev label is applied anywhere
+- Tracker: Ops/config; overlaps #1813/#1697/#1686.
 
 ---
 
@@ -897,14 +908,14 @@ Product, security, or operations decision required before implementation can be 
 
 ### [#1813](https://github.com/chester-hill-solutions/callcaster/issues/1813) issues should be marked on-dev when commits are merged into dev.
 - Verdict: **Needs decision** · Size: XS · Risk: low · Labels: devops/admin · Assignee: @wra-sol · Updated: 2026-09-13
-- Recommended title: **Decide the on-dev Status move: configure PROJECT vars or keep label+comment**
-- The on-dev automation ALREADY exists: .github/workflows/issue-on-dev.yml labels + comments each issue when a PR merges into dev, and moves the project Status only when vars.ON_DEV_PROJECT_NUMBER and secrets.PROJECT_TOKEN are set. Repo state: no repo variables are set (gh variable list empty; only NODE_AUTH_TOKEN secret), so the Status move step is skipped — label and comment land, the kanban Status never moves. That is the reported confusion (some issues on backlog, others on-dev).
-- Current behavior: issue-on-dev.yml: label + comment on dev merge; Status move gated on ON_DEV_PROJECT_NUMBER + PROJECT_TOKEN, both unset.
-- Root cause: None — the requested automation exists; the optional Status column move is unconfigured.
-- Resolution: Set ON_DEV_PROJECT_NUMBER (repo variable) + PROJECT_TOKEN (fine-grained secret with Projects read/write) so the Status option moves; or explicitly decide the label+comment path is the process and close with that documented.
+- Recommended title: **Finish the on-dev Status config: mint PROJECT_TOKEN**
+- Resolved shape per #1822: issue-on-dev.yml now moves the CHS backlog Status via `gh project item-edit` (Status is THE signal; the `on-dev` label was removed). ON_DEV_PROJECT_NUMBER=9 is set as a repo variable. The only missing piece is the fine-grained PROJECT_TOKEN secret (GITHUB_TOKEN cannot write org projects). Until it is set, the workflow logs-and-comments and the project-on-dev-status skill backfills the move.
+- Current behavior: issue-on-dev.yml: Status move via gh project item-edit + comment on dev merge; no label. Without PROJECT_TOKEN the move is skipped (logged) and the comment still lands.
+- Root cause: None — automation now exists and is Status-first; the token secret is the sole unconfigured input.
+- Resolution: Mint a fine-grained PAT with Projects read/write and set it as the PROJECT_TOKEN repo secret (steps in .github/workflows/issue-on-dev.yml header). Until then the project-on-dev-status skill covers merges.
 - Look in: `.github/workflows/issue-on-dev.yml`
-- Done when: Issues merged to dev are visibly on-dev without manual intervention; Chosen mechanism is either the project Status move (configured vars) or label+comment documented as enough
-- Tracker: Ops config decision, not code; overlaps #1697/#1686 decisions.
+- Done when: A dev-merge PR auto-moves its referenced issues to the 'On dev' Status; No on-dev label is applied anywhere (Status is the only signal)
+- Tracker: Ops/config: only PROJECT_TOKEN remains; overlaps #1697/#1686.
 
 ### [#1789](https://github.com/chester-hill-solutions/callcaster/issues/1789) Voice campaign exports calculate credits with the retired one-credit-per-minute rate
 - Verdict: **Needs decision** · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
