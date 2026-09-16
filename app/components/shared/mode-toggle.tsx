@@ -56,6 +56,12 @@ export function ModeToggle() {
       ? theme
       : "system";
   const label = getThemeLabel(mode);
+  // #1750: `aria-label`/`title` must stay server-stable like the icon. The
+  // resolved theme comes from localStorage/`prefers-color-scheme`, which the
+  // server cannot know — emitting a resolved label on the first pass would
+  // mismatch the server HTML and re-trigger React #418. Until mount, use the
+  // neutral label; the theme-specific copy only appears post-hydration.
+  const visibleLabel = mounted ? `Toggle theme. ${label}` : "Toggle theme.";
   const Icon =
     mode === "system" ? SunMoon : resolvedTheme === "dark" ? Moon : Sun;
 
@@ -63,8 +69,8 @@ export function ModeToggle() {
     <button
       type="button"
       onClick={() => setTheme(getNextTheme(mode))}
-      aria-label={`Toggle theme. ${label}`}
-      title={label}
+      aria-label={visibleLabel}
+      title={visibleLabel}
       className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-transparent bg-white/70 text-brand-primary transition-colors duration-150 ease-in-out hover:border-brand-primary/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 dark:bg-black/70 dark:text-brand-secondary dark:hover:bg-black"
     >
       {mounted ? (
