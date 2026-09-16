@@ -23,7 +23,11 @@ The manual's command surface is: `agent-task`, `alias`, `api`, `attestation`, `a
 3. Prefer `--json` with `--jq` or `--template` for scripts and inspection. For REST or GraphQL capabilities missing from porcelain commands, use `gh api` and inspect the API response.
 4. Read current state before modifying it. Use the specific command's `--help` to confirm the available create, edit, remove, or delete flags.
 5. Treat `delete`, `close`, `merge`, `transfer`, `archive`, secret changes, permission changes, and workflow reruns/cancellations as consequential mutations. Confirm target and requested intent before running them.
-6. For issue type, parent/child, or dependency work, load the `github-issues` skill in addition to this skill.
+6. For pull request work, load the `github-pull-request` skill in addition to this skill.
+7. For issue type, parent/child, or dependency work, load the `github-issues` skill in addition to this skill.
+8. For project-board work, load the `github-projects` skill in addition to this skill.
+9. For branch and commit work, load the `git` skill in addition to this skill.
+10. When an error reveals missing reusable guidance, update the relevant skill in the same task. Do not create one-off incident logs.
 
 ## Authentication And Scopes
 
@@ -44,3 +48,5 @@ Use `gh auth refresh -s <scope>` only when the operation requires an additional 
 ## Verification
 
 After a mutation, query the target object and report its URL plus the fields that changed. Do not treat successful command exit status as sufficient proof of remote state.
+
+For pull requests and projects, follow the dedicated skill workflows before using their mutation commands.
