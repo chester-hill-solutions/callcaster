@@ -250,5 +250,26 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Parent #1352 still open needs-repro; this is the actionable child."
+  },
+  {
+    "issueNumber": 1822,
+    "verdict": "fix-now",
+    "recommendedTitle": "ops(ci): mint PROJECT_TOKEN so issue-on-dev.yml moves the kanban Status",
+    "summary": "Sai: agents add the `on-dev` label instead of setting the project Status; `gh project item-edit` is the correct command. Root cause: issue-on-dev.yml always labelled and only moved Status when ON_DEV_PROJECT_NUMBER + PROJECT_TOKEN were set — the variable was unset and the secret missing, so every dev merge produced label-only. The workflow has been rewritten to be Status-only (no label) with the variable set to 9; the only remaining gap is minting the PROJECT_TOKEN secret.",
+    "currentBehavior": "issue-on-dev.yml: finds referenced issues (closing keywords AND `Issues: #N` line), moves them to 'On dev' via gh project item-edit, then comments. Without PROJECT_TOKEN it logs the skip and still comments.",
+    "rootCause": "GITHUB_TOKEN cannot write org projects; without the fine-grained PROJECT_TOKEN secret the Status move step was silently skipped and the label was the visible proxy.",
+    "resolution": "Mint a fine-grained PAT with Projects read/write scoped to the CHS backlog project and set it as the repo secret PROJECT_TOKEN. Until then the project-on-dev-status skill backfills merges.",
+    "lookIn": [
+      ".github/workflows/issue-on-dev.yml"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A dev-merge PR moves its referenced issues to the 'On dev' Status",
+      "No on-dev label is applied anywhere"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Ops/config; overlaps #1813/#1697/#1686."
   }
 ]

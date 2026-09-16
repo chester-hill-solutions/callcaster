@@ -549,23 +549,23 @@
   {
     "issueNumber": 1813,
     "verdict": "needs-decision",
-    "recommendedTitle": "Decide the on-dev Status move: configure PROJECT vars or keep label+comment",
-    "summary": "The on-dev automation ALREADY exists: .github/workflows/issue-on-dev.yml labels + comments each issue when a PR merges into dev, and moves the project Status only when vars.ON_DEV_PROJECT_NUMBER and secrets.PROJECT_TOKEN are set. Repo state: no repo variables are set (gh variable list empty; only NODE_AUTH_TOKEN secret), so the Status move step is skipped \u2014 label and comment land, the kanban Status never moves. That is the reported confusion (some issues on backlog, others on-dev).",
-    "currentBehavior": "issue-on-dev.yml: label + comment on dev merge; Status move gated on ON_DEV_PROJECT_NUMBER + PROJECT_TOKEN, both unset.",
-    "rootCause": "None \u2014 the requested automation exists; the optional Status column move is unconfigured.",
-    "resolution": "Set ON_DEV_PROJECT_NUMBER (repo variable) + PROJECT_TOKEN (fine-grained secret with Projects read/write) so the Status option moves; or explicitly decide the label+comment path is the process and close with that documented.",
+    "recommendedTitle": "Finish the on-dev Status config: mint PROJECT_TOKEN",
+    "summary": "Resolved shape per #1822: issue-on-dev.yml now moves the CHS backlog Status via `gh project item-edit` (Status is THE signal; the `on-dev` label was removed). ON_DEV_PROJECT_NUMBER=9 is set as a repo variable. The only missing piece is the fine-grained PROJECT_TOKEN secret (GITHUB_TOKEN cannot write org projects). Until it is set, the workflow logs-and-comments and the project-on-dev-status skill backfills the move.",
+    "currentBehavior": "issue-on-dev.yml: Status move via gh project item-edit + comment on dev merge; no label. Without PROJECT_TOKEN the move is skipped (logged) and the comment still lands.",
+    "rootCause": "None \u2014 automation now exists and is Status-first; the token secret is the sole unconfigured input.",
+    "resolution": "Mint a fine-grained PAT with Projects read/write and set it as the PROJECT_TOKEN repo secret (steps in .github/workflows/issue-on-dev.yml header). Until then the project-on-dev-status skill covers merges.",
     "lookIn": [
       ".github/workflows/issue-on-dev.yml"
     ],
     "existingTests": [],
     "missingTests": [],
     "acceptanceCriteria": [
-      "Issues merged to dev are visibly on-dev without manual intervention",
-      "Chosen mechanism is either the project Status move (configured vars) or label+comment documented as enough"
+      "A dev-merge PR auto-moves its referenced issues to the 'On dev' Status",
+      "No on-dev label is applied anywhere (Status is the only signal)"
     ],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Ops config decision, not code; overlaps #1697/#1686 decisions."
+    "trackerRecommendation": "Ops/config: only PROJECT_TOKEN remains; overlaps #1697/#1686."
   },
   {
     "issueNumber": 1814,
