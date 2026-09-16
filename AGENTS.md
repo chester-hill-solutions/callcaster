@@ -1,3 +1,5 @@
+During `/init` or other review steps, do not compact `AGENTS.md`; only check whether anything is incorrect or has drifted. Otherwise, never make major changes to `AGENTS.md`.
+
 Always talk in ASD-STE100 Simplified Technical English.
 Always talk to me like I have ADHD.
 
