@@ -8,6 +8,7 @@ on:
       - AGENTS.md
       - .agents/**
       - .opencode/**
+      - .github/projects.yaml
       - .gitignore
   pull_request:
     paths-ignore:
@@ -15,6 +16,7 @@ on:
       - AGENTS.md
       - .agents/**
       - .opencode/**
+      - .github/projects.yaml
       - .gitignore
   # Nightly full-signal run (the coverage job only runs here now — per-PR
   # coverage duplicated both test suites on every push for marginal signal).
