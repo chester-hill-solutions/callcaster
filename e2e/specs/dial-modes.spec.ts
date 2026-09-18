@@ -5,13 +5,14 @@ import { setWorkspaceCredits } from "../fixtures/factories";
 
 ownerTest.describe("Dial modes @authenticated @slow", () => {
   ownerTest("DIAL-01 predictive toggle in settings", async ({ page }) => {
+    // #1863: the dial options moved from Launch's collapsed "Calling options"
+    // to the Setup page, where they are always visible.
     await page.goto(
       workspacePath(
         E2E_WORKSPACES.ready.id,
-        `campaigns/${E2E_CAMPAIGNS.livePredictive.id}/launch`,
+        `campaigns/${E2E_CAMPAIGNS.livePredictive.id}/settings`,
       ),
     );
-    await page.getByText("Calling options").click();
     await expect(page.getByText("Dial Type:")).toBeVisible();
     await expect(page.locator("#dial_type")).toBeVisible();
   });
