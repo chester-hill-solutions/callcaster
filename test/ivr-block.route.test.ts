@@ -148,9 +148,10 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       request: ivrBlockRequest(),
     } as any));
     const xml = await res.text();
-    expect(xml).toContain("<Play>https://signed</Play>");
+    // The prompt must sit INSIDE <Gather> so a keypad press interrupts it
+    // (#1841); as a sibling it only played to the end first.
     expect(xml).toContain(
-      '<Gather action="https://base.example/api/ivr/1/page_1/b1/response" input="dtmf speech" speechTimeout="auto" speechModel="phone_call" timeout="5"/>',
+      '<Gather action="https://base.example/api/ivr/1/page_1/b1/response" input="dtmf speech" speechTimeout="auto" speechModel="phone_call" timeout="5"><Play>https://signed</Play></Gather>',
     );
     expect(xml).toContain(
       "<Redirect>https://base.example/api/ivr/1/page_1/b1/response</Redirect>",

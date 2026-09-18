@@ -50,8 +50,10 @@ export function synthesizedSpeechText(block: AudioBlock): string {
   return "";
 }
 
+type AudioTarget = Pick<TwimlResponse, "play" | "say">;
+
 const handleAudio = async (
-  twiml: TwimlResponse,
+  target: AudioTarget,
   block: AudioBlock,
   workspace: string,
 ) => {
@@ -62,7 +64,7 @@ const handleAudio = async (
       `${workspace}/${audioFile}`,
       3600,
     );
-    twiml.play(signedUrl);
+    target.play(signedUrl);
   } else {
     // `audioFile` on a synthetic block actually stores the speech text —
     // legacy field naming from the wire format; the editor labels it
@@ -74,8 +76,8 @@ const handleAudio = async (
     // twilio SDK's SayVoice enum on module import above.
     const speech = synthesizedSpeechText(block);
     if (!speech) return;
-    twiml.say(
-      { voice: resolveVoiceForBlock(block) as Parameters<typeof twiml.say>[0]["voice"] },
+    target.say(
+      { voice: resolveVoiceForBlock(block) as Parameters<typeof target.say>[0]["voice"] },
       speech,
     );
   }
@@ -114,38 +116,6 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
   return null;
 };
 
-const handleOptions = (
-  twiml: TwimlResponse,
-  block: { options?: Array<{ value: string; next?: string }> },
-  campaignId: string,
-  pageId: string,
-  blockId: string,
-  script: Script,
-  baseUrl: string,
-) => {
-  if (block.options && block.options.length > 0) {
-    twiml.gather({
-      action: `${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
-      input: ["dtmf", "speech"],
-      speechTimeout: "auto",
-      speechModel: "phone_call",
-      timeout: 5,
-    });
-    twiml.redirect(
-      `${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/response`,
-    );
-  } else {
-    const nextLocation = findNextBlock(script, pageId, blockId);
-    if (nextLocation) {
-      twiml.redirect(
-        `${baseUrl}/api/ivr/${campaignId}/${nextLocation.pageId}/${nextLocation.blockId}`,
-      );
-    } else {
-      twiml.hangup();
-    }
-  }
-};
-
 const handleBlock = async (
     twiml: TwimlResponse,
   block: AudioBlock & { options?: Array<{ value: string; next?: string }> },
@@ -156,8 +126,32 @@ const handleBlock = async (
   workspace: string,
   baseUrl: string,
 ) => {
+  if (block.options && block.options.length > 0) {
+    const action = `${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/response`;
+    // Nest the prompt inside <Gather> so a keypad press interrupts playback
+    // (#1841). A sibling prompt is only read after it finishes, which is why
+    // the caller had to wait out the whole block before the digits registered.
+    const gather = twiml.gather({
+      action,
+      input: ["dtmf", "speech"],
+      speechTimeout: "auto",
+      speechModel: "phone_call",
+      timeout: 5,
+    });
+    await handleAudio(gather, block, workspace);
+    twiml.redirect(action);
+    return;
+  }
+
   await handleAudio(twiml, block, workspace);
-  handleOptions(twiml, block, campaignId, pageId, blockId, script, baseUrl);
+  const nextLocation = findNextBlock(script, pageId, blockId);
+  if (nextLocation) {
+    twiml.redirect(
+      `${baseUrl}/api/ivr/${campaignId}/${nextLocation.pageId}/${nextLocation.blockId}`,
+    );
+  } else {
+    twiml.hangup();
+  }
 };
 
 export const action = defineAction({

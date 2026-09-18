@@ -17,8 +17,10 @@ interface Script {
   }>;
 }
 
+type AudioTarget = Pick<TwimlResponse, "play" | "say">;
+
 const handleAudio = async (
-    twiml: TwimlResponse,
+    target: AudioTarget,
   block: { type: string; audioFile: string },
   workspace: string,
 ) => {
@@ -29,9 +31,9 @@ const handleAudio = async (
       `${workspace}/${audioFile}`,
       3600,
     );
-    twiml.play(signedUrl);
+    target.play(signedUrl);
   } else {
-    twiml.say(audioFile);
+    target.say(audioFile);
   }
 };
 
@@ -63,38 +65,6 @@ const findNextBlock = (
   return null;
 };
 
-const handleOptions = (
-  twiml: TwimlResponse,
-  block: { options?: Array<{ value: string; next?: string }> },
-  numberId: string,
-  pageId: string,
-  blockId: string,
-  script: Script,
-  baseUrl: string,
-) => {
-  if (block.options && block.options.length > 0) {
-    twiml.gather({
-      action: `${baseUrl}/api/inbound-ivr/${numberId}/${pageId}/${blockId}/response`,
-      input: ["dtmf", "speech"],
-      speechTimeout: "auto",
-      speechModel: "phone_call",
-      timeout: 5,
-    });
-    twiml.redirect(
-      `${baseUrl}/api/inbound-ivr/${numberId}/${pageId}/${blockId}/response`,
-    );
-  } else {
-    const nextLocation = findNextBlock(script, pageId, blockId);
-    if (nextLocation) {
-      twiml.redirect(
-        `${baseUrl}/api/inbound-ivr/${numberId}/${nextLocation.pageId}/${nextLocation.blockId}`,
-      );
-    } else {
-      twiml.hangup();
-    }
-  }
-};
-
 const handleBlock = async (
     twiml: TwimlResponse,
   block: { type: string; audioFile: string; options?: Array<{ value: string; next?: string }> },
@@ -105,8 +75,31 @@ const handleBlock = async (
   workspace: string,
   baseUrl: string,
 ) => {
+  if (block.options && block.options.length > 0) {
+    const action = `${baseUrl}/api/inbound-ivr/${numberId}/${pageId}/${blockId}/response`;
+    // Nest the prompt inside <Gather> so a keypad press interrupts playback
+    // (#1841); a sibling prompt is only read after it finishes.
+    const gather = twiml.gather({
+      action,
+      input: ["dtmf", "speech"],
+      speechTimeout: "auto",
+      speechModel: "phone_call",
+      timeout: 5,
+    });
+    await handleAudio(gather, block, workspace);
+    twiml.redirect(action);
+    return;
+  }
+
   await handleAudio(twiml, block, workspace);
-  handleOptions(twiml, block, numberId, pageId, blockId, script, baseUrl);
+  const nextLocation = findNextBlock(script, pageId, blockId);
+  if (nextLocation) {
+    twiml.redirect(
+      `${baseUrl}/api/inbound-ivr/${numberId}/${nextLocation.pageId}/${nextLocation.blockId}`,
+    );
+  } else {
+    twiml.hangup();
+  }
 };
 
 export const action = defineAction({

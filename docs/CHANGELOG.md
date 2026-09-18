@@ -7,6 +7,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Fixed
 
 - IVR test calls now follow the keypad branch you press instead of apologising and hanging up — a test call has no outreach attempt to record, and the key-press handler no longer mistakes that for an error ([#1840](https://github.com/chester-hill-solutions/callcaster/issues/1840)).
+- IVR keypad presses now interrupt the prompt and take the branch straight away, instead of waiting for the audio to finish first ([#1841](https://github.com/chester-hill-solutions/callcaster/issues/1841)).
 
 ## 2026-09-18 — release [#1838](https://github.com/chester-hill-solutions/callcaster/pull/1838)
 
