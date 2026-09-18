@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
@@ -62,6 +63,11 @@ function renderEditor(script: Script, audioFlow?: boolean) {
   return { onChange, lastSteps };
 }
 
+function ControlledEditor({ initialScript }: { initialScript: Script }) {
+  const [script, setScript] = useState(initialScript);
+  return <CampaignSettingsScript script={script} onChange={setScript} mediaNames={[]} />;
+}
+
 /** The block at `index` on the first page, or a clear failure if it is missing. */
 function blockOnPage(steps: WireSteps, index: number): WireBlock {
   const id = steps.pages.page_1?.blocks[index];
@@ -122,6 +128,27 @@ describe("script editor shell — audio scripts", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add response" }));
 
     expect(lastSteps().blocks.b_legacy?.options).toHaveLength(1);
+  });
+
+  test("keeps answer-label focus after the parent echoes a script update", () => {
+    const script = makeScript("ivr");
+    const steps = script.steps as {
+      blocks: Record<string, { options?: Array<{ value: string; label: string }> }>;
+    };
+    const legacyBlock = steps.blocks.b_legacy;
+    if (!legacyBlock) throw new Error("missing legacy block");
+    legacyBlock.options = [{ value: "1", label: "Yes" }];
+
+    render(<ControlledEditor initialScript={script} />);
+
+    const answerLabel = screen.getByLabelText("Answer label");
+    act(() => {
+      answerLabel.focus();
+      fireEvent.change(answerLabel, { target: { value: "Yes please" } });
+    });
+
+    expect(screen.getByLabelText("Answer label")).toHaveValue("Yes please");
+    expect(screen.getByLabelText("Answer label")).toHaveFocus();
   });
 
   test("the legacy step's text is surfaced as unspoken, not hidden", () => {

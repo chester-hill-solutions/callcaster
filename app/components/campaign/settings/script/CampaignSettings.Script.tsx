@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { Script } from "@/lib/types";
 import { documentToScript, scriptToDocument } from "@/lib/call-script-service";
 import { isAudioScriptType } from "@/lib/ivr-script-editor";
@@ -27,11 +27,26 @@ export default function CampaignSettingsScript({
   onUploadAudio,
   readOnly = false,
 }: CampaignSettingsScriptProps) {
-  const document = useMemo(() => scriptToDocument(script), [script]);
+  const latestDocument = useRef<ReturnType<typeof scriptToDocument> | null>(null);
+  const lastEmittedSteps = useRef<Script["steps"] | null>(null);
+  const document = useMemo(() => {
+    // Option ids exist only in the editor document. Re-importing the script we
+    // just emitted regenerates them and remounts focused option inputs.
+    if (script.steps === lastEmittedSteps.current && latestDocument.current) {
+      return latestDocument.current;
+    }
+
+    const nextDocument = scriptToDocument(script);
+    latestDocument.current = nextDocument;
+    return nextDocument;
+  }, [script]);
 
   const handleChange = useCallback(
     (nextDocument: ReturnType<typeof scriptToDocument>) => {
-      onChange(documentToScript(script, nextDocument));
+      latestDocument.current = nextDocument;
+      const nextScript = documentToScript(script, nextDocument);
+      lastEmittedSteps.current = nextScript.steps;
+      onChange(nextScript);
     },
     [onChange, script],
   );
