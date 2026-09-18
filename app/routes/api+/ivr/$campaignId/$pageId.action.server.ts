@@ -1,9 +1,17 @@
 import { ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { createVoiceResponse, hangupTwiml } from "@/lib/twilio-twiml.server";
+import {
+  createVoiceResponse,
+  hangupTwiml,
+  pausePlayTwiml,
+} from "@/lib/twilio-twiml.server";
 import { requireTwilioSignatureForIvrPage } from "@/lib/ivr-webhook-auth.server";
-import { findCallWithCampaignScriptBySid } from "@/lib/telephony-db.server";
+import {
+  findCallWithCampaignScriptBySid,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { defineAction } from "@/lib/handler.server";
 
 const MAX_RETRIES = 5;
@@ -34,11 +42,11 @@ const getCallWithRetry = async (
 export const action = defineAction({
   auth: ({ request, params }) =>
     requireTwilioSignatureForIvrPage(request, [params.campaignId, params.pageId]),
-  sideEffects: ["db-read"],
+  sideEffects: ["db-read", "db-write", "external"],
   handler: async ({ params, auth }) => {
   const twiml = createVoiceResponse();
   const { pageId, campaignId } = params as { pageId: string; campaignId: string };
-  const { callSid } = auth;
+  const { callSid, answeredBy } = auth;
 
   try {
     const callData = await getCallWithRetry(callSid);
@@ -52,6 +60,39 @@ export const action = defineAction({
         headers: { "Content-Type": "text/xml" },
       });
     }
+
+    // Synchronous AMD sends its verdict on this first request (#1864). Decide
+    // here so a machine never hears the IVR: play the configured drop when it
+    // is switched on, otherwise hang up.
+    const isMachine =
+      answeredBy.includes("machine") && !answeredBy.includes("other");
+    if (isMachine) {
+      if (callData.outreach_attempt_id) {
+        const updated = await updateOutreachAttemptForWorkspace(
+          String(callData.workspace),
+          callData.outreach_attempt_id,
+          { disposition: "voicemail", answered_at: new Date().toISOString() },
+        );
+        if (updated instanceof Response) {
+          throw new Error(await updated.text());
+        }
+      }
+      const campaign = callData.campaign;
+      if (campaign?.voicemail_drop_enabled && campaign.voicemail_file) {
+        const signedUrl = await createSignedObjectUrl(
+          "workspaceAudio",
+          `${callData.workspace}/${campaign.voicemail_file}`,
+          3600,
+        );
+        return new Response(pausePlayTwiml(signedUrl), {
+          headers: { "Content-Type": "text/xml" },
+        });
+      }
+      return new Response(hangupTwiml(), {
+        headers: { "Content-Type": "text/xml" },
+      });
+    }
+
     const script = ivrScriptStepsFromCampaign(callData.campaign) as
       | IvrScriptSteps
       | null

@@ -153,55 +153,17 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ success: true });
   });
 
-  test("machine voicemail: plays the campaign audio when the drop is on; hangs up when off or without audio (#1839)", async () => {
-    const callUpdate = vi.fn(async (_p: any) => ({}));
-    mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: () => ({ update: callUpdate }) });
+  test("machine answer records the voicemail disposition; playback is owned by the flow route (#1864)", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
 
-    // toggle off => hangup, no audio lookup
-    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
-      voicemail_drop_enabled: false,
-    }));
-    let res = await asRouteResponse(mod.action({
+    const res = await asRouteResponse(mod.action({
       request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
     } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ twiml: expect.stringContaining("<Hangup/>") }),
-    );
-    expect(objectStorageMocks.createSignedObjectUrl).not.toHaveBeenCalled();
-
-    // toggle on + audio => play the signed url
-    callUpdate.mockClear();
-    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
-      voicemail_drop_enabled: true,
-      voicemail_file: "v.mp3",
-    }));
-    res = await asRouteResponse(mod.action({
-      request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
-    } as any));
-    await expect(res.json()).resolves.toEqual({ success: true });
-    expect(objectStorageMocks.createSignedObjectUrl).toHaveBeenCalledWith(
-      "workspaceAudio",
-      "w1/v.mp3",
-      3600,
-    );
-    expect(callUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ twiml: expect.stringContaining("<Pause length=\"1\"/><Play>https://signed</Play>") }),
-    );
-
-    // toggle on but no audio => hangup, no throw
-    callUpdate.mockClear();
-    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
-      voicemail_drop_enabled: true,
-      voicemail_file: null,
-    }));
-    res = await asRouteResponse(mod.action({
-      request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
-    } as any));
-    await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ twiml: expect.stringContaining("<Hangup/>") }),
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      1,
+      expect.objectContaining({ disposition: "voicemail" }),
     );
   });
 
@@ -240,56 +202,15 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
-  test("covers voicemail signedUrl error/missing, toggle-off hangup, dbCall null, and updateResult error throw", async () => {
+  test("covers dbCall null and the machine disposition error throw", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
-    const callUpdate = vi.fn(async (_p: any) => ({}));
-    mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: () => ({ update: callUpdate }) });
 
     // dbCall null (callError null) => "Call not found"
     telephonyDbMocks.findCallBySid.mockResolvedValueOnce(null);
     let res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
 
-    // toggle off => hangup update
-    callUpdate.mockClear();
-    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
-      voicemail_drop_enabled: false,
-    }));
-    res = await asRouteResponse(mod.action({
-      request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }),
-    } as any));
-    await expect(res.json()).resolves.toEqual({ success: true });
-    expect(callUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ twiml: expect.stringContaining("<Hangup/>") }),
-    );
-
-    // signedUrl error => throws and is caught
-    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
-      voicemail_drop_enabled: true,
-      voicemail_file: "v.mp3",
-    }));
-    objectStorageMocks.createSignedObjectUrl.mockRejectedValueOnce(new Error("sig"));
-    res = await asRouteResponse(mod.action({
-      request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }),
-    } as any));
-    await expect(res.json()).resolves.toMatchObject({ success: false });
-
-    // signedUrl returns null => current code still issues play (no throw)
-    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
-      voicemail_drop_enabled: true,
-      voicemail_file: "v.mp3",
-    }));
-    objectStorageMocks.createSignedObjectUrl.mockResolvedValueOnce(null as any);
-    res = await asRouteResponse(mod.action({
-      request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }),
-    } as any));
-    await expect(res.json()).resolves.toMatchObject({ success: true });
-
     // updateResult error throw (machine path)
-    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
-      voicemail_drop_enabled: true,
-      voicemail_file: "v.mp3",
-    }));
     telephonyDbMocks.updateOutreachAttemptForWorkspace.mockResolvedValueOnce(new Response(JSON.stringify({ error: "x" }), { status: 500 }));
     res = await asRouteResponse(mod.action({ request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start" }) } as any));
     await expect(res.json()).resolves.toMatchObject({ success: false });
