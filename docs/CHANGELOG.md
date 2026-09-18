@@ -23,6 +23,17 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Upload failures no longer leak raw storage/server messages — every upload path returns a friendly message and keeps the raw detail in the logs ([#1769](https://github.com/chester-hill-solutions/callcaster/issues/1769)).
 - Number verification now updates the numbers page live — no refresh needed to see a number flip to verified — and the verification sheet shows a pending state with the confirmation token while the call is in flight ([#1740](https://github.com/chester-hill-solutions/callcaster/issues/1740)).
 - Adding an audio without selecting a file now shows the standard error style instead of a plain red text line ([#1665](https://github.com/chester-hill-solutions/callcaster/issues/1665)).
+- Editing a campaign's calling hours or send window now takes effect right away: the queued send is pulled forward to the new window instead of sleeping until the old boundary, so widening the window to open now sends at the new time ([#1816](https://github.com/chester-hill-solutions/callcaster/issues/1816)).
+- Campaign export credits are now labelled as an estimate: the column reads `credits_used_estimated` so it cannot be mistaken for the actual debited amount (real debits are in Billing activity) ([#1789](https://github.com/chester-hill-solutions/callcaster/issues/1789)).
+- The workspace picker no longer throws when pinned footer actions render inside the menu — workspace actions stay in the React Aria menu where required, and the pinned **All workspaces** option renders as a regular button.
+- The onboarding Identity breadcrumb now completes after you save the legal business name, instead of staying unfinished ([#1832](https://github.com/chester-hill-solutions/callcaster/issues/1832)).
+- The landing page offers **Go to Workspaces** to signed-in visitors instead of **Sign Up**, so returning users get to their workspaces in one click.
+- The page no longer logs hydration mismatch warnings on load when a theme is stored — the theme toggle's label stays neutral until the resolved theme is known, and the html theme class is applied without a React hydration conflict ([#1783](https://github.com/chester-hill-solutions/callcaster/issues/1783), [#1750](https://github.com/chester-hill-solutions/callcaster/issues/1750)).
+- Two scripts can no longer share the same name in one workspace — the friendly "already exists" error is now enforced by the database instead of only in the UI ([#1704](https://github.com/chester-hill-solutions/callcaster/issues/1704), [#1781](https://github.com/chester-hill-solutions/callcaster/issues/1781)).
+
+### Developers / operators
+
+- Issues whose fix lands on `dev` now move to the kanban **On dev** status automatically instead of getting a label, so the board shows real progress without comment spam ([#1822](https://github.com/chester-hill-solutions/callcaster/issues/1822)).
 
 ## 2026-09-11 — release [#1761](https://github.com/chester-hill-solutions/callcaster/pull/1761)
 
