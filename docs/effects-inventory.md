@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**117** documented / **119** total effects (2 grandfathered, ratcheting to 0).
+**118** documented / **120** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -25,6 +25,7 @@
 | `app/components/file-assets/AudioRecorder.tsx` | On mount, enumerate the available microphones and subscribe to the | refreshDevices (stable callback; selection is reconciled with a | subscription (mediaDevices "devicechange" listener, | Browser hardware enumeration is a client-only device |
 | `app/components/file-assets/AudioRecorder.tsx` | Tick the visible elapsed timer roughly 4x/second while a take is | phase (starts the interval on 'recording'; any other phase | timer (setInterval), cleared on phase change/unmount | Wall-clock elapsed time is live client timer state, |
 | `app/components/file-assets/AudioRecorder.tsx` | Release the microphone, audio graph, rAF loop and object URL when the | releaseAll (stable callback composed of stable callbacks; runs | dom (MediaStreamTrack.stop, AudioContext.close, | Imperative teardown of browser media hardware handles; |
+| `app/components/queue/ContactSearchDialog.tsx` | When the create POST resolves, add the new contact to the queue and | [createFetcher.state, createFetcher.data, searchQuery] | queue enqueue + search refetch | Client-side search-panel flow, no loader needed. |
 | `app/components/shared/SaveBar.tsx` | Wire a global Cmd/Ctrl+S keyboard shortcut to trigger onSave while there are unsaved changes. | isChanged, isSaving, onSave — the handler must see current values to guard the save and avoid double-submits. | dom (document keydown listener; removed on cleanup/re-run) | A global keyboard shortcut requires a document-level event listener; there's no loader/fetcher equivalent for DOM key events. |
 | `app/components/shared/mode-toggle.tsx` | Flag that we are past hydration so the resolved-theme icon can render. | none (mount only) | none (local setState) | The theme comes from localStorage/`prefers-color-scheme`, |
 | `app/components/sms-ui/ChatInput.tsx` | KEEP: align the controlled From selection with available sender | initialFrom, workspaceNumbers (available sender option values) | setSelectedFrom only | selectedFrom is intentional user-controlled state; |
