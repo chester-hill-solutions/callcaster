@@ -7,6 +7,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Changed
 
 - IVR setup no longer asks you to choose Simple IVR or Complex IVR — there is one automated phone menu. A campaign saved with the old simple/complex type stores as the automated phone menu on its next save ([#1741](https://github.com/chester-hill-solutions/callcaster/issues/1741)).
+- Voicemail drop is now an explicit switch on campaign Setup for phone-menu and live-calling campaigns, next to its audio. Existing campaigns that already had voicemail audio keep dropping; turning the switch on without choosing audio blocks launch. IVR no longer needs a script page named "voicemail" ([#1839](https://github.com/chester-hill-solutions/callcaster/issues/1839)).
 
 ### Fixed
 

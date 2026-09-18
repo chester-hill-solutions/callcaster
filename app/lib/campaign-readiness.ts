@@ -31,6 +31,7 @@ export type CampaignReadinessCode =
   | "script_required"
   | "script_unavailable"
   | "audio_unavailable"
+  | "voicemail_audio_required"
   | "message_content_required";
 
 export type CampaignReadinessIssue = {
@@ -296,6 +297,20 @@ function getResourceIssues(
   ) {
     resourceIssues.push(
       issue("script_unavailable", "The configured script is unavailable in this workspace"),
+    );
+  }
+
+  // #1839: turning the drop on without choosing audio would silently do nothing.
+  if (
+    campaignData.type !== "message" &&
+    campaignData.voicemail_drop_enabled &&
+    !campaignData.voicemail_file
+  ) {
+    resourceIssues.push(
+      issue(
+        "voicemail_audio_required",
+        "Voicemail drop is on, but no voicemail audio is selected",
+      ),
     );
   }
 

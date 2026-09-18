@@ -11,7 +11,6 @@ export default function CampaignLaunchRoute() {
     queueCount,
     dequeuedCount,
     scripts,
-    mediaData,
     draftCampaignData,
     draftCampaignDetails,
     isChanged,
@@ -47,7 +46,6 @@ export default function CampaignLaunchRoute() {
       campaignDetails={draftCampaignDetails as never}
       credits={credits}
       scripts={scripts}
-      mediaData={mediaData}
       phoneNumbers={phoneNumbers}
       handleInputChange={handleInputChange}
       handleDuplicateButton={handleDuplicate}

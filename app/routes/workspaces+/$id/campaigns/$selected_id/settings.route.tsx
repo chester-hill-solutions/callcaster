@@ -20,6 +20,7 @@ export default function CampaignSettingsRoute() {
   const location = useLocation();
   const {
     phoneNumbers,
+    mediaData,
     user,
     draftCampaignData,
     draftCampaignDetails,
@@ -86,6 +87,7 @@ export default function CampaignSettingsRoute() {
         campaignData={draftCampaignData}
         campaignDetails={draftCampaignDetails as never}
         phoneNumbers={phoneNumbers}
+        mediaData={mediaData}
         handleInputChange={handleInputChange}
         formFetcher={fetcher}
         flags={{}}

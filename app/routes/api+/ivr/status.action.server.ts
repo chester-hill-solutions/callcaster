@@ -1,5 +1,5 @@
-import { Call, Campaign, OutreachAttempt, Script, type Block } from "@/lib/types";
-import { resolveCampaignScript, fetchCampaignWithScript } from "@/lib/campaign-ivr.server";
+import { Call, Campaign, OutreachAttempt } from "@/lib/types";
+import { fetchCampaignWithScript } from "@/lib/campaign-ivr.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
@@ -8,7 +8,6 @@ import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import {
   hangupTwiml,
   pausePlayTwiml,
-  pauseSayTwiml,
 } from "@/lib/twilio-twiml.server";
 import {
   buildCallUpsertFromTwilioParams,
@@ -65,51 +64,26 @@ export interface CallEvent {
     }
 };
 
-interface ScriptSteps {
-    pages?: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }>;
-    blocks?: Record<string, Block>;
-}
-
-function findVoicemailPage(pagesObject: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }> | undefined): { title: string; blocks: string[]; speechType?: string; say?: string } | null {
-    if (!pagesObject) return null;
-    for (const pageId in pagesObject) {
-        const page = pagesObject[pageId];
-        if (!page) {
-            continue;
-        }
-        if (page.title.toLowerCase() === "voicemail") {
-            return page;
-        }
-    }
-    return null;
-}
-
-const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { script: Script | Script[] | null }): Promise<void> => {
+const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign): Promise<void> => {
     const call = twilio.calls(callSid);
     // Test calls (#1653) have a campaign but no outreach attempt; the voicemail
     // drop must still play for them.
     if (dbCall.outreach_attempt_id) {
         await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
     }
-    const scriptSteps = (resolveCampaignScript(campaign)?.steps as unknown) as ScriptSteps | null | undefined;
-    const step = findVoicemailPage(scriptSteps?.pages);
-    if (!step) {
+    // #1839: an explicit toggle gates the drop, and the audio is the campaign's
+    // dedicated voicemail file. A script page titled "voicemail" no longer
+    // triggers anything.
+    if (!campaign.voicemail_drop_enabled || !campaign.voicemail_file) {
         await call.update({ twiml: hangupTwiml() });
-    } else {
-        if (step.speechType === 'synthetic') {
-            await call.update({ twiml: pauseSayTwiml(step.say ?? "") });
-        } else {
-            if (!campaign.voicemail_file) {
-                throw new Error("Voicemail file is undefined");
-            }
-            const signedUrl = await createSignedObjectUrl(
-                "workspaceAudio",
-                `${dbCall.workspace}/${campaign.voicemail_file}`,
-                3600,
-            );
-            await call.update({ twiml: pausePlayTwiml(signedUrl) });
-        }
+        return;
     }
+    const signedUrl = await createSignedObjectUrl(
+        "workspaceAudio",
+        `${dbCall.workspace}/${campaign.voicemail_file}`,
+        3600,
+    );
+    await call.update({ twiml: pausePlayTwiml(signedUrl) });
 };
 
 export const action = defineAction({
@@ -154,19 +128,7 @@ export const action = defineAction({
             callStatus !== 'completed';
 
         if (isMachine) {
-            // `dbCall` is already typed as `Call` (`Call` and `findCallBySid`'s
-            // `CallRow` both alias the same Drizzle-inferred `call` row via
-            // `@/lib/db-types`), so it needs no cast here. `fetchCampaignWithScript`'s
-            // `script` field can be `undefined` (a `script_id` set on the campaign
-            // with no matching `script` row), which `handleVoicemail`'s
-            // `Script | Script[] | null` parameter type doesn't cover — normalize
-            // that one field to `null` instead of casting the whole shape away, so
-            // a genuinely ill-shaped campaign/call row still fails to compile
-            // rather than silently becoming `undefined` at runtime.
-            await handleVoicemail(twilio, callSid, dbCall, {
-                ...campaignData,
-                script: campaignData.script ?? null,
-            });
+            await handleVoicemail(twilio, callSid, dbCall, campaignData);
         } else if (['failed', 'no-answer', 'completed'].includes(callStatus)) {
             const updateData = buildCallUpsertFromTwilioParams(params);
             await processCallStatusWebhook(updateData, {
