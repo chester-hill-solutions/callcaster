@@ -158,44 +158,46 @@ export const action = defineAction({
       throw new Error(`Block ${blockId} not found`);
     }
 
-    const resultValue = await getOutreach(call.workspace, call.outreach_attempt_id ?? 0);
-    const result =
-      resultValue && typeof resultValue === "object"
-        ? (resultValue as Record<string, unknown>)
-        : {};
+    // Test calls (#1653) have no outreach attempt by design: they walk the flow
+    // but record nothing, so results, exports, and analytics never see them.
+    // Guarding here keeps a test key press from speaking the generic error.
+    if (call.outreach_attempt_id) {
+      const resultValue = await getOutreach(call.workspace, call.outreach_attempt_id);
+      const result =
+        resultValue && typeof resultValue === "object"
+          ? (resultValue as Record<string, unknown>)
+          : {};
 
-    const blockTitle =
-      "title" in currentBlock && typeof currentBlock.title === "string"
-        ? currentBlock.title
-        : blockId;
+      const blockTitle =
+        "title" in currentBlock && typeof currentBlock.title === "string"
+          ? currentBlock.title
+          : blockId;
 
-    const newResult = {
-      ...result,
-      [pageId]: {
-        ...(result[pageId] && typeof result[pageId] === "object"
-          ? (result[pageId] as Record<string, unknown>)
-          : {}),
-        [blockTitle]: userInput,
-      },
-    };
+      const newResult = {
+        ...result,
+        [pageId]: {
+          ...(result[pageId] && typeof result[pageId] === "object"
+            ? (result[pageId] as Record<string, unknown>)
+            : {}),
+          [blockTitle]: userInput,
+        },
+      };
 
-    if (!call.outreach_attempt_id) {
-      throw new Error("Missing outreach attempt for IVR response");
-    }
-    const typedFields = extractTypedOutreachFields(newResult as Json);
-    const tdb = createTenantDb(call.workspace);
-    const outreachUpdate = await updateOutreachAttemptForWorkspace(
-      call.workspace,
-      call.outreach_attempt_id,
-      { result: newResult, ...typedFields },
-      { tdb },
-    );
-    if (outreachUpdate instanceof Response) {
-      throw new Error(await outreachUpdate.text());
-    }
+      const typedFields = extractTypedOutreachFields(newResult as Json);
+      const tdb = createTenantDb(call.workspace);
+      const outreachUpdate = await updateOutreachAttemptForWorkspace(
+        call.workspace,
+        call.outreach_attempt_id,
+        { result: newResult, ...typedFields },
+        { tdb },
+      );
+      if (outreachUpdate instanceof Response) {
+        throw new Error(await outreachUpdate.text());
+      }
 
-    if (call.contact_id != null && typedFields.support_level != null) {
-      await syncContactSupportLevelCache(tdb, call.contact_id, typedFields.support_level);
+      if (call.contact_id != null && typedFields.support_level != null) {
+        await syncContactSupportLevelCache(tdb, call.contact_id, typedFields.support_level);
+      }
     }
 
     const nextStep = findNextStep(currentBlock, userInput, script, pageId);
