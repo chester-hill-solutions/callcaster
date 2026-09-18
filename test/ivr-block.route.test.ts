@@ -149,13 +149,40 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     } as any));
     const xml = await res.text();
     // The prompt must sit INSIDE <Gather> so a keypad press interrupts it
-    // (#1841); as a sibling it only played to the end first.
+    // (#1841); as a sibling it only played to the end first. A keypad-only
+    // step gathers DTMF only, so speech cannot skip the menu (#1856).
     expect(xml).toContain(
-      '<Gather action="https://base.example/api/ivr/1/page_1/b1/response" input="dtmf speech" speechTimeout="auto" speechModel="phone_call" timeout="5"><Play>https://signed</Play></Gather>',
+      '<Gather action="https://base.example/api/ivr/1/page_1/b1/response" input="dtmf" timeout="5"><Play>https://signed</Play></Gather>',
     );
     expect(xml).toContain(
       "<Redirect>https://base.example/api/ivr/1/page_1/b1/response</Redirect>",
     );
+  });
+
+  test("gathers speech only when the step maps a spoken answer (#1856)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: {
+        b1: {
+          id: "b1",
+          type: "say",
+          audioFile: "Say what you need.",
+          options: [{ value: "vx-any", next: "hangup" }],
+        },
+      },
+    };
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({
+      workspace: "w1",
+      script: { steps: script },
+    } as any);
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await asRouteResponse(mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: ivrBlockRequest(),
+    } as any));
+    const xml = await res.text();
+    expect(xml).toContain('input="dtmf speech"');
+    expect(xml).toContain('speechTimeout="auto"');
   });
 
   test("synthetic-speech block emits <Say voice='...'> using the block's roster voice (#1401)", async () => {

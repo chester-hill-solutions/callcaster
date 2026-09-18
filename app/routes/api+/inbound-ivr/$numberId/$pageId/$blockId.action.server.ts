@@ -77,13 +77,20 @@ const handleBlock = async (
 ) => {
   if (block.options && block.options.length > 0) {
     const action = `${baseUrl}/api/inbound-ivr/${numberId}/${pageId}/${blockId}/response`;
+    // Only listen for speech when this step maps a spoken answer (#1856). A
+    // keypad-only menu must ignore speech, or any phrase longer than two
+    // characters falls through to the linear next block and skips the menu.
+    const gathersSpeech = block.options.some(
+      (option) => String(option.value).trim() === "vx-any",
+    );
     // Nest the prompt inside <Gather> so a keypad press interrupts playback
     // (#1841); a sibling prompt is only read after it finishes.
     const gather = twiml.gather({
       action,
-      input: ["dtmf", "speech"],
-      speechTimeout: "auto",
-      speechModel: "phone_call",
+      input: gathersSpeech ? ["dtmf", "speech"] : ["dtmf"],
+      ...(gathersSpeech
+        ? { speechTimeout: "auto", speechModel: "phone_call" }
+        : {}),
       timeout: 5,
     });
     await handleAudio(gather, block, workspace);
