@@ -4,6 +4,7 @@ import {
   buildCampaignDetailsForType,
   DETAIL_FIELDS,
   normalizeCampaignData,
+  normalizeIvrCampaignType,
 } from "../app/lib/campaign-settings";
 
 describe("campaign-settings", () => {
@@ -20,6 +21,15 @@ describe("campaign-settings", () => {
     } as never);
 
     expect(normalized.schedule).toEqual({ days: ["mon"] });
+  });
+
+  test("normalizeIvrCampaignType collapses legacy IVR types to robocall (#1741)", () => {
+    expect(normalizeIvrCampaignType("simple_ivr")).toBe("robocall");
+    expect(normalizeIvrCampaignType("complex_ivr")).toBe("robocall");
+    expect(normalizeIvrCampaignType("robocall")).toBe("robocall");
+    expect(normalizeIvrCampaignType("live_call")).toBe("live_call");
+    expect(normalizeIvrCampaignType(null)).toBeNull();
+    expect(normalizeIvrCampaignType(undefined)).toBeUndefined();
   });
 
   test("buildCampaignDetailsForType builds message campaign details", () => {

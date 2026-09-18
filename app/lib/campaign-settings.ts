@@ -31,12 +31,23 @@ export function normalizeCampaignData(
 ): CampaignWithAudiences {
   return {
     ...campaignData,
+    type: normalizeIvrCampaignType(campaignData.type),
     schedule: normalizeSchedule(campaignData.schedule) as Schedule | null,
     sms_send_window: normalizeSchedule(
       (campaignData as CampaignWithAudiences & { sms_send_window?: unknown })
         .sms_send_window,
     ),
   } as CampaignWithAudiences;
+}
+
+/**
+ * IVR is a single campaign type (#1741). A `simple_ivr` / `complex_ivr` row
+ * saved before the split was removed reads and persists as `robocall`.
+ */
+export function normalizeIvrCampaignType<
+  T extends string | null | undefined,
+>(type: T): T | "robocall" {
+  return type === "simple_ivr" || type === "complex_ivr" ? "robocall" : type;
 }
 
 export function buildCampaignDetailsForType(

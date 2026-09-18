@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Changed
+
+- IVR setup no longer asks you to choose Simple IVR or Complex IVR — there is one automated phone menu. A campaign saved with the old simple/complex type stores as the automated phone menu on its next save ([#1741](https://github.com/chester-hill-solutions/callcaster/issues/1741)).
+
 ### Fixed
 
 - IVR test calls now follow the keypad branch you press instead of apologising and hanging up — a test call has no outreach attempt to record, and the key-press handler no longer mistakes that for an error ([#1840](https://github.com/chester-hill-solutions/callcaster/issues/1840)).
