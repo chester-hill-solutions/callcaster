@@ -2,10 +2,6 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { SplitCampaignPrompt } from "./CampaignDetailed.SplitCampaign";
 import {
-  DialTypeSwitch,
-  HouseholdSwitch,
-} from "./live/CampaignDetailed.Live.Switches";
-import {
   Campaign,
   WorkspaceNumbers,
   WorkspaceTwilioOpsConfig,
@@ -125,17 +121,15 @@ function OutboundEstimateAlert({
   );
 }
 
-/** Launch-adjacent extras moved out of Setup: dial options, pacing, split. */
+/** Launch-only pacing/split extras. Campaign configuration lives on Setup. */
 export function CampaignLaunchExtras({
   campaignData,
-  handleInputChange,
   isBusy,
   queueCount,
   phoneNumbers,
   outboundEstimateInputs,
 }: {
   campaignData: NonNullable<Campaign>;
-  handleInputChange: (name: string, value: unknown) => void;
   isBusy: boolean;
   queueCount: number;
   phoneNumbers: WorkspaceNumbers[];
@@ -203,41 +197,14 @@ export function CampaignLaunchExtras({
     ...ivrEstimate.warnings,
   ];
 
-  const showDialOptions = campaignData.type === "live_call";
   const showEstimates = campaignData.type === "message" || isIvrCampaign;
 
-  if (!showDialOptions && !showEstimates) {
+  if (!showEstimates) {
     return null;
   }
 
   return (
     <div className="space-y-4">
-      {showDialOptions ? (
-        <details className="rounded-md border border-border/70 p-3">
-          <summary className="cursor-pointer text-sm font-medium">
-            Calling options
-          </summary>
-          <div className="mt-3 flex flex-col gap-3">
-            <div className="flex flex-wrap gap-2">
-              <HouseholdSwitch
-                handleInputChange={handleInputChange}
-                campaignData={{
-                  group_household_queue: campaignData.group_household_queue,
-                  dial_type: campaignData.dial_type || "call",
-                }}
-              />
-              <DialTypeSwitch
-                handleInputChange={handleInputChange}
-                campaignData={{
-                  group_household_queue: campaignData.group_household_queue,
-                  dial_type: campaignData.dial_type || "call",
-                }}
-              />
-            </div>
-          </div>
-        </details>
-      ) : null}
-
       {campaignData.type === "message" ? (
         <>
           <OutboundEstimateAlert

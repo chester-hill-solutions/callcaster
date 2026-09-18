@@ -441,7 +441,6 @@ export const CampaignLaunch = ({
               ) : null}
               <CampaignLaunchExtras
                 campaignData={campaignData}
-                handleInputChange={handleInputChange}
                 isBusy={formFetcher.state !== "idle"}
                 queueCount={queueCount}
                 phoneNumbers={phoneNumbers}
