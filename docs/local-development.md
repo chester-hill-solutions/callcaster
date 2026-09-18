@@ -145,6 +145,10 @@ lt --port 3000
 
 4. Set `BASE_URL` in `.env` to that HTTPS URL.
 
+   If `.env.local` exists, update or remove its `BASE_URL` too. Bun loads
+   `.env.local` as an override, so its localhost value takes precedence over
+   the tunnel URL in `.env`.
+
 Example:
 
 ```bash
