@@ -14,7 +14,10 @@ import {
   TwilioAccountData,
 } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
-import { normalizeCampaignData } from "@/lib/campaign-settings";
+import {
+  normalizeCampaignData,
+  normalizeIvrCampaignType,
+} from "@/lib/campaign-settings";
 import { normalizeSchedule } from "@/lib/workspace-members";
 import { deepEqual } from "@/lib/utils";
 import { parseActionRequest } from "@/lib/request-utils.server";
@@ -111,6 +114,10 @@ export const action = defineAction({
 
         const nextCampaignData = JSON.parse(campaignDataStr);
         const nextCampaignDetails = JSON.parse(campaignDetailsStr);
+
+        // IVR is a single campaign type (#1741): a campaign saved before the
+        // simple/complex split was removed persists as robocall from here on.
+        nextCampaignData.type = normalizeIvrCampaignType(nextCampaignData.type);
 
         const schedule = normalizeSchedule(nextCampaignData.schedule);
         const scheduleValidation = getScheduleValidation(schedule);

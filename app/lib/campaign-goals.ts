@@ -4,8 +4,8 @@ import type { WorkspaceOnboardingGoal } from "@/lib/types";
 /**
  * The one customer-facing name for the robocall / IVR campaign goal (#1347).
  * Internal enum values (`robocall`, `simple_ivr`, `complex_ivr`) and API
- * fields are unchanged; only copy reads from here. "Advanced IVR" stays a
- * distinct, technical label for the simple/complex IVR builders.
+ * fields are unchanged; only copy reads from here. The Advanced IVR
+ * simple/complex choice was removed from campaign setup (#1741).
  */
 export const AUTOMATED_PHONE_MENU_LABEL = "Automated phone menu";
 
