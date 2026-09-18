@@ -11,6 +11,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- IVR keypad menus no longer treat anything a caller says as an answer: speech is only listened for on steps that ask for it, so a stray phrase can no longer skip the menu ([#1856](https://github.com/chester-hill-solutions/callcaster/issues/1856)).
 - IVR campaigns now act on answering-machine detection before the call flow starts: a detected machine is dropped or hung up on immediately, instead of hearing the first prompts while the async status callback catches up ([#1864](https://github.com/chester-hill-solutions/callcaster/issues/1864)).
 - IVR test calls now follow the keypad branch you press instead of apologising and hanging up — a test call has no outreach attempt to record, and the key-press handler no longer mistakes that for an error ([#1840](https://github.com/chester-hill-solutions/callcaster/issues/1840)).
 - IVR keypad presses now interrupt the prompt and take the branch straight away, instead of waiting for the audio to finish first ([#1841](https://github.com/chester-hill-solutions/callcaster/issues/1841)).
