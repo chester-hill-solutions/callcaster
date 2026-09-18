@@ -1,8 +1,8 @@
 import { useFetcher } from "react-router";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, X } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { Contact } from "@/lib/types";
 
 export interface ContactSearchDialogProps {
@@ -29,11 +29,43 @@ export function ContactSearchDialog({
       queued: boolean;
     })[];
   }>();
+  // Create-new-contact fetcher (POST /api/contacts): the bottom "Add …" row.
+  const createFetcher = useFetcher<Contact>();
+  const createSubmittedRef = useRef(false);
+
+  /**
+   * @effect When the create POST resolves, add the new contact to the queue and
+   * refresh the search so the row shows as Added — no page navigation (#1726).
+   * @effect-deps [createFetcher.state, createFetcher.data, searchQuery]
+   * @effect-side-effects queue enqueue + search refetch
+   * @effect-why-not-loader Client-side search-panel flow, no loader needed.
+   */
+  useEffect(() => {
+    if (createFetcher.state !== "idle" || !createSubmittedRef.current) return;
+    createSubmittedRef.current = false;
+    if (createFetcher.data) {
+      onAddToQueue([createFetcher.data]);
+      contactFetcher.load(
+        `/api/contacts?q=${searchQuery}&workspace_id=${workspaceId}&campaign_id=${campaignId}`,
+      );
+    }
+  }, [createFetcher.state, createFetcher.data, searchQuery, campaignId, workspaceId, contactFetcher, onAddToQueue]);
 
   const handleSearch = (query: string) => {
     contactFetcher.load(
       `/api/contacts?q=${query}&workspace_id=${workspaceId}&campaign_id=${campaignId}`,
     );
+  };
+
+  /** Create a contact from the typed query (firstname) and queue it inline. */
+  const handleCreateFromQuery = () => {
+    const query = searchQuery.trim();
+    if (!query || createFetcher.state !== "idle") return;
+    const formData = new FormData();
+    formData.set("workspace_id", workspaceId);
+    formData.set("firstname", query);
+    createSubmittedRef.current = true;
+    createFetcher.submit(formData, { action: "/api/contacts", method: "POST" });
   };
 
   if (!open) return null;
@@ -126,6 +158,23 @@ export function ContactSearchDialog({
               No results found
             </div>
           )}
+          {/* Create-when-missing (#1726): always reachable at the bottom of the
+              list, so a search is never a dead end. */}
+          <div className="border-t pt-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full justify-between text-xs text-muted-foreground hover:text-foreground"
+              disabled={!searchQuery.trim() || createFetcher.state !== "idle"}
+              onClick={handleCreateFromQuery}
+            >
+              <span className="truncate">
+                Add &ldquo;{searchQuery.trim() || "…"}&rdquo; as a new contact
+              </span>
+              <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            </Button>
+          </div>
         </div>
       </div>
     </section>

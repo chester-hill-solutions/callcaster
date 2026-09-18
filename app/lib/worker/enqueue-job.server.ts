@@ -145,6 +145,33 @@ export async function rescheduleQueuedJob(
   return rows.length > 0;
 }
 
+/**
+ * Find the live (queued or running) job row for a type/workspace/campaign —
+ * the same predicate `enqueueWithLiveDedupe` uses for dedupe. Used by the
+ * window-edit reschedule path to pull a parked `campaign_dispatch` successor
+ * forward to the new boundary without enqueueing a second chain row.
+ */
+export async function findLiveJobId(args: {
+  type: string;
+  workspaceId?: string | null;
+  campaignId?: number;
+}): Promise<number | null> {
+  const workspaceId = args.workspaceId ?? null;
+  const campaignId = args.campaignId ?? null;
+  const rows = (await db.execute(sql`
+    SELECT id
+    FROM job
+    WHERE type = ${args.type}
+      AND status IN ('queued', 'running')
+      AND workspace_id IS NOT DISTINCT FROM ${workspaceId}
+      AND (${campaignId}::integer IS NULL
+        OR (params->>'campaignId')::integer = ${campaignId})
+    ORDER BY created_at ASC
+    LIMIT 1
+  `)) as Array<{ id: number }>;
+  return rows[0]?.id ?? null;
+}
+
 async function enqueueWithIdempotency(args: {
   type: string;
   params: Record<string, unknown>;

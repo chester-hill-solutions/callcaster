@@ -77,43 +77,28 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1162,
-    "verdict": "verify-close",
-    "summary": "The default branch remains master. #1686 now labels closing issues on-dev when their PR merges to dev. Optional project movement still needs project setup.",
-    "resolution": "Verify on-dev labels on the next merge. Preserve master as release branch; do not introduce a qa branch.",
-    "lookIn": [
-      ".github/workflows/issue-on-dev.yml"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1168,
     "verdict": "verify-close",
-    "recommendedTitle": "Verify and close campaign Running/Waiting state clarity",
-    "summary": "The 'waiting' status and automatic running<->waiting transitions around calling hours are implemented (PR #1236 / commit fca7f872). UI shows amber Waiting; scheduler flips voice campaigns in/out of window.",
-    "currentBehavior": "campaign-status-rail + status-badge show waiting; campaign-schedule-sync.server.ts runs every minute and transitions running<->waiting; tests cover transitions.",
-    "rootCause": "Implemented; uses 'Archived' instead of proposed 'Stopped'.",
-    "resolution": "Visual/product QA; close if 'Archived' is accepted, else file a naming-only decision.",
+    "recommendedTitle": "verify-close: campaign shows waiting when out of sending hours",
+    "summary": "waiting status + schedule-sweep running<->waiting implemented (#1236). Verified locally: a running voice campaign with no in-window schedule flips running->waiting via campaign_schedule_sync.",
+    "currentBehavior": "campaign_schedule_sync flips active voice campaigns to waiting outside calling hours; UI shows amber Waiting.",
+    "rootCause": "None — behaviour implemented; needed verification.",
+    "resolution": "Confirmed via direct sync run (scanned 3, transitioned 1) + campaign_schedule_sync.server.test.ts.",
     "lookIn": [
-      "app/lib/campaign-status-rail.ts",
-      "app/components/ui/status-badge.tsx",
       "app/lib/campaign-schedule-sync.server.ts",
-      "app/lib/worker/handlers/cron.server.ts"
+      "app/lib/campaign-dispatch-policy.ts"
     ],
     "existingTests": [
       "test/campaign-schedule-sync.server.test.ts"
     ],
-    "missingTests": [
-      "integrated UI test shows Waiting after transition"
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
-      "Outside-hours voice shows Waiting",
-      "Returns to Running in window",
-      "Product approves Archived vs Stopped"
+      "running->waiting outside window",
+      "waiting->running inside window"
     ],
     "size": "XS",
     "risk": "low",
-    "trackerRecommendation": "Close after QA; stale enrichment described a proposal.",
+    "trackerRecommendation": "Close as verified; naming (waiting vs stopped) tracked separately if needed.",
     "blockedBy": []
   },
   {
@@ -183,13 +168,28 @@
   {
     "issueNumber": 1325,
     "verdict": "verify-close",
-    "summary": "The audio-step editor shipped in #1672/release #1684; the residual empty-speech runtime gap shipped in #1687/release #1688.",
-    "resolution": "Verify both recording upload and spoken text on the deployed app; this reopened issue remains pending user testing.",
+    "summary": "Editor UI shipped in #1672; the M4A silent-upload bug fixed in #1731 (transcode from a seekable temp file). Verified on preview and dev: same file went from a 278-byte stub to a 1.6 MB / 200 s playable MP3.",
+    "resolution": "transcodeAudioBuffer stages input to a temp file (mirrors probeAudioDurationMs). Merged via #1731.",
     "lookIn": [
-      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx",
-      "test/ui/script-block-editor-ivr.test.tsx"
+      "app/lib/audio.server.ts",
+      "app/lib/audio.server.test.ts (moov-at-end regression)",
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx"
     ],
-    "blockedBy": []
+    "blockedBy": [],
+    "recommendedTitle": "verify-close: add audio to an IVR script (editor upload + M4A playback)",
+    "currentBehavior": "IVR step editor exposes Speak text / Play a recording + Upload audio; M4A uploads now normalize to playable MP3.",
+    "rootCause": "M4A/MOV moov-at-end cannot be read from a non-seekable stdin pipe: ffmpeg emitted a header-only stub and exited 0.",
+    "existingTests": [
+      "test/audio.server.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Upload non-faststart M4A -> real playable MP3",
+      "Regression test proves file input, not pipe:0"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Close with #1730 (M4A bug) via #1731."
   },
   {
     "issueNumber": 1327,
@@ -281,17 +281,6 @@
       "test/utils.test.ts"
     ],
     "trackerRecommendation": "PR #1594 merge 8334dcda is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
-  },
-  {
-    "issueNumber": 1348,
-    "verdict": "verify-close",
-    "summary": "The latest retest found an audible-script failure rather than absent dispatch. #1687 shipped the text fallback in release #1688.",
-    "resolution": "Retest a sample phone menu on the deployed app. Keep open for a separate dispatch defect if no call arrives.",
-    "lookIn": [
-      "app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts",
-      "test/ivr-block.route.test.ts"
-    ],
-    "blockedBy": []
   },
   {
     "issueNumber": 1472,
@@ -784,17 +773,6 @@
     "trackerRecommendation": "PR #1648 merge f1c4509b is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
   },
   {
-    "issueNumber": 1662,
-    "verdict": "verify-close",
-    "summary": "PR #1663 is merged to dev. Full local CI, GitHub quality/E2E checks and both preview deployments passed.",
-    "resolution": "Release the Account SID/Auth Token fix, then verify Twilio health sync in the deployed workspace.",
-    "lookIn": [
-      "app/lib/database/workspace-twilio-sync.server.ts",
-      "test/workspace-twilio-sync.server.test.ts"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1664,
     "verdict": "verify-close",
     "summary": "The GitHub issue skill distinguishes COMPLETED, NOT_PLANNED and DUPLICATE. API verification on 2026-09-09 still reports #1314 as closed/not_planned.",
@@ -805,14 +783,486 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1674,
+    "issueNumber": 1224,
     "verdict": "verify-close",
-    "summary": "PR #1691 is merged to dev. The IVR fixture now has explicit speech text and a Press 1 → Yes → Hang up response. Its browser check passed.",
-    "resolution": "Include the fixture fix in release #1693. Keep the seeded editor browser check in the compose suite.",
+    "recommendedTitle": "verify-close: voicemail email sends (presign TTL + auth token)",
+    "summary": "Verified end-to-end on dev: fired a signed RecordingStatusCallback (real Twilio recording, real call) and the route fetched the recording, uploaded to S3, presigned (7-day) and Resend sent the email (message id 6e55aadd...).",
+    "currentBehavior": "email-vm: fetch recording (API key/auth token), upload, presign 7d, resend.emails.send; recording_url persists only after a successful send.",
+    "rootCause": "Original: presign 100d over SigV4 cap (#1223) + stale subaccount auth (#1655).",
+    "resolution": "#1223 presign clamp + API-key-first auth; verified live.",
     "lookIn": [
-      "scripts/e2e/seed-database.mjs",
-      "e2e/specs/scripts-audio.spec.ts"
+      "app/routes/api+/email-vm.action.server.ts",
+      "app/lib/object-storage.server.ts"
     ],
+    "existingTests": [
+      "test/ivr-status.route.test.ts (voicemail)"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Voicemail webhook -> email arrives",
+      "recording_url persisted after send"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Close as verified; residual eyeball = leave a real voicemail."
+  },
+  {
+    "issueNumber": 1292,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: call screen shows Hang Up in-call, Dial (with confirm) after",
+    "summary": "Dial control (#1408) flips to Dial and requires a second click after a call ends; Hang Up has its own two-step confirm. CallControls state machine verified by code + call-screen UI tests.",
+    "currentBehavior": "in-call -> Hang Up (two-step); after end -> armed Dial ('Click again to call back') that disarms on first click.",
+    "rootCause": "Errors not reproduced; #1408 implemented the guard.",
+    "resolution": "No new code; run the idle-state eyeball on dev.",
+    "lookIn": [
+      "app/components/call/CallScreen.CallArea.tsx"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-callarea.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "active call -> Hang Up",
+      "ended call -> Dial with confirm",
+      "no hang-up confirm loop"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Close after the eyeball."
+  },
+  {
+    "issueNumber": 1338,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: call settings sheet laid out by device, no redundant labels",
+    "summary": "#1680 laid the sheet out by device (single label per field, buttons say what they do, flex gap), removing the redundant headings flagged in the issue. UI green; visual eyeball pending.",
+    "currentBehavior": "Microphone/Speaker/Output fields each carry one label with their controls beneath.",
+    "rootCause": "Original layout clipped/misaligned; #1680 restructured.",
+    "resolution": "No new code; eyeball on dev.",
+    "lookIn": [
+      "app/components/call/CallScreen.DeviceSettings.tsx",
+      "app/components/call/CallScreen.Layout.tsx"
+    ],
+    "existingTests": [
+      "test/ui/audio-device-lifecycle.test.tsx",
+      "test/ui/call-screen-header.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "no clipping left/right",
+      "no redundant labels"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Close after the eyeball."
+  },
+  {
+    "issueNumber": 1665,
+    "verdict": "verify-close",
+    "recommendedTitle": "Standardized Alert for a file-less upload error",
+    "summary": "Merged to dev (#1768); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once Sai/user confirms on dev."
+  },
+  {
+    "issueNumber": 1740,
+    "verdict": "verify-close",
+    "recommendedTitle": "Live number-verification status + pending sheet with confirmation token",
+    "summary": "Merged to dev (#1767); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once Sai/user confirms on dev."
+  },
+  {
+    "issueNumber": 1769,
+    "verdict": "verify-close",
+    "recommendedTitle": "Upload actions route failures through toUserMessage",
+    "summary": "Merged to dev (#1775); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once Sai/user confirms on dev."
+  },
+  {
+    "issueNumber": 1667,
+    "verdict": "verify-close",
+    "recommendedTitle": "Audio upload toast stays one inline line",
+    "summary": "Merged to dev (#1777); UI tests green; awaiting Sai/user retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once confirmed on dev."
+  },
+  {
+    "issueNumber": 1668,
+    "verdict": "verify-close",
+    "recommendedTitle": "Toast spacing defaults (padding + gap)",
+    "summary": "Merged to dev (#1778); UI tests green; awaiting Sai/user retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once confirmed on dev."
+  },
+  {
+    "issueNumber": 1669,
+    "verdict": "verify-close",
+    "recommendedTitle": "All workspaces pinned in workspace picker",
+    "summary": "Merged to dev (#1776); UI tests green; awaiting Sai/user retest on dev.",
+    "currentBehavior": "Shipped on dev.",
+    "rootCause": "Fixed; see the PR.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "retest on dev"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Close once confirmed on dev."
+  },
+  {
+    "issueNumber": 1682,
+    "verdict": "verify-close",
+    "summary": "Fixed by PR #1683 (merged 2026-09-08, commit 03923185, same title as the issue); requirePositiveIntegerParam now guards the campaigns loaders so malformed ids 404. Sai's later comment is only a design nit on the 404 page styling, not a defect.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1708,
+    "verdict": "verify-close",
+    "summary": "Voicemail-drop capability is largely shipped (campaign.voicemail_file, audiodrop route, auto-detection + dispose on VM, 'Voicemail Left' UI). Remaining asks are acceptance-style (play/pause, attach UI, smart drop) — a verification pass on dev, not new architecture.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1745,
+    "verdict": "verify-close",
+    "summary": "Bot comment 2026-09-09: merged in PR #1747 (0d4ead79); PR state MERGED. Retest on review env; closes when promoted to master.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1748,
+    "verdict": "verify-close",
+    "summary": "Bot comment 2026-09-09: merged in PR #1749 (2febfa74); PR state MERGED. Retest on review env.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1753,
+    "verdict": "verify-close",
+    "summary": "Bot comment 2026-09-10: merged in PR #1754 (2de36426); PR state MERGED (pagination + full totals). Retest on review env.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1757,
+    "verdict": "verify-close",
+    "summary": "Bot comment 2026-09-11: merged in PR #1758 (db7e9b32); PR state MERGED (roll up before pagination). Retest on review env.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1759,
+    "verdict": "verify-close",
+    "summary": "Bot comment 2026-09-11: merged in PR #1760 (1d961fed); PR state MERGED (nested sub-table + row disclosure). Retest on review env.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1726,
+    "verdict": "verify-close",
+    "recommendedTitle": "Contact search creates a missing contact from the results list",
+    "summary": "Merged to dev (#1785); full local e2e gate green (118 passed). Awaiting user/QA retest.",
+    "currentBehavior": "Bottom Add row creates + queues the contact inline.",
+    "rootCause": "Feature gap; implemented.",
+    "resolution": "No further code expected unless retest finds a gap.",
+    "lookIn": [],
+    "existingTests": [
+      "test/ui/contact-search-dialog.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "no-match search offers an Add row",
+      "created contact queued in the same dialog"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Close once confirmed on dev."
+  },
+  {
+    "issueNumber": 1205,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify guided phone rental and caller-ID setup on dev",
+    "summary": "Guided rental and caller-ID substeps shipped to dev in PR #1746 (3a37310a). Both paths, address saving, billing return, and saved-number recovery were verified.",
+    "currentBehavior": "Choose a method first; rental collects a service address before number search; caller-ID verification opens directly. Saved numbers resume at review.",
+    "rootCause": "The original single-page flow was replaced in PR #1746.",
+    "resolution": "Retest the shipped flow. The missing address breadcrumb is the separate remaining issue #1764; do not rebuild the substeps.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx",
+      "app/routes/workspaces+/$id/onboarding/wizard-step-resolution.ts"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-first-number-flow.test.tsx"
+    ],
+    "missingTests": [
+      "Live number purchase and carrier verification were not exercised in PR #1746."
+    ],
+    "acceptanceCriteria": [
+      "Choose method first",
+      "Rent requires address before search",
+      "Verify bypasses rental",
+      "Routing appears only after a number exists"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 1696,
+    "verdict": "verify-close",
+    "summary": "Recording metadata preload shipped to dev in PR #1806 (270680d8). A real Chrome check showed a one-second duration before Play, with the audio paused at time zero.",
+    "lookIn": [
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx"
+    ],
+    "existingTests": [
+      "test/ui/script-block-editor-ivr.test.tsx",
+      "PR #1806: real Chrome before/after component check"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A selected recording shows its duration before Play.",
+      "Loading metadata does not start playback."
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "currentBehavior": "The IVR recording preview uses preload=\"metadata\".",
+    "resolution": "Retest a selected recording on dev before playback. No further code is expected unless that check finds a gap."
+  },
+  {
+    "issueNumber": 1782,
+    "verdict": "verify-close",
+    "summary": "PR #1796 (0188cea8) now wakes waiting voice work at the next calling-hours boundary. The four deployed boundary checks requested by this issue remain pending.",
+    "resolution": "Collect deployed evidence for future start, exact open, mid-run close, and no premature completion. Preserve #1351/#1352 until that evidence is assessed.",
+    "lookIn": [
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/lib/campaign-schedule-sync.server.ts"
+    ],
+    "missingTests": [
+      "DB rows plus screenshots or API results for all four deployed boundary cases."
+    ],
+    "trackerRecommendation": "Verification work remains; do not repeat the next-window scheduling patch from PR #1796.",
+    "blockedBy": [],
+    "currentBehavior": "The waiting voice successor uses the next window opening; schedule-sweep ownership of waiting-to-running remains intact.",
+    "existingTests": [
+      "test/campaign-dispatch-worker.test.ts"
+    ]
+  },
+  {
+    "issueNumber": 1788,
+    "verdict": "verify-close",
+    "summary": "PR #1798 (a80b3f9c) shipped the filter that removes synthetic SMS skipped rows for sent contacts.",
+    "resolution": "Verify delivered and genuine skipped contact rows on a dev export.",
+    "lookIn": [
+      "app/lib/campaign-export.server.ts",
+      "app/lib/campaign-queue-db.server.ts"
+    ],
+    "missingTests": [],
+    "risk": "medium",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": [],
+    "currentBehavior": "Successful-send dequeues do not add a second skipped CSV row; genuine suppression reasons remain eligible for skip rows.",
+    "existingTests": [
+      "test/campaign-export-sms-dequeued.test.ts"
+    ]
+  },
+  {
+    "issueNumber": 1790,
+    "verdict": "verify-close",
+    "summary": "PR #1798 (a80b3f9c) added supported machine-dispatched IVR types to the HTTP, workspace API, and durable export paths.",
+    "resolution": "Verify an export for each IVR type on dev.",
+    "lookIn": [
+      "app/routes/api+/campaign-export.action.server.ts",
+      "app/lib/platform-analytics.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts"
+    ],
+    "missingTests": [],
+    "risk": "medium",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": [],
+    "currentBehavior": "simple_ivr and complex_ivr reach the voice CSV exporter through the shared campaign-type predicate.",
+    "existingTests": [
+      "test/campaign-export-ivr-adapters.test.ts"
+    ]
+  },
+  {
+    "issueNumber": 1791,
+    "verdict": "verify-close",
+    "summary": "PR #1796 (0188cea8) added campaign-window checks before provider requests, including after asynchronous preparation.",
+    "resolution": "Verify the closing-boundary behavior on dev without sending outside the test window.",
+    "lookIn": [
+      "app/lib/campaign-sms-dispatch.server.ts"
+    ],
+    "missingTests": [
+      "Deployed closing-boundary verification."
+    ],
+    "risk": "high",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": [],
+    "currentBehavior": "When the campaign window closes mid-batch, new sends stop and unsent contacts remain queued.",
+    "existingTests": [
+      "test/campaign-sms-dispatch-window.test.ts"
+    ]
+  },
+  {
+    "issueNumber": 1792,
+    "verdict": "verify-close",
+    "summary": "PR #1796 (0188cea8) preserves the configured SMS send-start interval across dispatch batches.",
+    "resolution": "Verify configured pacing across batch boundaries on dev.",
+    "lookIn": [
+      "app/lib/campaign-sms-dispatch.server.ts"
+    ],
+    "missingTests": [
+      "Deployed pacing verification."
+    ],
+    "risk": "high",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": [],
+    "currentBehavior": "A one-MPS target retains its delay between one-row batches.",
+    "existingTests": [
+      "test/campaign-sms-dispatch-pacing.test.ts"
+    ]
+  },
+  {
+    "issueNumber": 1794,
+    "verdict": "verify-close",
+    "summary": "PR #1797 (88f73343) made schedule writes conditional on the status read by the sweep. The requested real database interleaving check is still missing.",
+    "resolution": "Verify pause/completion interleaving against a real database. The existing sweep test mocks the status helper, so it does not prove the SQL concurrency behavior.",
+    "lookIn": [
+      "app/lib/campaign-schedule-sync.server.ts",
+      "app/lib/campaign-ivr.server.ts"
+    ],
+    "missingTests": [
+      "Real database pause/completion after candidate selection; confirm state and emitted events."
+    ],
+    "risk": "high",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
+    "blockedBy": [],
+    "currentBehavior": "A concurrent status change causes the guarded update to return no transition; events follow successful updates only.",
+    "existingTests": [
+      "test/campaign-schedule-sync.server.test.ts (sweep orchestration with mocked status helper)"
+    ]
+  },
+  {
+    "issueNumber": 1805,
+    "verdict": "verify-close",
+    "summary": "PR #1807 (814d804f) shipped Nano ID 3.3.19 in both lockfiles. Unaffected 5.1.16 consumers remain unchanged.",
+    "resolution": "Verify default-branch promotion and Dependabot alert #209 after release. No further Nano ID change is expected unless a new affected version is found.",
+    "lookIn": [
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "existingTests": [
+      "PR #1807: both package-manager installs, frozen Bun check, full ci:local"
+    ],
+    "missingTests": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix."
   }
 ]

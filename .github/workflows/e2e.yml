@@ -8,6 +8,7 @@ on:
       - AGENTS.md
       - .agents/**
       - .opencode/**
+      - .github/projects.yaml
       - .gitignore
   # The app server runs under Bun in production; PR-level CI otherwise never
   # boots it, so Bun-only regressions (e.g. react-dom/server export shape)
@@ -18,6 +19,7 @@ on:
       - AGENTS.md
       - .agents/**
       - .opencode/**
+      - .github/projects.yaml
       - .gitignore
   schedule:
     - cron: "0 6 * * *"

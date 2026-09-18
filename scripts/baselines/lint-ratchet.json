@@ -3,11 +3,11 @@
   "counts": {
     "max-lines-per-function": 58,
     "complexity": 85,
-    "@typescript-eslint/no-non-null-assertion": 125,
+    "@typescript-eslint/no-non-null-assertion": 119,
     "max-params": 9,
     "max-depth": 21,
     "import/no-cycle": 16,
-    "no-return-await": 24,
+    "no-return-await": 23,
     "no-console": 11
   }
 }

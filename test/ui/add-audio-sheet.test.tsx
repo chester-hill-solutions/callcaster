@@ -98,6 +98,27 @@ describe("AddAudioSheet", () => {
     expect(mocks.revalidate).toHaveBeenCalled();
   });
 
+  test("flattens a multi-line audio name onto one inline toast line (#1667)", () => {
+    const { rerender } = render(
+      <AddAudioSheet workspaceId="ws-1" open onOpenChange={() => undefined} />,
+    );
+    mocks.fetcher.state = "submitting";
+    rerender(
+      <AddAudioSheet workspaceId="ws-1" open onOpenChange={() => undefined} />,
+    );
+    mocks.fetcher.state = "idle";
+    mocks.fetcher.data = {
+      audio: { name: "My\nrecording.mp3", path: "ws-1/My recording.mp3", signed_url: null },
+    };
+    act(() => {
+      rerender(
+        <AddAudioSheet workspaceId="ws-1" open onOpenChange={() => undefined} />,
+      );
+    });
+
+    expect(toast.success).toHaveBeenCalledWith("Uploaded My recording.mp3");
+  });
+
   test("surfaces upload errors without closing", () => {
     const onOpenChange = vi.fn();
     const { rerender } = render(

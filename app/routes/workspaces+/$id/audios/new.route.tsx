@@ -5,11 +5,11 @@ import { Form, Link, useActionData, useNavigation } from "react-router";
 import { useRef, useState } from "react";
 import { Section } from "@/components/shared/Section";
 import { FileDropzone } from "@/components/shared/FileDropzone";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { PageShell } from "@/components/ui/page-shell";
-import { Text } from "@/components/ui/typography";
 import { getAudioUploadAcceptValue } from "@/lib/audio-upload";
 
 export default function Media() {
@@ -39,12 +39,13 @@ export default function Media() {
     <section id="form">
       <PageShell title="Add Audio" maxWidth="narrow">
         {actionData?.error != null ? (
-          <Text className="text-center text-destructive-text">
-            Error:{" "}
-            {typeof actionData.error === "string"
-              ? actionData.error
-              : actionData.error.message}
-          </Text>
+          <Alert variant="destructive">
+            <AlertDescription>
+              {typeof actionData.error === "string"
+                ? actionData.error
+                : actionData.error.message}
+            </AlertDescription>
+          </Alert>
         ) : null}
         <Form method="POST" className="space-y-6" encType="multipart/form-data">
           <Section variant="flat" className="space-y-6">

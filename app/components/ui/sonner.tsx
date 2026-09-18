@@ -9,6 +9,22 @@
 import type { ComponentProps } from "react";
 import { Toaster as ThemedToaster } from "@chester-hill-solutions/shad-cc/sonner";
 
+// The shared toaster sets these classNames internally (see shad-cc dist
+// sonner). Passing our own toastOptions replaces them, so reproduce them here
+// and layer the app's spacing defaults on top: consistent vertical padding and
+// a gap between the icon/title/description rows for every toast in the app
+// (#1668). If shad-cc's default class changes, update this string with it.
+const TOAST_CLASS =
+  "cn-toast font-sans shadow-[0_2px_0_0_var(--border)] [&_[data-title]]:font-heading [&_[data-title]]:font-semibold gap-2 py-3";
+
 export function Toaster(props: ComponentProps<typeof ThemedToaster>) {
-  return <ThemedToaster richColors={props.richColors ?? true} {...props} />;
+  return (
+    <ThemedToaster
+      richColors={props.richColors ?? true}
+      toastOptions={{
+        classNames: { toast: TOAST_CLASS },
+      }}
+      {...props}
+    />
+  );
 }

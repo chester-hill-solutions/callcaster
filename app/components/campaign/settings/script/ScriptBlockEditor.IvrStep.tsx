@@ -319,7 +319,7 @@ function RecordingStepFields({
       {fileName.length > 0 && audioPreviewUrl && (
         <audio
           controls
-          preload="none"
+          preload="metadata"
           src={audioPreviewUrl(fileName)}
           aria-label={`Preview ${fileName}`}
           className="h-8 w-full max-w-md"

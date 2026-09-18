@@ -1,0 +1,133 @@
+--- a/test/campaign-sms-dispatch-contract.test.ts
++++ b/test/campaign-sms-dispatch-contract.test.ts
+@@ -670,3 +670,70 @@
+     expect(zod.zInsufficientCreditsError.safeParse(await res.json()).success).toBe(true);
+   });
+ });
++
++
++describe("SCAN: missed dispatch boundaries", () => {
++  beforeEach(() => {
++    vi.resetModules();
++    seedCommonMocks();
++    mocks.getCampaignQueueById.mockResolvedValue(TWO_ELIGIBLE_ROWS);
++  });
++
++  test("SCAN: stops new sends when the window closes during a paced batch", async () => {
++    vi.useFakeTimers();
++    vi.setSystemTime(new Date("2026-09-09T20:59:59.750Z"));
++    try {
++      const actual = await vi.importActual<typeof import("@/lib/campaign-send-window")>("@/lib/campaign-send-window");
++      mocks.isWithinSendWindow.mockImplementation(actual.isWithinSendWindow);
++      mocks.loadCampaignSmsDispatchData.mockResolvedValue({
++        ...baseCampaignData(),
++        campaign: { ...baseCampaignData().campaign,
++          sms_send_window: { wednesday: { active: true, intervals: [{ start: "09:00", end: "21:00" }] } },
++        },
++      });
++      mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({ ...basePortal, parallelDispatchEnabled: true, smsTargetMps: 2 });
++      const sendTimes: string[] = [];
++      mocks.createWorkspaceTwilioInstance.mockResolvedValue({ messages: { create: vi.fn(async (args: any) => {
++        sendTimes.push(new Date().toISOString());
++        return { sid: `SM${sendTimes.length}`, ...args };
++      }) } });
++      const { dispatchCampaignSmsBatch } = await import("@/lib/campaign-sms-dispatch.server");
++      const running = dispatchCampaignSmsBatch({ workspaceId: TEST_WORKSPACE_ID, campaignId: String(CAMPAIGN_ID), userId: USER_ID });
++      await vi.advanceTimersByTimeAsync(2000);
++      const result = await running;
++      console.log("SCAN boundary", JSON.stringify({sendTimes, result}));
++      expect(sendTimes).toEqual(["2026-09-09T20:59:59.750Z"]);
++    } finally { vi.useRealTimers(); }
++  });
++
++  test("SCAN: an eligible row behind a deferred head must receive a turn", async () => {
++    mocks.loadCampaignSmsDispatchData.mockResolvedValue(baseCampaignData());
++    const windows = await import("@/lib/recipient-calling-window");
++    vi.mocked(windows.recipientCallingWindowStatus).mockImplementation((phone) => ({
++      allowed: phone === TWO_ELIGIBLE_ROWS[1].contact.phone,
++      timezone: "America/Toronto", reason: "in_window",
++    }));
++    const { dispatchCampaignSmsBatch } = await import("@/lib/campaign-sms-dispatch.server");
++    const outcomes = [];
++    for (let i=0;i<2;i++) outcomes.push(await dispatchCampaignSmsBatch({ workspaceId: TEST_WORKSPACE_ID, campaignId: String(CAMPAIGN_ID), userId: USER_ID, maxContacts: 1 }));
++    console.log("SCAN starvation", JSON.stringify(outcomes));
++    expect(mocks.rpcCreateOutreachAttempt).toHaveBeenCalledTimes(1);
++  });
++  test("SCAN: a one-MPS target spaces sends across one-row batch boundaries", async () => {
++    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-09T15:00:00Z"));
++    try {
++      mocks.loadCampaignSmsDispatchData.mockResolvedValue(baseCampaignData());
++      mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({...basePortal, parallelDispatchEnabled: true, smsTargetMps: 1});
++      const windows = await import("@/lib/recipient-calling-window");
++      vi.mocked(windows.recipientCallingWindowStatus).mockReturnValue({allowed: true, timezone: "America/Toronto", reason: "in_window"});
++      const sendTimes: number[] = [];
++      mocks.createWorkspaceTwilioInstance.mockResolvedValue({messages: {create: vi.fn(async(args: any) => {sendTimes.push(Date.now()); return {sid: `SM${sendTimes.length}`, ...args};})}});
++      const {dispatchCampaignSmsBatch} = await import("@/lib/campaign-sms-dispatch.server");
++      const running = dispatchCampaignSmsBatch({workspaceId: TEST_WORKSPACE_ID, campaignId: String(CAMPAIGN_ID), userId: USER_ID});
++      await vi.advanceTimersByTimeAsync(2000); await running;
++      console.log("SCAN one-MPS gaps", sendTimes[1]-sendTimes[0]);
++      expect(sendTimes[1]-sendTimes[0]).toBeGreaterThanOrEqual(1000);
++    } finally {vi.useRealTimers();}
++  });
++
++});
+--- a/test/campaign-export-contract.test.ts
++++ b/test/campaign-export-contract.test.ts
+@@ -358,4 +358,37 @@
+     // Opt-out skip: same shape, different reason.
+     expect(csvText).toContain(",Contact opted out\r\n");
+   }, 30000);
+-});
++  test("SCAN: a sent contact must not get a second skipped export row", async () => {
++    exportDbMocks.listExportCampaignMessages.mockResolvedValue([{...messageRow, from: "+15559990000", to: contactRow.phone}]);
++    queueMocks.findDequeuedQueueRowsForCampaign.mockResolvedValue([{contact_id: contactRow.id, dequeued_reason: "SMS message sent"}]);
++    const { processMessageCampaignExport } = await import("@/lib/campaign-export.server");
++    await processMessageCampaignExport(123, "w1", "scan-sent", "TestCampaign");
++    const csv = objectStorageUploads.find(u => u.path.endsWith(".csv"));
++    console.log("SCAN sent CSV", csv?.text);
++    expect(csv?.text).not.toContain(",skipped,");
++  });
++
++  test("SCAN: IVR export credits must match the shared rate for a 90-second call", async () => {
++    exportDbMocks.findCampaignWithScriptForExport.mockResolvedValue({...campaignRow, type: "robocall", script: null});
++    exportDbMocks.countExportOutreachAttempts.mockResolvedValue(1);
++    exportDbMocks.listExportOutreachAttempts.mockResolvedValue([{id: 44, contact_id: 1, created_at: "2026-01-01T12:00:00Z", result: null}]);
++    exportDbMocks.findExportCallsByOutreachAttemptIds.mockResolvedValue([{outreach_attempt_id: 44, sid: "CA1", duration: "90", status: "completed"}]);
++    const { processCallCampaignExport } = await import("@/lib/campaign-export.server");
++    await processCallCampaignExport(123, "w1", "scan-credits", "TestCampaign");
++    const csv = objectStorageUploads.find(u => u.path.endsWith(".csv"));
++    const lines = csv!.text.trim().split("\r\n");
++    const index = lines[0].split(",").indexOf("credits_used");
++    console.log("SCAN voice credits", lines[1].split(",")[index]);
++    expect(lines[1].split(",")[index]).toBe("5");
++  });
++
++  test.each(["simple_ivr", "complex_ivr"])("SCAN: %s campaign export is supported", async (type) => {
++    campaignIvrMocks.findCampaignExportMeta.mockResolvedValue({...campaignRow, type});
++    const mod = await import("../app/routes/api+/campaign-export");
++    const fd = new FormData(); fd.set("campaignId", "123"); fd.set("workspaceId", "w1");
++    const res = await asRouteResponse(mod.action({request: new Request("http://localhost/api/campaign-export", {method: "POST", body: fd})} as any));
++    console.log("SCAN IVR export", type, res.status);
++    expect(res.status).toBe(200);
++  });
++
++});
+--- a/test/campaign-dispatch-worker.test.ts
++++ b/test/campaign-dispatch-worker.test.ts
+@@ -706,3 +706,16 @@
+     expect(mocks.enqueueJob).not.toHaveBeenCalled();
+   });
+ });
++
++
++test("SCAN: voice successor reaches a window five minutes away", async () => {
++  vi.clearAllMocks();
++  vi.useFakeTimers(); vi.setSystemTime(new Date("2026-09-09T14:00:00Z"));
++  try {
++    mocks.findCampaignInWorkspace.mockResolvedValue(runningMessageCampaign({type: "simple_ivr", status: "waiting", start_date: "2026-09-01T00:00:00Z", end_date: "2026-09-30T00:00:00Z", schedule: {wednesday: {active: true, intervals: [{start: "14:05", end: "21:00"}]}}}));
++    await campaignDispatchHandler(makeJob());
++    const call = mocks.enqueueJob.mock.calls.at(-1)?.[0] as {runAt: Date};
++    console.log("SCAN voice wake", call.runAt.toISOString());
++    expect(call.runAt.getTime()).toBeLessThanOrEqual(new Date("2026-09-09T14:05:00Z").getTime());
++  } finally {vi.useRealTimers();}
++});

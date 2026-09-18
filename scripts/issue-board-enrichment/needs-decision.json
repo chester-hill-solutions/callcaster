@@ -43,7 +43,7 @@
       "app/lib/platform-workspace-numbers.server.ts"
     ],
     "existingTests": [
-      "n/a — operational"
+      "n/a \u2014 operational"
     ],
     "missingTests": [
       "before/after evidence, rollback steps"
@@ -64,7 +64,7 @@
     "issueNumber": 1345,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide and add a CHS-managed toll-free SMS verification path",
-    "summary": "Political campaigns have no business number, so toll-free SMS (which requires a BN) does not serve them. Offer a CHS-managed path — but only after a compliance/ownership decision.",
+    "summary": "Political campaigns have no business number, so toll-free SMS (which requires a BN) does not serve them. Offer a CHS-managed path \u2014 but only after a compliance/ownership decision.",
     "currentBehavior": "Goal step offers toll-free (requires customer BN) or local (no BN); readiness requires businessRegistrationNumber for toll-free; twilio-toll-free-provision uses workspace business identity.",
     "rootCause": "No managed-sponsorship model; CHS BN must not be stored as customer identity.",
     "resolution": "Decide if CHS can sponsor customer traffic; if yes, add a support-request flow with clear ownership/review status and local-number alternative.",
@@ -92,7 +92,7 @@
   {
     "issueNumber": 1355,
     "verdict": "needs-decision",
-    "summary": "The current topology is dev→dev and master→staging/production. The request only renames staging to qa; there is no qa branch.",
+    "summary": "The current topology is dev\u2192dev and master\u2192staging/production. The request only renames staging to qa; there is no qa branch.",
     "resolution": "Verify a safe in-place rename before changing IaC. Do not recreate the environment.",
     "lookIn": [
       ".railway/environments/staging.ts"
@@ -129,5 +129,486 @@
       "app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.UsagePanel.tsx"
     ],
     "blockedBy": []
+  },
+  {
+    "issueNumber": 1741,
+    "verdict": "needs-decision",
+    "recommendedTitle": "change(ivr): make simple/complex a script property, not a campaign type",
+    "summary": "Campaign setup offers Simple IVR vs Complex IVR, but the runtime treats both identically; complexity belongs to the script (one page vs menus).",
+    "currentBehavior": "CampaignBasicInfo.SelectType exposes simple_ivr/complex_ivr; dispatch/execution treat them the same.",
+    "rootCause": "Design decision.",
+    "resolution": "Decide: single IVR option at campaign setup; campaign_type simple_ivr/complex_ivr kept for existing rows and possibly derived from the script.",
+    "lookIn": [
+      "app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx",
+      "app/lib/campaign-execution.server.ts",
+      "app/db/schema.ts"
+    ],
+    "existingTests": [
+      "test/ui/campaign-* type selection"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "campaign setup asks IVR once",
+      "no behavioural difference to lose"
+    ],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Product decision first; storage/UI change after."
+  },
+  {
+    "issueNumber": 1742,
+    "verdict": "needs-decision",
+    "recommendedTitle": "feature(ivr): preview Speak (TTS) steps in the script editor",
+    "summary": "Spoken IVR steps have no in-editor preview; recorded steps do. Add a Preview control that plays the text in the selected Polly voice.",
+    "currentBehavior": "No TTS preview endpoint; text+voice only materialise when Twilio runs the call.",
+    "rootCause": "Feature gap.",
+    "resolution": "Add a workspace-gated route using AWS Polly SynthesizeSpeech (voices are Polly ids) + a preview control in SpokenStepFields; AWS creds need polly:SynthesizeSpeech.",
+    "lookIn": [
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx",
+      "app/lib/tts-voices.ts",
+      "app/routes/workspaces+/$id/audios/$fileName.preview.loader.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "preview plays selected voice text",
+      "membership enforced"
+    ],
+    "acceptanceCriteria": [
+      "Speak step previews audibly",
+      "voice matches the block",
+      "workspace-gated"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Confirm provider (Polly vs ElevenLabs) then implement."
+  },
+  {
+    "issueNumber": 1770,
+    "verdict": "needs-decision",
+    "recommendedTitle": "feature(audience): client-side preview + column-mapping step (gocanvass parity)",
+    "summary": "Add a preview/map step to the audience uploader: parse client-side, show headers + rows, guess and edit the mapping, then start. Server validation stays the gate.",
+    "currentBehavior": "AudienceUploader is fire-and-forget: server parses + validates, job starts.",
+    "rootCause": "UX gap vs gocanvass's import wizard.",
+    "resolution": "Wizard: file -> preview/map -> start; browser-safe CSV parser; reuse shared/contact-import-headers types.",
+    "lookIn": [
+      "app/components/audience/AudienceUploader.tsx",
+      "app/lib/csv.ts",
+      "shared/contact-import-headers.ts",
+      "app/routes/api+/audience-upload.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ui/audience-uploader.test.tsx"
+    ],
+    "missingTests": [
+      "preview renders parsed headers/rows",
+      "mapping submitted with upload"
+    ],
+    "acceptanceCriteria": [
+      "parsed preview before start",
+      "columns mappable",
+      "server validation still gates"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Scope with #1771 (can ship together or split)."
+  },
+  {
+    "issueNumber": 1771,
+    "verdict": "needs-decision",
+    "recommendedTitle": "feature(audience): per-row import error report + original CSV artifact",
+    "summary": "Persist per-row failures (rowNumber + field + reason) during the audience import job and expose a reviewable list; store the original CSV at a workspace-scoped artifact path.",
+    "currentBehavior": "Only aggregate counts (skipped invalid/duplicate) are surfaced; original file not retained.",
+    "rootCause": "No per-row capture or artifact retention, unlike gocanvass.",
+    "resolution": "Record per-row errors in the job; surface in the progress/completion panel; upload original.csv under {ws}/{importId}/ with existing guards.",
+    "lookIn": [
+      "app/lib/audience-upload-process.server.ts",
+      "app/components/audience/AudienceUploader.tsx",
+      "app/lib/object-storage.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "per-row errors persisted + listed",
+      "original retained under workspace prefix"
+    ],
+    "acceptanceCriteria": [
+      "reviewable per-row failure list or download",
+      "original CSV retained safely",
+      "aggregate counts unchanged"
+    ],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Co-ordinate with #1770."
+  },
+  {
+    "issueNumber": 1773,
+    "verdict": "needs-decision",
+    "recommendedTitle": "feature(backup): daily lossless per-workspace CSV snapshots + manifest + retention",
+    "summary": "No data backup today. Adopt quick-canvass backup.workspace_csv pattern: daily self-scheduling job snapshots workspace-scoped core tables to a backup bucket with manifest.json, date-keyed retention pruning (BACKUP_RETENTION_DAYS, default 30), per-workspace failure isolation.",
+    "currentBehavior": "No daily data backup exists; worker only does job-row retention.",
+    "rootCause": "Gap \u2014 no snapshot job.",
+    "resolution": "Register a schedule:true worker job; reuse uploadObject/listObjects/deleteObject; phase-1 coverage from app/db/workspace-scoped-tables.ts; BACKUP_S3_BUCKET/BACKUP_RETENTION_DAYS env; docs restore procedure.",
+    "lookIn": [
+      "app/lib/worker/handlers.server.ts",
+      "app/lib/object-storage.server.ts",
+      "app/db/workspace-scoped-tables.ts",
+      "app/lib/env.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "daily snapshot + manifest appear",
+      "retention pruned",
+      "one failing workspace does not stop others"
+    ],
+    "acceptanceCriteria": [
+      "per-workspace snapshot + manifest daily",
+      "older-than-retention pruned",
+      "failure isolation + errored job",
+      "restore documented"
+    ],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "Phase-1: core tables; document coverage in the manifest format."
+  },
+  {
+    "issueNumber": 1697,
+    "verdict": "needs-decision",
+    "summary": "PR #1686 already merged (2026-09-09) and working (on-dev label + 'On dev: merged in' comments). Remaining is how the project status should be set (needs ON_DEV_PROJECT_NUMBER/PROJECT_TOKEN config) and whether to keep the label behaviour \u2014 ops/product decision, not code.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1699,
+    "verdict": "needs-decision",
+    "summary": "Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1700,
+    "verdict": "needs-decision",
+    "summary": "Proposal to collapse Speak/recording block types into one 'Add block'. The editor already treats them as one block with a playback-mode toggle, so the change is a product/scope decision.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1705,
+    "verdict": "needs-decision",
+    "summary": "Default primary hover is hover:bg-primary/90 (shad-cc); the exact darker token/shade is a design-system decision the issue does not specify.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1709,
+    "verdict": "needs-decision",
+    "summary": "Major UX redesign of the workspace/campaign sidebar; interaction model (per-campaign sidebar with status/completion/quick controls) needs a product decision before scoping.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1710,
+    "verdict": "needs-decision",
+    "summary": "Architecture question whether surveys should merge into scripts. Surveys exist as a separate module with public & workspace routes; consolidation scope needs a decision.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1713,
+    "verdict": "needs-decision",
+    "summary": "Requiring an existing user before invite is documented current design ('They must sign up before being invited'); email delivery TBD in module comment. Pre-account (email-first) invites are a feature decision plus auth/email work.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1717,
+    "verdict": "needs-decision",
+    "summary": "404 'Go back' is context-free history.back(); issue proposes URL-shape-dependent targets. Behavior policy decision first, then a small change.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1722,
+    "verdict": "needs-decision",
+    "summary": "'Kick off' button (running/paused) has no explanation and Sai 2026-09-09 confirms confusion; product decides label/tooltip/placement.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1723,
+    "verdict": "needs-decision",
+    "summary": "Feature request (template-tag \u2192 contact picker) whose scope depends on the tag UX decisions in 1724/1725; product decision first.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1724,
+    "verdict": "needs-decision",
+    "summary": "Current behavior: missing contact fields render empty string or the fallback (code answers the question). Product decides the desired UX (placeholder/flagging).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1725,
+    "verdict": "needs-decision",
+    "summary": "Parser tolerance of missing braces is intentional legacy support (single-brace bodies) \u2014 product decides whether to keep it or lint strict double-brace tags.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1728,
+    "verdict": "needs-decision",
+    "summary": "Campaign completes on queue drain (completeCampaignsDrainedByDequeue) while the dial fires async seconds later \u2014 behavior confirmed. What 'complete' means for IVR is a product decision that blocks the fix.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1729,
+    "verdict": "needs-decision",
+    "summary": "Auto-disposition mapping needs a spec (which outcome \u2192 which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1732,
+    "verdict": "needs-decision",
+    "summary": "Umbrella queue status-model redesign (completion vs outreach status; missing opted-out/dialing/failed states). Big product decision; 1720 is a subset.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1763,
+    "verdict": "needs-decision",
+    "summary": "Verify path never advances past sub-step 2 (caller-ID sets no hasFirstNumber so numberStep stays 'verify' and crumb 3 is unreachable for caller-ID). What progression means on the verify path is a product decision; overlaps #1205 (already Fix now).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1316,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide session behavior after MFA enrollment",
+    "summary": "MFA enrollment UI polish shipped to dev in PR #1780 (cb05869d). That PR explicitly left the issue\u2019s logout-after-save question as a product decision.",
+    "currentBehavior": "Status badge, Next action, copy success controls, secure-storage prompt, and themed feedback are implemented. Session behavior was not changed.",
+    "rootCause": "The remaining question is whether MFA enrollment should retain the current session.",
+    "resolution": "Decide the intended session behavior after MFA enrollment. Retest the shipped controls; do not implement the UI polish again.",
+    "lookIn": [
+      "app/routes/account.security.tsx",
+      "app/routes/two-factor.tsx"
+    ],
+    "existingTests": [
+      "test/ui/account-security.test.tsx",
+      "test/two-factor.server.test.ts"
+    ],
+    "missingTests": [
+      "Acceptance check for the chosen enrollment/session behavior."
+    ],
+    "acceptanceCriteria": [
+      "Decide whether enrollment keeps the current session.",
+      "Verify the chosen session behavior and the shipped enrollment controls."
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Keep open while the session decision remains unresolved; UI-only PR #1780 does not settle it.",
+    "blockedBy": []
+  },
+  {
+    "issueNumber": 1789,
+    "verdict": "needs-decision",
+    "summary": "PR #1798 (a80b3f9c) fixed voice export rate math and zero-duration gating: exports now use voiceCreditsFromDurationSeconds (shared/pricing.ts:122; IVR 2+3, staffed 4+5) and gate zero-duration attempts to 0 (campaign-export.server.ts:436-447). CONFIRMED in current dev; test/campaign-export-voice-credits.test.ts pins it. The only open item is the estimate-versus-ledger contract and the credits_used label.",
+    "resolution": "Decide the credits_used contract. If it remains an estimate, label it clearly; if actual debits are required, source it from the ledger. Preserve the corrected rates.",
+    "lookIn": [
+      "app/lib/campaign-export.server.ts",
+      "shared/pricing.ts"
+    ],
+    "missingTests": [
+      "Acceptance check for the selected actual-versus-estimated contract."
+    ],
+    "risk": "medium",
+    "trackerRecommendation": "Keep this contract decision open. Do not repeat the rate calculation fix from PR #1798.",
+    "blockedBy": [],
+    "currentBehavior": "The CSV credits_used value is calculated from duration and shared pricing, not read from ledger debits. The column remains named credits_used.",
+    "rootCause": "The arithmetic fix does not establish whether the field promises actual debits or an estimate.",
+    "existingTests": [
+      "test/campaign-export-voice-credits.test.ts"
+    ],
+    "acceptanceCriteria": [
+      "Define actual ledger debits versus estimated credits.",
+      "Label an estimate clearly, or source actual debits from the ledger."
+    ]
+  },
+  {
+    "issueNumber": 1813,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Finish the on-dev Status config: mint PROJECT_TOKEN",
+    "summary": "Resolved shape per #1822: issue-on-dev.yml now moves the CHS backlog Status via `gh project item-edit` (Status is THE signal; the `on-dev` label was removed). ON_DEV_PROJECT_NUMBER=9 is set as a repo variable. The only missing piece is the fine-grained PROJECT_TOKEN secret (GITHUB_TOKEN cannot write org projects). Until it is set, the workflow logs-and-comments and the project-on-dev-status skill backfills the move.",
+    "currentBehavior": "issue-on-dev.yml: Status move via gh project item-edit + comment on dev merge; no label. Without PROJECT_TOKEN the move is skipped (logged) and the comment still lands.",
+    "rootCause": "None \u2014 automation now exists and is Status-first; the token secret is the sole unconfigured input.",
+    "resolution": "Mint a fine-grained PAT with Projects read/write and set it as the PROJECT_TOKEN repo secret (steps in .github/workflows/issue-on-dev.yml header). Until then the project-on-dev-status skill covers merges.",
+    "lookIn": [
+      ".github/workflows/issue-on-dev.yml"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A dev-merge PR auto-moves its referenced issues to the 'On dev' Status",
+      "No on-dev label is applied anywhere (Status is the only signal)"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Ops/config: only PROJECT_TOKEN remains; overlaps #1697/#1686."
+  },
+  {
+    "issueNumber": 1814,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide agent verbosity when quoting resolved sibling issues",
+    "summary": "Report: an agent comment on #1325 (M4A upload bug, already verified/closed-tracked) pasted a wra-sol snippet pointing to PR #1731 as if the issue were still open. The M4A bug fix (#1731, merged) is real and verified; the complaint is process/verbosity — referencing a resolved fix on a non-matching context reads as noise.",
+    "currentBehavior": "Issue comments may restate resolved fixes from sibling issues; #1325's record (verify-close) already points at #1731 and #1730.",
+    "rootCause": "None in code — comment placement/copy discipline for agents.",
+    "resolution": "Decide the agent guideline: do not re-post resolution snippets from another issue's thread; prefer a one-line pointer and check whether the issue is already marked tested/on-dev before commenting.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Issue comments avoid restating resolved sibling fixes",
+      "Agent checks issue state/labels before commenting"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Process decision; overlaps #1813 (on-dev marking) and the agent-skills guidance."
+  },
+  {
+    "issueNumber": 1815,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide TWO_FACTOR_ENABLED kill-switch state per environment",
+    "summary": "Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 \u2014 the #1569 kill-switch default.",
+    "currentBehavior": "Better Auth twoFactor plugin is not registered; no code prompt at sign-in for enrolled users. Enrollment rows are kept (two-factor.server.ts:59) so setting the flag turns it all back on.",
+    "rootCause": "None \u2014 MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.",
+    "resolution": "Decide the intended state. To enable 2FA, set TWO_FACTOR_ENABLED=true|1 on dev + production and retest. Otherwise keep the kill switch and close with the explanation.",
+    "lookIn": [
+      "app/lib/env.server.ts",
+      "app/lib/two-factor.server.ts"
+    ],
+    "existingTests": [
+      "test/two-factor-kill-switch.route.test.ts",
+      "test/two-factor.server.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Decide whether 2FA should be on",
+      "If on, set TWO_FACTOR_ENABLED and verify the plugin registers"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Keeps blocking #1316 until the state is decided."
   }
 ]

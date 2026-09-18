@@ -53,4 +53,34 @@ describe("Add Audio upload zone (#1346)", () => {
 
     expect(screen.getByText("greeting.mp3")).toBeInTheDocument();
   });
+
+  test("shows a file-less submit error in the standardized Alert style (#1665)", async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/workspaces/w1/audios/new",
+          Component: Media,
+          action: () => ({
+            success: false,
+            error: "Please choose an audio file to upload.",
+          }),
+        },
+      ],
+      { initialEntries: ["/workspaces/w1/audios/new"] },
+    );
+    render(<RouterProvider router={router} />);
+
+    void router.navigate("/workspaces/w1/audios/new", {
+      formMethod: "POST",
+      formData: new FormData(),
+    });
+
+    // The standardized Alert (role=alert) with the message, not the old
+    // hand-built "Error:" text-destructive line.
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(
+      screen.getByText("Please choose an audio file to upload."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^Error:/)).not.toBeInTheDocument();
+  });
 });

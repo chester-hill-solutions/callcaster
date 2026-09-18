@@ -4,6 +4,39 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-09-18 — release [#1838](https://github.com/chester-hill-solutions/callcaster/pull/1838)
+
+### Security
+
+- Updated the Nano ID dependency to remove affected 3.x versions from both installation lockfiles ([#1805](https://github.com/chester-hill-solutions/callcaster/issues/1805)).
+- Updated query serialization dependencies to prevent known input handling failures ([#1809](https://github.com/chester-hill-solutions/callcaster/issues/1809)).
+
+### Fixed
+
+- IVR recording previews load the audio duration before you press Play ([#1696](https://github.com/chester-hill-solutions/callcaster/issues/1696)).
+- Campaign SMS sends stop when the send window closes and keep the configured pacing across batches. SMS and IVR dispatch scan past contacts in quiet hours so eligible recipients can proceed ([#1782](https://github.com/chester-hill-solutions/callcaster/issues/1782), [#1791](https://github.com/chester-hill-solutions/callcaster/issues/1791), [#1792](https://github.com/chester-hill-solutions/callcaster/issues/1792), [#1793](https://github.com/chester-hill-solutions/callcaster/issues/1793); PR [#1796](https://github.com/chester-hill-solutions/callcaster/pull/1796)).
+- Campaign schedule sync preserves a newer pause or completion status if the status changes after the schedule check starts ([#1794](https://github.com/chester-hill-solutions/callcaster/issues/1794); PR [#1797](https://github.com/chester-hill-solutions/callcaster/pull/1797)).
+- Campaign exports now omit false SMS skip rows, use the shared voice credit rates, and accept all supported IVR campaign types ([#1788](https://github.com/chester-hill-solutions/callcaster/issues/1788), [#1789](https://github.com/chester-hill-solutions/callcaster/issues/1789), [#1790](https://github.com/chester-hill-solutions/callcaster/issues/1790); PR [#1798](https://github.com/chester-hill-solutions/callcaster/pull/1798)).
+- Contact search lets you create a missing contact from the bottom of the results list — no dead-end searches ([#1726](https://github.com/chester-hill-solutions/callcaster/issues/1726)).
+- MFA enrollment polish: the status shows as a top-right badge, the password step advances with a right-aligned "Next" action, the secret and backup codes get copy buttons (with a success checkmark), backup codes carry a secure-storage prompt, and verification errors use consistent themed padding ([#1316](https://github.com/chester-hill-solutions/callcaster/issues/1316)).
+- Toasts now use consistent spacing defaults (vertical padding + row gap) app-wide, fixing cramped bottom spacing around upload errors ([#1668](https://github.com/chester-hill-solutions/callcaster/issues/1668)).
+- Upload success toasts keep the audio file name on a single inline line ([#1667](https://github.com/chester-hill-solutions/callcaster/issues/1667)).
+- The workspace picker keeps **All workspaces** pinned at the bottom of the dropdown, always visible even with many workspaces ([#1669](https://github.com/chester-hill-solutions/callcaster/issues/1669)).
+- Upload failures no longer leak raw storage/server messages — every upload path returns a friendly message and keeps the raw detail in the logs ([#1769](https://github.com/chester-hill-solutions/callcaster/issues/1769)).
+- Number verification now updates the numbers page live — no refresh needed to see a number flip to verified — and the verification sheet shows a pending state with the confirmation token while the call is in flight ([#1740](https://github.com/chester-hill-solutions/callcaster/issues/1740)).
+- Adding an audio without selecting a file now shows the standard error style instead of a plain red text line ([#1665](https://github.com/chester-hill-solutions/callcaster/issues/1665)).
+- Editing a campaign's calling hours or send window now takes effect right away: the queued send is pulled forward to the new window instead of sleeping until the old boundary, so widening the window to open now sends at the new time ([#1816](https://github.com/chester-hill-solutions/callcaster/issues/1816)).
+- Campaign export credits are now labelled as an estimate: the column reads `credits_used_estimated` so it cannot be mistaken for the actual debited amount (real debits are in Billing activity) ([#1789](https://github.com/chester-hill-solutions/callcaster/issues/1789)).
+- The workspace picker no longer throws when pinned footer actions render inside the menu — workspace actions stay in the React Aria menu where required, and the pinned **All workspaces** option renders as a regular button.
+- The onboarding Identity breadcrumb now completes after you save the legal business name, instead of staying unfinished ([#1832](https://github.com/chester-hill-solutions/callcaster/issues/1832)).
+- The landing page offers **Go to Workspaces** to signed-in visitors instead of **Sign Up**, so returning users get to their workspaces in one click.
+- The page no longer logs hydration mismatch warnings on load when a theme is stored — the theme toggle's label stays neutral until the resolved theme is known, and the html theme class is applied without a React hydration conflict ([#1783](https://github.com/chester-hill-solutions/callcaster/issues/1783), [#1750](https://github.com/chester-hill-solutions/callcaster/issues/1750)).
+- Two scripts can no longer share the same name in one workspace — the friendly "already exists" error is now enforced by the database instead of only in the UI ([#1704](https://github.com/chester-hill-solutions/callcaster/issues/1704), [#1781](https://github.com/chester-hill-solutions/callcaster/issues/1781)).
+
+### Developers / operators
+
+- Issues whose fix lands on `dev` now move to the kanban **On dev** status automatically instead of getting a label, so the board shows real progress without comment spam ([#1822](https://github.com/chester-hill-solutions/callcaster/issues/1822)).
+
 ## 2026-09-11 — release [#1761](https://github.com/chester-hill-solutions/callcaster/pull/1761)
 
 ### Fixed

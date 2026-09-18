@@ -31,122 +31,245 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1205,
+    "issueNumber": 1701,
     "verdict": "fix-now",
-    "recommendedTitle": "ux(onboarding): split Number into guided rent-or-verify substeps",
-    "summary": "The Number onboarding step is one long page (service address, rent/verify, inbound routing) with no internal navigation.",
-    "currentBehavior": "OnboardingFirstNumberStep renders all sections on one page; outer wizard treats it as one first_number step.",
-    "rootCause": "No internal state machine or substeps.",
-    "resolution": "Add substeps: choose Rent vs Verify -> service address (rent path) -> purchase/verify -> inbound routing. Preserve server actions and billing return URL.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx",
-      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx",
-      "app/routes/workspaces+/$id/onboarding/wizard-step-resolution.ts"
-    ],
-    "existingTests": [
-      "none for the step UI"
-    ],
-    "missingTests": [
-      "both branches",
-      "back navigation",
-      "billing return",
-      "completed-number resume"
-    ],
+    "summary": "Well-scoped layout change: move the Upload audio button (rendered in IvrStepFields) adjacent to the 'Select a recording' control (RecordingStepFields).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
     "acceptanceCriteria": [
-      "Choose method first",
-      "Rent requires address before search",
-      "Verify bypasses rental",
-      "Routing appears only after a number exists"
+      "See rationale in .agent/board-dig-results.md"
     ],
-    "size": "M",
+    "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Overlaps #1110/#1113/#1318; keep as its own issue.",
-    "blockedBy": []
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1316,
+    "issueNumber": 1702,
     "verdict": "fix-now",
-    "recommendedTitle": "design(mfa): polish enrollment steps, status layout, and secure code-copy controls",
-    "summary": "MFA change-log polish: cramped sublines (move status top-right), password-step action should be 'Next', icon copy controls with checkmark success, backup-code copy + secure-storage prompt, error-toast consistency.",
-    "currentBehavior": "account.tsx renders SectionHeader with 'Save' button for the password step, status below header, plain text copy control, no backup-code copy/guidance; account.security.tsx + two-factor.tsx use plain red text.",
-    "rootCause": "Enrollment layout and copy still need the requested polish.",
-    "resolution": "Scope the remaining enrollment controls first. Keep session behavior unchanged; shared toast spacing is tracked in #1668.",
-    "lookIn": [
-      "app/routes/account.tsx",
-      "app/routes/account.security.tsx",
-      "app/routes/two-factor.tsx"
-    ],
-    "existingTests": [
-      "test/two-factor.server.test.ts (server gates only)"
-    ],
-    "missingTests": [
-      "button labels",
-      "clipboard success/failure",
-      "enrollment keeps session"
-    ],
+    "summary": "Exact change: convert the Answer label description into a hover tooltip.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
     "acceptanceCriteria": [
-      "Password step says Next",
-      "Copy buttons accessible with check states",
-      "Backup codes have secure-storage prompt",
-      "Session behavior unchanged"
+      "See rationale in .agent/board-dig-results.md"
     ],
-    "size": "M",
+    "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Treat enrollment polish as a separate PR from global toast spacing.",
-    "blockedBy": []
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1665,
+    "issueNumber": 1703,
     "verdict": "fix-now",
-    "summary": "Submitting the audio form without a file shows plain red error text. The request asks for the shared error style.",
-    "resolution": "Use the existing shared form-error primitive, then inspect other audio upload entry points for the same mismatch.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/audios/new.route.tsx",
-      "app/components/ui/form-field.tsx"
+    "summary": "Exact change: replace the full-width 'Remove response' button with an inline trash icon in each response row.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
     ],
-    "blockedBy": []
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1667,
+    "issueNumber": 1704,
     "verdict": "fix-now",
-    "summary": "Audio upload toast text should read as one sentence with a space.",
-    "resolution": "Inspect title and description values; make the upload message one coherent sentence without changing global error semantics.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/audios/new.route.tsx",
-      "app/lib/audio-upload.ts"
+    "summary": "Confirmed gap: script table has no unique index on (workspace,name) (schema + migrations), yet campaign.server.ts already maps isUniqueViolation to a friendly 'already exists' error — the guard is unreachable. Add the constraint and surface the existing error.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
     ],
-    "blockedBy": []
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1668,
+    "issueNumber": 1715,
     "verdict": "fix-now",
-    "summary": "Error toast content lacks bottom spacing. The request requires a shared correction.",
-    "resolution": "Reproduce in the root Toaster and fix shared toast spacing. Verify success/error messages and light/dark themes.",
-    "lookIn": [
-      "app/components/ui/sonner.tsx",
-      "app/root.tsx"
+    "summary": "Precise change list with an exact target component (profile dropdown): remove padding/info/first-name/workspace settings, rename invitations line + icon.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
     ],
-    "blockedBy": []
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1669,
+    "issueNumber": 1716,
     "verdict": "fix-now",
-    "summary": "The All workspaces action should remain visible at the bottom while workspace results scroll.",
-    "resolution": "Put the action outside the scrolling results area and verify a long workspace list.",
-    "lookIn": [
-      "app/components/layout/Navbar.tsx"
+    "summary": "Navbar order shifts because NavbarCredits/WorkspacePicker render conditionally; issue specifies the exact desired order. Fix is a stable nav-shell order.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
     ],
-    "blockedBy": []
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1690,
+    "issueNumber": 1727,
     "verdict": "fix-now",
-    "summary": "Refresh all live issue records for this release, with shipped PR evidence and explicit pending user tests.",
-    "resolution": "Generate the full board, verify all references, and merge the board-only PR after full local checks.",
+    "summary": "Explicit ordering spec (reverse chrono + status grouping running→waiting→draft→complete); campaigns list renders without that ordering. Well-scoped change at the source.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1739,
+    "verdict": "fix-now",
+    "summary": "Well-scoped template change with example copy: inject the workspace name into the low-credit email subject/body (workspace is in the notify context).",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1764,
+    "verdict": "fix-now",
+    "summary": "Confirmed gap: the rent path has a real address substep but the substep nav collapses address/rent/verify into one crumb. Add an address crumb to the nav state machine.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See rationale in .agent/board-dig-results.md"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+  },
+  {
+    "issueNumber": 1781,
+    "verdict": "fix-now",
+    "recommendedTitle": "Unique index for script names (duplicate-name error has no DB constraint)",
+    "summary": "No unique index on script(workspace,name) — the friendly duplicate error (campaign.server.ts:556/619) is unenforceable. Add citext/lower unique index + map violations to the friendly message.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Implement per ticket"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Filed 2026-09-12 from board triage."
+  },
+  {
+    "issueNumber": 1783,
+    "verdict": "fix-now",
+    "recommendedTitle": "Theme bootstrap <html> hydration mismatch",
+    "summary": "root.tsx inline theme script mutates documentElement pre-hydration; React logs mismatch every boot. Use narrow suppressHydrationWarning or server-rendered theme, keep the anti-flash script.",
+    "lookIn": [],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Implement per ticket"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Filed 2026-09-12 from board triage."
+  },
+  {
+    "issueNumber": 1804,
+    "verdict": "fix-now",
+    "summary": "The audit release-note correction is in progress in PR #1808; it was not merged at this review.",
+    "resolution": "Finish the existing PR and verify each audit fix appears once under Unreleased, with the schedule entry restored.",
+    "lookIn": [
+      "docs/CHANGELOG.md"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Active PR #1808 owns this change; do not create a duplicate."
+  },
+  {
+    "issueNumber": 1809,
+    "verdict": "fix-now",
+    "summary": "PR #1811 contains the qs override and lockfile remediation and is awaiting review/checks. The two advisory inputs, actual Twilio/Stripe serialization, and full local CI passed; the PR has not merged.",
+    "resolution": "Finish the active qs-only change and full checks. Keep parent SDK versions unchanged; verify default-branch alerts after promotion.",
+    "lookIn": [
+      "package.json",
+      "package-lock.json",
+      "bun.lock"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Active PR #1811 owns this remediation; do not start a competing lockfile change."
+  },
+  {
+    "issueNumber": 1810,
+    "verdict": "fix-now",
+    "summary": "This tracking-only refresh updates stale verdicts from live issue states and merged PR evidence.",
+    "resolution": "Review and merge the active board refresh after full local checks.",
     "lookIn": [
       "ISSUE_BOARD.md",
-      "scripts/issue-board-enrichment"
+      "scripts/issue-board-enrichment/"
     ],
-    "blockedBy": []
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "This board-refresh PR owns the ticket; do not duplicate it."
+  },
+  {
+    "issueNumber": 1816,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(dispatch): reschedule a parked campaign_dispatch successor when the campaign window is edited",
+    "summary": "Child of #1352 (window widened to include 12:47, send landed 1:12). Deferrals post-#1796 enqueue successors exactly at the boundary computed at defer time (nextDispatchOpenAt, campaign.server.ts waiting/deferred_send_window branches), but editing the calling-hours/send-window of a running or waiting campaign (`$selected_id/settings.action.server.ts` case 'save') never rewrites the queued successor's retry_at, so the campaign keeps sleeping to the stale boundary.",
+    "currentBehavior": "A deferred campaign_dispatch successor is enqueued at min(nextOpenAt, now+60min). A schedule edit updates the campaign row only; rescheduleQueuedJob (enqueue-job.server.ts:133) is called from the launch path only (campaign-execution.server.ts:129).",
+    "rootCause": "The successor parked at defer time is not rescheduled when the window is later widened/opened.",
+    "resolution": "On settings save of `schedule`/`sms_send_window` for a running/waiting/scheduled machine campaign, reschedule the live campaign_dispatch row (same live-dedupe predicate) to min(nextOpenAt, now+60min) via rescheduleQueuedJob.",
+    "lookIn": [
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/lib/campaign-dispatch-policy.ts",
+      "app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts",
+      "app/lib/worker/enqueue-job.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Campaign dispatched to a deferred successor -> window edited to open now -> queued job retry_at is pulled forward"
+    ],
+    "acceptanceCriteria": [
+      "Editing the window to open now moves the parked successor forward",
+      "Far-future cap (now+60min) still applies on the reschedule"
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Parent #1352 still open needs-repro; this is the actionable child."
+  },
+  {
+    "issueNumber": 1822,
+    "verdict": "fix-now",
+    "recommendedTitle": "ops(ci): mint PROJECT_TOKEN so issue-on-dev.yml moves the kanban Status",
+    "summary": "Sai: agents add the `on-dev` label instead of setting the project Status; `gh project item-edit` is the correct command. Root cause: issue-on-dev.yml always labelled and only moved Status when ON_DEV_PROJECT_NUMBER + PROJECT_TOKEN were set — the variable was unset and the secret missing, so every dev merge produced label-only. The workflow has been rewritten to be Status-only (no label) with the variable set to 9; the only remaining gap is minting the PROJECT_TOKEN secret.",
+    "currentBehavior": "issue-on-dev.yml: finds referenced issues (closing keywords AND `Issues: #N` line), moves them to 'On dev' via gh project item-edit, then comments. Without PROJECT_TOKEN it logs the skip and still comments.",
+    "rootCause": "GITHUB_TOKEN cannot write org projects; without the fine-grained PROJECT_TOKEN secret the Status move step was silently skipped and the label was the visible proxy.",
+    "resolution": "Mint a fine-grained PAT with Projects read/write scoped to the CHS backlog project and set it as the repo secret PROJECT_TOKEN. Until then the project-on-dev-status skill backfills merges.",
+    "lookIn": [
+      ".github/workflows/issue-on-dev.yml"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A dev-merge PR moves its referenced issues to the 'On dev' Status",
+      "No on-dev label is applied anywhere"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Ops/config; overlaps #1813/#1697/#1686."
   }
 ]

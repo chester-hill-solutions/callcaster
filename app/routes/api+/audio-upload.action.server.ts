@@ -1,3 +1,4 @@
+import { toUserMessage } from "@/lib/user-message";
 import { data as routeData } from "react-router";
 import { getDualAuthUser, requireDualAuth } from "@/lib/api-auth.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
@@ -42,7 +43,10 @@ export const action = defineAction({
       file,
     );
     if (!result.ok) {
-      return routeData({ error: result.error }, { status: result.status });
+      return routeData(
+        { error: toUserMessage(result.error, "Failed to upload audio.") },
+        { status: result.status },
+      );
     }
 
     return routeData({ name: result.audio.name });

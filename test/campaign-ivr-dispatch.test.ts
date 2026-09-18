@@ -156,7 +156,10 @@ describe("dispatchCampaignIvrBatch", () => {
       campaignId: "42",
       userId: USER_ID,
     });
-    expect(outcome).toEqual({ kind: "deferred_send_window" });
+    expect(outcome).toMatchObject({
+      kind: "deferred_send_window",
+      nextOpenAt: expect.any(Date),
+    });
     expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
   });
 
@@ -239,6 +242,32 @@ describe("dispatchCampaignIvrBatch", () => {
     expect(outcome.counts).toEqual({ called: 1, failed: 0, dequeued: 0, deferred: 1, exhausted: 0 });
     expect(outcome.queuedRemaining).toBe(1);
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledTimes(1);
+  });
+
+  test("skips deferred queue-head rows when filling a bounded batch", async () => {
+    mocks.getCampaignQueueById.mockResolvedValue([
+      queuedRow({ id: 501, contact_id: 9001, contact: { id: 9001, phone: "+16045550100", opt_out: false } }),
+      queuedRow({ id: 502, contact_id: 9002, contact: { id: 9002, phone: "+16135550200", opt_out: false } }),
+    ]);
+    mocks.recipientCallingWindowStatus.mockImplementation((phone: string) => ({
+      allowed: phone !== "+16045550100",
+      timezone: "America/Toronto",
+      reason: phone === "+16045550100" ? "outside_window" : "in_window",
+    }));
+
+    const outcome = (await dispatchCampaignIvrBatch({
+      workspaceId: WORKSPACE_ID,
+      campaignId: "42",
+      userId: USER_ID,
+      maxContacts: 1,
+    })) as Extract<Awaited<ReturnType<typeof dispatchCampaignIvrBatch>>, { kind: "dispatched" }>;
+
+    expect(mocks.twilioCallCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.twilioCallCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "+16135550200" }),
+    );
+    expect(outcome.counts).toMatchObject({ called: 1, deferred: 1 });
+    expect(outcome.queuedRemaining).toBe(1);
   });
 
   test("an opted-out contact is dequeued without a call", async () => {

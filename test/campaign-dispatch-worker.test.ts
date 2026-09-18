@@ -438,6 +438,29 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
     );
   });
 
+  test("a waiting voice campaign wakes at the next calling-hours boundary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T14:00:00.000Z"));
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningMessageCampaign({
+        type: "simple_ivr",
+        status: "waiting",
+        schedule: {
+          wednesday: {
+            active: true,
+            intervals: [{ start: "14:05", end: "15:00" }],
+          },
+        },
+      }),
+    );
+
+    await campaignDispatchHandler(makeJob());
+
+    const call = mocks.enqueueJob.mock.calls.at(-1)?.[0] as { runAt: Date };
+    expect(call.runAt.getTime()).toBe(Date.parse("2026-09-09T14:05:00.000Z"));
+    vi.useRealTimers();
+  });
+
   test("paused voice campaign ends the chain without dispatching", async () => {
     mocks.findCampaignInWorkspace.mockResolvedValue(
       runningMessageCampaign({ type: "simple_ivr", status: "paused" }),
@@ -501,7 +524,10 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
   });
 
   test("IVR schedule deferral schedules a delayed successor", async () => {
-    mocks.dispatchCampaignIvrBatch.mockResolvedValue({ kind: "deferred_send_window" });
+    mocks.dispatchCampaignIvrBatch.mockResolvedValue({
+      kind: "deferred_send_window",
+      nextOpenAt: new Date(Date.now() + 5 * 60 * 1000),
+    });
     const result = await campaignDispatchHandler(makeJob());
     expect(result).toMatchObject({ ok: true, deferred: "send_window" });
     expect(mocks.enqueueJob).toHaveBeenCalledWith(

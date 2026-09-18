@@ -82,6 +82,7 @@ describe("runCampaignScheduleSync", () => {
       "ws-1",
       1,
       { status: "waiting" },
+      { expectedStatus: "running" },
     );
   });
 
@@ -95,6 +96,7 @@ describe("runCampaignScheduleSync", () => {
       "ws-1",
       1,
       { status: "running" },
+      { expectedStatus: "waiting" },
     );
   });
 
@@ -124,6 +126,7 @@ describe("runCampaignScheduleSync", () => {
       "ws-1",
       1,
       { status: "waiting" },
+      { expectedStatus: "running" },
     );
     expect(result.transitioned).toBe(1);
   });
@@ -141,6 +144,36 @@ describe("runCampaignScheduleSync", () => {
 
     expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledTimes(2);
     expect(result.transitioned).toBe(1);
+  });
+
+  test("a concurrent pause or completion is preserved by the conditional update", async () => {
+    mocks.findMany.mockResolvedValueOnce([
+      makeCampaign({ schedule: CLOSED_WEDNESDAY }),
+      makeCampaign({ id: 2, status: "waiting", schedule: OPEN_WEDNESDAY }),
+    ]);
+    // The first candidate was paused after the sweep read it. The second
+    // candidate still transitions normally.
+    mocks.updateCampaignStatusInWorkspace
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 2, status: "running" });
+
+    const result = await runCampaignScheduleSync();
+
+    expect(result).toEqual({ scanned: 2, transitioned: 1 });
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenNthCalledWith(
+      1,
+      "ws-1",
+      1,
+      { status: "waiting" },
+      { expectedStatus: "running" },
+    );
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenNthCalledWith(
+      2,
+      "ws-1",
+      2,
+      { status: "running" },
+      { expectedStatus: "waiting" },
+    );
   });
 
   test("rows missing workspace or dates are skipped", async () => {

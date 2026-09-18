@@ -17,7 +17,6 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Check, ChevronDown, Menu, User as UserIcon, LogOut } from "lucide-react";
@@ -103,6 +102,7 @@ const WorkspacePicker = ({
           <CommandList
             id="navbar-workspace-picker-list"
             aria-label="Workspaces"
+            className="max-h-64 overflow-y-auto"
             renderEmptyState={() => <CommandEmpty>No workspaces found.</CommandEmpty>}
           >
             <CommandGroup heading="Workspaces">
@@ -121,11 +121,16 @@ const WorkspacePicker = ({
                 </CommandItem>
               ))}
             </CommandGroup>
-            <CommandSeparator />
-            <CommandItem id="all-workspaces" textValue="All workspaces" onAction={() => go("/workspaces")}>
-              All workspaces
-            </CommandItem>
           </CommandList>
+          <div role="separator" className="my-1 h-px bg-border/50" />
+          <button
+            type="button"
+            id="all-workspaces"
+            onClick={() => go("/workspaces")}
+            className="flex min-h-7 w-full items-center rounded-md border-t border-border/60 px-2 py-1.5 text-left text-sm outline-hidden transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground"
+          >
+            All workspaces
+          </button>
         </Command>
       </PopoverContent>
     </Popover>

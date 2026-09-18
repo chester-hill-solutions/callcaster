@@ -21,7 +21,8 @@ import {
 } from "@/lib/campaign-ivr.server";
 import { rpcTryCompleteCampaignIfDrained } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
-import { DISPATCH_TICK_MS } from "@/lib/throughput-config";
+import { DISPATCH_TICK_MS, SEND_WINDOW_MAX_DEFER_MS } from "@/lib/throughput-config";
+import { ivrCallingPolicy, nextDispatchOpenAt } from "@/lib/campaign-dispatch-policy";
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 import type { VoterListSource } from "@/lib/audience-upload-process.server";
@@ -145,7 +146,10 @@ export async function campaignExportHandler(
       exportId,
       campaignName,
     );
-  } else if (campaignType === "live_call" || campaignType === "robocall") {
+  } else if (
+    campaignType === "live_call" ||
+    isMachineDispatchedVoiceCampaignType(campaignType)
+  ) {
     await processCallCampaignExport(
       campaignId,
       workspaceId,
@@ -165,13 +169,6 @@ const DISPATCH_BATCH_SIZE = 50;
  *  sweep waiting flips, IVR calling-hours gate). The SMS send-window gate
  *  instead schedules its successor at the exact window boundary (#1352). */
 const SEND_WINDOW_RETRY_MS = 15 * 60 * 1000;
-/** Upper bound on one send-window deferral. The successor wakes at
- *  min(nextOpenAt, now + this): exact for boundaries within reach (#1352),
- *  but a boundary days away cannot pin the chain to window config that may
- *  change first. Every wake re-reads the campaign, so a window edited or
- *  removed while deferred takes effect within one bounded hop, and the hop
- *  that lands inside the cap still resumes exactly at the true boundary. */
-const SEND_WINDOW_MAX_DEFER_MS = 60 * 60 * 1000;
 
 /** Milliseconds until a campaign's start date; 0 when unset, invalid, or past. */
 function msUntilCampaignStart(
@@ -314,12 +311,16 @@ export async function campaignDispatchHandler(
       campaignRecord.type !== "message" &&
       campaignRecord.status === "waiting"
     ) {
+      const nextOpenAt = nextDispatchOpenAt(ivrCallingPolicy(campaignRecord));
+      const exactDelayMs = nextOpenAt
+        ? Math.max(0, nextOpenAt.getTime() - Date.now())
+        : SEND_WINDOW_RETRY_MS;
       await enqueueDispatchSuccessor({
         workspaceId,
         campaignId,
         userId,
         completedJobId: job.id,
-        delayMs: SEND_WINDOW_RETRY_MS,
+        delayMs: Math.min(exactDelayMs, SEND_WINDOW_MAX_DEFER_MS),
       });
       return { ok: true, campaignId, deferred: "waiting_for_schedule" };
     }
@@ -464,15 +465,17 @@ async function runMachineVoiceDispatch(
       // Config error — retrying cannot fix it; surface loudly and stop.
       logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
       return { ok: true, campaignId, blocked: "caller_id_required" };
-    case "deferred_send_window":
+    case "deferred_send_window": {
+      const exactDelayMs = Math.max(0, outcome.nextOpenAt.getTime() - Date.now());
       await enqueueDispatchSuccessor({
         workspaceId,
         campaignId,
         userId,
         completedJobId: job.id,
-        delayMs: SEND_WINDOW_RETRY_MS,
+        delayMs: Math.min(exactDelayMs, SEND_WINDOW_MAX_DEFER_MS),
       });
       return { ok: true, campaignId, deferred: "send_window" };
+    }
     case "dispatched": {
       const { counts, queuedRemaining } = outcome;
 

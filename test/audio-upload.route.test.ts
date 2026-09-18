@@ -181,4 +181,26 @@ describe("app/routes/api+/audio-upload action", () => {
     expect(res.status).toBe(409);
     expect((await res.json()).error).toMatch(/already exists/i);
   });
+
+  test("falls back to a friendly message when the service returns a raw error", async () => {
+    sessionAuth();
+    mocks.uploadWorkspaceAudioApi.mockResolvedValueOnce({
+      ok: false as const,
+      error: "RequestTimeout: socket hang up (host=api.s3…)",
+      status: 500,
+    });
+
+    const mod = await import("../app/routes/api+/audio-upload.action.server");
+    const fd = new FormData();
+    fd.set("workspaceId", "w1");
+    fd.set("media", new File(["x"], "greeting.mp3", { type: "audio/mpeg" }));
+
+    const res = await asRouteResponse(
+      mod.action({ request: makeRequest(fd) } as never),
+    );
+
+    expect(res.status).toBe(500);
+    // Raw infra text never reaches the user (#1769).
+    expect((await res.json()).error).toBe("Failed to upload audio.");
+  });
 });

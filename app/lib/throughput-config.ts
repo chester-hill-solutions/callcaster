@@ -12,6 +12,16 @@ export const MAX_QUEUE_ATTEMPTS = 5;
 export const STALE_CLAIM_TIMEOUT_MS = 10 * 60 * 1000;
 export const DISPATCH_TICK_MS = 1000;
 
+/**
+ * Upper bound on one send-window/calling-hours deferral. The successor wakes
+ * at min(nextOpenAt, now + this): exact for boundaries within reach, but a
+ * boundary days away cannot pin the chain to window config that may change
+ * first. Every wake re-reads the campaign, so a window edited or removed
+ * while deferred takes effect within one bounded hop, and the hop that lands
+ * inside the cap still resumes exactly at the true boundary.
+ */
+export const SEND_WINDOW_MAX_DEFER_MS = 60 * 60 * 1000;
+
 export function defaultSmsTargetMps(senderClass: TwilioSmsSenderClass): number {
   switch (senderClass) {
     case "ca_short_code":

@@ -294,18 +294,22 @@ export const campaign_queue = pgTable(
   (table) => [unique("campaign_queue_campaign_contact_unique").on(table.campaign_id, table.contact_id)],
 );
 
-export const script = pgTable("script", {
-  created_at: text().notNull(),
-  created_by: uuid(),
-  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  is_sample: boolean().notNull().default(false),
-  name: text().notNull(),
-  steps: jsonb(),
-  type: text(),
-  updated_at: text(),
-  updated_by: text(),
-  workspace: uuid(),
-});
+export const script = pgTable(
+  "script",
+  {
+    created_at: text().notNull(),
+    created_by: uuid(),
+    id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
+    is_sample: boolean().notNull().default(false),
+    name: text().notNull(),
+    steps: jsonb(),
+    type: text(),
+    updated_at: text(),
+    updated_by: text(),
+    workspace: uuid(),
+  },
+  (table) => [uniqueIndex("script_workspace_name_unique").on(table.workspace, table.name)],
+);
 
 // ─── Contact/Audience ──────────────────────────────────────
 
