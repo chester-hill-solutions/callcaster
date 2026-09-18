@@ -10,7 +10,10 @@ const mocks = vi.hoisted(() => {
     validateTwilioWebhookParams: vi.fn(() => true),
     requireTwilioSignature: vi.fn(),
     markContactLineType: vi.fn(),
-    fetchCampaignByIdForWorkspace: vi.fn(async () => ({ voicemail_file: "vm.mp3" })),
+    fetchCampaignByIdForWorkspace: vi.fn(async () => ({
+      voicemail_file: "vm.mp3",
+      voicemail_drop_enabled: true,
+    })),
     env: {
       BETTER_AUTH_URL: () => "https://sb.example",
       BETTER_AUTH_SERVICE_KEY: () => "svc",
@@ -68,7 +71,7 @@ function makeDbClient() {
   let callRow: any = { campaign_id: 1, outreach_attempt_id: 10, workspace: "w1" };
   let callError: any = null;
   let workspaceRow: any = { twilio_data: { sid: "AC_test", authToken: "tok" } };
-  let campaignRow: any = { voicemail_file: "vm.mp3" };
+  let campaignRow: any = { voicemail_file: "vm.mp3", voicemail_drop_enabled: true };
   let campaignError: any = null;
   let signedUrl: string | null = "https://signed";
   let voicemailError: any = null;

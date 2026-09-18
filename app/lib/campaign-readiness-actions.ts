@@ -17,7 +17,8 @@ export type CampaignReadinessCorrectiveAction =
         | "type"
         | "campaign-setup-number"
         | "campaign-setup-schedule"
-        | "sms_send_mode";
+        | "sms_send_mode"
+        | "voicemail_file";
       label: string;
     }
   | {
@@ -116,6 +117,11 @@ export const CAMPAIGN_READINESS_ACTIONS = {
     type: "route",
     template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
     label: "Replace audio",
+  },
+  voicemail_audio_required: {
+    type: "scroll",
+    targetId: "voicemail_file",
+    label: "Choose voicemail audio",
   },
   message_content_required: {
     type: "route",

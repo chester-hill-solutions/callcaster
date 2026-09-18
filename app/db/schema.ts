@@ -69,6 +69,16 @@ export {
   response_answer,
 };
 
+// Campaign tables live in schema-campaign.ts; re-exported here so
+// `@/db/schema` stays the single import site. Imported (not just re-exported)
+// because the relations block below wires them.
+import {
+  campaign,
+  campaign_audience,
+  campaign_queue,
+} from "./schema-campaign";
+export { campaign, campaign_audience, campaign_queue };
+
 export const agent_state = pgEnum("agent_state", ["offline","available","busy","wrap_up","away"]);
 export const answered_by = pgEnum("answered_by", ["human","machine","unknown"]);
 export const call_status = pgEnum("call_status", ["queued","ringing","in-progress","canceled","completed","failed","busy","no-answer","initiated"]);
@@ -233,66 +243,7 @@ export const workspace_number = pgTable("workspace_number", {
   workspace: uuid().notNull(),
 });
 
-// ─── Campaign ──────────────────────────────────────
-
-export const campaign = pgTable("campaign", {
-  allow_bulk_local_send: boolean().notNull().default(false),
-  body_text: text(),
-  caller_id: text(),
-  created_at: text().notNull(),
-  dial_ratio: numeric({ mode: "number" }).notNull(),
-  dial_type: text(),
-  disposition_options: jsonb(),
-  end_date: text(),
-  group_household_queue: boolean().notNull(),
-  id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  is_sample: boolean().notNull().default(false),
-  live_questions: jsonb(),
-  message_media: text().array(),
-  next_queue_order: integer().notNull(),
-  schedule: jsonb(),
-  script_id: integer(),
-  sms_messaging_service_sid: text(),
-  sms_send_mode: text(),
-  sms_send_window: jsonb(),
-  start_date: text(),
-  status: text(),
-  title: text().notNull(),
-  type: text(),
-  voicemail_file: text(),
-  voicedrop_audio: text(),
-  workspace: uuid(),
-});
-
-export const campaign_audience = pgTable("campaign_audience", {
-  audience_id: bigint({ mode: "number" }).notNull(),
-  campaign_id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity(),
-  created_at: text().notNull(),
-});
-
-export const campaign_queue = pgTable(
-  "campaign_queue",
-  {
-    assigned_to_user_id: uuid(),
-    attempt_count: integer().notNull(),
-    attempts: integer().notNull(),
-    campaign_id: bigint({ mode: "number" }).notNull(),
-    claimed_at: text(),
-    contact_id: bigint({ mode: "number" }).notNull(),
-    created_at: text().notNull(),
-    id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-    last_attempt_at: text(),
-    last_attempt_error: text(),
-    provider_status: text(),
-    queue_order: integer(),
-    queue_state: text(),
-    dequeued_by: uuid(),
-    dequeued_at: text(),
-    dequeued_reason: text(),
-    workspace: uuid().notNull(),
-  },
-  (table) => [unique("campaign_queue_campaign_contact_unique").on(table.campaign_id, table.contact_id)],
-);
+// ─── Script ───────────────────────────────────────
 
 export const script = pgTable(
   "script",

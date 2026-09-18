@@ -18,7 +18,6 @@ import {
   WorkspaceNumbers,
   WorkspaceTwilioOpsConfig,
   WorkspaceTwilioSyncSnapshot,
-  FileObject,
 } from "@/lib/types";
 import { CampaignLaunchExtras } from "./detailed/CampaignLaunchExtras";
 import { CampaignLaunchActions } from "./CampaignLaunchActions";
@@ -73,7 +72,6 @@ export type CampaignLaunchProps = {
   campaignDetails: LiveCampaign | MessageCampaign | IVRCampaign;
   workspace: string;
   scripts: Script[];
-  mediaData: FileObject[];
   isChanged: boolean;
   phoneNumbers: WorkspaceNumbers[];
   handleInputChange: (name: string, value: unknown) => void;
@@ -110,7 +108,6 @@ export type CampaignLaunchProps = {
 export const CampaignLaunch = ({
   campaignData,
   campaignDetails,
-  mediaData,
   isChanged = false,
   phoneNumbers = [],
   credits,
@@ -445,13 +442,10 @@ export const CampaignLaunch = ({
               <CampaignLaunchExtras
                 campaignData={campaignData}
                 handleInputChange={handleInputChange}
-                mediaData={mediaData}
-                details={campaignDetails!}
                 isBusy={formFetcher.state !== "idle"}
                 queueCount={queueCount}
                 phoneNumbers={phoneNumbers}
                 outboundEstimateInputs={outboundEstimateInputs}
-                workspaceId={workspace}
               />
               {campaignBilling ? (
                 <details className="rounded-md border border-border/70 p-3">

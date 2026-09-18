@@ -241,6 +241,53 @@ describe("app/lib/campaign-readiness.ts", () => {
     );
   });
 
+  test("requires voicemail audio when the drop is on (#1839)", () => {
+    const base = {
+      type: "robocall",
+      caller_id: "+15555550100",
+      start_date: "2026-03-10T10:00:00.000Z",
+      end_date: "2026-03-11T10:00:00.000Z",
+      schedule: validSchedule,
+    } as any;
+    const message = "Voicemail drop is on, but no voicemail audio is selected";
+
+    const missing = getCampaignReadiness(
+      { ...base, voicemail_drop_enabled: true, voicemail_file: null },
+      { script_id: 42 } as any,
+      {
+        queueCount: 1,
+        workspacePhoneNumbers: [],
+        workspaceScriptIds: [42],
+        workspaceAudioNames: [],
+      },
+    );
+    expect(missing.startIssues).toContain(message);
+
+    const satisfied = getCampaignReadiness(
+      { ...base, voicemail_drop_enabled: true, voicemail_file: "vm.mp3" },
+      { script_id: 42 } as any,
+      {
+        queueCount: 1,
+        workspacePhoneNumbers: [],
+        workspaceScriptIds: [42],
+        workspaceAudioNames: ["vm.mp3"],
+      },
+    );
+    expect(satisfied.startIssues).not.toContain(message);
+
+    const off = getCampaignReadiness(
+      { ...base, voicemail_drop_enabled: false, voicemail_file: null },
+      { script_id: 42 } as any,
+      {
+        queueCount: 1,
+        workspacePhoneNumbers: [],
+        workspaceScriptIds: [42],
+        workspaceAudioNames: [],
+      },
+    );
+    expect(off.startIssues).not.toContain(message);
+  });
+
   test("rejects a foreign caller ID and accepts owned resources", () => {
     const baseCampaign = {
       type: "live_call",
