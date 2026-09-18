@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+## 2026-09-18 — release [#1838](https://github.com/chester-hill-solutions/callcaster/pull/1838)
+
 ### Security
 
 - Updated the Nano ID dependency to remove affected 3.x versions from both installation lockfiles ([#1805](https://github.com/chester-hill-solutions/callcaster/issues/1805)).
