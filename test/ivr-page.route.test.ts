@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { findCallWithCampaignScriptBySid } from "@/lib/telephony-db.server";
+import {
+  findCallWithCampaignScriptBySid,
+  updateOutreachAttemptForWorkspace,
+} from "@/lib/telephony-db.server";
+import { createSignedObjectUrl } from "@/lib/object-storage.server";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -22,6 +26,12 @@ vi.mock("@/lib/twilio-webhook.server", () => ({
 
 vi.mock("@/lib/telephony-db.server", () => ({
   findCallWithCampaignScriptBySid: vi.fn(),
+  updateOutreachAttemptForWorkspace: vi.fn(),
+}));
+
+vi.mock("@/lib/object-storage.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/object-storage.server")>()),
+  createSignedObjectUrl: vi.fn(),
 }));
 
 vi.mock("@/lib/campaign-ivr.server", () => ({
@@ -38,6 +48,10 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     mocks.requireTwilioSignature.mockResolvedValue(null);
     mocks.logger.error.mockReset();
     vi.mocked(findCallWithCampaignScriptBySid).mockReset();
+    vi.mocked(updateOutreachAttemptForWorkspace).mockReset();
+    vi.mocked(updateOutreachAttemptForWorkspace).mockResolvedValue({} as never);
+    vi.mocked(createSignedObjectUrl).mockReset();
+    vi.mocked(createSignedObjectUrl).mockResolvedValue("https://signed");
   });
 
   test("returns 400 when required params missing", async () => {
@@ -152,5 +166,67 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
     } as never);
     expect(await res.text()).toMatch(/hangup/i);
+  });
+
+  test("uses the AMD verdict before the flow starts: machine drops or hangs up, never redirects (#1864)", async () => {
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
+    const req = (answeredBy: string) => {
+      const fd = new FormData();
+      fd.set("CallSid", "CA1");
+      fd.set("AnsweredBy", answeredBy);
+      return new Request("http://x", {
+        method: "POST",
+        headers: { "x-twilio-signature": "sig" },
+        body: fd,
+      });
+    };
+    const script = { steps: { pages: { page_1: { blocks: ["b1"] } } } };
+
+    // machine, drop off => hang up with no redirect and no IVR audio
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({
+      workspace: "w1",
+      campaign_id: 1,
+      outreach_attempt_id: 7,
+      campaign: { voicemail_drop_enabled: false, voicemail_file: null, script },
+    } as never);
+    let res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1" },
+      request: req("machine_start"),
+    } as never);
+    let text = await res.text();
+    expect(text).toMatch(/hangup/i);
+    expect(text).not.toContain("<Redirect>");
+    expect(vi.mocked(updateOutreachAttemptForWorkspace)).toHaveBeenCalledWith(
+      "w1",
+      7,
+      expect.objectContaining({ disposition: "voicemail" }),
+    );
+
+    // machine, drop on => play the drop, still no redirect
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({
+      workspace: "w1",
+      campaign_id: 1,
+      outreach_attempt_id: null,
+      campaign: { voicemail_drop_enabled: true, voicemail_file: "vm.mp3", script },
+    } as never);
+    res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1" },
+      request: req("machine_end_beep"),
+    } as never);
+    text = await res.text();
+    expect(text).toContain("<Play>https://signed</Play>");
+    expect(text).not.toContain("<Redirect>");
+
+    // human => the flow starts as before
+    vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({
+      workspace: "w1",
+      campaign_id: 1,
+      campaign: { voicemail_drop_enabled: false, voicemail_file: null, script },
+    } as never);
+    res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1" },
+      request: req("human"),
+    } as never);
+    expect(await res.text()).toContain("<Redirect>/api/ivr/1/page_1/b1</Redirect>");
   });
 });

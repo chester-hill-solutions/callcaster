@@ -20,16 +20,19 @@ async function readWebhookFormParams(request: Request): Promise<Record<string, s
 export async function requireTwilioSignatureForIvrPage(
   request: Request,
   routeIds: Array<string | undefined>,
-): Promise<Response | { callSid: string }> {
+): Promise<Response | { callSid: string; answeredBy: string }> {
   const paramsObj = await readWebhookFormParams(request);
   const callSid = paramsObj.CallSid ?? null;
+  // Synchronous AMD sends the verdict on the initial TwiML request; the page
+  // route uses it to decide before any IVR audio plays.
+  const answeredBy = paramsObj.AnsweredBy ?? "";
 
   if (!callSid || routeIds.some((id) => !id)) {
     return new Response("Missing required parameters", { status: 400 });
   }
 
   const forbidden = await requireTwilioSignature(request, { callSid });
-  return forbidden ?? { callSid };
+  return forbidden ?? { callSid, answeredBy };
 }
 
 /** Block routes: missing route params 400 first, then missing CallSid 400. */
