@@ -41,6 +41,7 @@ const mocks = vi.hoisted(() => {
     logger: { error: vi.fn() , info: vi.fn(), debug: vi.fn()},
     fetch: vi.fn(async () => ({ ok: true })),
     fetchCampaignByIdForWorkspace: vi.fn(async () => ({
+      voicemail_drop_enabled: true,
       voicemail_file: "vm.mp3",
       group_household_queue: true,
       caller_id: "+1555",
@@ -79,13 +80,17 @@ vi.mock("@/lib/auto-dial.server", () => ({
 
 const roomRpcState = vi.hoisted(() => ({ client: null as any }));
 const roomStorageState = vi.hoisted(() => ({ error: null as Error | null }));
+const createSignedObjectUrlMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/object-storage.server", () => ({
-  createSignedObjectUrl: async () => {
-    if (roomStorageState.error) throw roomStorageState.error;
-    return "https://signed";
-  },
-}));
+vi.mock("@/lib/object-storage.server", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/object-storage.server")>(
+    "@/lib/object-storage.server",
+  );
+  return {
+    ...actual,
+    createSignedObjectUrl: (...args: unknown[]) => createSignedObjectUrlMock(...args),
+  };
+});
 
 vi.mock("@/lib/twilio-webhook.server", () => ({
   requireTwilioSignature: vi.fn(async (args: {
@@ -138,9 +143,12 @@ vi.mock("@/lib/user-audio.server", () => ({
     roomDbMocks.getUserVerifiedAudioNumbers(...args),
 }));
 
-vi.mock("@/lib/telephony-db.server", async () => {
+vi.mock("@/lib/telephony-db.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/telephony-db.server")>();
   const stub = await import("./helpers/telephony-db-stub");
   return {
+    ...actual,
+    claimTerminalOutreachDisposition: stub.telephonyDbMocks.claimTerminalOutreachDisposition,
     findCallBySid: stub.telephonyDbMocks.findCallBySid,
     findCallsByConferenceId: stub.telephonyDbMocks.findCallsByConferenceId,
     findActiveConferenceIdsForUser: stub.telephonyDbMocks.findActiveConferenceIdsForUser,
@@ -176,6 +184,7 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     mocks.fetch.mockClear();
     mocks.fetchCampaignByIdForWorkspace.mockReset();
     mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
+      voicemail_drop_enabled: true,
       voicemail_file: "vm.mp3",
       group_household_queue: true,
       caller_id: "+1555",
@@ -188,9 +197,14 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       conference_id: "u1~00000000-0000-0000-0000-000000000000",
     });
     roomStorageState.error = null;
+    createSignedObjectUrlMock.mockImplementation(async () => {
+      if (roomStorageState.error) throw roomStorageState.error;
+      return "https://signed";
+    });
     vi.stubGlobal("fetch", mocks.fetch);
     runAutoDialerTurnMock.mockClear();
     runAutoDialerTurnMock.mockResolvedValue({ success: true });
+    telephonyDbMocks.claimTerminalOutreachDisposition.mockClear();
   });
 
   test("device-check path: verified device joins conference and triggers dialer", async () => {
@@ -370,8 +384,6 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     client.storage.from.mockReturnValueOnce({
       createSignedUrl: async () => ({ data: { signedUrl: "https://signed" }, error: null }),
     });
-    client.rpc.mockResolvedValueOnce({ data: {}, error: null }); // dequeue_contact
-
     useRoomPostgres(client);
 
     const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
@@ -389,6 +401,11 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     expect(updateCallTwiml).toHaveBeenCalledWith(
       expect.objectContaining({ twiml: expect.stringContaining("<Play>https://signed</Play>") }),
     );
+    expect(telephonyDbMocks.claimTerminalOutreachDisposition).toHaveBeenCalledWith(
+      "w1",
+      "1",
+      "voicemail",
+    );
     // Regression guard: dialer turn is invoked in-process, not via self-fetch.
     expect(mocks.fetch).not.toHaveBeenCalledWith(
       "https://base.example/api/auto-dial/dialer",
@@ -404,15 +421,17 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     );
   });
 
-  test("machine answer with no voicemail signedUrl returns Hangup response", async () => {
+  test("machine answer with the drop off records no-answer, hangs up, and advances", async () => {
     mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
-      voicemail_file: null,
+      voicemail_drop_enabled: false,
+      voicemail_file: "vm.mp3",
       group_household_queue: true,
       caller_id: "+1555",
     });
+    const updateCallTwiml = vi.fn();
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      calls: () => ({ update: vi.fn() }),
-      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
+      calls: () => ({ update: updateCallTwiml }),
+      conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => [{ sid: "CONF1" }]) }),
     } as any);
 
     const client = makeDbClient({});
@@ -481,11 +500,106 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
 
-    expect(await res.text()).toContain("<Hangup/>");
+    const body = await res.text();
+    expect(body).toContain("<Hangup/>");
+    expect(body).not.toContain("<Play>");
+    expect(updateCallTwiml).not.toHaveBeenCalled();
+    expect(createSignedObjectUrlMock).not.toHaveBeenCalled();
+    expect(telephonyDbMocks.claimTerminalOutreachDisposition).toHaveBeenCalledWith(
+      "w1",
+      "1",
+      "no-answer",
+    );
+    expect(runAutoDialerTurnMock).toHaveBeenCalledTimes(1);
   });
 
-  test("machine answer: conferences empty + fallbacks + campaign_queue dequeue success", async () => {
+  test("machine answer with no voicemail audio records no-answer and advances", async () => {
     mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
+      voicemail_drop_enabled: true,
+      voicemail_file: null,
+      group_household_queue: true,
+      caller_id: "+1555",
+    });
+    const updateCallTwiml = vi.fn();
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
+      calls: () => ({ update: updateCallTwiml }),
+      conferences: Object.assign(
+        (_sid: string) => ({ update: vi.fn() }),
+        { list: vi.fn(async () => [{ sid: "CONF1" }]) },
+      ),
+    } as any);
+    const client = makeDbClient({});
+    roomRpcState.client = client;
+    useRoomPostgres(client);
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
+    const fd = new FormData();
+    fd.set("CallSid", "CA1");
+    fd.set("AnsweredBy", "machine_start");
+    fd.set("CallStatus", "ringing");
+    fd.set("Called", "+1888");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/room", { method: "POST", body: fd }),
+      params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
+    } as any));
+
+    expect(await res.text()).toContain("<Hangup/>");
+    expect(updateCallTwiml).not.toHaveBeenCalled();
+    expect(createSignedObjectUrlMock).not.toHaveBeenCalled();
+    expect(telephonyDbMocks.claimTerminalOutreachDisposition).toHaveBeenCalledWith(
+      "w1",
+      "1",
+      "no-answer",
+    );
+    expect(runAutoDialerTurnMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("concurrent machine callbacks claim only one next dialer turn", async () => {
+    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
+      voicemail_drop_enabled: false,
+      voicemail_file: "vm.mp3",
+      group_household_queue: true,
+      caller_id: "+1555",
+    });
+    const conferencesList = vi.fn(async () => [{ sid: "CONF1" }]);
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({
+      calls: () => ({ update: vi.fn() }),
+      conferences: Object.assign(
+        (_sid: string) => ({ update: vi.fn() }),
+        { list: conferencesList },
+      ),
+    } as any);
+    const client = makeDbClient({});
+    roomRpcState.client = client;
+    useRoomPostgres(client);
+    telephonyDbMocks.claimTerminalOutreachDisposition
+      .mockResolvedValueOnce({ user_id: "u1", campaign_id: 1 })
+      .mockResolvedValueOnce(null);
+
+    const mod = await import("../app/routes/api+/auto-dial/$roomId.route");
+    const invoke = () => {
+      const fd = new FormData();
+      fd.set("CallSid", "CA1");
+      fd.set("AnsweredBy", "machine_start");
+      fd.set("CallStatus", "ringing");
+      fd.set("Called", "+1888");
+      return mod.action({
+        request: new Request("http://localhost/api/auto-dial/room", { method: "POST", body: fd }),
+        params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
+      } as any);
+    };
+
+    await Promise.all([invoke(), invoke()]);
+
+    expect(telephonyDbMocks.claimTerminalOutreachDisposition).toHaveBeenCalledTimes(2);
+    expect(conferencesList).toHaveBeenCalledTimes(1);
+    expect(runAutoDialerTurnMock).toHaveBeenCalledTimes(1);
+    expect(client.rpc).not.toHaveBeenCalled();
+    expect(roomDbMocks.dequeueCampaignQueueByContact).not.toHaveBeenCalled();
+  });
+
+  test("machine answer: conferences empty uses fallbacks", async () => {
+    mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
+      voicemail_drop_enabled: true,
       voicemail_file: "vm.mp3",
       group_household_queue: null,
       caller_id: null,
@@ -591,9 +705,10 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     expect(updateCallTwiml).toHaveBeenCalled();
   });
 
-  test("machine answer: dequeue_contact rpc error is caught", async () => {
+  test("machine answer does not dequeue again after dispatch", async () => {
+    const updateCallTwiml = vi.fn();
     mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({
-      calls: () => ({ update: vi.fn() }),
+      calls: () => ({ update: updateCallTwiml }),
       conferences: Object.assign((_sid: string) => ({ update: vi.fn() }), { list: vi.fn(async () => []) }),
     } as any);
 
@@ -630,7 +745,10 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
-    expect(await res.text()).toContain("<Hangup/>");
+    expect(updateCallTwiml).toHaveBeenCalledWith(
+      expect.objectContaining({ twiml: expect.stringContaining("<Play>https://signed</Play>") }),
+    );
+    expect(client.rpc).not.toHaveBeenCalled();
   });
 
   test("machine answer: outreach_attempt update error is caught", async () => {
@@ -1154,8 +1272,9 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     expect(await res.text()).toContain("<Hangup/>");
   });
 
-  test("machine answer: group_household_queue=false uses campaign_queue update and handles its error", async () => {
+  test("machine answer does not repeat the non-household queue update", async () => {
     mocks.fetchCampaignByIdForWorkspace.mockResolvedValue({
+      voicemail_drop_enabled: true,
       voicemail_file: "vm.mp3",
       group_household_queue: false,
       caller_id: "+1555",
@@ -1195,7 +1314,8 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
       request: new Request("http://localhost/api/auto-dial/u1~00000000-0000-0000-0000-000000000000", { method: "POST", body: fd }),
       params: { roomId: "u1~00000000-0000-0000-0000-000000000000" },
     } as any));
-    expect(await res.text()).toContain("<Hangup/>");
+    expect(res.headers.get("Content-Type")).toBe("text/xml");
+    expect(roomDbMocks.dequeueCampaignQueueByContact).not.toHaveBeenCalled();
   });
 
   test("human answer: called starts with client skips answered_at update", async () => {
@@ -1242,4 +1362,3 @@ describe("app/routes/api+/auto-dial/route.$roomId.tsx", () => {
     expect(outreachSelect).not.toHaveBeenCalledWith(expect.anything());
   });
 });
-

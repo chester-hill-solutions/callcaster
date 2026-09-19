@@ -63,6 +63,7 @@ export const telephonyDbMocks = {
   findCampaignTypeByCampaignId: vi.fn(),
   upsertCallBySid: vi.fn(),
   claimTerminalCallStatus: vi.fn(),
+  claimTerminalOutreachDisposition: vi.fn(),
 };
 
 function applyTelephonyMockImplementations() {
@@ -116,6 +117,31 @@ function applyTelephonyMockImplementations() {
         : {}),
     };
   });
+
+  telephonyDbMocks.claimTerminalOutreachDisposition.mockImplementation(
+    async (_workspaceId: string, _id: number | string, disposition: string) => {
+      const cfg = readConfig();
+      if (cfg.outreachUpdateThrows != null) {
+        return new Response(
+          `Error claiming outreach disposition: ${cfg.outreachUpdateThrows instanceof Error ? cfg.outreachUpdateThrows.message : "Unknown error"}`,
+          { status: 500 },
+        );
+      }
+      if (cfg.outreachUpdateError) {
+        return new Response(
+          `Error claiming outreach disposition: ${cfg.outreachUpdateError.message}`,
+          { status: 500 },
+        );
+      }
+
+      telephonyStubState.outreachUpdateCalls.push({ disposition });
+      return {
+        ...defaultOutreachRow,
+        disposition,
+        ...(cfg.outreachRowOverrides ?? {}),
+      };
+    },
+  );
 
   telephonyDbMocks.updateOutreachAttemptForWorkspace.mockImplementation(
     async (_workspaceId: string, _id: number | string, patch: Record<string, unknown>) => {
