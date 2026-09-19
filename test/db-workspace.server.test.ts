@@ -560,6 +560,36 @@ describe("app/lib/database/workspace.server.ts", () => {
     });
   });
 
+  test("getWorkspaceInfoWithDetails groups campaigns by status and newest first", async () => {
+    const mod = await import("../app/lib/database/workspace.server");
+
+    adminDbMocks.workspaceFindFirst.mockResolvedValueOnce({
+      id: "w1",
+      name: "W",
+      credits: 0,
+    });
+    tdbMocks.workspace_member.findFirst.mockResolvedValueOnce({
+      id: "wm:w1:u1",
+      role_id: "admin",
+    });
+    tdbMocks.campaign.findMany.mockResolvedValueOnce([
+      { id: 1, status: "complete", created_at: "2026-09-19T12:00:00Z" },
+      { id: 2, status: "running", created_at: "2026-09-19T10:00:00Z" },
+      { id: 3, status: "running", created_at: "2026-09-19T11:00:00Z" },
+      { id: 4, status: "waiting", created_at: "2026-09-19T09:00:00Z" },
+      { id: 5, status: "draft", created_at: "2026-09-19T08:00:00Z" },
+    ]);
+    tdbMocks.workspace_number.findMany.mockResolvedValueOnce([]);
+    tdbMocks.audience.findMany.mockResolvedValueOnce([]);
+
+    const out = await mod.getWorkspaceInfoWithDetails({
+      workspaceId: "w1",
+      userId: "u1",
+    });
+
+    expect(out.campaigns.map((campaign) => campaign.id)).toEqual([3, 2, 4, 5, 1]);
+  });
+
   test("getWorkspaceUsers + getWorkspacePhoneNumbers log on error", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const mod = await import("../app/lib/database/workspace.server");
