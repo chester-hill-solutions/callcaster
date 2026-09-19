@@ -30,6 +30,7 @@ import {
 } from "@/lib/messaging-onboarding.server";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { sortCampaignsForList } from "@/lib/campaign-list-order";
 import { data as routeData } from "react-router";
 import type { WorkspaceInfoWithDetails } from "@/lib/workspace-info-types";
 import { TWILIO_REQUEST_TIMEOUT_MS } from "@/lib/twilio-client-options";
@@ -241,7 +242,7 @@ export async function getWorkspaceInfoWithDetails({
   }
 
   const [campaigns, phoneNumbers, audiences] = await Promise.all([
-    tdb.campaign.findMany(),
+    tdb.campaign.findMany().then(sortCampaignsForList),
     tdb.workspace_number.findMany({
       columns: { id: true, phone_number: true, capabilities: true },
     }),
