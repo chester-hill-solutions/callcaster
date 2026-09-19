@@ -12,12 +12,7 @@ import { chatSmsBodySchema } from "../app/lib/schemas/api/chat-sms";
 import { campaignSmsDispatchBodySchema } from "../app/lib/schemas/api/sms";
 import { tokenBodySchema } from "../app/lib/schemas/api/platform-auth";
 
-const scriptCampaignTypes = [
-  "live_call",
-  "robocall",
-  "simple_ivr",
-  "complex_ivr",
-] as const;
+const scriptCampaignTypes = ["live_call", "robocall"] as const;
 
 describe("openapi spec", () => {
   test("has basic OpenAPI structure", () => {
@@ -96,6 +91,26 @@ describe("openapi spec", () => {
       script: { name: "s", steps: {} },
       script_id: 1,
     }).success).toBe(false);
+
+    for (const legacyType of ["simple_ivr", "complex_ivr"] as const) {
+      const result = createWithScriptBodySchema.safeParse({
+        title: "t",
+        type: legacyType,
+        caller_id: "+1",
+        script_id: 1,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              path: ["type"],
+              message: `"${legacyType}" is no longer supported; use "robocall" instead`,
+            }),
+          ]),
+        );
+      }
+    }
   });
 
   test("chat_sms required fields match Zod schema", () => {

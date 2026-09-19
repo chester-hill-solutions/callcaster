@@ -19,9 +19,9 @@ export type CreateCampaignWithScriptRequest = {
      */
     title: string;
     /**
-     * Campaign type (script-based).
+     * Campaign type (script-based). Use robocall for an automated phone menu.
      */
-    type: 'live_call' | 'robocall' | 'simple_ivr' | 'complex_ivr';
+    type: 'live_call' | 'robocall';
     /**
      * Outbound caller ID. Must be a workspace phone number (e.g. +15551234567).
      */

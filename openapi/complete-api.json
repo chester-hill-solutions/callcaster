@@ -12020,11 +12020,9 @@
             "type": "string",
             "enum": [
               "live_call",
-              "robocall",
-              "simple_ivr",
-              "complex_ivr"
+              "robocall"
             ],
-            "description": "Campaign type (script-based)."
+            "description": "Campaign type (script-based). Use robocall for an automated phone menu."
           },
           "caller_id": {
             "type": "string",

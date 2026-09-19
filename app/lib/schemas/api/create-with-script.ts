@@ -1,18 +1,19 @@
 import { z } from "zod";
 import { workspaceIdSchema } from "@/lib/schemas/api/common";
 
-const scriptCampaignTypes = [
-  "live_call",
-  "robocall",
-  "simple_ivr",
-  "complex_ivr",
-] as const;
+const scriptCampaignTypes = ["live_call", "robocall"] as const;
+const legacyIvrCampaignTypes = new Set(["simple_ivr", "complex_ivr"]);
 
 export const createWithScriptBodySchema = z
   .object({
     workspace_id: workspaceIdSchema.optional(),
     title: z.string().min(1),
-    type: z.enum(scriptCampaignTypes),
+    type: z.enum(scriptCampaignTypes, {
+      error: (issue) =>
+        typeof issue.input === "string" && legacyIvrCampaignTypes.has(issue.input)
+          ? `"${issue.input}" is no longer supported; use "robocall" instead`
+          : 'Campaign type must be "live_call" or "robocall"',
+    }),
     caller_id: z.string().min(1),
     script: z
       .object({
