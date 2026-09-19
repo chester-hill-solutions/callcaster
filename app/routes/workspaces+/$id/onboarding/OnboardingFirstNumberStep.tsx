@@ -166,6 +166,10 @@ export function OnboardingFirstNumberStep({
       : requestedStep === "rent"
         ? hasServiceAddress ? "rent" : "address"
         : requestedStep === "address" ? "address" : "choose";
+  const isRentalPath =
+    numberStep === "address" ||
+    numberStep === "rent" ||
+    (numberStep === "complete" && rentedCount > 0);
   const rentReturnTo = `${firstNumberReturnTo}&numberStep=rent`;
 
   if (!messagingReady) {
@@ -243,11 +247,31 @@ export function OnboardingFirstNumberStep({
               1. Choose a method
             </Link>}
             <span aria-hidden="true">/</span>
-            <span aria-current={numberStep === "address" || numberStep === "rent" || numberStep === "verify" ? "step" : undefined}>
-              2. {numberStep === "verify" ? "Verify your number" : "Add your number"}
-            </span>
-            <span aria-hidden="true">/</span>
-            <span aria-current={numberStep === "complete" ? "step" : undefined}>3. Review your number</span>
+            {isRentalPath ? (
+              <>
+                <span aria-current={numberStep === "address" ? "step" : undefined}>
+                  2. Service address
+                </span>
+                <span aria-hidden="true">/</span>
+                <span aria-current={numberStep === "rent" ? "step" : undefined}>
+                  3. Rent a number
+                </span>
+                <span aria-hidden="true">/</span>
+                <span aria-current={numberStep === "complete" ? "step" : undefined}>
+                  4. Review your number
+                </span>
+              </>
+            ) : (
+              <>
+                <span aria-current={numberStep === "verify" ? "step" : undefined}>
+                  2. {numberStep === "verify" ? "Verify your number" : "Add your number"}
+                </span>
+                <span aria-hidden="true">/</span>
+                <span aria-current={numberStep === "complete" ? "step" : undefined}>
+                  3. Review your number
+                </span>
+              </>
+            )}
           </nav>
           {numberStep === "choose" ? (
             <div className="grid gap-4 md:grid-cols-2">

@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- Phone-number onboarding now shows Service address as its own step when you rent a number, and the breadcrumb moves from address to number search to review as you progress ([#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764)).
 - SMS onboarding now collects toll-free and US registration business details on the Identity step after you choose the number path, instead of expanding them on the Goal step ([#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148)).
 - IVR speech steps now pass Twilio the answers they expect (recognition hints), use a valid speech model/timeout pairing, and single-key menus submit as soon as the caller presses a key ([#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875)).
 - Household grouping and dial type now sit on campaign Setup with the other calling options; Launch no longer folds them away ([#1863](https://github.com/chester-hill-solutions/callcaster/issues/1863)).
