@@ -108,8 +108,11 @@ export async function runCallStatusSideEffects(args: {
   // while an agent hang-up clears it (#1362). Idempotent: if the agent already
   // hung up, the guarded dequeue_contact RPC no-ops on dequeued rows. The
   // assignee id is required for the RPC to cover assigned rows, so take it
-  // from the queue row itself — a webhook has no acting user.
+  // from the queue row itself — a webhook has no acting user. Test calls can
+  // name a campaign and contact, but they deliberately have no outreach
+  // attempt and must leave the matching queue row untouched (#1869).
   if (
+    outreachAttemptId != null &&
     CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()] &&
     callRow.contact_id != null
   ) {

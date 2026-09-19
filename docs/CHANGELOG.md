@@ -13,6 +13,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Calls without an outreach attempt cannot remove a matching contact from a campaign queue, which keeps test calls isolated from real sends ([#1869](https://github.com/chester-hill-solutions/callcaster/issues/1869)).
 - An IVR call answered by a machine with the voicemail drop switched off now records **No Answer** instead of Voicemail, so the results match what the caller heard ([#1888](https://github.com/chester-hill-solutions/callcaster/issues/1888)).
 - The mobile navigation sheet now stacks its links one per row instead of laying them out side by side ([#1891](https://github.com/chester-hill-solutions/callcaster/issues/1891)).
 - Workspace invites no longer fail on environments migrated off Supabase: the legacy foreign keys pointing at the empty `auth.users` table are dropped, so an invite insert only needs the Better Auth profile row ([#1853](https://github.com/chester-hill-solutions/callcaster/issues/1853)).
