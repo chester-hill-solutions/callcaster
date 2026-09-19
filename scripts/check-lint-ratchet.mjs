@@ -63,7 +63,7 @@ function main() {
   // of that rule — otherwise an unattended session (or a lazy fix) could zero
   // its count by silencing the warning instead of guarding the code.
   const DISABLE_RE =
-    /eslint-disable(?:-next-line)?\b[^\n]*?(@typescript-eslint\/no-non-null-assertion|complexity|max-depth|max-params|max-lines-per-function|no-console|no-return-await)\b/g;
+    /eslint-disable(?:-next-line)?\b[^\n]*?(@typescript-eslint\/no-non-null-assertion|complexity|max-depth|max-params|max-lines-per-function|no-console|no-return-await|shadcn\/no-restyle|shadcn\/no-raw-colors|shadcn\/no-arbitrary-values|shadcn\/no-inline-styles|shadcn\/no-unknown-classes|shadcn\/require-static-classes)\b/g;
   for (const file of reports) {
     const rel = file.filePath.replace(`${ROOT}/`, "");
     for (const message of file.messages) {
