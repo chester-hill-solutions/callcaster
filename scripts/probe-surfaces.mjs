@@ -489,7 +489,6 @@ async function probePage(route) {
 
   let status = 0;
   let location = "";
-  let bodyText = "";
   try {
     const response = await fetch(url, {
       method: "GET",
@@ -498,7 +497,6 @@ async function probePage(route) {
     });
     status = response.status;
     location = response.headers.get("location") ?? "";
-    bodyText = (await response.text()).slice(0, 4000);
   } catch (error) {
     return {
       path: route.path,

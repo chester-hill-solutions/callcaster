@@ -63,7 +63,7 @@ function main() {
   // of that rule — otherwise an unattended session (or a lazy fix) could zero
   // its count by silencing the warning instead of guarding the code.
   const DISABLE_RE =
-    /eslint-disable(?:-next-line)?\b[^\n]*?(@typescript-eslint\/no-non-null-assertion|complexity|max-depth|max-params|max-lines-per-function|no-console|no-return-await|import\/no-cycle)\b/g;
+    /eslint-disable(?:-next-line)?\b[^\n]*?(@typescript-eslint\/no-non-null-assertion|complexity|max-depth|max-params|max-lines-per-function|no-console|no-return-await)\b/g;
   for (const file of reports) {
     const rel = file.filePath.replace(`${ROOT}/`, "");
     for (const message of file.messages) {
@@ -127,7 +127,7 @@ function main() {
       "Fix the new violations (extract functions, drop non-null assertions with",
       "real guards, route output through @/lib/logger.server). If a warning is a",
       "false positive, refactor until it is not, or scope an exemption in",
-      ".eslintrc.cjs with a reason — do not raise the baseline to pass.",
+      "eslint.config.mjs with a reason — do not raise the baseline to pass.",
       "",
       "Baseline: scripts/baselines/lint-ratchet.json (rewrite: npm run tools:lint-ratchet:baseline).",
     ].join("\n"),
