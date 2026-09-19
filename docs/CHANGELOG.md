@@ -13,6 +13,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- An IVR call answered by a machine with the voicemail drop switched off now records **No Answer** instead of Voicemail, so the results match what the caller heard ([#1888](https://github.com/chester-hill-solutions/callcaster/issues/1888)).
 - Workspace invites no longer fail on environments migrated off Supabase: the legacy foreign keys pointing at the empty `auth.users` table are dropped, so an invite insert only needs the Better Auth profile row ([#1853](https://github.com/chester-hill-solutions/callcaster/issues/1853)).
 - Message template tags now need balanced braces: `{{field}}` or the legacy `{field}`. An unbalanced `{{field}` or `{field}}` is plain text, and the preview now agrees with how the send replaces tags ([#1725](https://github.com/chester-hill-solutions/callcaster/issues/1725)).
 - IVR keypad menus no longer treat anything a caller says as an answer: speech is only listened for on steps that ask for it, so a stray phrase can no longer skip the menu ([#1856](https://github.com/chester-hill-solutions/callcaster/issues/1856)).

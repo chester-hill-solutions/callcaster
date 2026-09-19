@@ -11,7 +11,7 @@ import {
 import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
 import {
   isMachineAnswered,
-  recordVoicemailAnswer,
+  recordMachineAnswer,
 } from "@/lib/ivr-machine.server";
 import { defineAction } from "@/lib/handler.server";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
@@ -101,7 +101,7 @@ export const action = defineAction({
         const callStatus = event.callStatus;
 
         if (isMachineAnswered(event.answeredBy, callStatus)) {
-            await recordVoicemailAnswer(dbCall);
+            await recordMachineAnswer(dbCall, campaignData);
         } else if (['failed', 'no-answer', 'completed'].includes(callStatus)) {
             const updateData = buildCallUpsertFromTwilioParams(params);
             await processCallStatusWebhook(updateData, {
@@ -117,9 +117,9 @@ export const action = defineAction({
             // this the attempt keeps a NULL disposition and `get_campaign_stats`
             // filters the call out of campaign results entirely. Twilio's
             // terminal statuses are already valid disposition values; a machine
-            // answer that later reports `completed` keeps its `voicemail`
-            // disposition via the terminal-transition guard in
-            // `updateOutreachAttemptForWorkspace`.
+            // answer that later reports `completed` keeps its machine
+            // disposition (`voicemail` or `no-answer`) via the terminal
+            // transition guard in `updateOutreachAttemptForWorkspace`.
             if (dbCall.outreach_attempt_id) {
                 await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, {
                     disposition: callStatus,

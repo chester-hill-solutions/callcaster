@@ -10,8 +10,9 @@ import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
  *
  * The flow-entry route acts on the synchronous AMD verdict before any IVR audio
  * plays; the status callback records the same disposition as a safety net. Both
- * ask this module what "machine" means and how to answer it, so the rule cannot
- * drift between them.
+ * ask this module what "machine" means, how to answer it, and what to record, so
+ * the rule cannot drift between them. The recorded disposition follows the drop:
+ * `voicemail` when it plays, otherwise `no-answer` (#1888).
  */
 
 export type IvrMachineCall = {
@@ -48,19 +49,40 @@ export function isMachineAnswered(
 }
 
 /**
- * Marks the attempt as a voicemail answer. Idempotent — the flow entry and the
- * status callback both call it for the same machine event, and it writes the
- * same values each time. Test calls (#1653) have no outreach attempt and are
- * skipped.
+ * What a detected machine should be recorded as. A machine only counts as
+ * `voicemail` when the drop actually plays; with the drop off (or no audio) the
+ * caller heard nothing, so the operator sees `no-answer` (#1888).
  */
-export async function recordVoicemailAnswer(
+export function machineAnswerDisposition(
+  campaign: IvrMachineCampaign,
+): "voicemail" | "no-answer" {
+  return campaign?.voicemail_drop_enabled && campaign.voicemail_file
+    ? "voicemail"
+    : "no-answer";
+}
+
+/**
+ * Records the machine disposition. Idempotent — the flow entry and the status
+ * callback both call it for the same machine event, and it writes the same
+ * values each time. Test calls (#1653) have no outreach attempt and are
+ * skipped.
+ *
+ * `answered_at` is stamped only for a voicemail: `isConnectedAttempt` treats a
+ * present `answered_at` as a connection, so stamping it on a `no-answer` would
+ * count a machine hangup as a connected call in analytics (#1888).
+ */
+export async function recordMachineAnswer(
   call: IvrMachineCall,
+  campaign: IvrMachineCampaign,
 ): Promise<void> {
   if (!call.outreach_attempt_id || !call.workspace) return;
+  const disposition = machineAnswerDisposition(campaign);
   const updated = await updateOutreachAttemptForWorkspace(
     String(call.workspace),
     call.outreach_attempt_id,
-    { disposition: "voicemail", answered_at: new Date().toISOString() },
+    disposition === "voicemail"
+      ? { disposition, answered_at: new Date().toISOString() }
+      : { disposition },
   );
   if (updated instanceof Response) {
     throw new Error(await updated.text());
@@ -91,6 +113,6 @@ export async function handleMachineAnswer(
   call: IvrMachineCall,
   campaign: IvrMachineCampaign,
 ): Promise<Response> {
-  await recordVoicemailAnswer(call);
+  await recordMachineAnswer(call, campaign);
   return machineAnswerResponse(campaign, call.workspace);
 }

@@ -182,7 +182,8 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     };
     const script = { steps: { pages: { page_1: { blocks: ["b1"] } } } };
 
-    // machine, drop off => hang up with no redirect and no IVR audio
+    // machine, drop off => hang up with no redirect and no IVR audio. From the
+    // operator's view nothing was left, so the call is a No Answer (#1888).
     vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({
       workspace: "w1",
       campaign_id: 1,
@@ -196,17 +197,18 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     let text = await res.text();
     expect(text).toMatch(/hangup/i);
     expect(text).not.toContain("<Redirect>");
-    expect(vi.mocked(updateOutreachAttemptForWorkspace)).toHaveBeenCalledWith(
+    expect(vi.mocked(updateOutreachAttemptForWorkspace)).toHaveBeenNthCalledWith(
+      1,
       "w1",
       7,
-      expect.objectContaining({ disposition: "voicemail" }),
+      { disposition: "no-answer" },
     );
 
-    // machine, drop on => play the drop, still no redirect
+    // machine, drop on => play the drop, still no redirect, recorded as a voicemail
     vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({
       workspace: "w1",
       campaign_id: 1,
-      outreach_attempt_id: null,
+      outreach_attempt_id: 8,
       campaign: { voicemail_drop_enabled: true, voicemail_file: "vm.mp3", script },
     } as never);
     res = await mod.action({
@@ -216,6 +218,12 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     text = await res.text();
     expect(text).toContain("<Play>https://signed</Play>");
     expect(text).not.toContain("<Redirect>");
+    expect(vi.mocked(updateOutreachAttemptForWorkspace)).toHaveBeenNthCalledWith(
+      2,
+      "w1",
+      8,
+      { disposition: "voicemail", answered_at: expect.any(String) },
+    );
 
     // human => the flow starts as before
     vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({

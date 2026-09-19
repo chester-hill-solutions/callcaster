@@ -153,7 +153,7 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ success: true });
   });
 
-  test("machine answer records the voicemail disposition; playback is owned by the flow route (#1864)", async () => {
+  test("machine answer records the voicemail disposition when the drop plays; playback is owned by the flow route (#1864)", async () => {
     const mod = await import("../app/routes/api+/ivr/status.route");
 
     const res = await asRouteResponse(mod.action({
@@ -163,7 +163,28 @@ describe("app/routes/api+/ivr/status.route.tsx", () => {
     expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
       "w1",
       1,
-      expect.objectContaining({ disposition: "voicemail" }),
+      { disposition: "voicemail", answered_at: expect.any(String) },
+    );
+  });
+
+  test("machine answer with the drop off records no-answer, not voicemail (#1888)", async () => {
+    const mod = await import("../app/routes/api+/ivr/status.route");
+    // Drop switch off (or no audio): the flow entry hangs up without playing a
+    // message, so the operator must see No Answer. No `answered_at` either —
+    // analytics reads a present `answered_at` as a connected call.
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce(makeCampaign({
+      voicemail_drop_enabled: false,
+      voicemail_file: null,
+    }));
+
+    const res = await asRouteResponse(mod.action({
+      request: makeReq({ CallSid: "CA1", CallStatus: "ringing", AnsweredBy: "machine_start", Timestamp: new Date().toISOString() }),
+    } as any));
+    await expect(res.json()).resolves.toEqual({ success: true });
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      1,
+      { disposition: "no-answer" },
     );
   });
 
