@@ -33,6 +33,7 @@ const ResultsScreen = ({
   queueCounts: {
     fullCount: number;
     queuedCount: number;
+    completedCount: number;
   };
   ivrResponses?: IvrQuestionResults[] | null;
 }) => {
@@ -49,7 +50,11 @@ const ResultsScreen = ({
       </div>
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">
-          <TotalCalls totalCalls={totalOfAllResults || 0} expectedTotal={queueCounts.fullCount || 0} />
+          <TotalCalls
+            label="Contacts Completed"
+            totalCalls={queueCounts.completedCount || 0}
+            expectedTotal={queueCounts.fullCount || 0}
+          />
           <AsyncExportButton campaignId={campaignId} workspaceId={workspaceId} />
         </div>
         <DispositionBreakdown

@@ -143,7 +143,7 @@ export const NoResultsYet = ({
   const title = isMessage
     ? "Message Campaign Results"
     : "Call Campaign Results";
-  const totalLabel = isMessage ? "Total Messages" : "Total Calls";
+  const totalLabel = isMessage ? "Total Messages" : "Contacts Completed";
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -151,7 +151,10 @@ export const NoResultsYet = ({
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="mb-8 flex flex-col">
           <h2 className="mb-0 text-2xl font-semibold">{totalLabel}: 0</h2>
-          <h3 className="mb-4 text-xl font-light">of {expectedTotal}</h3>
+          {/* Messages are not contacts: never show a contact denominator. */}
+          {!isMessage && (
+            <h3 className="mb-4 text-xl font-light">of {expectedTotal}</h3>
+          )}
         </div>
         <div className="mb-8">
           <h3 className="mb-4 text-xl font-semibold">Disposition Breakdown</h3>
