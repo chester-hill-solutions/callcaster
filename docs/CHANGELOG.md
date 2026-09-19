@@ -15,6 +15,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Call campaign results now show **Contacts completed** against the queue total, instead of mixing call attempts with contacts — a contact attempted twice no longer reads as more results than contacts ([#1334](https://github.com/chester-hill-solutions/callcaster/issues/1334)).
 - Calls without an outreach attempt cannot remove a matching contact from a campaign queue, which keeps test calls isolated from real sends ([#1869](https://github.com/chester-hill-solutions/callcaster/issues/1869)).
 - Campaign navigation now groups campaigns as running, waiting, draft, and complete, with newest campaigns first in each group ([#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727)).
 - An IVR call answered by a machine with the voicemail drop switched off now records **No Answer** instead of Voicemail, so the results match what the caller heard ([#1888](https://github.com/chester-hill-solutions/callcaster/issues/1888)).
