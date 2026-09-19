@@ -152,7 +152,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     // (#1841); as a sibling it only played to the end first. A keypad-only
     // step gathers DTMF only, so speech cannot skip the menu (#1856).
     expect(xml).toContain(
-      '<Gather action="https://base.example/api/ivr/1/page_1/b1/response" input="dtmf" timeout="5"><Play>https://signed</Play></Gather>',
+      '<Gather action="https://base.example/api/ivr/1/page_1/b1/response" input="dtmf" numDigits="1" timeout="5"><Play>https://signed</Play></Gather>',
     );
     expect(xml).toContain(
       "<Redirect>https://base.example/api/ivr/1/page_1/b1/response</Redirect>",
@@ -182,7 +182,9 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     } as any));
     const xml = await res.text();
     expect(xml).toContain('input="dtmf speech"');
-    expect(xml).toContain('speechTimeout="auto"');
+    // A speechModel requires a positive-integer speechTimeout; "auto" is invalid.
+    expect(xml).toContain('speechTimeout="3"');
+    expect(xml).toContain('speechModel="phone_call"');
   });
 
   test("synthetic-speech block emits <Say voice='...'> using the block's roster voice (#1401)", async () => {
