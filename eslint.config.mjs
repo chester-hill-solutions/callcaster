@@ -5,6 +5,7 @@ import jsxA11y from "eslint-plugin-jsx-a11y";
 import importPlugin from "eslint-plugin-import";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import globals from "globals";
+import { plugin as shadcn } from "@shadcn/lint";
 
 /**
  * Flat config (ESLint 9). Ported 1:1 from the former `.eslintrc.cjs` — every
@@ -319,6 +320,28 @@ export default [
     files: JSX_FILES,
     plugins: { "@typescript-eslint": tsPlugin },
     rules: RATCHET_RULES,
+  },
+
+  // Design-system rules (@shadcn/lint). Tailwind v4 + components.json gives
+  // auto-discovery; `ui` is set explicitly. Warnings ride the same lint ratchet
+  // as the strictness rules, so a new raw colour or restyled primitive fails CI.
+  {
+    files: JSX_FILES,
+    plugins: { shadcn },
+    settings: {
+      shadcn: {
+        ui: "@/components/ui",
+        componentImports: ["^@chester-hill-solutions/shad-cc(/|$)"],
+      },
+    },
+    rules: {
+      "shadcn/no-restyle": ["warn", { allow: ["layout"] }],
+      "shadcn/no-raw-colors": "warn",
+      "shadcn/no-arbitrary-values": "warn",
+      "shadcn/no-inline-styles": "warn",
+      "shadcn/no-unknown-classes": "warn",
+      "shadcn/require-static-classes": "warn",
+    },
   },
 
   // Scoped exemptions from the ratchet — each with a reason.
