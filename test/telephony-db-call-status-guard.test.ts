@@ -13,6 +13,7 @@ vi.mock("@/server/admin-db", () => ({ adminDb: {} }));
 
 const tenantDbMocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
+  outreachUpdate: vi.fn(),
   update: vi.fn(),
 }));
 
@@ -22,12 +23,20 @@ vi.mock("@/server/tenant-db", () => ({
       findFirst: (...args: unknown[]) => tenantDbMocks.findFirst(...args),
       update: (...args: unknown[]) => tenantDbMocks.update(...args),
     },
+    outreach_attempt: {
+      update: (...args: unknown[]) => tenantDbMocks.outreachUpdate(...args),
+    },
   })),
 }));
 
 import { SQL } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 
-import { canTransitionCallStatus, updateCallBySid } from "../app/lib/telephony-db.server";
+import {
+  canTransitionCallStatus,
+  claimTerminalOutreachDisposition,
+  updateCallBySid,
+} from "../app/lib/telephony-db.server";
 
 describe("canTransitionCallStatus", () => {
   test("allows any transition when there is no current status", () => {
@@ -138,5 +147,49 @@ describe("updateCallBySid status regression guard", () => {
     expect(tenantDbMocks.update).toHaveBeenCalledWith(
       expect.objectContaining({ set: { recording_url: "https://rec" } }),
     );
+  });
+});
+
+describe("claimTerminalOutreachDisposition", () => {
+  beforeEach(() => {
+    tenantDbMocks.outreachUpdate.mockReset();
+  });
+
+  test("returns the row from one atomic guarded update", async () => {
+    const row = { id: 10, disposition: "no-answer", user_id: "u1" };
+    tenantDbMocks.outreachUpdate.mockResolvedValueOnce([row]);
+
+    const result = await claimTerminalOutreachDisposition(
+      "w1",
+      10,
+      "no-answer",
+    );
+
+    expect(tenantDbMocks.outreachUpdate).toHaveBeenCalledTimes(1);
+    expect(tenantDbMocks.outreachUpdate).toHaveBeenCalledWith({
+      set: { disposition: "no-answer" },
+      where: expect.any(SQL),
+    });
+    const update = tenantDbMocks.outreachUpdate.mock.calls[0][0] as {
+      where: SQL;
+    };
+    const guardedWhere = new PgDialect().sqlToQuery(update.where).sql.toLowerCase();
+    expect(guardedWhere).toContain('"outreach_attempt"."disposition" is null');
+    expect(guardedWhere).toContain(
+      'lower("outreach_attempt"."disposition") <> all(array[',
+    );
+    expect(result).toBe(row);
+  });
+
+  test("returns null when another delivery already claimed a terminal disposition", async () => {
+    tenantDbMocks.outreachUpdate.mockResolvedValueOnce([]);
+
+    const result = await claimTerminalOutreachDisposition(
+      "w1",
+      10,
+      "voicemail",
+    );
+
+    expect(result).toBeNull();
   });
 });

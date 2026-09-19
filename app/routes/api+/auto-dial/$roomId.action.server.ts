@@ -5,10 +5,10 @@ import { Database, Tables } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { runAutoDialerTurn } from "@/lib/auto-dial.server";
 import { logger } from "@/lib/logger.server";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { fetchCampaignByIdForWorkspace } from "@/lib/campaign-ivr.server";
 import { getUserVerifiedAudioNumbers } from "@/lib/user-audio.server";
 import {
+  claimTerminalOutreachDisposition,
   findCallBySid,
   updateOutreachAttemptForWorkspace,
 } from "@/lib/telephony-db.server";
@@ -18,6 +18,10 @@ import { appendLiveTranscriptionStreamTwiml } from "@/lib/media-stream-twiml.ser
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import { defineAction } from "@/lib/handler.server";
+import {
+  isMachineAnswered,
+  machineAnswerDisposition,
+} from "@/lib/ivr-machine.server";
 import type Twilio from "twilio";
 
 const getAdmin = () => null /* removed service client */;
@@ -41,6 +45,7 @@ const fetchCallData = async (callSid: string): Promise<NonNullable<Partial<Call>
 const fetchCampaignData = async (campaignId: string, workspaceId: string) => {
   const row = await fetchCampaignByIdForWorkspace(workspaceId, campaignId);
   return {
+    voicemail_drop_enabled: row.voicemail_drop_enabled,
     voicemail_file: row.voicemail_file,
     group_household_queue: row.group_household_queue,
     caller_id: row.caller_id,
@@ -56,36 +61,6 @@ const getVoicemailSignedUrl = async (workspace: string, voicemailFile: string) =
     }
 };
 
-const dequeueContact = async (
-  contactId: string,
-  groupOnHousehold: boolean,
-  userId: string,
-  workspace: string,
-  campaignId?: number | null,
-) => {
-    if (groupOnHousehold) {
-        return await dequeueQueueEntry({
-            by: { contactId: Number(contactId) },
-            workspaceId: workspace,
-            household: true,
-            userId,
-            reason: "Auto-dial completed",
-        });
-    }
-
-    try {
-        return await dequeueQueueEntry({
-          by: { contactId: Number(contactId), campaignId },
-          userId,
-          reason: "Auto-dial completed",
-        });
-    } catch (error) {
-        throw new Error(
-          `Error updating queue status: ${error instanceof Error ? error.message : String(error)}`,
-        );
-    }
-};
-
 const updateOutreachAttempt = async (
   attemptId: string,
   workspaceId: string,
@@ -96,6 +71,22 @@ const updateOutreachAttempt = async (
     throw new Error(`Error updating outreach attempt: ${await result.text()}`);
   }
   return [result];
+};
+
+const claimMachineDisposition = async (
+  attemptId: string,
+  workspaceId: string,
+  disposition: "voicemail" | "no-answer",
+) => {
+  const result = await claimTerminalOutreachDisposition(
+    workspaceId,
+    attemptId,
+    disposition,
+  );
+  if (result instanceof Response) {
+    throw new Error(`Error updating outreach attempt: ${await result.text()}`);
+  }
+  return result;
 };
 
 const triggerAutoDialer = async (conferenceId: string, campaignId: string, workspaceId: string, userId: string) => {
@@ -120,36 +111,27 @@ const handleMachineAnswer = async (
     call: CallContext,
     twilio: Twilio.Twilio,
     dbCall: NonNullable<Partial<Call>>,
-    campaign: NonNullable<Partial<Tables<"campaign">>>,
-    signedUrl: string,
-    outreachStatus: OutreachStatusItem[]
+    signedUrl: string | null,
+    outreachStatus: OutreachStatusItem | null
 ) => {
     const twiml = createVoiceResponse();
-    const firstOutreachStatus = outreachStatus[0];
-    if (!firstOutreachStatus) {
-        await call.update({ twiml: hangupTwiml() });
-        return new Response(twiml.toString(), {
-            headers: { 'Content-Type': 'text/xml' }
-        });
+
+    if (outreachStatus) {
+        // A completed status callback does not start the next dialer turn. The
+        // atomic disposition claim gives that one-time continuation to only
+        // one AMD delivery without changing call.status before billing runs.
+        const conferenceName = dbCall.conference_id?.toString() ?? '';
+        const conferences = await twilio.conferences.list({ friendlyName: conferenceName, status: 'in-progress' });
+        if (conferences.length) {
+            await triggerAutoDialer(conferenceName, outreachStatus.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '', outreachStatus.user_id?.toString() ?? '');
+        }
     }
 
-    await dequeueContact(
-      dbCall.contact_id?.toString() ?? "",
-      campaign.group_household_queue ?? false,
-      firstOutreachStatus.user_id?.toString() ?? "",
-      dbCall.workspace?.toString() ?? "",
-      dbCall.campaign_id ?? null,
-    );
-
-    const conferenceName = dbCall.conference_id?.toString() ?? '';
-    const conferences = await twilio.conferences.list({ friendlyName: conferenceName, status: 'in-progress' });
-    if (conferences.length) {
-        await triggerAutoDialer(conferenceName, firstOutreachStatus.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '', firstOutreachStatus.user_id?.toString() ?? '');
+    if (signedUrl) {
+        await call.update({ twiml: pausePlayTwiml(signedUrl, 5) });
     }
 
-    await call.update({ twiml: pausePlayTwiml(signedUrl, 5) });
-
-    return new Response(twiml.toString(), {
+    return new Response(signedUrl ? twiml.toString() : hangupTwiml(), {
         headers: { 'Content-Type': 'text/xml' }
     });
 };
@@ -260,23 +242,18 @@ export const action = defineAction({
             const twilio = await createWorkspaceTwilioInstance({ workspace_id: dbCall.workspace ?? '' });
             const call: CallContext = twilio.calls(callSid);
 
-            if (answeredBy && answeredBy.includes('machine') && !answeredBy.includes('other') && callStatus !== 'completed') {
+            if (isMachineAnswered(answeredBy, callStatus)) {
                 //This is an answering machine
-                const campaign = await fetchCampaignData(dbCall.campaign_id?.toString() ?? '', dbCall.workspace?.toString() ?? '');
-                const signedUrl = await getVoicemailSignedUrl(dbCall.workspace?.toString() ?? '', campaign.voicemail_file?.toString() ?? '');
-                const outreachStatus = await updateOutreachAttempt(
+                const disposition = machineAnswerDisposition(campaign);
+                const signedUrl = disposition === "voicemail"
+                  ? await getVoicemailSignedUrl(dbCall.workspace?.toString() ?? '', campaign.voicemail_file?.toString() ?? '')
+                  : null;
+                const outreachStatus = await claimMachineDisposition(
                   dbCall.outreach_attempt_id?.toString() ?? "",
                   dbCall.workspace?.toString() ?? "",
-                  { disposition: "voicemail" },
+                  disposition,
                 );
-                if (signedUrl) {
-                    response = await handleMachineAnswer(call, twilio, dbCall, campaign, signedUrl, outreachStatus);
-                } else {
-                    //No voicemail file found, so we hang up
-                    response = new Response(hangupTwiml(), {
-                        headers: { 'Content-Type': 'text/xml' }
-                    });
-                }
+                response = await handleMachineAnswer(call, twilio, dbCall, signedUrl, outreachStatus);
             } else {
                 //This is a human answer
                 response = await handleHumanAnswer(dbCall, called);
