@@ -1,6 +1,7 @@
 import { useId } from "react";
 import type { ScriptOption } from "@chester-hill-solutions/scriptkit-call-script-core";
 import type { RoutingTarget } from "@chester-hill-solutions/scriptkit-call-script-react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -96,7 +97,7 @@ function IvrResponseRow({
       : IVR_RESPONSE_KEYS;
 
   return (
-    <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3 sm:grid-cols-3">
+    <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3 sm:grid-cols-[repeat(3,minmax(0,1fr))_auto] sm:items-end">
       <FormField label="Caller answers with" htmlFor={keyId}>
         <Select
           value={value}
@@ -148,12 +149,13 @@ function IvrResponseRow({
       {!readOnly && (
         <Button
           type="button"
-          size="sm"
+          size="icon"
           variant="outline"
-          className="justify-self-start sm:col-span-3"
+          aria-label="Remove response"
+          title="Remove response"
           onClick={onRemove}
         >
-          Remove response
+          <Trash2 className="h-4 w-4" aria-hidden />
         </Button>
       )}
     </div>
