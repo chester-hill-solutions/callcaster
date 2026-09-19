@@ -13,6 +13,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Workspace invites no longer fail on environments migrated off Supabase: the legacy foreign keys pointing at the empty `auth.users` table are dropped, so an invite insert only needs the Better Auth profile row ([#1853](https://github.com/chester-hill-solutions/callcaster/issues/1853)).
 - Message template tags now need balanced braces: `{{field}}` or the legacy `{field}`. An unbalanced `{{field}` or `{field}}` is plain text, and the preview now agrees with how the send replaces tags ([#1725](https://github.com/chester-hill-solutions/callcaster/issues/1725)).
 - IVR keypad menus no longer treat anything a caller says as an answer: speech is only listened for on steps that ask for it, so a stray phrase can no longer skip the menu ([#1856](https://github.com/chester-hill-solutions/callcaster/issues/1856)).
 - IVR campaigns now act on answering-machine detection before the call flow starts: a detected machine is dropped or hung up on immediately, instead of hearing the first prompts while the async status callback catches up ([#1864](https://github.com/chester-hill-solutions/callcaster/issues/1864)).
