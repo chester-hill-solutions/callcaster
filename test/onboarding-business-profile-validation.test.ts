@@ -278,6 +278,58 @@ describe("save_business_profile validation", () => {
     );
   });
 
+  test("identity save persists the SMS business fields shown for selected channels", async () => {
+    mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
+      onboardingState({
+        selectedGoal: "sms_blast",
+        selectedChannels: ["toll_free_bulk_sms", "a2p10dlc"],
+      }),
+    );
+
+    await runOnboardingAction(
+      USER_ID,
+      WORKSPACE_ID,
+      "save_business_profile",
+      identityForm({
+        legalBusinessName: "Northgate Services Inc.",
+        websiteUrl: "https://www.northgateservices.example",
+        doingBusinessAs: "Northgate",
+        businessRegistrationNumber: "123456789RC0001",
+        ageGatedContent: "true",
+        channelSampleMessages:
+          "Northgate: your appointment is tomorrow.\nReply STOP to opt out.",
+        ein: "12-3456789",
+        industry: "Healthcare",
+        authorizedRepName: "Jordan Smith",
+        authorizedRepTitle: "Head of Operations",
+        authorizedRepEmail: "jordan@northgate.example",
+        authorizedRepPhone: "+1 555 123 4567",
+      }),
+    );
+
+    expect(mocks.persistWorkspaceOnboardingState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        updates: expect.objectContaining({
+          businessProfile: expect.objectContaining({
+            doingBusinessAs: "Northgate",
+            businessRegistrationNumber: "123456789RC0001",
+            ageGatedContent: true,
+            sampleMessages: [
+              "Northgate: your appointment is tomorrow.",
+              "Reply STOP to opt out.",
+            ],
+            ein: "12-3456789",
+            industry: "Healthcare",
+            authorizedRepName: "Jordan Smith",
+            authorizedRepTitle: "Head of Operations",
+            authorizedRepEmail: "jordan@northgate.example",
+            authorizedRepPhone: "+1 555 123 4567",
+          }),
+        }),
+      }),
+    );
+  });
+
   test("advances identity save to audience when program is not required", async () => {
     mocks.getWorkspaceMessagingOnboardingState.mockResolvedValue(
       onboardingState({ selectedGoal: "live_call" }),
