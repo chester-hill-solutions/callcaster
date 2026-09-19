@@ -13,20 +13,27 @@ vi.mock("react-router", async () => {
 
 import { OnboardingBusinessIdentityStep } from "@/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep";
 import type { WorkspaceMessagingOnboardingState } from "@/lib/types";
+import { onboardingFixture } from "../fixtures/onboarding";
 
 function onboarding(overrides: {
   selectedGoal?: WorkspaceMessagingOnboardingState["selectedGoal"];
+  selectedChannels?: WorkspaceMessagingOnboardingState["selectedChannels"];
   websiteUrl?: string;
+  businessProfile?: Partial<WorkspaceMessagingOnboardingState["businessProfile"]>;
 } = {}): WorkspaceMessagingOnboardingState {
+  const base = onboardingFixture();
   return {
+    ...base,
     selectedGoal: overrides.selectedGoal ?? null,
-    selectedChannels: [],
+    selectedChannels: overrides.selectedChannels ?? [],
     operatingCountry: "US",
     businessProfile: {
+      ...base.businessProfile,
       legalBusinessName: "",
       websiteUrl: overrides.websiteUrl ?? "",
+      ...overrides.businessProfile,
     },
-  } as unknown as WorkspaceMessagingOnboardingState;
+  };
 }
 
 function renderStep(o: WorkspaceMessagingOnboardingState): void {
@@ -68,6 +75,67 @@ describe("OnboardingBusinessIdentityStep — Website URL required only for SMS (
     renderStep(onboarding({ selectedGoal: null }));
     const input = screen.getByLabelText(/website url/i) as HTMLInputElement;
     expect(input.required).toBe(false);
+  });
+});
+
+describe("OnboardingBusinessIdentityStep — SMS identity fields (#1148)", () => {
+  test("shows toll-free business fields only for the selected SMS channel", () => {
+    renderStep(
+      onboarding({
+        selectedGoal: "sms_blast",
+        selectedChannels: ["toll_free_bulk_sms"],
+        businessProfile: {
+          legalBusinessName: "Northgate Services",
+          doingBusinessAs: "Northgate",
+          businessRegistrationNumber: "123456789RC0001",
+          sampleMessages: ["Northgate: your appointment is tomorrow."],
+        },
+      }),
+    );
+
+    expect(screen.getByText("Toll-free verification details")).toBeInTheDocument();
+    expect(screen.getByLabelText(/doing business as/i)).toHaveValue("Northgate");
+    expect(screen.getByLabelText(/business registration number/i)).toHaveValue(
+      "123456789RC0001",
+    );
+    expect(screen.getByLabelText("Sample messages")).toHaveValue(
+      "Northgate: your appointment is tomorrow.",
+    );
+    expect(screen.queryByText("US brand registration details")).toBeNull();
+  });
+
+  test("shows US registration fields only for the selected A2P channel", () => {
+    renderStep(
+      onboarding({
+        selectedGoal: "sms_blast",
+        selectedChannels: ["a2p10dlc"],
+        businessProfile: {
+          ein: "12-3456789",
+          industry: "Healthcare",
+          authorizedRepName: "Jordan Smith",
+        },
+      }),
+    );
+
+    expect(screen.getByText("US brand registration details")).toBeInTheDocument();
+    expect(screen.getByLabelText(/ein/i)).toHaveValue("12-3456789");
+    expect(screen.getByLabelText("Industry")).toHaveValue("Healthcare");
+    expect(screen.getByLabelText("Authorized representative name")).toHaveValue(
+      "Jordan Smith",
+    );
+    expect(screen.queryByText("Toll-free verification details")).toBeNull();
+  });
+
+  test("hides SMS business fields when the goal is not SMS", () => {
+    renderStep(
+      onboarding({
+        selectedGoal: "live_call",
+        selectedChannels: ["toll_free_bulk_sms", "a2p10dlc"],
+      }),
+    );
+
+    expect(screen.queryByText("Toll-free verification details")).toBeNull();
+    expect(screen.queryByText("US brand registration details")).toBeNull();
   });
 });
 
