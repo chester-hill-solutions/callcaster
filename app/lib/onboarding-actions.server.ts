@@ -149,10 +149,10 @@ export function buildBusinessProfile(
 }
 
 /**
- * Overlays the channel-scoped inline business-profile fields (revealed on the
- * Channels step for `toll_free_bulk_sms` and `a2p10dlc`) onto the current
- * business profile. Only fields actually posted are overwritten, so unchecking a
- * channel or saving from another step never wipes previously-saved values.
+ * Overlays the channel-scoped business-profile fields for
+ * `toll_free_bulk_sms` and `a2p10dlc` onto the current business profile. Only
+ * fields actually posted are overwritten, so saving from another step never
+ * wipes previously-saved values.
  */
 export function readChannelInlineBusinessFields(
   formData: FormData,
@@ -179,7 +179,7 @@ export function readChannelInlineBusinessFields(
     const last = values[values.length - 1];
     next.ageGatedContent = last === "true" || last === "on" || last === "1";
   }
-  // The Channels step reuses the shared `sampleMessages` field for TFV samples.
+  // The SMS identity fields use a separate form name for their TFV samples.
   if (formData.has("channelSampleMessages")) {
     next.sampleMessages = parseSampleMessages(formData.get("channelSampleMessages"));
   }

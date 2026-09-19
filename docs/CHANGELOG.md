@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- SMS onboarding now collects toll-free and US registration business details on the Identity step after you choose the number path, instead of expanding them on the Goal step ([#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148)).
 - IVR speech steps now pass Twilio the answers they expect (recognition hints), use a valid speech model/timeout pairing, and single-key menus submit as soon as the caller presses a key ([#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875)).
 - Household grouping and dial type now sit on campaign Setup with the other calling options; Launch no longer folds them away ([#1863](https://github.com/chester-hill-solutions/callcaster/issues/1863)).
 - IVR setup no longer asks you to choose Simple IVR or Complex IVR — there is one automated phone menu. A campaign saved with the old simple/complex type stores as the automated phone menu on its next save ([#1741](https://github.com/chester-hill-solutions/callcaster/issues/1741)).

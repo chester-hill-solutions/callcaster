@@ -176,7 +176,8 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
     };
   }
 
-  // SMS goals still collect toll-free / A2P Trust Hub fields inline when shown.
+  // Keep accepting toll-free / A2P fields from older clients that posted them
+  // with the Goal step. The current wizard collects them on Business identity.
   const businessProfile = readChannelInlineBusinessFields(
     formData,
     current.businessProfile,
