@@ -37,7 +37,7 @@ export const MobileMenu = ({
   creditWorkspace,
 }: MobileMenuProps) => {
   const navLinkClass =
-    "rounded-lg border border-transparent px-3 py-2 font-Zilla-Slab text-lg font-semibold text-foreground transition-colors hover:border-border hover:bg-muted";
+    "block rounded-lg border border-transparent px-3 py-2 font-Zilla-Slab text-lg font-semibold text-foreground transition-colors hover:border-border hover:bg-muted";
 
   const close = () => onOpenChange(false);
 
@@ -91,7 +91,7 @@ export const MobileMenu = ({
                   key={workspace.id}
                   to={`/workspaces/${workspace.id}`}
                   onClick={close}
-                  className={`${navLinkClass} block truncate ${
+                  className={`${navLinkClass} truncate ${
                     workspace.id === activeWorkspaceId ? "border-border bg-muted" : ""
                   }`}
                 >
