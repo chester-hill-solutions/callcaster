@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, test, vi } from "vitest";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
@@ -52,6 +53,11 @@ function renderEditor(script: Script = makeScript()) {
     />,
   );
   return { onChange };
+}
+
+function ControlledEditor({ initialScript }: { initialScript: Script }) {
+  const [script, setScript] = useState(initialScript);
+  return <CampaignSettingsScript script={script} onChange={setScript} mediaNames={[]} />;
 }
 
 describe("script editor — renders through the real design-system primitives", () => {
@@ -122,5 +128,43 @@ describe("script editor — renders through the real design-system primitives", 
     // Untouched, including its original empty-string "no target" — legacy wire
     // data stores it that way and a keystroke elsewhere must not rewrite it.
     expect(options[1]).toMatchObject({ value: "bad", next: "" });
+  });
+
+  test("keeps option-label focus after the parent echoes a script update", () => {
+    render(<ControlledEditor initialScript={makeScript()} />);
+
+    const optionLabel = screen.getAllByLabelText("Option label")[0];
+    if (!optionLabel) throw new Error("missing option label");
+    act(() => {
+      optionLabel.focus();
+      fireEvent.change(optionLabel, { target: { value: "Better" } });
+    });
+
+    const updatedOptionLabel = screen.getAllByLabelText("Option label")[0];
+    if (!updatedOptionLabel) throw new Error("missing updated option label");
+    expect(updatedOptionLabel).toHaveValue("Better");
+    expect(updatedOptionLabel).toHaveFocus();
+  });
+
+  test("adopts an externally replaced script", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <CampaignSettingsScript script={makeScript()} onChange={onChange} mediaNames={[]} />,
+    );
+    const replacement = makeScript();
+    const steps = replacement.steps as {
+      blocks: Record<string, { options: Array<{ label: string }> }>;
+    };
+    const radioBlock = steps.blocks.b_radio;
+    if (!radioBlock) throw new Error("missing radio block");
+    const firstOption = radioBlock.options[0];
+    if (!firstOption) throw new Error("missing first option");
+    firstOption.label = "Replaced";
+
+    rerender(
+      <CampaignSettingsScript script={replacement} onChange={onChange} mediaNames={[]} />,
+    );
+
+    expect(screen.getAllByLabelText("Option label")[0]).toHaveValue("Replaced");
   });
 });
