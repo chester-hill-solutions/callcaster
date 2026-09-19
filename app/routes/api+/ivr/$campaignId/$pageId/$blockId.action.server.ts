@@ -7,6 +7,7 @@ import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
 import { resolveVoiceForBlock } from "@/lib/tts-voices";
+import { ivrGatherAttributes } from "@/lib/ivr-gather.server";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -22,7 +23,7 @@ interface Script {
     // scriptkit's pass-through slot; the roster module is the allowlist for
     // safe id values (see resolveVoiceForBlock).
     wireExtras?: Record<string, unknown> | null;
-    options?: Array<{ value: string; next?: string }>;
+    options?: Array<{ value: string; next?: string; label?: string; content?: string }>;
   }>;
 }
 
@@ -118,7 +119,7 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
 
 const handleBlock = async (
     twiml: TwimlResponse,
-  block: AudioBlock & { options?: Array<{ value: string; next?: string }> },
+  block: AudioBlock & { options?: Array<{ value: string; next?: string; label?: string; content?: string }> },
   campaignId: string,
   pageId: string,
   blockId: string,
@@ -128,22 +129,15 @@ const handleBlock = async (
 ) => {
   if (block.options && block.options.length > 0) {
     const action = `${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/response`;
-    // Only listen for speech when this step maps a spoken answer (#1856). A
-    // keypad-only menu must ignore speech, or any phrase longer than two
-    // characters falls through to the linear next block and skips the menu.
-    const gathersSpeech = block.options.some(
-      (option) => String(option.value).trim() === "vx-any",
-    );
+    // Speech capture attributes come from the shared helper: DTMF-only on a
+    // keypad menu (#1856), and hints/model/timeout from the step's options
+    // when it maps a spoken answer (#1875).
     // Nest the prompt inside <Gather> so a keypad press interrupts playback
     // (#1841). A sibling prompt is only read after it finishes, which is why
     // the caller had to wait out the whole block before the digits registered.
     const gather = twiml.gather({
       action,
-      input: gathersSpeech ? ["dtmf", "speech"] : ["dtmf"],
-      ...(gathersSpeech
-        ? { speechTimeout: "auto", speechModel: "phone_call" }
-        : {}),
-      timeout: 5,
+      ...ivrGatherAttributes(block.options),
     });
     await handleAudio(gather, block, workspace);
     twiml.redirect(action);

@@ -81,7 +81,7 @@ describe("inbound IVR block", () => {
     } as any);
     const xml = await res.text();
     expect(xml).toContain(
-      '<Gather action="https://base.example/api/inbound-ivr/1/page_1/b1/response" input="dtmf" timeout="5"><Play>https://signed</Play></Gather>',
+      '<Gather action="https://base.example/api/inbound-ivr/1/page_1/b1/response" input="dtmf" numDigits="1" timeout="5"><Play>https://signed</Play></Gather>',
     );
     expect(xml).toContain(
       "<Redirect>https://base.example/api/inbound-ivr/1/page_1/b1/response</Redirect>",

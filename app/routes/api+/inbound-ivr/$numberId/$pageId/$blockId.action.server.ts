@@ -6,6 +6,7 @@ import { requireTwilioSignatureForIvrBlock } from "@/lib/ivr-webhook-auth.server
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
+import { ivrGatherAttributes } from "@/lib/ivr-gather.server";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -13,7 +14,7 @@ interface Script {
     id: string;
     type: string;
     audioFile: string;
-    options?: Array<{ value: string; next?: string }>;
+    options?: Array<{ value: string; next?: string; label?: string; content?: string }>;
   }>;
 }
 
@@ -67,7 +68,7 @@ const findNextBlock = (
 
 const handleBlock = async (
     twiml: TwimlResponse,
-  block: { type: string; audioFile: string; options?: Array<{ value: string; next?: string }> },
+  block: { type: string; audioFile: string; options?: Array<{ value: string; next?: string; label?: string; content?: string }> },
   numberId: string,
   pageId: string,
   blockId: string,
@@ -77,21 +78,11 @@ const handleBlock = async (
 ) => {
   if (block.options && block.options.length > 0) {
     const action = `${baseUrl}/api/inbound-ivr/${numberId}/${pageId}/${blockId}/response`;
-    // Only listen for speech when this step maps a spoken answer (#1856). A
-    // keypad-only menu must ignore speech, or any phrase longer than two
-    // characters falls through to the linear next block and skips the menu.
-    const gathersSpeech = block.options.some(
-      (option) => String(option.value).trim() === "vx-any",
-    );
-    // Nest the prompt inside <Gather> so a keypad press interrupts playback
-    // (#1841); a sibling prompt is only read after it finishes.
+    // Shared speech-capture attributes (#1856, #1875); the prompt nests inside
+    // <Gather> so a key press interrupts playback (#1841).
     const gather = twiml.gather({
       action,
-      input: gathersSpeech ? ["dtmf", "speech"] : ["dtmf"],
-      ...(gathersSpeech
-        ? { speechTimeout: "auto", speechModel: "phone_call" }
-        : {}),
-      timeout: 5,
+      ...ivrGatherAttributes(block.options),
     });
     await handleAudio(gather, block, workspace);
     twiml.redirect(action);
