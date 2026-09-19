@@ -30,7 +30,7 @@ vi.mock("sonner", () => ({
 }));
 
 import { AddAudioSheet } from "@/components/campaign/settings/AddAudioSheet";
-import { CampaignVoicemailSettings } from "@/components/campaign/settings/basic/CampaignBasicInfo.Voicemail";
+import { CampaignVoiceSettings } from "@/components/campaign/settings/basic/CampaignVoiceSettings";
 
 describe("AddAudioSheet", () => {
   beforeEach(() => {
@@ -162,7 +162,7 @@ describe("AddAudioSheet", () => {
   });
 });
 
-describe("CampaignVoicemailSettings add audio trigger", () => {
+describe("CampaignVoiceSettings add audio trigger", () => {
   beforeEach(() => {
     mocks.fetcher.state = "idle";
     mocks.fetcher.data = undefined;
@@ -172,7 +172,7 @@ describe("CampaignVoicemailSettings add audio trigger", () => {
   test("opens the add audio sheet from the Setup voicemail controls (#1839)", async () => {
     const user = userEvent.setup();
     render(
-      <CampaignVoicemailSettings
+      <CampaignVoiceSettings
         campaignData={
           {
             id: 1,

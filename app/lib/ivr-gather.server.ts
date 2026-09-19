@@ -6,7 +6,7 @@
  * one place.
  */
 
-export type IvrGatherOption = {
+export type IvrOption = {
   value?: string | number | null;
   label?: string | null;
   content?: string | null;
@@ -51,7 +51,7 @@ function humanizeHint(raw: string): string {
  * stray phrase skips the menu (#1856).
  */
 export function ivrStepGathersSpeech(
-  options: ReadonlyArray<IvrGatherOption>,
+  options: ReadonlyArray<IvrOption>,
 ): boolean {
   return options.some((option) => String(option.value).trim() === "vx-any");
 }
@@ -62,7 +62,7 @@ export function ivrStepGathersSpeech(
  * recognition of the answers this step is actually waiting for.
  */
 export function ivrSpeechHints(
-  options: ReadonlyArray<IvrGatherOption>,
+  options: ReadonlyArray<IvrOption>,
 ): string | undefined {
   const seen = new Set<string>();
   const hints: string[] = [];
@@ -89,7 +89,7 @@ export function ivrSpeechHints(
  * instead of waiting out the timeout.
  */
 export function ivrSingleKeyDigits(
-  options: ReadonlyArray<IvrGatherOption>,
+  options: ReadonlyArray<IvrOption>,
 ): number | undefined {
   if (options.length === 0) return undefined;
   const everyOptionIsOneKey = options.every((option) => {
@@ -101,7 +101,7 @@ export function ivrSingleKeyDigits(
 
 /** Build the gather attributes for one option step. */
 export function ivrGatherAttributes(
-  options: ReadonlyArray<IvrGatherOption>,
+  options: ReadonlyArray<IvrOption>,
 ): IvrGatherAttributes {
   const gathersSpeech = ivrStepGathersSpeech(options);
 

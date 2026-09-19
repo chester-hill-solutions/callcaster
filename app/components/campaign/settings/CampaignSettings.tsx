@@ -9,8 +9,7 @@ import {
   FileObject,
 } from "@/lib/types";
 import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
-import { CampaignVoicemailSettings } from "./basic/CampaignBasicInfo.Voicemail";
-import { CampaignDialOptionsSettings } from "./basic/CampaignDialOptionsSettings";
+import { CampaignVoiceSettings } from "./basic/CampaignVoiceSettings";
 import { CampaignTypeSpecificSettings } from "./detailed/CampaignDetailed";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -105,13 +104,9 @@ export const CampaignSettings = ({
               campaignData.sms_send_mode === "messaging_service"
             }
           />
-          <CampaignVoicemailSettings
+          <CampaignVoiceSettings
             campaignData={campaignData}
             mediaData={mediaData}
-            handleInputChange={handleInputChange}
-          />
-          <CampaignDialOptionsSettings
-            campaignData={campaignData}
             handleInputChange={handleInputChange}
           />
           <div className="mt-6">
