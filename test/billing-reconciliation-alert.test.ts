@@ -1,4 +1,45 @@
-import { describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  getWorkspaceById: vi.fn(),
+  listWorkspaceOwnerAdminEmails: vi.fn(),
+  loadWorkspaceTwilioData: vi.fn(),
+  mergeWorkspaceTwilioData: vi.fn(),
+  patchWorkspaceTwilioData: vi.fn(),
+  send: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock("@/lib/workspace-members-db.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-members-db.server")>()),
+  getWorkspaceById: mocks.getWorkspaceById,
+  listWorkspaceOwnerAdminEmails: mocks.listWorkspaceOwnerAdminEmails,
+}));
+vi.mock("@/lib/merge-workspace-twilio-data.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/merge-workspace-twilio-data.server")>()),
+  loadWorkspaceTwilioData: mocks.loadWorkspaceTwilioData,
+  mergeWorkspaceTwilioData: mocks.mergeWorkspaceTwilioData,
+  patchWorkspaceTwilioData: mocks.patchWorkspaceTwilioData,
+}));
+vi.mock("@/lib/env.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/env.server")>()),
+  env: {
+    RESEND_API_KEY: () => "test-resend-key",
+    BASE_URL: () => "https://app.example.com",
+  },
+}));
+vi.mock("@/lib/logger.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/logger.server")>()),
+  logger: { warn: mocks.warn, error: mocks.error },
+}));
+vi.mock("resend", () => {
+  class Resend {
+    emails = { send: (...args: unknown[]) => mocks.send(...args) };
+    constructor(_apiKey: string) {}
+  }
+  return { Resend };
+});
 
 import {
   BILLING_RECONCILIATION_VARIANCE_THRESHOLD,
@@ -11,6 +52,7 @@ import {
   getBillingReconciliationDriftMarker,
   shouldSendBillingReconciliationDriftEmail,
 } from "../shared/billing-reconciliation-alert";
+import { handleBillingReconciliationDrift } from "../app/lib/billing-reconciliation-alert.server";
 
 function sampleReport(overrides?: Partial<BillingReconciliationReport>): BillingReconciliationReport {
   return {
@@ -55,6 +97,70 @@ function sampleReport(overrides?: Partial<BillingReconciliationReport>): Billing
 }
 
 describe("billing reconciliation alerting", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    for (const fn of Object.values(mocks)) fn.mockReset();
+    mocks.getWorkspaceById.mockResolvedValue({ id: "w1", name: "Civic Action" });
+    mocks.listWorkspaceOwnerAdminEmails.mockResolvedValue(["owner@example.com"]);
+    mocks.loadWorkspaceTwilioData.mockResolvedValue({});
+    mocks.patchWorkspaceTwilioData.mockResolvedValue({});
+    mocks.send.mockResolvedValue({ data: { id: "email_1" }, error: null });
+  });
+
+  test("includes the workspace name in customer drift email output", async () => {
+    const result = await handleBillingReconciliationDrift({
+      workspaceId: "w1",
+      report: sampleReport({ unrecognizedDebitEvents: 1 }),
+      snapshot: {
+        lastRunAt: "2026-06-01T00:00:00.000Z",
+        lastRunSource: "cron",
+        materialVariance: true,
+        period: { startDate: "2026-05-01", endDate: "2026-05-31" },
+        smsVariance: 10,
+        voiceVariance: 0,
+        messageGap: 10,
+        callGap: 0,
+        unrecognizedDebitEvents: 1,
+      },
+    });
+
+    expect(result).toEqual({ emailed: true, cleared: false });
+    expect(mocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Civic Action: CallCaster billing reconciliation drift detected",
+        html: expect.stringContaining(
+          "the <strong>Civic Action</strong> workspace ledger",
+        ),
+        text: expect.stringContaining("Workspace: Civic Action"),
+      }),
+    );
+  });
+
+  test("still sends drift email when the workspace name lookup fails", async () => {
+    mocks.getWorkspaceById.mockRejectedValueOnce(new Error("lookup unavailable"));
+
+    const result = await handleBillingReconciliationDrift({
+      workspaceId: "w1",
+      report: sampleReport({ unrecognizedDebitEvents: 1 }),
+      snapshot: {
+        lastRunAt: "2026-06-01T00:00:00.000Z",
+        lastRunSource: "cron",
+        materialVariance: true,
+        period: { startDate: "2026-05-01", endDate: "2026-05-31" },
+        smsVariance: 10,
+        voiceVariance: 0,
+        messageGap: 10,
+        callGap: 0,
+        unrecognizedDebitEvents: 1,
+      },
+    });
+
+    expect(result).toEqual({ emailed: true, cleared: false });
+    expect(mocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: "w1: CallCaster billing reconciliation drift detected" }),
+    );
+  });
+
   test("exceedsBillingVarianceThreshold uses shared constant", () => {
     expect(BILLING_RECONCILIATION_VARIANCE_THRESHOLD).toBe(2);
     expect(exceedsBillingVarianceThreshold(2)).toBe(false);

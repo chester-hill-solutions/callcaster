@@ -25,6 +25,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 - Script response labels keep keyboard focus while you type, so you can enter a complete answer without selecting the field again ([#1698](https://github.com/chester-hill-solutions/callcaster/issues/1698)).
 - IVR test calls now follow the keypad branch you press instead of apologising and hanging up — a test call has no outreach attempt to record, and the key-press handler no longer mistakes that for an error ([#1840](https://github.com/chester-hill-solutions/callcaster/issues/1840)).
 - IVR keypad presses now interrupt the prompt and take the branch straight away, instead of waiting for the audio to finish first ([#1841](https://github.com/chester-hill-solutions/callcaster/issues/1841)).
+- Workspace notification emails now include the workspace name in their subject and message, including low-credit, number-rental, and billing-reconciliation notices, so recipients can identify which workspace needs attention ([#1739](https://github.com/chester-hill-solutions/callcaster/issues/1739)).
 
 ## 2026-09-18 — release [#1838](https://github.com/chester-hill-solutions/callcaster/pull/1838)
 

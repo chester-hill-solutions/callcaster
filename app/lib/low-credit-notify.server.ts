@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { LOW_CREDIT_THRESHOLD } from "../../shared/pricing";
+import { escapeHtml } from "@/lib/email-html";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
@@ -9,6 +10,7 @@ import {
   patchWorkspaceTwilioData,
 } from "@/lib/merge-workspace-twilio-data.server";
 import {
+  getWorkspaceById,
   listAllWorkspacesOrdered,
   listWorkspaceOwnerAdminEmails,
 } from "@/lib/workspace-members-db.server";
@@ -39,23 +41,28 @@ export function getLowCreditNotificationMarker(
   return { notifiedAt, balance };
 }
 
-function buildEmail(args: { workspaceId: string; balance: number }) {
+function buildEmail(args: {
+  workspaceId: string;
+  workspaceName: string;
+  balance: number;
+}) {
   const billingUrl = `${env.BASE_URL()}/workspaces/${args.workspaceId}/billing`;
+  const workspaceNameHtml = escapeHtml(args.workspaceName);
   return {
-    subject: "Your CallCaster credits are running low",
+    subject: `Your ${args.workspaceName} credits are running low`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Your credits are running low</h2>
-        <p>Your workspace balance is <strong>${args.balance}</strong> credits, below the
+        <h2>Your ${workspaceNameHtml} credits are running low</h2>
+        <p>Your workspace, <strong>${workspaceNameHtml}</strong>, balance is <strong>${args.balance}</strong> credits, below the
         ${LOW_CREDIT_THRESHOLD}-credit warning threshold.</p>
         <p>Top up now to avoid interruptions to campaigns, calls, and number rentals.</p>
         <p><a href="${billingUrl}" style="background-color: #c91d25; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Add credits</a></p>
       </div>
     `,
     text: `
-      Your credits are running low
+      Your ${args.workspaceName} credits are running low
 
-      Your workspace balance is ${args.balance} credits, below the ${LOW_CREDIT_THRESHOLD}-credit warning threshold.
+      Your workspace, ${args.workspaceName}, balance is ${args.balance} credits, below the ${LOW_CREDIT_THRESHOLD}-credit warning threshold.
       Top up now to avoid interruptions to campaigns, calls, and number rentals.
 
       Add credits: ${billingUrl}
@@ -65,12 +72,14 @@ function buildEmail(args: { workspaceId: string; balance: number }) {
 
 async function sendLowCreditEmail(args: {
   workspaceId: string;
+  workspaceName: string;
   balance: number;
   recipients: string[];
 }): Promise<void> {
   const resend = new Resend(env.RESEND_API_KEY());
   const { subject, html, text } = buildEmail({
     workspaceId: args.workspaceId,
+    workspaceName: args.workspaceName,
     balance: args.balance,
   });
   await resend.emails.send({
@@ -101,9 +110,23 @@ export type LowCreditNotifyResult = {
 export async function runLowCreditNotify(args?: {
   workspaceId?: string;
 }): Promise<LowCreditNotifyResult> {
-  const workspaces = args?.workspaceId
-    ? [{ id: args.workspaceId }]
-    : await listAllWorkspacesOrdered();
+  let workspaces;
+  if (args?.workspaceId) {
+    try {
+      const workspace = await getWorkspaceById(args.workspaceId);
+      workspaces = workspace
+        ? [workspace]
+        : [{ id: args.workspaceId, name: args.workspaceId }];
+    } catch (error) {
+      logger.warn("low_credit_notify.workspace_name_lookup_failed", {
+        workspaceId: args.workspaceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      workspaces = [{ id: args.workspaceId, name: args.workspaceId }];
+    }
+  } else {
+    workspaces = await listAllWorkspacesOrdered();
+  }
 
   let notified = 0;
   let cleared = 0;
@@ -145,7 +168,12 @@ export async function runLowCreditNotify(args?: {
         skippedNoRecipients++;
         logger.warn("low_credit_notify.no_recipients", { workspaceId });
       } else {
-        await sendLowCreditEmail({ workspaceId, balance, recipients });
+        await sendLowCreditEmail({
+          workspaceId,
+          workspaceName: workspace.name,
+          balance,
+          recipients,
+        });
         notified++;
       }
 

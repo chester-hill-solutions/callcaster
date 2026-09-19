@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 const workspaceMocks = vi.hoisted(() => ({
+  getWorkspaceById: vi.fn(),
   listAllWorkspacesOrdered: vi.fn(),
   listWorkspaceOwnerAdminEmails: vi.fn(),
 }));
@@ -46,7 +47,13 @@ describe("app/lib/low-credit-notify.server.ts", () => {
     );
     twilioDataMocks.patchWorkspaceTwilioData.mockResolvedValue({});
 
-    vi.doMock("@/lib/workspace-members-db.server", () => workspaceMocks);
+    vi.doMock(
+      "@/lib/workspace-members-db.server",
+      async (importOriginal) => ({
+        ...(await importOriginal<typeof import("@/lib/workspace-members-db.server")>()),
+        ...workspaceMocks,
+      }),
+    );
     vi.doMock("@/lib/workspace-credits.server", () => creditsMocks);
     vi.doMock("@/lib/merge-workspace-twilio-data.server", () => twilioDataMocks);
     vi.doMock("@/lib/logger.server", () => ({ logger: loggerMocks }));
@@ -66,7 +73,9 @@ describe("app/lib/low-credit-notify.server.ts", () => {
   });
 
   test("sends a notification when balance is below threshold and no marker is set", async () => {
-    workspaceMocks.listAllWorkspacesOrdered.mockResolvedValue([{ id: "w1" }]);
+    workspaceMocks.listAllWorkspacesOrdered.mockResolvedValue([
+      { id: "w1", name: "Civic Action" },
+    ]);
     creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(50);
     twilioDataMocks.loadWorkspaceTwilioData.mockResolvedValue({});
 
@@ -80,7 +89,13 @@ describe("app/lib/low-credit-notify.server.ts", () => {
       expect.objectContaining({
         from: "Callcaster <info@callcaster.ca>",
         to: ["owner@example.com"],
-        subject: "Your CallCaster credits are running low",
+        subject: "Your Civic Action credits are running low",
+        html: expect.stringContaining(
+          "Your workspace, <strong>Civic Action</strong>, balance is <strong>50</strong>",
+        ),
+        text: expect.stringContaining(
+          "Your workspace, Civic Action, balance is 50",
+        ),
       }),
     );
     expect(twilioDataMocks.patchWorkspaceTwilioData).toHaveBeenCalledWith(
@@ -105,6 +120,27 @@ describe("app/lib/low-credit-notify.server.ts", () => {
 
     expect(result).toMatchObject({ ok: true, checked: 1, notified: 0, cleared: 0 });
     expect(resendMocks.send).not.toHaveBeenCalled();
+  });
+
+  test("escapes workspace names in HTML while retaining the name in text and subject", async () => {
+    workspaceMocks.listAllWorkspacesOrdered.mockResolvedValue([
+      { id: "w1", name: "A & <B>" },
+    ]);
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(50);
+    twilioDataMocks.loadWorkspaceTwilioData.mockResolvedValue({});
+
+    const mod = await import("../app/lib/low-credit-notify.server");
+    await mod.runLowCreditNotify();
+
+    expect(resendMocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Your A & <B> credits are running low",
+        html: expect.stringContaining(
+          "Your workspace, <strong>A &amp; &lt;B&gt;</strong>",
+        ),
+        text: expect.stringContaining("Your workspace, A & <B>, balance is 50"),
+      }),
+    );
   });
 
   test("skips sending when a low-credit marker is already present", async () => {
@@ -189,14 +225,37 @@ describe("app/lib/low-credit-notify.server.ts", () => {
   });
 
   test("scopes to a single workspace when workspaceId is passed", async () => {
+    workspaceMocks.getWorkspaceById.mockResolvedValue({
+      id: "w-specific",
+      name: "Scoped Workspace",
+    });
     creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(20);
     twilioDataMocks.loadWorkspaceTwilioData.mockResolvedValue({});
 
     const mod = await import("../app/lib/low-credit-notify.server");
     const result = await mod.runLowCreditNotify({ workspaceId: "w-specific" });
 
-    expect(workspaceMocks.listAllWorkspacesOrdered).not.toHaveBeenCalled();
+    expect(workspaceMocks.getWorkspaceById).toHaveBeenCalledWith("w-specific");
     expect(creditsMocks.getWorkspaceCreditsBalance).toHaveBeenCalledWith("w-specific");
     expect(result).toMatchObject({ ok: true, checked: 1, notified: 1 });
+    expect(resendMocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Your Scoped Workspace credits are running low",
+      }),
+    );
+  });
+
+  test("still sends when the scoped workspace name lookup fails", async () => {
+    workspaceMocks.getWorkspaceById.mockRejectedValueOnce(new Error("lookup unavailable"));
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(20);
+    twilioDataMocks.loadWorkspaceTwilioData.mockResolvedValue({});
+
+    const mod = await import("../app/lib/low-credit-notify.server");
+    const result = await mod.runLowCreditNotify({ workspaceId: "w-specific" });
+
+    expect(result).toMatchObject({ ok: true, checked: 1, notified: 1 });
+    expect(resendMocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({ subject: "Your w-specific credits are running low" }),
+    );
   });
 });
