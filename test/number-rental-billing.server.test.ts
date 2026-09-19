@@ -21,6 +21,7 @@ const creditsMocks = vi.hoisted(() => ({
 }));
 
 const workspaceMembersMocks = vi.hoisted(() => ({
+  getWorkspaceById: vi.fn(),
   listWorkspaceOwnerAdminEmails: vi.fn(),
 }));
 
@@ -42,7 +43,13 @@ vi.mock("@/lib/transaction-history.server", () => transactionHistoryMocks);
 vi.mock("@/lib/workspace-credits.server", () => creditsMocks);
 vi.mock("@/lib/ops-alert.server", () => ({ notifyOps: (...a: unknown[]) => opsMocks.notifyOps(...a) }));
 
-vi.mock("@/lib/workspace-members-db.server", () => workspaceMembersMocks);
+vi.mock(
+  "@/lib/workspace-members-db.server",
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/lib/workspace-members-db.server")>()),
+    ...workspaceMembersMocks,
+  }),
+);
 
 vi.mock("resend", () => {
   class Resend {
@@ -83,6 +90,11 @@ describe("runNumberRentalBilling", () => {
     workspaceMembersMocks.listWorkspaceOwnerAdminEmails.mockResolvedValue([
       "owner@example.com",
     ]);
+    workspaceMembersMocks.getWorkspaceById.mockReset();
+    workspaceMembersMocks.getWorkspaceById.mockResolvedValue({
+      id: "workspace-1",
+      name: "Civic Action",
+    });
     resendMocks.send.mockReset();
     resendMocks.send.mockResolvedValue({ data: { id: "email_1" }, error: null });
   });
@@ -129,7 +141,13 @@ describe("runNumberRentalBilling", () => {
         expect.objectContaining({
           from: "Callcaster <info@callcaster.ca>",
           to: ["owner@example.com"],
-          subject: `Your CallCaster number rental renews in ${daysUntilDue} days`,
+          subject: `Your Civic Action number rental renews in ${daysUntilDue} days`,
+          html: expect.stringContaining(
+            "Your workspace, <strong>Civic Action</strong>, needs enough credits",
+          ),
+          text: expect.stringContaining(
+            "Your workspace, Civic Action, needs enough credits",
+          ),
         }),
       );
     },
@@ -418,6 +436,14 @@ describe("runNumberRentalBilling", () => {
     expect(result).toMatchObject({ suspended: 1, released: 0 });
     expect(tdbMocks.workspace_number.update).toHaveBeenCalledTimes(1);
     expect(lifecycleMocks.removeWorkspacePhoneNumber).not.toHaveBeenCalled();
+    expect(resendMocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Civic Action: +15551234567 is suspended",
+        text: expect.stringContaining(
+          "Your workspace, Civic Action, has +15551234567 suspended",
+        ),
+      }),
+    );
   });
 
   test("three unpaid cycles releases the number at Twilio", async () => {
@@ -442,6 +468,14 @@ describe("runNumberRentalBilling", () => {
     );
     expect(opsMocks.notifyOps).toHaveBeenCalledWith(
       expect.objectContaining({ event: "billing.rental_released", severity: "page" }),
+    );
+    expect(resendMocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Civic Action: +15551234567 has been released",
+        text: expect.stringContaining(
+          "Your workspace, Civic Action, has +15551234567 released",
+        ),
+      }),
     );
   });
 
@@ -499,6 +533,25 @@ describe("runNumberRentalBilling", () => {
     });
 
     expect(opsMocks.notifyOps).not.toHaveBeenCalled();
+  });
+
+  test("continues billing when the workspace name lookup fails", async () => {
+    workspaceMembersMocks.getWorkspaceById.mockRejectedValueOnce(
+      new Error("workspace lookup unavailable"),
+    );
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01" }),
+    ]);
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue(
+      undefined,
+    );
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ charged: 1, technicalFailures: 0 });
   });
 
   test("leaves the rental unpaid (no debit) when the workspace can't afford it", async () => {
@@ -665,6 +718,17 @@ describe("runNumberRentalBilling", () => {
     expect(result).toMatchObject({ warned: 1 });
     expect(tdbMocks.workspace_number.update).toHaveBeenCalledWith(
       expect.objectContaining({ set: { rental_warned_cycle: 1 } }),
+    );
+    expect(resendMocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: "Payment needed for Civic Action: +15551234567",
+        html: expect.stringContaining(
+          "Your workspace, Civic Action, could not renew +15551234567",
+        ),
+        text: expect.stringContaining(
+          "Your workspace, Civic Action, could not renew +15551234567",
+        ),
+      }),
     );
   });
 
