@@ -1,6 +1,6 @@
 import { ResultsScreenProps, DispositionResult } from "@/lib/types";
 import { TotalMessages } from "./ResultsScreen.TotalCalls";
-import { AsyncExportButton } from "./AsyncExportButton";
+import { CampaignExportButton } from "./CampaignExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { KeyMessageMetrics } from "./ResultsScreen.KeyMetrics";
 import { NavLink, useNavigation, useParams } from "react-router";
@@ -39,7 +39,7 @@ const MessageResultsScreen = ({
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">
           <TotalMessages totalMessages={totalOfAllResults || 0} />
-          <AsyncExportButton
+          <CampaignExportButton
             campaignId={campaignId}
             workspaceId={workspaceId}
           />

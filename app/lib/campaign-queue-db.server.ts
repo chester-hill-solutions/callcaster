@@ -13,6 +13,7 @@ import {
   contact as contactTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
+import { loadContactsByQueueRows } from "@/lib/campaign-queue-contacts.server";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { emitQueueEvent } from "@/lib/workspace-events.server";
 import { rpcDequeueContact, type RpcExecutor } from "@/lib/db-rpc.server";
@@ -439,12 +440,7 @@ export async function fetchCampaignQueueRowsByIds(queueIds: number[], workspaceI
     return [];
   }
 
-  const contactIds = [...new Set(queueRows.map((row) => row.contact_id))];
-  const contacts = await db
-    .select()
-    .from(contactTable)
-    .where(inArray(contactTable.id, contactIds));
-  const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
+  const contactById = await loadContactsByQueueRows(queueRows);
 
   return queueRows.map((queueRow) => ({
     ...queueRow,
