@@ -9,6 +9,10 @@ import {
   processCallStatusWebhook,
 } from "@/lib/twilio-call-status.server";
 import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
+import {
+  isMachineAnswered,
+  recordVoicemailAnswer,
+} from "@/lib/ivr-machine.server";
 import { defineAction } from "@/lib/handler.server";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
@@ -58,18 +62,11 @@ export interface CallEvent {
 };
 
 /**
- * Records the machine-answer disposition. The voicemail audio (or the hangup)
- * is emitted by the flow entry route, which acts on the synchronous AMD verdict
- * before any IVR audio plays (#1864).
+ * Records the machine-answer disposition, then the status callback continues.
+ * The voicemail audio (or the hangup) is emitted by the flow entry route, which
+ * acts on the synchronous AMD verdict before any IVR audio plays (#1864); this
+ * is the callback's safety net and writes the same values.
  */
-const recordVoicemailDisposition = async (dbCall: Call): Promise<void> => {
-    // Test calls (#1653) have a campaign but no outreach attempt; they still
-    // record the disposition when a machine answers.
-    if (dbCall.outreach_attempt_id) {
-        await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
-    }
-};
-
 export const action = defineAction({
     auth: async ({ request }) => {
         const formData = await request.clone().formData();
@@ -102,17 +99,9 @@ export const action = defineAction({
         const campaignData = await fetchCampaignWithScript(dbCall.campaign_id);
 
         const callStatus = event.callStatus;
-        const answeredBy = event.answeredBy ?? "";
-        const isMachine =
-            Boolean(answeredBy) &&
-            answeredBy.includes('machine') &&
-            !answeredBy.includes('other') &&
-            callStatus !== 'completed';
 
-        if (isMachine) {
-            // The flow entry route owns playback/hangup on the AMD verdict
-            // (#1864); here we only record the disposition.
-            await recordVoicemailDisposition(dbCall);
+        if (isMachineAnswered(event.answeredBy, callStatus)) {
+            await recordVoicemailAnswer(dbCall);
         } else if (['failed', 'no-answer', 'completed'].includes(callStatus)) {
             const updateData = buildCallUpsertFromTwilioParams(params);
             await processCallStatusWebhook(updateData, {

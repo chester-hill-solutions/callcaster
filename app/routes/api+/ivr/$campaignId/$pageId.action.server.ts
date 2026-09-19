@@ -1,17 +1,13 @@
 import { ivrScriptStepsFromCampaign } from "@/lib/campaign-ivr.server";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import {
-  createVoiceResponse,
-  hangupTwiml,
-  pausePlayTwiml,
-} from "@/lib/twilio-twiml.server";
+import { createVoiceResponse, hangupTwiml } from "@/lib/twilio-twiml.server";
 import { requireTwilioSignatureForIvrPage } from "@/lib/ivr-webhook-auth.server";
+import { findCallWithCampaignScriptBySid } from "@/lib/telephony-db.server";
 import {
-  findCallWithCampaignScriptBySid,
-  updateOutreachAttemptForWorkspace,
-} from "@/lib/telephony-db.server";
-import { createSignedObjectUrl } from "@/lib/object-storage.server";
+  handleMachineAnswer,
+  isMachineAnswered,
+} from "@/lib/ivr-machine.server";
 import { defineAction } from "@/lib/handler.server";
 
 const MAX_RETRIES = 5;
@@ -62,35 +58,10 @@ export const action = defineAction({
     }
 
     // Synchronous AMD sends its verdict on this first request (#1864). Decide
-    // here so a machine never hears the IVR: play the configured drop when it
-    // is switched on, otherwise hang up.
-    const isMachine =
-      answeredBy.includes("machine") && !answeredBy.includes("other");
-    if (isMachine) {
-      if (callData.outreach_attempt_id) {
-        const updated = await updateOutreachAttemptForWorkspace(
-          String(callData.workspace),
-          callData.outreach_attempt_id,
-          { disposition: "voicemail", answered_at: new Date().toISOString() },
-        );
-        if (updated instanceof Response) {
-          throw new Error(await updated.text());
-        }
-      }
-      const campaign = callData.campaign;
-      if (campaign?.voicemail_drop_enabled && campaign.voicemail_file) {
-        const signedUrl = await createSignedObjectUrl(
-          "workspaceAudio",
-          `${callData.workspace}/${campaign.voicemail_file}`,
-          3600,
-        );
-        return new Response(pausePlayTwiml(signedUrl), {
-          headers: { "Content-Type": "text/xml" },
-        });
-      }
-      return new Response(hangupTwiml(), {
-        headers: { "Content-Type": "text/xml" },
-      });
+    // here so a machine never hears the IVR; the shared policy plays the
+    // configured drop when it is on, otherwise hangs up.
+    if (isMachineAnswered(answeredBy)) {
+      return handleMachineAnswer(callData, callData.campaign);
     }
 
     const script = ivrScriptStepsFromCampaign(callData.campaign) as

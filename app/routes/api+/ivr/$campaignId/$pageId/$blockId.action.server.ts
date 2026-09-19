@@ -7,7 +7,11 @@ import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { findCallBySid } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
 import { resolveVoiceForBlock } from "@/lib/tts-voices";
-import { ivrGatherAttributes } from "@/lib/ivr-gather.server";
+import {
+  appendBlockResponse,
+  type AudioTarget,
+  type IvrOption,
+} from "@/lib/ivr-block-runtime.server";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -23,7 +27,7 @@ interface Script {
     // scriptkit's pass-through slot; the roster module is the allowlist for
     // safe id values (see resolveVoiceForBlock).
     wireExtras?: Record<string, unknown> | null;
-    options?: Array<{ value: string; next?: string; label?: string; content?: string }>;
+    options?: IvrOption[];
   }>;
 }
 
@@ -50,8 +54,6 @@ export function synthesizedSpeechText(block: AudioBlock): string {
   }
   return "";
 }
-
-type AudioTarget = Pick<TwimlResponse, "play" | "say">;
 
 const handleAudio = async (
   target: AudioTarget,
@@ -84,42 +86,9 @@ const handleAudio = async (
   }
 };
 
-const findNextBlock = (script: Script, currentPageId: string, currentBlockId: string): { pageId: string; blockId: string } | null => {
-  const currentPage = script.pages[currentPageId];
-  if (!currentPage) {
-    return null;
-  }
-  const currentBlockIndex = currentPage.blocks.indexOf(currentBlockId);
-
-  if (currentBlockIndex < currentPage.blocks.length - 1) {
-    const nextBlockId = currentPage.blocks[currentBlockIndex + 1];
-    if (!nextBlockId) {
-      return null;
-    }
-    return {
-      pageId: currentPageId,
-      blockId: nextBlockId,
-    };
-  }
-
-  const pageIds = Object.keys(script.pages);
-  const currentPageIndex = pageIds.indexOf(currentPageId);
-  if (currentPageIndex < pageIds.length - 1) {
-    const nextPageId = pageIds[currentPageIndex + 1];
-    const nextPage = nextPageId ? script.pages[nextPageId] : undefined;
-    const nextBlockId = nextPage?.blocks[0];
-    if (!nextPageId || !nextBlockId) {
-      return null;
-    }
-    return { pageId: nextPageId, blockId: nextBlockId };
-  }
-
-  return null;
-};
-
 const handleBlock = async (
     twiml: TwimlResponse,
-  block: AudioBlock & { options?: Array<{ value: string; next?: string; label?: string; content?: string }> },
+  block: AudioBlock & { options?: IvrOption[] },
   campaignId: string,
   pageId: string,
   blockId: string,
@@ -127,32 +96,16 @@ const handleBlock = async (
   workspace: string,
   baseUrl: string,
 ) => {
-  if (block.options && block.options.length > 0) {
-    const action = `${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/response`;
-    // Speech capture attributes come from the shared helper: DTMF-only on a
-    // keypad menu (#1856), and hints/model/timeout from the step's options
-    // when it maps a spoken answer (#1875).
-    // Nest the prompt inside <Gather> so a keypad press interrupts playback
-    // (#1841). A sibling prompt is only read after it finishes, which is why
-    // the caller had to wait out the whole block before the digits registered.
-    const gather = twiml.gather({
-      action,
-      ...ivrGatherAttributes(block.options),
-    });
-    await handleAudio(gather, block, workspace);
-    twiml.redirect(action);
-    return;
-  }
-
-  await handleAudio(twiml, block, workspace);
-  const nextLocation = findNextBlock(script, pageId, blockId);
-  if (nextLocation) {
-    twiml.redirect(
-      `${baseUrl}/api/ivr/${campaignId}/${nextLocation.pageId}/${nextLocation.blockId}`,
-    );
-  } else {
-    twiml.hangup();
-  }
+  await appendBlockResponse({
+    twiml,
+    block,
+    pageId,
+    blockId,
+    script,
+    buildActionUrl: (p, b) => `${baseUrl}/api/ivr/${campaignId}/${p}/${b}/response`,
+    buildBlockUrl: (p, b) => `${baseUrl}/api/ivr/${campaignId}/${p}/${b}`,
+    renderAudio: (target, b) => handleAudio(target, b, workspace),
+  });
 };
 
 export const action = defineAction({

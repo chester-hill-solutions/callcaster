@@ -5,7 +5,7 @@ vi.mock("@/components/campaign/settings/AddAudioSheet", () => ({
   AddAudioSheet: () => null,
 }));
 
-import { CampaignVoicemailSettings } from "@/components/campaign/settings/basic/CampaignBasicInfo.Voicemail";
+import { CampaignVoiceSettings } from "@/components/campaign/settings/basic/CampaignVoiceSettings";
 
 const baseCampaign = {
   id: 1,
@@ -15,12 +15,14 @@ const baseCampaign = {
   voicemail_file: null,
   voicemail_drop_enabled: false,
   voicedrop_audio: null,
+  group_household_queue: false,
+  dial_type: "call",
 };
 
-describe("CampaignVoicemailSettings (#1839)", () => {
+describe("CampaignVoiceSettings (#1839, #1863)", () => {
   test("renders nothing for a text campaign", () => {
     const { container } = render(
-      <CampaignVoicemailSettings
+      <CampaignVoiceSettings
         campaignData={{ ...baseCampaign, type: "message" } as never}
         mediaData={[]}
         handleInputChange={vi.fn()}
@@ -33,13 +35,15 @@ describe("CampaignVoicemailSettings (#1839)", () => {
     "shows the voicemail drop toggle and audio picker for %s",
     (type) => {
       render(
-        <CampaignVoicemailSettings
+        <CampaignVoiceSettings
           campaignData={{ ...baseCampaign, type } as never}
           mediaData={[]}
           handleInputChange={vi.fn()}
         />,
       );
-      expect(screen.getByRole("switch", { name: /voicemail drop/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("switch", { name: /voicemail drop/i }),
+      ).toBeInTheDocument();
       expect(document.querySelector("#voicemail_file")).toBeInTheDocument();
     },
   );
@@ -47,7 +51,7 @@ describe("CampaignVoicemailSettings (#1839)", () => {
   test("toggling reports the boolean to handleInputChange", () => {
     const change = vi.fn();
     render(
-      <CampaignVoicemailSettings
+      <CampaignVoiceSettings
         campaignData={{ ...baseCampaign, type: "robocall" } as never}
         mediaData={[]}
         handleInputChange={change}
@@ -57,23 +61,44 @@ describe("CampaignVoicemailSettings (#1839)", () => {
     expect(change).toHaveBeenCalledWith("voicemail_drop_enabled", true);
   });
 
-  test("shows the live voice drop only for live calling", () => {
+  test("shows the live voice drop and calling options only for live calling", () => {
     const { rerender } = render(
-      <CampaignVoicemailSettings
+      <CampaignVoiceSettings
         campaignData={{ ...baseCampaign, type: "live_call" } as never}
         mediaData={[]}
         handleInputChange={vi.fn()}
       />,
     );
     expect(document.querySelector("#voicedrop_audio")).toBeInTheDocument();
+    expect(screen.getByText("Calling options")).toBeInTheDocument();
+    expect(document.querySelector("#group_household_queue")).toBeInTheDocument();
+    expect(document.querySelector("#dial_type")).toBeInTheDocument();
 
     rerender(
-      <CampaignVoicemailSettings
+      <CampaignVoiceSettings
         campaignData={{ ...baseCampaign, type: "robocall" } as never}
         mediaData={[]}
         handleInputChange={vi.fn()}
       />,
     );
     expect(document.querySelector("#voicedrop_audio")).not.toBeInTheDocument();
+    expect(screen.queryByText("Calling options")).not.toBeInTheDocument();
+    expect(document.querySelector("#dial_type")).not.toBeInTheDocument();
+  });
+
+  test("reports household grouping and dial type changes", () => {
+    const change = vi.fn();
+    render(
+      <CampaignVoiceSettings
+        campaignData={{ ...baseCampaign, type: "live_call" } as never}
+        mediaData={[]}
+        handleInputChange={change}
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: /group by household/i }));
+    expect(change).toHaveBeenCalledWith("group_household_queue", true);
+
+    fireEvent.click(screen.getByRole("switch", { name: /dial type/i }));
+    expect(change).toHaveBeenCalledWith("dial_type", "predictive");
   });
 });
