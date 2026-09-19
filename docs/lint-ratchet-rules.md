@@ -134,5 +134,5 @@ Every check must report:
 
 - Lint gate: `scripts/check-lint-ratchet.mjs`
 - Lint baseline: `scripts/baselines/lint-ratchet.json`
-- ESLint configuration: `.eslintrc.cjs`
+- ESLint configuration: `eslint.config.mjs`
 - CI composition: `package.json` `ci:local` script

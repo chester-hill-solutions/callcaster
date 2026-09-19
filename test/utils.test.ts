@@ -20,7 +20,7 @@ describe("app/lib/utils.ts", () => {
 
   test("cn merges class names", async () => {
     const mod = await import("../app/lib/utils");
-    expect(mod.cn("a", false && "no", ["b", "c"])).toContain("a");
+    expect(mod.cn("a", false, ["b", "c"])).toContain("a");
     expect(mod.cn("a", "b")).toContain("b");
   });
 

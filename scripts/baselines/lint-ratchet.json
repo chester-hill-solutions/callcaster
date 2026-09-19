@@ -1,13 +1,12 @@
 {
-  "_comment": "Ratchet baseline for check:lint-ratchet — per-rule warning counts from the scoped eslint run. Growth fails CI; rewrite with npm run tools:lint-ratchet:baseline.",
+  "_comment": "Ratchet baseline for check:lint-ratchet — per-rule warning counts from the scoped eslint run. Growth fails CI; rewrite with npm run tools:lint-ratchet:baseline. NOTE: the complexity count (112) reflects ESLint 9's stricter complexity rule (it counts ?? / ?. / default params); the same code was 85 under ESLint 8.",
   "counts": {
     "max-lines-per-function": 58,
-    "complexity": 85,
-    "@typescript-eslint/no-non-null-assertion": 119,
-    "max-params": 9,
+    "complexity": 112,
+    "@typescript-eslint/no-non-null-assertion": 117,
+    "max-params": 6,
     "max-depth": 21,
-    "import/no-cycle": 16,
-    "no-return-await": 23,
+    "no-return-await": 22,
     "no-console": 11
   }
 }
