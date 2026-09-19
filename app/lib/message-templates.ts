@@ -18,14 +18,24 @@ export const SAMPLE_TEMPLATE_CONTACT = {
   external_id: "C-1042",
 } as unknown as Contact;
 
-const TEMPLATE_SYNTAX = /\{|btoa\(/;
+const BTOA_SYNTAX = /btoa\(/;
+
+/**
+ * A tag is `{{field}}`, or the legacy single-brace `{field}`, with an optional
+ * `|fallback`. Braces must balance: `{{field}` and `{field}}` are literal text,
+ * not tags. The single-brace alternative's lookarounds stop it from matching
+ * one half of an unbalanced double-brace pair.
+ */
+const TAG_PATTERN =
+  /\{\{\s*([a-zA-Z0-9_]+)(?:\|([^}]+))?\s*\}\}|(?<!\{)\{\s*([a-zA-Z0-9_]+)(?:\|([^}]+))?\s*\}(?!\})/g;
+
+/** Same shape as {@link TAG_PATTERN}, without the global flag, for testing. */
+const TAG_TEST = new RegExp(TAG_PATTERN.source);
 
 /** True when the text contains anything processTemplateTags would rewrite. */
 export function hasTemplateSyntax(text: string): boolean {
-  return TEMPLATE_SYNTAX.test(text);
+  return TAG_TEST.test(text) || BTOA_SYNTAX.test(text);
 }
-
-const TAG_PATTERN = /\{\{?\s*([a-zA-Z0-9_]+)(?:\|([^}]+))?\s*\}\}?/g;
 
 const FIELD_READERS: Record<string, (contact: Contact) => string | number | null | undefined> = {
   firstname: (c) => c.firstname,
@@ -64,13 +74,18 @@ export function processTemplateTags(text: string, contact: Contact): string {
   if (!text || !contact) return text;
 
   const processBraces = (input: string): string =>
-    input.replace(TAG_PATTERN, (_match, field, fallback) => {
-      const value = contactField(contact, field);
-      if (!value && typeof fallback === "string") {
-        return unquote(fallback);
-      }
-      return value;
-    });
+    input.replace(
+      TAG_PATTERN,
+      (_match, doubleField, doubleFallback, singleField, singleFallback) => {
+        const field = doubleField ?? singleField;
+        const fallback = doubleFallback ?? singleFallback;
+        const value = contactField(contact, field);
+        if (!value && typeof fallback === "string") {
+          return unquote(fallback);
+        }
+        return value;
+      },
+    );
 
   const processFunctions = (input: string): string => {
     return input.replace(/btoa\(([^)]*)\)/g, (_match, inner) => {
