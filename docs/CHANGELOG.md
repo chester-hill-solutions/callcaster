@@ -13,8 +13,9 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
-- Predictive calls answered by a machine now play and record a voicemail only when the campaign's voicemail drop is on and has audio. Otherwise they record **No Answer** and continue to the next contact ([#1889](https://github.com/chester-hill-solutions/callcaster/issues/1889)).
+- Campaign navigation now groups campaigns as running, waiting, draft, and complete, with newest campaigns first in each group ([#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727)).
 - An IVR call answered by a machine with the voicemail drop switched off now records **No Answer** instead of Voicemail, so the results match what the caller heard ([#1888](https://github.com/chester-hill-solutions/callcaster/issues/1888)).
+- Predictive calls answered by a machine now play and record a voicemail only when the campaign's voicemail drop is on and has audio. Otherwise they record **No Answer** and continue to the next contact ([#1889](https://github.com/chester-hill-solutions/callcaster/issues/1889)).
 - The mobile navigation sheet now stacks its links one per row instead of laying them out side by side ([#1891](https://github.com/chester-hill-solutions/callcaster/issues/1891)).
 - Workspace invites no longer fail on environments migrated off Supabase: the legacy foreign keys pointing at the empty `auth.users` table are dropped, so an invite insert only needs the Better Auth profile row ([#1853](https://github.com/chester-hill-solutions/callcaster/issues/1853)).
 - Message template tags now need balanced braces: `{{field}}` or the legacy `{field}`. An unbalanced `{{field}` or `{field}}` is plain text, and the preview now agrees with how the send replaces tags ([#1725](https://github.com/chester-hill-solutions/callcaster/issues/1725)).
