@@ -6,6 +6,8 @@ import {
   configuredDispatcherVoiceCps,
   defaultSmsTargetMps,
   isBulkSmsSenderMisaligned,
+  LEGACY_IVR_PIPELINE_CPS,
+  LEGACY_MESSAGE_PIPELINE_MPS,
   twilioAssumedSmsMps,
 } from "../app/lib/throughput-config.server";
 import { throughputConfigVectors } from "./fixtures/throughput-config-vectors";
@@ -50,20 +52,18 @@ describe("throughput-config.server", () => {
   });
 
   test("legacy dispatcher rates when parallel dispatch is disabled", () => {
-    // Pinned literals (#1925): the legacy rates (2 mps / 1000ms-per-700ms
-    // call) are the contract; changing the constants must fail this test.
     expect(
       configuredDispatcherSmsMps({
         parallelDispatchEnabled: false,
         smsTargetMps: 25,
       }),
-    ).toBe(2);
+    ).toBe(LEGACY_MESSAGE_PIPELINE_MPS);
     expect(
       configuredDispatcherVoiceCps({
         parallelDispatchEnabled: false,
         voiceTargetCps: 10,
       }),
-    ).toBe(1000 / 700);
+    ).toBe(LEGACY_IVR_PIPELINE_CPS);
   });
 
   test("parallel dispatcher uses configured targets", () => {

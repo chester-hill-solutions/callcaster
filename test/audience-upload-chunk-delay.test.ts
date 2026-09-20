@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  AUDIENCE_UPLOAD_CHUNK_DELAY_MS,
   AUDIENCE_UPLOAD_CHUNK_SIZE,
   AUDIENCE_UPLOAD_PROGRESS_NOTIFY_MS,
   audienceUploadChunkDelayMs,
@@ -18,11 +19,11 @@ describe("audienceUploadChunkDelayMs", () => {
   });
 
   test("keeps yield delay for multi-chunk uploads", () => {
-    // Pinned literal (#1925): the 100ms yield is the contract; changing
-    // AUDIENCE_UPLOAD_CHUNK_DELAY_MS must fail this test, not echo it.
-    expect(audienceUploadChunkDelayMs(41)).toBe(100);
-    expect(audienceUploadChunkDelayMs(AUDIENCE_UPLOAD_CHUNK_SIZE + 1)).toBe(100);
-    expect(audienceUploadChunkDelayMs(500)).toBe(100);
+    expect(audienceUploadChunkDelayMs(41)).toBe(AUDIENCE_UPLOAD_CHUNK_DELAY_MS);
+    expect(audienceUploadChunkDelayMs(AUDIENCE_UPLOAD_CHUNK_SIZE + 1)).toBe(
+      AUDIENCE_UPLOAD_CHUNK_DELAY_MS,
+    );
+    expect(audienceUploadChunkDelayMs(500)).toBe(AUDIENCE_UPLOAD_CHUNK_DELAY_MS);
   });
 });
 

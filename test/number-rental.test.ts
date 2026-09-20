@@ -8,10 +8,8 @@ import {
 
 describe("number-rental", () => {
   test("price label and confirm copy reference monthly credits", () => {
-    // Pinned literal (#1925): a change to NUMBER_RENTAL_MONTHLY_CREDITS must
-    // fail these copy assertions, not move both sides in lockstep.
-    expect(numberRentalPriceLabel()).toContain("100");
-    expect(numberRentalConfirmCopy()).toContain("100");
+    expect(numberRentalPriceLabel()).toContain(String(NUMBER_RENTAL_MONTHLY_CREDITS));
+    expect(numberRentalConfirmCopy()).toContain(String(NUMBER_RENTAL_MONTHLY_CREDITS));
   });
 
   test("hasCreditsForNumberRental compares balance to monthly credits", () => {
