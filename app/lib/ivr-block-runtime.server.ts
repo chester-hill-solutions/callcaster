@@ -18,24 +18,16 @@ export type AudioTarget = Pick<TwimlResponse, "play" | "say">;
 
 export type IvrBlock = {
   options?: IvrOption[];
-  /** Wait (seconds) before the DTMF/menu gather times out; override of the 5s default. */
   gatherTimeoutSeconds?: number;
-  /** What happens when the caller gives no input at this step. */
   noInput?: IvrNoInputConfig;
 };
 
-/**
- * Per-step no-input behaviour: hang up, replay the prompt (capped), or route
- * to a named block. The default is the historical linear continuation to the
- * next step.
- */
 export type IvrNoInputConfig = {
   action:
     | "next"
     | "hangup"
     | "replay"
     | { pageId: string; blockId: string };
-  /** How many replays before falling through to the next step. Default 2. */
   maxReplays?: number;
 };
 

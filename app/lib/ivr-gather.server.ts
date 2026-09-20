@@ -99,8 +99,6 @@ export function ivrSingleKeyDigits(
   return everyOptionIsOneKey ? 1 : undefined;
 }
 
-/** Build the gather attributes for one option step. A block may override the
- *  DTMF/menu wait via `timeoutSeconds`. */
 export function ivrGatherAttributes(
   options: ReadonlyArray<IvrOption>,
   opts?: { timeoutSeconds?: number },
