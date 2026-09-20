@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@f1d19cc3` · 153 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@f2ebd298` · 151 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,15 +15,226 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 0
+## Fix now — 17
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
-_None._
+### [#1885](https://github.com/chester-hill-solutions/callcaster/issues/1885) Rewrite Supabase-auth RPCs, then drop the legacy auth schema
+- Verdict: **Fix now** · Size: M-L · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **Rewrite the two live auth.uid() RPCs, drop get_outreach_attempts, then drop schema auth**
+- Not a Supabase dependency: the only auth survivors are our own shim. auth.uid() is defined by drizzle/0001_auth_uid_shim.sql; auth.jwt() has no shim, so get_outreach_attempts is dead. The only live RPCs using auth.uid() are select_and_update_campaign_contacts and update_user_workspace_last_access_time, both called inside withAppCurrentUser. No code has shipped.
+- Current behavior: Public RPCs still reference auth.uid()/auth.jwt(); schema auth cannot be dropped. get_outreach_attempts is dead.
+- Root cause: Legacy Supabase-era definitions survive in the Drizzle baseline and the auth.uid() shim was never rewritten onto the v2 app.current_user_id identity.
+- Resolution: Chunk 1: migration dropping public.get_outreach_attempts, remove its KEEP entry, wire into both bootstrap step lists. Chunk 2: rewrite the two RPCs to nullif(current_setting('app.current_user_id', true), '')::uuid. Chunk 3: fail-closed guard raising while any non-auth function or public policy still matches auth., then DROP SCHEMA IF EXISTS auth CASCADE. Retire or guard drizzle/0001_auth_uid_shim.sql.
+- Look in: `app/lib/db-rpc.server.ts`, `drizzle/0001_auth_uid_shim.sql`, `drizzle/0000_baseline.sql`, `client/migrations/20260807130000_manual_dial_claim_attempt_count.sql`, `client/migrations/20260715140000_drop_legacy_rls.sql`, `scripts/db/check-db-orphans.mjs`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`
+- Existing tests: test/queue-rpc-contract.test.ts; test/db-rpc-claim-queue-entry.test.ts; test/db-rpc-outreach-attempt.test.ts; test/atomic-manual-dial-claims.integration.test.ts
+- Missing tests: test/legacy-auth-sql-guard.test.ts - latest CREATE OR REPLACE per public function has no auth.uid()/auth.jwt(); test/integration-db/manual-dial-claim-actor.test.ts - claim RPC assigns the withAppCurrentUser actor; test/queue-rpc-contract.test.ts latest-definition resolver must pick the new migration
+- Done when: No public function or policy references auth.*; The two RPC flows still pass their tests; DROP SCHEMA auth succeeds on dev, then prod; A fresh bootstrap does not recreate auth.uid()
+- Tracker: Keep in Fix now, split into the three PR-sized chunks. Run the zero-auth.* dependency query on prod before the drop and keep the rewrite and the drop in separate releases.
+
+### [#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842) IVR audio takes ~7s to start after answer (synchronous AMD suspected)
+- Verdict: **Fix now** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **IVR first audio: remove the flow-entry redirect and serve WAV prompts**
+- Re-scoped from synchronous AMD to the gather/first-audio path. Remaining on dev: the flow entry returns only a Redirect, so the block route re-runs findCallBySid + fetchCampaignWithScript before any prompt, and every IVR prompt is mono MP3. No PR yet; measurement is required.
+- Current behavior: Time-to-first-audio about 7s: first audio waits on two server round-trips and an MP3 prompt Twilio transcodes.
+- Root cause: The flow entry returns a Redirect before rendering any prompt, and the prompt library only stores MP3.
+- Resolution: PR1: extract the shared block renderer into app/lib/ivr-block-runtime.server.ts and render the first block inline from the outbound and inbound page routes. PR2: add a WAV transcode in app/lib/audio.server.ts, an ivr-wav/ object path + signed URL, backfill existing prompts, then point playback at WAV. Instrument answer->flowEntry and flowEntry->firstBlock timestamps; target under 2s.
+- Look in: `app/routes/api+/ivr/$campaignId/$pageId.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId.action.server.ts`, `app/lib/audio.server.ts`, `app/lib/audio-upload.ts`, `app/lib/object-storage.server.ts`, `app/lib/platform-media.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/campaign-test-call.server.ts`
+- Existing tests: test/ivr-page.route.test.ts; test/ivr-block.route.test.ts; test/audio.server.test.ts; test/campaign-ivr-dispatch.test.ts; test/campaign-test-call.test.ts
+- Missing tests: page route returns inline first-block TwiML with no Redirect; signed prompt path is ivr-wav/*.wav; WAV transcode args; a WAV failure does not fail the MP3 write; machine branches unchanged
+- Done when: Time-to-first-audio measured before/after with numbers recorded; Under 2s on the human path; No redirect hop; the first block is rendered from the flow entry; IVR prompts served as WAV without breaking legacy objects; Machine-detection behaviour unchanged
+- Tracker: Fix now, split into PR1 (redirect removal) and PR2 (WAV + backfill). If measurement shows AMD dominates, open a separate IVR AMD-conditioning ticket (cf. #1845).
+
+### [#1873](https://github.com/chester-hill-solutions/callcaster/issues/1873) record every call and IVR
+- Verdict: **Fix now** · Size: L · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
+- Recommended title: **feat(recording): record live and IVR calls under a workspace policy**
+- The recording + transcript pipeline already exists for agent calls (record:'record-from-answer' + /api/recording -> Railway Bucket -> ElevenLabs Scribe per ADR-0029). IVR dispatch and test-call never set record; predictive dialing does not either. Consent model recorded in the issue comment.
+- Current behavior: campaign-ivr-dispatch.server.ts:241 and campaign-test-call.server.ts:105 create calls with no record/recordingStatusCallback; auto-dial.server.ts createTwilioCall also omits record. Manual live paths record.
+- Root cause: Recording is wired per call-creation site, and the IVR/predictive creators were never wired; there is no workspace policy to gate or disclose recording.
+- Resolution: Add workspace recording policy (allowed + disclosure text) and a campaign opt-in; set record:'record-from-answer' with recordingStatusCallback/Event on the IVR dispatch, test-call, and predictive paths; play the disclosure before the menu when set; reuse /api/recording and the ADR-0029 pipeline.
+- Look in: `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/lib/auto-dial.server.ts`, `app/routes/api+/recording.action.server.ts`, `app/lib/call-recording-storage.server.ts`, `app/db/schema.ts`, `docs/adr/0029-post-call-golden-transcript-cohere-batch-worker.md`
+- Existing tests: test/recording.route.test.ts; test/call-recording-storage.server.test.ts; test/campaign-ivr-dispatch.test.ts; test/campaign-test-call.test.ts
+- Missing tests: IVR and test-call calls.create include record + callback; disclosure plays before the first menu when configured; policy off means no record; policy on + campaign opt-in records and enqueues transcription
+- Done when: Every live and IVR call records when the workspace policy allows and the campaign opts in; The disclosure message plays before the menu when set; No recording when the policy disallows it; Recording flows into the existing bucket + transcript pipeline
+- Tracker: Fix now, but likely split: (1) workspace recording policy + campaign opt-in, (2) IVR/predictive record wiring + disclosure. Confirm jurisdiction gating and policy storage before coding.
+
+### [#1883](https://github.com/chester-hill-solutions/callcaster/issues/1883) IVR step: configurable no-input handling (wait length + reroute/replay)
+- Verdict: **Fix now** · Size: M-L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
+- The runtime half shipped on dev in PR #1937 (e79644b9): per-step gather timeout plus hangup/replay/route with a 2-replay cap. The PR deferred the script-editor panel and the inbound IVR mirror, so the feature is not authorable and not applied inbound.
+- Current behavior: IvrBlock carries gatherTimeoutSeconds and noInput; appendBlockResponse honours the timeout and the outbound response route branches on resolveNoInputTarget. Nothing writes those fields (no editor control) and the inbound response route has no noInput/timeout handling.
+- Root cause: PR #1937 kept the editor panel and inbound twin out to stay atomic; the wire fields have no producer.
+- Resolution: Add the script-editor no-input panel (wait length + action select + conditional target) writing the block fields, mirror the branching into the inbound response route with its own replay store and cap, add editor/inbound route tests. Fold #1843 into this issue or close it as duplicate.
+- Look in: `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-gather.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/components/campaign/settings/script/ScriptBlockEditor.tsx`, `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/ivr-script-editor.ts`
+- Existing tests: test/ivr-block-runtime.test.ts; test/ivr-gather.test.ts
+- Missing tests: Editor emits wait/no-input controls; Inbound response route no-input branches and replay cap
+- Done when: A step can wait longer than the default and, on no input, replay or route instead of just advancing; Defaults are unchanged for steps that do not configure it
+- Tracker: Fix now. Runtime + outbound are dev-only in PR #1937; finish the editor panel and inbound mirror (or fold #1843 in).
+
+### [#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884) IVR editor: expose an explicit Hang up routing target and a guaranteed terminal hangup
+- Verdict: **Fix now** · Size: M-L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **IVR: guarantee a terminal hangup (handle next:"end", validate dangling targets and cycles)**
+- 'Hang up' is already an editor routing target. The real remaining ask is the terminal-hangup guarantee: handleNextStep treats only 'hangup' as terminal; next:"end" redirects, a dangling target falls back to pageIds[0], and validateDocument only checks startPageId and missing blocks.
+- Current behavior: A script can route to "end" or a dangling target and be redirected instead of hanging up; routing cycles are undetected; the editor shows no validation warning.
+- Root cause: The runtime parses next as an opaque string with no terminal/validation contract.
+- Resolution: Treat 'hangup' and 'end' as terminal in handleNextStep and the inbound renderer; hang up instead of redirecting when the page/block does not exist; add app/lib/ivr-script-validation.ts (edge graph + DFS) surfaced in ScriptEditorShell.tsx and wired into validateScriptSteps; add a script_routing_invalid readiness code that blocks launch.
+- Look in: `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts`, `app/components/campaign/settings/script/ScriptBlockEditor.routing.ts`, `app/components/campaign/settings/script/ScriptEditorShell.tsx`, `app/lib/call-script-service.ts`, `vendor/scriptkit/scriptkit-call-script-core/src/parse.ts`, `docs/script-json-format.md`
+- Existing tests: test/ivr-block-response.route.test.ts; test/ivr-block.route.test.ts; test/inbound-ivr-block-response.route.test.ts; test/ui/script-block-editor-ivr.test.tsx; vendor/scriptkit test/script-editor.test.ts
+- Missing tests: ivr-script-routing-validation: dangling target, A->B->A cycle, hangup/end ok, linear end ok; route tests: next:"end" renders <Hangup/>, dangling renders <Hangup/>, last-block fallthrough renders <Hangup/>; editor shell test shows the validation error for a cyclic script
+- Done when: An author can choose Hang up as an option's next step (already true); A published script always has a terminal hangup; next:"end" and "hangup" are both terminal at runtime; Dangling targets and reachable cycles fail validation and block launch
+- Tracker: Fix now; confirm the already-present 'expose Hang up' half with the reporter, then split runtime safety from editor/launch validation if the PR grows.
+
+### [#1886](https://github.com/chester-hill-solutions/callcaster/issues/1886) Run db:schema:check per deployed environment (DB-backed gate)
+- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-09-19
+- scripts/db/check-schema-drift.mjs (db:schema:check) compares app-required tables/columns/functions/enum values against the live DB, but nothing invokes it: absent from ci:local and from .github/workflows/ledger-drift-check.yml. It also lacks --require-db. No PR exists.
+- Current behavior: Running the script with no DATABASE_URL prints a message and exits 2; no workflow runs it. A deployed environment missing a required object is not caught.
+- Root cause: The checker was added as a tool but never connected to a DB-backed per-environment gate.
+- Resolution: Add --require-db (or SCHEMA_CHECK_REQUIRE_DB=1) to scripts/db/check-schema-drift.mjs mirroring check-migration-ledger.mjs so a missing URL exits 1; add a --require-db step after each ledger step in ledger-drift-check.yml; extend push paths; factor flag/URL resolution into a pure helper in scripts/lib/app-db-objects.mjs and unit-test it. Type parity is a follow-up.
+- Look in: `scripts/db/check-schema-drift.mjs`, `scripts/db/check-migration-ledger.mjs`, `.github/workflows/ledger-drift-check.yml`, `scripts/lib/app-db-objects.mjs`, `test/schema-drift-enums.test.ts`
+- Existing tests: test/schema-drift-enums.test.ts
+- Missing tests: Shared arg/URL resolver: flag + no URL => exit 1; no flag + no URL => exit 2; URL present => the URL
+- Done when: A deployed environment missing a required object fails the workflow.; A missing DATABASE_URL fails the workflow rather than no-op passing.; Push path filters include the schema files and the checker.
+- Tracker: Fix now per the accepted grilling decision (existence gate first, type parity deferred).
+
+### [#1844](https://github.com/chester-hill-solutions/callcaster/issues/1844) Call History LIsten In feature sends you to twilio
+- Verdict: **Fix now** · Size: S-M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-18
+- Recommended title: **Play call recordings in-app instead of linking to the Twilio recording URL**
+- The Call History 'Listen' link opens call.recording_url, a Twilio API mp3 URL that sends the user to Twilio; recordings are already copied to object storage as call.audio_url.
+- Current behavior: CallLogTable renders an <a href={recordingUrl}>Listen when recording_url is set. app/lib/call-log.server.ts selects call.recording_url. runRecordingSideEffects already persists recordings to object storage (call.audio_url).
+- Root cause: Call History reads the raw Twilio recording_url and links out to it instead of serving the stored call.audio_url.
+- Resolution: Select call.audio_url in app/lib/call-log.server.ts and mint a signed object-storage URL (createSignedObjectUrls, as the voicemails loader does), preferring it for the Listen action; render an in-app player and keep a clear fallback when no persisted copy exists.
+- Look in: `app/lib/call-log.server.ts`, `app/components/calls/CallLogTable.tsx`, `app/lib/call-recording-storage.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/platform-media.server.ts`, `app/lib/object-storage.server.ts`
+- Existing tests: test/call-log.test.ts
+- Missing tests: Loader returns a non-Twilio playback URL for a call with audio_url; CallLogTable renders the in-app player and no external Twilio link
+- Done when: Listen plays the recording without leaving CallCaster or opening Twilio; Works for a call whose recording was persisted to storage; A clear message when no recording copy exists; Tenant scoping is preserved
+- Tracker: Confirmed defect with a clear path; recordings are already persisted server-side.
+
+### [#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875) Improve IVR speech capture: hints, valid speech model, confidence, intent matching
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **IVR: store speech answers as { value, raw, inputType } (slice B)**
+- Slice A shipped on dev in PR #1876 (642f4ee7, not in master). Slice B has not shipped: ivr-webhook-auth.server.ts returns only a bare userInput and never reads Confidence; ivr-results.ts normalizeAnswer returns a bare string. Confidence is deferred to #1880, so slice B is the { value, raw, inputType } shape only.
+- Current behavior: outreach_attempt.result stores a bare transcript string; readers unwrap only strings; Twilio Confidence is discarded.
+- Root cause: The response parser collapses Digits/SpeechResult into one string and drops Confidence.
+- Resolution: Add IvrStoredAnswer + isIvrStoredAnswer + ivrAnswerValue to app/lib/ivr-results.ts; parse Confidence in ivr-webhook-auth.server.ts; store answer in the outbound response route; unwrap to .value in outreach-typed-fields.server.ts and campaign-export.server.ts; keep readers accepting the legacy bare string.
+- Look in: `app/lib/ivr-results.ts`, `app/lib/ivr-webhook-auth.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/lib/outreach-typed-fields.server.ts`, `app/lib/campaign-export.server.ts`, `app/components/campaign/home/CampaignHomeScreen/ResultsScreen.IvrResponses.tsx`
+- Existing tests: test/ivr-gather.test.ts; test/ivr-block-response.route.test.ts; test/inbound-ivr-block-response.route.test.ts; test/ivr-results.test.ts
+- Missing tests: ivr-webhook-auth: digits yields DTMF with no confidence; speech yields the transcript; ivr-results aggregation over the object shape and mixed legacy/new merge; outreach-typed-fields unwraps the object shape; campaign export CSV cell is the value, not [object Object]
+- Done when: A vx-any step stores { value, raw, inputType }; Legacy bare strings and new objects both aggregate; Typed fields and CSV export resolve the value; Confidence capture is deferred to #1880
+- Tracker: Fix now as slice B in one PR. Keep confidence, intent matching and per-campaign language with #1880 and the #268 epic.
+
+### [#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845) Live campaign calls keep synchronous AMD latency when voicemail drop is off
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **fix(dial): drop synchronous AMD from manual/power dials; keep it predictive-only**
+- Manual call-creation paths still send machineDetection:'Enable', so an answered manual call waits for the AMD verdict. Decision couples AMD to dial mode: predictive keeps it, manual/power turns it off and uses the agent's Audio Drop button. IVR keeps AMD (see #1842/#1864).
+- Current behavior: machineDetection:'Enable' at call.action.server.ts:108 and dial/$number.action.server.ts:73; auto-dial.server.ts:63 keeps it. test/api-call.route.test.ts:180 asserts machineDetection="Enable".
+- Root cause: AMD was added unconditionally to support auto voicemail drop; on manual/power calls an agent is already on the line.
+- Resolution: Remove machineDetection (and any AMD-callback wiring) from call.action.server.ts and dial/$number.action.server.ts; keep it in auto-dial.server.ts. Confirm the Audio Drop control stays visible when voicedrop_audio is set. Update the api-call test and add a regression that auto-dial still sets it.
+- Look in: `app/routes/api+/call.action.server.ts`, `app/routes/api+/dial/$number.action.server.ts`, `app/lib/auto-dial.server.ts`, `app/routes/api+/dial/status.action.server.ts`, `app/components/call/CallScreen.CallArea.tsx`
+- Existing tests: test/api-call.route.test.ts; test/dial-number.route.test.ts; test/dial-status.route.test.ts; test/auto-dial.server.test.ts
+- Missing tests: manual routes emit no machineDetection; auto-dial still emits machineDetection; Audio Drop still works on manual/power calls
+- Done when: A manual/power call reaches audio immediately with no AMD wait; Predictive dialing still drops or hangs up on a detected machine; A drop-enabled campaign still plays the voicemail when an agent drops it
+- Tracker: Fix now; decision recorded. IVR stays AMD-on per #1842/#1864; #1839 toggle is the Setup layer.
+
+### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface the caller audio selection on the /call welcome dialog (on join)
+- Verdict: **Fix now** · Size: M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **Surface and select the caller audio on the /call welcome dialog**
+- The welcome dialog receives voicemail_file as a boolean and only describes the drop in prose. Wants the dialog to show the actual caller audio (machine drop campaign.voicemail_file and agent voice drop campaign.voicedrop_audio) and let the agent change it. Grilling decision: session-only, no campaign write.
+- Current behavior: CallScreen.Dialogs.tsx renders prose keyed on a voicemail_file boolean; CallScreen.Layout.tsx:495 passes Boolean(campaign.voicemail_file). Audio Drop posts to /api/audiodrop, which loads campaign.voicedrop_audio server-side; no session override.
+- Root cause: The call-loader/Dialogs contract carries booleans and prose only; /api/audiodrop has no override parameter.
+- Resolution: Pass campaign voicemail_file and voicedrop_audio strings plus the workspace audio library into the call loader and Dialogs; render the caller audio with a picker; hold the choice in call-screen session state and send it with /api/audiodrop (validate against the workspace library); keep the Setup default.
+- Look in: `app/components/call/CallScreen.Dialogs.tsx`, `app/components/call/CallScreen.Layout.tsx`, `app/components/call/CallScreen.CallArea.tsx`, `app/hooks/call/useCallScreen.ts`, `app/routes/workspaces+/$id/campaigns/$campaign_id/call.loader.server.ts`, `app/routes/api+/audiodrop.action.server.ts`
+- Existing tests: test/ui/call-screen-dialogs.test.tsx; test/ui/call-screen-callarea.test.tsx; test/audiodrop.test.ts
+- Missing tests: dialog shows the configured caller audio name; changing it updates the session value; audiodrop POST carries the session override; default matches the campaign config and no campaign row is written
+- Done when: The welcome dialog surfaces the caller audio (name and a way to change it); What is surfaced matches what the dialer actually plays; The choice is session-only and does not write the campaign config
+- Tracker: Fix now; session-only per the recorded decision. Relates to #1839 and #1708.
+
+### [#1936](https://github.com/chester-hill-solutions/callcaster/issues/1936) Comment policy: comments must carry information (no-useless-comments rule)
+- Verdict: **Fix now** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Add a local ESLint rule callcaster/no-useless-comments (error) rejecting issue/PR-number-only and punctuation-only comments, sweep the ~20 existing offenders, and document the rule. Not implemented.
+- Current behavior: eslint.config.mjs only wires upstream plugins; there is no local rule infrastructure and no no-useless-comments rule.
+- Root cause: Comment hygiene is unenforced; a number or a punctuation banner passes lint.
+- Resolution: Define the rule (inline plugin object in eslint.config.mjs, or a small local-rules module), set it to error, fix the offenders, add rule unit tests, and document the intent.
+- Look in: `eslint.config.mjs`, `package.json`, `app/`, `test/`
+- Missing tests: Rule unit tests: number-only comment fails, punctuation-only comment fails, informative comment passes
+- Done when: Issue/PR-number-only comments are lint errors; Punctuation-only comments are lint errors; Existing offenders are zero; Rule intent is documented
+- Tracker: Fix now as one atomic PR (rule + zero-offender sweep + rule tests).
+
+### [#1847](https://github.com/chester-hill-solutions/callcaster/issues/1847) Call list mapping should allow you to drop columns if you don't want the clutter instead of just custom fields
+- Verdict: **Fix now** · Size: S-M · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-18
+- Recommended title: **Add a 'Do not import' mapping option so columns can be dropped**
+- The CSV mapping forces every column to a target and defaults unknown columns to Custom field; users want to drop unwanted columns instead of importing them as custom fields.
+- Current behavior: Every CSV header maps to a ContactImportTarget (unknown headers default to other_data / Custom field). The Map CSV Headers select offers no ignore/drop option.
+- Root cause: CONTACT_IMPORT_TARGETS has no ignore/drop target, and the mapping, validation, and import paths assume every column is imported.
+- Resolution: Add an 'ignore' / 'Do not import' option: offer it in the Map CSV Headers select, exclude it from other_data, exclude it from duplicate-target validation, and skip it in processAudienceUpload. Leave the Data Preview unchanged.
+- Look in: `shared/contact-import-headers.ts`, `app/components/audience/AudienceUploadMapStep.tsx`, `app/components/audience/audience-upload-csv.ts`, `app/components/audience/AudienceUploader.tsx`, `app/lib/audience-upload-process.server.ts`
+- Existing tests: test/contact-import-headers.test.ts; test/ui/audience-uploader.test.tsx; test/audience-upload-parsing.test.ts
+- Missing tests: A column mapped to ignore passes validation and is absent from imported contacts; Ignore is not counted as a duplicate target
+- Done when: A mapping option drops a column; Dropped columns are not written to other_data; Dropped columns do not create duplicate-target errors; Phone and name validation behaviour is unchanged
+- Tracker: Well-scoped UX feature; add the ignore target end to end and test the import exclusion.
+
+### [#1833](https://github.com/chester-hill-solutions/callcaster/issues/1833) Primary button hover needs the hover mouse
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-09-18
+- Recommended title: **fix(ui): pointer cursor on shared Button + guard raw <button> usage**
+- Primary buttons show the arrow cursor because neither shad-cc's buttonVariants nor the local wrapper declares a cursor. The fix already exists on branch origin/bug/1833-primary-button-cursor (1a99dc44): default cursor-pointer with disabled/aria-disabled cursor-default plus test updates.
+- Current behavior: app/components/ui/button.tsx sets no cursor; the underlying shad-cc buttonVariants base class also has none. The reported onboarding 'Save & continue' uses the shared Button. A large raw-<button> inventory bypasses the shared component.
+- Root cause: Base button styles never declared a cursor; some controls bypass the shared Button.
+- Resolution: Land the existing branch/PR (cursor-pointer default + disabled/aria-disabled handling + button.smoke assertions). Then migrate the raw-<button> call sites from the issue inventory in focused groups and add a guard. Treat the inventory as follow-up tickets.
+- Look in: `app/components/ui/button.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx`, `test/ui/button.smoke.test.tsx`
+- Existing tests: test/ui/button.smoke.test.tsx
+- Missing tests: default class includes cursor-pointer; disabled and aria-disabled use cursor-default; guard against new raw <button> usages
+- Done when: Interactive shared buttons show the pointer cursor by default; Disabled buttons show the default cursor; The reported onboarding save/continue instance is fixed; A guard prevents recurrence
+- Tracker: Branch origin/bug/1833-primary-button-cursor (1a99dc44) is ready but unmerged; open a PR. File the raw-button inventory migration as follow-up tickets.
+
+### [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846) Phone number verification pending doesn't switch to verified from onboarding steps
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-09-18
+- Recommended title: **Pass the live caller-ID verification status to the onboarding verification sheet**
+- From onboarding the verification sheet keeps showing 'Verification pending' after the number is verified; Settings shows 'Number verified' because it passes the live status.
+- Current behavior: OnboardingFirstNumberStep renders CallerIdVerificationDialog without a status prop, so the sheet defaults to pending. Settings passes status derived from capabilities.verification_status.
+- Root cause: The live-status wiring added for Settings (#1740) was never added to the onboarding render.
+- Resolution: Compute the live verification status from callerIdNumbers and pass it to CallerIdVerificationDialog in OnboardingFirstNumberStep, mirroring settings/numbers.route.tsx.
+- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx`, `app/routes/workspaces+/$id/settings/numbers.route.tsx`, `app/components/phone-numbers/CallerIdVerificationDialog.tsx`
+- Existing tests: test/ui/caller-id-verification-dialog.test.tsx; test/ui/onboarding-first-number-flow.test.tsx
+- Missing tests: Onboarding dialog shows 'Number verified' after the number's verification_status flips to success
+- Done when: Completing verification from onboarding flips the sheet to 'Number verified' with no reload; A failed verification still shows 'Verification failed'; Settings behaviour is unchanged
+- Tracker: Exact fix: pass the live status the way Settings already does.
+
+### [#1896](https://github.com/chester-hill-solutions/callcaster/issues/1896) Design-system linting: ESLint 9 + @shadcn/lint
+- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **Design-system linting: retire the hand-rolled SaveBar token test**
+- Both linter PRs shipped on dev: ESLint 9 flat config in PR #1907 (c5ac39e2) and @shadcn/lint in PR #1908 (f561396f), neither in master. One acceptance item is unmet: the hand-rolled token test test/ui/components-shared-smoke.test.tsx:286 is still present.
+- Current behavior: eslint.config.mjs registers @shadcn/lint; the SaveBar token smoke test still asserts bg-background / not bg-white.
+- Root cause: The migration PRs covered the linter config but did not remove the now-redundant hand-rolled test.
+- Resolution: Delete the 'uses design tokens rather than hardcoded colors' test from test/ui/components-shared-smoke.test.tsx and confirm check:lint-ratchet and the ratchet baseline are unchanged. Keep the component-variant tests.
+- Look in: `test/ui/components-shared-smoke.test.tsx`, `eslint.config.mjs`, `scripts/check-lint-ratchet.mjs`, `scripts/baselines/lint-ratchet.json`
+- Existing tests: test/ui/components-shared-smoke.test.tsx (remove line 286)
+- Done when: ESLint 9 runs the same rule set with the ratchet baseline unchanged or lower (done on dev); @shadcn/lint rules enabled and ratcheted (done on dev); The hand-rolled token test is removed (outstanding)
+- Tracker: Fix now (delete the obsolete test), then close. The linter migration reaches master on the next release.
+
+### [#1859](https://github.com/chester-hill-solutions/callcaster/issues/1859) Show campaign costs un-collapsed on the Launch page
+- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-18
+- The campaign cost panel is still wrapped in a collapsed <details> labelled 'Campaign cost' in CampaignLaunch.tsx. Remove the fold and render CampaignCostPanel directly.
+- Current behavior: CampaignLaunch.tsx (~449-462) renders <details><summary>Campaign cost</summary><CampaignCostPanel .../></details> when campaignBilling is present.
+- Root cause: The cost panel was placed inside a disclosure widget split out from the #1839 review.
+- Resolution: Render CampaignCostPanel directly (guarded by the existing campaignBilling ternary) and delete the <details>/<summary> wrapper and its inner mt-3 div. Keep the null/absent behaviour when campaignBilling is null.
+- Look in: `app/components/campaign/settings/CampaignLaunch.tsx`
+- Existing tests: test/ui/campaign-launch-review.test.tsx
+- Missing tests: Cost panel is visible on Launch without expanding any disclosure; No cost panel renders when campaignBilling is null
+- Done when: Campaign costs are visible on the Launch page without expanding anything; No 'Campaign cost' details/summary remains; Absent behaviour unchanged when campaignBilling is null
+- Tracker: Standalone UI change; one PR. Update campaign-launch-review.test.tsx to assert the panel is not behind a disclosure.
+
+### [#1830](https://github.com/chester-hill-solutions/callcaster/issues/1830) Tasks for other devs that are blocking movement on an issue should be new tickets, that are set to "blocking" the other issue and correctly assigned. GH agent skills should reflect
+- Verdict: **Fix now** · Size: XS · Risk: low · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
+- Recommended title: **Codify blocking cross-developer tasks as assigned tickets in the GitHub agent skills**
+- Request that work another developer must do to unblock an issue becomes a separate ticket, set to block that issue and assigned to the right person, and that the agent skills say so.
+- Current behavior: github-issues/SKILL.md covers issue types, parent/child decomposition, and the --blocked-by / --blocking flags, but does not require creating a separate assigned ticket when another dev's task blocks an issue.
+- Root cause: The skill documents the mechanics of blocking links but not the policy that blocking work is its own assigned ticket.
+- Resolution: Add a section to .agents/skills/github-issues/SKILL.md stating that blocking cross-developer work is created as a new Task, linked with --blocking <blocked issue> (or --blocked-by on the blocked issue), and assigned with --assignee; include a worked example.
+- Look in: `.agents/skills/github-issues/SKILL.md`, `.agents/skills/github-cli/SKILL.md`, `.agents/skills/github-pull-request/SKILL.md`
+- Done when: The skill states blocking work becomes a separate ticket; The skill shows the blocking link direction and assignment; The example uses --blocking and --assignee correctly
+- Tracker: Small documentation change. Note: the issue body is a copied #1822 PROJECT_TOKEN comment that does not match the title; confirm scope with the reporter before editing.
 
 ---
 
-## Verify and close — 27
+## Verify and close — 60
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -89,6 +300,17 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: No profile-info heading, first name, padding, or Workspace settings link; invitations labelled 'Invitations: N' with a mail-open icon.
 - Tracker: Merged on dev in PR #1949 (7bf76e25); closes on master promotion.
 
+### [#1854](https://github.com/chester-hill-solutions/callcaster/issues/1854) Public API: reject simple_ivr / complex_ivr with a steering error (#1741 follow-up)
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-20
+- The public campaign-creation API now rejects legacy simple_ivr/complex_ivr with a steering error to robocall, and OpenAPI plus docs advertise only the supported types. Shipped on dev in PR #1904 (078c797f).
+- Current behavior: A create request with type simple_ivr/complex_ivr fails validation with '"<value>" is no longer supported; use "robocall" instead'. OpenAPI enums, generated clients and docs list only live_call/robocall.
+- Root cause: The create-with-script schema advertised simple_ivr/complex_ivr and mapped them to the ivr script kind.
+- Resolution: No code work left. Verify the rejection message and docs on the review env, then close when dev is promoted to master.
+- Look in: `app/lib/schemas/api/create-with-script.ts`, `app/lib/create-with-script.server.ts`, `app/lib/campaign-settings.ts`, `app/lib/openapi-integrator.ts`, `docs/api-create-campaign-with-script.md`
+- Existing tests: test/campaigns-create-with-script.route.test.ts; test/openapi.test.ts
+- Done when: A simple_ivr/complex_ivr create request fails with a message directing the caller to robocall; OpenAPI and the public docs list only the supported types
+- Tracker: Verify and close. Dev-only: 078c797f is in origin/dev but not origin/master; close when dev promotes to master.
+
 ### [#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702) IVR Script: Answer label description should be in an on hover tool tip after "Answer Label" not underneath the field
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: @wra-sol · Updated: 2026-09-20
 - Recommended title: **verify-close: IVR Answer label help in a tooltip**
@@ -123,6 +345,194 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/tenant-db.test.ts
 - Done when: No createTenantDb under app/routes/workspaces+; tdb built once per workspace request
 - Tracker: PR #1941 merge 58bea105 is on dev, not yet master.
+
+### [#1938](https://github.com/chester-hill-solutions/callcaster/issues/1938) Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes
+- Verdict: **Verify and close** · Size: L-XL · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-20
+- All three children shipped on dev: middleware builds the scoped tdb once (#1940/PR #1941), the unscoped admin client is banned in app/lib with a ratchet baseline (#1939/PR #1943), and the base db client is ratcheted too (#1942/PR #1944). The epic's acceptance is met on dev.
+- Current behavior: workspaceMiddleware and dataPlaneMiddleware build createTenantDb(workspaceId) once and expose tdb on the route context; workspaces+ routes read context.tdb. scripts/check-unscoped-db-imports.mjs bans @/server/admin-db and @/server/db in app/lib against an 81-entry baseline.
+- Root cause: The scoped-client rule was enforced only in app/routes; app/lib was honor-system.
+- Resolution: No code work left. Verify on the review env that no workspaces+ route constructs createTenantDb and that the unscoped-import guard fails on a probe import, then close when dev is promoted to master.
+- Look in: `app/lib/route-context.server.ts`, `app/lib/workspace-middleware.server.ts`, `app/lib/data-plane-middleware.server.ts`, `app/lib/workspace-route.server.ts`, `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`, `eslint.config.mjs`
+- Existing tests: test/helpers/route-context-mock.ts; test/ci-guard-scripts.test.ts
+- Missing tests: A guard probe that a new app/lib module importing @/server/admin-db fails the run
+- Done when: No route file under app/routes constructs createTenantDb for a plain request-scoped read or write; tdb is built once per workspace request, in middleware; A new app/lib module cannot import @/server/admin-db without adding itself to a ratchet allowlist; npm run ci:local is green
+- Tracker: Verify and close. Children #1939/#1940/#1942 merged to dev (PRs #1943/#1941/#1944) but not master; close the epic when dev promotes to master.
+
+### [#1932](https://github.com/chester-hill-solutions/callcaster/issues/1932) Systemic structural review: PR risk template + coverage gate
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- PR #1935 (93def136) added .github/pull_request_template.md and the review-coverage workflow gate: high-risk paths or a ~500-line diff require a Structural review: marker. Shipped on dev only.
+- Current behavior: Every PR body declares Files touched / Risk class / Structural review; the review-coverage workflow fails a PR that touches app/lib/worker/, app/server/, app/db/ or client/migrations/, or crosses the line cap, without the marker.
+- Root cause: Structural review was an end-of-batch habit, so problems were caught after merge.
+- Resolution: No code work left in-repo. Verify the gate fails an unmarked high-risk PR on the review env, then close when dev is promoted to master.
+- Look in: `.github/pull_request_template.md`, `.github/workflows/review-coverage.yml`, `.github/workflows/pr-issue-reference.yml`
+- Existing tests: Workflow self-validates on its own PR
+- Done when: PR template declares risk surface; Gate fails high-risk PRs without a Structural review: marker; ci:local green
+- Tracker: Verify and close. Dev-only (93def136 not in master); confirm the marker is enforced, then close on promotion.
+
+### [#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874) IVR estimates are too low. projected CPS is too high
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-20
+- The IVR completion estimate is now bounded by voiceConcurrentCallLimit / average in-flight call duration and labelled as completion time. Shipped on dev in PR #1934 (e833d955).
+- Current behavior: campaign-outbound-estimate.ts computes the effective IVR rate as min(configured dispatcher CPS, voiceConcurrentCallLimit / IVR_AVG_CALL_DURATION_SECONDS) and footnote-annotates the concurrent-call bound.
+- Root cause: The projection treated CPS (dial-start rate) as a completion rate while IVR rows are dequeued only at call completion.
+- Resolution: No code work left. Verify a 5000-call IVR projection against the concurrency bound on the review env, then close when dev is promoted to master.
+- Look in: `app/lib/campaign-outbound-estimate.ts`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`, `app/lib/campaign-ivr-dispatch.server.ts`
+- Existing tests: test/campaign-outbound-estimate.test.ts
+- Done when: IVR projection accounts for the concurrent-call bound; Projection is labelled as completion time, not dial time
+- Tracker: Verify and close. Dev-only (e833d955 not in master); close when dev promotes to master.
+
+### [#1931](https://github.com/chester-hill-solutions/callcaster/issues/1931) Ratchet the test echo-shape: expectations that reuse SUT exports
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- PR #1933 (3bfd5210) added scripts/check-test-echo.mjs plus an empty baseline, wired check:test-echo into ci:local, and converted the remaining echo candidates. Shipped on dev only.
+- Current behavior: check:test-echo scans test/ for toBe/toEqual/toContain whose expected argument is an identifier imported from app/ or shared/; scripts/test-echo-baseline.json is {}.
+- Root cause: Assertions could echo SUT exports, so any value the SUT chose would pass.
+- Resolution: No code work left. Re-run npm run check:test-echo on the review env, then close when dev is promoted to master.
+- Look in: `scripts/check-test-echo.mjs`, `scripts/test-echo-baseline.json`, `package.json`, `.github/workflows/ci.yml`
+- Existing tests: test/test-echo-checker.test.ts
+- Done when: check:test-echo reports echo-shaped expectations; Existing occurrences are zero; the count only ratchets down; Both suites stay green
+- Tracker: Verify and close. Dev-only (3bfd5210 not in master); baseline is empty.
+
+### [#1925](https://github.com/chester-hill-solutions/callcaster/issues/1925) Prune tautological tests (echo tests) with kill-verification
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- First tautological-test prune pass shipped on dev in PR #1929 (5ab94de6), pinning echoed constants as literals across five tests with kill-verification. The remaining sweep is tracked by #1931.
+- Current behavior: audience-upload-chunk-delay, campaign-terminology, number-rental, throughput-config, and tts-voices tests now assert literal expectations instead of SUT-derived values.
+- Root cause: Tests whose expectations echoed the implementation stayed green while the behaviour could rot.
+- Resolution: No code work left for this pass. Verify the five converted tests are kill-verified, then close when dev is promoted to master; the wider sweep continues in #1931.
+- Look in: `test/audience-upload-chunk-delay.test.ts`, `test/campaign-terminology.test.ts`, `test/number-rental.test.ts`, `test/throughput-config.server.test.ts`, `test/tts-voices.test.ts`
+- Existing tests: The five converted test files themselves
+- Done when: Each rewritten test is listed with its kill-check outcome in the PR; Both suites stay green; no behaviour coverage is lost
+- Tracker: Verify and close. Dev-only (5ab94de6 not in master); follow-on sweep is #1931.
+
+### [#1924](https://github.com/chester-hill-solutions/callcaster/issues/1924) Effects gate: require @effect-why-not-loader and flag 'none' side-effects
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- PR #1928 (e15dda5b) made @effect-why-not-loader a required tag (or a CANDIDATE-REMOVE marker), extracted the compliance predicate to scripts/lib/effects-lib.mjs, and unit-tested it. Shipped on dev only.
+- Current behavior: scripts/check-effects.mjs fails an effect without @effect-why-not-loader unless it carries the CANDIDATE-REMOVE purpose marker; the 'side-effects: none => CANDIDATE-REMOVE' half was deliberately dropped as overbroad.
+- Root cause: The why-not-loader tag was optional.
+- Resolution: No code work left. Verify check:effects on the review env, then close when dev is promoted to master; docs/effects-strictness.md records why 'none' is not auto-flagged.
+- Look in: `scripts/check-effects.mjs`, `scripts/lib/effects-lib.mjs`, `docs/effects-strictness.md`, `docs/effects-inventory.md`
+- Existing tests: test/effects-compliance.test.ts
+- Done when: Every effect requires a non-empty @effect-why-not-loader or the CANDIDATE-REMOVE marker; Existing effects backfilled; weak ones marked CANDIDATE-REMOVE; docs/effects-strictness.md documents the requirement
+- Tracker: Verify and close. Dev-only (e15dda5b not in master).
+
+### [#1910](https://github.com/chester-hill-solutions/callcaster/issues/1910) Issue board: render unenriched issues in a Needs triage lane
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- PR #1927 (87ecef16) made the board generator render unenriched open issues in a Needs triage lane instead of refusing to write, while still validating existing records. Shipped on dev only.
+- Current behavior: npm run tools:issues:board exits 0 and writes a board that includes every open issue; unenriched issues land in Needs triage. A malformed enriched record still fails the run.
+- Root cause: The generator required an enrichment record for every open issue, so the board could not refresh.
+- Resolution: No code work left. Verify the generator exits 0 and a malformed record still fails on the review env, then close when dev is promoted to master.
+- Look in: `scripts/issue-board-generate.mjs`, `scripts/issue-board-lib.mjs`, `scripts/issue-board-enrichment/`
+- Existing tests: test/issue-board-generator.test.ts
+- Done when: tools:issues:board exits 0 and includes every open issue, unenriched ones in Needs triage; A malformed enriched record still fails the run; The board header reports the Needs-triage count
+- Tracker: Verify and close. Dev-only (87ecef16 not in master).
+
+### [#1897](https://github.com/chester-hill-solutions/callcaster/issues/1897) Guardrails: git hooks + PR issue-reference gate
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **verify-close: git hooks + PR issue-reference gate (shipped to dev in #1921/#1926)**
+- Both halves shipped to dev: a checked-in pre-commit hook wired via core.hooksPath, and a PR-into-dev issue-reference gate. Merged in PR #1921 (23700b0f) and PR #1926 (f416f037). Both are ancestors of origin/dev but NOT of origin/master.
+- Root cause: The repo had no git hooks and no requirement that a PR body reference an issue.
+- Resolution: Verify on dev only: stage a lint error and confirm the pre-commit hook blocks the human commit; open a dev PR without an issue reference and confirm the check is red, then add no-issue and confirm it clears. No new code expected.
+- Look in: `.githooks/pre-commit`, `scripts/setup-githooks.sh`, `package.json`, `.github/workflows/pr-issue-reference.yml`, `.github/workflows/issue-on-dev.yml`
+- Done when: A commit with a lint error is blocked by the pre-commit hook.; A PR into dev with no issue reference fails a check unless labelled no-issue.
+- Tracker: Verify and close after dev verification; promote #1921/#1926 to master first.
+
+### [#1919](https://github.com/chester-hill-solutions/callcaster/issues/1919) Hooks: drop global-barrel exports for single-consumer hooks
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **verify-close: single-consumer hooks dropped from the global barrel (#1920)**
+- app/hooks/index.ts no longer exports useSurveyForm or useCampaignExport; the hooks stay reachable through their sub-barrels. Shipped to dev in PR #1920 (95f084c9); ancestor of origin/dev, NOT of origin/master.
+- Root cause: The #1892 DRY pass widened the global barrel with hooks that have one consumer each.
+- Resolution: Verify on dev: rg the two hook names in app/hooks/index.ts finds no export, and the survey/export tests stay green. No new code expected.
+- Look in: `app/hooks/index.ts`, `app/hooks/surveys/index.ts`, `app/hooks/campaign/index.ts`
+- Existing tests: test/ui/use-survey-form.test.tsx; test/ui/campaign-export-button.test.tsx
+- Done when: The global-barrel exports are dropped; the sub-barrels keep the hooks.; No import breaks.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1918](https://github.com/chester-hill-solutions/callcaster/issues/1918) Queue item relations: return grouped contact maps
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **verify-close: loadQueueItemRelations returns grouped contact maps (#1920)**
+- loadQueueItemRelations in app/lib/campaign-queue-search.server.ts now returns { contactById, attemptsByContactId, audiencesByContactId } and both fetchers consume the same maps. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The helper returned raw arrays, so the page fetcher grouped them while the item fetcher re-filtered them.
+- Resolution: Verify on dev: queue route suites green and both fetchers use the maps. No new code expected.
+- Look in: `app/lib/campaign-queue-search.server.ts`
+- Existing tests: test/campaign-queue.route.test.ts; test/campaign-queue-db.claim.test.ts; test/campaign-settings-queue.route.test.ts
+- Done when: The helper returns grouped-by-contact maps used by both consumers.; The queue suites stay green.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917) Public survey guard: type the extra required fields
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **verify-close: type the public survey guard's extra required fields (#1920)**
+- extraRequiredFields is typed as PublicSurveyRequiredField[] in app/lib/survey-public-action.server.ts. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The shared guard encoded one route's requirement as an untyped string list.
+- Resolution: Verify on dev: survey route suites stay green and the type alias is used. No new code expected.
+- Look in: `app/lib/survey-public-action.server.ts`
+- Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts
+- Done when: extraRequiredFields is typed or the required-field check stays route-local.; Survey route suites stay green.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916) Campaign export hook: stop recreating the poll interval every tick
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **verify-close: campaign export poll keyed on ids only, stops on terminal status (#1920)**
+- useCampaignExport's poll effect depends on [exportId, workspaceIdStr] only and clears its interval on terminal status. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: Keying the interval on exportStatus tore down and restarted the 2s timer on every status change.
+- Resolution: Verify on dev: test/ui/campaign-export-button.test.tsx covers start -> poll -> completed with fake timers. No new code expected.
+- Look in: `app/hooks/campaign/useCampaignExport.ts`, `app/components/campaign/CampaignExportButton.tsx`
+- Existing tests: test/ui/campaign-export-button.test.tsx
+- Done when: The interval is keyed on exportId / workspaceIdStr only; terminal status stops polling.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915) Admin pagination: consolidate onto the canonical TablePagination
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **verify-close: admin pagination consolidated onto TablePagination (#1920)**
+- TablePagination gained optional pageSizeOptions + onPageSizeChange; AdminPagination is deleted and the three admin panels use TablePagination. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The DRY pass extracted a near-duplicate AdminPagination instead of extending the canonical component.
+- Resolution: Verify on dev: rg AdminPagination finds no imports; test/ui/table-pagination-page-size.test.tsx green. Eyeball the three admin panels' pagination. No new code expected.
+- Look in: `app/components/shared/TablePagination.tsx`, `app/components/admin/`, `app/components/queue/QueueTablePagination.tsx`
+- Existing tests: test/ui/table-pagination-page-size.test.tsx
+- Done when: TablePagination gains the page-size select.; AdminPagination is deleted; the three admin panels use TablePagination.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1914](https://github.com/chester-hill-solutions/callcaster/issues/1914) Survey routes: share the fetcher-redirect and error extraction
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **verify-close: survey routes share the fetcher redirect and error extraction (#1920)**
+- app/lib/survey-submit.ts owns SurveySubmitResult, surveySubmitError, and surveySuccessPath; both survey routes import it and render <Navigate>. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The two routes carried ~40 duplicated lines.
+- Resolution: Verify on dev: test/ui/survey-create-edit-redirect.test.tsx green and both routes import from @/lib/survey-submit. No new code expected.
+- Look in: `app/lib/survey-submit.ts`, `app/routes/workspaces+/$id/surveys/new.route.tsx`, `app/routes/workspaces+/$id/surveys/$surveyId/edit.route.tsx`
+- Existing tests: test/ui/survey-create-edit-redirect.test.tsx
+- Done when: A shared helper owns the redirect and error extraction.; Both routes use it.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1913](https://github.com/chester-hill-solutions/callcaster/issues/1913) Decompose SurveyForm into page and question subcomponents
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **verify-close: SurveyForm decomposed into page and question subcomponents (#1920)**
+- SurveyForm.tsx defines SurveyQuestionCard and SurveyPageSection; the top-level SurveyForm function is under the 200-line threshold. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: The file held a 265-line function with everything inline.
+- Resolution: Verify on dev: lint reports no max-lines-per-function warning and survey tests stay green. No new code expected.
+- Look in: `app/components/surveys/SurveyForm.tsx`
+- Existing tests: test/ui/survey-create-edit-redirect.test.tsx; test/ui/use-survey-form.test.tsx
+- Done when: SurveyPageSection and SurveyQuestionCard are extracted.; The top-level function drops under the threshold.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1912](https://github.com/chester-hill-solutions/callcaster/issues/1912) Survey form hook: duplicate page/question ids after a removal
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **verify-close: survey ids derive from the highest suffix, unique after removal (#1920)**
+- useSurveyForm derives new page/question ids from nextSuffix() (highest existing suffix + 1) and a regression test asserts ids stay unique after a middle removal. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: Ids were derived from array.length + 1, which collides after a middle removal.
+- Resolution: Verify on dev: test/ui/use-survey-form.test.tsx includes the uniqueness regression. No new code expected.
+- Look in: `app/hooks/surveys/useSurveyForm.ts`, `test/ui/use-survey-form.test.tsx`
+- Existing tests: test/ui/use-survey-form.test.tsx
+- Done when: New ids derive from the max existing numeric suffix.; A test adds three, removes the middle, adds another, asserts unique ids.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
+
+### [#1911](https://github.com/chester-hill-solutions/callcaster/issues/1911) Survey form hook: collapse the deep-map mutators into index primitives
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **verify-close: useSurveyForm mutators collapsed onto index primitives (#1920)**
+- useSurveyForm routes nested mutations through updatePages/withPage/withQuestions/withQuestion/withOptions/withOption, with generic field setters linking field and value types. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
+- Root cause: Ten hand-written map-replace handlers duplicated index threading and immutability.
+- Resolution: Verify on dev: test/ui/use-survey-form.test.tsx stays green and the primitives are the only traversal. No new code expected.
+- Look in: `app/hooks/surveys/useSurveyForm.ts`
+- Existing tests: test/ui/use-survey-form.test.tsx
+- Missing tests: Type-level assertion that the generic setters reject mismatched field/value pairs
+- Done when: Index primitives own traversal once.; All mutators are expressed through them.; Setters are generic.
+- Tracker: Verify and close after dev verification; promote #1920 to master first.
 
 ### [#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764) "Number" onboarding breadcrumbs missing address step
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
@@ -161,6 +571,30 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: Low-credit email subject and body name the workspace
 - Tracker: PR #1902 merge f081cee8 is on dev, not yet master. Closes on master promotion.
 
+### [#1889](https://github.com/chester-hill-solutions/callcaster/issues/1889) Predictive auto-dial drops a voicemail even when the voicemail drop switch is off
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-19
+- Recommended title: **Verify: predictive auto-dial honours the voicemail-drop switch**
+- Fixed on dev in PR #1901 (16a7abdd, merged 2026-09-19, base dev). NOT in master (origin/master 807cea82), so dev-only until the next release.
+- Current behavior: On dev, the predictive AMD branch reads voicemail_drop_enabled and calls machineAnswerDisposition.
+- Root cause: The AMD branch read campaign.voicemail_file but never campaign.voicemail_drop_enabled.
+- Resolution: No new code. Verify on the review environment, then close when promoted to master.
+- Look in: `app/routes/api+/auto-dial/$roomId.action.server.ts`, `app/lib/telephony-db.server.ts`, `app/lib/ivr-machine.server.ts`
+- Existing tests: test/auto-dial-room.route.test.ts; test/integration-db/call-status-guard.test.ts; test/telephony-db-call-status-guard.test.ts
+- Done when: Predictive + machine + drop off yields No Answer with no audio; Predictive + machine + drop on yields Voicemail with the drop played
+- Tracker: Verify on the review env; close when promoted to master (dev-only today).
+
+### [#1869](https://github.com/chester-hill-solutions/callcaster/issues/1869) Test calls must not change the campaign queue
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-19
+- Recommended title: **Verify: test calls leave the campaign queue untouched**
+- Fixed on dev in PR #1900 (2a2eb281, merged 2026-09-19, base dev). NOT in master, so dev-only.
+- Current behavior: On dev, the dequeue block in webhook-side-effects.server.ts is gated on outreachAttemptId != null.
+- Root cause: The contact-keyed dequeue had no guard on the resolved outreach attempt, so any terminal callback with a contact_id could mutate the queue.
+- Resolution: No new code. Verify on the review environment, then close when promoted to master.
+- Look in: `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/routes/api+/call-status.action.server.ts`
+- Existing tests: test/webhook-side-effects.test.ts
+- Done when: A test call to a queued number leaves queue_state queued, queue_order unchanged, attempts unchanged and dequeued_at null
+- Tracker: Verify on the review env; close when promoted to master (dev-only today).
+
 ### [#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727) Campaign List should be sorted
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
 - Fixed on dev in PR #1899 (9a82cbce): the campaigns list sorts by status group then newest first, via app/lib/campaign-list-order.ts. The open state does not prove the fix is absent.
@@ -169,6 +603,169 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/campaign-list-order.test.ts
 - Done when: Campaign list orders running, waiting, draft, complete, newest first within each group
 - Tracker: PR #1899 merge 9a82cbce is on dev, not yet master. Closes on master promotion.
+
+### [#1894](https://github.com/chester-hill-solutions/callcaster/issues/1894) Pin the test suite to UTC
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **Verify: the test suite is pinned to UTC**
+- Fixed on dev in PR #1898 (4079b7ae, merged 2026-09-19, base dev). NOT in master, so dev-only.
+- Current behavior: On dev, vitest.shared.config.ts:16 sets test env { TZ: "UTC" } for both projects.
+- Root cause: Neither vitest.shared.config.ts nor the setup files set TZ.
+- Resolution: No new code. Verify on the review environment and a non-UTC machine, then close when promoted to master.
+- Look in: `vitest.shared.config.ts`, `test/ui/campaign-launch-eta.test.tsx`, `test/setup.node.ts`, `test/setup.ui.ts`
+- Existing tests: test/ui/campaign-launch-eta.test.tsx
+- Missing tests: optional guard that process.env.TZ === "UTC" inside a test
+- Done when: process.env.TZ === "UTC" in node and ui tests without any per-file pin; The suite passes unchanged on a non-UTC machine
+- Tracker: Verify on the review env; close when promoted to master (dev-only today). Update the AGENTS.md per-file TZ pitfall once confirmed.
+
+### [#1891](https://github.com/chester-hill-solutions/callcaster/issues/1891) Mobile nav sheet lays its links out horizontally instead of stacking them
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **Verify: mobile nav sheet stacks its links vertically**
+- Fixed on dev in PR #1893 (c83ad822, merged 2026-09-19, base dev). NOT in master, so dev-only.
+- Current behavior: On dev, navLinkClass in Navbar.MobileMenu.tsx:37 includes block.
+- Root cause: navLinkClass lacked block, so <NavLink> stayed inline.
+- Resolution: No new code. Verify on the review environment at a narrow viewport, then close when promoted to master.
+- Look in: `app/components/layout/Navbar.MobileMenu.tsx`
+- Existing tests: e2e/specs/marketing-mobile-nav.spec.ts
+- Done when: On a narrow viewport, Home, Docs, Sign In and Sign Up stack one per row; Signed-in account links and the Log Out button stack the same way
+- Tracker: Verify on the review env; close when promoted to master (dev-only today).
+
+### [#1888](https://github.com/chester-hill-solutions/callcaster/issues/1888) IVR: a machine answer with the voicemail drop off should record No Answer, not Voicemail
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **Verify: IVR machine answer with the drop off records No Answer**
+- Fixed on dev in PR #1890 (d07e26b1, merged 2026-09-19, base dev). NOT in master, so dev-only.
+- Current behavior: On dev, machineAnswerDisposition(campaign) returns voicemail only when voicemail_drop_enabled && voicemail_file, otherwise no-answer.
+- Root cause: recordVoicemailAnswer wrote disposition voicemail for every machine answer before deciding whether the drop would play.
+- Resolution: No new code. Verify on the review environment, then close when promoted to master.
+- Look in: `app/lib/ivr-machine.server.ts`, `app/routes/api+/ivr/status.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId.action.server.ts`
+- Existing tests: test/ivr-page.route.test.ts; test/ivr-status.route.test.ts
+- Done when: Drop on + audio records disposition voicemail; Drop off or no audio records disposition no-answer; Results, metrics and exports show No Answer in the second case
+- Tracker: Verify on the review env; close when promoted to master (dev-only today).
+
+### [#1853](https://github.com/chester-hill-solutions/callcaster/issues/1853) Dev: workspace invite insert fails (works on prod)
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
+- Root cause confirmed in comments: workspace_invite.user_id had two FKs, one to legacy auth.users (empty on dev), so every invite insert failed. PR #1887 (c80e59ec) drops both legacy constraints in migration 20260919120000_drop_legacy_auth_users_fks.sql, wired into both bootstrap scripts. Merged on dev only.
+- Current behavior: On dev the dropped constraints are gone; the public.user FK remains. Master still has the legacy auth.users FKs.
+- Root cause: Legacy Supabase auth.users FK on workspace_invite.user_id (and workspace_api_key.created_by).
+- Resolution: Invite a user on the review environment and confirm the insert succeeds; then close when the fix is promoted to master. No further code.
+- Look in: `client/migrations/20260919120000_drop_legacy_auth_users_fks.sql`, `app/lib/invite-user-by-email.server.ts`, `scripts/db/bootstrap-fresh-db.mjs`, `scripts/e2e/bootstrap-compose-db.mjs`
+- Existing tests: test/accept-invite.route.test.ts; test/bootstrap-migrations.server.test.ts
+- Missing tests: schema assertion that no public FK targets auth.users; invite insert succeeds with no legacy FK
+- Done when: Inviting a user to a workspace succeeds on dev; Root schema difference identified and reconciled; No public FK to auth.users remains after migrations
+- Tracker: Verify on review env. Merged on dev in PR #1887 (c80e59ec); close on master promotion.
+
+### [#1877](https://github.com/chester-hill-solutions/callcaster/issues/1877) De-duplicate the IVR runtime (machine policy, block runtime, option type, Setup sections)
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-19
+- PR #1879 (5435f694) landed the behaviour-preserving dedup on dev: one machine policy, one block runtime (ivr-block-runtime.server.ts), one runtime option type (IvrOption), and one Setup voice section. Master does not have it yet.
+- Current behavior: Outbound and inbound block routes are thin adapters over appendBlockResponse; the flow entry and status callback share the machine predicate. Legacy UI types remain only in the Result path.
+- Root cause: Duplicated IVR runtime and Setup shells from the #1855/#1860/#1864/#1856/#1863/#1875 batch.
+- Resolution: Verify IVR keypad and speech flows and the Setup voice settings on the review environment, then close on promotion to master. No new code.
+- Look in: `app/lib/ivr-machine.server.ts`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-gather.server.ts`, `app/components/campaign/settings/basic/CampaignVoiceSettings.tsx`
+- Existing tests: test/ivr-block-runtime.test.ts; test/ivr-block.route.test.ts; test/inbound-ivr-block.route.test.ts; test/ivr-page.route.test.ts; test/ivr-status.route.test.ts; test/ui/campaign-voice-settings.test.tsx
+- Done when: One isMachineAnswered predicate and one machine-disposition write; One shared block-runtime module; routes are thin adapters; One option shape used by the runtime and gather helper; Setup renders one voice-settings section; All existing tests green; no behaviour change
+- Tracker: Merged on dev in PR #1879 (5435f694); closes on master promotion.
+
+### [#1863](https://github.com/chester-hill-solutions/callcaster/issues/1863) Move the remaining dial options (household, dial type) to campaign Setup
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-18
+- Household grouping and dial type were moved to campaign Setup by PR #1870 (2bb79c83, dev only); a later dev refactor (#1879/5435f694) folded the controls into CampaignVoiceSettings on Setup.
+- Current behavior: Setup's CampaignVoiceSettings shows Group by household and Dial Type. CampaignLaunch/CampaignLaunchExtras no longer render a Calling options block.
+- Root cause: Launch held campaign configuration that belongs on Setup.
+- Resolution: Verify on the review env that Setup shows household grouping and dial type and Launch has no Calling options section. Close on master promotion. Do not reimplement; #1879 already merged the duplicate setup sections.
+- Look in: `app/components/campaign/settings/basic/CampaignVoiceSettings.tsx`, `app/components/campaign/settings/CampaignLaunch.tsx`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`
+- Existing tests: test/ui/campaign-voice-settings.test.tsx; e2e/specs/dial-modes.spec.ts
+- Done when: Household grouping and dial type are set on Setup; Launch no longer shows a Calling options section; No behaviour change to the stored values
+- Tracker: PR #1870 merge 2bb79c83 is on dev, not yet master. Closes on master promotion.
+
+### [#1856](https://github.com/chester-hill-solutions/callcaster/issues/1856) IVR advances when the caller speaks on a keypad-only step
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-18
+- Shipped on dev in PR #1872 (725d77df). The shared gather builder now gathers DTMF only unless the block declares a vx-any spoken option (ivrStepGathersSpeech).
+- Current behavior: Keypad-only steps build <Gather input=['dtmf']> (numDigits=1 for single-key menus). Speech is collected only for a vx-any option.
+- Root cause: Every option block gathered input ['dtmf','speech']; any speech longer than two characters advanced the call.
+- Resolution: Verify on the review env that speaking at a DTMF menu waits for a keypress/timeout and an explicit speech step still routes speech. Close on master promotion. Do not reimplement; #1862 is a separate open follow-up.
+- Look in: `app/lib/ivr-gather.server.ts`, `app/lib/ivr-block-runtime.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts`
+- Existing tests: test/ivr-block.route.test.ts; test/inbound-ivr-block.route.test.ts; test/ivr-gather.test.ts
+- Done when: Speaking at a DTMF menu does not advance the call; An explicit speech / vx-any step still captures and routes speech
+- Tracker: PR #1872 merge 725d77df is on dev, not yet master. Closes on master promotion.
+
+### [#1864](https://github.com/chester-hill-solutions/callcaster/issues/1864) Review env: IVR still drops voicemail with the drop off (campaign 109)
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-18
+- Shipped on dev in PR #1867 (5132c4ed). The IVR flow-entry route acts on the synchronous AMD verdict before any IVR audio plays, and the status callback records the same disposition via app/lib/ivr-machine.server.ts.
+- Current behavior: A detected machine is dropped or hung up immediately, never routed into the IVR script. Drop off records no-answer (#1888); drop on records voicemail.
+- Root cause: The IVR flow began serving prompts before Twilio's AMD status callback was processed.
+- Resolution: Verify on the review env that a machine answer with the drop off hangs up and records No Answer, and that the review service runs a commit including #1860/#1867. Close on master promotion. Do not reimplement.
+- Look in: `app/lib/ivr-machine.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId.action.server.ts`, `app/routes/api+/ivr/status.action.server.ts`
+- Existing tests: test/ivr-page.route.test.ts; test/ivr-status.route.test.ts; test/ivr-block-runtime.test.ts
+- Done when: With the drop off and saved, a machine answer hangs up with no voicemail; The review environment runs a commit that includes #1860
+- Tracker: PR #1867 merge 5132c4ed is on dev, not yet master. Closes on master promotion.
+
+### [#1839](https://github.com/chester-hill-solutions/callcaster/issues/1839) Voice campaigns need a voicemail-drop toggle and dedicated voicemail audio on Setup (IVR and live)
+- Verdict: **Verify and close** · Size: L · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-09-18
+- Shipped on dev in PR #1860 (e1339d3d). Added campaign.voicemail_drop_enabled, backfilled true where voicemail_file existed; Setup owns the toggle and Voicemail audio picker; both runtimes gate on the switch; readiness blocks drop-on without audio.
+- Current behavior: Setup's CampaignVoiceSettings shows Voicemail drop plus dedicated voicemail audio. dial/status and ivr-machine only prepare/play the drop when voicemail_drop_enabled && voicemail_file; readiness raises voicemail_audio_required otherwise.
+- Root cause: No explicit voicemail-drop boolean existed and IVR depended on a magic script page titled 'voicemail'.
+- Resolution: Verify on the review env that the toggle and dedicated audio appear on Setup for IVR and live, toggle-off never plays voicemail, and launch is blocked when the toggle is on with no audio. Close on master promotion. Caller-side controls stay in #1708; AMD latency is #1842/#1845.
+- Look in: `app/components/campaign/settings/basic/CampaignVoiceSettings.tsx`, `app/lib/ivr-machine.server.ts`, `app/routes/api+/dial/status.action.server.ts`, `app/lib/campaign-readiness.ts`, `client/migrations/20260918120000_campaign_voicemail_drop_enabled.sql`
+- Existing tests: test/ui/campaign-voice-settings.test.tsx; test/ui/voicemail-setup.test.tsx; test/dial-status.route.test.ts; test/ivr-status.route.test.ts; test/campaign-readiness.test.ts; test/campaign-readiness-actions.test.ts
+- Done when: Setup shows a voicemail-drop toggle and dedicated voicemail audio for IVR and live; Toggle off: a detected machine never plays the voicemail; Toggle on + audio: both campaign types play the chosen audio on a machine; IVR plays the dedicated audio without a script page named voicemail
+- Tracker: PR #1860 merge e1339d3d is on dev, not yet master. Closes on master promotion. #1863 is also on dev.
+
+### [#1841](https://github.com/chester-hill-solutions/callcaster/issues/1841) IVR key press does not interrupt the current audio block (prompt sits outside the Gather)
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-18
+- Shipped on dev in PR #1851 (51240b0b). The prompt now renders inside <Gather> via the shared appendBlockResponse seam, so a keypad press interrupts playback.
+- Current behavior: When a block maps options, the gather is built first and the prompt is rendered into it; a DTMF press follows the mapped branch immediately.
+- Root cause: handleAudio wrote the prompt as a sibling before the sibling <Gather>.
+- Resolution: Verify on the review env that pressing a key during a block prompt stops the prompt and navigates, for outbound and inbound IVR. Close on master promotion. Do not reimplement.
+- Look in: `app/lib/ivr-block-runtime.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts`
+- Existing tests: test/ivr-block.route.test.ts; test/inbound-ivr-block.route.test.ts; test/ivr-block-runtime.test.ts
+- Done when: Pressing a key while a block prompt is playing stops the prompt and navigates; Applies to outbound campaign IVR and inbound IVR
+- Tracker: PR #1851 merge 51240b0b is on dev, not yet master. Closes on master promotion.
+
+### [#1840](https://github.com/chester-hill-solutions/callcaster/issues/1840) IVR test call key press speaks the generic error: response route requires an outreach attempt
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-18
+- Shipped on dev in PR #1850 (2df51d56). The IVR response route now resolves the branch and persists nothing when outreach_attempt_id is null, matching the test-call design from #1653.
+- Current behavior: A key press on a test call with outreach_attempt_id null navigates to the mapped branch and records no result, typed fields, or support-level sync.
+- Root cause: The response handler required an outreach attempt and threw when the id was absent.
+- Resolution: Verify on the review env that pressing a key on an IVR test call navigates and never speaks the generic error. Close on master promotion. Do not reimplement.
+- Look in: `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/lib/campaign-test-call.server.ts`
+- Existing tests: test/ivr-block-response.route.test.ts; test/inbound-ivr-block-response.route.test.ts
+- Done when: Pressing a key on an IVR test call navigates to the mapped branch; The generic error is never spoken for a test call with no outreach attempt
+- Tracker: PR #1850 merge 2df51d56 is on dev, not yet master. Closes on master promotion.
+
+### [#1849](https://github.com/chester-hill-solutions/callcaster/issues/1849) what happens when multiple columns map to the same column in call list upload
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: question, business-logic · Assignee: @wra-sol · Updated: 2026-09-18
+- Working as designed. Duplicate mappings are a blocking validation: validateContactImportMapping flags duplicate-target, AudienceUploadMapStep shows a destructive 'Mapping needs attention' alert, Continue is blocked, and the upload action re-validates server-side. The guard shipped in PR #1063 (7824c824) and is on master.
+- Current behavior: Mapping both 'phone' and 'cell phone' to Phone number shows 'Phone number is assigned to more than one CSV column' and prevents continuing. The server rejects the same mapping independently.
+- Root cause: Not a defect. The issue is a question about intentional designed behaviour.
+- Resolution: Answer the question and confirm the blocking behaviour is intended, then close. If the desired behaviour is to merge two phone columns, that is a new feature.
+- Look in: `shared/contact-import-headers.ts`, `app/components/audience/AudienceUploadMapStep.tsx`, `app/components/audience/AudienceUploader.tsx`, `app/routes/api+/audience-upload.action.server.ts`, `app/lib/audience-upload-process.server.ts`
+- Existing tests: test/contact-import-headers.test.ts
+- Done when: Question answered with the current blocking behaviour; Blocking validation confirmed on master
+- Tracker: Answer and close as working-as-designed (validation from PR #1063 is on master). Open a separate feature ticket only if merging multiple phone columns is wanted.
+
+### [#360](https://github.com/chester-hill-solutions/callcaster/issues/360) sign in and signup pages shouldn't be available to people who are already signed in
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-09-16
+- Recommended title: **Verify the signed-in redirect on /signin and /signup and the home CTA**
+- The sign-in and sign-up loaders already redirect a signed-in visitor to /workspaces, and the landing page shows 'Go to Workspaces' instead of Sign Up. Both are on master.
+- Current behavior: signin.loader.server.ts and signup.loader.server.ts redirect to /workspaces when getSession returns a user. _index renders 'Go to Workspaces' for a signed-in user.
+- Root cause: The original gap was closed by the loader redirects plus the signed-in home CTA (release 807cea82, #1838).
+- Resolution: Verify on the deployed master environment that a signed-in visit to /signin and /signup redirects to /workspaces and that the home CTAs read 'Go to Workspaces'. No new code expected.
+- Look in: `app/routes/signin.loader.server.ts`, `app/routes/signup.loader.server.ts`, `app/routes/_index/index.tsx`, `app/routes/_index/index.loader.server.ts`
+- Existing tests: test/ui/index.route.test.tsx; test/signup.route.test.ts; e2e/specs/auth.spec.ts; e2e/specs/signup-flow.spec.ts
+- Missing tests: Loader test that /signin and /signup redirect to /workspaces when a session exists
+- Done when: Signed-in /signin redirects to /workspaces; Signed-in /signup redirects to /workspaces; The home hero and CTA read 'Go to Workspaces' when signed in
+- Tracker: Released to master (807cea82, #1838). Verify, then close; do not reimplement the redirects.
+
+### [#1824](https://github.com/chester-hill-solutions/callcaster/issues/1824) workspace dropdown sends user to "Something went wrong" page
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: business-logic · Assignee: @sai-sy · Updated: 2026-09-16
+- Recommended title: **Verify the workspace picker runtime-error fix**
+- PR #1825 kept the workspace actions inside the React Aria menu and rendered the pinned All workspaces footer as a plain button, removing the runtime error. The change is on master.
+- Current behavior: The workspace picker's All workspaces footer is a plain <button> with id all-workspaces outside the CommandList/menu.
+- Root cause: A React Aria CommandItem (All workspaces) was rendered outside its required menu context, causing the runtime error.
+- Resolution: Retest on the review environment: open the workspace dropdown, choose a workspace, and choose All workspaces; confirm no error page. Close on master. Do not reimplement.
+- Look in: `app/components/layout/Navbar.tsx`
+- Existing tests: test/ui/navbar-user-menu.test.tsx; test/ui/navbar-credits.test.tsx
+- Missing tests: Workspace-picker regression test (the mocked test was deleted in PR #1825)
+- Done when: Opening the workspace dropdown does not throw; Choosing a workspace navigates to it; All workspaces navigates to /workspaces
+- Tracker: PR #1825's change is present on master (release trunk 807cea82, #1838); verify and close.
 
 ### [#1788](https://github.com/chester-hill-solutions/callcaster/issues/1788) SMS export adds a false skipped row for each sent contact
 - Verdict: **Verify and close** · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-12
@@ -258,17 +855,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Resolution: Verify the canonical duplicate timeline, then correct the closed reason for #1314. Keep the existing closed state and avoid a false completed classification.
 - Look in: `.agents/skills/github-issues/SKILL.md`
 
-### [#1327](https://github.com/chester-hill-solutions/callcaster/issues/1327) chore(scripts): collapse vestigial pageData.campaignDetails nesting
-- **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-08-27
-- Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.
-- Current behavior: Script editor routes consume flattened campaign/script fields; no campaignDetails accessor remains. Sai cannot see this on the stale review env.
-- Root cause: Internal refactor, invisible without a redeploy.
-- Resolution: Verify on dev: rg campaignDetails in app/ has no editor hits, script editor routes render and save (covered by test/ui/script-editor-*.test.tsx), then close.
-- Look in: `app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx`, `app/routes/workspaces+/$id/scripts/`
-- Existing tests: test/ui/script-editor-route.test.tsx; test/ui/script-editor-adapter.test.tsx; test/ui/campaign-script-edit-route.test.tsx
-- Done when: No campaignDetails references in editor code on dev; Editor tests green on dev
-- Tracker: Verification only; no new code.
-
 ### [#1333](https://github.com/chester-hill-solutions/callcaster/issues/1333) I don't think it's helpful to obfuscate the unsubscribe and resubscribe SMS message from the CC side
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux · Assignee: none · Updated: 2026-08-26
 - Recommended title: **test(chats): prove STOP and START text remains visible to operators**
@@ -284,9 +870,22 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 ---
 
-## Needs reproduction — 13
+## Needs reproduction — 14
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
+
+### [#1857](https://github.com/chester-hill-solutions/callcaster/issues/1857) gap between pressing an IVR option and it moving on to the next block is very long ~4 seconds
+- Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-09-19
+- Recommended title: **Instrument and attribute the ~4s IVR option-press to next-block gap**
+- No issue body. The one comment attributes the gap to the flow-entry redirect hop or per-request media render in #1842, but this is the response->block hop after a key press, a path #1842 does not measure.
+- Current behavior: Pressing an option POSTs to response.action (outreach read/write, findNextStep), which redirects; Twilio then calls the block route, which re-fetches call and campaign in series and renders audio.
+- Root cause: Not confirmed. Candidates: the response->block double round-trip, serial findCallBySid + fetchCampaignWithScript, and MP3 transcoding.
+- Resolution: Add structured timing logs at option received, response TwiML returned, next-block request, and first audio. Attribute the gap from real review-env calls, then either fold into #1842 or open a scoped PR. Do not close on the likely-cause comment alone.
+- Look in: `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId.action.server.ts`, `app/lib/ivr-block-runtime.server.ts`
+- Existing tests: test/ivr-block-response.route.test.ts; test/ivr-block.route.test.ts; test/ivr-page.route.test.ts
+- Missing tests: latency attribution from option-press to next-block first audio
+- Done when: Measured option-press -> next-block first-audio, before and after; Chosen fix under 2s without regressing #1842/#1864; Root cause recorded, or folded into #1842 with evidence
+- Tracker: needs-repro: likely shares the per-request render root cause with #1842 but different hop. Measure before merging the tickets.
 
 ### [#1698](https://github.com/chester-hill-solutions/callcaster/issues/1698) every keypress in the "Answer label" field in the script maker unfocuses the input
 - Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
@@ -313,10 +912,16 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1351](https://github.com/chester-hill-solutions/callcaster/issues/1351) SMS Window set to 3:05PM yet estimate says 3pm it'll be done
-- **IN PROGRESS** · Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- Fix #1375 (estimateOutboundCompletion, window-aware) shipped to dev, but Sai 2026-09-09 reports the estimate still tracks wall clock and suggests a cron-interval minimum; claim vs counter-claim needs an on-dev check before coding.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
+- Fix #1375 (e49ce7a1, on master) made the launch-page queue ETA window-aware. Sai's 2026-09-09 counter-claim has not been re-verified, and #1816/#1820 (on master) now pulls a parked dispatch successor forward when the window is edited. The 15-min-cron hypothesis is refuted for SMS: the successor is scheduled at the exact nextOpenAt and the worker polls every 5s; SEND_WINDOW_RETRY_MS=15min applies only to voice 'waiting'.
+- Current behavior: With an in-window campaign the ETA is now+activeSeconds by design; outside the window it projects to the next open. Editing a window to include now wakes the parked successor. Actual first-send latency vs the ETA has not been measured.
+- Root cause: Unproven counter-claim with no timed repro. No 15-min dispatch floor exists on the SMS path.
+- Resolution: Reproduce on master/review env: (1) set a narrow future SMS window and note the ETA; (2) widen it to include now; (3) record the ETA and the actual first-send/completion timestamps. If dispatch still lags, instrument the successor's runAt vs actual execution and decide whether the ETA should add a dispatch-startup floor.
+- Look in: `app/lib/campaign-outbound-estimate.ts`, `app/lib/campaign-dispatch-policy.ts`, `app/lib/campaign-execution.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`, `app/lib/throughput-config.ts`, `app/lib/worker/poll-jobs.server.ts`
+- Existing tests: test/campaign-dispatch-policy.test.ts; test/campaign-outbound-estimate.test.ts
+- Missing tests: SMS ETA with a future window starts at/after the window boundary; rescheduleDispatchAfterWindowEdit pulls a parked successor to now when the window is widened; Timed integration: first-send latency within one poll interval of the ETA
+- Done when: A 3:05 window shows an ETA at/after 3:05; Widening the window to include now makes both the ETA and actual dispatch start within the poll interval; No unexplained wall-clock drift remains
+- Tracker: Needs reproduction. Fix #1375 and #1816/#1820 are on master; re-test the window-expansion scenario before scoping code. Keep paired with #1352.
 
 ### [#1719](https://github.com/chester-hill-solutions/callcaster/issues/1719) messages page should fit within VH
 - Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: design, ux · Assignee: none · Updated: 2026-09-09
@@ -375,7 +980,7 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 32
+## Needs decision — 35
 
 Product, security, or operations decision required before implementation can be scoped.
 
@@ -384,6 +989,18 @@ Product, security, or operations decision required before implementation can be 
 - Parser tolerance of missing braces is intentional legacy support (single-brace bodies) — product decides whether to keep it or lint strict double-brace tags.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
+### [#1880](https://github.com/chester-hill-solutions/callcaster/issues/1880) Roadmap: evaluate Jev (TypeSafe) as the IVR speech-intent service
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent**
+- Roadmap investigation to replace the vx-any catch-all with structured intent routing via Jev's Choice primitive. Open questions: round-trip latency, per-call/step cost, service boundary, transcript-only vs audio input, EN/FR calibration, failure mode, confidence threshold. Its answer decides #1862 and the deferred confidence slice of #1875.
+- Current behavior: vx-any matches any speech longer than 2 characters; no intent classification and no confidence. #1875 slice B stores { value, raw, inputType } only; language defaults en-US.
+- Root cause: No intent-classification layer exists; the choice is between a calibrated service and a local normalizer/matcher.
+- Resolution: Run the evaluation as a spike: benchmark latency and cost per step, test EN/FR calibration, pick a service boundary and fallback, and record a decision with an ADR. Then either open the Jev integration ticket or unblock #1862 as a hand-rolled matcher.
+- Look in: `app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts`, `app/lib/ivr-gather.server.ts`, `app/lib/ivr-webhook-auth.server.ts`, `docs/adr/`
+- Existing tests: test/ivr-gather.test.ts
+- Done when: Latency, cost, bilingual calibration, and failure-mode answers recorded; A decision: adopt Jev or hand-roll, with a named service boundary; #1862 and the #1875 confidence slice unblocked or closed accordingly
+- Tracker: needs-decision/roadmap spike. Keep vx-any as-is until answered; its outcome decides #1862.
 
 ### [#1705](https://github.com/chester-hill-solutions/callcaster/issues/1705) Primary button hover darkening isn't strong enough. should be a bit darker
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-18
@@ -401,6 +1018,19 @@ Product, security, or operations decision required before implementation can be 
 - Done when: Issue comments avoid restating resolved sibling fixes; Agent checks issue state/labels before commenting
 - Tracker: Process decision; overlaps #1813 (on-dev marking) and the agent-skills guidance.
 
+### [#1858](https://github.com/chester-hill-solutions/callcaster/issues/1858) IVR Script Builder Options
+- Verdict: **Needs decision** · Size: XL · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-18
+- Recommended title: **Unify IVR and live script blocks and define prompt, multi-select, input, and end-call semantics**
+- Umbrella request to align the IVR script model with the live-call script model and add block kinds: prompt-only, multi-select with an explicit 'do nothing' default, free input with a stop key, end-call options, and a per-block default go-to.
+- Current behavior: IVR scripts use IvrBlock; live scripts use a separate instruction/multi-select model. There is no prompt-only block, no stop-key input block, no end-call block, and no general per-block default destination beyond noInput.
+- Root cause: Two parallel script models and undefined block semantics.
+- Resolution: Decide the unified block model, the default 'do nothing' behaviour, and stop-key/end-call semantics first; record the decision, then split into tracer-sized tickets (one block kind each).
+- Look in: `app/components/campaign/settings/script/`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-gather.server.ts`, `app/lib/campaign-ivr.server.ts`, `app/db/schema-campaign.ts`
+- Existing tests: test/ivr-block-runtime.test.ts; test/ivr-gather.test.ts; test/ui/script-block-editor-ivr.test.tsx
+- Missing tests: Default go-to when the caller gives no input; Input block stop-key handling; End-call block routes/hangs up as authored
+- Done when: Product decision recorded for the unified block model and defaults; Blocks split into ticket-sized units before implementation; Prompt, multi-select, input, and end-call semantics specified with a default do-nothing path
+- Tracker: Decision first, then split. Related: #1862, #1741. #1856 and #1841 are already fixed on dev and should not be re-done.
+
 ### [#1741](https://github.com/chester-hill-solutions/callcaster/issues/1741) IVR simple vs complex should be a script-side concern, not a campaign type choice
 - Verdict: **Needs decision** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-18
 - Recommended title: **change(ivr): make simple/complex a script property, not a campaign type**
@@ -412,6 +1042,32 @@ Product, security, or operations decision required before implementation can be 
 - Existing tests: test/ui/campaign-* type selection
 - Done when: campaign setup asks IVR once; no behavioural difference to lose
 - Tracker: Product decision first; storage/UI change after.
+
+### [#1852](https://github.com/chester-hill-solutions/callcaster/issues/1852) cleanup .env
+- Verdict: **Needs decision** · Size: L · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-18
+- Recommended title: **cleanup .env: document Twilio env vars and define config-as-code vs layered secrets**
+- Audit and rationalize environment variables. Both TWILIO_APP_SID and TWILIO_AUTH_TOKEN in .env.example are used, but there is no documented policy for config-as-code vs secrets and no layered secret resolution.
+- Current behavior: TWILIO_APP_SID is the TwiML App SID for Voice SDK outbound and is auto-assigned per non-protected environment; TWILIO_AUTH_TOKEN is used for REST calls. Some paths use TWILIO_API_KEY/TWILIO_API_SECRET. No ENVIRONMENT singleton and no .secrets/env.<environment> layering.
+- Root cause: No documented owner/purpose per variable and no agreed boundary between config and secrets.
+- Resolution: Decide the env schema and secret precedence (.env -> .secrets/env.<environment> -> secrets manager), document each variable's purpose and which are secrets, then prune unused/duplicated variables. Prefer an ENVIRONMENT selector over per-value env config.
+- Look in: `.env.example`, `app/lib/env.server.ts`, `app/lib/required-env-keys.mjs`, `app/server/environment-twiml-app.server.ts`, `docs/twilio-runtime-inventory.md`, `docs/local-development.md`, `scripts/railway/`
+- Existing tests: test/env.server.test.ts
+- Missing tests: Env validation / precedence for layered secrets; A guard that fails on an undocumented or unused required key
+- Done when: Every env var has a documented purpose and secret/config classification; Unused or duplicated variables removed; Secret precedence defined and easy to swap to a secrets manager; Non-sensitive config handled as config, not env values
+- Tracker: Decision (secrets/config policy) before edits. Coordinate with #1329. Do not touch the user's live .env.
+
+### [#1848](https://github.com/chester-hill-solutions/callcaster/issues/1848) call list mapping
+- Verdict: **Needs decision** · Size: S · Risk: low · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-18
+- Recommended title: **Decide the default mapping when a full-name and a last-name column both exist**
+- Suggestion to auto-map a full-name column to firstname instead of name when a separate populated surname column exists, so the pair is not blocked by the ambiguous-name rule. The reporter is unsure the heuristic is worth the overhead.
+- Current behavior: suggestContactImportMapping maps a 'Name' header to 'name' and a 'Last name' header to 'surname'; validateContactImportMapping then raises a blocking ambiguous-name issue.
+- Root cause: Auto-mapping has no cross-column heuristic; a full-name column and component-name columns cannot coexist because ambiguous-name is blocking.
+- Resolution: Decide whether to add a heuristic: when one header resolves to 'name' and a different header resolves to 'surname' and the name column's values do not already contain the surname values, default the name column to 'firstname'. If approved, implement in shared/contact-import-headers.ts and cover it with tests.
+- Look in: `shared/contact-import-headers.ts`, `app/components/audience/AudienceUploadMapStep.tsx`, `app/components/audience/AudienceUploader.tsx`
+- Existing tests: test/contact-import-headers.test.ts
+- Missing tests: Name + separate surname data maps to First name + Last name without a blocking issue; Negative case: a name column that already contains the surname keeps the full-name mapping
+- Done when: Decision recorded on whether to add the heuristic; If added, a Name column plus a Last name column with data maps to First name + Last name and is not blocking; Name-only files keep name splitting
+- Tracker: needs-decision: the reporter questions the overhead; confirm the heuristic is wanted before implementing.
 
 ### [#1815](https://github.com/chester-hill-solutions/callcaster/issues/1815) MFA is turned off?
 - Verdict: **Needs decision** · Size: XS · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-13
@@ -516,10 +1172,16 @@ Product, security, or operations decision required before implementation can be 
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728) IVR was marked as complete before the recipient actually received their dial
-- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
-- Campaign completes on queue drain (completeCampaignsDrainedByDequeue) while the dial fires async seconds later — behavior confirmed. What 'complete' means for IVR is a product decision that blocks the fix.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+- Verdict: **Needs decision** · Size: M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
+- Confirmed defect with a product-semantics blocker. IVR dispatch dequeues each queue row immediately after Twilio calls.create (campaign-ivr-dispatch.server.ts:260-264), and completion fires whenever campaign_queue_has_pending_work is false. So once every row is dialled the campaign flips to 'complete' while calls are still ringing. Whether 'complete' means all dials attempted or all calls terminal is a product decision that gates the fix.
+- Current behavior: Campaign status turns 'complete' seconds after launch; the recipient's phone rings afterwards.
+- Root cause: dequeued_at is written at dial time, not at call completion, while completion keys only off pending queue rows and never checks in-flight calls.
+- Resolution: Decide the semantics, then: preferred - treat a campaign as drained only when it has no pending queue rows AND no non-terminal calls; alternative - defer the IVR dequeue to the terminal status callback (larger; needs a timeout sweep). Note the existing test asserts the current buggy behaviour.
+- Look in: `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/ivr-initiate.server.ts`, `app/lib/campaign-queue-completion.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/routes/api+/ivr/status.action.server.ts`, `drizzle/0000_baseline.sql`
+- Existing tests: test/campaign-ivr-dispatch.test.ts; test/campaign-dispatch-worker.test.ts; test/ivr-status.route.test.ts; test/campaign-queue-throughput.integration.test.ts
+- Missing tests: Campaign is not marked complete while it has a non-terminal call; A terminal status callback completes the campaign only after all calls settle; Update/remove the 'dequeues on success' assertion
+- Done when: Campaign status does not read 'complete' while any campaign call is still in flight; Completion happens after the last call reaches a terminal status (or after all dials attempt, if that is the decision); No stalled campaign when a status callback never arrives
+- Tracker: Needs decision: product defines whether IVR 'complete' = all dials attempted or all calls settled. If settled, this becomes fix-now with the completion-gate path.
 
 ### [#1722](https://github.com/chester-hill-solutions/callcaster/issues/1722) What does "kick off" on campaign launch pane do
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-09
@@ -572,12 +1234,6 @@ Product, security, or operations decision required before implementation can be 
 ### [#1699](https://github.com/chester-hill-solutions/callcaster/issues/1699) IVR script refers to the recipient as the "caller" in "caller response"
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
 - Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1697](https://github.com/chester-hill-solutions/callcaster/issues/1697) Overwrite PR #1686 and add workflow to properly set project status
-- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-09
-- PR #1686 already merged (2026-09-09) and working (on-dev label + 'On dev: merged in' comments). Remaining is how the project status should be set (needs ON_DEV_PROJECT_NUMBER/PROJECT_TOKEN config) and whether to keep the label behaviour — ops/product decision, not code.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
@@ -647,9 +1303,127 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 14
+## Blocked / split first — 23
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
+
+### [#1892](https://github.com/chester-hill-solutions/callcaster/issues/1892) DRY pass: de-duplicate the largest copy-paste clones (jscpd)
+- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
+- Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930. The remaining ranked clones are each tracked as an open child issue (#1911-#1919).
+- Current behavior: scripts/dry-baseline.json holds the gate at 178 clones / 1902 duplicated lines (1.28%).
+- Root cause: Copy-paste duplication across the ranked files; each row needs a behaviour-preserving extraction.
+- Resolution: Do not schedule this issue directly. Work the child issues #1911-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.
+- Look in: `scripts/dry-baseline.json`, `scripts/check-dry.mjs`
+- Blocked by: [#1911](https://github.com/chester-hill-solutions/callcaster/issues/1911), [#1912](https://github.com/chester-hill-solutions/callcaster/issues/1912), [#1913](https://github.com/chester-hill-solutions/callcaster/issues/1913), [#1914](https://github.com/chester-hill-solutions/callcaster/issues/1914), [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915), [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916), [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917), [#1918](https://github.com/chester-hill-solutions/callcaster/issues/1918), [#1919](https://github.com/chester-hill-solutions/callcaster/issues/1919)
+- Existing tests: check:dry gate is the acceptance signal
+- Done when: clones/duplicatedLines drop and the baseline is lowered to lock it; One implementation per clone; call sites behave the same
+- Tracker: Umbrella/tracker; do not pick directly. Work the open children #1911-#1919.
+
+### [#268](https://github.com/chester-hill-solutions/callcaster/issues/268) i18n: add proper localization with fr-CA as the first locale
+- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-19
+- Recommended title: **i18n epic: fr-CA as the first locale (6 slices, one PR each)**
+- Multi-PR epic reviving #268. Decisions recorded (React Aria I18nProvider + @react-aria/i18n; react-i18next + remix-i18next JSON catalogs; per-user locale with workspace default en-CA; per-campaign campaign.language; explicit /fr/* marketing routes; sign-in as slice 1). Nothing is implemented.
+- Current behavior: English-only app with locale-naive formatting and no locale column on user, workspace or campaign.
+- Root cause: No i18n framework or locale resolution was ever added.
+- Resolution: Run the six published slices as separate PRs, starting with foundation + sign-in. Split them into child issues so each lands independently.
+- Look in: `app/root.tsx`, `app/lib/types.ts`, `app/lib/tts-voices.ts`, `app/routes.ts`, `package.json`, `app/lib/low-credit-notify.server.ts`, `app/lib/billing-reconciliation-alert.server.ts`, `app/lib/send-reset-password-email.server.ts`
+- Missing tests: catalog parity - every key present in every locale; locale resolution - user pref, then workspace default, then en-CA; /fr/* routes and hreflang; ICU plural handling for French
+- Done when: A signed-in operator can switch to French and UI, dates and numbers render in fr-CA; Outbound voice, SMS and email can be French per campaign; A missing-translation check fails CI
+- Tracker: Split first: open six child issues (one per slice) linked to this epic; slice 1 (foundation + sign-in) can start immediately. Do not attempt in one PR.
+
+### [#1862](https://github.com/chester-hill-solutions/callcaster/issues/1862) IVR: fuzzy-match spoken / DTMF input to the script's declared options
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: enhancement, business-logic · Assignee: none · Updated: 2026-09-19
+- Recommended title: **IVR: match spoken/DTMF input to the script's declared options (normalize + fuzzy)**
+- Wants caller input matched to a block's declared options in three tiers: exact value, normalized (digit words, yes/no, case/punctuation), then fuzzy against value+label. The issue comment defers intent matching to #1880 and says to keep this as the concrete spec only if #1880 chooses to hand-roll.
+- Current behavior: findNextStep compares raw strings exactly: optionValue === input || (input.length > 2 && optionValue === 'vx-any'). A caller who says 'one' against '1' misses; no normalization or similarity layer exists.
+- Root cause: The runtime only string-compares Twilio Digits/SpeechResult to option.value.
+- Resolution: Wait for #1880's decision. If a service, this is superseded; if hand-rolled, add a pure matcher module (normalize, then fuzzy against value+label, accept one candidate above threshold, re-prompt on ties). Keep the exact fast path and vx-any.
+- Look in: `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/ivr-gather.server.ts`, `app/lib/ivr-block-runtime.server.ts`
+- Blocked by: [#1880](https://github.com/chester-hill-solutions/callcaster/issues/1880)
+- Existing tests: test/ivr-block-response.route.test.ts
+- Missing tests: one -> 1; press one -> 1; yeah -> yes; ambiguous utterance re-prompts; keypad-only step ignores speech
+- Done when: On a keypad-only step, a spoken digit word maps to the matching option; Ambiguous input re-prompts and never invents an option; Speech / vx-any behaviour unchanged; Exact matches add no latency; Recorded raw userInput stays as-is
+- Tracker: Blocked on #1880 (service vs hand-rolled). Keep as the spec; do not implement until that decision lands.
+
+### [#780](https://github.com/chester-hill-solutions/callcaster/issues/780) Hang up controls/block in IVR script
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
+- Recommended title: **Hang up controls/block in IVR script (parent of #1883 + #1884)**
+- Bundles four asks. Split into #1883 (per-step configurable no-input wait + action; dev, PR #1937) and #1884 (explicit Hang up routing target + guaranteed terminal hangup; open). The runtime already understands next:'hangup' and ends the script with a hangup, so #1884 is editor exposure plus validation.
+- Current behavior: No-input handling exists on dev (#1883). 'Hang up' is selectable in the editor via scriptkit and maps to <Hangup/>; gaps are next:'end' unhandled, dangling targets unvalidated, no guaranteed terminal/cycle check (#1884).
+- Root cause: Parent tracking ticket; the only remaining work is the explicit/validated terminal owned by #1884.
+- Resolution: Keep open until #1884 lands, then close. Do not rebuild the shipped #1883 no-input handling or the working hangup routing.
+- Look in: `app/lib/ivr-block-runtime.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/components/campaign/settings/script/ScriptBlockEditor.routing.ts`
+- Blocked by: [#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884)
+- Existing tests: test/ivr-block-response.route.test.ts; test/ui/script-block-editor-ivr.test.tsx
+- Missing tests: next:'end' is terminal at runtime; dangling page/block target hangs up instead of redirecting; reachable routing cycle is reported/blocked at launch
+- Done when: Hang up is selectable as an option's next step; A published script always ends in a terminal hangup; Configurable no-input wait and reroute (delivered by #1883)
+- Tracker: Parent. #1883 shipped on dev (PR #1937 e79644b9); #1884 open. Close when #1884 lands.
+
+### [#1861](https://github.com/chester-hill-solutions/callcaster/issues/1861) Spike: replace Twilio AMD with a local, faster voicemail classifier
+- Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: enhancement, business-logic · Assignee: none · Updated: 2026-09-18
+- Investigation spike to keep, replace, or front-run Twilio AMD. Acceptance requires measured time-to-first-audio and accuracy on the same call set, which depends on the instrumentation in #1842 and the live AMD scope in #1845.
+- Current behavior: Every outbound path sends synchronous machineDetection: 'Enable'. No async AMD, no local classifier, no shadow mode.
+- Root cause: Synchronous AMD adds seconds of dead air and caps accuracy at Twilio's engine; there is no measured baseline.
+- Resolution: After #1842 instrumentation and #1845 land, run the spike: measure Twilio async AMD and one local/managed option on the same call set, evaluate the media-stream fork limit, write the report and an ADR with the accuracy/latency threshold, then a phased shadow-mode plan.
+- Look in: `app/lib/auto-dial.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/ivr-initiate.server.ts`, `app/routes/api+/dial/status.action.server.ts`, `app/db/schema.ts`, `docs/adr/0030-media-stream-bun-service-third-railway-process.md`, `docs/live-transcription-coaching-plan.md`
+- Blocked by: [#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842), [#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845)
+- Missing tests: Measured time-to-first-audio for sync vs async AMD and a local classifier; Classifier accuracy on human/machine/screening/beep/silence/fax; Media-stream fork/concurrency budget at target volume
+- Done when: Written report with measured latency and accuracy for Twilio async AMD and one local option on the same call set; Recommendation with an accuracy-latency threshold and reconciliation/fallback policy; If replacing: an ADR and a phased plan starting in shadow mode
+- Tracker: Blocked on #1842 instrumentation and #1845. Run as a scoped spike after those land; produce an ADR before any implementation.
+
+### [#1828](https://github.com/chester-hill-solutions/callcaster/issues/1828) PR open qa tests
+- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
+- Recommended title: **QA-environment PR acceptance suite against the smart test audience**
+- Per-PR QA acceptance run: full sign-up through each of the 3 campaign types against the smart test audience, plus unit tests using CallCaster-qa test credentials.
+- Current behavior: PRs run the compose E2E gate and a Twilio test-credential tier, but there is no QA-environment full-flow suite against a CallCaster-qa account.
+- Root cause: There is no dedicated CallCaster-qa Twilio account or qa environment wiring yet.
+- Resolution: After #1829 lands (which needs #1357), add the QA acceptance workflow and specs: sign up, run the 3 campaign types against the smart test audience, and run the Twilio-tier unit tests with the QA test credentials.
+- Look in: `.github/workflows/e2e.yml`, `.github/workflows/ci.yml`, `e2e/`, `test/integration-twilio/`, `vitest.integration-twilio.config.ts`
+- Blocked by: [#1157](https://github.com/chester-hill-solutions/callcaster/issues/1157), [#1829](https://github.com/chester-hill-solutions/callcaster/issues/1829)
+- Existing tests: e2e compose gate; .github/workflows/e2e.yml; test/integration-twilio/twilio-test-credentials.test.ts
+- Missing tests: QA-environment full-flow acceptance over the 3 campaign types; Unit tier wired to CallCaster-qa credentials
+- Done when: PRs run sign-up through the 3 campaign types against the smart test audience; Twilio unit tests use CallCaster-qa credentials; Failures are attributable to the PR
+- Tracker: blocked-epic: #1829 (CallCaster-qa Twilio account) and #1157 (smart test audiences) must land first; #1357 gates #1829.
+
+### [#1826](https://github.com/chester-hill-solutions/callcaster/issues/1826) PR open dev tests
+- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
+- Recommended title: **Dev-environment PR acceptance suite**
+- Per-PR dev tests: sign-up, create workspace, MFA, rent a number, upload an audience and audio, create a second workspace; plus Twilio-tier unit tests with CallCaster-dev credentials.
+- Current behavior: E2E runs in the local compose harness; nothing runs against a dev.callcaster.ca environment backed by a dedicated CallCaster-dev Twilio account.
+- Root cause: There is no dedicated CallCaster-dev Twilio account; #1356 and #1827 are both open.
+- Resolution: After #1827 lands (which needs #1356), wire the dev PR suite over the listed steps and run the Twilio-tier unit tests with dev credentials.
+- Look in: `.github/workflows/e2e.yml`, `e2e/specs/`, `test/integration-twilio/`, `docs/local-development.md`
+- Blocked by: [#1827](https://github.com/chester-hill-solutions/callcaster/issues/1827)
+- Existing tests: e2e compose gate; test/integration-twilio/twilio-test-credentials.test.ts
+- Missing tests: Dev-environment signup / workspace / MFA / number / audience / audio flow; Dev-credential unit tier
+- Done when: PRs run the dev checklist against CallCaster-dev; MFA is enabled on the dev test environment; Twilio unit tests use CallCaster-dev credentials
+- Tracker: blocked-epic: #1827 (CallCaster-dev Twilio account) first; #1356 gates #1827.
+
+### [#1829](https://github.com/chester-hill-solutions/callcaster/issues/1829) Create Twilio CallCaster-qa account (ideally with IaC) and update qa.callcaster.ca to use that account
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
+- Recommended title: **Provision a CallCaster-qa Twilio account and point qa.callcaster.ca at it**
+- Create a dedicated Twilio account for QA (ideally via IaC) and repoint qa.callcaster.ca to use it.
+- Current behavior: QA has no dedicated Twilio account; #1357 is open and is the prerequisite.
+- Root cause: Environment-level Twilio credential separation has not been provisioned; blocked by the DNS/IaC task #1357 (itself blocked by #1355).
+- Resolution: Decide manual vs IaC provisioning, create the CallCaster-qa Twilio account, store credentials as environment secrets/vars, and update the qa environment config. Then unblock #1828.
+- Look in: `.railway/environments/`, `.railway/railway.ts`, `docs/twilio-runtime-inventory.md`, `docs/twilio-parent-ops-runbook.md`, `.github/workflows/railway-iac.yml`
+- Blocked by: [#1357](https://github.com/chester-hill-solutions/callcaster/issues/1357)
+- Missing tests: n/a (operations task)
+- Done when: CallCaster-qa Twilio account exists and is documented; qa.callcaster.ca uses the QA account credentials; Credentials are stored as secrets/vars, not in the repo; IaC-vs-manual decision is recorded
+- Tracker: blocked-epic: #1357 (qa DNS/IaC, blocked by #1355). Confirm the IaC-vs-manual decision when unblocked; this unblocks #1828.
+
+### [#1827](https://github.com/chester-hill-solutions/callcaster/issues/1827) Create Twilio CallCaster-dev account (ideally with IaC) and update dev.callcaster.ca to use that account
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
+- Recommended title: **Provision a CallCaster-dev Twilio account and point dev.callcaster.ca at it**
+- Create a dedicated Twilio account for the dev environment (ideally via IaC) and update dev.callcaster.ca to use it.
+- Current behavior: There is no dedicated CallCaster-dev Twilio account; dev falls back to shared or main-account credentials. #1356 is open.
+- Root cause: Environment-level Twilio credential separation has not been provisioned; blocked by the DNS/IaC task #1356.
+- Resolution: Create the CallCaster-dev Twilio account, store the credentials as dev environment secrets/vars, and update the dev.callcaster.ca config. Then unblock #1826.
+- Look in: `.railway/environments/dev.ts`, `.railway/railway.ts`, `docs/twilio-runtime-inventory.md`, `docs/twilio-parent-ops-runbook.md`
+- Blocked by: [#1356](https://github.com/chester-hill-solutions/callcaster/issues/1356)
+- Missing tests: n/a (operations task)
+- Done when: CallCaster-dev Twilio account exists and is documented; dev.callcaster.ca uses the dev account credentials; Credentials are stored as secrets/vars, not in the repo; IaC-vs-manual decision is recorded
+- Tracker: blocked-epic: #1356 (dev DNS/IaC) first. Confirm the IaC-vs-manual decision when unblocked; this unblocks #1826.
 
 ### [#1157](https://github.com/chester-hill-solutions/callcaster/issues/1157) Create test audiences for voice, SMS, and AI scenarios
 - Verdict: **Blocked / split first** · Size: L-XL · Risk: high · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
@@ -790,9 +1564,22 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 
 ---
 
-## Duplicates — 1
+## Duplicates — 2
 
 Same root cause as the linked canonical issue. Do not implement separately — fold scope in and close.
+
+### [#1843](https://github.com/chester-hill-solutions/callcaster/issues/1843) All steps in a script should have a next or "goto" option even outside of a selected choice and how long it waits
+- Verdict: **Duplicates** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
+- Duplicate of: [#1883](https://github.com/chester-hill-solutions/callcaster/issues/1883)
+- Recommended title: **IVR step no-input wait + next/goto (folds into #1883 and #1884)**
+- Body asks for a per-step no-input behavior: default 10s wait, default to next block, and an option to hang up. That is #1883 (configurable wait + no-input action) plus the explicit terminal routing in #1884.
+- Current behavior: After #1883 (dev, PR #1937), a step carries a configurable wait and a no-input action. #1884 still owns the explicit Hang up target and terminal validation.
+- Root cause: Same requirement as #1883/#1884, filed before the work was split from #780.
+- Resolution: Close as duplicate of #1883. Fold the next/goto and guaranteed-hangup acceptance into #1884. Do not implement again.
+- Look in: `app/lib/ivr-step-config.ts`, `app/lib/ivr-block-runtime.server.ts`, `app/components/campaign/settings/script/ScriptBlockEditor.IvrNoInput.tsx`
+- Existing tests: test/ivr-step-config.test.ts; test/ivr-block-response.route.test.ts; test/ui/script-block-editor-ivr.test.tsx
+- Done when: See #1883 (wait + no-input action) and #1884 (next/goto + terminal hangup)
+- Tracker: Duplicate of #1883; the goto half belongs to #1884. Close, do not re-scope.
 
 ### [#1720](https://github.com/chester-hill-solutions/callcaster/issues/1720) Contacts that have opted out should be marked as such in the queue instead of completed
 - Verdict: **Duplicates** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-09
@@ -802,270 +1589,8 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 66
+## Needs triage — 0
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
-### [#1854](https://github.com/chester-hill-solutions/callcaster/issues/1854) Public API: reject simple_ivr / complex_ivr with a steering error (#1741 follow-up)
-- Status: on-dev · Labels: none · Assignee: @wra-sol · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1938](https://github.com/chester-hill-solutions/callcaster/issues/1938) Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1883](https://github.com/chester-hill-solutions/callcaster/issues/1883) IVR step: configurable no-input handling (wait length + reroute/replay)
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1892](https://github.com/chester-hill-solutions/callcaster/issues/1892) DRY pass: de-duplicate the largest copy-paste clones (jscpd)
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1936](https://github.com/chester-hill-solutions/callcaster/issues/1936) Comment policy: comments must carry information (no-useless-comments rule)
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1932](https://github.com/chester-hill-solutions/callcaster/issues/1932) Systemic structural review: PR risk template + coverage gate
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874) IVR estimates are too low. projected CPS is too high
-- Status: on-dev · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1931](https://github.com/chester-hill-solutions/callcaster/issues/1931) Ratchet the test echo-shape: expectations that reuse SUT exports
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1925](https://github.com/chester-hill-solutions/callcaster/issues/1925) Prune tautological tests (echo tests) with kill-verification
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1924](https://github.com/chester-hill-solutions/callcaster/issues/1924) Effects gate: require @effect-why-not-loader and flag 'none' side-effects
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1910](https://github.com/chester-hill-solutions/callcaster/issues/1910) Issue board: render unenriched issues in a Needs triage lane
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1897](https://github.com/chester-hill-solutions/callcaster/issues/1897) Guardrails: git hooks + PR issue-reference gate
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1919](https://github.com/chester-hill-solutions/callcaster/issues/1919) Hooks: drop global-barrel exports for single-consumer hooks
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1918](https://github.com/chester-hill-solutions/callcaster/issues/1918) Queue item relations: return grouped contact maps
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917) Public survey guard: type the extra required fields
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916) Campaign export hook: stop recreating the poll interval every tick
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915) Admin pagination: consolidate onto the canonical TablePagination
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1914](https://github.com/chester-hill-solutions/callcaster/issues/1914) Survey routes: share the fetcher-redirect and error extraction
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1913](https://github.com/chester-hill-solutions/callcaster/issues/1913) Decompose SurveyForm into page and question subcomponents
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1912](https://github.com/chester-hill-solutions/callcaster/issues/1912) Survey form hook: duplicate page/question ids after a removal
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1911](https://github.com/chester-hill-solutions/callcaster/issues/1911) Survey form hook: collapse the deep-map mutators into index primitives
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1886](https://github.com/chester-hill-solutions/callcaster/issues/1886) Run db:schema:check per deployed environment (DB-backed gate)
-- Status: Backlog · Labels: none · Assignee: @wra-sol · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1885](https://github.com/chester-hill-solutions/callcaster/issues/1885) Rewrite Supabase-auth RPCs, then drop the legacy auth schema
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875) Improve IVR speech capture: hints, valid speech model, confidence, intent matching
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884) IVR editor: expose an explicit Hang up routing target and a guaranteed terminal hangup
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842) IVR audio takes ~7s to start after answer (synchronous AMD suspected)
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#268](https://github.com/chester-hill-solutions/callcaster/issues/268) i18n: add proper localization with fr-CA as the first locale
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1889](https://github.com/chester-hill-solutions/callcaster/issues/1889) Predictive auto-dial drops a voicemail even when the voicemail drop switch is off
-- Status: on-dev · Labels: none · Assignee: @wra-sol · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1869](https://github.com/chester-hill-solutions/callcaster/issues/1869) Test calls must not change the campaign queue
-- Status: on-dev · Labels: none · Assignee: @wra-sol · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1894](https://github.com/chester-hill-solutions/callcaster/issues/1894) Pin the test suite to UTC
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1896](https://github.com/chester-hill-solutions/callcaster/issues/1896) Design-system linting: ESLint 9 + @shadcn/lint
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1891](https://github.com/chester-hill-solutions/callcaster/issues/1891) Mobile nav sheet lays its links out horizontally instead of stacking them
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1888](https://github.com/chester-hill-solutions/callcaster/issues/1888) IVR: a machine answer with the voicemail drop off should record No Answer, not Voicemail
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1862](https://github.com/chester-hill-solutions/callcaster/issues/1862) IVR: fuzzy-match spoken / DTMF input to the script's declared options
-- Status: Backlog · Labels: enhancement, business-logic · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1857](https://github.com/chester-hill-solutions/callcaster/issues/1857) gap between pressing an IVR option and it moving on to the next block is very long ~4 seconds
-- Status: Backlog · Labels: ux · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1843](https://github.com/chester-hill-solutions/callcaster/issues/1843) All steps in a script should have a next or "goto" option even outside of a selected choice and how long it waits
-- Status: Backlog · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1853](https://github.com/chester-hill-solutions/callcaster/issues/1853) Dev: workspace invite insert fails (works on prod)
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#780](https://github.com/chester-hill-solutions/callcaster/issues/780) Hang up controls/block in IVR script
-- Status: Backlog · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1873](https://github.com/chester-hill-solutions/callcaster/issues/1873) record every call and IVR
-- Status: Backlog · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1877](https://github.com/chester-hill-solutions/callcaster/issues/1877) De-duplicate the IVR runtime (machine policy, block runtime, option type, Setup sections)
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface the caller audio selection on the /call welcome dialog (on join)
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845) Live campaign calls keep synchronous AMD latency when voicemail drop is off
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1880](https://github.com/chester-hill-solutions/callcaster/issues/1880) Roadmap: evaluate Jev (TypeSafe) as the IVR speech-intent service
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1833](https://github.com/chester-hill-solutions/callcaster/issues/1833) Primary button hover needs the hover mouse
-- Status: Backlog · Labels: design · Assignee: @sai-sy · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1863](https://github.com/chester-hill-solutions/callcaster/issues/1863) Move the remaining dial options (household, dial type) to campaign Setup
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1856](https://github.com/chester-hill-solutions/callcaster/issues/1856) IVR advances when the caller speaks on a keypad-only step
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1864](https://github.com/chester-hill-solutions/callcaster/issues/1864) Review env: IVR still drops voicemail with the drop off (campaign 109)
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1839](https://github.com/chester-hill-solutions/callcaster/issues/1839) Voice campaigns need a voicemail-drop toggle and dedicated voicemail audio on Setup (IVR and live)
-- Status: on-dev · Labels: none · Assignee: @wra-sol · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1861](https://github.com/chester-hill-solutions/callcaster/issues/1861) Spike: replace Twilio AMD with a local, faster voicemail classifier
-- Status: Backlog · Labels: enhancement, business-logic · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1859](https://github.com/chester-hill-solutions/callcaster/issues/1859) Show campaign costs un-collapsed on the Launch page
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1858](https://github.com/chester-hill-solutions/callcaster/issues/1858) IVR Script Builder Options
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1841](https://github.com/chester-hill-solutions/callcaster/issues/1841) IVR key press does not interrupt the current audio block (prompt sits outside the Gather)
-- Status: tested-on-dev · Labels: none · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1852](https://github.com/chester-hill-solutions/callcaster/issues/1852) cleanup .env
-- Status: Backlog · Labels: devops/admin · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1840](https://github.com/chester-hill-solutions/callcaster/issues/1840) IVR test call key press speaks the generic error: response route requires an outreach attempt
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1849](https://github.com/chester-hill-solutions/callcaster/issues/1849) what happens when multiple columns map to the same column in call list upload
-- Status: Backlog · Labels: question, business-logic · Assignee: @wra-sol · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1848](https://github.com/chester-hill-solutions/callcaster/issues/1848) call list mapping
-- Status: Backlog · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1847](https://github.com/chester-hill-solutions/callcaster/issues/1847) Call list mapping should allow you to drop columns if you don't want the clutter instead of just custom fields
-- Status: Backlog · Labels: ux, business-logic · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846) Phone number verification pending doesn't switch to verified from onboarding steps
-- Status: Backlog · Labels: ux · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1844](https://github.com/chester-hill-solutions/callcaster/issues/1844) Call History LIsten In feature sends you to twilio
-- Status: Backlog · Labels: business-logic · Assignee: none · Updated: 2026-09-18
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#360](https://github.com/chester-hill-solutions/callcaster/issues/360) sign in and signup pages shouldn't be available to people who are already signed in
-- Status: No status · Labels: design · Assignee: none · Updated: 2026-09-16
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1830](https://github.com/chester-hill-solutions/callcaster/issues/1830) Tasks for other devs that are blocking movement on an issue should be new tickets, that are set to "blocking" the other issue and correctly assigned. GH agent skills should reflect
-- Status: Backlog · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1824](https://github.com/chester-hill-solutions/callcaster/issues/1824) workspace dropdown sends user to "Something went wrong" page
-- Status: tested-on-dev · Labels: business-logic · Assignee: @sai-sy · Updated: 2026-09-16
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1828](https://github.com/chester-hill-solutions/callcaster/issues/1828) PR open qa tests
-- Status: Backlog · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1826](https://github.com/chester-hill-solutions/callcaster/issues/1826) PR open dev tests
-- Status: Backlog · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1829](https://github.com/chester-hill-solutions/callcaster/issues/1829) Create Twilio CallCaster-qa account (ideally with IaC) and update qa.callcaster.ca to use that account
-- Status: Backlog · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1827](https://github.com/chester-hill-solutions/callcaster/issues/1827) Create Twilio CallCaster-dev account (ideally with IaC) and update dev.callcaster.ca to use that account
-- Status: Backlog · Labels: devops/admin · Assignee: none · Updated: 2026-09-16
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+_None._
