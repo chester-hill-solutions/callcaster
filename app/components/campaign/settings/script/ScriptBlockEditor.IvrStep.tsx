@@ -1,4 +1,10 @@
-import { useId, useRef, useState, type ChangeEvent } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from "react";
 import type { ScriptBlock } from "@chester-hill-solutions/scriptkit-call-script-core";
 import { Mic, Volume2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -78,6 +84,41 @@ export function IvrStepFields({
     }
   };
 
+  const canUploadAudio = !readOnly && Boolean(onUploadAudio);
+
+  // The hidden file input and its trigger are one unit. In "Speak text" mode
+  // the trigger stays visible (users should not have to flip the mode first,
+  // #1325), with a hint about the side effect. In "Play a recording" mode it
+  // renders next to the recording Select instead, because both are ways to
+  // choose what the caller hears (#1701).
+  const renderUploadControl = (showModeHint: boolean) =>
+    canUploadAudio ? (
+      <div className="grid gap-1">
+        <input
+          ref={audioInputRef}
+          type="file"
+          accept={getAudioUploadAcceptValue()}
+          className="hidden"
+          onChange={handleAudioFileSelected}
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="justify-self-start"
+          disabled={isUploadingAudio}
+          onClick={() => audioInputRef.current?.click()}
+        >
+          {isUploadingAudio ? "Uploading…" : "Upload audio"}
+        </Button>
+        {showModeHint && (
+          <p className="text-xs text-muted-foreground">
+            Uploading switches this step to a recording.
+          </p>
+        )}
+      </div>
+    ) : null;
+
   return (
     <div className="grid gap-3 rounded-md border border-border bg-muted/30 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -109,15 +150,18 @@ export function IvrStepFields({
       </div>
 
       {mode === "synthetic" ? (
-        <SpokenStepFields
-          block={block}
-          text={audioFile}
-          prompt={prompt}
-          readOnly={readOnly}
-          textId={textId}
-          voiceId={voiceId}
-          onChange={onChange}
-        />
+        <>
+          <SpokenStepFields
+            block={block}
+            text={audioFile}
+            prompt={prompt}
+            readOnly={readOnly}
+            textId={textId}
+            voiceId={voiceId}
+            onChange={onChange}
+          />
+          {renderUploadControl(true)}
+        </>
       ) : (
         <RecordingStepFields
           block={block}
@@ -127,34 +171,8 @@ export function IvrStepFields({
           fileId={fileId}
           audioPreviewUrl={audioPreviewUrl}
           onChange={onChange}
+          uploadControl={renderUploadControl(false)}
         />
-      )}
-
-      {!readOnly && onUploadAudio && (
-        <div className="grid gap-1">
-          <input
-            ref={audioInputRef}
-            type="file"
-            accept={getAudioUploadAcceptValue()}
-            className="hidden"
-            onChange={handleAudioFileSelected}
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="justify-self-start"
-            disabled={isUploadingAudio}
-            onClick={() => audioInputRef.current?.click()}
-          >
-            {isUploadingAudio ? "Uploading…" : "Upload audio"}
-          </Button>
-          {mode !== "recorded" && (
-            <p className="text-xs text-muted-foreground">
-              Uploading switches this step to a recording.
-            </p>
-          )}
-        </div>
       )}
     </div>
   );
@@ -263,6 +281,7 @@ function RecordingStepFields({
   fileId,
   audioPreviewUrl,
   onChange,
+  uploadControl,
 }: {
   block: ScriptBlock;
   fileName: string;
@@ -271,6 +290,7 @@ function RecordingStepFields({
   fileId: string;
   audioPreviewUrl?: (fileName: string) => string;
   onChange: (patch: Partial<ScriptBlock>) => void;
+  uploadControl?: ReactNode;
 }) {
   const inLibrary = fileName.length === 0 || mediaNames.includes(fileName);
   // A step can point at a file that is no longer in the library (deleted, or
@@ -316,6 +336,7 @@ function RecordingStepFields({
           </Select>
         ) : null}
       </FormField>
+      {uploadControl}
       {fileName.length > 0 && audioPreviewUrl && (
         <audio
           controls

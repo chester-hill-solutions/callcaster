@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- In an IVR step set to **Play a recording**, the **Upload audio** button now sits with the recording control instead of below its preview and warning. It stays visible on **Speak text** steps, where uploading switches the step to a recording ([#1701](https://github.com/chester-hill-solutions/callcaster/issues/1701)).
 - The workspace credit count no longer appears in the navbar (desktop or mobile), so the workspace dropdown no longer shifts; the count stays in the workspace sidebar ([#1716](https://github.com/chester-hill-solutions/callcaster/issues/1716)).
 - The account menu now drops the profile-info heading, first name, and Workspace settings link, and shows pending invitations as **Invitations: N** beside an open-mail icon ([#1715](https://github.com/chester-hill-solutions/callcaster/issues/1715)).
 - The IVR editor's **Answer label** help now appears in a hover/focus tooltip beside the label instead of a paragraph under the field, so the response row stays compact ([#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702)).
