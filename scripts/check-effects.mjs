@@ -30,7 +30,7 @@ const BASELINE_PATH = path.join(ROOT, "scripts", "effects-baseline.json");
 const INVENTORY_PATH = path.join(ROOT, "docs", "effects-inventory.md");
 
 // Required tags for a NEW effect to count as compliant.
-const REQUIRED_TAGS = ["@effect", "@effect-deps", "@effect-side-effects"];
+import { isEffectCompliant } from "./lib/effects-lib.mjs";
 const EFFECT_RE = /\buse(Layout)?Effect\s*\(/g;
 
 function walk(dir, out = []) {
@@ -100,7 +100,7 @@ function collect() {
       if (/function\s*$|\.\s*$/.test(pre)) continue;
       const block = precedingBlock(src, m.index);
       const tags = parseTags(block);
-      const compliant = REQUIRED_TAGS.every((t) => t in tags && tags[t] !== "");
+      const compliant = isEffectCompliant(tags);
       perFile[rel] ??= { annotated: [], unannotated: 0 };
       if (compliant) perFile[rel].annotated.push({ rel, tags });
       else perFile[rel].unannotated += 1;

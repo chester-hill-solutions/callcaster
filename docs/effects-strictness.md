@@ -25,11 +25,20 @@ useEffect(() => { /* … */ }, [callState]);
 | `@effect` | ✅ | One-line purpose. |
 | `@effect-deps` | ✅ | The external state the effect reacts to (and why). |
 | `@effect-side-effects` | ✅ | `subscription` / `timer` / `dom` / `analytics` / `fetch` / `none`. |
-| `@effect-why-not-loader` | optional | Why this can't be a loader, fetcher, or derived value. Fill it in for anything that touches data — if you can't, it probably shouldn't be an effect. |
+| `@effect-why-not-loader` | ✅ | Why this can't be a loader, fetcher, or derived value. Non-empty, or the effect must carry the `CANDIDATE-REMOVE` marker — see below. |
 
 **If the answer to `@effect-why-not-loader` is "no reason", delete the effect** and
 use a React Router loader/`useFetcher`/derived state instead. Data fetching does not
 belong in an effect in this app.
+
+`@effect-why-not-loader` is **required** (#1924): the point of the annotation is to
+force the "could this be a loader / fetcher / derived render?" question in writing.
+If an effect genuinely cannot answer it, prefix its `@effect` purpose with
+`CANDIDATE-REMOVE` — that is the only escape, and it surfaces the effect in the
+inventory as removal debt instead of letting it pass silently. `@effect-side-effects:
+none` claims deserve scrutiny in review (a `none` claim can hide derived state), but
+`none` is not automatically a candidate — the latest-ref and local-state patterns are
+legitimate effects.
 
 ## Enforcement (ratchet)
 
