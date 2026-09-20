@@ -99,11 +99,14 @@ export function ivrSingleKeyDigits(
   return everyOptionIsOneKey ? 1 : undefined;
 }
 
-/** Build the gather attributes for one option step. */
+/** Build the gather attributes for one option step. A block may override the
+ *  DTMF/menu wait via `timeoutSeconds`. */
 export function ivrGatherAttributes(
   options: ReadonlyArray<IvrOption>,
+  opts?: { timeoutSeconds?: number },
 ): IvrGatherAttributes {
   const gathersSpeech = ivrStepGathersSpeech(options);
+  const timeout = opts?.timeoutSeconds ?? GATHER_TIMEOUT_SECONDS;
 
   if (gathersSpeech) {
     return {
@@ -111,13 +114,13 @@ export function ivrGatherAttributes(
       speechTimeout: SPEECH_TIMEOUT_SECONDS,
       speechModel: "phone_call",
       hints: ivrSpeechHints(options),
-      timeout: GATHER_TIMEOUT_SECONDS,
+      timeout,
     };
   }
 
   return {
     input: ["dtmf"],
     numDigits: ivrSingleKeyDigits(options),
-    timeout: GATHER_TIMEOUT_SECONDS,
+    timeout,
   };
 }

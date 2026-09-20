@@ -10,6 +10,10 @@ import { createVoiceResponse, hangupTwiml, type TwimlResponse } from "@/lib/twil
 import { requireTwilioSignatureForIvrResponse } from "@/lib/ivr-webhook-auth.server";
 import { defineAction } from "@/lib/handler.server";
 import {
+  resolveNoInputTarget,
+  type IvrNoInputConfig,
+} from "@/lib/ivr-block-runtime.server";
+import {
   extractTypedOutreachFields,
   syncContactSupportLevelCache,
 } from "@/lib/outreach-typed-fields.server";
@@ -26,7 +30,12 @@ interface Script {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<
     string,
-    { id: string; title?: string; options?: Array<{ value: string; next?: string }> }
+    {
+      id: string;
+      title?: string;
+      options?: Array<{ value: string; next?: string }>;
+      noInput?: IvrNoInputConfig;
+    }
   >;
 }
 
@@ -156,6 +165,66 @@ export const action = defineAction({
       : undefined;
     if (!currentBlock) {
       throw new Error(`Block ${blockId} not found`);
+    }
+
+    // Replay counts live in the call result so the cap survives the round-trip.
+    const hadInput = userInput != null && String(userInput).trim() !== "";
+    const persistResult = async (patch: Record<string, unknown>) => {
+      if (call.outreach_attempt_id == null || !call.workspace) return;
+      await updateOutreachAttemptForWorkspace(
+        call.workspace,
+        call.outreach_attempt_id,
+        patch,
+        { tdb: createTenantDb(call.workspace) },
+      );
+    };
+
+    let noInputReplays = 0;
+    if (currentBlock.noInput) {
+      const resultValue =
+        call.outreach_attempt_id != null && call.workspace
+          ? await getOutreach(call.workspace, call.outreach_attempt_id)
+          : null;
+      const result =
+        resultValue && typeof resultValue === "object"
+          ? (resultValue as Record<string, unknown>)
+          : {};
+      const nested = result.__no_input_replays as
+        | Record<string, Record<string, unknown>>
+        | undefined;
+      const perPage = nested?.[pageId] as Record<string, unknown> | undefined;
+      noInputReplays = typeof perPage?.[blockId] === "number" ? (perPage[blockId] as number) : 0;
+
+      if (!hadInput) {
+        const target = resolveNoInputTarget(currentBlock.noInput, noInputReplays);
+        if (target.kind === "hangup") {
+          twiml.hangup();
+          return;
+        }
+        if (target.kind === "route") {
+          handleNextStep(
+            twiml,
+            `${target.pageId}:${target.blockId}`,
+            campaignId,
+            pageId,
+            baseUrl,
+          );
+          return;
+        }
+        if (target.kind === "replay" && call.outreach_attempt_id != null && call.workspace) {
+          await persistResult({
+            result: {
+              __no_input_replays: {
+                ...(nested ?? {}),
+                [pageId]: { ...(perPage ?? {}), [blockId]: noInputReplays + 1 },
+              },
+            },
+          });
+          twiml.redirect(`${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/`);
+          return;
+        }
+        // replay without a store, or past the cap: fall through.
+      }
     }
 
     // Test calls (#1653) have no outreach attempt by design: they walk the flow

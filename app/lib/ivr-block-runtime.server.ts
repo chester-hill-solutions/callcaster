@@ -18,7 +18,51 @@ export type AudioTarget = Pick<TwimlResponse, "play" | "say">;
 
 export type IvrBlock = {
   options?: IvrOption[];
+  /** Wait (seconds) before the DTMF/menu gather times out; override of the 5s default. */
+  gatherTimeoutSeconds?: number;
+  /** What happens when the caller gives no input at this step. */
+  noInput?: IvrNoInputConfig;
 };
+
+/**
+ * Per-step no-input behaviour: hang up, replay the prompt (capped), or route
+ * to a named block. The default is the historical linear continuation to the
+ * next step.
+ */
+export type IvrNoInputConfig = {
+  action:
+    | "next"
+    | "hangup"
+    | "replay"
+    | { pageId: string; blockId: string };
+  /** How many replays before falling through to the next step. Default 2. */
+  maxReplays?: number;
+};
+
+export const DEFAULT_NO_INPUT_MAX_REPLAYS = 2;
+
+export type NoInputTarget =
+  | { kind: "next" }
+  | { kind: "hangup" }
+  | { kind: "replay" }
+  | { kind: "route"; pageId: string; blockId: string };
+
+/**
+ * The target after a caller gives no input, given how many times this step
+ * has already replayed. Replay is capped: past `maxReplays`, fall through.
+ */
+export function resolveNoInputTarget(
+  config: IvrNoInputConfig | undefined,
+  replays: number,
+): NoInputTarget {
+  if (!config || config.action === "next") return { kind: "next" };
+  if (config.action === "hangup") return { kind: "hangup" };
+  if (config.action === "replay") {
+    const max = Math.max(1, config.maxReplays ?? DEFAULT_NO_INPUT_MAX_REPLAYS);
+    return replays >= max ? { kind: "next" } : { kind: "replay" };
+  }
+  return { kind: "route", pageId: config.action.pageId, blockId: config.action.blockId };
+}
 
 /** The block after the current one: the next block in the page, else the next page's first block. */
 export function findNextBlock(
@@ -85,7 +129,9 @@ export async function appendBlockResponse<B extends IvrBlock>(args: {
     const action = buildActionUrl(pageId, blockId);
     const gather = twiml.gather({
       action,
-      ...ivrGatherAttributes(block.options),
+      ...ivrGatherAttributes(block.options, {
+        timeoutSeconds: block.gatherTimeoutSeconds,
+      }),
     });
     await renderAudio(gather, block);
     twiml.redirect(action);
