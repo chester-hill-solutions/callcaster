@@ -44,4 +44,9 @@ describe("ivr-gather (#1875)", () => {
       ivrSpeechHints([{ label: "Support" }, { label: "support" }, { content: "Support" }]),
     ).toBe("Support");
   });
+
+  test("a step can override the gather wait, with the 5s default unchanged", () => {
+    expect(ivrGatherAttributes([]).timeout).toBe(5);
+    expect(ivrGatherAttributes([], { timeoutSeconds: 10 }).timeout).toBe(10);
+  });
 });
