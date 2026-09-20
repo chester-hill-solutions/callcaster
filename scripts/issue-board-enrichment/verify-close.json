@@ -166,32 +166,6 @@
     "trackerRecommendation": "PR #1596 merge 317dd679 is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items."
   },
   {
-    "issueNumber": 1325,
-    "verdict": "verify-close",
-    "summary": "Editor UI shipped in #1672; the M4A silent-upload bug fixed in #1731 (transcode from a seekable temp file). Verified on preview and dev: same file went from a 278-byte stub to a 1.6 MB / 200 s playable MP3.",
-    "resolution": "transcodeAudioBuffer stages input to a temp file (mirrors probeAudioDurationMs). Merged via #1731.",
-    "lookIn": [
-      "app/lib/audio.server.ts",
-      "app/lib/audio.server.test.ts (moov-at-end regression)",
-      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx"
-    ],
-    "blockedBy": [],
-    "recommendedTitle": "verify-close: add audio to an IVR script (editor upload + M4A playback)",
-    "currentBehavior": "IVR step editor exposes Speak text / Play a recording + Upload audio; M4A uploads now normalize to playable MP3.",
-    "rootCause": "M4A/MOV moov-at-end cannot be read from a non-seekable stdin pipe: ffmpeg emitted a header-only stub and exited 0.",
-    "existingTests": [
-      "test/audio.server.test.ts"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Upload non-faststart M4A -> real playable MP3",
-      "Regression test proves file input, not pipe:0"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Close with #1730 (M4A bug) via #1731."
-  },
-  {
     "issueNumber": 1327,
     "verdict": "verify-close",
     "summary": "Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.",
@@ -783,30 +757,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1224,
-    "verdict": "verify-close",
-    "recommendedTitle": "verify-close: voicemail email sends (presign TTL + auth token)",
-    "summary": "Verified end-to-end on dev: fired a signed RecordingStatusCallback (real Twilio recording, real call) and the route fetched the recording, uploaded to S3, presigned (7-day) and Resend sent the email (message id 6e55aadd...).",
-    "currentBehavior": "email-vm: fetch recording (API key/auth token), upload, presign 7d, resend.emails.send; recording_url persists only after a successful send.",
-    "rootCause": "Original: presign 100d over SigV4 cap (#1223) + stale subaccount auth (#1655).",
-    "resolution": "#1223 presign clamp + API-key-first auth; verified live.",
-    "lookIn": [
-      "app/routes/api+/email-vm.action.server.ts",
-      "app/lib/object-storage.server.ts"
-    ],
-    "existingTests": [
-      "test/ivr-status.route.test.ts (voicemail)"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Voicemail webhook -> email arrives",
-      "recording_url persisted after send"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Close as verified; residual eyeball = leave a real voicemail."
-  },
-  {
     "issueNumber": 1292,
     "verdict": "verify-close",
     "recommendedTitle": "verify-close: call screen shows Hang Up in-call, Dial (with confirm) after",
@@ -856,131 +806,9 @@
     "trackerRecommendation": "Close after the eyeball."
   },
   {
-    "issueNumber": 1665,
-    "verdict": "verify-close",
-    "recommendedTitle": "Standardized Alert for a file-less upload error",
-    "summary": "Merged to dev (#1768); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.",
-    "currentBehavior": "Shipped on dev.",
-    "rootCause": "Fixed; see the PR.",
-    "resolution": "No further code expected unless retest finds a gap.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "retest on dev"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close once Sai/user confirms on dev."
-  },
-  {
-    "issueNumber": 1740,
-    "verdict": "verify-close",
-    "recommendedTitle": "Live number-verification status + pending sheet with confirmation token",
-    "summary": "Merged to dev (#1767); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.",
-    "currentBehavior": "Shipped on dev.",
-    "rootCause": "Fixed; see the PR.",
-    "resolution": "No further code expected unless retest finds a gap.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "retest on dev"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close once Sai/user confirms on dev."
-  },
-  {
-    "issueNumber": 1769,
-    "verdict": "verify-close",
-    "recommendedTitle": "Upload actions route failures through toUserMessage",
-    "summary": "Merged to dev (#1775); unit/UI tests green; full local e2e gate passed for #1665. Awaiting final user/QA retest on dev.",
-    "currentBehavior": "Shipped on dev.",
-    "rootCause": "Fixed; see the PR.",
-    "resolution": "No further code expected unless retest finds a gap.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "retest on dev"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close once Sai/user confirms on dev."
-  },
-  {
-    "issueNumber": 1667,
-    "verdict": "verify-close",
-    "recommendedTitle": "Audio upload toast stays one inline line",
-    "summary": "Merged to dev (#1777); UI tests green; awaiting Sai/user retest on dev.",
-    "currentBehavior": "Shipped on dev.",
-    "rootCause": "Fixed; see the PR.",
-    "resolution": "No further code expected unless retest finds a gap.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "retest on dev"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close once confirmed on dev."
-  },
-  {
-    "issueNumber": 1668,
-    "verdict": "verify-close",
-    "recommendedTitle": "Toast spacing defaults (padding + gap)",
-    "summary": "Merged to dev (#1778); UI tests green; awaiting Sai/user retest on dev.",
-    "currentBehavior": "Shipped on dev.",
-    "rootCause": "Fixed; see the PR.",
-    "resolution": "No further code expected unless retest finds a gap.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "retest on dev"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close once confirmed on dev."
-  },
-  {
-    "issueNumber": 1669,
-    "verdict": "verify-close",
-    "recommendedTitle": "All workspaces pinned in workspace picker",
-    "summary": "Merged to dev (#1776); UI tests green; awaiting Sai/user retest on dev.",
-    "currentBehavior": "Shipped on dev.",
-    "rootCause": "Fixed; see the PR.",
-    "resolution": "No further code expected unless retest finds a gap.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "retest on dev"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Close once confirmed on dev."
-  },
-  {
     "issueNumber": 1682,
     "verdict": "verify-close",
     "summary": "Fixed by PR #1683 (merged 2026-09-08, commit 03923185, same title as the issue); requirePositiveIntegerParam now guards the campaigns loaders so malformed ids 404. Sai's later comment is only a design nit on the 404 page styling, not a defect.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1708,
-    "verdict": "verify-close",
-    "summary": "Voicemail-drop capability is largely shipped (campaign.voicemail_file, audiodrop route, auto-detection + dispose on VM, 'Voicemail Left' UI). Remaining asks are acceptance-style (play/pause, attach UI, smart drop) — a verification pass on dev, not new architecture.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -1060,27 +888,6 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1726,
-    "verdict": "verify-close",
-    "recommendedTitle": "Contact search creates a missing contact from the results list",
-    "summary": "Merged to dev (#1785); full local e2e gate green (118 passed). Awaiting user/QA retest.",
-    "currentBehavior": "Bottom Add row creates + queues the contact inline.",
-    "rootCause": "Feature gap; implemented.",
-    "resolution": "No further code expected unless retest finds a gap.",
-    "lookIn": [],
-    "existingTests": [
-      "test/ui/contact-search-dialog.test.tsx"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "no-match search offers an Add row",
-      "created contact queued in the same dialog"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Close once confirmed on dev."
   },
   {
     "issueNumber": 1205,

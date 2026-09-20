@@ -85,7 +85,7 @@ describe("buildBoard", () => {
       projectNumber: 9,
       reviewedAt: "dev@abc1234",
     });
-    expect(counts).toEqual({ "fix-now": 1, "verify-close": 0, "needs-repro": 0, "needs-decision": 0, "blocked-epic": 1, duplicate: 1 });
+    expect(counts).toEqual({ "fix-now": 1, "verify-close": 0, "needs-repro": 0, "needs-decision": 0, "blocked-epic": 1, duplicate: 1, "needs-triage": 0 });
     expect(md).toContain("Reviewed at `dev@abc1234`");
     expect(md).toContain("## Fix now — 1");
     expect(md).toContain("Recommended title: **A better title**");
@@ -101,10 +101,20 @@ describe("buildBoard", () => {
     expect(a.md).not.toContain("Generated:");
   });
 
-  test("throws when an open issue has no enrichment record", () => {
-    expect(() =>
-      buildBoard({ issues: [issue(1), issue(99)], records, repo: "x/y", projectNumber: 9, reviewedAt: "dev@abc1234" }),
-    ).toThrow(/open issues without enrichment: 99/);
+  test("renders issues without an enrichment record in the Needs triage lane", () => {
+    const { md, counts } = buildBoard({
+      issues: [issue(1), issue(99)],
+      records: [record({ issueNumber: 1 })],
+      repo: "x/y",
+      projectNumber: 9,
+      reviewedAt: "dev@abc1234",
+    });
+    expect(counts["needs-triage"]).toBe(1);
+    expect(md).toContain("## Needs triage — 1");
+    expect(md).toContain("### [#99](https://github.com/x/y/issues/99) Issue 99");
+    expect(md).toContain("Status: No status");
+    expect(md).toContain("No enrichment record yet");
+    expect(md).not.toContain("open issues without enrichment");
   });
 
   test("throws when a record references a closed issue", () => {

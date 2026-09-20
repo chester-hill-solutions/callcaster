@@ -73,20 +73,6 @@
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1704,
-    "verdict": "fix-now",
-    "summary": "Confirmed gap: script table has no unique index on (workspace,name) (schema + migrations), yet campaign.server.ts already maps isUniqueViolation to a friendly 'already exists' error — the guard is unreachable. Add the constraint and surface the existing error.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
     "issueNumber": 1715,
     "verdict": "fix-now",
     "summary": "Precise change list with an exact target component (profile dropdown): remove padding/info/first-name/workspace settings, rename invitations line + icon.",
@@ -157,62 +143,6 @@
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1781,
-    "verdict": "fix-now",
-    "recommendedTitle": "Unique index for script names (duplicate-name error has no DB constraint)",
-    "summary": "No unique index on script(workspace,name) — the friendly duplicate error (campaign.server.ts:556/619) is unenforceable. Add citext/lower unique index + map violations to the friendly message.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Implement per ticket"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Filed 2026-09-12 from board triage."
-  },
-  {
-    "issueNumber": 1783,
-    "verdict": "fix-now",
-    "recommendedTitle": "Theme bootstrap <html> hydration mismatch",
-    "summary": "root.tsx inline theme script mutates documentElement pre-hydration; React logs mismatch every boot. Use narrow suppressHydrationWarning or server-rendered theme, keep the anti-flash script.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Implement per ticket"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Filed 2026-09-12 from board triage."
-  },
-  {
-    "issueNumber": 1804,
-    "verdict": "fix-now",
-    "summary": "The audit release-note correction is in progress in PR #1808; it was not merged at this review.",
-    "resolution": "Finish the existing PR and verify each audit fix appears once under Unreleased, with the schedule entry restored.",
-    "lookIn": [
-      "docs/CHANGELOG.md"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Active PR #1808 owns this change; do not create a duplicate."
-  },
-  {
-    "issueNumber": 1809,
-    "verdict": "fix-now",
-    "summary": "PR #1811 contains the qs override and lockfile remediation and is awaiting review/checks. The two advisory inputs, actual Twilio/Stripe serialization, and full local CI passed; the PR has not merged.",
-    "resolution": "Finish the active qs-only change and full checks. Keep parent SDK versions unchanged; verify default-branch alerts after promotion.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Active PR #1811 owns this remediation; do not start a competing lockfile change."
-  },
-  {
     "issueNumber": 1810,
     "verdict": "fix-now",
     "summary": "This tracking-only refresh updates stale verdicts from live issue states and merged PR evidence.",
@@ -224,32 +154,6 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "This board-refresh PR owns the ticket; do not duplicate it."
-  },
-  {
-    "issueNumber": 1816,
-    "verdict": "fix-now",
-    "recommendedTitle": "fix(dispatch): reschedule a parked campaign_dispatch successor when the campaign window is edited",
-    "summary": "Child of #1352 (window widened to include 12:47, send landed 1:12). Deferrals post-#1796 enqueue successors exactly at the boundary computed at defer time (nextDispatchOpenAt, campaign.server.ts waiting/deferred_send_window branches), but editing the calling-hours/send-window of a running or waiting campaign (`$selected_id/settings.action.server.ts` case 'save') never rewrites the queued successor's retry_at, so the campaign keeps sleeping to the stale boundary.",
-    "currentBehavior": "A deferred campaign_dispatch successor is enqueued at min(nextOpenAt, now+60min). A schedule edit updates the campaign row only; rescheduleQueuedJob (enqueue-job.server.ts:133) is called from the launch path only (campaign-execution.server.ts:129).",
-    "rootCause": "The successor parked at defer time is not rescheduled when the window is later widened/opened.",
-    "resolution": "On settings save of `schedule`/`sms_send_window` for a running/waiting/scheduled machine campaign, reschedule the live campaign_dispatch row (same live-dedupe predicate) to min(nextOpenAt, now+60min) via rescheduleQueuedJob.",
-    "lookIn": [
-      "app/lib/worker/handlers/campaign.server.ts",
-      "app/lib/campaign-dispatch-policy.ts",
-      "app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts",
-      "app/lib/worker/enqueue-job.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Campaign dispatched to a deferred successor -> window edited to open now -> queued job retry_at is pulled forward"
-    ],
-    "acceptanceCriteria": [
-      "Editing the window to open now moves the parked successor forward",
-      "Far-future cap (now+60min) still applies on the reschedule"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Parent #1352 still open needs-repro; this is the actionable child."
   },
   {
     "issueNumber": 1822,
