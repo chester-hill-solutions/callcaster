@@ -1,6 +1,7 @@
 import { createContext } from "react-router";
 import type { AuthUser } from "@/lib/auth.server";
 import type { DataPlaneAuthContext } from "@/lib/platform-data.server";
+import type { TenantDb } from "@/server/tenant-db";
 
 export type SessionContextValue = {
   user: AuthUser;
@@ -12,10 +13,22 @@ export type WorkspaceContextValue = {
   userId: string;
   userRole: string;
   headers: Headers;
+  /**
+   * Workspace-scoped Drizzle client, built once by workspace middleware.
+   * Routes read this instead of constructing their own `createTenantDb`.
+   */
+  tdb: TenantDb;
 };
 
-export type DataPlaneAuthContextValue = DataPlaneAuthContext & {
+export type DataPlaneActor = DataPlaneAuthContext & {
   workspaceId: string;
+};
+
+export type DataPlaneAuthContextValue = DataPlaneActor & {
+  /**
+   * Workspace-scoped Drizzle client, built once by data-plane middleware.
+   */
+  tdb: TenantDb;
 };
 
 export type AdminContextValue = {

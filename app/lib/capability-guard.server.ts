@@ -15,7 +15,7 @@ import { getUserRole } from "@/lib/database/workspace.server";
 import { hasMinRole, type MemberRole } from "@/lib/member-role";
 import { defineLoader, withEnforcedCapability } from "@/lib/handler.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
+import type { DataPlaneActor, DataPlaneAuthContextValue } from "@/lib/route-context.server";
 import type {
   ApiKeyAuthResult,
   BearerSessionAuthResult,
@@ -37,7 +37,7 @@ function capabilityDeniedResponse(error: CapabilityDeniedError): Response {
  * through {@link requireDataPlaneCapability}, which owns the denial shapes.
  */
 async function resolveDataPlaneAuthorizationActor(
-  auth: DataPlaneAuthContextValue,
+  auth: DataPlaneActor,
 ): Promise<AuthorizationActor | Response> {
   if (auth.apiKey) {
     return apiKeyActorFromScopes({
@@ -72,7 +72,7 @@ async function resolveDataPlaneAuthorizationActor(
  * Returns the actor on success, or a 403/404 Response.
  */
 export async function requireDataPlaneCapability(
-  auth: DataPlaneAuthContextValue,
+  auth: DataPlaneActor,
   capability: ProductCapabilityId,
 ): Promise<AuthorizationActor | Response> {
   const actor = await resolveDataPlaneAuthorizationActor(auth);

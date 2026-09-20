@@ -9,7 +9,6 @@ import { workspace as workspaceTable } from "@/db/schema";
 // workspace is the global tenancy root table; tdb cannot scope it.
 // eslint-disable-next-line no-restricted-imports
 import { adminDb } from "@/server/admin-db";
-import { createTenantDb } from "@/server/tenant-db";
 
 export type CallLogLoaderData = Awaited<ReturnType<typeof loadCallLogPage>> & {
   workspace: { id: string; name: string; credits: number } | null;
@@ -22,7 +21,7 @@ export const loader = defineLoader({
   auth: workspaceRouteAuth,
   sideEffects: ["db-read"],
   handler: async ({ auth, url }) => {
-    const { headers, workspaceId, userRole } = auth;
+    const { headers, workspaceId, userRole, tdb } = auth;
 
     if (!workspaceId) {
       return routeData(
@@ -51,7 +50,6 @@ export const loader = defineLoader({
       );
     }
 
-    const tdb = createTenantDb(workspaceId);
     const [workspaceRow, campaigns] = await Promise.all([
       adminDb
         .select({

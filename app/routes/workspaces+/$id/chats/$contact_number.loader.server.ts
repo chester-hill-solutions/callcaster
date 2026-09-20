@@ -8,7 +8,6 @@ import {
 } from "@/lib/message-db.server";
 import { normalizePhoneNumber } from "@/lib/utils";
 import { parseOptOutKeywords } from "@/lib/chat-opt-out";
-import { createTenantDb } from "@/server/tenant-db";
 import type { Message } from "@/lib/types";
 import { fetchMessagePage } from "./$contact_number.messages.server";
 import { defineLoader } from "@/lib/handler.server";
@@ -39,7 +38,7 @@ export const loader = defineLoader({
     }
   }
 
-  const tdb = id ? createTenantDb(id) : null;
+  const tdb = id ? auth.tdb : null;
 
   if (contact_number !== "new") {
     try {
