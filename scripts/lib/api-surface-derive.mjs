@@ -156,6 +156,12 @@ const BASE_HELPERS = [
     re: /\bgetDataPlaneRouteContext\s*\(/,
     allows: ["session", "workspaceAdmin"],
   },
+  // The canonical workspace+user preamble shared by data-plane API routes.
+  {
+    id: "requireDataPlaneWorkspaceUser",
+    re: /\brequireDataPlaneWorkspaceUser\b/,
+    allows: ["session", "workspaceAdmin"],
+  },
 ];
 
 /**

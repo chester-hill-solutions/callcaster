@@ -40,6 +40,7 @@ const TREES = [
     required: [
       /getDataPlaneRouteContext/,
       /requireDataPlaneRouteCapability/,
+      /requireDataPlaneWorkspaceUser/,
       /dataPlaneCapabilityAuth/,
       /dataPlaneSessionMinRoleAuth/,
       /dataPlaneSessionAuth/,

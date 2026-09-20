@@ -9,28 +9,11 @@ import {
   listWorkspaceApiKeys,
 } from "@/lib/platform-members.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { requireDataPlaneWorkspaceUser } from "@/lib/data-plane-route.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-
-function requireDataPlaneUser({
-  params,
-  context,
-}: LoaderFunctionArgs | ActionFunctionArgs) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-  const { userId } = getDataPlaneRouteContext(context, workspaceId);
-  if (!userId) {
-    return jsonError("Unauthorized", 401);
-  }
-
-  return { userId, workspaceId };
-}
 
 export const loader = defineLoader({
-  auth: requireDataPlaneUser,
+  auth: requireDataPlaneWorkspaceUser,
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     const result = await listWorkspaceApiKeys(    auth.userId,
@@ -46,7 +29,7 @@ export const loader = defineLoader({
 });
 
 export const action = defineAction({
-  auth: requireDataPlaneUser,
+  auth: requireDataPlaneWorkspaceUser,
   sideEffects: ["db-write"],
   handler: async ({ request, auth }) => {
     if (request.method === "POST") {
