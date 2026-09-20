@@ -1,0 +1,50 @@
+name: Review coverage
+
+# #1932: structural review is a mechanical part of every PR into dev. The
+# check fails when the PR touches high-risk code (worker / server / db /
+# migrations) or crosses ~500 changed lines, unless the body declares a
+# `Structural review:` line (done | not-needed: <reason>). The pull-request
+# template carries the line, so the marker is enforced, not advisory.
+#
+# This is a gate on the PR itself, not a reviewer: the human/agent structural
+# pass still runs the code-review / thermo-nuclear skill. The gate only makes
+# the declaration a requirement.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+    branches: [dev]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  require-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assess the risk surface
+        id: risk
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          num=${{ github.event.pull_request.number }}
+          files=$(gh api "repos/${{ github.repository }}/pulls/$num/files" --paginate --jq '.[].filename')
+          added=$(gh api "repos/${{ github.repository }}/pulls/$num/files" --paginate --jq '[.[].additions] | add // 0')
+          high_risk=false
+          if printf '%s\n' "$files" | grep -qE '^(app/lib/worker/|app/server/|app/db/|client/migrations/)'; then
+            high_risk=true
+          fi
+          echo "high_risk=$high_risk"
+          echo "changed_lines=$added"
+          echo "high_risk=$high_risk" >> "$GITHUB_OUTPUT"
+          echo "changed_lines=$added" >> "$GITHUB_OUTPUT"
+
+      - name: Fail when a structural review marker is missing
+        if: |
+          (steps.risk.outputs.high_risk == 'true' ||
+           fromJSON(steps.risk.outputs.changed_lines) > 500) &&
+          !contains(github.event.pull_request.body, 'Structural review:')
+        run: |
+          echo "::error::This PR touches high-risk code or is large (>500 changed lines)."
+          echo "::error::Add a \"Structural review:\" line to the body (done | not-needed: <reason>)."
+          exit 1
