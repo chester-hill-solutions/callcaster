@@ -88,6 +88,47 @@ describe("campaign-outbound-estimate", () => {
     );
   });
 
+  test("IVR completion rate is bounded by the concurrent call limit over avg call time (#1874)", () => {
+    const estimate = estimateIvrCampaignOutbound({
+      portalConfig: basePortalConfig, // parallel off, voiceConcurrentCallLimit 100
+      voiceCapableLocalNumbers: 20,
+    });
+
+    expect(estimate.effectiveDialAttemptsPerSecond).toBeCloseTo(
+      LEGACY_IVR_PIPELINE_CPS,
+      3,
+    );
+    expect(estimate.effectiveCompletionPerSecond).toBeCloseTo(100 / 75, 3);
+    expect(estimate.effectiveCompletionPerSecond).toBeLessThan(
+      estimate.effectiveDialAttemptsPerSecond,
+    );
+    expect(estimate.avgCallDurationSeconds).toBe(75);
+    expect(estimate.warnings.join(" ")).toContain(
+      "bound by the concurrent call limit",
+    );
+  });
+
+  test("IVR completion rate equals the dial-start rate when concurrency is not the bound", () => {
+    const estimate = estimateIvrCampaignOutbound({
+      portalConfig: makePortalConfig({ voiceConcurrentCallLimit: 10_000 }),
+      voiceCapableLocalNumbers: 20,
+    });
+
+    expect(estimate.effectiveCompletionPerSecond).toBeCloseTo(
+      estimate.effectiveDialAttemptsPerSecond,
+      3,
+    );
+  });
+
+  test("a low concurrent call limit caps completion well below the dial-start rate", () => {
+    const estimate = estimateIvrCampaignOutbound({
+      portalConfig: makePortalConfig({ voiceConcurrentCallLimit: 10 }),
+      voiceCapableLocalNumbers: 20,
+    });
+
+    expect(estimate.effectiveCompletionPerSecond).toBeCloseTo(10 / 75, 3);
+  });
+
   test("messaging_service uses sync pool while from_number uses local SMS count", () => {
     const messagingServiceEstimate = estimateMessageCampaignOutbound({
       portalConfig: basePortalConfig,
