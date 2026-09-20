@@ -29,6 +29,16 @@ The manual's command surface is: `agent-task`, `alias`, `api`, `attestation`, `a
 9. For branch and commit work, load the `git` skill in addition to this skill.
 10. When an error reveals missing reusable guidance, update the relevant skill in the same task. Do not create one-off incident logs.
 
+## Rate Limits And REST Fallback
+
+`gh` uses GraphQL for `pr create`, `pr view`, `pr checks --watch`, `issue create`, most `project` commands, and repo navigation. Its GraphQL bucket exhausts much faster than the REST bucket during long automation sessions — a queue of PRs (create, watch checks, move project items, merge) can hit `API rate limit already exceeded` mid-flight and stall the pipeline.
+
+1. Use REST for high-frequency work once a session is underway: `gh api repos/{owner}/{repo}/pulls`, `.../issues`, `.../commits/{sha}/check-runs`, `.../commits/{sha}/status`, and `.../git/refs/heads/{branch}` (delete). For mutations with a markdown body, build JSON with `jq -n --rawfile body <file> ...` and pass `--input` — never inline a markdown body into a double-quoted shell arg (backticks execute).
+2. Poll checks with REST, not `gh pr checks --watch` (GraphQL): `commits/{sha}/check-runs` (quality conclusion) + `commits/{sha}/status` (combined — includes the Railway deploy contexts). Both green means merge-ready.
+3. Reserve GraphQL for what REST cannot do: `gh project item-edit` Status moves and `projectItems` queries.
+4. When `gh pr create` / `gh pr merge` hit `graphql_rate_limit`, fall back to REST: `POST /repos/{owner}/{repo}/pulls` (create; ensure the head branch has commits ahead of base first — "No commits between base and head" is the failure when it does not), `PUT /repos/{owner}/{repo}/pulls/{n}/merge` with `-f merge_method=squash`, and `DELETE /repos/{owner}/{repo}/git/refs/heads/{branch}`.
+5. Verify REST fallbacks the same as any mutation: query the remote state and report it.
+
 ## Authentication And Scopes
 
 Use `gh auth refresh -s <scope>` only when the operation requires an additional scope. Project mutations commonly require `project`; do not expose tokens in commands, logs, or issue bodies.

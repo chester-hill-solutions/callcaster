@@ -43,7 +43,6 @@ import {
   normalizeWorkspaceMessagingOnboardingState,
   updateMessagingServiceSenders,
   updateWorkspaceMessagingOnboardingState,
-  WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "../app/lib/messaging-onboarding.server";
 
 describe("messaging onboarding helpers", () => {
@@ -537,7 +536,8 @@ describe("messaging onboarding helpers", () => {
       unknownSection: { foo: "bar" },
     });
 
-    expect(state.version).toBe(WORKSPACE_MESSAGING_ONBOARDING_VERSION);
+    // Pinned literal (#1931): the schema version (3) is the contract.
+    expect(state.version).toBe(3);
     expect(state.status).toBe("not_started");
     expect(state.businessProfile.legalBusinessName).toBe("");
     expect(state.messagingService.desiredSendMode).toBe("messaging_service");

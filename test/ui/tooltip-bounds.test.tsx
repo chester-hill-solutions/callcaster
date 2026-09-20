@@ -3,8 +3,6 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
 
 import {
-  TOOLTIP_DEFAULT_MAX_HEIGHT,
-  TOOLTIP_DEFAULT_MAX_WIDTH,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -32,8 +30,9 @@ describe("TooltipContent bounds (#1148)", () => {
     const bubble = screen.getAllByText(/A long explanation/).at(-1)?.closest("[data-state]");
     expect(bubble).not.toBeNull();
     const className = bubble?.className ?? "";
-    expect(className).toContain(TOOLTIP_DEFAULT_MAX_WIDTH);
-    expect(className).toContain(TOOLTIP_DEFAULT_MAX_HEIGHT);
+    // Pinned literals (#1931): the default tooltip bounds are the contract.
+    expect(className).toContain("max-w-xs");
+    expect(className).toContain("max-h-64");
     expect(className).toContain("overflow-y-auto");
     expect(className).toContain("break-words");
     expect(className).not.toContain("overflow-hidden");
@@ -45,6 +44,6 @@ describe("TooltipContent bounds (#1148)", () => {
     const className = bubble?.className ?? "";
     expect(className).toContain("max-w-md");
     expect(className).toContain("max-h-none");
-    expect(className).not.toContain(TOOLTIP_DEFAULT_MAX_WIDTH);
+    expect(className).not.toContain("max-w-xs");
   });
 });

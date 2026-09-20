@@ -77,7 +77,8 @@ describe("inboundSmsRateVerdict (#1394)", () => {
     if (result.allowed) throw new Error("expected refusal");
     expect(result.window).toBe("burst");
     expect(result.count).toBe(INBOUND_SMS_BURST_MAX + 5);
-    expect(result.limit).toBe(INBOUND_SMS_BURST_MAX);
+    // Pinned literal (#1931): the burst window limit (20) is the contract.
+    expect(result.limit).toBe(20);
   });
 
   test("empty from-number short-circuits to allowed without a db call", async () => {
