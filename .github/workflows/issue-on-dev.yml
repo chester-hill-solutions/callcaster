@@ -7,7 +7,7 @@ name: Issue on dev
 #
 # This workflow fires when a pull request merges into `dev`, reads the
 # referenced issues from its body, and for each referenced issue moves the
-# issue's item on the CHS backlog project to the "On dev" Status via
+# issue's item on the CHS backlog project to the "on-dev" Status via
 # `gh project item-edit` (#1822):
 #
 #   * Status is the ONLY mechanism for "this fix is on dev" — the fragile
@@ -24,8 +24,12 @@ name: Issue on dev
 # Repository variables:
 #
 #   ON_DEV_PROJECT_NUMBER  — the project number from its URL (CHS backlog = 9)
-#   ON_DEV_STATUS_VALUE    — the Status option to move to (default "On dev")
+#   ON_DEV_STATUS_VALUE    — the Status option to move to (default "on-dev")
 #   ON_DEV_STATUS_FIELD    — the Status field name (default "Status")
+#
+# The Status option name is the project's own lowercase `on-dev`, NOT `On dev`.
+# A stale value makes the option lookup fail and the step skip silently while
+# still posting the comment (the original #1822 symptom).
 #
 # The release promotion keeps closing the issue on `master`, so "closed"
 # still means "in production".
@@ -67,7 +71,7 @@ jobs:
           echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
           echo "Issues: ${numbers:-none}"
 
-      - name: Move project items to "On dev" Status
+      - name: Move project items to "on-dev" Status
         if: steps.issues.outputs.numbers != ''
         env:
           GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
@@ -75,7 +79,7 @@ jobs:
           REPO: ${{ github.repository }}
           PROJECT: ${{ vars.ON_DEV_PROJECT_NUMBER }}
           STATUS_FIELD: ${{ vars.ON_DEV_STATUS_FIELD || 'Status' }}
-          STATUS_VALUE: ${{ vars.ON_DEV_STATUS_VALUE || 'On dev' }}
+          STATUS_VALUE: ${{ vars.ON_DEV_STATUS_VALUE || 'on-dev' }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           SHA: ${{ github.event.pull_request.merge_commit_sha }}
