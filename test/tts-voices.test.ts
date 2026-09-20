@@ -48,10 +48,12 @@ describe("tts-voices (#1401 runtime slice)", () => {
       ).toBe(known);
     });
 
+    // Pinned literal (#1925): changing DEFAULT_VOICE_ID must fail these, not
+    // move the expected value in lockstep.
     test("falls back to DEFAULT_VOICE_ID when wireExtras.voice is missing", () => {
-      expect(resolveVoiceForBlock({ wireExtras: {} })).toBe(DEFAULT_VOICE_ID);
-      expect(resolveVoiceForBlock({ wireExtras: null })).toBe(DEFAULT_VOICE_ID);
-      expect(resolveVoiceForBlock({})).toBe(DEFAULT_VOICE_ID);
+      expect(resolveVoiceForBlock({ wireExtras: {} })).toBe("Polly.Salli-Neural");
+      expect(resolveVoiceForBlock({ wireExtras: null })).toBe("Polly.Salli-Neural");
+      expect(resolveVoiceForBlock({})).toBe("Polly.Salli-Neural");
     });
 
     test("rejects an unknown voice id and falls back to DEFAULT_VOICE_ID", () => {
@@ -59,18 +61,18 @@ describe("tts-voices (#1401 runtime slice)", () => {
       // twiml.say (Twilio would 500 the response, killing the IVR).
       expect(
         resolveVoiceForBlock({ wireExtras: { voice: "attacker.injection" } }),
-      ).toBe(DEFAULT_VOICE_ID);
+      ).toBe("Polly.Salli-Neural");
     });
 
     test("ignores non-string voice values without throwing", () => {
       expect(
         resolveVoiceForBlock({ wireExtras: { voice: 42 as unknown as string } }),
-      ).toBe(DEFAULT_VOICE_ID);
+      ).toBe("Polly.Salli-Neural");
       expect(
         resolveVoiceForBlock({
           wireExtras: { voice: ["a"] as unknown as string },
         }),
-      ).toBe(DEFAULT_VOICE_ID);
+      ).toBe("Polly.Salli-Neural");
     });
   });
 });
