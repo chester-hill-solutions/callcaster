@@ -213,6 +213,13 @@ export type CampaignDispatchParams = {
   userId: string | undefined;
 };
 
+/** The actor + campaign the machine dispatch chain runs for. */
+type DispatchChainContext = {
+  workspaceId: string;
+  campaignId: number;
+  userId: string;
+};
+
 async function pauseForInsufficientCredits(
   workspaceId: string,
   campaignId: number,
@@ -405,7 +412,7 @@ export async function campaignDispatchHandler(
  */
 async function resolveDispatchBlockedCase(
   job: ClaimedJobRow,
-  args: { workspaceId: string; campaignId: number; userId: string },
+  args: DispatchChainContext,
   outcome:
     | { kind: "insufficient_credits" }
     | { kind: "caller_id_required" }
@@ -452,7 +459,7 @@ async function resolveDispatchBlockedCase(
  */
 async function continueOrCompleteDispatch(
   job: ClaimedJobRow,
-  args: { workspaceId: string; campaignId: number; userId: string },
+  args: DispatchChainContext,
   queuedRemaining: number,
 ): Promise<void> {
   const { workspaceId, campaignId, userId } = args;
@@ -482,7 +489,7 @@ async function continueOrCompleteDispatch(
  */
 async function runMachineVoiceDispatch(
   job: ClaimedJobRow,
-  args: { workspaceId: string; campaignId: number; userId: string },
+  args: DispatchChainContext,
 ): Promise<unknown> {
   const { workspaceId, campaignId, userId } = args;
 
