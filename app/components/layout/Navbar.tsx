@@ -27,7 +27,6 @@ import {
   LogOut,
   MailOpen,
 } from "lucide-react";
-import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { MobileMenu } from "./Navbar.MobileMenu";
 import type {
@@ -143,40 +142,6 @@ const WorkspacePicker = ({
   );
 };
 
-/**
- * Admin+ credit readout for the active workspace. Freshness comes from the
- * workspace-tree `transaction_history` subscription in `workspaces+/$id.tsx`,
- * which revalidates root + workspace loaders together.
- */
-const NavbarCredits = ({
-  workspace,
-}: {
-  workspace: RootWorkspaceSummary & { credits: number };
-}) => (
-  <Link
-    to={`/workspaces/${workspace.id}/billing`}
-    data-testid="navbar-credits"
-    aria-label={`Credits: ${workspace.credits.toLocaleString()}. Open billing.`}
-    className="inline-flex h-10 items-center rounded-lg border border-transparent bg-white/70 px-2.5 font-Zilla-Slab text-sm font-bold text-brand-primary transition-colors duration-150 hover:border-brand-primary/30 hover:bg-white"
-  >
-    Credits&nbsp;
-    <span className="tabular-nums">{workspace.credits.toLocaleString()}</span>
-  </Link>
-);
-
-/** Show credits only for Admin+ members; the server nulls credits otherwise. */
-function creditWorkspaceFor(
-  workspaces: RootWorkspaceSummary[] | null,
-  activeWorkspaceId: string | undefined,
-): (RootWorkspaceSummary & { credits: number }) | null {
-  if (!workspaces || !activeWorkspaceId) return null;
-  const active = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
-  if (!active) return null;
-  if (typeof active.credits !== "number") return null;
-  if (!hasMinRole(active.role, MemberRole.Admin)) return null;
-  return { ...active, credits: active.credits };
-}
-
 const UserDropdownMenu = ({
   user,
   handleSignOut,
@@ -263,7 +228,6 @@ export default function Navbar({
 }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const workspaceId = params.id;
-  const creditWorkspace = creditWorkspaceFor(workspaces, workspaceId);
   const location = useLocation();
   const [prevPathname, setPrevPathname] = useState(location.pathname);
 
@@ -307,7 +271,6 @@ export default function Navbar({
             ) : (
               <NavButton to={"/workspaces"}>Workspaces</NavButton>
             ))}
-          {creditWorkspace ? <NavbarCredits workspace={creditWorkspace} /> : null}
           {user && (
             <UserDropdownMenu user={user} handleSignOut={handleSignOut} />
           )}
@@ -336,7 +299,6 @@ export default function Navbar({
           handleSignOut={handleSignOut}
           workspaces={workspaces}
           activeWorkspaceId={workspaceId}
-          creditWorkspace={creditWorkspace}
         />
       </div>
     </header>

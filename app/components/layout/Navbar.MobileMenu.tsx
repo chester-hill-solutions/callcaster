@@ -23,7 +23,6 @@ type MobileMenuProps = {
   >;
   workspaces: RootWorkspaceSummary[] | null;
   activeWorkspaceId: string | undefined;
-  creditWorkspace: (RootWorkspaceSummary & { credits: number }) | null;
 };
 
 export const MobileMenu = ({
@@ -34,7 +33,6 @@ export const MobileMenu = ({
   handleSignOut,
   workspaces,
   activeWorkspaceId,
-  creditWorkspace,
 }: MobileMenuProps) => {
   const navLinkClass =
     "block rounded-lg border border-transparent px-3 py-2 font-Zilla-Slab text-lg font-semibold text-foreground transition-colors hover:border-border hover:bg-muted";
@@ -98,19 +96,6 @@ export const MobileMenu = ({
                   {workspace.name}
                 </NavLink>
               ))}
-              {creditWorkspace ? (
-                <Link
-                  to={`/workspaces/${creditWorkspace.id}/billing`}
-                  onClick={close}
-                  className="block px-3 py-1 text-sm text-muted-foreground underline-offset-2 hover:underline"
-                >
-                  Credits:{" "}
-                  <span className="tabular-nums font-medium text-foreground">
-                    {creditWorkspace.credits.toLocaleString()}
-                  </span>{" "}
-                  · Add credits
-                </Link>
-              ) : null}
             </div>
           )}
 

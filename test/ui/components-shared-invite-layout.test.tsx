@@ -251,7 +251,6 @@ describe("app/components/layout/Navbar.MobileMenu.tsx", () => {
             handleSignOut={async () => ({ success: null, error: null })}
             workspaces={null}
             activeWorkspaceId={undefined}
-            creditWorkspace={null}
           />
         </SmokeRouter>
       );
