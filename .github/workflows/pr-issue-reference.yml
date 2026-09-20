@@ -1,0 +1,67 @@
+name: PR issue reference
+
+# #1897 (part 2): every pull request into `dev` must reference an issue, so
+# merged-to-dev work stays traceable back to the board. Accepts this repo's two
+# conventions — a closing keyword (`Fixes/Closes #N`) or a bare
+# `Issues: #N, #N` line (codex-sourced fixes) — with a `no-issue` label
+# override for genuine chores (docs/CI tweaks).
+#
+# This is a gate on the pull request itself, not a commenter: the
+# merge-on-dev comment + project Status behaviour stays in issue-on-dev.yml
+# (untouched).
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+    branches: [dev]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  require-issue-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for the no-issue override label
+        id: labels
+        env:
+          LABELS: ${{ toJson(github.event.pull_request.labels[*].name) }}
+        run: |
+          if printf '%s' "$LABELS" | grep -q '"no-issue"'; then
+            echo "has_override=true" >> "$GITHUB_OUTPUT"
+            echo "no-issue label present; the issue reference is not required"
+          else
+            echo "has_override=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Find issue references
+        id: issues
+        if: steps.labels.outputs.has_override != 'true'
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Same two conventions and regexes as issue-on-dev.yml — closing
+          # keywords AND the bare `Issues: #N, #N` line. The sort+tr must stay
+          # INSIDE the $(...) or the subshell loses the assignment.
+          numbers=$(
+            { printf '%s' "$BODY" \
+                | grep -oiE '\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b[[:space:]]*:?[[:space:]]*#[0-9]+' \
+                | grep -oE '[0-9]+$'; \
+              printf '%s\n' "$BODY" \
+                | grep -oiE '\bissues?\b[[:space:]]*:?[[:space:]]*#[0-9]+([[:space:],]+#?[0-9]+)*' \
+                | grep -oE '#[0-9]+' | grep -oE '[0-9]+$'; } \
+            | sort -un | tr '\n' ' '
+          )
+          echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
+          if [ -n "$numbers" ]; then
+            echo "References: $numbers"
+          fi
+
+      - name: Fail when no issue is referenced
+        if: steps.labels.outputs.has_override != 'true' && steps.issues.outputs.numbers == ''
+        run: |
+          echo "::error::PRs into dev must reference an issue. Either:"
+          echo "::error::  - add \"Closes #N\" / \"Fixes #N\", or"
+          echo "::error::  - add a bare \"Issues: #N, #N\" line (this repo's convention), or"
+          echo "::error::  - label the PR 'no-issue' for a genuine chore."
+          exit 1
