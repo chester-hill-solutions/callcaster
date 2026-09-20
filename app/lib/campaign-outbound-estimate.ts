@@ -23,6 +23,14 @@ export const QUEUE_NEXT_DELAY_MS = 200;
 export const SMS_HANDLER_NEXT_DELAY_MS = 300;
 export const IVR_HANDLER_NEXT_DELAY_MS = 500;
 
+/**
+ * Assumed average in-flight time per IVR call — ring time, connect, the menu,
+ * and hang-up or voicemail. The queue drains at CALL COMPLETION, so
+ * completion is bounded by `voiceConcurrentCallLimit / this duration`, not by
+ * the dial-start rate (#1874).
+ */
+export const IVR_AVG_CALL_DURATION_SECONDS = 75;
+
 type ThroughputContext = {
   smsSenderClass: WorkspaceTwilioOpsConfig["smsSenderClass"];
   trafficClass: TwilioTrafficClass;
@@ -64,6 +72,14 @@ export type IvrCampaignEstimate = {
   configuredDispatcherDialAttemptsPerSecond: number;
   twilioAssumedDialAttemptsPerSecond: number;
   effectiveDialAttemptsPerSecond: number;
+  /**
+   * Dial starts per second minus the concurrency bound
+   * (`voiceConcurrentCallLimit / IVR_AVG_CALL_DURATION_SECONDS`). Rows only
+   * dequeue after a call completes, so THIS is the completion rate the ETA
+   * should use (#1874).
+   */
+  effectiveCompletionPerSecond: number;
+  avgCallDurationSeconds: number;
   voiceConcurrentCallLimit: number;
   senderPoolSize: number;
   senderContextLabel: string;
@@ -259,6 +275,16 @@ export function estimateIvrCampaignOutbound(
     twilioAssumedDialAttemptsPerSecond,
   );
 
+  const voiceConcurrentCallLimit = input.portalConfig.voiceConcurrentCallLimit;
+  const completionBound =
+    voiceConcurrentCallLimit > 0
+      ? voiceConcurrentCallLimit / IVR_AVG_CALL_DURATION_SECONDS
+      : Infinity;
+  const effectiveCompletionPerSecond = Math.min(
+    effectiveDialAttemptsPerSecond,
+    completionBound,
+  );
+
   const warnings: string[] = [];
   if (
     input.portalConfig.parallelDispatchEnabled &&
@@ -266,6 +292,11 @@ export function estimateIvrCampaignOutbound(
   ) {
     warnings.push(
       "Voice CPS above 5 typically requires Twilio Business Profile approval and a CPS increase.",
+    );
+  }
+  if (completionBound < effectiveDialAttemptsPerSecond) {
+    warnings.push(
+      `IVR completion is bound by the concurrent call limit (${voiceConcurrentCallLimit} in-flight × ~${IVR_AVG_CALL_DURATION_SECONDS}s per call), which is slower than the dial-start rate.`,
     );
   }
   if (!input.portalConfig.parallelDispatchEnabled) {
@@ -279,13 +310,16 @@ export function estimateIvrCampaignOutbound(
     configuredDispatcherDialAttemptsPerSecond,
     twilioAssumedDialAttemptsPerSecond,
     effectiveDialAttemptsPerSecond,
-    voiceConcurrentCallLimit: input.portalConfig.voiceConcurrentCallLimit,
+    effectiveCompletionPerSecond,
+    avgCallDurationSeconds: IVR_AVG_CALL_DURATION_SECONDS,
+    voiceConcurrentCallLimit,
     senderPoolSize,
     senderContextLabel,
     warnings,
     footnotes: [
       "Dial-attempt rate reflects dial starts per second, not completed calls.",
-      "Total IVR completion time also depends on ring time, answer rate, call duration, and concurrent call limits.",
+      "Rows are dequeued after each call completes; the estimate bounds completion by the concurrent call limit over the average in-flight call time (~75s: ring, menu, hang-up/voicemail).",
+      "Total IVR completion time also depends on ring time, answer rate, and call duration.",
     ],
   };
 }

@@ -177,7 +177,7 @@ export function CampaignLaunchExtras({
   const ivrEtaRange = isIvrCampaign
     ? getEtaRange({
         queueCount,
-        ratePerSecond: ivrEstimate.effectiveDialAttemptsPerSecond,
+        ratePerSecond: ivrEstimate.effectiveCompletionPerSecond,
         policy: ivrCallingPolicy(campaignData),
       })
     : null;
@@ -190,9 +190,15 @@ export function CampaignLaunchExtras({
     ...messageEstimate.warnings,
   ];
   const ivrTooltipLines = [
-    `Estimated effective dial-start rate: ${formatRatePerMinute(ivrEstimate.effectiveDialAttemptsPerSecond)} CPS.`,
+    `Estimated completion rate: ${formatRatePerMinute(
+      ivrEstimate.effectiveCompletionPerSecond,
+    )} calls/sec (dial starts ${formatRatePerMinute(
+      ivrEstimate.effectiveDialAttemptsPerSecond,
+    )} CPS; ${ivrEstimate.voiceConcurrentCallLimit} concurrent × ~${
+      ivrEstimate.avgCallDurationSeconds
+    }s in-flight per call).`,
     ivrEtaRange
-      ? `If started now, queue dial attempts are estimated to complete around ${ivrEtaRange}.`
+      ? `If started now, queue completion is estimated around ${ivrEtaRange}.`
       : "Queue completion ETA appears after contacts are queued.",
     ...ivrEstimate.warnings,
   ];
