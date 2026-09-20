@@ -1,31 +1,5 @@
 [
   {
-    "issueNumber": 1327,
-    "verdict": "verify-close",
-    "summary": "Collapse the vestigial pageData.campaignDetails nesting in script editors. Flattened in #1353 (664708c7); Sai reopened requesting manual verification since other closures from the same PR did not hold.",
-    "currentBehavior": "Script editor routes consume flattened campaign/script fields; no campaignDetails accessor remains. Sai cannot see this on the stale review env.",
-    "rootCause": "Internal refactor, invisible without a redeploy.",
-    "resolution": "Verify on dev: rg campaignDetails in app/ has no editor hits, script editor routes render and save (covered by test/ui/script-editor-*.test.tsx), then close.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/campaigns/$selected_id/script/edit.route.tsx",
-      "app/routes/workspaces+/$id/scripts/"
-    ],
-    "existingTests": [
-      "test/ui/script-editor-route.test.tsx",
-      "test/ui/script-editor-adapter.test.tsx",
-      "test/ui/campaign-script-edit-route.test.tsx"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "No campaignDetails references in editor code on dev",
-      "Editor tests green on dev"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Verification only; no new code.",
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1333,
     "verdict": "verify-close",
     "recommendedTitle": "test(chats): prove STOP and START text remains visible to operators",
@@ -545,5 +519,944 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Merged on dev in PR #1952 (0beba212); closes on master promotion."
+  },
+  {
+    "issueNumber": 1854,
+    "verdict": "verify-close",
+    "recommendedTitle": "Public API: reject simple_ivr / complex_ivr with a steering error (#1741 follow-up)",
+    "summary": "The public campaign-creation API now rejects legacy simple_ivr/complex_ivr with a steering error to robocall, and OpenAPI plus docs advertise only the supported types. Shipped on dev in PR #1904 (078c797f).",
+    "currentBehavior": "A create request with type simple_ivr/complex_ivr fails validation with '\"<value>\" is no longer supported; use \"robocall\" instead'. OpenAPI enums, generated clients and docs list only live_call/robocall.",
+    "rootCause": "The create-with-script schema advertised simple_ivr/complex_ivr and mapped them to the ivr script kind.",
+    "resolution": "No code work left. Verify the rejection message and docs on the review env, then close when dev is promoted to master.",
+    "lookIn": [
+      "app/lib/schemas/api/create-with-script.ts",
+      "app/lib/create-with-script.server.ts",
+      "app/lib/campaign-settings.ts",
+      "app/lib/openapi-integrator.ts",
+      "docs/api-create-campaign-with-script.md"
+    ],
+    "existingTests": [
+      "test/campaigns-create-with-script.route.test.ts",
+      "test/openapi.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A simple_ivr/complex_ivr create request fails with a message directing the caller to robocall",
+      "OpenAPI and the public docs list only the supported types"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close. Dev-only: 078c797f is in origin/dev but not origin/master; close when dev promotes to master."
+  },
+  {
+    "issueNumber": 1938,
+    "verdict": "verify-close",
+    "recommendedTitle": "Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes",
+    "summary": "All three children shipped on dev: middleware builds the scoped tdb once (#1940/PR #1941), the unscoped admin client is banned in app/lib with a ratchet baseline (#1939/PR #1943), and the base db client is ratcheted too (#1942/PR #1944). The epic's acceptance is met on dev.",
+    "currentBehavior": "workspaceMiddleware and dataPlaneMiddleware build createTenantDb(workspaceId) once and expose tdb on the route context; workspaces+ routes read context.tdb. scripts/check-unscoped-db-imports.mjs bans @/server/admin-db and @/server/db in app/lib against an 81-entry baseline.",
+    "rootCause": "The scoped-client rule was enforced only in app/routes; app/lib was honor-system.",
+    "resolution": "No code work left. Verify on the review env that no workspaces+ route constructs createTenantDb and that the unscoped-import guard fails on a probe import, then close when dev is promoted to master.",
+    "lookIn": [
+      "app/lib/route-context.server.ts",
+      "app/lib/workspace-middleware.server.ts",
+      "app/lib/data-plane-middleware.server.ts",
+      "app/lib/workspace-route.server.ts",
+      "scripts/check-unscoped-db-imports.mjs",
+      "scripts/baselines/unscoped-db-imports.txt",
+      "eslint.config.mjs"
+    ],
+    "existingTests": [
+      "test/helpers/route-context-mock.ts",
+      "test/ci-guard-scripts.test.ts"
+    ],
+    "missingTests": [
+      "A guard probe that a new app/lib module importing @/server/admin-db fails the run"
+    ],
+    "acceptanceCriteria": [
+      "No route file under app/routes constructs createTenantDb for a plain request-scoped read or write",
+      "tdb is built once per workspace request, in middleware",
+      "A new app/lib module cannot import @/server/admin-db without adding itself to a ratchet allowlist",
+      "npm run ci:local is green"
+    ],
+    "blockedBy": [],
+    "size": "L-XL",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close. Children #1939/#1940/#1942 merged to dev (PRs #1943/#1941/#1944) but not master; close the epic when dev promotes to master."
+  },
+  {
+    "issueNumber": 1932,
+    "verdict": "verify-close",
+    "recommendedTitle": "Systemic structural review: PR risk template + coverage gate",
+    "summary": "PR #1935 (93def136) added .github/pull_request_template.md and the review-coverage workflow gate: high-risk paths or a ~500-line diff require a Structural review: marker. Shipped on dev only.",
+    "currentBehavior": "Every PR body declares Files touched / Risk class / Structural review; the review-coverage workflow fails a PR that touches app/lib/worker/, app/server/, app/db/ or client/migrations/, or crosses the line cap, without the marker.",
+    "rootCause": "Structural review was an end-of-batch habit, so problems were caught after merge.",
+    "resolution": "No code work left in-repo. Verify the gate fails an unmarked high-risk PR on the review env, then close when dev is promoted to master.",
+    "lookIn": [
+      ".github/pull_request_template.md",
+      ".github/workflows/review-coverage.yml",
+      ".github/workflows/pr-issue-reference.yml"
+    ],
+    "existingTests": [
+      "Workflow self-validates on its own PR"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "PR template declares risk surface",
+      "Gate fails high-risk PRs without a Structural review: marker",
+      "ci:local green"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close. Dev-only (93def136 not in master); confirm the marker is enforced, then close on promotion."
+  },
+  {
+    "issueNumber": 1874,
+    "verdict": "verify-close",
+    "recommendedTitle": "IVR estimates are too low. projected CPS is too high",
+    "summary": "The IVR completion estimate is now bounded by voiceConcurrentCallLimit / average in-flight call duration and labelled as completion time. Shipped on dev in PR #1934 (e833d955).",
+    "currentBehavior": "campaign-outbound-estimate.ts computes the effective IVR rate as min(configured dispatcher CPS, voiceConcurrentCallLimit / IVR_AVG_CALL_DURATION_SECONDS) and footnote-annotates the concurrent-call bound.",
+    "rootCause": "The projection treated CPS (dial-start rate) as a completion rate while IVR rows are dequeued only at call completion.",
+    "resolution": "No code work left. Verify a 5000-call IVR projection against the concurrency bound on the review env, then close when dev is promoted to master.",
+    "lookIn": [
+      "app/lib/campaign-outbound-estimate.ts",
+      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx",
+      "app/lib/campaign-ivr-dispatch.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-outbound-estimate.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "IVR projection accounts for the concurrent-call bound",
+      "Projection is labelled as completion time, not dial time"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close. Dev-only (e833d955 not in master); close when dev promotes to master."
+  },
+  {
+    "issueNumber": 1931,
+    "verdict": "verify-close",
+    "recommendedTitle": "Ratchet the test echo-shape: expectations that reuse SUT exports",
+    "summary": "PR #1933 (3bfd5210) added scripts/check-test-echo.mjs plus an empty baseline, wired check:test-echo into ci:local, and converted the remaining echo candidates. Shipped on dev only.",
+    "currentBehavior": "check:test-echo scans test/ for toBe/toEqual/toContain whose expected argument is an identifier imported from app/ or shared/; scripts/test-echo-baseline.json is {}.",
+    "rootCause": "Assertions could echo SUT exports, so any value the SUT chose would pass.",
+    "resolution": "No code work left. Re-run npm run check:test-echo on the review env, then close when dev is promoted to master.",
+    "lookIn": [
+      "scripts/check-test-echo.mjs",
+      "scripts/test-echo-baseline.json",
+      "package.json",
+      ".github/workflows/ci.yml"
+    ],
+    "existingTests": [
+      "test/test-echo-checker.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "check:test-echo reports echo-shaped expectations",
+      "Existing occurrences are zero; the count only ratchets down",
+      "Both suites stay green"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close. Dev-only (3bfd5210 not in master); baseline is empty."
+  },
+  {
+    "issueNumber": 1925,
+    "verdict": "verify-close",
+    "recommendedTitle": "Prune tautological tests (echo tests) with kill-verification",
+    "summary": "First tautological-test prune pass shipped on dev in PR #1929 (5ab94de6), pinning echoed constants as literals across five tests with kill-verification. The remaining sweep is tracked by #1931.",
+    "currentBehavior": "audience-upload-chunk-delay, campaign-terminology, number-rental, throughput-config, and tts-voices tests now assert literal expectations instead of SUT-derived values.",
+    "rootCause": "Tests whose expectations echoed the implementation stayed green while the behaviour could rot.",
+    "resolution": "No code work left for this pass. Verify the five converted tests are kill-verified, then close when dev is promoted to master; the wider sweep continues in #1931.",
+    "lookIn": [
+      "test/audience-upload-chunk-delay.test.ts",
+      "test/campaign-terminology.test.ts",
+      "test/number-rental.test.ts",
+      "test/throughput-config.server.test.ts",
+      "test/tts-voices.test.ts"
+    ],
+    "existingTests": [
+      "The five converted test files themselves"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Each rewritten test is listed with its kill-check outcome in the PR",
+      "Both suites stay green; no behaviour coverage is lost"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close. Dev-only (5ab94de6 not in master); follow-on sweep is #1931."
+  },
+  {
+    "issueNumber": 1924,
+    "verdict": "verify-close",
+    "recommendedTitle": "Effects gate: require @effect-why-not-loader and flag 'none' side-effects",
+    "summary": "PR #1928 (e15dda5b) made @effect-why-not-loader a required tag (or a CANDIDATE-REMOVE marker), extracted the compliance predicate to scripts/lib/effects-lib.mjs, and unit-tested it. Shipped on dev only.",
+    "currentBehavior": "scripts/check-effects.mjs fails an effect without @effect-why-not-loader unless it carries the CANDIDATE-REMOVE purpose marker; the 'side-effects: none => CANDIDATE-REMOVE' half was deliberately dropped as overbroad.",
+    "rootCause": "The why-not-loader tag was optional.",
+    "resolution": "No code work left. Verify check:effects on the review env, then close when dev is promoted to master; docs/effects-strictness.md records why 'none' is not auto-flagged.",
+    "lookIn": [
+      "scripts/check-effects.mjs",
+      "scripts/lib/effects-lib.mjs",
+      "docs/effects-strictness.md",
+      "docs/effects-inventory.md"
+    ],
+    "existingTests": [
+      "test/effects-compliance.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Every effect requires a non-empty @effect-why-not-loader or the CANDIDATE-REMOVE marker",
+      "Existing effects backfilled; weak ones marked CANDIDATE-REMOVE",
+      "docs/effects-strictness.md documents the requirement"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close. Dev-only (e15dda5b not in master)."
+  },
+  {
+    "issueNumber": 1910,
+    "verdict": "verify-close",
+    "recommendedTitle": "Issue board: render unenriched issues in a Needs triage lane",
+    "summary": "PR #1927 (87ecef16) made the board generator render unenriched open issues in a Needs triage lane instead of refusing to write, while still validating existing records. Shipped on dev only.",
+    "currentBehavior": "npm run tools:issues:board exits 0 and writes a board that includes every open issue; unenriched issues land in Needs triage. A malformed enriched record still fails the run.",
+    "rootCause": "The generator required an enrichment record for every open issue, so the board could not refresh.",
+    "resolution": "No code work left. Verify the generator exits 0 and a malformed record still fails on the review env, then close when dev is promoted to master.",
+    "lookIn": [
+      "scripts/issue-board-generate.mjs",
+      "scripts/issue-board-lib.mjs",
+      "scripts/issue-board-enrichment/"
+    ],
+    "existingTests": [
+      "test/issue-board-generator.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "tools:issues:board exits 0 and includes every open issue, unenriched ones in Needs triage",
+      "A malformed enriched record still fails the run",
+      "The board header reports the Needs-triage count"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close. Dev-only (87ecef16 not in master)."
+  },
+  {
+    "issueNumber": 1897,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: git hooks + PR issue-reference gate (shipped to dev in #1921/#1926)",
+    "summary": "Both halves shipped to dev: a checked-in pre-commit hook wired via core.hooksPath, and a PR-into-dev issue-reference gate. Merged in PR #1921 (23700b0f) and PR #1926 (f416f037). Both are ancestors of origin/dev but NOT of origin/master.",
+    "rootCause": "The repo had no git hooks and no requirement that a PR body reference an issue.",
+    "resolution": "Verify on dev only: stage a lint error and confirm the pre-commit hook blocks the human commit; open a dev PR without an issue reference and confirm the check is red, then add no-issue and confirm it clears. No new code expected.",
+    "lookIn": [
+      ".githooks/pre-commit",
+      "scripts/setup-githooks.sh",
+      "package.json",
+      ".github/workflows/pr-issue-reference.yml",
+      ".github/workflows/issue-on-dev.yml"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A commit with a lint error is blocked by the pre-commit hook.",
+      "A PR into dev with no issue reference fails a check unless labelled no-issue."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after dev verification; promote #1921/#1926 to master first."
+  },
+  {
+    "issueNumber": 1919,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: single-consumer hooks dropped from the global barrel (#1920)",
+    "summary": "app/hooks/index.ts no longer exports useSurveyForm or useCampaignExport; the hooks stay reachable through their sub-barrels. Shipped to dev in PR #1920 (95f084c9); ancestor of origin/dev, NOT of origin/master.",
+    "rootCause": "The #1892 DRY pass widened the global barrel with hooks that have one consumer each.",
+    "resolution": "Verify on dev: rg the two hook names in app/hooks/index.ts finds no export, and the survey/export tests stay green. No new code expected.",
+    "lookIn": [
+      "app/hooks/index.ts",
+      "app/hooks/surveys/index.ts",
+      "app/hooks/campaign/index.ts"
+    ],
+    "existingTests": [
+      "test/ui/use-survey-form.test.tsx",
+      "test/ui/campaign-export-button.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "The global-barrel exports are dropped; the sub-barrels keep the hooks.",
+      "No import breaks."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
+  },
+  {
+    "issueNumber": 1918,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: loadQueueItemRelations returns grouped contact maps (#1920)",
+    "summary": "loadQueueItemRelations in app/lib/campaign-queue-search.server.ts now returns { contactById, attemptsByContactId, audiencesByContactId } and both fetchers consume the same maps. Shipped to dev in PR #1920 (95f084c9); NOT yet master.",
+    "rootCause": "The helper returned raw arrays, so the page fetcher grouped them while the item fetcher re-filtered them.",
+    "resolution": "Verify on dev: queue route suites green and both fetchers use the maps. No new code expected.",
+    "lookIn": [
+      "app/lib/campaign-queue-search.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-queue.route.test.ts",
+      "test/campaign-queue-db.claim.test.ts",
+      "test/campaign-settings-queue.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "The helper returns grouped-by-contact maps used by both consumers.",
+      "The queue suites stay green."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
+  },
+  {
+    "issueNumber": 1917,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: type the public survey guard's extra required fields (#1920)",
+    "summary": "extraRequiredFields is typed as PublicSurveyRequiredField[] in app/lib/survey-public-action.server.ts. Shipped to dev in PR #1920 (95f084c9); NOT yet master.",
+    "rootCause": "The shared guard encoded one route's requirement as an untyped string list.",
+    "resolution": "Verify on dev: survey route suites stay green and the type alias is used. No new code expected.",
+    "lookIn": [
+      "app/lib/survey-public-action.server.ts"
+    ],
+    "existingTests": [
+      "test/survey-answer.route.test.ts",
+      "test/survey-complete.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "extraRequiredFields is typed or the required-field check stays route-local.",
+      "Survey route suites stay green."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
+  },
+  {
+    "issueNumber": 1916,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: campaign export poll keyed on ids only, stops on terminal status (#1920)",
+    "summary": "useCampaignExport's poll effect depends on [exportId, workspaceIdStr] only and clears its interval on terminal status. Shipped to dev in PR #1920 (95f084c9); NOT yet master.",
+    "rootCause": "Keying the interval on exportStatus tore down and restarted the 2s timer on every status change.",
+    "resolution": "Verify on dev: test/ui/campaign-export-button.test.tsx covers start -> poll -> completed with fake timers. No new code expected.",
+    "lookIn": [
+      "app/hooks/campaign/useCampaignExport.ts",
+      "app/components/campaign/CampaignExportButton.tsx"
+    ],
+    "existingTests": [
+      "test/ui/campaign-export-button.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "The interval is keyed on exportId / workspaceIdStr only; terminal status stops polling."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
+  },
+  {
+    "issueNumber": 1915,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: admin pagination consolidated onto TablePagination (#1920)",
+    "summary": "TablePagination gained optional pageSizeOptions + onPageSizeChange; AdminPagination is deleted and the three admin panels use TablePagination. Shipped to dev in PR #1920 (95f084c9); NOT yet master.",
+    "rootCause": "The DRY pass extracted a near-duplicate AdminPagination instead of extending the canonical component.",
+    "resolution": "Verify on dev: rg AdminPagination finds no imports; test/ui/table-pagination-page-size.test.tsx green. Eyeball the three admin panels' pagination. No new code expected.",
+    "lookIn": [
+      "app/components/shared/TablePagination.tsx",
+      "app/components/admin/",
+      "app/components/queue/QueueTablePagination.tsx"
+    ],
+    "existingTests": [
+      "test/ui/table-pagination-page-size.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "TablePagination gains the page-size select.",
+      "AdminPagination is deleted; the three admin panels use TablePagination."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
+  },
+  {
+    "issueNumber": 1914,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: survey routes share the fetcher redirect and error extraction (#1920)",
+    "summary": "app/lib/survey-submit.ts owns SurveySubmitResult, surveySubmitError, and surveySuccessPath; both survey routes import it and render <Navigate>. Shipped to dev in PR #1920 (95f084c9); NOT yet master.",
+    "rootCause": "The two routes carried ~40 duplicated lines.",
+    "resolution": "Verify on dev: test/ui/survey-create-edit-redirect.test.tsx green and both routes import from @/lib/survey-submit. No new code expected.",
+    "lookIn": [
+      "app/lib/survey-submit.ts",
+      "app/routes/workspaces+/$id/surveys/new.route.tsx",
+      "app/routes/workspaces+/$id/surveys/$surveyId/edit.route.tsx"
+    ],
+    "existingTests": [
+      "test/ui/survey-create-edit-redirect.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A shared helper owns the redirect and error extraction.",
+      "Both routes use it."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
+  },
+  {
+    "issueNumber": 1913,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: SurveyForm decomposed into page and question subcomponents (#1920)",
+    "summary": "SurveyForm.tsx defines SurveyQuestionCard and SurveyPageSection; the top-level SurveyForm function is under the 200-line threshold. Shipped to dev in PR #1920 (95f084c9); NOT yet master.",
+    "rootCause": "The file held a 265-line function with everything inline.",
+    "resolution": "Verify on dev: lint reports no max-lines-per-function warning and survey tests stay green. No new code expected.",
+    "lookIn": [
+      "app/components/surveys/SurveyForm.tsx"
+    ],
+    "existingTests": [
+      "test/ui/survey-create-edit-redirect.test.tsx",
+      "test/ui/use-survey-form.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "SurveyPageSection and SurveyQuestionCard are extracted.",
+      "The top-level function drops under the threshold."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
+  },
+  {
+    "issueNumber": 1912,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: survey ids derive from the highest suffix, unique after removal (#1920)",
+    "summary": "useSurveyForm derives new page/question ids from nextSuffix() (highest existing suffix + 1) and a regression test asserts ids stay unique after a middle removal. Shipped to dev in PR #1920 (95f084c9); NOT yet master.",
+    "rootCause": "Ids were derived from array.length + 1, which collides after a middle removal.",
+    "resolution": "Verify on dev: test/ui/use-survey-form.test.tsx includes the uniqueness regression. No new code expected.",
+    "lookIn": [
+      "app/hooks/surveys/useSurveyForm.ts",
+      "test/ui/use-survey-form.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/use-survey-form.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "New ids derive from the max existing numeric suffix.",
+      "A test adds three, removes the middle, adds another, asserts unique ids."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
+  },
+  {
+    "issueNumber": 1911,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: useSurveyForm mutators collapsed onto index primitives (#1920)",
+    "summary": "useSurveyForm routes nested mutations through updatePages/withPage/withQuestions/withQuestion/withOptions/withOption, with generic field setters linking field and value types. Shipped to dev in PR #1920 (95f084c9); NOT yet master.",
+    "rootCause": "Ten hand-written map-replace handlers duplicated index threading and immutability.",
+    "resolution": "Verify on dev: test/ui/use-survey-form.test.tsx stays green and the primitives are the only traversal. No new code expected.",
+    "lookIn": [
+      "app/hooks/surveys/useSurveyForm.ts"
+    ],
+    "existingTests": [
+      "test/ui/use-survey-form.test.tsx"
+    ],
+    "missingTests": [
+      "Type-level assertion that the generic setters reject mismatched field/value pairs"
+    ],
+    "acceptanceCriteria": [
+      "Index primitives own traversal once.",
+      "All mutators are expressed through them.",
+      "Setters are generic."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
+  },
+  {
+    "issueNumber": 1889,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify: predictive auto-dial honours the voicemail-drop switch",
+    "summary": "Fixed on dev in PR #1901 (16a7abdd, merged 2026-09-19, base dev). NOT in master (origin/master 807cea82), so dev-only until the next release.",
+    "currentBehavior": "On dev, the predictive AMD branch reads voicemail_drop_enabled and calls machineAnswerDisposition.",
+    "rootCause": "The AMD branch read campaign.voicemail_file but never campaign.voicemail_drop_enabled.",
+    "resolution": "No new code. Verify on the review environment, then close when promoted to master.",
+    "lookIn": [
+      "app/routes/api+/auto-dial/$roomId.action.server.ts",
+      "app/lib/telephony-db.server.ts",
+      "app/lib/ivr-machine.server.ts"
+    ],
+    "existingTests": [
+      "test/auto-dial-room.route.test.ts",
+      "test/integration-db/call-status-guard.test.ts",
+      "test/telephony-db-call-status-guard.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Predictive + machine + drop off yields No Answer with no audio",
+      "Predictive + machine + drop on yields Voicemail with the drop played"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify on the review env; close when promoted to master (dev-only today)."
+  },
+  {
+    "issueNumber": 1869,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify: test calls leave the campaign queue untouched",
+    "summary": "Fixed on dev in PR #1900 (2a2eb281, merged 2026-09-19, base dev). NOT in master, so dev-only.",
+    "currentBehavior": "On dev, the dequeue block in webhook-side-effects.server.ts is gated on outreachAttemptId != null.",
+    "rootCause": "The contact-keyed dequeue had no guard on the resolved outreach attempt, so any terminal callback with a contact_id could mutate the queue.",
+    "resolution": "No new code. Verify on the review environment, then close when promoted to master.",
+    "lookIn": [
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/campaign-test-call.server.ts",
+      "app/routes/api+/call-status.action.server.ts"
+    ],
+    "existingTests": [
+      "test/webhook-side-effects.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A test call to a queued number leaves queue_state queued, queue_order unchanged, attempts unchanged and dequeued_at null"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify on the review env; close when promoted to master (dev-only today)."
+  },
+  {
+    "issueNumber": 1894,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify: the test suite is pinned to UTC",
+    "summary": "Fixed on dev in PR #1898 (4079b7ae, merged 2026-09-19, base dev). NOT in master, so dev-only.",
+    "currentBehavior": "On dev, vitest.shared.config.ts:16 sets test env { TZ: \"UTC\" } for both projects.",
+    "rootCause": "Neither vitest.shared.config.ts nor the setup files set TZ.",
+    "resolution": "No new code. Verify on the review environment and a non-UTC machine, then close when promoted to master.",
+    "lookIn": [
+      "vitest.shared.config.ts",
+      "test/ui/campaign-launch-eta.test.tsx",
+      "test/setup.node.ts",
+      "test/setup.ui.ts"
+    ],
+    "existingTests": [
+      "test/ui/campaign-launch-eta.test.tsx"
+    ],
+    "missingTests": [
+      "optional guard that process.env.TZ === \"UTC\" inside a test"
+    ],
+    "acceptanceCriteria": [
+      "process.env.TZ === \"UTC\" in node and ui tests without any per-file pin",
+      "The suite passes unchanged on a non-UTC machine"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify on the review env; close when promoted to master (dev-only today). Update the AGENTS.md per-file TZ pitfall once confirmed."
+  },
+  {
+    "issueNumber": 1891,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify: mobile nav sheet stacks its links vertically",
+    "summary": "Fixed on dev in PR #1893 (c83ad822, merged 2026-09-19, base dev). NOT in master, so dev-only.",
+    "currentBehavior": "On dev, navLinkClass in Navbar.MobileMenu.tsx:37 includes block.",
+    "rootCause": "navLinkClass lacked block, so <NavLink> stayed inline.",
+    "resolution": "No new code. Verify on the review environment at a narrow viewport, then close when promoted to master.",
+    "lookIn": [
+      "app/components/layout/Navbar.MobileMenu.tsx"
+    ],
+    "existingTests": [
+      "e2e/specs/marketing-mobile-nav.spec.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "On a narrow viewport, Home, Docs, Sign In and Sign Up stack one per row",
+      "Signed-in account links and the Log Out button stack the same way"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify on the review env; close when promoted to master (dev-only today)."
+  },
+  {
+    "issueNumber": 1888,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify: IVR machine answer with the drop off records No Answer",
+    "summary": "Fixed on dev in PR #1890 (d07e26b1, merged 2026-09-19, base dev). NOT in master, so dev-only.",
+    "currentBehavior": "On dev, machineAnswerDisposition(campaign) returns voicemail only when voicemail_drop_enabled && voicemail_file, otherwise no-answer.",
+    "rootCause": "recordVoicemailAnswer wrote disposition voicemail for every machine answer before deciding whether the drop would play.",
+    "resolution": "No new code. Verify on the review environment, then close when promoted to master.",
+    "lookIn": [
+      "app/lib/ivr-machine.server.ts",
+      "app/routes/api+/ivr/status.action.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-page.route.test.ts",
+      "test/ivr-status.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Drop on + audio records disposition voicemail",
+      "Drop off or no audio records disposition no-answer",
+      "Results, metrics and exports show No Answer in the second case"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify on the review env; close when promoted to master (dev-only today)."
+  },
+  {
+    "issueNumber": 1853,
+    "verdict": "verify-close",
+    "recommendedTitle": "Dev: workspace invite insert fails (works on prod)",
+    "summary": "Root cause confirmed in comments: workspace_invite.user_id had two FKs, one to legacy auth.users (empty on dev), so every invite insert failed. PR #1887 (c80e59ec) drops both legacy constraints in migration 20260919120000_drop_legacy_auth_users_fks.sql, wired into both bootstrap scripts. Merged on dev only.",
+    "currentBehavior": "On dev the dropped constraints are gone; the public.user FK remains. Master still has the legacy auth.users FKs.",
+    "rootCause": "Legacy Supabase auth.users FK on workspace_invite.user_id (and workspace_api_key.created_by).",
+    "resolution": "Invite a user on the review environment and confirm the insert succeeds; then close when the fix is promoted to master. No further code.",
+    "lookIn": [
+      "client/migrations/20260919120000_drop_legacy_auth_users_fks.sql",
+      "app/lib/invite-user-by-email.server.ts",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs"
+    ],
+    "existingTests": [
+      "test/accept-invite.route.test.ts",
+      "test/bootstrap-migrations.server.test.ts"
+    ],
+    "missingTests": [
+      "schema assertion that no public FK targets auth.users",
+      "invite insert succeeds with no legacy FK"
+    ],
+    "acceptanceCriteria": [
+      "Inviting a user to a workspace succeeds on dev",
+      "Root schema difference identified and reconciled",
+      "No public FK to auth.users remains after migrations"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify on review env. Merged on dev in PR #1887 (c80e59ec); close on master promotion."
+  },
+  {
+    "issueNumber": 1877,
+    "verdict": "verify-close",
+    "recommendedTitle": "De-duplicate the IVR runtime (machine policy, block runtime, option type, Setup sections)",
+    "summary": "PR #1879 (5435f694) landed the behaviour-preserving dedup on dev: one machine policy, one block runtime (ivr-block-runtime.server.ts), one runtime option type (IvrOption), and one Setup voice section. Master does not have it yet.",
+    "currentBehavior": "Outbound and inbound block routes are thin adapters over appendBlockResponse; the flow entry and status callback share the machine predicate. Legacy UI types remain only in the Result path.",
+    "rootCause": "Duplicated IVR runtime and Setup shells from the #1855/#1860/#1864/#1856/#1863/#1875 batch.",
+    "resolution": "Verify IVR keypad and speech flows and the Setup voice settings on the review environment, then close on promotion to master. No new code.",
+    "lookIn": [
+      "app/lib/ivr-machine.server.ts",
+      "app/lib/ivr-block-runtime.server.ts",
+      "app/lib/ivr-gather.server.ts",
+      "app/components/campaign/settings/basic/CampaignVoiceSettings.tsx"
+    ],
+    "existingTests": [
+      "test/ivr-block-runtime.test.ts",
+      "test/ivr-block.route.test.ts",
+      "test/inbound-ivr-block.route.test.ts",
+      "test/ivr-page.route.test.ts",
+      "test/ivr-status.route.test.ts",
+      "test/ui/campaign-voice-settings.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "One isMachineAnswered predicate and one machine-disposition write",
+      "One shared block-runtime module; routes are thin adapters",
+      "One option shape used by the runtime and gather helper",
+      "Setup renders one voice-settings section",
+      "All existing tests green; no behaviour change"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Merged on dev in PR #1879 (5435f694); closes on master promotion."
+  },
+  {
+    "issueNumber": 1863,
+    "verdict": "verify-close",
+    "recommendedTitle": "Move the remaining dial options (household, dial type) to campaign Setup",
+    "summary": "Household grouping and dial type were moved to campaign Setup by PR #1870 (2bb79c83, dev only); a later dev refactor (#1879/5435f694) folded the controls into CampaignVoiceSettings on Setup.",
+    "currentBehavior": "Setup's CampaignVoiceSettings shows Group by household and Dial Type. CampaignLaunch/CampaignLaunchExtras no longer render a Calling options block.",
+    "rootCause": "Launch held campaign configuration that belongs on Setup.",
+    "resolution": "Verify on the review env that Setup shows household grouping and dial type and Launch has no Calling options section. Close on master promotion. Do not reimplement; #1879 already merged the duplicate setup sections.",
+    "lookIn": [
+      "app/components/campaign/settings/basic/CampaignVoiceSettings.tsx",
+      "app/components/campaign/settings/CampaignLaunch.tsx",
+      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx"
+    ],
+    "existingTests": [
+      "test/ui/campaign-voice-settings.test.tsx",
+      "e2e/specs/dial-modes.spec.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Household grouping and dial type are set on Setup",
+      "Launch no longer shows a Calling options section",
+      "No behaviour change to the stored values"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "PR #1870 merge 2bb79c83 is on dev, not yet master. Closes on master promotion."
+  },
+  {
+    "issueNumber": 1856,
+    "verdict": "verify-close",
+    "recommendedTitle": "IVR advances when the caller speaks on a keypad-only step",
+    "summary": "Shipped on dev in PR #1872 (725d77df). The shared gather builder now gathers DTMF only unless the block declares a vx-any spoken option (ivrStepGathersSpeech).",
+    "currentBehavior": "Keypad-only steps build <Gather input=['dtmf']> (numDigits=1 for single-key menus). Speech is collected only for a vx-any option.",
+    "rootCause": "Every option block gathered input ['dtmf','speech']; any speech longer than two characters advanced the call.",
+    "resolution": "Verify on the review env that speaking at a DTMF menu waits for a keypress/timeout and an explicit speech step still routes speech. Close on master promotion. Do not reimplement; #1862 is a separate open follow-up.",
+    "lookIn": [
+      "app/lib/ivr-gather.server.ts",
+      "app/lib/ivr-block-runtime.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-block.route.test.ts",
+      "test/inbound-ivr-block.route.test.ts",
+      "test/ivr-gather.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Speaking at a DTMF menu does not advance the call",
+      "An explicit speech / vx-any step still captures and routes speech"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "PR #1872 merge 725d77df is on dev, not yet master. Closes on master promotion."
+  },
+  {
+    "issueNumber": 1864,
+    "verdict": "verify-close",
+    "recommendedTitle": "Review env: IVR still drops voicemail with the drop off (campaign 109)",
+    "summary": "Shipped on dev in PR #1867 (5132c4ed). The IVR flow-entry route acts on the synchronous AMD verdict before any IVR audio plays, and the status callback records the same disposition via app/lib/ivr-machine.server.ts.",
+    "currentBehavior": "A detected machine is dropped or hung up immediately, never routed into the IVR script. Drop off records no-answer (#1888); drop on records voicemail.",
+    "rootCause": "The IVR flow began serving prompts before Twilio's AMD status callback was processed.",
+    "resolution": "Verify on the review env that a machine answer with the drop off hangs up and records No Answer, and that the review service runs a commit including #1860/#1867. Close on master promotion. Do not reimplement.",
+    "lookIn": [
+      "app/lib/ivr-machine.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId.action.server.ts",
+      "app/routes/api+/ivr/status.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-page.route.test.ts",
+      "test/ivr-status.route.test.ts",
+      "test/ivr-block-runtime.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "With the drop off and saved, a machine answer hangs up with no voicemail",
+      "The review environment runs a commit that includes #1860"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "PR #1867 merge 5132c4ed is on dev, not yet master. Closes on master promotion."
+  },
+  {
+    "issueNumber": 1839,
+    "verdict": "verify-close",
+    "recommendedTitle": "Voice campaigns need a voicemail-drop toggle and dedicated voicemail audio on Setup (IVR and live)",
+    "summary": "Shipped on dev in PR #1860 (e1339d3d). Added campaign.voicemail_drop_enabled, backfilled true where voicemail_file existed; Setup owns the toggle and Voicemail audio picker; both runtimes gate on the switch; readiness blocks drop-on without audio.",
+    "currentBehavior": "Setup's CampaignVoiceSettings shows Voicemail drop plus dedicated voicemail audio. dial/status and ivr-machine only prepare/play the drop when voicemail_drop_enabled && voicemail_file; readiness raises voicemail_audio_required otherwise.",
+    "rootCause": "No explicit voicemail-drop boolean existed and IVR depended on a magic script page titled 'voicemail'.",
+    "resolution": "Verify on the review env that the toggle and dedicated audio appear on Setup for IVR and live, toggle-off never plays voicemail, and launch is blocked when the toggle is on with no audio. Close on master promotion. Caller-side controls stay in #1708; AMD latency is #1842/#1845.",
+    "lookIn": [
+      "app/components/campaign/settings/basic/CampaignVoiceSettings.tsx",
+      "app/lib/ivr-machine.server.ts",
+      "app/routes/api+/dial/status.action.server.ts",
+      "app/lib/campaign-readiness.ts",
+      "client/migrations/20260918120000_campaign_voicemail_drop_enabled.sql"
+    ],
+    "existingTests": [
+      "test/ui/campaign-voice-settings.test.tsx",
+      "test/ui/voicemail-setup.test.tsx",
+      "test/dial-status.route.test.ts",
+      "test/ivr-status.route.test.ts",
+      "test/campaign-readiness.test.ts",
+      "test/campaign-readiness-actions.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Setup shows a voicemail-drop toggle and dedicated voicemail audio for IVR and live",
+      "Toggle off: a detected machine never plays the voicemail",
+      "Toggle on + audio: both campaign types play the chosen audio on a machine",
+      "IVR plays the dedicated audio without a script page named voicemail"
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "PR #1860 merge e1339d3d is on dev, not yet master. Closes on master promotion. #1863 is also on dev."
+  },
+  {
+    "issueNumber": 1841,
+    "verdict": "verify-close",
+    "recommendedTitle": "IVR key press does not interrupt the current audio block (prompt sits outside the Gather)",
+    "summary": "Shipped on dev in PR #1851 (51240b0b). The prompt now renders inside <Gather> via the shared appendBlockResponse seam, so a keypad press interrupts playback.",
+    "currentBehavior": "When a block maps options, the gather is built first and the prompt is rendered into it; a DTMF press follows the mapped branch immediately.",
+    "rootCause": "handleAudio wrote the prompt as a sibling before the sibling <Gather>.",
+    "resolution": "Verify on the review env that pressing a key during a block prompt stops the prompt and navigates, for outbound and inbound IVR. Close on master promotion. Do not reimplement.",
+    "lookIn": [
+      "app/lib/ivr-block-runtime.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-block.route.test.ts",
+      "test/inbound-ivr-block.route.test.ts",
+      "test/ivr-block-runtime.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Pressing a key while a block prompt is playing stops the prompt and navigates",
+      "Applies to outbound campaign IVR and inbound IVR"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "PR #1851 merge 51240b0b is on dev, not yet master. Closes on master promotion."
+  },
+  {
+    "issueNumber": 1840,
+    "verdict": "verify-close",
+    "recommendedTitle": "IVR test call key press speaks the generic error: response route requires an outreach attempt",
+    "summary": "Shipped on dev in PR #1850 (2df51d56). The IVR response route now resolves the branch and persists nothing when outreach_attempt_id is null, matching the test-call design from #1653.",
+    "currentBehavior": "A key press on a test call with outreach_attempt_id null navigates to the mapped branch and records no result, typed fields, or support-level sync.",
+    "rootCause": "The response handler required an outreach attempt and threw when the id was absent.",
+    "resolution": "Verify on the review env that pressing a key on an IVR test call navigates and never speaks the generic error. Close on master promotion. Do not reimplement.",
+    "lookIn": [
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
+      "app/lib/campaign-test-call.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-block-response.route.test.ts",
+      "test/inbound-ivr-block-response.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Pressing a key on an IVR test call navigates to the mapped branch",
+      "The generic error is never spoken for a test call with no outreach attempt"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "PR #1850 merge 2df51d56 is on dev, not yet master. Closes on master promotion."
+  },
+  {
+    "issueNumber": 1849,
+    "verdict": "verify-close",
+    "recommendedTitle": "what happens when multiple columns map to the same column in call list upload",
+    "summary": "Working as designed. Duplicate mappings are a blocking validation: validateContactImportMapping flags duplicate-target, AudienceUploadMapStep shows a destructive 'Mapping needs attention' alert, Continue is blocked, and the upload action re-validates server-side. The guard shipped in PR #1063 (7824c824) and is on master.",
+    "currentBehavior": "Mapping both 'phone' and 'cell phone' to Phone number shows 'Phone number is assigned to more than one CSV column' and prevents continuing. The server rejects the same mapping independently.",
+    "rootCause": "Not a defect. The issue is a question about intentional designed behaviour.",
+    "resolution": "Answer the question and confirm the blocking behaviour is intended, then close. If the desired behaviour is to merge two phone columns, that is a new feature.",
+    "lookIn": [
+      "shared/contact-import-headers.ts",
+      "app/components/audience/AudienceUploadMapStep.tsx",
+      "app/components/audience/AudienceUploader.tsx",
+      "app/routes/api+/audience-upload.action.server.ts",
+      "app/lib/audience-upload-process.server.ts"
+    ],
+    "existingTests": [
+      "test/contact-import-headers.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Question answered with the current blocking behaviour",
+      "Blocking validation confirmed on master"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Answer and close as working-as-designed (validation from PR #1063 is on master). Open a separate feature ticket only if merging multiple phone columns is wanted."
+  },
+  {
+    "issueNumber": 360,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify the signed-in redirect on /signin and /signup and the home CTA",
+    "summary": "The sign-in and sign-up loaders already redirect a signed-in visitor to /workspaces, and the landing page shows 'Go to Workspaces' instead of Sign Up. Both are on master.",
+    "currentBehavior": "signin.loader.server.ts and signup.loader.server.ts redirect to /workspaces when getSession returns a user. _index renders 'Go to Workspaces' for a signed-in user.",
+    "rootCause": "The original gap was closed by the loader redirects plus the signed-in home CTA (release 807cea82, #1838).",
+    "resolution": "Verify on the deployed master environment that a signed-in visit to /signin and /signup redirects to /workspaces and that the home CTAs read 'Go to Workspaces'. No new code expected.",
+    "lookIn": [
+      "app/routes/signin.loader.server.ts",
+      "app/routes/signup.loader.server.ts",
+      "app/routes/_index/index.tsx",
+      "app/routes/_index/index.loader.server.ts"
+    ],
+    "existingTests": [
+      "test/ui/index.route.test.tsx",
+      "test/signup.route.test.ts",
+      "e2e/specs/auth.spec.ts",
+      "e2e/specs/signup-flow.spec.ts"
+    ],
+    "missingTests": [
+      "Loader test that /signin and /signup redirect to /workspaces when a session exists"
+    ],
+    "acceptanceCriteria": [
+      "Signed-in /signin redirects to /workspaces",
+      "Signed-in /signup redirects to /workspaces",
+      "The home hero and CTA read 'Go to Workspaces' when signed in"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Released to master (807cea82, #1838). Verify, then close; do not reimplement the redirects."
+  },
+  {
+    "issueNumber": 1824,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify the workspace picker runtime-error fix",
+    "summary": "PR #1825 kept the workspace actions inside the React Aria menu and rendered the pinned All workspaces footer as a plain button, removing the runtime error. The change is on master.",
+    "currentBehavior": "The workspace picker's All workspaces footer is a plain <button> with id all-workspaces outside the CommandList/menu.",
+    "rootCause": "A React Aria CommandItem (All workspaces) was rendered outside its required menu context, causing the runtime error.",
+    "resolution": "Retest on the review environment: open the workspace dropdown, choose a workspace, and choose All workspaces; confirm no error page. Close on master. Do not reimplement.",
+    "lookIn": [
+      "app/components/layout/Navbar.tsx"
+    ],
+    "existingTests": [
+      "test/ui/navbar-user-menu.test.tsx",
+      "test/ui/navbar-credits.test.tsx"
+    ],
+    "missingTests": [
+      "Workspace-picker regression test (the mocked test was deleted in PR #1825)"
+    ],
+    "acceptanceCriteria": [
+      "Opening the workspace dropdown does not throw",
+      "Choosing a workspace navigates to it",
+      "All workspaces navigates to /workspaces"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "PR #1825's change is present on master (release trunk 807cea82, #1838); verify and close."
   }
 ]

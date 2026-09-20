@@ -270,20 +270,6 @@
     "trackerRecommendation": "Phase-1: core tables; document coverage in the manifest format."
   },
   {
-    "issueNumber": 1697,
-    "verdict": "needs-decision",
-    "summary": "PR #1686 already merged (2026-09-09) and working (on-dev label + 'On dev: merged in' comments). Remaining is how the project status should be set (needs ON_DEV_PROJECT_NUMBER/PROJECT_TOKEN config) and whether to keep the label behaviour — ops/product decision, not code.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
     "issueNumber": 1699,
     "verdict": "needs-decision",
     "summary": "Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.",
@@ -440,16 +426,39 @@
   {
     "issueNumber": 1728,
     "verdict": "needs-decision",
-    "summary": "Campaign completes on queue drain (completeCampaignsDrainedByDequeue) while the dial fires async seconds later — behavior confirmed. What 'complete' means for IVR is a product decision that blocks the fix.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
+    "recommendedTitle": "IVR was marked as complete before the recipient actually received their dial",
+    "summary": "Confirmed defect with a product-semantics blocker. IVR dispatch dequeues each queue row immediately after Twilio calls.create (campaign-ivr-dispatch.server.ts:260-264), and completion fires whenever campaign_queue_has_pending_work is false. So once every row is dialled the campaign flips to 'complete' while calls are still ringing. Whether 'complete' means all dials attempted or all calls terminal is a product decision that gates the fix.",
+    "currentBehavior": "Campaign status turns 'complete' seconds after launch; the recipient's phone rings afterwards.",
+    "rootCause": "dequeued_at is written at dial time, not at call completion, while completion keys only off pending queue rows and never checks in-flight calls.",
+    "resolution": "Decide the semantics, then: preferred - treat a campaign as drained only when it has no pending queue rows AND no non-terminal calls; alternative - defer the IVR dequeue to the terminal status callback (larger; needs a timeout sweep). Note the existing test asserts the current buggy behaviour.",
+    "lookIn": [
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/ivr-initiate.server.ts",
+      "app/lib/campaign-queue-completion.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/routes/api+/ivr/status.action.server.ts",
+      "drizzle/0000_baseline.sql"
     ],
-    "size": "S",
+    "existingTests": [
+      "test/campaign-ivr-dispatch.test.ts",
+      "test/campaign-dispatch-worker.test.ts",
+      "test/ivr-status.route.test.ts",
+      "test/campaign-queue-throughput.integration.test.ts"
+    ],
+    "missingTests": [
+      "Campaign is not marked complete while it has a non-terminal call",
+      "A terminal status callback completes the campaign only after all calls settle",
+      "Update/remove the 'dequeues on success' assertion"
+    ],
+    "acceptanceCriteria": [
+      "Campaign status does not read 'complete' while any campaign call is still in flight",
+      "Completion happens after the last call reaches a terminal status (or after all dials attempt, if that is the decision)",
+      "No stalled campaign when a status callback never arrives"
+    ],
+    "blockedBy": [],
+    "size": "M",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Needs decision: product defines whether IVR 'complete' = all dials attempted or all calls settled. If settled, this becomes fix-now with the completion-gate path."
   },
   {
     "issueNumber": 1729,
@@ -582,5 +591,133 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Keeps blocking #1316 until the state is decided."
+  },
+  {
+    "issueNumber": 1880,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide: adopt Jev (TypeSafe) or hand-roll IVR speech intent",
+    "summary": "Roadmap investigation to replace the vx-any catch-all with structured intent routing via Jev's Choice primitive. Open questions: round-trip latency, per-call/step cost, service boundary, transcript-only vs audio input, EN/FR calibration, failure mode, confidence threshold. Its answer decides #1862 and the deferred confidence slice of #1875.",
+    "currentBehavior": "vx-any matches any speech longer than 2 characters; no intent classification and no confidence. #1875 slice B stores { value, raw, inputType } only; language defaults en-US.",
+    "rootCause": "No intent-classification layer exists; the choice is between a calibrated service and a local normalizer/matcher.",
+    "resolution": "Run the evaluation as a spike: benchmark latency and cost per step, test EN/FR calibration, pick a service boundary and fallback, and record a decision with an ADR. Then either open the Jev integration ticket or unblock #1862 as a hand-rolled matcher.",
+    "lookIn": [
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts",
+      "app/lib/ivr-gather.server.ts",
+      "app/lib/ivr-webhook-auth.server.ts",
+      "docs/adr/"
+    ],
+    "existingTests": [
+      "test/ivr-gather.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Latency, cost, bilingual calibration, and failure-mode answers recorded",
+      "A decision: adopt Jev or hand-roll, with a named service boundary",
+      "#1862 and the #1875 confidence slice unblocked or closed accordingly"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "needs-decision/roadmap spike. Keep vx-any as-is until answered; its outcome decides #1862."
+  },
+  {
+    "issueNumber": 1858,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Unify IVR and live script blocks and define prompt, multi-select, input, and end-call semantics",
+    "summary": "Umbrella request to align the IVR script model with the live-call script model and add block kinds: prompt-only, multi-select with an explicit 'do nothing' default, free input with a stop key, end-call options, and a per-block default go-to.",
+    "currentBehavior": "IVR scripts use IvrBlock; live scripts use a separate instruction/multi-select model. There is no prompt-only block, no stop-key input block, no end-call block, and no general per-block default destination beyond noInput.",
+    "rootCause": "Two parallel script models and undefined block semantics.",
+    "resolution": "Decide the unified block model, the default 'do nothing' behaviour, and stop-key/end-call semantics first; record the decision, then split into tracer-sized tickets (one block kind each).",
+    "lookIn": [
+      "app/components/campaign/settings/script/",
+      "app/lib/ivr-block-runtime.server.ts",
+      "app/lib/ivr-gather.server.ts",
+      "app/lib/campaign-ivr.server.ts",
+      "app/db/schema-campaign.ts"
+    ],
+    "existingTests": [
+      "test/ivr-block-runtime.test.ts",
+      "test/ivr-gather.test.ts",
+      "test/ui/script-block-editor-ivr.test.tsx"
+    ],
+    "missingTests": [
+      "Default go-to when the caller gives no input",
+      "Input block stop-key handling",
+      "End-call block routes/hangs up as authored"
+    ],
+    "acceptanceCriteria": [
+      "Product decision recorded for the unified block model and defaults",
+      "Blocks split into ticket-sized units before implementation",
+      "Prompt, multi-select, input, and end-call semantics specified with a default do-nothing path"
+    ],
+    "blockedBy": [],
+    "size": "XL",
+    "risk": "medium",
+    "trackerRecommendation": "Decision first, then split. Related: #1862, #1741. #1856 and #1841 are already fixed on dev and should not be re-done."
+  },
+  {
+    "issueNumber": 1852,
+    "verdict": "needs-decision",
+    "recommendedTitle": "cleanup .env: document Twilio env vars and define config-as-code vs layered secrets",
+    "summary": "Audit and rationalize environment variables. Both TWILIO_APP_SID and TWILIO_AUTH_TOKEN in .env.example are used, but there is no documented policy for config-as-code vs secrets and no layered secret resolution.",
+    "currentBehavior": "TWILIO_APP_SID is the TwiML App SID for Voice SDK outbound and is auto-assigned per non-protected environment; TWILIO_AUTH_TOKEN is used for REST calls. Some paths use TWILIO_API_KEY/TWILIO_API_SECRET. No ENVIRONMENT singleton and no .secrets/env.<environment> layering.",
+    "rootCause": "No documented owner/purpose per variable and no agreed boundary between config and secrets.",
+    "resolution": "Decide the env schema and secret precedence (.env -> .secrets/env.<environment> -> secrets manager), document each variable's purpose and which are secrets, then prune unused/duplicated variables. Prefer an ENVIRONMENT selector over per-value env config.",
+    "lookIn": [
+      ".env.example",
+      "app/lib/env.server.ts",
+      "app/lib/required-env-keys.mjs",
+      "app/server/environment-twiml-app.server.ts",
+      "docs/twilio-runtime-inventory.md",
+      "docs/local-development.md",
+      "scripts/railway/"
+    ],
+    "existingTests": [
+      "test/env.server.test.ts"
+    ],
+    "missingTests": [
+      "Env validation / precedence for layered secrets",
+      "A guard that fails on an undocumented or unused required key"
+    ],
+    "acceptanceCriteria": [
+      "Every env var has a documented purpose and secret/config classification",
+      "Unused or duplicated variables removed",
+      "Secret precedence defined and easy to swap to a secrets manager",
+      "Non-sensitive config handled as config, not env values"
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "Decision (secrets/config policy) before edits. Coordinate with #1329. Do not touch the user's live .env."
+  },
+  {
+    "issueNumber": 1848,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Decide the default mapping when a full-name and a last-name column both exist",
+    "summary": "Suggestion to auto-map a full-name column to firstname instead of name when a separate populated surname column exists, so the pair is not blocked by the ambiguous-name rule. The reporter is unsure the heuristic is worth the overhead.",
+    "currentBehavior": "suggestContactImportMapping maps a 'Name' header to 'name' and a 'Last name' header to 'surname'; validateContactImportMapping then raises a blocking ambiguous-name issue.",
+    "rootCause": "Auto-mapping has no cross-column heuristic; a full-name column and component-name columns cannot coexist because ambiguous-name is blocking.",
+    "resolution": "Decide whether to add a heuristic: when one header resolves to 'name' and a different header resolves to 'surname' and the name column's values do not already contain the surname values, default the name column to 'firstname'. If approved, implement in shared/contact-import-headers.ts and cover it with tests.",
+    "lookIn": [
+      "shared/contact-import-headers.ts",
+      "app/components/audience/AudienceUploadMapStep.tsx",
+      "app/components/audience/AudienceUploader.tsx"
+    ],
+    "existingTests": [
+      "test/contact-import-headers.test.ts"
+    ],
+    "missingTests": [
+      "Name + separate surname data maps to First name + Last name without a blocking issue",
+      "Negative case: a name column that already contains the surname keeps the full-name mapping"
+    ],
+    "acceptanceCriteria": [
+      "Decision recorded on whether to add the heuristic",
+      "If added, a Name column plus a Last name column with data maps to First name + Last name and is not blocking",
+      "Name-only files keep name splitting"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "needs-decision: the reporter questions the overhead; confirm the heuristic is wanted before implementing."
   }
 ]

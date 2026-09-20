@@ -274,7 +274,7 @@
   {
     "issueNumber": 1752,
     "verdict": "blocked-epic",
-    "summary": "Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket — split PDF pipeline, CSV, and aggregation layers first.",
+    "summary": "Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket \u2014 split PDF pipeline, CSV, and aggregation layers first.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -283,7 +283,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1802,
@@ -308,5 +308,318 @@
       "bun.lock"
     ],
     "trackerRecommendation": "The live ticket lists development packages only; do not pull runtime Nano ID or csv-parse into this scope."
+  },
+  {
+    "issueNumber": 1892,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "DRY pass: de-duplicate the largest copy-paste clones (jscpd)",
+    "summary": "Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930. The remaining ranked clones are each tracked as an open child issue (#1911-#1919).",
+    "currentBehavior": "scripts/dry-baseline.json holds the gate at 178 clones / 1902 duplicated lines (1.28%).",
+    "rootCause": "Copy-paste duplication across the ranked files; each row needs a behaviour-preserving extraction.",
+    "resolution": "Do not schedule this issue directly. Work the child issues #1911-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.",
+    "lookIn": [
+      "scripts/dry-baseline.json",
+      "scripts/check-dry.mjs"
+    ],
+    "existingTests": [
+      "check:dry gate is the acceptance signal"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "clones/duplicatedLines drop and the baseline is lowered to lock it",
+      "One implementation per clone; call sites behave the same"
+    ],
+    "blockedBy": [
+      1911,
+      1912,
+      1913,
+      1914,
+      1915,
+      1916,
+      1917,
+      1918,
+      1919
+    ],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "Umbrella/tracker; do not pick directly. Work the open children #1911-#1919."
+  },
+  {
+    "issueNumber": 268,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "i18n epic: fr-CA as the first locale (6 slices, one PR each)",
+    "summary": "Multi-PR epic reviving #268. Decisions recorded (React Aria I18nProvider + @react-aria/i18n; react-i18next + remix-i18next JSON catalogs; per-user locale with workspace default en-CA; per-campaign campaign.language; explicit /fr/* marketing routes; sign-in as slice 1). Nothing is implemented.",
+    "currentBehavior": "English-only app with locale-naive formatting and no locale column on user, workspace or campaign.",
+    "rootCause": "No i18n framework or locale resolution was ever added.",
+    "resolution": "Run the six published slices as separate PRs, starting with foundation + sign-in. Split them into child issues so each lands independently.",
+    "lookIn": [
+      "app/root.tsx",
+      "app/lib/types.ts",
+      "app/lib/tts-voices.ts",
+      "app/routes.ts",
+      "package.json",
+      "app/lib/low-credit-notify.server.ts",
+      "app/lib/billing-reconciliation-alert.server.ts",
+      "app/lib/send-reset-password-email.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "catalog parity - every key present in every locale",
+      "locale resolution - user pref, then workspace default, then en-CA",
+      "/fr/* routes and hreflang",
+      "ICU plural handling for French"
+    ],
+    "acceptanceCriteria": [
+      "A signed-in operator can switch to French and UI, dates and numbers render in fr-CA",
+      "Outbound voice, SMS and email can be French per campaign",
+      "A missing-translation check fails CI"
+    ],
+    "blockedBy": [],
+    "size": "XL",
+    "risk": "high",
+    "trackerRecommendation": "Split first: open six child issues (one per slice) linked to this epic; slice 1 (foundation + sign-in) can start immediately. Do not attempt in one PR."
+  },
+  {
+    "issueNumber": 1862,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "IVR: match spoken/DTMF input to the script's declared options (normalize + fuzzy)",
+    "summary": "Wants caller input matched to a block's declared options in three tiers: exact value, normalized (digit words, yes/no, case/punctuation), then fuzzy against value+label. The issue comment defers intent matching to #1880 and says to keep this as the concrete spec only if #1880 chooses to hand-roll.",
+    "currentBehavior": "findNextStep compares raw strings exactly: optionValue === input || (input.length > 2 && optionValue === 'vx-any'). A caller who says 'one' against '1' misses; no normalization or similarity layer exists.",
+    "rootCause": "The runtime only string-compares Twilio Digits/SpeechResult to option.value.",
+    "resolution": "Wait for #1880's decision. If a service, this is superseded; if hand-rolled, add a pure matcher module (normalize, then fuzzy against value+label, accept one candidate above threshold, re-prompt on ties). Keep the exact fast path and vx-any.",
+    "lookIn": [
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
+      "app/lib/ivr-gather.server.ts",
+      "app/lib/ivr-block-runtime.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-block-response.route.test.ts"
+    ],
+    "missingTests": [
+      "one -> 1",
+      "press one -> 1",
+      "yeah -> yes",
+      "ambiguous utterance re-prompts",
+      "keypad-only step ignores speech"
+    ],
+    "acceptanceCriteria": [
+      "On a keypad-only step, a spoken digit word maps to the matching option",
+      "Ambiguous input re-prompts and never invents an option",
+      "Speech / vx-any behaviour unchanged",
+      "Exact matches add no latency",
+      "Recorded raw userInput stays as-is"
+    ],
+    "blockedBy": [
+      1880
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked on #1880 (service vs hand-rolled). Keep as the spec; do not implement until that decision lands."
+  },
+  {
+    "issueNumber": 780,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Hang up controls/block in IVR script (parent of #1883 + #1884)",
+    "summary": "Bundles four asks. Split into #1883 (per-step configurable no-input wait + action; dev, PR #1937) and #1884 (explicit Hang up routing target + guaranteed terminal hangup; open). The runtime already understands next:'hangup' and ends the script with a hangup, so #1884 is editor exposure plus validation.",
+    "currentBehavior": "No-input handling exists on dev (#1883). 'Hang up' is selectable in the editor via scriptkit and maps to <Hangup/>; gaps are next:'end' unhandled, dangling targets unvalidated, no guaranteed terminal/cycle check (#1884).",
+    "rootCause": "Parent tracking ticket; the only remaining work is the explicit/validated terminal owned by #1884.",
+    "resolution": "Keep open until #1884 lands, then close. Do not rebuild the shipped #1883 no-input handling or the working hangup routing.",
+    "lookIn": [
+      "app/lib/ivr-block-runtime.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
+      "app/components/campaign/settings/script/ScriptBlockEditor.routing.ts"
+    ],
+    "existingTests": [
+      "test/ivr-block-response.route.test.ts",
+      "test/ui/script-block-editor-ivr.test.tsx"
+    ],
+    "missingTests": [
+      "next:'end' is terminal at runtime",
+      "dangling page/block target hangs up instead of redirecting",
+      "reachable routing cycle is reported/blocked at launch"
+    ],
+    "acceptanceCriteria": [
+      "Hang up is selectable as an option's next step",
+      "A published script always ends in a terminal hangup",
+      "Configurable no-input wait and reroute (delivered by #1883)"
+    ],
+    "blockedBy": [
+      1884
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Parent. #1883 shipped on dev (PR #1937 e79644b9); #1884 open. Close when #1884 lands."
+  },
+  {
+    "issueNumber": 1861,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Spike: replace Twilio AMD with a local, faster voicemail classifier",
+    "summary": "Investigation spike to keep, replace, or front-run Twilio AMD. Acceptance requires measured time-to-first-audio and accuracy on the same call set, which depends on the instrumentation in #1842 and the live AMD scope in #1845.",
+    "currentBehavior": "Every outbound path sends synchronous machineDetection: 'Enable'. No async AMD, no local classifier, no shadow mode.",
+    "rootCause": "Synchronous AMD adds seconds of dead air and caps accuracy at Twilio's engine; there is no measured baseline.",
+    "resolution": "After #1842 instrumentation and #1845 land, run the spike: measure Twilio async AMD and one local/managed option on the same call set, evaluate the media-stream fork limit, write the report and an ADR with the accuracy/latency threshold, then a phased shadow-mode plan.",
+    "lookIn": [
+      "app/lib/auto-dial.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/ivr-initiate.server.ts",
+      "app/routes/api+/dial/status.action.server.ts",
+      "app/db/schema.ts",
+      "docs/adr/0030-media-stream-bun-service-third-railway-process.md",
+      "docs/live-transcription-coaching-plan.md"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Measured time-to-first-audio for sync vs async AMD and a local classifier",
+      "Classifier accuracy on human/machine/screening/beep/silence/fax",
+      "Media-stream fork/concurrency budget at target volume"
+    ],
+    "acceptanceCriteria": [
+      "Written report with measured latency and accuracy for Twilio async AMD and one local option on the same call set",
+      "Recommendation with an accuracy-latency threshold and reconciliation/fallback policy",
+      "If replacing: an ADR and a phased plan starting in shadow mode"
+    ],
+    "blockedBy": [
+      1842,
+      1845
+    ],
+    "size": "XL",
+    "risk": "high",
+    "trackerRecommendation": "Blocked on #1842 instrumentation and #1845. Run as a scoped spike after those land; produce an ADR before any implementation."
+  },
+  {
+    "issueNumber": 1828,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "QA-environment PR acceptance suite against the smart test audience",
+    "summary": "Per-PR QA acceptance run: full sign-up through each of the 3 campaign types against the smart test audience, plus unit tests using CallCaster-qa test credentials.",
+    "currentBehavior": "PRs run the compose E2E gate and a Twilio test-credential tier, but there is no QA-environment full-flow suite against a CallCaster-qa account.",
+    "rootCause": "There is no dedicated CallCaster-qa Twilio account or qa environment wiring yet.",
+    "resolution": "After #1829 lands (which needs #1357), add the QA acceptance workflow and specs: sign up, run the 3 campaign types against the smart test audience, and run the Twilio-tier unit tests with the QA test credentials.",
+    "lookIn": [
+      ".github/workflows/e2e.yml",
+      ".github/workflows/ci.yml",
+      "e2e/",
+      "test/integration-twilio/",
+      "vitest.integration-twilio.config.ts"
+    ],
+    "existingTests": [
+      "e2e compose gate",
+      ".github/workflows/e2e.yml",
+      "test/integration-twilio/twilio-test-credentials.test.ts"
+    ],
+    "missingTests": [
+      "QA-environment full-flow acceptance over the 3 campaign types",
+      "Unit tier wired to CallCaster-qa credentials"
+    ],
+    "acceptanceCriteria": [
+      "PRs run sign-up through the 3 campaign types against the smart test audience",
+      "Twilio unit tests use CallCaster-qa credentials",
+      "Failures are attributable to the PR"
+    ],
+    "blockedBy": [
+      1157,
+      1829
+    ],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "blocked-epic: #1829 (CallCaster-qa Twilio account) and #1157 (smart test audiences) must land first; #1357 gates #1829."
+  },
+  {
+    "issueNumber": 1826,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Dev-environment PR acceptance suite",
+    "summary": "Per-PR dev tests: sign-up, create workspace, MFA, rent a number, upload an audience and audio, create a second workspace; plus Twilio-tier unit tests with CallCaster-dev credentials.",
+    "currentBehavior": "E2E runs in the local compose harness; nothing runs against a dev.callcaster.ca environment backed by a dedicated CallCaster-dev Twilio account.",
+    "rootCause": "There is no dedicated CallCaster-dev Twilio account; #1356 and #1827 are both open.",
+    "resolution": "After #1827 lands (which needs #1356), wire the dev PR suite over the listed steps and run the Twilio-tier unit tests with dev credentials.",
+    "lookIn": [
+      ".github/workflows/e2e.yml",
+      "e2e/specs/",
+      "test/integration-twilio/",
+      "docs/local-development.md"
+    ],
+    "existingTests": [
+      "e2e compose gate",
+      "test/integration-twilio/twilio-test-credentials.test.ts"
+    ],
+    "missingTests": [
+      "Dev-environment signup / workspace / MFA / number / audience / audio flow",
+      "Dev-credential unit tier"
+    ],
+    "acceptanceCriteria": [
+      "PRs run the dev checklist against CallCaster-dev",
+      "MFA is enabled on the dev test environment",
+      "Twilio unit tests use CallCaster-dev credentials"
+    ],
+    "blockedBy": [
+      1827
+    ],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "blocked-epic: #1827 (CallCaster-dev Twilio account) first; #1356 gates #1827."
+  },
+  {
+    "issueNumber": 1829,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Provision a CallCaster-qa Twilio account and point qa.callcaster.ca at it",
+    "summary": "Create a dedicated Twilio account for QA (ideally via IaC) and repoint qa.callcaster.ca to use it.",
+    "currentBehavior": "QA has no dedicated Twilio account; #1357 is open and is the prerequisite.",
+    "rootCause": "Environment-level Twilio credential separation has not been provisioned; blocked by the DNS/IaC task #1357 (itself blocked by #1355).",
+    "resolution": "Decide manual vs IaC provisioning, create the CallCaster-qa Twilio account, store credentials as environment secrets/vars, and update the qa environment config. Then unblock #1828.",
+    "lookIn": [
+      ".railway/environments/",
+      ".railway/railway.ts",
+      "docs/twilio-runtime-inventory.md",
+      "docs/twilio-parent-ops-runbook.md",
+      ".github/workflows/railway-iac.yml"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "n/a (operations task)"
+    ],
+    "acceptanceCriteria": [
+      "CallCaster-qa Twilio account exists and is documented",
+      "qa.callcaster.ca uses the QA account credentials",
+      "Credentials are stored as secrets/vars, not in the repo",
+      "IaC-vs-manual decision is recorded"
+    ],
+    "blockedBy": [
+      1357
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "blocked-epic: #1357 (qa DNS/IaC, blocked by #1355). Confirm the IaC-vs-manual decision when unblocked; this unblocks #1828."
+  },
+  {
+    "issueNumber": 1827,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Provision a CallCaster-dev Twilio account and point dev.callcaster.ca at it",
+    "summary": "Create a dedicated Twilio account for the dev environment (ideally via IaC) and update dev.callcaster.ca to use it.",
+    "currentBehavior": "There is no dedicated CallCaster-dev Twilio account; dev falls back to shared or main-account credentials. #1356 is open.",
+    "rootCause": "Environment-level Twilio credential separation has not been provisioned; blocked by the DNS/IaC task #1356.",
+    "resolution": "Create the CallCaster-dev Twilio account, store the credentials as dev environment secrets/vars, and update the dev.callcaster.ca config. Then unblock #1826.",
+    "lookIn": [
+      ".railway/environments/dev.ts",
+      ".railway/railway.ts",
+      "docs/twilio-runtime-inventory.md",
+      "docs/twilio-parent-ops-runbook.md"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "n/a (operations task)"
+    ],
+    "acceptanceCriteria": [
+      "CallCaster-dev Twilio account exists and is documented",
+      "dev.callcaster.ca uses the dev account credentials",
+      "Credentials are stored as secrets/vars, not in the repo",
+      "IaC-vs-manual decision is recorded"
+    ],
+    "blockedBy": [
+      1356
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "blocked-epic: #1356 (dev DNS/IaC) first. Confirm the IaC-vs-manual decision when unblocked; this unblocks #1826."
   }
 ]

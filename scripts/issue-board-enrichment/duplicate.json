@@ -11,6 +11,34 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1843,
+    "verdict": "duplicate",
+    "duplicateOf": 1883,
+    "recommendedTitle": "IVR step no-input wait + next/goto (folds into #1883 and #1884)",
+    "summary": "Body asks for a per-step no-input behavior: default 10s wait, default to next block, and an option to hang up. That is #1883 (configurable wait + no-input action) plus the explicit terminal routing in #1884.",
+    "currentBehavior": "After #1883 (dev, PR #1937), a step carries a configurable wait and a no-input action. #1884 still owns the explicit Hang up target and terminal validation.",
+    "rootCause": "Same requirement as #1883/#1884, filed before the work was split from #780.",
+    "resolution": "Close as duplicate of #1883. Fold the next/goto and guaranteed-hangup acceptance into #1884. Do not implement again.",
+    "lookIn": [
+      "app/lib/ivr-step-config.ts",
+      "app/lib/ivr-block-runtime.server.ts",
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrNoInput.tsx"
+    ],
+    "existingTests": [
+      "test/ivr-step-config.test.ts",
+      "test/ivr-block-response.route.test.ts",
+      "test/ui/script-block-editor-ivr.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "See #1883 (wait + no-input action) and #1884 (next/goto + terminal hangup)"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Duplicate of #1883; the goto half belongs to #1884. Close, do not re-scope."
   }
 ]
