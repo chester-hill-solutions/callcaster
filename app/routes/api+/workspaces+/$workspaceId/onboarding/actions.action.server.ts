@@ -5,22 +5,11 @@ import {
   mapOnboardingHandlerResult,
   runOnboardingAction,
 } from "@/lib/platform-onboarding.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { requireDataPlaneWorkspaceUser } from "@/lib/data-plane-route.server";
 import { defineAction } from "@/lib/handler.server";
-import type { ActionFunctionArgs } from "react-router";
 
 export const action = defineAction({
-  auth: ({ params, context }: Pick<ActionFunctionArgs, "params" | "context">) => {
-    const workspaceId = params.workspaceId;
-    if (!workspaceId) {
-      return jsonError("workspaceId is required", 400);
-    }
-    const { userId } = getDataPlaneRouteContext(context, workspaceId);
-    if (!userId) {
-      return jsonError("Unauthorized", 401);
-    }
-    return { workspaceId, userId };
-  },
+  auth: requireDataPlaneWorkspaceUser,
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth }) => {
     if (request.method !== "POST") {

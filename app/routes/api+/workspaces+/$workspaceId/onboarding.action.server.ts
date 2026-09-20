@@ -5,27 +5,11 @@ import {
   getWorkspaceOnboardingDetail,
   patchWorkspaceOnboarding,
 } from "@/lib/platform-onboarding.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { requireDataPlaneWorkspaceUser } from "@/lib/data-plane-route.server";
 import { defineAction, defineLoader } from "@/lib/handler.server";
-import type { LoaderFunctionArgs } from "react-router";
-
-function requireWorkspaceUser({
-  params,
-  context,
-}: Pick<LoaderFunctionArgs, "params" | "context">) {
-  const workspaceId = params.workspaceId;
-  if (!workspaceId) {
-    return jsonError("workspaceId is required", 400);
-  }
-  const { userId } = getDataPlaneRouteContext(context, workspaceId);
-  if (!userId) {
-    return jsonError("Unauthorized", 401);
-  }
-  return { workspaceId, userId };
-}
 
 export const loader = defineLoader({
-  auth: requireWorkspaceUser,
+  auth: requireDataPlaneWorkspaceUser,
   sideEffects: ["db-read"],
   handler: async ({ auth }) => {
     const result = await getWorkspaceOnboardingDetail(auth.userId, auth.workspaceId);
@@ -39,7 +23,7 @@ export const loader = defineLoader({
 });
 
 export const action = defineAction({
-  auth: requireWorkspaceUser,
+  auth: requireDataPlaneWorkspaceUser,
   sideEffects: ["db-write"],
   handler: async ({ request, auth }) => {
     if (request.method !== "PATCH") {

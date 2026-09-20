@@ -69,5 +69,6 @@ describe("check scripts pass on current tree", () => {
     expect(source).toContain("getWorkspaceRouteContext");
     expect(source).toContain("getDataPlaneRouteContext");
     expect(source).toContain("getAdminRouteContext");
+    expect(source).toContain("requireDataPlaneWorkspaceUser");
   });
 });
