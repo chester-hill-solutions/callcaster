@@ -19,8 +19,14 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronDown, Menu, User as UserIcon, LogOut } from "lucide-react";
-import { capitalize } from "@/lib/utils";
+import {
+  Check,
+  ChevronDown,
+  Menu,
+  User as UserIcon,
+  LogOut,
+  MailOpen,
+} from "lucide-react";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { MobileMenu } from "./Navbar.MobileMenu";
@@ -174,13 +180,11 @@ function creditWorkspaceFor(
 const UserDropdownMenu = ({
   user,
   handleSignOut,
-  workspaceId,
 }: {
   user: RootNavbarUser | null;
   handleSignOut: () => Promise<
     { success: string | null; error: string | null }
   >;
-  workspaceId: string | undefined;
 }) =>
   user && (
     <DropdownMenu>
@@ -213,11 +217,6 @@ const UserDropdownMenu = ({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56">
-        <DropdownMenuLabel>Profile Info:</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="font-normal">
-          {capitalize(user.first_name ?? "")}
-        </DropdownMenuLabel>
         <DropdownMenuLabel className="font-normal">
           {user.username}
         </DropdownMenuLabel>
@@ -235,19 +234,10 @@ const UserDropdownMenu = ({
               user.workspace_invite.length > 0 ? "bg-primary text-white" : ""
             }
           >
-            {`${user.workspace_invite.length} Pending Invitation${user.workspace_invite.length === 1 ? "" : "s"}`}
+            <MailOpen className="mr-2 h-4 w-4" />
+            {`Invitations: ${user.workspace_invite.length}`}
           </NavLink>
         </DropdownMenuItem>
-        {workspaceId && (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link to={`/workspaces/${workspaceId}/settings`}>
-                Workspace settings
-              </Link>
-            </DropdownMenuItem>
-          </>
-        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           id="logoutButton"
@@ -319,11 +309,7 @@ export default function Navbar({
             ))}
           {creditWorkspace ? <NavbarCredits workspace={creditWorkspace} /> : null}
           {user && (
-            <UserDropdownMenu
-              user={user}
-              handleSignOut={handleSignOut}
-              workspaceId={workspaceId}
-            />
+            <UserDropdownMenu user={user} handleSignOut={handleSignOut} />
           )}
           <ModeToggle />
         </div>
