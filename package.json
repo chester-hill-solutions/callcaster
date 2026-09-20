@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
+    "prepare": "sh -c 'test -f scripts/setup-githooks.sh && sh scripts/setup-githooks.sh || true'",
+    "setup:githooks": "sh scripts/setup-githooks.sh",
     "setup": "node ./scripts/local/setup.mjs",
     "doctor": "node ./scripts/local/doctor.mjs",
     "dev": "node ./scripts/local/dev.mjs",

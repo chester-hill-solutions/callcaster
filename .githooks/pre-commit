@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Pre-commit guardrails — CallCaster (#1897)
+#
+# Catches the cheap failures before they become commits. CI remains the real
+# gate; humans and agents can bypass this with `git commit --no-verify`.
+#
+# Runs in <5s:
+#   1. Whitespace / conflict markers on the staged changes.
+#   2. ESLint on the staged source files.
+#   3. Effects strictness (`check:effects`) — the baseline is 0, so a new
+#      un-annotated `useEffect` fails the commit. This is what enforces the
+#      "@effect" annotation discipline (docs/effects-strictness.md).
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+# 1. Whitespace / conflict markers.
+git diff --cached --check
+
+# 2. Lint the staged source files (CI still lints the whole tree).
+STAGED_SOURCE="$(git diff --cached --name-only --diff-filter=ACM -- '*.ts' '*.tsx' '*.mjs' '*.cjs' '*.js')"
+if [ -n "$STAGED_SOURCE" ]; then
+  npx eslint $STAGED_SOURCE
+fi
+
+# 3. Effects strictness. The script regenerates docs/effects-inventory.md;
+#    stage it so a commit can never carry a stale inventory.
+node scripts/check-effects.mjs
+git add docs/effects-inventory.md

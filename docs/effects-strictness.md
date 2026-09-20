@@ -45,6 +45,18 @@ belong in an effect in this app.
   hit 0 and all dep warnings were resolved). Intentional omissions need an inline
   `eslint-disable-next-line` with a reason, mirrored in the `@effect-deps` tag.
 
+## Pre-commit enforcement
+
+A checked-in `pre-commit` hook (`.githooks/pre-commit`, wired via
+`git config core.hooksPath .githooks`, set automatically by `npm install` /
+`npm run setup:githooks`) runs `check:effects` before a commit can be created.
+An un-annotated effect therefore fails at the commit boundary, not just in CI.
+The hook also lints the staged source files and checks whitespace.
+
+The hook is a convenience, not a security boundary — it can be bypassed with
+`git commit --no-verify`, which is why the CI `check:effects` gate remains the
+source of truth.
+
 ## Status
 
 Baseline is **0** — every `useEffect`/`useLayoutEffect` is documented in the
