@@ -213,6 +213,13 @@ export type CampaignDispatchParams = {
   userId: string | undefined;
 };
 
+/** The actor + campaign the machine dispatch chain runs for. */
+type DispatchChainContext = {
+  workspaceId: string;
+  campaignId: number;
+  userId: string;
+};
+
 async function pauseForInsufficientCredits(
   workspaceId: string,
   campaignId: number,
@@ -346,6 +353,77 @@ export async function campaignDispatchHandler(
     maxContacts: DISPATCH_BATCH_SIZE,
   });
 
+  if (outcome.kind !== "dispatched") {
+    return resolveDispatchBlockedCase(job, { workspaceId, campaignId, userId }, outcome);
+  }
+
+  const { counts, queuedRemaining } = outcome;
+
+  // The balance ran out inside the batch: stop the chain exactly as the
+  // entry gate does. Rows the budget refused stay queued for a relaunch.
+  if (outcome.creditsExhausted) {
+    await pauseForInsufficientCredits(workspaceId, campaignId, {
+      sent: counts.sent,
+      unaffordable: counts.unaffordable,
+    });
+    return {
+      ok: true,
+      campaignId,
+      blocked: "insufficient_credits",
+      sent: counts.sent,
+      unaffordable: counts.unaffordable,
+    };
+  }
+
+  // Every attempted send failed and nothing was dequeued or dead-lettered:
+  // let the job retry with backoff instead of hot-looping successors.
+  // Failed rows stay queued (attempt recorded) and the duplicate gate
+  // keeps retries single-send; exhausted rows count as progress.
+  if (
+    counts.failed > 0 &&
+    counts.sent === 0 &&
+    counts.dequeued === 0 &&
+    counts.exhausted === 0
+  ) {
+    throw new Error(
+      `campaign_dispatch: all ${counts.failed} sends failed for campaign ${campaignId}`,
+    );
+  }
+
+  await continueOrCompleteDispatch(job, { workspaceId, campaignId, userId }, queuedRemaining);
+
+  return {
+    ok: true,
+    campaignId,
+    sent: counts.sent,
+    failed: counts.failed,
+    dequeued: counts.dequeued,
+    deferred: counts.deferred,
+    unaffordable: counts.unaffordable,
+    exhausted: counts.exhausted,
+    queuedRemaining,
+  };
+}
+
+/**
+ * The non-dispatched tail of the machine dispatch chain (#1892): park on
+ * insufficient credit, stop on a caller-id config error, or reschedule the
+ * successor at the send-window boundary. Shared by the SMS and IVR branches.
+ */
+async function resolveDispatchBlockedCase(
+  job: ClaimedJobRow,
+  args: DispatchChainContext,
+  outcome:
+    | { kind: "insufficient_credits" }
+    | { kind: "caller_id_required" }
+    | { kind: "deferred_send_window"; nextOpenAt: Date },
+): Promise<
+  | { ok: true; campaignId: number; blocked: "insufficient_credits" }
+  | { ok: true; campaignId: number; blocked: "caller_id_required" }
+  | { ok: true; campaignId: number; deferred: "send_window" }
+> {
+  const { workspaceId, campaignId, userId } = args;
+
   switch (outcome.kind) {
     case "insufficient_credits":
       // Park the campaign so a stopped chain cannot leave it marked running;
@@ -372,69 +450,35 @@ export async function campaignDispatchHandler(
       });
       return { ok: true, campaignId, deferred: "send_window" };
     }
-    case "dispatched": {
-      const { counts, queuedRemaining } = outcome;
+  }
+}
 
-      // The balance ran out inside the batch: stop the chain exactly as the
-      // entry gate does. Rows the budget refused stay queued for a relaunch.
-      if (outcome.creditsExhausted) {
-        await pauseForInsufficientCredits(workspaceId, campaignId, {
-          sent: counts.sent,
-          unaffordable: counts.unaffordable,
-        });
-        return {
-          ok: true,
-          campaignId,
-          blocked: "insufficient_credits",
-          sent: counts.sent,
-          unaffordable: counts.unaffordable,
-        };
-      }
+/**
+ * The shared dispatched tail (#1892): keep the chain ticking until the queue
+ * drains, then try to complete the campaign.
+ */
+async function continueOrCompleteDispatch(
+  job: ClaimedJobRow,
+  args: DispatchChainContext,
+  queuedRemaining: number,
+): Promise<void> {
+  const { workspaceId, campaignId, userId } = args;
 
-      // Every attempted send failed and nothing was dequeued or dead-lettered:
-      // let the job retry with backoff instead of hot-looping successors.
-      // Failed rows stay queued (attempt recorded) and the duplicate gate
-      // keeps retries single-send; exhausted rows count as progress.
-      if (
-        counts.failed > 0 &&
-        counts.sent === 0 &&
-        counts.dequeued === 0 &&
-        counts.exhausted === 0
-      ) {
-        throw new Error(
-          `campaign_dispatch: all ${counts.failed} sends failed for campaign ${campaignId}`,
-        );
-      }
-
-      if (queuedRemaining > 0) {
-        await enqueueDispatchSuccessor({
-          workspaceId,
-          campaignId,
-          userId,
-          completedJobId: job.id,
-          delayMs: DISPATCH_TICK_MS,
-        });
-      } else {
-        const completed = await rpcTryCompleteCampaignIfDrained(
-          createTenantDb(workspaceId),
-          campaignId,
-        );
-        if (completed) {
-          logger.info("campaign_dispatch.completed", { campaignId, workspaceId });
-        }
-      }
-
-      return {
-        ok: true,
-        campaignId,
-        sent: counts.sent,
-        failed: counts.failed,
-        dequeued: counts.dequeued,
-        deferred: counts.deferred,
-        unaffordable: counts.unaffordable,
-        exhausted: counts.exhausted,
-        queuedRemaining,
-      };
+  if (queuedRemaining > 0) {
+    await enqueueDispatchSuccessor({
+      workspaceId,
+      campaignId,
+      userId,
+      completedJobId: job.id,
+      delayMs: DISPATCH_TICK_MS,
+    });
+  } else {
+    const completed = await rpcTryCompleteCampaignIfDrained(
+      createTenantDb(workspaceId),
+      campaignId,
+    );
+    if (completed) {
+      logger.info("campaign_dispatch.completed", { campaignId, workspaceId });
     }
   }
 }
@@ -445,7 +489,7 @@ export async function campaignDispatchHandler(
  */
 async function runMachineVoiceDispatch(
   job: ClaimedJobRow,
-  args: { workspaceId: string; campaignId: number; userId: string },
+  args: DispatchChainContext,
 ): Promise<unknown> {
   const { workspaceId, campaignId, userId } = args;
 
@@ -455,75 +499,39 @@ async function runMachineVoiceDispatch(
     userId,
   });
 
-  switch (outcome.kind) {
-    case "insufficient_credits":
-      // Park the campaign so a stopped chain cannot leave it marked running;
-      // the owner relaunches after topping up.
-      await pauseForInsufficientCredits(workspaceId, campaignId);
-      return { ok: true, campaignId, blocked: "insufficient_credits" };
-    case "caller_id_required":
-      // Config error — retrying cannot fix it; surface loudly and stop.
-      logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
-      return { ok: true, campaignId, blocked: "caller_id_required" };
-    case "deferred_send_window": {
-      const exactDelayMs = Math.max(0, outcome.nextOpenAt.getTime() - Date.now());
-      await enqueueDispatchSuccessor({
-        workspaceId,
-        campaignId,
-        userId,
-        completedJobId: job.id,
-        delayMs: Math.min(exactDelayMs, SEND_WINDOW_MAX_DEFER_MS),
-      });
-      return { ok: true, campaignId, deferred: "send_window" };
-    }
-    case "dispatched": {
-      const { counts, queuedRemaining } = outcome;
-
-      // Every attempted call failed and nothing was dequeued or dead-lettered:
-      // let the job retry with backoff instead of hot-looping successors.
-      // Failed rows stay queued (attempt recorded); exhausted rows count as
-      // progress.
-      if (
-        counts.failed > 0 &&
-        counts.called === 0 &&
-        counts.dequeued === 0 &&
-        counts.exhausted === 0
-      ) {
-        throw new Error(
-          `campaign_dispatch: all ${counts.failed} IVR calls failed for campaign ${campaignId}`,
-        );
-      }
-
-      if (queuedRemaining > 0) {
-        await enqueueDispatchSuccessor({
-          workspaceId,
-          campaignId,
-          userId,
-          completedJobId: job.id,
-          delayMs: DISPATCH_TICK_MS,
-        });
-      } else {
-        const completed = await rpcTryCompleteCampaignIfDrained(
-          createTenantDb(workspaceId),
-          campaignId,
-        );
-        if (completed) {
-          logger.info("campaign_dispatch.completed", { campaignId, workspaceId });
-        }
-      }
-
-      return {
-        ok: true,
-        campaignId,
-        called: counts.called,
-        failed: counts.failed,
-        dequeued: counts.dequeued,
-        deferred: counts.deferred,
-        exhausted: counts.exhausted,
-        queuedRemaining,
-      };
-    }
+  if (outcome.kind !== "dispatched") {
+    return resolveDispatchBlockedCase(job, args, outcome);
   }
+
+  const { counts, queuedRemaining } = outcome;
+
+  // Every attempted call failed and nothing was dequeued or dead-lettered:
+  // let the job retry with backoff instead of hot-looping successors.
+  // Failed rows stay queued (attempt recorded); exhausted rows count as
+  // progress.
+  if (
+    counts.failed > 0 &&
+    counts.called === 0 &&
+    counts.dequeued === 0 &&
+    counts.exhausted === 0
+  ) {
+    throw new Error(
+      `campaign_dispatch: all ${counts.failed} IVR calls failed for campaign ${campaignId}`,
+    );
+  }
+
+  await continueOrCompleteDispatch(job, args, queuedRemaining);
+
+  return {
+    ok: true,
+    campaignId,
+    called: counts.called,
+    failed: counts.failed,
+    dequeued: counts.dequeued,
+    deferred: counts.deferred,
+    exhausted: counts.exhausted,
+    queuedRemaining,
+  };
 }
 
 export type WebhookDeliveryParams = {
