@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- The workspace credit count no longer appears in the navbar (desktop or mobile), so the workspace dropdown no longer shifts; the count stays in the workspace sidebar ([#1716](https://github.com/chester-hill-solutions/callcaster/issues/1716)).
 - The account menu now drops the profile-info heading, first name, and Workspace settings link, and shows pending invitations as **Invitations: N** beside an open-mail icon ([#1715](https://github.com/chester-hill-solutions/callcaster/issues/1715)).
 - The IVR editor's **Answer label** help now appears in a hover/focus tooltip beside the label instead of a paragraph under the field, so the response row stays compact ([#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702)).
 - IVR campaign launch estimates now bound completion by the concurrent call limit and average call time, so the ETA reflects when calls actually finish rather than the dial-start rate ([#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874)).
