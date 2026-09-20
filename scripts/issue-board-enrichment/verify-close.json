@@ -53,7 +53,7 @@
   {
     "issueNumber": 1127,
     "verdict": "verify-close",
-    "summary": "Shipped on master in PR #1590: feat(campaigns): default calling hours to 09:00–21:00 local from one shared constant. The open state does not prove the fix is absent.",
+    "summary": "Shipped on master in PR #1590: feat(campaigns): default calling hours to 09:00\u201321:00 local from one shared constant. The open state does not prove the fix is absent.",
     "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
     "lookIn": [
       "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx",
@@ -82,7 +82,7 @@
     "recommendedTitle": "verify-close: campaign shows waiting when out of sending hours",
     "summary": "waiting status + schedule-sweep running<->waiting implemented (#1236). Verified locally: a running voice campaign with no in-window schedule flips running->waiting via campaign_schedule_sync.",
     "currentBehavior": "campaign_schedule_sync flips active voice campaigns to waiting outside calling hours; UI shows amber Waiting.",
-    "rootCause": "None — behaviour implemented; needed verification.",
+    "rootCause": "None \u2014 behaviour implemented; needed verification.",
     "resolution": "Confirmed via direct sync run (scanned 3, transitioned 1) + campaign_schedule_sync.server.test.ts.",
     "lookIn": [
       "app/lib/campaign-schedule-sync.server.ts",
@@ -328,7 +328,7 @@
   {
     "issueNumber": 1533,
     "verdict": "verify-close",
-    "summary": "Shipped on master in PR #1540: feat(billing): double SMS/MMS credit rates (1→2, 2→4). The open state does not prove the fix is absent.",
+    "summary": "Shipped on master in PR #1540: feat(billing): double SMS/MMS credit rates (1\u21922, 2\u21924). The open state does not prove the fix is absent.",
     "resolution": "Verify the original acceptance criteria on the deployed app. Preserve this issue if user testing finds a residual defect. Do not implement the old fix again.",
     "lookIn": [
       "app/routes/workspaces+/$id/billing.route.tsx",
@@ -817,7 +817,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1745,
@@ -831,7 +831,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1748,
@@ -845,7 +845,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1753,
@@ -859,7 +859,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1757,
@@ -873,7 +873,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1759,
@@ -887,7 +887,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1205,
@@ -1254,5 +1254,100 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "PR #1946 merge 8e3c8668 is on dev, not yet master."
+  },
+  {
+    "issueNumber": 1701,
+    "verdict": "verify-close",
+    "summary": "In an IVR step on Play a recording, the Upload audio control now renders with the recording field (before the preview/empty-recording warning). On Speak text it stays visible with its switch hint.",
+    "resolution": "Verify on the review environment that the Upload audio button sits under the recording control in Play a recording mode and is still present in Speak text mode. Close on master promotion.",
+    "lookIn": [
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx"
+    ],
+    "existingTests": [
+      "test/ui/script-block-editor-audio.test.tsx",
+      "test/ui/script-block-editor-ivr.test.tsx"
+    ],
+    "acceptanceCriteria": [
+      "Upload audio is adjacent to the recording Select on recorded steps; still visible on spoken steps (keeps #1325)."
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Merged on dev in PR #1951 (fffeae9a); closes on master promotion."
+  },
+  {
+    "issueNumber": 1715,
+    "verdict": "verify-close",
+    "summary": "Profile dropdown trimmed to username, Account, Invitations: N (with an open-mail icon), and Log Out; profile-info heading, first name, and Workspace settings link removed.",
+    "resolution": "Verify on the review environment that the account menu shows only username / Account / Invitations: N / Log Out. Close on master promotion.",
+    "lookIn": [
+      "app/components/layout/Navbar.tsx"
+    ],
+    "existingTests": [
+      "test/ui/navbar-user-menu.test.tsx"
+    ],
+    "acceptanceCriteria": [
+      "No profile-info heading, first name, padding, or Workspace settings link; invitations labelled 'Invitations: N' with a mail-open icon."
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Merged on dev in PR #1949 (7bf76e25); closes on master promotion."
+  },
+  {
+    "issueNumber": 1716,
+    "verdict": "verify-close",
+    "summary": "Navbar credit count removed on desktop and mobile so the workspace dropdown no longer shifts; the count stays in the workspace sidebar (WorkspaceNav).",
+    "resolution": "Verify on the review environment that no Credits readout appears in the navbar and the workspace dropdown holds its position; the sidebar still shows credits. Close on master promotion.",
+    "lookIn": [
+      "app/components/layout/Navbar.tsx",
+      "app/components/layout/Navbar.MobileMenu.tsx",
+      "app/components/workspace/WorkspaceNav.tsx"
+    ],
+    "existingTests": [
+      "test/ui/navbar-credits.test.tsx",
+      "test/ui/components-shared-invite-layout.test.tsx"
+    ],
+    "acceptanceCriteria": [
+      "No navbar-credits testid and no 'Credits:' link in the nav shell; sidebar credits unchanged."
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Merged on dev in PR #1950 (2180c94d); closes on master promotion."
+  },
+  {
+    "issueNumber": 1810,
+    "verdict": "verify-close",
+    "summary": "Tracking-only board refresh. Regenerates ISSUE_BOARD.md and prunes/moves enrichment records after verified dev fixes.",
+    "resolution": "This PR is the refresh. Review the generated board and enrichment diff, then close on master promotion.",
+    "lookIn": [
+      "ISSUE_BOARD.md",
+      "scripts/issue-board-enrichment/"
+    ],
+    "existingTests": [
+      "test/issue-board-generator.test.ts",
+      "test/issue-board-atomic.test.ts"
+    ],
+    "acceptanceCriteria": [
+      "Verified merged work leaves Fix now; closed issues' records pruned; no issue closed early."
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Recurring tracking ticket; the active refresh PR owns it. Do not duplicate."
+  },
+  {
+    "issueNumber": 1822,
+    "verdict": "verify-close",
+    "summary": "issue-on-dev.yml now moves the CHS backlog Status to the project's lowercase on-dev option on every dev merge (no label). The stale 'On dev' default that silently skipped the move is fixed; the vestigial on-dev label is deleted.",
+    "resolution": "Live-verified: merging PR #1949 logged moved=1 and moved #1715 to on-dev with no label applied. Close on master promotion.",
+    "lookIn": [
+      ".github/workflows/issue-on-dev.yml",
+      ".agents/skills/project-on-dev-status/SKILL.md"
+    ],
+    "existingTests": [],
+    "acceptanceCriteria": [
+      "A dev-merge PR moves its referenced issues to the on-dev Status; no on-dev label exists or is applied."
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Merged on dev in PR #1952 (0beba212); closes on master promotion."
   }
 ]
