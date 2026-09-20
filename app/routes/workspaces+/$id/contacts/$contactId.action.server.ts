@@ -2,7 +2,6 @@ import { data as routeData } from "react-router";
 import { findContactsByPhone, updateContact } from "@/lib/database/contact.server";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import { logger } from "@/lib/logger.server";
-import { createTenantDb } from "@/server/tenant-db";
 import { defineAction } from "@/lib/handler.server";
 import { MemberRole } from "@/lib/member-role";
 import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
@@ -27,7 +26,7 @@ export const action = defineAction({
   sideEffects: ["db-write"],
   handler: async ({ request, params, auth }) => {
   const { id: workspace_id, contactId: selected_id } = params;
-  const { user, userRole, headers } = auth;
+  const { user, userRole, headers, tdb } = auth;
 
   if (!workspace_id || !selected_id) {
     return routeData({ error: "Missing required parameters" }, { status: 400 });
@@ -68,8 +67,6 @@ export const action = defineAction({
       external_id: (formData.get("external_id") as string) || undefined,
       workspace: workspace_id,
     };
-
-    const tdb = createTenantDb(workspace_id);
 
     if (selected_id === "new") {
       let duplicateWarning: string | undefined;

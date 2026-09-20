@@ -23,7 +23,6 @@ import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
 // workspace is the global tenancy root table; tdb cannot scope it.
 // eslint-disable-next-line no-restricted-imports
 import { adminDb } from "@/server/admin-db";
-import { createTenantDb } from "@/server/tenant-db";
 import { defineLoader } from "@/lib/handler.server";
 import { requirePositiveIntegerParam } from "@/lib/route-params";
 
@@ -32,12 +31,10 @@ export const loader = defineLoader({
   sideEffects: ["db-read", "external"],
   handler: async ({ params, auth }) => {
   const { id: workspace_id, selected_id } = params;
-  const { user } = auth;
+  const { user, tdb } = auth;
 
   if (!selected_id || !workspace_id) return redirect("/");
   requirePositiveIntegerParam(selected_id, auth.headers);
-
-  const tdb = createTenantDb(workspace_id);
 
   const [
     campaignWithAudience,

@@ -11,7 +11,6 @@ import {
   contact_audience as contactAudienceTable,
   outreach_attempt as outreachAttemptTable,
 } from "@/db/schema";
-import { createTenantDb } from "@/server/tenant-db";
 // contact_audience is a join table without a workspace column; tdb cannot scope it.
 // eslint-disable-next-line no-restricted-imports
 import { db } from "@/server/db";
@@ -42,7 +41,7 @@ export const loader = defineLoader({
   }
 
   try {
-    const { user, workspaceId, userRole, headers } = getWorkspaceRouteContext(context)
+    const { user, workspaceId, userRole, headers, tdb } = getWorkspaceRouteContext(context)
     if (!userRole) {
       return redirect(`/workspaces/${workspace_id}`);
     }
@@ -52,7 +51,6 @@ export const loader = defineLoader({
       return redirect(`/workspaces/${workspace_id}`);
     }
 
-    const tdb = createTenantDb(workspace_id);
     let contact: Contact | null = null;
 
     if (selected_id !== "new") {

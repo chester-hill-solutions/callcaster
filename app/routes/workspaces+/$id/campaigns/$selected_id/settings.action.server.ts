@@ -50,7 +50,6 @@ import { logger } from "@/lib/logger.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import { defineAction } from "@/lib/handler.server";
 import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
-import { createTenantDb } from "@/server/tenant-db";
 import { MemberRole } from "@/lib/member-role";
 import { toUserMessage } from "@/lib/user-message";
 import { sendCampaignTestSms } from "@/lib/campaign-test-send.server";
@@ -85,7 +84,7 @@ export const action = defineAction({
   sideEffects: ["db-write"],
   handler: async ({ request, params, auth }) => {
   const { id: workspace_id, selected_id } = params;
-  const { user, userRole, headers } = auth;
+  const { user, userRole, headers, tdb } = auth;
 
   if (!selected_id || !workspace_id) return redirect("/");
 
@@ -210,7 +209,6 @@ export const action = defineAction({
             );
           }
 
-          const tdb = createTenantDb(workspace_id);
           const [campaignDetails, queueCounts, phoneNumbersResult, scripts, audioList] =
             await Promise.all([
               fetchCampaignDetails({

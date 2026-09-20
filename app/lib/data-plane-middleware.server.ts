@@ -5,6 +5,7 @@ import { getUserRole } from "@/lib/database/workspace.server";
 import { hasMinRole } from "@/lib/workspace-route.server";
 import { blockUnenrolledPrivilegedSessionUser } from "@/lib/two-factor.server";
 import { dataPlaneAuthContext } from "@/lib/route-context.server";
+import { createTenantDb } from "@/server/tenant-db";
 
 /**
  * Data-plane auth middleware for `api+/workspaces+/$workspaceId/*` routes.
@@ -31,7 +32,11 @@ export const dataPlaneMiddleware: MiddlewareFunction = async (
     return mfaBlock;
   }
 
-  context.set(dataPlaneAuthContext, { ...auth, workspaceId });
+  context.set(dataPlaneAuthContext, {
+    ...auth,
+    workspaceId,
+    tdb: createTenantDb(workspaceId),
+  });
   return next();
 };
 

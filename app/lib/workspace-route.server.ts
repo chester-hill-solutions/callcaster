@@ -7,6 +7,7 @@ import {
   WORKSPACE_ROLE_RANK,
 } from "@/lib/member-role";
 import { workspaceContext } from "@/lib/route-context.server";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 
 export { hasMinRole, WORKSPACE_ROLE_RANK };
 
@@ -15,6 +16,8 @@ export type WorkspaceRouteContext = {
   user: { id: string };
   workspaceId: string;
   userRole: string;
+  /** Workspace-scoped client from middleware; never construct one per route. */
+  tdb: TenantDb;
 };
 
 /** Read workspace context set by layout middleware (required on `workspaces+/$id` children). */
@@ -30,6 +33,7 @@ export function getWorkspaceRouteContext(
     user: { id: ws.userId },
     workspaceId: ws.workspaceId,
     userRole: ws.userRole,
+    tdb: ws.tdb,
   };
 }
 
@@ -38,6 +42,8 @@ export type WorkspaceLoaderContext = {
   user: { id: string };
   workspaceId: string;
   userRole: NonNullable<Awaited<ReturnType<typeof getUserRole>>>;
+  /** Workspace-scoped client from middleware; never construct one per route. */
+  tdb: TenantDb;
 };
 
 export type WorkspaceLoaderResult =
@@ -70,6 +76,7 @@ export async function requireWorkspaceLoaderContext(
         user: { id: fromMiddleware.userId },
         workspaceId: fromMiddleware.workspaceId,
         userRole: { role: fromMiddleware.userRole },
+        tdb: fromMiddleware.tdb,
       },
     };
   }
@@ -128,7 +135,7 @@ async function requireWorkspaceLoaderContextFromRequest(
 
   return {
     ok: true,
-    ctx: { headers, user, workspaceId, userRole },
+    ctx: { headers, user, workspaceId, userRole, tdb: createTenantDb(workspaceId) },
   };
 }
 
