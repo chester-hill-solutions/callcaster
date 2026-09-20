@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@dda06a62` · 204 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@f2be7289` · 204 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,28 +15,9 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 9
+## Fix now — 6
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
-
-### [#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148) SMS Onboarding Changes
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
-- Recommended title: **ux(onboarding): move SMS compliance identity fields out of Goal and bound help popovers**
-- Tooltip bounds are already implemented, and Goal renders its descriptions without a duplicate InfoPopover. Toll-free business identity fields still render on Goal.
-- Current behavior: InfoPopover forwards max-width and max-height settings; OnboardingGoalStep still renders TollFreeVerificationFields after SMS number-path selection.
-- Root cause: The remaining issue is placement of SMS identity fields, not the tooltip primitive.
-- Resolution: Move SMS business identity fields into the identity step while preserving validation and channel-specific visibility. Do not reimplement tooltip bounds.
-- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx`, `app/components/shared/InfoPopover.tsx`
-- Existing tests: test/ui/onboarding-goal-step.test.tsx (expects toll-free on Goal — must move)
-- Missing tests: popover bounds; SMS-only identity fields
-- Done when: Goal has short non-duplicated guidance; Help content wraps/scrolls within bounds; SMS compliance fields only for SMS goal; Saved data unchanged
-- Tracker: Coordinate with #1345/#1311/#1122.
-
-### [#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764) "Number" onboarding breadcrumbs missing address step
-- **IN PROGRESS** · Verdict: **Fix now** · Size: S · Risk: medium · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
-- Confirmed gap: the rent path has a real address substep but the substep nav collapses address/rent/verify into one crumb. Add an address crumb to the nav state machine.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1701](https://github.com/chester-hill-solutions/callcaster/issues/1701) IVR Script: Upload Audio button should be closer to the select a recording option since they are options of the same choice: "What audio do you want to use"
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
@@ -47,12 +28,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 ### [#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702) IVR Script: Answer label description should be in an on hover tool tip after "Answer Label" not underneath the field
 - **IN PROGRESS** · Verdict: **Fix now** · Size: S · Risk: medium · Labels: design · Assignee: @wra-sol · Updated: 2026-09-19
 - Exact change: convert the Answer label description into a hover tooltip.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1703](https://github.com/chester-hill-solutions/callcaster/issues/1703) IVR Script: Remove response for IVR script should be a trash can icon in line with the fields on the right
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: design · Assignee: @wra-sol · Updated: 2026-09-19
-- Exact change: replace the full-width 'Remove response' button with an inline trash icon in each response row.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
@@ -69,7 +44,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1810](https://github.com/chester-hill-solutions/callcaster/issues/1810) docs(issues): refresh board after verified dev fixes
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: on-dev · Assignee: @wra-sol · Updated: 2026-09-12
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: on-dev · Assignee: @wra-sol · Updated: 2026-09-20
 - This tracking-only refresh updates stale verdicts from live issue states and merged PR evidence.
 - Resolution: Review and merge the active board refresh after full local checks.
 - Look in: `ISSUE_BOARD.md`, `scripts/issue-board-enrichment/`
@@ -88,7 +63,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 68
+## Verify and close — 71
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -124,6 +99,34 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.tsx`, `app/components/campaign/home/CampaignHomeScreen/MessageResultsScreen.tsx`, `app/components/campaign/home/CampaignHomeScreen/ResultsScreen.TotalCalls.tsx`, `app/lib/database/campaign-stats.server.ts`
 - Existing tests: test/ui/campaign-result-display.test.tsx
 - Tracker: PR #1633 merge 420e49bc is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items.
+
+### [#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764) "Number" onboarding breadcrumbs missing address step
+- **IN PROGRESS** · Verdict: **Verify and close** · Size: S · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
+- Fixed on dev in PR #1906 (14d29f1c): the rent path shows Service address as its own breadcrumb step (address, then number search, then review). Changelog records the change.
+- Resolution: Verify on the review environment that the address substep gets its own crumb when renting. Close on master promotion.
+- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx`
+- Existing tests: test/ui/onboarding-first-number-flow.test.tsx
+- Done when: Address substep has its own breadcrumb when renting
+- Tracker: PR #1906 merge 14d29f1c is on dev, not yet master.
+
+### [#1703](https://github.com/chester-hill-solutions/callcaster/issues/1703) IVR Script: Remove response for IVR script should be a trash can icon in line with the fields on the right
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: @wra-sol · Updated: 2026-09-19
+- Fixed on dev in PR #1905 (db176dc8): each IVR response row removes with an inline trash icon beside the fields. Changelog records the change.
+- Resolution: Verify on the review environment that the Remove response button is a trash icon in line with the row. Close on master promotion.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrResponses.tsx`
+- Existing tests: test/ui/script-block-editor-ivr.test.tsx
+- Done when: Response removal is an inline trash icon, not a full-width button
+- Tracker: PR #1905 merge db176dc8 is on dev, not yet master.
+
+### [#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148) SMS Onboarding Changes
+- Verdict: **Verify and close** · Size: M · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
+- Recommended title: **verify-close: SMS business identity fields on the Identity step**
+- Fixed on dev in PR #1903 (3103b835): toll-free and US registration business details are collected on the Identity step after the number path is chosen, not expanded on the Goal step. Changelog records the change.
+- Resolution: Verify on the review environment that the Goal step no longer shows the identity fields and that Identity collects them for the SMS paths, with saved data unchanged. Close on master promotion. Do not reimplement tooltip bounds (already shipped in #1608).
+- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx`
+- Existing tests: test/ui/onboarding-goal-step.test.tsx
+- Done when: SMS compliance fields only on Identity; Goal has no duplicate guidance; Saved data unchanged
+- Tracker: PR #1903 merge 3103b835 is on dev, not yet master. Closes on master promotion.
 
 ### [#1739](https://github.com/chester-hill-solutions/callcaster/issues/1739) Workspace notification emails should mention the workspace name in the email
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19

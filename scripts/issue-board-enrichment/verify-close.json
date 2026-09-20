@@ -1171,5 +1171,66 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "PR #1944 merge dda06a62 is on dev, not yet master."
+  },
+  {
+    "issueNumber": 1148,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: SMS business identity fields on the Identity step",
+    "summary": "Fixed on dev in PR #1903 (3103b835): toll-free and US registration business details are collected on the Identity step after the number path is chosen, not expanded on the Goal step. Changelog records the change.",
+    "resolution": "Verify on the review environment that the Goal step no longer shows the identity fields and that Identity collects them for the SMS paths, with saved data unchanged. Close on master promotion. Do not reimplement tooltip bounds (already shipped in #1608).",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-goal-step.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "SMS compliance fields only on Identity",
+      "Goal has no duplicate guidance",
+      "Saved data unchanged"
+    ],
+    "size": "M",
+    "risk": "low",
+    "trackerRecommendation": "PR #1903 merge 3103b835 is on dev, not yet master. Closes on master promotion."
+  },
+  {
+    "issueNumber": 1703,
+    "verdict": "verify-close",
+    "summary": "Fixed on dev in PR #1905 (db176dc8): each IVR response row removes with an inline trash icon beside the fields. Changelog records the change.",
+    "resolution": "Verify on the review environment that the Remove response button is a trash icon in line with the row. Close on master promotion.",
+    "lookIn": [
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrResponses.tsx"
+    ],
+    "existingTests": [
+      "test/ui/script-block-editor-ivr.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Response removal is an inline trash icon, not a full-width button"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "PR #1905 merge db176dc8 is on dev, not yet master."
+  },
+  {
+    "issueNumber": 1764,
+    "verdict": "verify-close",
+    "summary": "Fixed on dev in PR #1906 (14d29f1c): the rent path shows Service address as its own breadcrumb step (address, then number search, then review). Changelog records the change.",
+    "resolution": "Verify on the review environment that the address substep gets its own crumb when renting. Close on master promotion.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-first-number-flow.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Address substep has its own breadcrumb when renting"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "PR #1906 merge 14d29f1c is on dev, not yet master."
   }
 ]
