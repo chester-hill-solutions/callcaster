@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- The account menu now drops the profile-info heading, first name, and Workspace settings link, and shows pending invitations as **Invitations: N** beside an open-mail icon ([#1715](https://github.com/chester-hill-solutions/callcaster/issues/1715)).
 - The IVR editor's **Answer label** help now appears in a hover/focus tooltip beside the label instead of a paragraph under the field, so the response row stays compact ([#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702)).
 - IVR campaign launch estimates now bound completion by the concurrent call limit and average call time, so the ETA reflects when calls actually finish rather than the dial-start rate ([#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874)).
 - Phone-number onboarding now shows Service address as its own step when you rent a number, and the breadcrumb moves from address to number search to review as you progress ([#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764)).
