@@ -5,7 +5,6 @@ import { openApiSpec } from "../app/lib/openapi";
 import { toOpenApiPath } from "../app/lib/openapi-build";
 import {
   INTEGRATOR_API_PATHS,
-  INTEGRATOR_API_TAG,
 } from "../app/lib/public-api";
 import { createWithScriptBodySchema } from "../app/lib/schemas/api/create-with-script";
 import { chatSmsBodySchema } from "../app/lib/schemas/api/chat-sms";
@@ -66,7 +65,8 @@ describe("openapi spec", () => {
       const operation = pathItem.post;
       expect(operation).toBeDefined();
       expect(operation?.operationId).toBeTruthy();
-      expect(operation?.tags).toContain(INTEGRATOR_API_TAG);
+      // Pinned literal (#1931): the integrator spec section name is the contract.
+      expect(operation?.tags).toContain("Integrator API");
       expect(operation?.security).toEqual([
         { sessionCookie: [] },
         { apiKey: [] },
