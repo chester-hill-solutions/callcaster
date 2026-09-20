@@ -1,36 +1,5 @@
 [
   {
-    "issueNumber": 1148,
-    "verdict": "fix-now",
-    "recommendedTitle": "ux(onboarding): move SMS compliance identity fields out of Goal and bound help popovers",
-    "summary": "Tooltip bounds are already implemented, and Goal renders its descriptions without a duplicate InfoPopover. Toll-free business identity fields still render on Goal.",
-    "currentBehavior": "InfoPopover forwards max-width and max-height settings; OnboardingGoalStep still renders TollFreeVerificationFields after SMS number-path selection.",
-    "rootCause": "The remaining issue is placement of SMS identity fields, not the tooltip primitive.",
-    "resolution": "Move SMS business identity fields into the identity step while preserving validation and channel-specific visibility. Do not reimplement tooltip bounds.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx",
-      "app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx",
-      "app/components/shared/InfoPopover.tsx"
-    ],
-    "existingTests": [
-      "test/ui/onboarding-goal-step.test.tsx (expects toll-free on Goal — must move)"
-    ],
-    "missingTests": [
-      "popover bounds",
-      "SMS-only identity fields"
-    ],
-    "acceptanceCriteria": [
-      "Goal has short non-duplicated guidance",
-      "Help content wraps/scrolls within bounds",
-      "SMS compliance fields only for SMS goal",
-      "Saved data unchanged"
-    ],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Coordinate with #1345/#1311/#1122.",
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1701,
     "verdict": "fix-now",
     "summary": "Well-scoped layout change: move the Upload audio button (rendered in IvrStepFields) adjacent to the 'Select a recording' control (RecordingStepFields).",
@@ -59,20 +28,6 @@
     "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
-    "issueNumber": 1703,
-    "verdict": "fix-now",
-    "summary": "Exact change: replace the full-width 'Remove response' button with an inline trash icon in each response row.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
     "issueNumber": 1715,
     "verdict": "fix-now",
     "summary": "Precise change list with an exact target component (profile dropdown): remove padding/info/first-name/workspace settings, rename invitations line + icon.",
@@ -90,20 +45,6 @@
     "issueNumber": 1716,
     "verdict": "fix-now",
     "summary": "Navbar order shifts because NavbarCredits/WorkspacePicker render conditionally; issue specifies the exact desired order. Fix is a stable nav-shell order.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1764,
-    "verdict": "fix-now",
-    "summary": "Confirmed gap: the rent path has a real address substep but the substep nav collapses address/rent/verify into one crumb. Add an address crumb to the nav state machine.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
