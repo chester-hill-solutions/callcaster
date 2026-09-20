@@ -16,6 +16,7 @@ import {
   DEFAULT_WORKSPACE_ONBOARDING_STEPS,
   WORKSPACE_MESSAGING_ONBOARDING_VERSION,
 } from "@/lib/messaging-onboarding/defaults.server";
+import { EMPTY_BUSINESS_PROFILE } from "@/lib/messaging-onboarding/business-profile.server";
 import { buildOnboardingStepsForState } from "@/lib/messaging-onboarding/readiness.server";
 import {
   normalizeA2p10dlcSection,
@@ -47,30 +48,7 @@ export const DEFAULT_WORKSPACE_MESSAGING_ONBOARDING_STATE: WorkspaceMessagingOnb
   selectedChannels: [],
   selectedGoal: null,
   steps: DEFAULT_WORKSPACE_ONBOARDING_STEPS,
-  businessProfile: {
-    legalBusinessName: "",
-    businessType: "",
-    websiteUrl: "",
-    privacyPolicyUrl: "",
-    termsOfServiceUrl: "",
-    supportEmail: "",
-    supportPhone: "",
-    useCaseSummary: "",
-    optInWorkflow: "",
-    optInKeywords: "",
-    optOutKeywords: "",
-    helpKeywords: "",
-    sampleMessages: [],
-    doingBusinessAs: "",
-    businessRegistrationNumber: "",
-    ageGatedContent: false,
-    ein: "",
-    industry: "",
-    authorizedRepName: "",
-    authorizedRepEmail: "",
-    authorizedRepPhone: "",
-    authorizedRepTitle: "",
-  },
+  businessProfile: EMPTY_BUSINESS_PROFILE,
   messagingService: {
     desiredSendMode: "messaging_service",
     serviceSid: null,
