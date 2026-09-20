@@ -1232,5 +1232,27 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "PR #1906 merge 14d29f1c is on dev, not yet master."
+  },
+  {
+    "issueNumber": 1702,
+    "verdict": "verify-close",
+    "recommendedTitle": "verify-close: IVR Answer label help in a tooltip",
+    "summary": "Merged to dev in PR #1946 (8e3c8668): the IVR response Answer label help shows in a hover/focus tooltip beside the label, via a new FormField labelTooltip prop, instead of a paragraph under the field.",
+    "resolution": "Verify on the review environment that the Answer label help appears on hover/focus and no paragraph renders under the field. Close on master promotion.",
+    "lookIn": [
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrResponses.tsx",
+      "app/components/ui/form-field.tsx"
+    ],
+    "existingTests": [
+      "test/ui/form-field.test.tsx",
+      "test/ui/script-block-editor-ivr.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Answer label help is a tooltip, not a paragraph under the field"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "PR #1946 merge 8e3c8668 is on dev, not yet master."
   }
 ]

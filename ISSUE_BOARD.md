@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@f2be7289` · 204 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@048ed1f7` · 204 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,19 +15,13 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 6
+## Fix now — 5
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
 ### [#1701](https://github.com/chester-hill-solutions/callcaster/issues/1701) IVR Script: Upload Audio button should be closer to the select a recording option since they are options of the same choice: "What audio do you want to use"
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
 - Well-scoped layout change: move the Upload audio button (rendered in IvrStepFields) adjacent to the 'Select a recording' control (RecordingStepFields).
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702) IVR Script: Answer label description should be in an on hover tool tip after "Answer Label" not underneath the field
-- **IN PROGRESS** · Verdict: **Fix now** · Size: S · Risk: medium · Labels: design · Assignee: @wra-sol · Updated: 2026-09-19
-- Exact change: convert the Answer label description into a hover tooltip.
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
@@ -63,9 +57,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 71
+## Verify and close — 72
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702) IVR Script: Answer label description should be in an on hover tool tip after "Answer Label" not underneath the field
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: @wra-sol · Updated: 2026-09-20
+- Recommended title: **verify-close: IVR Answer label help in a tooltip**
+- Merged to dev in PR #1946 (8e3c8668): the IVR response Answer label help shows in a hover/focus tooltip beside the label, via a new FormField labelTooltip prop, instead of a paragraph under the field.
+- Resolution: Verify on the review environment that the Answer label help appears on hover/focus and no paragraph renders under the field. Close on master promotion.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrResponses.tsx`, `app/components/ui/form-field.tsx`
+- Existing tests: test/ui/form-field.test.tsx; test/ui/script-block-editor-ivr.test.tsx
+- Done when: Answer label help is a tooltip, not a paragraph under the field
+- Tracker: PR #1946 merge 8e3c8668 is on dev, not yet master.
 
 ### [#1942](https://github.com/chester-hill-solutions/callcaster/issues/1942) Task: ratchet the base db client in app/lib
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
