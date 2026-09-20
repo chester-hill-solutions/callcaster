@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * ADR-0004 service-layer boundary: the unscoped admin client is not importable
- * from `app/lib` by default.
+ * ADR-0004 service-layer boundary: an unscoped database client is not
+ * importable from `app/lib` by default.
  *
- * `adminDb` bypasses workspace tenancy entirely (there is no RLS), so every
- * import is a cross-workspace capability. The route tree already bans it in
- * eslint (`eslint.config.mjs`); this guard extends the rule to the service
- * layer, where the actual tenant reads happen.
+ * `adminDb` and the base `db` client both bypass workspace tenancy (there is no
+ * RLS), so every import is a cross-workspace capability or a place where a
+ * missing `.where(workspace)` leaks another tenant's rows. The route tree
+ * already bans both in eslint (`eslint.config.mjs`); this guard extends the
+ * rule to the service layer, where the actual tenant reads happen.
  *
  * Ratchet: existing importers are baselined in
  * scripts/baselines/unscoped-db-imports.txt (`<file>::<module>` lines). This
@@ -25,7 +26,7 @@ const LIB_DIR = join(ROOT, "app", "lib");
 const BASELINE = join(import.meta.dirname, "baselines", "unscoped-db-imports.txt");
 
 /** Unscoped clients that bypass workspace tenancy. Extend as more are adopted. */
-const BANNED_MODULES = ["@/server/admin-db"];
+const BANNED_MODULES = ["@/server/admin-db", "@/server/db"];
 
 function listSourceFiles(dir) {
   const out = [];
