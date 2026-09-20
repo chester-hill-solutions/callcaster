@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@6e4d99ff` · 197 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@dda06a62` · 204 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 11
+## Fix now — 9
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -62,18 +62,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: See rationale in .agent/board-dig-results.md
 - Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
-### [#1739](https://github.com/chester-hill-solutions/callcaster/issues/1739) Workspace notification emails should mention the workspace name in the email
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
-- Well-scoped template change with example copy: inject the workspace name into the low-credit email subject/body (workspace is in the notify context).
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
-### [#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727) Campaign List should be sorted
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
-- Explicit ordering spec (reverse chrono + status grouping running→waiting→draft→complete); campaigns list renders without that ordering. Well-scoped change at the source.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
-
 ### [#1716](https://github.com/chester-hill-solutions/callcaster/issues/1716) workspace drop down shouldn't move
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: ux · Assignee: none · Updated: 2026-09-16
 - Navbar order shifts because NavbarCredits/WorkspacePicker render conditionally; issue specifies the exact desired order. Fix is a stable nav-shell order.
@@ -100,9 +88,34 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 63
+## Verify and close — 68
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#1942](https://github.com/chester-hill-solutions/callcaster/issues/1942) Task: ratchet the base db client in app/lib
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Merged to dev in PR #1944 (dda06a62): the guard also bans @/server/db in app/lib; baseline grew to 81 (50 base, 31 admin).
+- Resolution: Verify the guard fails on a new base-db import in app/lib and that ci:local is green. Close on master promotion.
+- Look in: `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`
+- Done when: A new app/lib @/server/db import fails the guard
+- Tracker: PR #1944 merge dda06a62 is on dev, not yet master.
+
+### [#1939](https://github.com/chester-hill-solutions/callcaster/issues/1939) Task: ban the unscoped admin client in app/lib
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
+- Merged to dev in PR #1943 (ec1d8075): scripts/check-unscoped-db-imports.mjs bans @/server/admin-db in app/lib with a ratchet baseline of 31 importers.
+- Resolution: Verify the guard fails on a new admin-db import in app/lib and on a stale baseline entry, and that ci:local runs check:unscoped-db-imports. Close on master promotion.
+- Look in: `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`, `package.json`, `.github/workflows/ci.yml`
+- Done when: A new app/lib admin-db import fails the guard; A stale baseline entry fails the guard
+- Tracker: PR #1943 merge ec1d8075 is on dev, not yet master.
+
+### [#1940](https://github.com/chester-hill-solutions/callcaster/issues/1940) Task: construct the workspace-scoped tenant client in middleware
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
+- Merged to dev in PR #1941 (58bea105): workspace and data-plane middleware build the scoped Drizzle client once and expose it as tdb on the context; 14 workspaces+/$id routes read it.
+- Resolution: Verify typecheck, test:node, test:ui, and that no createTenantDb remains under app/routes/workspaces+. Close on master promotion.
+- Look in: `app/lib/route-context.server.ts`, `app/lib/workspace-middleware.server.ts`, `app/lib/data-plane-middleware.server.ts`, `app/lib/workspace-route.server.ts`
+- Existing tests: test/tenant-db.test.ts
+- Done when: No createTenantDb under app/routes/workspaces+; tdb built once per workspace request
+- Tracker: PR #1941 merge 58bea105 is on dev, not yet master.
 
 ### [#1334](https://github.com/chester-hill-solutions/callcaster/issues/1334) Results numbers are off?
 - Verdict: **Verify and close** · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
@@ -111,6 +124,24 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.tsx`, `app/components/campaign/home/CampaignHomeScreen/MessageResultsScreen.tsx`, `app/components/campaign/home/CampaignHomeScreen/ResultsScreen.TotalCalls.tsx`, `app/lib/database/campaign-stats.server.ts`
 - Existing tests: test/ui/campaign-result-display.test.tsx
 - Tracker: PR #1633 merge 420e49bc is an ancestor of master. Close only after remaining verification; this release does not bulk-close shipped items.
+
+### [#1739](https://github.com/chester-hill-solutions/callcaster/issues/1739) Workspace notification emails should mention the workspace name in the email
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
+- Fixed on dev in PR #1902 (f081cee8): the low-credit notification email names the workspace in its subject and body from the notify context. The open state does not prove the fix is absent.
+- Resolution: Verify on the review environment that the low-credit email subject and body name the workspace. Close on master promotion. Do not reimplement the template change.
+- Look in: `app/lib/low-credit-notify.server.ts`
+- Existing tests: test/low-credit-notify.server.test.ts
+- Done when: Low-credit email subject and body name the workspace
+- Tracker: PR #1902 merge f081cee8 is on dev, not yet master. Closes on master promotion.
+
+### [#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727) Campaign List should be sorted
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
+- Fixed on dev in PR #1899 (9a82cbce): the campaigns list sorts by status group then newest first, via app/lib/campaign-list-order.ts. The open state does not prove the fix is absent.
+- Resolution: Verify on the review environment that the list orders running, then waiting, then draft, then complete, newest first within each group. Close on master promotion. Do not reimplement the sort.
+- Look in: `app/lib/campaign-list-order.ts`
+- Existing tests: test/campaign-list-order.test.ts
+- Done when: Campaign list orders running, waiting, draft, complete, newest first within each group
+- Tracker: PR #1899 merge 9a82cbce is on dev, not yet master. Closes on master promotion.
 
 ### [#1168](https://github.com/chester-hill-solutions/callcaster/issues/1168) Campaign states aren't clear
 - **IN PROGRESS** · Verdict: **Verify and close** · Size: XS · Risk: low · Labels: ux, business-logic · Assignee: @wra-sol · Updated: 2026-09-19
@@ -1154,19 +1185,51 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 62
+## Needs triage — 66
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
-### [#1925](https://github.com/chester-hill-solutions/callcaster/issues/1925) Prune tautological tests (echo tests) with kill-verification
+### [#1938](https://github.com/chester-hill-solutions/callcaster/issues/1938) Epic: construct the scoped tenant client in middleware and enforce the boundary beyond routes
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-20
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#1924](https://github.com/chester-hill-solutions/callcaster/issues/1924) Effects gate: require @effect-why-not-loader and flag 'none' side-effects
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-20
+### [#1883](https://github.com/chester-hill-solutions/callcaster/issues/1883) IVR step: configurable no-input handling (wait length + reroute/replay)
+- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#1892](https://github.com/chester-hill-solutions/callcaster/issues/1892) DRY pass: de-duplicate the largest copy-paste clones (jscpd)
+- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#1936](https://github.com/chester-hill-solutions/callcaster/issues/1936) Comment policy: comments must carry information (no-useless-comments rule)
+- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-20
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#1932](https://github.com/chester-hill-solutions/callcaster/issues/1932) Systemic structural review: PR risk template + coverage gate
+- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874) IVR estimates are too low. projected CPS is too high
+- Status: on-dev · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-20
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#1931](https://github.com/chester-hill-solutions/callcaster/issues/1931) Ratchet the test echo-shape: expectations that reuse SUT exports
+- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#1925](https://github.com/chester-hill-solutions/callcaster/issues/1925) Prune tautological tests (echo tests) with kill-verification
+- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#1924](https://github.com/chester-hill-solutions/callcaster/issues/1924) Effects gate: require @effect-why-not-loader and flag 'none' side-effects
+- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#1910](https://github.com/chester-hill-solutions/callcaster/issues/1910) Issue board: render unenriched issues in a Needs triage lane
+- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#1897](https://github.com/chester-hill-solutions/callcaster/issues/1897) Guardrails: git hooks + PR issue-reference gate
 - Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
@@ -1206,14 +1269,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-20
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#1910](https://github.com/chester-hill-solutions/callcaster/issues/1910) Issue board: render unenriched issues in a Needs triage lane
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1897](https://github.com/chester-hill-solutions/callcaster/issues/1897) Guardrails: git hooks + PR issue-reference gate
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
 ### [#1886](https://github.com/chester-hill-solutions/callcaster/issues/1886) Run db:schema:check per deployed environment (DB-backed gate)
 - Status: Backlog · Labels: none · Assignee: @wra-sol · Updated: 2026-09-19
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
@@ -1227,10 +1282,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884) IVR editor: expose an explicit Hang up routing target and a guaranteed terminal hangup
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1883](https://github.com/chester-hill-solutions/callcaster/issues/1883) IVR step: configurable no-input handling (wait length + reroute/replay)
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
@@ -1308,10 +1359,6 @@ Open and not yet audited — no enrichment record. Assign a verdict in scripts/i
 
 ### [#1880](https://github.com/chester-hill-solutions/callcaster/issues/1880) Roadmap: evaluate Jev (TypeSafe) as the IVR speech-intent service
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-19
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874) IVR estimates are too low. projected CPS is too high
-- Status: Backlog · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-18
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#1833](https://github.com/chester-hill-solutions/callcaster/issues/1833) Primary button hover needs the hover mouse

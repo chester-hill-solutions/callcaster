@@ -1071,5 +1071,105 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix."
+  },
+  {
+    "issueNumber": 1727,
+    "verdict": "verify-close",
+    "summary": "Fixed on dev in PR #1899 (9a82cbce): the campaigns list sorts by status group then newest first, via app/lib/campaign-list-order.ts. The open state does not prove the fix is absent.",
+    "resolution": "Verify on the review environment that the list orders running, then waiting, then draft, then complete, newest first within each group. Close on master promotion. Do not reimplement the sort.",
+    "lookIn": [
+      "app/lib/campaign-list-order.ts"
+    ],
+    "existingTests": [
+      "test/campaign-list-order.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Campaign list orders running, waiting, draft, complete, newest first within each group"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "PR #1899 merge 9a82cbce is on dev, not yet master. Closes on master promotion."
+  },
+  {
+    "issueNumber": 1739,
+    "verdict": "verify-close",
+    "summary": "Fixed on dev in PR #1902 (f081cee8): the low-credit notification email names the workspace in its subject and body from the notify context. The open state does not prove the fix is absent.",
+    "resolution": "Verify on the review environment that the low-credit email subject and body name the workspace. Close on master promotion. Do not reimplement the template change.",
+    "lookIn": [
+      "app/lib/low-credit-notify.server.ts"
+    ],
+    "existingTests": [
+      "test/low-credit-notify.server.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Low-credit email subject and body name the workspace"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "PR #1902 merge f081cee8 is on dev, not yet master. Closes on master promotion."
+  },
+  {
+    "issueNumber": 1939,
+    "verdict": "verify-close",
+    "summary": "Merged to dev in PR #1943 (ec1d8075): scripts/check-unscoped-db-imports.mjs bans @/server/admin-db in app/lib with a ratchet baseline of 31 importers.",
+    "resolution": "Verify the guard fails on a new admin-db import in app/lib and on a stale baseline entry, and that ci:local runs check:unscoped-db-imports. Close on master promotion.",
+    "lookIn": [
+      "scripts/check-unscoped-db-imports.mjs",
+      "scripts/baselines/unscoped-db-imports.txt",
+      "package.json",
+      ".github/workflows/ci.yml"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A new app/lib admin-db import fails the guard",
+      "A stale baseline entry fails the guard"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "PR #1943 merge ec1d8075 is on dev, not yet master."
+  },
+  {
+    "issueNumber": 1940,
+    "verdict": "verify-close",
+    "summary": "Merged to dev in PR #1941 (58bea105): workspace and data-plane middleware build the scoped Drizzle client once and expose it as tdb on the context; 14 workspaces+/$id routes read it.",
+    "resolution": "Verify typecheck, test:node, test:ui, and that no createTenantDb remains under app/routes/workspaces+. Close on master promotion.",
+    "lookIn": [
+      "app/lib/route-context.server.ts",
+      "app/lib/workspace-middleware.server.ts",
+      "app/lib/data-plane-middleware.server.ts",
+      "app/lib/workspace-route.server.ts"
+    ],
+    "existingTests": [
+      "test/tenant-db.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "No createTenantDb under app/routes/workspaces+",
+      "tdb built once per workspace request"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "PR #1941 merge 58bea105 is on dev, not yet master."
+  },
+  {
+    "issueNumber": 1942,
+    "verdict": "verify-close",
+    "summary": "Merged to dev in PR #1944 (dda06a62): the guard also bans @/server/db in app/lib; baseline grew to 81 (50 base, 31 admin).",
+    "resolution": "Verify the guard fails on a new base-db import in app/lib and that ci:local is green. Close on master promotion.",
+    "lookIn": [
+      "scripts/check-unscoped-db-imports.mjs",
+      "scripts/baselines/unscoped-db-imports.txt"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A new app/lib @/server/db import fails the guard"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "PR #1944 merge dda06a62 is on dev, not yet master."
   }
 ]
