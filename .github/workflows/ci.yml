@@ -123,6 +123,7 @@ jobs:
       # service functions a route calls, because this codebase checks there.
       - run: npm run check:route-membership
       - run: npm run check:workspace-projection
+      - run: npm run check:unscoped-db-imports
       - run: npm run check:effects
       - run: npm run check:type-safety
       # A relative `redirect("../…")` in a loader/action resolves against
