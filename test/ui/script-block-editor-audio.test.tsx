@@ -113,6 +113,19 @@ describe("ScriptBlockEditor audio upload (#1346)", () => {
     });
   });
 
+  test("in recording mode the upload control sits with the recording field, before the empty-recording warning (#1701)", () => {
+    renderEditor({ onUploadAudio: vi.fn() });
+
+    const upload = screen.getByRole("button", { name: "Upload audio" });
+    const warning = screen.getByText(/Choose or upload a recording/);
+
+    // The warning rendered between the recording Select and the upload button
+    // before #1701; the button now groups with the field it belongs to.
+    expect(
+      upload.compareDocumentPosition(warning) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   test("uploading from an already-recorded block does not re-emit callcasterType (avoids a noisy patch)", async () => {
     const onUploadAudio = vi.fn().mockResolvedValue("uploaded.mp3");
     const { onChange, fileInput } = renderEditor({ onUploadAudio });
