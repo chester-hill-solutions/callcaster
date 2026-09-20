@@ -3,6 +3,7 @@ import { Slot } from "@radix-ui/react-slot";
 
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
+import InfoPopover from "@/components/shared/InfoPopover";
 
 type FormFieldContextValue = {
   descriptionId?: string;
@@ -14,6 +15,11 @@ const FormFieldContext = React.createContext<FormFieldContextValue>({});
 
 export interface FormFieldProps extends React.HTMLAttributes<HTMLDivElement> {
   label?: React.ReactNode;
+  /**
+   * Help text shown in a hover/focus tooltip beside the label, for guidance
+   * that would otherwise sit as a paragraph under the control (#1702).
+   */
+  labelTooltip?: string;
   description?: React.ReactNode;
   error?: React.ReactNode;
   htmlFor?: string;
@@ -27,6 +33,7 @@ export function FormField({
   error,
   htmlFor,
   label,
+  labelTooltip,
   required,
   ...props
 }: FormFieldProps) {
@@ -34,17 +41,26 @@ export function FormField({
   const descriptionId = description ? `${id}-description` : undefined;
   const errorId = error ? `${id}-error` : undefined;
 
+  const labelNode = label ? (
+    <Label htmlFor={htmlFor} className="text-sm font-semibold">
+      {label}
+      {required ? <span className="ml-1 text-destructive-text">*</span> : null}
+    </Label>
+  ) : null;
+
   return (
     <FormFieldContext.Provider
       value={{ descriptionId, errorId, invalid: Boolean(error) }}
     >
       <div className={cn("space-y-2", className)} {...props}>
-        {label ? (
-          <Label htmlFor={htmlFor} className="text-sm font-semibold">
-            {label}
-            {required ? <span className="ml-1 text-destructive-text">*</span> : null}
-          </Label>
-        ) : null}
+        {labelNode && labelTooltip ? (
+          <div className="flex items-center gap-1">
+            {labelNode}
+            <InfoPopover tooltip={labelTooltip} />
+          </div>
+        ) : (
+          labelNode
+        )}
         {React.Children.map(children, (child) =>
           htmlFor &&
           React.isValidElement<{ id?: string }>(child) &&

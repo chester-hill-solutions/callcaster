@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- The IVR editor's **Answer label** help now appears in a hover/focus tooltip beside the label instead of a paragraph under the field, so the response row stays compact ([#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702)).
 - IVR campaign launch estimates now bound completion by the concurrent call limit and average call time, so the ETA reflects when calls actually finish rather than the dial-start rate ([#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874)).
 - Phone-number onboarding now shows Service address as its own step when you rent a number, and the breadcrumb moves from address to number search to review as you progress ([#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764)).
 - SMS onboarding now collects toll-free and US registration business details on the Identity step after you choose the number path, instead of expanding them on the Goal step ([#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148)).

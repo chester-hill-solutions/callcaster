@@ -116,7 +116,7 @@ function IvrResponseRow({
           </SelectContent>
         </Select>
       </FormField>
-      <FormField label="Answer label" htmlFor={labelId} description="Shown in results and exports.">
+      <FormField label="Answer label" htmlFor={labelId} labelTooltip="Shown in results and exports.">
         <Input
           id={labelId}
           value={option.label}

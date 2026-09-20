@@ -119,4 +119,21 @@ describe("shared field accessibility (#1748)", () => {
     );
   });
 
+  test("shows label help as a tooltip instead of a paragraph (#1702)", () => {
+    render(
+      <FormField
+        htmlFor="answer"
+        label="Answer label"
+        labelTooltip="Shown in results and exports."
+      >
+        <Input id="answer" />
+      </FormField>,
+    );
+    expect(screen.getByLabelText("Answer label")).toBeInTheDocument();
+    expect(screen.queryByText("Shown in results and exports.")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "More information" }),
+    ).toBeInTheDocument();
+  });
+
 });
