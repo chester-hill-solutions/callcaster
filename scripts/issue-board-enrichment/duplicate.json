@@ -1,33 +1,5 @@
 [
   {
-    "issueNumber": 1193,
-    "verdict": "duplicate",
-    "duplicateOf": 1157,
-    "recommendedTitle": "test(e2e): run one campaign against a controlled synthetic audience",
-    "summary": "User story for the controlled-recipient campaign test. Near-duplicate of parent epic #1157; implement as the final acceptance journey after #1192/#1328.",
-    "currentBehavior": "Same gaps as #1157 (generic seed, no scenario selection, no server-side synthetic provider).",
-    "rootCause": "Dependent on #1328; redundant with #1157.",
-    "resolution": "Close as duplicate of #1157, or keep as the manual acceptance test for #1157/#1192/#1328.",
-    "lookIn": [
-      "e2e/fixtures/seed.ts",
-      "app/components/audience/AudienceUploader.tsx"
-    ],
-    "existingTests": [
-      "none"
-    ],
-    "missingTests": [
-      "controlled-campaign journey + metric assertions"
-    ],
-    "acceptanceCriteria": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Close as duplicate of #1157.",
-    "blockedBy": [
-      1328,
-      1192
-    ]
-  },
-  {
     "issueNumber": 1720,
     "verdict": "duplicate",
     "summary": "Same root cause as 1732: queue_status enum only has queued/dequeued and opted-out entries display as 'completed'. 1732's outreach-status model is the canonical ticket; 1720 is one of its observable symptoms.",

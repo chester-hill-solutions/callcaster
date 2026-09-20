@@ -250,19 +250,31 @@ function issueEntry(issue, record, status, repo) {
   return lines.join("\n");
 }
 
+/** Minimal entry for an open issue with no enrichment record yet (#1910). */
+function triageEntry(issue, status) {
+  const assignees = (issue.assignees?.nodes ?? []).map((a) => a.login);
+  const labels = (issue.labels?.nodes ?? []).map((l) => l.name);
+  const meta = [`Status: ${status}`];
+  meta.push(`Labels: ${labels.length ? labels.join(", ") : "none"}`);
+  meta.push(`Assignee: ${assignees.length ? `@${assignees.join(", @")}` : "none"}`);
+  meta.push(`Updated: ${issue.updatedAt.slice(0, 10)}`);
+  return [
+    `### [#${issue.number}](${issue.url}) ${issue.title}`,
+    `- ${meta.join(" · ")}`,
+    `- _No enrichment record yet — assign a verdict in \`scripts/issue-board-enrichment/\`._`,
+  ].join("\n");
+}
+
 /**
  * Render the board markdown for a list of open issues and validated records.
- * Pure and deterministic: no timestamps, no I/O. Throws if any open issue is
- * missing an enrichment record or a record references a closed issue.
+ * Pure and deterministic: no timestamps, no I/O. Open issues without an
+ * enrichment record land in a "Needs triage" lane (#1910) instead of failing
+ * the board; a record referencing a closed issue still throws.
  */
 export function buildBoard({ issues, records, repo, projectNumber, reviewedAt }) {
   const byNumber = new Map(records.map((r) => [r.issueNumber, r]));
   const openNumbers = new Set(issues.map((i) => i.number));
 
-  const missing = issues.filter((i) => !byNumber.has(i.number)).map((i) => i.number);
-  if (missing.length) {
-    throw new Error(`issue-board: open issues without enrichment: ${missing.join(", ")}`);
-  }
   const stale = records
     .filter((r) => !openNumbers.has(r.issueNumber))
     .map((r) => r.issueNumber);
@@ -271,10 +283,23 @@ export function buildBoard({ issues, records, repo, projectNumber, reviewedAt })
   }
 
   const lanes = new Map(LANES.map((l) => [l.key, { ...l, entries: [] }]));
+  // Unenriched issues have no verdict yet — they fill a "Needs triage" lane
+  // instead of failing the whole board (#1910).
+  const triage = {
+    key: "needs-triage",
+    label: "Needs triage",
+    blurb:
+      "Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.",
+    entries: [],
+  };
   for (const issue of issues) {
-    const record = byNumber.get(issue.number);
     const status = statusOf(issue, projectNumber) ?? "No status";
-    lanes.get(record.verdict).entries.push({ issue, record, status });
+    const record = byNumber.get(issue.number);
+    if (record) {
+      lanes.get(record.verdict).entries.push({ issue, record, status });
+    } else {
+      triage.entries.push({ issue, record: null, status });
+    }
   }
 
   for (const lane of lanes.values()) {
@@ -289,6 +314,8 @@ export function buildBoard({ issues, records, repo, projectNumber, reviewedAt })
     });
   }
 
+  triage.entries.sort((a, b) => b.issue.updatedAt.localeCompare(a.issue.updatedAt));
+
   const sections = LANES.map((l) => {
     const lane = lanes.get(l.key);
     const body = lane.entries.length
@@ -298,6 +325,15 @@ export function buildBoard({ issues, records, repo, projectNumber, reviewedAt })
       : "_None._";
     return `## ${l.label} — ${lane.entries.length}\n\n${l.blurb}\n\n${body}`;
   });
+  sections.push(
+    `## ${triage.label} — ${triage.entries.length}\n\n${triage.blurb}\n\n${
+      triage.entries.length
+        ? triage.entries
+            .map((e) => triageEntry(e.issue, e.status))
+            .join("\n\n")
+        : "_None._"
+    }`,
+  );
 
   const md = `# CallCaster — Open Issue Board for Agents
 
@@ -319,5 +355,9 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 ${sections.join("\n\n---\n\n")}
 `;
 
-  return { md, counts: Object.fromEntries([...lanes.values()].map((l) => [l.key, l.entries.length])) };
+  const counts = Object.fromEntries(
+    [...lanes.values()].map((l) => [l.key, l.entries.length]),
+  );
+  counts[triage.key] = triage.entries.length;
+  return { md, counts };
 }

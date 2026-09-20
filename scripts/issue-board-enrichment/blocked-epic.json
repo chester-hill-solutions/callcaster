@@ -32,40 +32,6 @@
     ]
   },
   {
-    "issueNumber": 1192,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "feat(test-audiences): select trusted server-owned scenario profiles",
-    "summary": "Test-audience uploads should select server-owned scenario profiles (voice result, callback timing, voicemail greeting, SMS result, optional reply, media fixture) — never accept arbitrary simulation behavior from CSV rows.",
-    "currentBehavior": "Header mapping supports contact fields only; upload submits file + mapping only; no profile registry.",
-    "rootCause": "Blocked by the synthetic provider (#1328).",
-    "resolution": "Add a server-owned profile registry and an audience-level profile reference; reject unknown/unauthorized profiles and CSV behavior fields.",
-    "lookIn": [
-      "app/components/audience/AudienceUploadMapStep.tsx",
-      "app/components/audience/AudienceUploader.tsx",
-      "scripts/e2e/seed-data.mjs"
-    ],
-    "existingTests": [
-      "none"
-    ],
-    "missingTests": [
-      "unknown profile rejection",
-      "CSV behavior-field rejection",
-      "profile-to-provider contract"
-    ],
-    "acceptanceCriteria": [
-      "Clients submit only a profile id",
-      "Unknown/unauthorized rejected server-side",
-      "CSV cannot define outcomes",
-      "Profile reaches provider unchanged"
-    ],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Child of #1157; blocked by #1328.",
-    "blockedBy": [
-      1328
-    ]
-  },
-  {
     "issueNumber": 1268,
     "verdict": "blocked-epic",
     "recommendedTitle": "epic(interactive-sms): ship release-one audited SMS/MMS interactions",
