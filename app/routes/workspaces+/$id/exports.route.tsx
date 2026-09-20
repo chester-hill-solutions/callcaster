@@ -86,7 +86,7 @@ export default function WorkspaceExports() {
   // Starting an export only needs the POST: the row it creates is picked up by
   // this page's existing poll, which already renders progress and the download
   // link. No second progress widget, and no duplicate of the polling in
-  // AsyncExportButton.
+  // CampaignExportButton.
   const startExport = async () => {
     if (!selectedCampaign || !workspaceId) return;
     setStartState({ status: "starting" });

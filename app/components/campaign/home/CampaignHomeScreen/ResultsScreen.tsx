@@ -1,5 +1,5 @@
 import { TotalCalls } from "./ResultsScreen.TotalCalls";
-import { AsyncExportButton } from "./AsyncExportButton";
+import { CampaignExportButton } from "./CampaignExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { IvrResponseBreakdown } from "./ResultsScreen.IvrResponses";
 import { KeyMetrics } from "./ResultsScreen.KeyMetrics";
@@ -55,7 +55,7 @@ const ResultsScreen = ({
             totalCalls={queueCounts.completedCount || 0}
             expectedTotal={queueCounts.fullCount || 0}
           />
-          <AsyncExportButton campaignId={campaignId} workspaceId={workspaceId} />
+          <CampaignExportButton campaignId={campaignId} workspaceId={workspaceId} />
         </div>
         <DispositionBreakdown
           results={results}

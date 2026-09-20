@@ -7,6 +7,13 @@ import {
   PaginationItem,
 } from "@/components/ui/pagination";
 import { buttonVariants } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 type TablePaginationProps = {
@@ -17,6 +24,8 @@ type TablePaginationProps = {
   totalCount?: number;
   pageSize?: number;
   showSummary?: boolean;
+  pageSizeOptions?: number[];
+  onPageSizeChange?: (pageSize: number) => void;
 };
 const TablePagination = ({
   currentPage,
@@ -26,6 +35,8 @@ const TablePagination = ({
   pageSize,
   showSummary = false,
   totalCount,
+  pageSizeOptions,
+  onPageSizeChange,
 }: TablePaginationProps) => {
   const renderPaginationItems = () => {
     const items = [];
@@ -79,9 +90,28 @@ const TablePagination = ({
   return (
     <div className="flex flex-col gap-3 px-2 sm:flex-row sm:items-center sm:justify-between">
       {showSummary && totalCount != null && pageSize != null ? (
-        <div className="text-xs text-muted-foreground">
-          Showing {Math.min((currentPage - 1) * pageSize + 1, totalCount)} to{" "}
-          {Math.min(currentPage * pageSize, totalCount)} of {totalCount} results
+        <div className="flex flex-wrap items-center gap-3">
+          {pageSizeOptions && onPageSizeChange ? (
+            <Select
+              value={String(pageSize)}
+              onValueChange={(value) => onPageSizeChange(Number(value))}
+            >
+              <SelectTrigger className="w-[100px]" aria-label="Rows per page">
+                <SelectValue placeholder="Per page" />
+              </SelectTrigger>
+              <SelectContent>
+                {pageSizeOptions.map((size) => (
+                  <SelectItem key={size} value={String(size)}>
+                    {size} per page
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
+          <div className="text-xs text-muted-foreground">
+            Showing {Math.min((currentPage - 1) * pageSize + 1, totalCount)} to{" "}
+            {Math.min(currentPage * pageSize, totalCount)} of {totalCount} results
+          </div>
         </div>
       ) : null}
       <Pagination className="mx-0 justify-start sm:justify-end">
