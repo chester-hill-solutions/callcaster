@@ -280,9 +280,7 @@ export function useCampaignCallFlow({
     }
   }, [agentLegSid]);
 
-  // ---------------------------------------------------------------------------
   // Display derivation: one source of truth for the call screen UI.
-  // ---------------------------------------------------------------------------
   const displayState = ((): string => {
     const { phase } = lifecycle;
 

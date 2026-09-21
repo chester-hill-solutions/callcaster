@@ -6,6 +6,7 @@ import importPlugin from "eslint-plugin-import";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import globals from "globals";
 import { plugin as shadcn } from "@shadcn/lint";
+import { noUselessComments } from "./eslint-rules/no-useless-comments.mjs";
 
 /**
  * Flat config (ESLint 9). Ported 1:1 from the former `.eslintrc.cjs` — every
@@ -341,6 +342,19 @@ export default [
       "shadcn/no-inline-styles": "warn",
       "shadcn/no-unknown-classes": "warn",
       "shadcn/require-static-classes": "warn",
+    },
+  },
+
+  // Repo-authored rules. Comment hygiene is an `error`, not a ratchet warning:
+  // the existing offenders are swept in the same change, so it is forward-only
+  // from the start (#1936).
+  {
+    files: ["**/*.{js,jsx,ts,tsx,mjs,cjs}"],
+    plugins: {
+      callcaster: { rules: { "no-useless-comments": noUselessComments } },
+    },
+    rules: {
+      "callcaster/no-useless-comments": "error",
     },
   },
 
