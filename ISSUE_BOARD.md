@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@356e3efe` · 159 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@6153b084` · 160 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 19
+## Fix now — 18
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -82,26 +82,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Editor emits wait/no-input controls; Inbound response route no-input branches and replay cap
 - Done when: A step can wait longer than the default and, on no input, replay or route instead of just advancing; Defaults are unchanged for steps that do not configure it
 - Tracker: Fix now. Runtime + outbound are dev-only in PR #1937; finish the editor panel and inbound mirror (or fold #1843 in).
-
-### [#1713](https://github.com/chester-hill-solutions/callcaster/issues/1713) Needing a user to have an account before invite makes no sense.
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-21
-- Recommended title: **Workspace invites: email-first (invite by email without requiring an account)**
-- Product decision confirmed 2026-09-21: inviting an email must not require the invitee to already have an account. If the email maps to an account, invite that user; if not, attach the email to the workspace and prompt the invitee to create an account. SEC-03 in docs/remediation/wave1-membership-migration-2026-07-13.md is the pre-planned implementation; the workspace_invitation table (email, role_id, token_hash, status, expiry, CAS redeem) is already scaffolded in the migration ledger and app/db/schema.ts, and @chester-hill-solutions/auth-postgres already ships createInvitation/redeemInvitation/resendInvitation/cancelInvitation/listPendingInvitations.
-- Current behavior: Invites are account-keyed: workspace_invite.user_id is uuid NOT NULL (schema.ts:214). app/lib/invite-user-by-email.server.ts:26-31 returns 'User not found. They must sign up before being invited to a workspace.' when no auth user matches, and the module comment says email delivery is TBD - no invitation email is ever sent; the invitee only sees the invite after logging in. The /accept-invite signup branch admits the gap ('invites are keyed by an existing user id, so nothing here proves an invite exists', accept-invite.action.server.ts:26-28).
-- Root cause: Legacy invite model (workspace_invite) has no email column and no delivery; invites were created only for existing user ids. The email-first replacement (workspace_invitation / SEC-03) was scaffolded in 2026-07 but never adopted by the writers/readers.
-- Resolution: Adopt SEC-03 from docs/remediation/wave1-membership-migration-2026-07-13.md §6 (implement-PR #4). PR-sized chunks, implemented after the 2026-09-21 release (#1978) merges:
-1. Writers: replace invite-user-by-email.server.ts to call createInvitation (normalized email, role_id, token_hash via package, 7-day expiry) for unknown emails and keep the existing-user invite path; keep the members.invite capability gate; owner never invitational.
-2. Email: send the invite via Resend (infra in send-reset-password-email.server.ts) with an accept link carrying the invite id + raw token; never store raw tokens.
-3. Redeem: replace accept-invite redemption with redeemInvitation (verified-email match + CAS, insert workspace_member in the same transaction); wire signup (new-user) and sign-in (existing-user) claim paths.
-4. List/UI: listPendingInvitations for the settings Team-members list; render invited emails (name 'invited'); cancel/resend actions.
-5. API surface + OpenAPI: POST /api/workspaces/{id}/members response shape (invite may be email-keyed, no user), member list pending_invites shape.
-6. Cleanup: migrate or abandon outstanding workspace_invite rows, then drop the legacy table (Phase D) once readers/writers are on workspace_invitation.
-#1714 (same 'User not found' error path) resolves when the email-first writers land - verify and close, or fold into this issue.
-- Look in: `app/lib/invite-user-by-email.server.ts`, `app/lib/platform-members.server.ts`, `app/routes/api+/workspaces+/$workspaceId/members.action.server.ts`, `app/routes/accept-invite.action.server.ts`, `app/routes/accept-invite.loader.server.ts`, `app/routes/accept-invite.tsx`, `app/routes/workspaces+/$id/settings.route.tsx`, `app/db/schema.ts:180`, `app/lib/schemas/api/platform-workspace-admin.ts`, `app/lib/send-reset-password-email.server.ts`, `docs/remediation/wave1-membership-migration-2026-07-13.md`
-- Existing tests: test/accept-invite* (accept/redeem; see test/ for invite coverage); members API invite tests (POST /members)
-- Missing tests: createInvitation writer: unknown email creates pending email-keyed invite; existing user creates user-keyed invite; duplicate pending email rejected; redeemInvitation: wrong token, expired, wrong email vs verified email, concurrent redeem CAS; signup-claim: new account with invited email lands in the workspace on /accept-invite; email sent carries id + raw token; token never persisted; members list renders pending email invitations; cancel/resend
-- Done when: Inviting an unknown email succeeds: the email is attached to the workspace and pending; the invitee gets a prompt (email + signup landing) to create an account; Inviting a known email behaves as today (user-keyed invite, no duplicate pending); After signup/sign-in with the invited email, the invite redeems atomically (verified-email match, CAS) and a workspace_member row is inserted; Raw invitation tokens are never stored; token_hash only; members.invite capability gate and role policy (owner never invitational) unchanged; Legacy workspace_invite rows migrated or abandoned before the table is dropped
-- Tracker: Decision confirmed 2026-09-21 - implement SEC-03 after the 2026-09-21 release (#1978) merges. Adopt the @chester-hill-solutions/auth-postgres invitation APIs; do not hand-roll tokens. Verify #1714 against the new flow.
 
 ### [#1886](https://github.com/chester-hill-solutions/callcaster/issues/1886) Run db:schema:check per deployed environment (DB-backed gate)
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-09-21
@@ -267,9 +247,22 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 62
+## Verify and close — 63
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#1713](https://github.com/chester-hill-solutions/callcaster/issues/1713) Needing a user to have an account before invite makes no sense.
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-21
+- Recommended title: **Workspace invites: email-first (invite by email without requiring an account)**
+- IMPLEMENTED on dev (#1985, merged 2026-09-21): email-first invites (SEC-03) landed end-to-end — invite writers no longer require a pre-existing account, pending invites live on workspace_invitation by email, acceptance is token-gated through the emailed link, email sent via Resend, members API / settings / admin lists and cancel/resend moved to the new table. Verify the invitee flow on the review env (invite unknown email -> accept link -> signup -> workspace membership), then close.
+- Current behavior: Invites are account-keyed: workspace_invite.user_id is uuid NOT NULL (schema.ts:214). app/lib/invite-user-by-email.server.ts:26-31 returns 'User not found. They must sign up before being invited to a workspace.' when no auth user matches, and the module comment says email delivery is TBD - no invitation email is ever sent; the invitee only sees the invite after logging in. The /accept-invite signup branch admits the gap ('invites are keyed by an existing user id, so nothing here proves an invite exists', accept-invite.action.server.ts:26-28).
+- Root cause: Legacy invite model (workspace_invite) has no email column and no delivery; invites were created only for existing user ids. The email-first replacement (workspace_invitation / SEC-03) was scaffolded in 2026-07 but never adopted by the writers/readers.
+- Resolution: Shipped in PR #1985. Follow-ups (tracked separately, do not block this close): Phase D drop of legacy workspace_invite; #1714 same-'User not found'-error verify-and-close against the new writer.
+- Look in: `app/lib/invite-user-by-email.server.ts`, `app/lib/platform-members.server.ts`, `app/routes/api+/workspaces+/$workspaceId/members.action.server.ts`, `app/routes/accept-invite.action.server.ts`, `app/routes/accept-invite.loader.server.ts`, `app/routes/accept-invite.tsx`, `app/routes/workspaces+/$id/settings.route.tsx`, `app/db/schema.ts:180`, `app/lib/schemas/api/platform-workspace-admin.ts`, `app/lib/send-reset-password-email.server.ts`, `docs/remediation/wave1-membership-migration-2026-07-13.md`
+- Existing tests: test/accept-invite* (accept/redeem; see test/ for invite coverage); members API invite tests (POST /members)
+- Missing tests: createInvitation writer: unknown email creates pending email-keyed invite; existing user creates user-keyed invite; duplicate pending email rejected; redeemInvitation: wrong token, expired, wrong email vs verified email, concurrent redeem CAS; signup-claim: new account with invited email lands in the workspace on /accept-invite; email sent carries id + raw token; token never persisted; members list renders pending email invitations; cancel/resend
+- Done when: Inviting an unknown email succeeds: the email is attached to the workspace and pending; the invitee gets a prompt (email + signup landing) to create an account; Inviting a known email behaves as today (user-keyed invite, no duplicate pending); After signup/sign-in with the invited email, the invite redeems atomically (verified-email match, CAS) and a workspace_member row is inserted; Raw invitation tokens are never stored; token_hash only; members.invite capability gate and role policy (owner never invitational) unchanged; Legacy workspace_invite rows migrated or abandoned before the table is dropped
+- Tracker: Verify on the review env after the 2026-09-21 release: invite an email with no account, receive the Resend link, sign up, land in the workspace; ensure token-less accept is not reachable. Then close.
 
 ### [#1810](https://github.com/chester-hill-solutions/callcaster/issues/1810) docs(issues): refresh board after verified dev fixes
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-21
@@ -923,6 +916,12 @@ Likely already fixed or working as designed. Run the listed verification, then c
 
 Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, payload, trace) before coding.
 
+### [#1698](https://github.com/chester-hill-solutions/callcaster/issues/1698) every keypress in the "Answer label" field in the script maker unfocuses the input
+- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: @sai-sy · Updated: 2026-09-21
+- Focus loss on each keystroke in Answer label is reproduced but root cause unproven; candidates are the option row key with id regeneration on document round-trip (documentToScript) and block onFocusCapture wrappers. Issue explicitly demands a systemic component-level fix, so evidence-first.
+- Done when: See rationale in .agent/board-dig-results.md
+- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
+
 ### [#1857](https://github.com/chester-hill-solutions/callcaster/issues/1857) gap between pressing an IVR option and it moving on to the next block is very long ~4 seconds
 - Verdict: **Needs reproduction** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-09-19
 - Recommended title: **Instrument and attribute the ~4s IVR option-press to next-block gap**
@@ -935,12 +934,6 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 - Missing tests: latency attribution from option-press to next-block first audio
 - Done when: Measured option-press -> next-block first-audio, before and after; Chosen fix under 2s without regressing #1842/#1864; Root cause recorded, or folded into #1842 with evidence
 - Tracker: needs-repro: likely shares the per-request render root cause with #1842 but different hop. Measure before merging the tickets.
-
-### [#1698](https://github.com/chester-hill-solutions/callcaster/issues/1698) every keypress in the "Answer label" field in the script maker unfocuses the input
-- Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
-- Focus loss on each keystroke in Answer label is reproduced but root cause unproven; candidates are the option row key with id regeneration on document round-trip (documentToScript) and block onFocusCapture wrappers. Issue explicitly demands a systemic component-level fix, so evidence-first.
-- Done when: See rationale in .agent/board-dig-results.md
-- Tracker: Lane set by 2026-09-12 board triage — confirm before implementing.
 
 ### [#1750](https://github.com/chester-hill-solutions/callcaster/issues/1750) Fix the existing sign-in page hydration mismatch
 - Verdict: **Needs reproduction** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-16
@@ -1620,9 +1613,13 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 6
+## Needs triage — 7
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
+
+### [#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347) need to verify consistency for Robocall vs IVR vs Automated Phone Menu
+- Status: In progress · Labels: design · Assignee: none · Updated: 2026-09-21
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#1983](https://github.com/chester-hill-solutions/callcaster/issues/1983) Receipts should have tax (and the charges themselves should be taxed)
 - Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-21

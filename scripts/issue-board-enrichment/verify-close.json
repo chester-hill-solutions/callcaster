@@ -1495,5 +1495,50 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Merged on dev in PR #1959; closes on master promotion."
+  },
+  {
+    "issueNumber": 1713,
+    "verdict": "verify-close",
+    "recommendedTitle": "Workspace invites: email-first (invite by email without requiring an account)",
+    "summary": "IMPLEMENTED on dev (#1985, merged 2026-09-21): email-first invites (SEC-03) landed end-to-end — invite writers no longer require a pre-existing account, pending invites live on workspace_invitation by email, acceptance is token-gated through the emailed link, email sent via Resend, members API / settings / admin lists and cancel/resend moved to the new table. Verify the invitee flow on the review env (invite unknown email -> accept link -> signup -> workspace membership), then close.",
+    "currentBehavior": "Invites are account-keyed: workspace_invite.user_id is uuid NOT NULL (schema.ts:214). app/lib/invite-user-by-email.server.ts:26-31 returns 'User not found. They must sign up before being invited to a workspace.' when no auth user matches, and the module comment says email delivery is TBD - no invitation email is ever sent; the invitee only sees the invite after logging in. The /accept-invite signup branch admits the gap ('invites are keyed by an existing user id, so nothing here proves an invite exists', accept-invite.action.server.ts:26-28).",
+    "rootCause": "Legacy invite model (workspace_invite) has no email column and no delivery; invites were created only for existing user ids. The email-first replacement (workspace_invitation / SEC-03) was scaffolded in 2026-07 but never adopted by the writers/readers.",
+    "resolution": "Shipped in PR #1985. Follow-ups (tracked separately, do not block this close): Phase D drop of legacy workspace_invite; #1714 same-'User not found'-error verify-and-close against the new writer.",
+    "lookIn": [
+      "app/lib/invite-user-by-email.server.ts",
+      "app/lib/platform-members.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/members.action.server.ts",
+      "app/routes/accept-invite.action.server.ts",
+      "app/routes/accept-invite.loader.server.ts",
+      "app/routes/accept-invite.tsx",
+      "app/routes/workspaces+/$id/settings.route.tsx",
+      "app/db/schema.ts:180",
+      "app/lib/schemas/api/platform-workspace-admin.ts",
+      "app/lib/send-reset-password-email.server.ts",
+      "docs/remediation/wave1-membership-migration-2026-07-13.md"
+    ],
+    "existingTests": [
+      "test/accept-invite* (accept/redeem; see test/ for invite coverage)",
+      "members API invite tests (POST /members)"
+    ],
+    "missingTests": [
+      "createInvitation writer: unknown email creates pending email-keyed invite; existing user creates user-keyed invite; duplicate pending email rejected",
+      "redeemInvitation: wrong token, expired, wrong email vs verified email, concurrent redeem CAS",
+      "signup-claim: new account with invited email lands in the workspace on /accept-invite",
+      "email sent carries id + raw token; token never persisted",
+      "members list renders pending email invitations; cancel/resend"
+    ],
+    "acceptanceCriteria": [
+      "Inviting an unknown email succeeds: the email is attached to the workspace and pending; the invitee gets a prompt (email + signup landing) to create an account",
+      "Inviting a known email behaves as today (user-keyed invite, no duplicate pending)",
+      "After signup/sign-in with the invited email, the invite redeems atomically (verified-email match, CAS) and a workspace_member row is inserted",
+      "Raw invitation tokens are never stored; token_hash only",
+      "members.invite capability gate and role policy (owner never invitational) unchanged",
+      "Legacy workspace_invite rows migrated or abandoned before the table is dropped"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Verify on the review env after the 2026-09-21 release: invite an email with no account, receive the Resend link, sign up, land in the workspace; ensure token-less accept is not reachable. Then close."
   }
 ]
