@@ -41,6 +41,28 @@ export const SQL_BUILTINS = new Set([
   "current_setting", "pg_try_advisory_lock", "to_regclass",
 ]);
 
+/**
+ * Decide whether a live-database check must hard-fail when it has no database
+ * to check, and which URL it should use. Kept pure and shared so the two
+ * `scripts/db` gates apply one rule (#1886). The callers implement this
+ * exit-code contract:
+ *
+ *   - URL present            -> run the check
+ *   - no URL, requireDb set  -> exit 1 (the run gated nothing)
+ *   - no URL, no flag        -> exit 2 (repo inventory only; loud warning)
+ *
+ * `--require-db` in argv or `<requireEnvVar>=1` in the environment both arm it.
+ */
+export function resolveDbCheckGate({
+  argv = process.argv,
+  env = process.env,
+  flag = "--require-db",
+  requireEnvVar,
+} = {}) {
+  const requireDb = argv.includes(flag) || env[requireEnvVar] === "1";
+  return { requireDb, databaseUrl: env.DATABASE_URL || null };
+}
+
 export function walk(dir, out = [], exts = [".ts", ".tsx"]) {
   let entries;
   try {
