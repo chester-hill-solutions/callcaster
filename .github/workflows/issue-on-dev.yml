@@ -108,13 +108,23 @@ jobs:
           fi
           moved=0
           for n in $NUMBERS; do
+            # A referenced number can be a pull request (a closing-keyword
+            # example, or a cross-reference). gh issue view reports its state
+            # happily, but the GraphQL `issue` node is absent and that call
+            # exits non-zero — under bash -e it aborted the whole loop and
+            # silently skipped every later issue (#1961). Skip PRs explicitly.
+            if gh pr view "$n" --repo "$REPO" --json number >/dev/null 2>&1; then
+              echo "#$n: is a pull request, skipping"
+              continue
+            fi
             state=$(gh issue view "$n" --repo "$REPO" --json state --jq .state 2>/dev/null || echo "MISSING")
             if [ "$state" = "MISSING" ]; then echo "#$n: not an issue, skipping"; continue; fi
             # GraphQL is authoritative for item resolution; item-list can
-            # silently drop items even when they ARE on the project.
-            item_id=$(gh api graphql -f query="query { repository(owner: \"$OWNER\", name: \"$(basename "$REPO")\") { issue(number: $n) { projectItems(first: 5) { nodes { id project { number } } } } } }" \
+            # silently drop items even when they ARE on the project. Tolerate a
+            # failed or null lookup rather than aborting the step.
+            item_id=$(gh api graphql -f query="query { repository(owner: \"$OWNER\", name: \"$(basename "$REPO")\") { issue(number: $n) { projectItems(first: 5) { nodes { id project { number } } } } } }" 2>/dev/null \
               | jq -r --argjson proj "$PROJECT" \
-                '[.data.repository.issue.projectItems.nodes[] | select(.project.number == $proj) | .id][0]')
+                '[.data.repository.issue.projectItems.nodes[]? | select(.project.number == $proj) | .id][0] // ""' 2>/dev/null) || item_id=""
             if [ -z "$item_id" ] || [ "$item_id" = "null" ]; then
               echo "#$n: not on project $PROJECT, skipping"
               continue
@@ -137,6 +147,12 @@ jobs:
           NUMBERS: ${{ steps.issues.outputs.numbers }}
         run: |
           for n in $NUMBERS; do
+            # gh issue comment also accepts a PR number, which would spam an
+            # unrelated PR; skip those (#1961).
+            if gh pr view "$n" --repo "$REPO" --json number >/dev/null 2>&1; then
+              echo "#$n: is a pull request, skipping"
+              continue
+            fi
             state=$(gh issue view "$n" --repo "$REPO" --json state --jq .state 2>/dev/null || echo "MISSING")
             if [ "$state" = "MISSING" ]; then echo "#$n: not an issue, skipping"; continue; fi
             gh issue comment "$n" --repo "$REPO" --body "On dev: merged in $PR_URL (\`${SHA:0:8}\`). Retest on the review environment; this issue closes when the fix is promoted to master."
