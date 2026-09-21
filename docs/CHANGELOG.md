@@ -24,6 +24,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Completing caller-ID verification from onboarding now flips the verification sheet to **Number verified** without a reload, matching Settings → Numbers ([#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846)).
 - Call campaign results now show **Contacts completed** against the queue total, instead of mixing call attempts with contacts — a contact attempted twice no longer reads as more results than contacts ([#1334](https://github.com/chester-hill-solutions/callcaster/issues/1334)).
 - Calls without an outreach attempt cannot remove a matching contact from a campaign queue, which keeps test calls isolated from real sends ([#1869](https://github.com/chester-hill-solutions/callcaster/issues/1869)).
 - Campaign navigation now groups campaigns as running, waiting, draft, and complete, with newest campaigns first in each group ([#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727)).
