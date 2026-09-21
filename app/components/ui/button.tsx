@@ -15,6 +15,8 @@ export type ButtonProps = VariantProps<typeof buttonVariants> & {
   children?: React.ReactNode;
   disabled?: boolean;
   isDisabled?: boolean;
+  /** Show the pointer cursor for interactive buttons by default. */
+  cursorPointer?: boolean;
   title?: string;
   "data-testid"?: string;
 } & Omit<
@@ -49,6 +51,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       asChild = false,
       disabled,
       isDisabled,
+      cursorPointer = true,
       onClick,
       ...props
     },
@@ -59,7 +62,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // wins via tailwind-merge's last-occurrence rule.
     const variantOverride =
       variant === "destructive" ? DESTRUCTIVE_HOVER_OVERRIDE : undefined;
-    const mergedClassName = cn(variantOverride, className);
+    const mergedClassName = cn(
+      cursorPointer ? "cursor-pointer" : "cursor-default",
+      "disabled:cursor-default aria-disabled:cursor-default",
+      variantOverride,
+      className,
+    );
 
     if (asChild) {
       return (
