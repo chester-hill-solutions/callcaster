@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@6153b084` · 160 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@39046a98` · 154 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -247,7 +247,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 63
+## Verify and close — 57
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -263,15 +263,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: createInvitation writer: unknown email creates pending email-keyed invite; existing user creates user-keyed invite; duplicate pending email rejected; redeemInvitation: wrong token, expired, wrong email vs verified email, concurrent redeem CAS; signup-claim: new account with invited email lands in the workspace on /accept-invite; email sent carries id + raw token; token never persisted; members list renders pending email invitations; cancel/resend
 - Done when: Inviting an unknown email succeeds: the email is attached to the workspace and pending; the invitee gets a prompt (email + signup landing) to create an account; Inviting a known email behaves as today (user-keyed invite, no duplicate pending); After signup/sign-in with the invited email, the invite redeems atomically (verified-email match, CAS) and a workspace_member row is inserted; Raw invitation tokens are never stored; token_hash only; members.invite capability gate and role policy (owner never invitational) unchanged; Legacy workspace_invite rows migrated or abandoned before the table is dropped
 - Tracker: Verify on the review env after the 2026-09-21 release: invite an email with no account, receive the Resend link, sign up, land in the workspace; ensure token-less accept is not reachable. Then close.
-
-### [#1810](https://github.com/chester-hill-solutions/callcaster/issues/1810) docs(issues): refresh board after verified dev fixes
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: @wra-sol · Updated: 2026-09-21
-- Tracking-only board refresh. Regenerates ISSUE_BOARD.md and prunes/moves enrichment records after verified dev fixes.
-- Resolution: This PR is the refresh. Review the generated board and enrichment diff, then close on master promotion.
-- Look in: `ISSUE_BOARD.md`, `scripts/issue-board-enrichment/`
-- Existing tests: test/issue-board-generator.test.ts; test/issue-board-atomic.test.ts
-- Done when: Verified merged work leaves Fix now; closed issues' records pruned; no issue closed early.
-- Tracker: Recurring tracking ticket; the active refresh PR owns it. Do not duplicate.
 
 ### [#1957](https://github.com/chester-hill-solutions/callcaster/issues/1957) Exempt docs/data-only PRs from the review-coverage gate
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-21
@@ -352,32 +343,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/campaigns-create-with-script.route.test.ts; test/openapi.test.ts
 - Done when: A simple_ivr/complex_ivr create request fails with a message directing the caller to robocall; OpenAPI and the public docs list only the supported types
 - Tracker: Verify and close. Dev-only: 078c797f is in origin/dev but not origin/master; close when dev promotes to master.
-
-### [#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702) IVR Script: Answer label description should be in an on hover tool tip after "Answer Label" not underneath the field
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: design · Assignee: @wra-sol · Updated: 2026-09-20
-- Recommended title: **verify-close: IVR Answer label help in a tooltip**
-- Merged to dev in PR #1946 (8e3c8668): the IVR response Answer label help shows in a hover/focus tooltip beside the label, via a new FormField labelTooltip prop, instead of a paragraph under the field.
-- Resolution: Verify on the review environment that the Answer label help appears on hover/focus and no paragraph renders under the field. Close on master promotion.
-- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrResponses.tsx`, `app/components/ui/form-field.tsx`
-- Existing tests: test/ui/form-field.test.tsx; test/ui/script-block-editor-ivr.test.tsx
-- Done when: Answer label help is a tooltip, not a paragraph under the field
-- Tracker: PR #1946 merge 8e3c8668 is on dev, not yet master.
-
-### [#1942](https://github.com/chester-hill-solutions/callcaster/issues/1942) Task: ratchet the base db client in app/lib
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Merged to dev in PR #1944 (dda06a62): the guard also bans @/server/db in app/lib; baseline grew to 81 (50 base, 31 admin).
-- Resolution: Verify the guard fails on a new base-db import in app/lib and that ci:local is green. Close on master promotion.
-- Look in: `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`
-- Done when: A new app/lib @/server/db import fails the guard
-- Tracker: PR #1944 merge dda06a62 is on dev, not yet master.
-
-### [#1939](https://github.com/chester-hill-solutions/callcaster/issues/1939) Task: ban the unscoped admin client in app/lib
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Merged to dev in PR #1943 (ec1d8075): scripts/check-unscoped-db-imports.mjs bans @/server/admin-db in app/lib with a ratchet baseline of 31 importers.
-- Resolution: Verify the guard fails on a new admin-db import in app/lib and on a stale baseline entry, and that ci:local runs check:unscoped-db-imports. Close on master promotion.
-- Look in: `scripts/check-unscoped-db-imports.mjs`, `scripts/baselines/unscoped-db-imports.txt`, `package.json`, `.github/workflows/ci.yml`
-- Done when: A new app/lib admin-db import fails the guard; A stale baseline entry fails the guard
-- Tracker: PR #1943 merge ec1d8075 is on dev, not yet master.
 
 ### [#1940](https://github.com/chester-hill-solutions/callcaster/issues/1940) Task: construct the workspace-scoped tenant client in middleware
 - Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
@@ -564,18 +529,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Done when: New ids derive from the max existing numeric suffix.; A test adds three, removes the middle, adds another, asserts unique ids.
 - Tracker: Verify and close after dev verification; promote #1920 to master first.
 
-### [#1911](https://github.com/chester-hill-solutions/callcaster/issues/1911) Survey form hook: collapse the deep-map mutators into index primitives
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-20
-- Recommended title: **verify-close: useSurveyForm mutators collapsed onto index primitives (#1920)**
-- useSurveyForm routes nested mutations through updatePages/withPage/withQuestions/withQuestion/withOptions/withOption, with generic field setters linking field and value types. Shipped to dev in PR #1920 (95f084c9); NOT yet master.
-- Root cause: Ten hand-written map-replace handlers duplicated index threading and immutability.
-- Resolution: Verify on dev: test/ui/use-survey-form.test.tsx stays green and the primitives are the only traversal. No new code expected.
-- Look in: `app/hooks/surveys/useSurveyForm.ts`
-- Existing tests: test/ui/use-survey-form.test.tsx
-- Missing tests: Type-level assertion that the generic setters reject mismatched field/value pairs
-- Done when: Index primitives own traversal once.; All mutators are expressed through them.; Setters are generic.
-- Tracker: Verify and close after dev verification; promote #1920 to master first.
-
 ### [#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764) "Number" onboarding breadcrumbs missing address step
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
 - Fixed on dev in PR #1906 (14d29f1c): the rent path shows Service address as its own breadcrumb step (address, then number search, then review). Changelog records the change.
@@ -593,16 +546,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/ui/script-block-editor-ivr.test.tsx
 - Done when: Response removal is an inline trash icon, not a full-width button
 - Tracker: PR #1905 merge db176dc8 is on dev, not yet master.
-
-### [#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148) SMS Onboarding Changes
-- Verdict: **Verify and close** · Size: M · Risk: low · Labels: design, ux · Assignee: @wra-sol · Updated: 2026-09-19
-- Recommended title: **verify-close: SMS business identity fields on the Identity step**
-- Fixed on dev in PR #1903 (3103b835): toll-free and US registration business details are collected on the Identity step after the number path is chosen, not expanded on the Goal step. Changelog records the change.
-- Resolution: Verify on the review environment that the Goal step no longer shows the identity fields and that Identity collects them for the SMS paths, with saved data unchanged. Close on master promotion. Do not reimplement tooltip bounds (already shipped in #1608).
-- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx`
-- Existing tests: test/ui/onboarding-goal-step.test.tsx
-- Done when: SMS compliance fields only on Identity; Goal has no duplicate guidance; Saved data unchanged
-- Tracker: PR #1903 merge 3103b835 is on dev, not yet master. Closes on master promotion.
 
 ### [#1739](https://github.com/chester-hill-solutions/callcaster/issues/1739) Workspace notification emails should mention the workspace name in the email
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
@@ -1333,15 +1276,15 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 
 ### [#1892](https://github.com/chester-hill-solutions/callcaster/issues/1892) DRY pass: de-duplicate the largest copy-paste clones (jscpd)
 - Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
-- Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930. The remaining ranked clones are each tracked as an open child issue (#1911-#1919).
+- Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930 (and 177 / 1895 in #1987). The remaining ranked clones are tracked as open child issues (#1912-#1919; #1911 closed in the 2026-09-21 release).
 - Current behavior: scripts/dry-baseline.json holds the gate at 178 clones / 1902 duplicated lines (1.28%).
 - Root cause: Copy-paste duplication across the ranked files; each row needs a behaviour-preserving extraction.
-- Resolution: Do not schedule this issue directly. Work the child issues #1911-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.
+- Resolution: Do not schedule this issue directly. Work the child issues #1912-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.
 - Look in: `scripts/dry-baseline.json`, `scripts/check-dry.mjs`
-- Blocked by: [#1911](https://github.com/chester-hill-solutions/callcaster/issues/1911), [#1912](https://github.com/chester-hill-solutions/callcaster/issues/1912), [#1913](https://github.com/chester-hill-solutions/callcaster/issues/1913), [#1914](https://github.com/chester-hill-solutions/callcaster/issues/1914), [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915), [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916), [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917), [#1918](https://github.com/chester-hill-solutions/callcaster/issues/1918), [#1919](https://github.com/chester-hill-solutions/callcaster/issues/1919)
+- Blocked by: [#1912](https://github.com/chester-hill-solutions/callcaster/issues/1912), [#1913](https://github.com/chester-hill-solutions/callcaster/issues/1913), [#1914](https://github.com/chester-hill-solutions/callcaster/issues/1914), [#1915](https://github.com/chester-hill-solutions/callcaster/issues/1915), [#1916](https://github.com/chester-hill-solutions/callcaster/issues/1916), [#1917](https://github.com/chester-hill-solutions/callcaster/issues/1917), [#1918](https://github.com/chester-hill-solutions/callcaster/issues/1918), [#1919](https://github.com/chester-hill-solutions/callcaster/issues/1919)
 - Existing tests: check:dry gate is the acceptance signal
 - Done when: clones/duplicatedLines drop and the baseline is lowered to lock it; One implementation per clone; call sites behave the same
-- Tracker: Umbrella/tracker; do not pick directly. Work the open children #1911-#1919.
+- Tracker: Umbrella/tracker; do not pick directly. Work the open children #1912-#1919.
 
 ### [#268](https://github.com/chester-hill-solutions/callcaster/issues/268) i18n: add proper localization with fr-CA as the first locale
 - Verdict: **Blocked / split first** · Size: XL · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-19
