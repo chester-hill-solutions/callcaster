@@ -69,9 +69,10 @@ export const action = defineAction({
                 recordingStatusCallbackEvent: ['in-progress']
             })
 
+            // No machineDetection on a manual dial (#1845): the agent is on the
+            // line, so the AMD verdict only adds latency. Predictive dialing
+            // keeps it (app/lib/auto-dial.server.ts).
             dial.number({
-                machineDetection: 'Enable',
-                amdStatusCallback: `${env.BASE_URL()}/api/dial/status`,
                 statusCallback: `${env.BASE_URL()}/api/call-status/`,
                 statusCallbackEvent: ["initiated", "ringing", "answered", "completed"],
             }, number!);
