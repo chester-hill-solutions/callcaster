@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/lib/env.server";
 import { objectStorageUsesPathStyle } from "@/lib/object-storage-config";
@@ -219,6 +219,27 @@ export async function uploadObject(
     }
     const message = error instanceof Error ? error.message : "Upload failed";
     throw new Error(message);
+  }
+}
+
+/**
+ * Whether an object exists, without downloading it. A 404 is a normal "no";
+ * any other failure is re-thrown so callers can tell "absent" from "storage
+ * down" (the same distinction `downloadObject` makes).
+ */
+export async function objectExists(
+  logicalBucket: ObjectStorageBucket,
+  objectPath: string,
+): Promise<boolean> {
+  const { bucketName, key } = resolveLocation(logicalBucket, objectPath);
+  try {
+    await getS3Client().send(
+      new HeadObjectCommand({ Bucket: bucketName, Key: key }),
+    );
+    return true;
+  } catch (error) {
+    if (isNotFound(error)) return false;
+    throw error;
   }
 }
 

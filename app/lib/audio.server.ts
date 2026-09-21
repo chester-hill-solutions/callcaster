@@ -65,6 +65,24 @@ const MP3_ENCODE_ARGS = [
   "mp3",
 ];
 
+/**
+ * Encoder flags for the Twilio-facing WAV sidecar (#1842): mono, 8 kHz,
+ * 16-bit PCM — what Twilio's `<Play>` streams without transcoding. Kept
+ * separate from MP3_ENCODE_ARGS because the two serve different consumers
+ * (library storage vs telephony playback).
+ */
+const WAV_ENCODE_ARGS = [
+  "-vn",
+  "-acodec",
+  "pcm_s16le",
+  "-ac",
+  "1",
+  "-ar",
+  "8000",
+  "-f",
+  "wav",
+];
+
 function formatSeconds(milliseconds: number) {
   return (milliseconds / 1000).toFixed(3);
 }
@@ -182,6 +200,37 @@ export async function transcodeAudioBuffer(inputBuffer: Buffer) {
     return await runAudioTool(
       "ffmpeg",
       ["-hide_banner", "-loglevel", "error", "-i", filePath, ...MP3_ENCODE_ARGS, "pipe:1"],
+      Buffer.alloc(0),
+      {
+        unavailable: "Audio transcoding is unavailable",
+        failed: "Audio transcoding failed",
+      },
+    );
+  } finally {
+    await rm(filePath, { force: true }).catch(() => {
+      // Best effort: a stranded temp file must not fail the upload.
+    });
+  }
+}
+
+/**
+ * Transcode any audio buffer to a Twilio-friendly WAV: mono, 8 kHz, 16-bit
+ * PCM. Twilio plays WAV without re-encoding, while MP3 prompts are transcoded
+ * on their side before playback — one source of first-audio delay (#1842).
+ */
+export async function transcodeToWavBuffer(inputBuffer: Buffer) {
+  // Same seekable-temp-file reason as transcodeAudioBuffer: MP4/M4A `moov`
+  // atoms sit at the end, and a pipe cannot be seeked.
+  const filePath = path.join(
+    os.tmpdir(),
+    `callcaster-wav-${randomUUID()}.${NORMALIZED_AUDIO_EXTENSION}`,
+  );
+
+  try {
+    await writeFile(filePath, inputBuffer);
+    return await runAudioTool(
+      "ffmpeg",
+      ["-hide_banner", "-loglevel", "error", "-i", filePath, ...WAV_ENCODE_ARGS, "pipe:1"],
       Buffer.alloc(0),
       {
         unavailable: "Audio transcoding is unavailable",
