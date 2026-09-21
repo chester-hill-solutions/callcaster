@@ -1,10 +1,11 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import {
   campaign as campaignTable,
   user as userTable,
   webhook as webhookTable,
   workspace as workspaceTable,
   workspace_api_key as workspaceApiKeyTable,
+  workspace_invitation as workspaceInvitationTable,
   workspace_invite as workspaceInviteTable,
   workspace_member as workspaceMemberTable,
   workspace_number as workspaceNumberTable,
@@ -26,6 +27,11 @@ import {
   memberRoleToRoleId,
   workspaceMemberId,
 } from "@/lib/workspace-membership.server";
+import {
+  cancelWorkspaceInvitationById,
+  listUserInvitesWithWorkspace,
+  listWorkspaceInvitations,
+} from "@/lib/workspace-invitations.server";
 
 type WorkspaceRole = Database["public"]["Enums"]["workspace_role"];
 
@@ -77,17 +83,14 @@ export async function listWorkspaceMembersEnriched(workspaceId: string) {
 }
 
 export async function listWorkspaceInvitesEnriched(workspaceId: string) {
-  const tdb = createTenantDb(workspaceId);
-  const invites = await tdb.workspace_invite.findMany({
-    orderBy: (invite, { desc: descFn }) => [descFn(invite.created_at)],
-  });
-  if (invites.length === 0) {
+  const views = await listWorkspaceInvitations(workspaceId);
+  if (views.length === 0) {
     return [];
   }
 
-  const userIds = invites.map((invite) => invite.user_id);
+  const emails = [...new Set(views.map((view) => view.email.toLowerCase()))];
   const users =
-    userIds.length === 0
+    emails.length === 0
       ? []
       : await adminDb
           .select({
@@ -97,12 +100,16 @@ export async function listWorkspaceInvitesEnriched(workspaceId: string) {
             last_name: userTable.last_name,
           })
           .from(userTable)
-          .where(inArray(userTable.id, userIds));
+          .where(
+            inArray(userTable.username, emails.map((e) => e.toLowerCase())),
+          );
 
-  const usersById = new Map(users.map((user) => [user.id, user]));
-  return invites.map((invite) => ({
-    ...invite,
-    user: usersById.get(invite.user_id) ?? null,
+  const usersByEmail = new Map(
+    users.map((user) => [user.username?.toLowerCase().trim(), user]),
+  );
+  return views.map((view) => ({
+    ...view,
+    user: usersByEmail.get(view.email.toLowerCase()) ?? null,
   }));
 }
 
@@ -455,23 +462,8 @@ export async function listUserWorkspaceMemberships(userId: string) {
   }));
 }
 
-export async function listPendingInvitesForUsername(username: string) {
-  const cleaned = username.toLowerCase().trim();
-  return adminDb
-    .select({
-      invite: workspaceInviteTable,
-      workspace: workspaceTable,
-    })
-    .from(workspaceInviteTable)
-    .innerJoin(userTable, eq(workspaceInviteTable.user_id, userTable.id))
-    .innerJoin(workspaceTable, eq(workspaceInviteTable.workspace, workspaceTable.id))
-    .where(eq(userTable.username, cleaned));
-}
-
 export async function deleteWorkspaceInviteById(inviteId: string) {
-  await adminDb
-    .delete(workspaceInviteTable)
-    .where(eq(workspaceInviteTable.id, inviteId));
+  await cancelWorkspaceInvitationById(inviteId);
 }
 
 export async function updateAdminWorkspaceMemberRole(args: {
@@ -545,28 +537,6 @@ export async function findAdminWorkspaceMembership(args: {
     .limit(1);
   if (!row) return null;
   return { ...row, role: row.role_id };
-}
-
-export async function listUserInvitesWithWorkspace(userId: string) {
-  const rows = await adminDb
-    .select({
-      invite: workspaceInviteTable,
-      workspace: {
-        id: workspaceTable.id,
-        name: workspaceTable.name,
-      },
-    })
-    .from(workspaceInviteTable)
-    .innerJoin(workspaceTable, eq(workspaceInviteTable.workspace, workspaceTable.id))
-    .where(eq(workspaceInviteTable.user_id, userId));
-
-  return rows.map(({ invite, workspace }) => ({
-    ...invite,
-    workspace: {
-      id: workspace.id,
-      name: workspace.name ?? "Unnamed workspace",
-    },
-  }));
 }
 
 export async function listUserWorkspaceSummaries(userId: string) {

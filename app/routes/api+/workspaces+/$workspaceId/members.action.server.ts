@@ -163,15 +163,22 @@ export const action = defineAction({
       if (parsed instanceof Response) return parsed;
 
       if (parsed.target === "invite") {
+        if (!parsed.invite_id) {
+          return jsonError("invite_id is required when target=invite", 400);
+        }
         const inviteResult = await cancelWorkspaceInvite(
           userId,
           workspaceId,
-          parsed.user_id,
+          parsed.invite_id,
         );
         if (!inviteResult.ok) {
           return jsonError(inviteResult.error, inviteResult.status);
         }
         return jsonResponse({ success: true, invites: inviteResult.invites }, 200);
+      }
+
+      if (!parsed.user_id) {
+        return jsonError("user_id is required", 400);
       }
 
       const removeResult = await removeWorkspaceMember(
@@ -181,15 +188,6 @@ export const action = defineAction({
       );
       if (removeResult.ok) {
         return jsonResponse({ success: true, member: removeResult.member }, 200);
-      }
-
-      const inviteResult = await cancelWorkspaceInvite(
-        userId,
-        workspaceId,
-        parsed.user_id,
-      );
-      if (inviteResult.ok && inviteResult.invites.length > 0) {
-        return jsonResponse({ success: true, invites: inviteResult.invites }, 200);
       }
 
       return jsonError(removeResult.error, removeResult.status);

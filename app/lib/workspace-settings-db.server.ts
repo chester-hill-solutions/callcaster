@@ -1,6 +1,6 @@
 import { capabilityIdsForRole, type ProductCapabilityId } from "@/lib/capabilities";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
-import type { User, WorkspaceInvite, WorkspaceWebhook } from "@/lib/types";
+import type { User, WorkspaceWebhook } from "@/lib/types";
 import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import {
   getWorkspaceById,
@@ -10,8 +10,14 @@ import {
   listWorkspaceMembersEnriched,
 } from "@/lib/workspace-members-db.server";
 import { createTenantDb } from "@/server/tenant-db";
+import type { WorkspaceInvitationView } from "@/lib/workspace-invitations.server";
 
 type UserWithRole = Partial<User> & { role: string };
+
+/** Email-first pending invite with a resolved display user (SEC-03 / #1713). */
+export type PendingInvitationRow = WorkspaceInvitationView & {
+  user: Partial<User> | null;
+};
 
 export type WorkspaceSettingsPageData = {
   workspace: { id: string; name: string | null };
@@ -20,7 +26,7 @@ export type WorkspaceSettingsPageData = {
   phoneNumbers: Awaited<
     ReturnType<ReturnType<typeof createTenantDb>["workspace_number"]["findMany"]>
   >;
-  pendingInvites: (WorkspaceInvite & { user: Partial<User> | null })[];
+  pendingInvites: PendingInvitationRow[];
   webhook: WorkspaceWebhook | null;
   hasAccess: boolean;
   /**
@@ -78,7 +84,7 @@ export async function getWorkspaceSettingsPageData(
     phoneNumbers,
     pendingInvites: pendingInvites.map((invite) => ({
       ...invite,
-      user: invite.user ?? {},
+      user: invite.user ?? null,
     })),
     webhook: (webhookRow as WorkspaceWebhook | null) ?? null,
     hasAccess,

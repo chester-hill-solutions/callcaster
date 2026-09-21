@@ -50,6 +50,15 @@ vi.mock("@/lib/platform-members.server", () => ({
   inviteWorkspaceMemberAsPlatformAdmin: (...args: unknown[]) =>
     membersDbMocks.inviteWorkspaceMemberAsPlatformAdmin(...args),
 }));
+const inviteMocks = vi.hoisted(() => ({
+  cancelWorkspaceInvitationById: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/lib/workspace-invitations.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-invitations.server")>()),
+  cancelWorkspaceInvitationById: (...args: unknown[]) =>
+    inviteMocks.cancelWorkspaceInvitationById(...args),
+}));
 vi.mock("@/lib/workspace-members-db.server", () => ({
   findUserIdByUsername: (...args: unknown[]) => membersDbMocks.findUserIdByUsername(...args),
   findWorkspaceInviteForUser: (...args: unknown[]) => membersDbMocks.findWorkspaceInviteForUser(...args),
@@ -261,15 +270,15 @@ describe("WorkspaceSettingUtils", () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();
     const fd = new FormData();
-    fd.set("userId", "u1");
+    fd.set("userId", "wi_invite_1");
 
-    membersDbMocks.removeWorkspaceInviteForUser.mockRejectedValueOnce(new Error("x"));
+    inviteMocks.cancelWorkspaceInvitationById.mockRejectedValueOnce(new Error("x"));
     const r1 = await mod.removeInvite({ workspaceId: "w1", formData: fd, headers });
     expect(r1.error).toBeTruthy();
 
-    membersDbMocks.removeWorkspaceInviteForUser.mockResolvedValueOnce([{ ok: 1 }]);
+    inviteMocks.cancelWorkspaceInvitationById.mockResolvedValueOnce(undefined);
     const r2 = await mod.removeInvite({ workspaceId: "w1", formData: fd, headers });
-    expect(r2).toEqual({ data: [{ ok: 1 }], error: null });
+    expect(r2).toEqual({ data: { invitationId: "wi_invite_1" }, error: null });
   });
 
   test("handleUpdateWebhook upserts and returns json (error or success)", async () => {

@@ -29,19 +29,19 @@ import type {
 } from "@/lib/schemas/api/platform-workspace-admin";
 import {
   deleteWorkspaceApiKeyRow,
-  findUserIdByUsername,
-  findWorkspaceInviteForUser,
   findWorkspaceMembership,
   getWorkspaceWebhookRow,
   insertWorkspaceApiKeyRow,
   listWorkspaceApiKeyRows,
   listWorkspaceInvitesEnriched,
   listWorkspaceMembersEnriched,
-  removeWorkspaceInviteForUser,
   removeWorkspaceMember as removeWorkspaceMemberRow,
   updateWorkspaceMemberRole as updateWorkspaceMemberRoleRow,
   upsertWorkspaceWebhookRow,
 } from "@/lib/workspace-members-db.server";
+import {
+  cancelWorkspaceInvitationById,
+} from "@/lib/workspace-invitations.server";
 import type { z } from "zod";
 
 const KEY_PREFIX = "cc_live_";
@@ -293,6 +293,7 @@ async function inviteWorkspaceMemberWithActorRole(
   workspaceId: string,
   email: string,
   role: "owner" | "admin" | "member" | "caller",
+  invitedByUserId: string,
 ) {
   const escalation = assertNoRoleEscalation(actorRole, role);
   if (!escalation.ok) return escalation;
@@ -310,26 +311,21 @@ async function inviteWorkspaceMemberWithActorRole(
     };
   }
 
-  const existingUserId = await findUserIdByUsername(cleanedEmail);
-
-  if (existingUserId) {
-    const pendingInvite = await findWorkspaceInviteForUser(workspaceId, existingUserId);
-    if (pendingInvite) {
-      return {
-        ok: true as const,
-        warning: "An invite is already pending for this email.",
-      };
-    }
-  }
-
+  // Email-first invite (#1713): no pre-existing account is required. The
+  // invite goes to workspace_invitation and is accepted via the emailed link.
   const result = await inviteUserByEmail({
     workspaceId,
     email: cleanedEmail,
     role,
+    invitedByUserId,
   });
 
   if (!result.ok) {
-    return { ok: false as const, error: result.error, status: 400 };
+    return { ok: false as const, error: result.error, status: result.status ?? 400 };
+  }
+
+  if (result.warning) {
+    return { ok: true as const, warning: result.warning };
   }
 
   return { ok: true as const, invite: result.invite };
@@ -349,6 +345,7 @@ export async function inviteWorkspaceMember(
     workspaceId,
     email,
     role,
+    userId,
   );
 }
 
@@ -364,7 +361,13 @@ export async function inviteWorkspaceMemberAsApiKey(
   // Actor rank `member`, not `admin`: a `members.invite` key must not be able to
   // mint an `admin`/`owner` invite. assertNoRoleEscalation blocks anything above
   // `member`, matching this function's member/caller-only policy.
-  return inviteWorkspaceMemberWithActorRole("member", workspaceId, email, role);
+  return inviteWorkspaceMemberWithActorRole(
+    "member",
+    workspaceId,
+    email,
+    role,
+    "api-key",
+  );
 }
 
 /**
@@ -377,7 +380,13 @@ export async function inviteWorkspaceMemberAsPlatformAdmin(
   email: string,
   role: "owner" | "admin" | "member" | "caller",
 ) {
-  return inviteWorkspaceMemberWithActorRole(MemberRole.Owner, workspaceId, email, role);
+  return inviteWorkspaceMemberWithActorRole(
+    MemberRole.Owner,
+    workspaceId,
+    email,
+    role,
+    "platform-admin",
+  );
 }
 
 export async function updateWorkspaceMemberRole(
@@ -469,17 +478,14 @@ export async function removeWorkspaceMember(
 export async function cancelWorkspaceInvite(
   userId: string,
   workspaceId: string,
-  inviteUserId: string,
+  invitationId: string,
 ) {
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
   try {
-    const data = await removeWorkspaceInviteForUser({
-      workspaceId,
-      userId: inviteUserId,
-    });
-    return { ok: true as const, invites: data };
+    await cancelWorkspaceInvitationById(invitationId);
+    return { ok: true as const, invites: [] };
   } catch (error) {
     logger.error("cancelWorkspaceInvite error", error);
     return {

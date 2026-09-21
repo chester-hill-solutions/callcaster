@@ -5,6 +5,9 @@ import {
 import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
 import { listRecentDeadLetteredJobs } from "@/lib/admin-jobs.server";
 import type { Database } from "@/lib/db-types";
+import {
+  listPendingInvitesForUsername,
+} from "@/lib/workspace-invitations.server";
 import { syncWorkspaceTwilioSnapshot } from "@/lib/database/workspace.server";
 import { env } from "@/lib/env.server";
 import {
@@ -18,7 +21,6 @@ import {
   listAllWorkspaceNumbers,
   listAllWorkspacesOrdered,
   listAllWorkspaceUsers,
-  listPendingInvitesForUsername,
   listUserWorkspaceMembershipsWithWorkspace,
   listWorkspaceInvitesEnriched,
   listAdminWorkspaceUsersWithUser,
@@ -228,6 +230,7 @@ export async function getAdminUserWorkspaces(
   const userWorkspaces = membershipRows;
   const pendingInvites = pendingInviteRows.map((row) => ({
     ...row.invite,
+    role: row.invite.role_id,
     workspace: row.workspace,
   }));
 

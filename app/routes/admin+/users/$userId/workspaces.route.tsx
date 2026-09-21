@@ -15,7 +15,13 @@ type WorkspaceRow = Tables<"workspace">;
 type UserWorkspaceRow = Tables<"workspace_users"> & {
   workspace?: WorkspaceRow | null;
 };
-type PendingInviteRow = Tables<"workspace_invite"> & {
+type PendingInviteRow = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  created_at: string;
+  expires_at: string | null;
   workspace?: WorkspaceRow | null;
 };
 

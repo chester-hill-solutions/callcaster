@@ -1,77 +1,97 @@
-import { eq } from "drizzle-orm";
-import { workspace_invite as workspaceInviteTable } from "@/db/schema";
-import { findUserIdByUsername, findWorkspaceInviteForUser } from "@/lib/workspace-members-db.server";
-import { createTenantDb } from "@/server/tenant-db";
+import {
+  createWorkspaceInvitation,
+  getPendingWorkspaceInvitationByEmail,
+  type WorkspaceInvitationView,
+} from "@/lib/workspace-invitations.server";
+import { sendWorkspaceInviteEmail } from "@/lib/send-workspace-invite-email.server";
+import { logger } from "@/lib/logger.server";
+
+export type InviteUserByEmailResult =
+  | {
+      ok: true;
+      invite: WorkspaceInvitationView;
+      warning?: string;
+    }
+  | { ok: false; error: string; status: number };
 
 /**
- * Local replacement for the deleted `invite-user-by-email` Edge Function.
- * Creates a workspace_invite record for an existing user.
- * Does NOT send email (email delivery TBD via Better Auth org plugin).
+ * SEC-03 email-first invite writer (#1713): a workspace invite is keyed by a
+ * normalized email and no longer requires the invitee to already have an
+ * account. The emailed link carries the one-time raw token used to accept.
  */
 export async function inviteUserByEmail({
   workspaceId,
   email,
   role,
+  invitedByUserId,
 }: {
   workspaceId: string;
   email: string;
-  role: string;
-}): Promise<
-  | { ok: true; invite: { id: string; user_id: string; role: string; workspace: string; created_at: string; isNew: boolean } }
-  | { ok: false; error: string }
-> {
+  role: "owner" | "admin" | "member" | "caller";
+  invitedByUserId: string;
+}): Promise<InviteUserByEmailResult> {
   const cleanedEmail = email.toLowerCase().trim();
-  const userId = await findUserIdByUsername(cleanedEmail);
 
-  if (!userId) {
-    return {
-      ok: false,
-      error: "User not found. They must sign up before being invited to a workspace.",
-    };
-  }
-
-  const pendingInvite = await findWorkspaceInviteForUser(workspaceId, userId);
+  const pendingInvite = await getPendingWorkspaceInvitationByEmail({
+    workspaceId,
+    email: cleanedEmail,
+  });
   if (pendingInvite) {
     return {
       ok: true,
       invite: {
         id: pendingInvite.id,
-        user_id: userId,
-        role: pendingInvite.role,
+        email: pendingInvite.email,
+        role: pendingInvite.role_id,
+        status: pendingInvite.status,
         workspace: workspaceId,
-        created_at: pendingInvite.created_at,
-        isNew: pendingInvite.isNew,
+        created_at: pendingInvite.created_at.toISOString(),
+        expires_at: pendingInvite.expires_at.toISOString(),
+        isNew: false,
       },
+      warning: "An invite is already pending for this email.",
     };
   }
 
-  const tdb = createTenantDb(workspaceId);
-  const id = crypto.randomUUID();
-  const createdAt = new Date().toISOString();
+  try {
+    const { invitation, rawToken } = await createWorkspaceInvitation({
+      workspaceId,
+      email: cleanedEmail,
+      role,
+      invitedByUserId,
+    });
 
-  const rows = await tdb.workspace_invite.insert({
-    id,
-    user_id: userId,
-    workspace: workspaceId,
-    role,
-    created_at: createdAt,
-    isNew: true,
-  });
+    await sendWorkspaceInviteEmail({
+      workspaceId,
+      email: cleanedEmail,
+      role: invitation.roleId,
+      invitationId: invitation.id,
+      rawToken,
+    });
 
-  const invite = rows[0];
-  if (!invite) {
-    return { ok: false, error: "Failed to create workspace invite" };
+    return {
+      ok: true,
+      invite: {
+        id: invitation.id,
+        email: invitation.email,
+        role: invitation.roleId,
+        status: invitation.status,
+        workspace: workspaceId,
+        created_at: invitation.createdAt.toISOString(),
+        expires_at: invitation.expiresAt.toISOString(),
+        isNew: true,
+      },
+    };
+  } catch (error) {
+    logger.error("invite_user_by_email.failed", {
+      workspaceId,
+      email: cleanedEmail,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      ok: false,
+      error: "Could not create the invitation. Please try again.",
+      status: 500,
+    };
   }
-
-  return {
-    ok: true,
-    invite: {
-      id: invite.id,
-      user_id: invite.user_id,
-      role: invite.role,
-      workspace: invite.workspace,
-      created_at: invite.created_at,
-      isNew: invite.isNew,
-    },
-  };
 }

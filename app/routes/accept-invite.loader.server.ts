@@ -1,152 +1,124 @@
 import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
-import { getInvitesByUserId } from "@/lib/database/workspace.server";
-import { listUserInvitesWithWorkspace , getUserById } from "@/lib/workspace-members-db.server";
-import { logger } from "@/lib/logger.server";
-import { auth } from "@/server/auth-instance";
-import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
+import {
+  findUserIdByUsername,
+  getWorkspaceById,
+} from "@/lib/workspace-members-db.server";
+import {
+  getWorkspaceInvitationById,
+  listUserPendingInvitationsByEmail,
+} from "@/lib/workspace-invitations.server";
 import { defineLoader } from "@/lib/handler.server";
-import type {
-  ExistingUserInvite,
-  LoaderData,
-  WorkspaceInviteRow,
-} from "./accept-invite.types";
+import type { LoaderData, PendingInvitation } from "./accept-invite.types";
 
-async function fetchInvitesWithWorkspace(userId: string): Promise<ExistingUserInvite[]> {
-  return listUserInvitesWithWorkspace(userId);
-}
-
-function isDefaultNewUserProfile(user: {
-  first_name?: string | null;
-  last_name?: string | null;
-}): boolean {
-  return user.first_name === "New" && user.last_name === "Caller";
-}
-
-async function handleAuthenticatedUser(
-  userId: string,
+async function loadPendingInvitationsByEmail(
   email: string,
-  headers: Headers,
-) {
-  const profile = await getUserById(userId);
-  const isNewUser = profile
-    ? isDefaultNewUserProfile(profile)
-    : false;
-
-  if (isNewUser) {
-    const invites =
-      ((await getInvitesByUserId(userId)) as WorkspaceInviteRow[] | null) ??
-      [];
-    return routeData<LoaderData>(
-      {
-        status: "verified",
-        invites,
-        email,
-      },
-      { headers },
-    );
-  }
-
-  const invites = await fetchInvitesWithWorkspace(userId);
-
-  return routeData<LoaderData>(
-    {
-      status: "existing_user",
-      invites,
-      email,
+): Promise<PendingInvitation[]> {
+  const rows = await listUserPendingInvitationsByEmail(email);
+  return rows.map((row) => ({
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    status: row.status,
+    created_at: row.created_at,
+    expires_at: row.expires_at,
+    workspace: {
+      id: row.workspace.id,
+      name: row.workspace.name,
     },
-    { headers },
-  );
+  }));
 }
 
-async function handleTokenVerification(
-  request: Request,
-  token_hash: string,
-  email: string,
-  headers: Headers,
-) {
-  try {
-    const result = await auth.api.verifyEmail({
-      query: { token: token_hash },
-      headers: request.headers,
-      returnHeaders: true,
-    });
-    const mergedHeaders = mergeBetterAuthSetCookieHeaders(result?.headers, headers);
-    const payload = (result?.response ?? result) as any;
-
-    if (!payload?.user) {
-      return routeData<LoaderData>(
-        {
-          status: "invalid_link",
-          error:
-            "The invitation link is invalid or has expired. Please request a new invitation.",
-        },
-        { headers: mergedHeaders },
-      );
-    }
-
-    const profile = await getUserById(payload.user.id);
-    const isNewUser = profile
-      ? isDefaultNewUserProfile(profile)
-      : false;
-
-    if (isNewUser) {
-      const invites =
-        ((await getInvitesByUserId(payload.user.id)) as
-          | WorkspaceInviteRow[]
-          | null) ?? [];
-      return routeData<LoaderData>(
-        {
-          status: "verified",
-          email,
-          invites,
-        },
-        { headers: mergedHeaders },
-      );
-    }
-
-    const invites = await fetchInvitesWithWorkspace(payload.user.id);
-
-    return routeData<LoaderData>(
-      {
-        status: "existing_user",
-        email,
-        invites,
-      },
-      { headers: mergedHeaders },
-    );
-  } catch (error) {
-    logger.error("Unhandled error during token verification", error);
-    const message =
-      error instanceof Error ? error.message : "An unexpected error occurred while verifying.";
-    return routeData<LoaderData>(
-      {
-        status: "error",
-        error: message,
-      },
-      { headers, status: 500 },
-    );
+/**
+ * Resolve the emailed invite link (`invitationId` + raw token) for a signed-out
+ * visitor into a signup or sign-in prompt. Returns null when the link is
+ * missing so the caller can fall through to the no-params states.
+ */
+async function inviteLinkState(
+  invitationId: string | null,
+  token: string | null,
+): Promise<LoaderData | null> {
+  if (!invitationId || !token) {
+    return null;
   }
+  const invite = await getWorkspaceInvitationById(invitationId);
+  if (!invite || invite.status !== "pending") {
+    return {
+      status: "invalid_link",
+      error:
+        "The invitation link is invalid or has expired. Please request a new invitation.",
+    };
+  }
+  const workspace = await getWorkspaceById(invite.workspace_id);
+  const workspaceName = workspace?.name ?? "this workspace";
+  const accountExists = (await findUserIdByUsername(invite.email)) != null;
+  return {
+    status: accountExists ? "sign_in_required" : "create_account",
+    email: invite.email,
+    invitationId: invite.id,
+    token,
+    workspaceName,
+  };
 }
 
 export const loader = defineLoader({
   auth: ({ request }) => getSession(request),
-  sideEffects: ["db-read", "db-write"],
+  sideEffects: ["db-read"],
   handler: async ({ request, url, auth: session }) => {
     const { user, headers } = session;
-    const token_hash = url.searchParams.get("token_hash");
-    const type = url.searchParams.get("type");
-    const email = url.searchParams.get("email");
+    const invitationId = url.searchParams.get("invitationId");
+    const token = url.searchParams.get("token");
 
-    if (user) {
-      return handleAuthenticatedUser(user.id, user.email ?? "", headers);
+    if (!user) {
+      const linkState = await inviteLinkState(invitationId, token);
+      if (linkState) {
+        return routeData<LoaderData>(linkState, { headers });
+      }
+      return routeData<LoaderData>({ status: "not_signed_in" }, { headers });
     }
 
-    if (token_hash && type) {
-      if (!email) throw new Error("No email address found.");
-      return handleTokenVerification(request, token_hash, email, headers);
+    const email = user.email?.toLowerCase().trim() ?? "";
+    const invites = await loadPendingInvitationsByEmail(email);
+
+    // Signed-in visitor landing on the emailed link: validate and offer redeem.
+    if (invitationId && token) {
+      const invite = await getWorkspaceInvitationById(invitationId);
+      if (!invite || invite.status !== "pending") {
+        return routeData<LoaderData>(
+          {
+            status: "invalid_link",
+            error:
+              "The invitation link is invalid or has expired. Please request a new invitation.",
+          },
+          { headers },
+        );
+      }
+      if (invite.email.toLowerCase() !== email) {
+        return routeData<LoaderData>(
+          {
+            status: "invalid_link",
+            error:
+              "The invitation link was sent to a different email address than the account you are signed in with.",
+          },
+          { headers },
+        );
+      }
+      const workspace = await getWorkspaceById(invite.workspace_id);
+      return routeData<LoaderData>(
+        {
+          status: "redeem_ready",
+          workspaceName: workspace?.name ?? "this workspace",
+          invitationId: invite.id,
+          token,
+          alreadyMember: false,
+        },
+        { headers },
+      );
     }
 
-    return routeData<LoaderData>({ status: "not_signed_in" }, { headers });
+    return routeData<LoaderData>(
+      { status: "existing_user", invites, email },
+      { headers },
+    );
   },
 });

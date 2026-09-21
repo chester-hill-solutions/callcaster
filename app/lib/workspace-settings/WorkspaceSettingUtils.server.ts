@@ -12,10 +12,10 @@ import {
 } from "@/lib/platform-members.server";
 import {
   deleteWorkspaceById,
-  removeWorkspaceInviteForUser,
   transferWorkspaceOwnership,
   upsertWorkspaceWebhookRow,
 } from "@/lib/workspace-members-db.server";
+import { cancelWorkspaceInvitationById } from "@/lib/workspace-invitations.server";
 
 export type InviteActor =
   | { kind: "member"; userId: string }
@@ -203,10 +203,10 @@ export async function removeInvite({
   formData: FormData;
   headers: Headers;
 }) {
-  const userId = formData.get("userId") as string;
+  const invitationId = formData.get("userId") as string;
   try {
-    const data = await removeWorkspaceInviteForUser({ workspaceId, userId });
-    return { data, error: null };
+    await cancelWorkspaceInvitationById(invitationId);
+    return { data: { invitationId }, error: null };
   } catch (error) {
     logger.error("Error removing invite: ", error);
     return { data: null, error };

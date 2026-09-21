@@ -40,7 +40,8 @@ export const verifyEmailBodySchema = z.object({
 });
 
 export const acceptInvitesBodySchema = z.object({
-  invitation_ids: z.array(z.string().uuid()).min(1),
+  invitation_id: z.string().min(1),
+  token: z.string().min(1),
 });
 
 export const updateMeBodySchema = z.object({

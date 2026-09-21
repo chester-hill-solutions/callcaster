@@ -38,8 +38,8 @@ update path — so revoke and re-mint to change them.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/workspaces/:workspaceId/members` | List members and pending invites |
-| POST | `/api/workspaces/:workspaceId/members` | Invite member by email |
+| GET | `/api/workspaces/:workspaceId/members` | List members and pending invites (email-first, SEC-03) |
+| POST | `/api/workspaces/:workspaceId/members` | Invite by email — invitee does not need an account; accepted via emailed link |
 | PATCH | `/api/workspaces/:workspaceId/members` | Update member role |
 | DELETE | `/api/workspaces/:workspaceId/members` | Remove member or cancel invite |
 
