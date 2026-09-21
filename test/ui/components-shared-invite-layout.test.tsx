@@ -127,7 +127,6 @@ describe("app/components/invite/welcome", () => {
     const { EmailField } = await import("@/components/invite/welcome/EmailField");
     const { ErrorAlert } = await import("@/components/invite/welcome/ErrorAlert");
     const { ExistingUserInvites } = await import("@/components/invite/welcome/ExistingUserInvites");
-    const { InviteCheckbox } = await import("@/components/invite/welcome/InviteCheckbox");
     const { NameFields } = await import("@/components/invite/welcome/NameFields");
     const { NewUserSignup } = await import("@/components/invite/welcome/NewUserSignUp");
     const { PasswordFields } = await import("@/components/invite/welcome/PasswordFields");
@@ -150,20 +149,6 @@ describe("app/components/invite/welcome", () => {
     render(
       <DataSmokeRouter>
         <ExistingUserInvites invites={[]} state="idle" />
-      </DataSmokeRouter>,
-    );
-    render(
-      <DataSmokeRouter>
-        <InviteCheckbox
-          invite={{
-            id: "i1",
-            created_at: new Date().toISOString(),
-            isNew: true,
-            role: "member",
-            user_id: "u1",
-            workspace: { id: "w1", name: "WS" },
-          }}
-        />
       </DataSmokeRouter>,
     );
     render(

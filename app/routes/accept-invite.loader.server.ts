@@ -1,63 +1,44 @@
 import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
-import {
-  findUserIdByUsername,
-  getWorkspaceById,
-} from "@/lib/workspace-members-db.server";
+import { findUserIdByUsername, getWorkspaceById } from "@/lib/workspace-members-db.server";
 import {
   getWorkspaceInvitationById,
   listUserPendingInvitationsByEmail,
+  type WorkspaceInvitationAppRow,
 } from "@/lib/workspace-invitations.server";
 import { defineLoader } from "@/lib/handler.server";
-import type { LoaderData, PendingInvitation } from "./accept-invite.types";
+import type { LoaderData } from "./accept-invite.types";
 
-async function loadPendingInvitationsByEmail(
-  email: string,
-): Promise<PendingInvitation[]> {
-  const rows = await listUserPendingInvitationsByEmail(email);
-  return rows.map((row) => ({
-    id: row.id,
-    email: row.email,
-    role: row.role,
-    status: row.status,
-    created_at: row.created_at,
-    expires_at: row.expires_at,
-    workspace: {
-      id: row.workspace.id,
-      name: row.workspace.name,
-    },
-  }));
-}
+type InviteLinkResolution =
+  | { ok: true; invite: WorkspaceInvitationAppRow; workspaceName: string; token: string }
+  | { ok: false; error: string };
 
 /**
- * Resolve the emailed invite link (`invitationId` + raw token) for a signed-out
- * visitor into a signup or sign-in prompt. Returns null when the link is
- * missing so the caller can fall through to the no-params states.
+ * Resolve the emailed invite link (`invitationId` + raw token) into a pending
+ * invite. Returns null when the link is missing so callers fall through to the
+ * corresponding no-params state.
  */
-async function inviteLinkState(
+async function resolveInviteLink(
   invitationId: string | null,
   token: string | null,
-): Promise<LoaderData | null> {
+): Promise<InviteLinkResolution | null> {
   if (!invitationId || !token) {
     return null;
   }
   const invite = await getWorkspaceInvitationById(invitationId);
   if (!invite || invite.status !== "pending") {
     return {
-      status: "invalid_link",
+      ok: false,
       error:
         "The invitation link is invalid or has expired. Please request a new invitation.",
     };
   }
   const workspace = await getWorkspaceById(invite.workspace_id);
-  const workspaceName = workspace?.name ?? "this workspace";
-  const accountExists = (await findUserIdByUsername(invite.email)) != null;
   return {
-    status: accountExists ? "sign_in_required" : "create_account",
-    email: invite.email,
-    invitationId: invite.id,
+    ok: true,
+    invite,
+    workspaceName: workspace?.name ?? "this workspace",
     token,
-    workspaceName,
   };
 }
 
@@ -70,52 +51,64 @@ export const loader = defineLoader({
     const token = url.searchParams.get("token");
 
     if (!user) {
-      const linkState = await inviteLinkState(invitationId, token);
+      const linkState = await resolveInviteLink(invitationId, token);
       if (linkState) {
-        return routeData<LoaderData>(linkState, { headers });
+        if (!linkState.ok) {
+          return routeData<LoaderData>(
+            { status: "invalid_link", error: linkState.error },
+            { headers },
+          );
+        }
+        const accountExists = (await findUserIdByUsername(linkState.invite.email)) != null;
+        return routeData<LoaderData>(
+          {
+            status: accountExists ? "sign_in_required" : "create_account",
+            email: linkState.invite.email,
+            invitationId: linkState.invite.id,
+            token: linkState.token,
+            workspaceName: linkState.workspaceName,
+          },
+          { headers },
+        );
       }
       return routeData<LoaderData>({ status: "not_signed_in" }, { headers });
     }
 
     const email = user.email?.toLowerCase().trim() ?? "";
-    const invites = await loadPendingInvitationsByEmail(email);
 
     // Signed-in visitor landing on the emailed link: validate and offer redeem.
     if (invitationId && token) {
-      const invite = await getWorkspaceInvitationById(invitationId);
-      if (!invite || invite.status !== "pending") {
+      const linkState = await resolveInviteLink(invitationId, token);
+      if (linkState) {
+        if (!linkState.ok) {
+          return routeData<LoaderData>(
+            { status: "invalid_link", error: linkState.error },
+            { headers },
+          );
+        }
+        if (linkState.invite.email.toLowerCase() !== email) {
+          return routeData<LoaderData>(
+            {
+              status: "invalid_link",
+              error:
+                "The invitation link was sent to a different email address than the account you are signed in with.",
+            },
+            { headers },
+          );
+        }
         return routeData<LoaderData>(
           {
-            status: "invalid_link",
-            error:
-              "The invitation link is invalid or has expired. Please request a new invitation.",
+            status: "redeem_ready",
+            workspaceName: linkState.workspaceName,
+            invitationId: linkState.invite.id,
+            token: linkState.token,
           },
           { headers },
         );
       }
-      if (invite.email.toLowerCase() !== email) {
-        return routeData<LoaderData>(
-          {
-            status: "invalid_link",
-            error:
-              "The invitation link was sent to a different email address than the account you are signed in with.",
-          },
-          { headers },
-        );
-      }
-      const workspace = await getWorkspaceById(invite.workspace_id);
-      return routeData<LoaderData>(
-        {
-          status: "redeem_ready",
-          workspaceName: workspace?.name ?? "this workspace",
-          invitationId: invite.id,
-          token,
-          alreadyMember: false,
-        },
-        { headers },
-      );
     }
 
+    const invites = await listUserPendingInvitationsByEmail(email);
     return routeData<LoaderData>(
       { status: "existing_user", invites, email },
       { headers },

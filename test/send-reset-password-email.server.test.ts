@@ -69,7 +69,7 @@ describe("sendResetPasswordEmail (Better Auth emailAndPassword.sendResetPassword
     ).resolves.toBeUndefined();
 
     expect(loggerMocks.error).toHaveBeenCalledWith(
-      "send_reset_password_email.failed",
+      "transactional_email.send.failed",
       expect.objectContaining({ error: "Resend API down" }),
     );
   });

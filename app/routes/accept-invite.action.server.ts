@@ -188,18 +188,9 @@ async function signUpAndClaimAction(
     const invites = await listUserPendingInvitationsByEmail(
       emailValue.toLowerCase().trim(),
     );
-    const mapped = invites.map((invite) => ({
-      id: invite.id,
-      email: invite.email,
-      role: invite.role,
-      status: invite.status,
-      created_at: invite.created_at,
-      expires_at: invite.expires_at,
-      workspace: invite.workspace,
-    }));
 
     return routeData<ActionData>(
-      { status: "updated", invites: mapped },
+      { status: "updated", invites },
       { headers: responseHeaders },
     );
   } catch (error) {

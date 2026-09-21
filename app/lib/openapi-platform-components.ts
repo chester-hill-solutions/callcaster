@@ -357,7 +357,6 @@ export const platformOpenApiComponents = {
         workspace: { type: "string" as const, format: "uuid" },
         created_at: { type: "string" as const, format: "date-time" },
         expires_at: { type: "string" as const, format: "date-time", nullable: true },
-        isNew: { type: "boolean" as const },
         user: {
           type: "object" as const,
           nullable: true,

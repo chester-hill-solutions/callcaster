@@ -1,6 +1,5 @@
-import { Resend } from "resend";
 import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+import { sendTransactionalEmail } from "@/lib/transactional-email.server";
 
 /**
  * SEC-03 invite email (#1713): the ONLY carrier of the raw invitation token.
@@ -14,7 +13,6 @@ export async function sendWorkspaceInviteEmail(args: {
   invitationId: string;
   rawToken: string;
 }): Promise<void> {
-  const resend = new Resend(env.RESEND_API_KEY());
   const baseUrl = env.BASE_URL();
   const acceptUrl = `${baseUrl}/accept-invite?invitationId=${encodeURIComponent(args.invitationId)}&token=${encodeURIComponent(args.rawToken)}`;
 
@@ -40,21 +38,13 @@ export async function sendWorkspaceInviteEmail(args: {
     If you weren't expecting this invitation, you can ignore this email.
   `;
 
-  try {
-    await resend.emails.send({
-      from: "Callcaster <info@callcaster.ca>",
-      to: [args.email],
-      subject,
-      html,
-      text,
-    });
-  } catch (error) {
-    // The invite row is already created and the sender saw success; a delivery
-    // failure must not surface as an invite failure — log it and let the owner
-    // resend from the members list.
-    logger.error("send_workspace_invite_email.failed", {
-      workspaceId: args.workspaceId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  // The invite row is already created and the sender saw success; a delivery
+  // failure must not surface as an invite failure — log it and let the owner
+  // resend from the members list.
+  await sendTransactionalEmail({
+    to: args.email,
+    subject,
+    html,
+    text,
+  });
 }

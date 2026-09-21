@@ -7,15 +7,7 @@
  * and an in-session redeem form.
  */
 
-export type PendingInvitation = {
-  id: string;
-  email: string;
-  role: string;
-  status: string;
-  created_at: string;
-  expires_at: string | null;
-  workspace: { name: string; id: string };
-};
+import type { PendingUserInvitation } from "@/lib/workspace-invitations.server";
 
 export type LoaderData =
   | {
@@ -41,7 +33,7 @@ export type LoaderData =
     }
   | {
       status: "existing_user";
-      invites: PendingInvitation[];
+      invites: PendingUserInvitation[];
       email: string;
     }
   | {
@@ -49,7 +41,6 @@ export type LoaderData =
       workspaceName: string;
       invitationId: string;
       token: string;
-      alreadyMember: boolean;
     }
   | {
       status: "error";
@@ -59,7 +50,7 @@ export type LoaderData =
 export type ActionData =
   | {
       status: "updated";
-      invites: PendingInvitation[];
+      invites: PendingUserInvitation[];
     }
   | {
       status: "redeemed";
