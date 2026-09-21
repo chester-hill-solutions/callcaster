@@ -35,9 +35,7 @@ export function deriveCallSessionPhase(
   return "idle";
 }
 
-// ---------------------------------------------------------------------------
 // Canonical call lifecycle: single source of truth for call phase + outcome
-// ---------------------------------------------------------------------------
 
 export type CallPhase =
   | "idle"

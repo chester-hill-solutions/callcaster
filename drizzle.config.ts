@@ -1,4 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────
 // DANGER: app/db/schema.ts is hand-synced introspection output, not the
 // source of truth. It has zero `.references()` and there is no
 // drizzle/meta journal checked in, so `drizzle-kit generate` run against
@@ -9,7 +8,6 @@
 // produce migrations for real use. New DDL belongs in hand-written SQL
 // under client/migrations/*.sql — see docs/migration-delivery-board.md
 // item 1.14 for why schema.ts is hand-synced instead of introspected.
-// ─────────────────────────────────────────────────────────────────────────
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({

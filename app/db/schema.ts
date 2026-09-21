@@ -1,4 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────
 // DANGER: this file is hand-synced introspection output, not the source of
 // truth for the database schema. It has zero `.references()` declared and
 // there is no drizzle/meta journal checked in, so running
@@ -12,7 +11,6 @@
 // currently errors against this Postgres version).
 //
 // Hand-maintained Drizzle schema — update when client/migrations/*.sql changes
-// ─────────────────────────────────────────────────────────────────────────
 
 import {
   pgTable, text, integer, bigint, numeric, boolean, timestamp, jsonb, uuid, serial, bigserial, smallint, pgEnum,
