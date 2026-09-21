@@ -1,4 +1,5 @@
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import { resolveIvrPromptObjectKey } from "@/lib/ivr-wav.server";
 import { resolveVoiceForBlock } from "@/lib/tts-voices";
 import {
   appendBlockResponse,
@@ -71,11 +72,11 @@ const renderAudio = async (
 ) => {
   const { type, audioFile } = block;
   if (type === "recorded") {
-    const signedUrl = await createSignedObjectUrl(
-      "workspaceAudio",
-      `${workspace}/${audioFile}`,
-      3600,
-    );
+    // Prefer the Twilio-friendly WAV sidecar when it exists (#1842); the MP3
+    // stays the fallback, so prompts uploaded before the sidecar existed still
+    // play.
+    const objectKey = await resolveIvrPromptObjectKey(workspace, audioFile);
+    const signedUrl = await createSignedObjectUrl("workspaceAudio", objectKey, 3600);
     target.play(signedUrl);
   } else {
     // `audioFile` on a synthetic block actually stores the speech text —
