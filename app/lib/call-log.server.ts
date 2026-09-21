@@ -16,6 +16,10 @@ import { db } from "@/server/db";
 import { andConditions } from "@/lib/sql-conditions";
 import { createTenantDb } from "@/server/tenant-db";
 import { listWorkspaceMembersEnriched } from "@/lib/workspace-members-db.server";
+import { createSignedObjectUrls } from "@/lib/object-storage.server";
+
+/** Signed-playback URL lifetime for Call History recordings. */
+const RECORDING_PLAYBACK_TTL_SECONDS = 3600;
 
 type CallLogQueryRow = {
   sid: string;
@@ -24,6 +28,8 @@ type CallLogQueryRow = {
   direction: string | null;
   date_created: string;
   recording_url: string | null;
+  /** Object-storage path of our copy of the recording (preferred for playback). */
+  audio_url: string | null;
   status: string | null;
   disposition: string | null;
   user_id: string | null;
@@ -40,7 +46,10 @@ export type CallLogRow = {
   disposition: string | null;
   agentName: string | null;
   agentUserId: string | null;
+  /** Raw Twilio recording URL — a fallback that leaves the app. */
   recordingUrl: string | null;
+  /** Signed URL for our stored copy, played in-app when present. */
+  recordingPlaybackUrl: string | null;
   status: string | null;
 };
 
@@ -128,6 +137,7 @@ function buildCallLogOrderBy(sortKey: CallLogSortKey, sortDirection: "asc" | "de
 function mapCallLogRow(
   row: CallLogQueryRow,
   workspaceNumbers: readonly string[],
+  signedPlaybackUrls: ReadonlyMap<string, string>,
 ): CallLogRow {
   const parties = resolveCallLogParties({
     from: row.from,
@@ -151,6 +161,9 @@ function mapCallLogRow(
     agentName: formatCallLogAgentName(user),
     agentUserId: row.user_id ?? null,
     recordingUrl: row.recording_url,
+    recordingPlaybackUrl: row.audio_url
+      ? (signedPlaybackUrls.get(row.audio_url) ?? null)
+      : null,
     status: row.status,
   };
 }
@@ -211,6 +224,7 @@ export async function loadCallLogPage(args: {
         direction: callTable.direction,
         date_created: callTable.date_created,
         recording_url: callTable.recording_url,
+        audio_url: callTable.audio_url,
         status: callTable.status,
         disposition: outreachAttemptTable.disposition,
         user_id: outreachAttemptTable.user_id,
@@ -226,7 +240,30 @@ export async function loadCallLogPage(args: {
       .offset(offset),
   ]);
 
-  const rows = data.map((row) => mapCallLogRow(row, workspacePhoneList));
+  // Prefer our stored copy for playback (#1844): sign the object paths once for
+  // the page so "Listen" plays in-app instead of opening the Twilio URL.
+  const audioPaths = [
+    ...new Set(
+      data
+        .map((row) => row.audio_url)
+        .filter((path): path is string => Boolean(path)),
+    ),
+  ];
+  const signedPlaybackUrls = new Map<string, string>();
+  if (audioPaths.length > 0) {
+    const signed = await createSignedObjectUrls(
+      "workspaceAudio",
+      audioPaths,
+      RECORDING_PLAYBACK_TTL_SECONDS,
+    );
+    for (const entry of signed) {
+      if (entry.signedUrl) signedPlaybackUrls.set(entry.path, entry.signedUrl);
+    }
+  }
+
+  const rows = data.map((row) =>
+    mapCallLogRow(row, workspacePhoneList, signedPlaybackUrls),
+  );
   const totalCount = countRow[0]?.value ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / filters.pageSize));
 

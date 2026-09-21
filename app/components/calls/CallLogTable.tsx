@@ -217,6 +217,22 @@ export function CallLogTable({
         id: "voicemail",
         header: "Voicemail",
         cell: ({ row }) => {
+          // Play our stored copy in-app (#1844); only fall back to the raw
+          // Twilio URL when no persisted copy exists.
+          if (row.original.recordingPlaybackUrl) {
+            return (
+              <audio
+                controls
+                preload="none"
+                src={row.original.recordingPlaybackUrl}
+                aria-label="Call recording"
+                className="h-8 w-full max-w-55"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <track kind="captions" />
+              </audio>
+            );
+          }
           if (row.original.recordingUrl) {
             return (
               <a
