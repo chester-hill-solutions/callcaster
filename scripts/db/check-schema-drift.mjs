@@ -18,7 +18,7 @@
  * are in fact present. Only asking the database what it actually has is
  * conclusive.
  *
- * Enum values (#1475): every `pgEnum(name, [...])` in the schema is compared
+ * Enum values: every `pgEnum(name, [...])` in the schema is compared
  * against `pg_enum`. A value declared in schema.ts but absent from the
  * database FAILS the check — the app writes it and Postgres rejects the row,
  * which is how `'waiting'` in `campaign_status` dead-lettered

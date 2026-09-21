@@ -25,6 +25,7 @@ The single source of truth is `docs/local-development.md`. Read the relevant sec
 - `dev` is the trunk; `master` is the release branch and only moves by a dev → master release PR. Check `git log origin/dev` before starting an "open" issue: it may already be fixed.
 - Create or update the GitHub issue before starting work. One issue, one concern, one PR; put `Closes #N` in the PR body, never close issues by hand.
 - The `dev → master` release PR must list every promoted issue with a closing keyword (`Closes #N, #M`) so GitHub closes them on promotion. A bare `(#N)` mention closes nothing, which is why shipped issues used to stay open; `release-close-issues.yml` gates this, with a `no-issue` label for a genuinely issue-free release.
+- Before committing, strip comments that narrate the code. A comment must state a reason the code cannot ("keep this in UTC", "auth.uid() has no shim") — not describe what the next line does. If deleting the comment (or the line under it) changes nothing for a reader, delete the comment. `callcaster/no-useless-comments` catches number-only and punctuation-only comments; the rest is a review standard, not a lint rule (#1978).
 - Every PR that changes behaviour adds a line under `## [Unreleased]` in `docs/CHANGELOG.md`.
 - Work in a worktree off `origin/dev` (`git worktree add <dir> -b <branch> origin/dev`); the main checkout is shared and can be reset under you. Commit each slice immediately.
 - Merge on green with `gh pr merge N --squash --delete-branch`, then `git remote prune origin` and remove the worktree.

@@ -45,7 +45,7 @@ type OnboardingFirstNumberStepProps = Pick<
 /**
  * One of the two actions on the first-number step. A `fieldset`/`legend`
  * pair drew the legend across the box's top edge, and `overflow-hidden`
- * clipped it, so the title looked struck through (#1113). A labelled group
+ * clipped it, so the title looked struck through. A labelled group
  * keeps the accessible grouping with an ordinary in-flow heading.
  */
 export function FirstNumberActionGroup({
@@ -159,7 +159,7 @@ export function OnboardingFirstNumberStep({
 
   // Live verification status of the number the dialog is showing, so the sheet
   // reflects the Twilio callback without a page reload — the same wiring as
-  // Settings → Numbers (#1740), which onboarding was missing (#1846).
+  // Settings → Numbers, which onboarding was missing.
   const validationPhone = activeValidationRequest?.phoneNumber?.trim();
   const verifyingNumber = validationPhone
     ? callerIdNumbers.find((number) => number?.phone_number === validationPhone)
@@ -426,7 +426,7 @@ export function OnboardingFirstNumberStep({
             </Button>
           ) : null}
 
-          {/* Routing only after a rented number exists (#1114). */}
+          {/* Routing only after a rented number exists. */}
           {rentedNumbers.length > 0 && !isReadOnly ? (
             <div className="space-y-2 border-t border-border/60 pt-6">
               <div>

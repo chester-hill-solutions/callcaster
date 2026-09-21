@@ -21,11 +21,6 @@ const CAMPAIGN_TYPE_OPTIONS = [
   { value: "live_call", label: "Live calling" },
 ] as const;
 
-/**
- * IVR is a single campaign type (#1741). A campaign saved before the
- * simple/complex split was removed reads as the automated phone menu here and
- * is normalized to `robocall` by the save handler.
- */
 const LEGACY_IVR_TYPES = new Set(["simple_ivr", "complex_ivr"]);
 
 export default function SelectType({

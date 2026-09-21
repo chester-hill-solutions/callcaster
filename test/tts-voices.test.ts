@@ -48,7 +48,7 @@ describe("tts-voices (#1401 runtime slice)", () => {
       ).toBe(known);
     });
 
-    // Pinned literal (#1925): changing DEFAULT_VOICE_ID must fail these, not
+    // Pinned literal: changing DEFAULT_VOICE_ID must fail these, not
     // move the expected value in lockstep.
     test("falls back to DEFAULT_VOICE_ID when wireExtras.voice is missing", () => {
       expect(resolveVoiceForBlock({ wireExtras: {} })).toBe("Polly.Salli-Neural");

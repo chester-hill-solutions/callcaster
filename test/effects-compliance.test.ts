@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import { isEffectCompliant } from "../scripts/lib/effects-lib.mjs";
 
-// The effects gate's compliance rule (#1924): an effect must answer
+// The effects gate's compliance rule: an effect must answer
 // @effect-why-not-loader in writing, or carry the CANDIDATE-REMOVE marker.
 // These tests would fail if the why-or-candidate disjunction were inverted.
 

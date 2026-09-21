@@ -192,7 +192,7 @@ export async function claimTerminalCallStatus(
       eq(callTable.sid, sid),
       // ::text — call.status is the call_status ENUM in every real database
       // and lower(call_status) does not exist; without the cast this guard
-      // throws instead of guarding (#1289).
+      // throws instead of guarding.
       or(isNull(callTable.status), sql`LOWER(${callTable.status}::text) <> ${normalized}`),
     ),
   });
@@ -225,7 +225,7 @@ export async function updateCallBySid(
   // ::text on the column: call.status is the call_status ENUM in every real
   // database, and lower(call_status) does not exist — without the cast this
   // UPDATE throws, so every status-bearing webhook/sync write failed and rows
-  // accumulated in 'queued' forever (#1289). The unit tier mocks the db
+  // accumulated in 'queued' forever. The unit tier mocks the db
   // client and could not see it; test/integration-db/call-status-guard.test.ts
   // runs this statement against a real database.
   const guardedStatus = sql`CASE WHEN LOWER(${callTable.status}::text) = ANY(${TERMINAL_CALL_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_CALL_STATUSES_SQL}) THEN ${callTable.status} ELSE ${update.status} END`;

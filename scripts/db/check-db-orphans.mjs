@@ -6,7 +6,7 @@
  * check-db-rpcs.mjs asserts called ⊆ created. Nothing asserted the reverse,
  * which is how ~45 Supabase-era orphans — including a publicly-executable
  * SECURITY DEFINER contact hard-delete — survived three remediation passes
- * (#1229). This check computes the survivor set (created and never dropped,
+ * This check computes the survivor set (created and never dropped
  * in bootstrap apply order), subtracts functions the app calls, functions
  * other surviving SQL uses (trigger bodies, PERFORM/SELECT inside functions),
  * and a named allowlist. Anything left fails the build.

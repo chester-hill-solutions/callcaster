@@ -536,7 +536,7 @@ describe("messaging onboarding helpers", () => {
       unknownSection: { foo: "bar" },
     });
 
-    // Pinned literal (#1931): the schema version (3) is the contract.
+    // Pinned literal: the schema version (3) is the contract.
     expect(state.version).toBe(3);
     expect(state.status).toBe("not_started");
     expect(state.businessProfile.legalBusinessName).toBe("");

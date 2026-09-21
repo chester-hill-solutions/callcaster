@@ -235,7 +235,7 @@ async function handleSaveChannels(ctx: OnboardingActionContext): Promise<Onboard
     },
   });
 
-  // The seeded sample campaign follows the chosen goal (#1323); best-effort.
+  // The seeded sample campaign follows the chosen goal; best-effort.
   if (selectedGoal) {
     try {
       await retargetSampleCampaignForGoal({ workspaceId: ctx.workspaceId, goal: selectedGoal });
@@ -327,7 +327,7 @@ async function handleSaveBusinessProfile(
     current.operatingCountry,
   );
 
-  // Goal is chosen first; identity/program advance along wizardStepsForGoal (#1104).
+  // Goal is chosen first; identity/program advance along wizardStepsForGoal.
   const nextStep =
     wizardStep === "business_identity" || wizardStep === "business_program"
       ? (nextWizardStep(wizardStep, current.selectedGoal) ?? "audience")
@@ -359,7 +359,7 @@ async function handleSaveBusinessProfile(
   // A step-hinted save comes from the wizard's "Save & continue" and must
   // land on the next step. Intake is already complete by the time the Program
   // step saves (the Identity save completed it), so gating on intake alone
-  // sent that save back to a payload and the wizard never moved (#1471).
+  // sent that save back to a payload and the wizard never moved.
   // Hint-less posts (API, capability surfaces) still return to where they came from.
   if (wizardStep === null && isWorkspaceIntakeComplete(current)) {
     return redirectToReturnToOrPayload(

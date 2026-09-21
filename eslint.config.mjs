@@ -347,7 +347,7 @@ export default [
 
   // Repo-authored rules. Comment hygiene is an `error`, not a ratchet warning:
   // the existing offenders are swept in the same change, so it is forward-only
-  // from the start (#1936).
+  // from the start.
   {
     files: ["**/*.{js,jsx,ts,tsx,mjs,cjs}"],
     plugins: {

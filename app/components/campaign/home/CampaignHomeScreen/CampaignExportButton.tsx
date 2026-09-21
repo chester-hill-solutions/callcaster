@@ -13,12 +13,6 @@ type CampaignExportButtonProps = {
   size?: "default" | "sm" | "lg" | "icon";
 };
 
-/**
- * Starts a campaign export and shows its progress, then a download link.
- *
- * One implementation for the campaign results screens and the admin panel;
- * the only differences between them are the labels and the button size (#1892).
- */
 export const CampaignExportButton = ({
   campaignId,
   workspaceId,

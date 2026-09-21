@@ -58,7 +58,7 @@ describe("goal-based onboarding UI", () => {
     expect(
       screen.getByText(/Toll-free is the higher-volume path/i),
     ).toBeInTheDocument();
-    // The guidance is the explanation; no tooltip repeats it (#1148).
+    // The guidance is the explanation; no tooltip repeats it.
     expect(screen.queryByRole("button", { name: "More information" })).toBeNull();
   });
 

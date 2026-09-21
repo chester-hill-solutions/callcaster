@@ -1,5 +1,5 @@
 /**
- * Shared `<Gather>` attributes for IVR option steps (#1875).
+ * Shared `<Gather>` attributes for IVR option steps.
  *
  * Both the outbound campaign route and the inbound IVR route build the same
  * gather; keeping the attribute decisions here means speech capture improves in
@@ -48,7 +48,7 @@ function humanizeHint(raw: string): string {
 /**
  * A step maps a spoken answer when it offers a `vx-any` option — the runtime's
  * "any spoken reply" catch-all. Keypad-only menus must not gather speech, or a
- * stray phrase skips the menu (#1856).
+ * stray phrase skips the menu.
  */
 export function ivrStepGathersSpeech(
   options: ReadonlyArray<IvrOption>,

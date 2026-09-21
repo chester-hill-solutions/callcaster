@@ -4,7 +4,7 @@ import { contact as contactTable } from "@/db/schema";
 import { db } from "@/server/db";
 
 /**
- * Shared queue-row → contact join (#1892).
+ * Shared queue-row → contact join.
  *
  * The same "load the contacts for these queue rows, key them by id" block was
  * copied across campaign-queue-search and campaign-queue-db. It lives here once.

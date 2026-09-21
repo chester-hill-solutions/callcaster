@@ -100,7 +100,7 @@ const handleNextStep = (
     // Both are terminal. `end` is the documented terminal target
     // (docs/script-json-format.md); the old code fell through and treated it as
     // a block id, redirecting to a bogus URL that played an error before
-    // hanging up (#1884).
+    // hanging up.
     twiml.hangup();
   } else if (nextStep.includes(":")) {
     const [nextPageId, nextBlockId] = nextStep.split(":");
@@ -231,7 +231,7 @@ export const action = defineAction({
       }
     }
 
-    // Test calls (#1653) have no outreach attempt by design: they walk the flow
+    // Test calls have no outreach attempt by design: they walk the flow
     // but record nothing, so results, exports, and analytics never see them.
     // Guarding here keeps a test key press from speaking the generic error.
     if (call.outreach_attempt_id) {

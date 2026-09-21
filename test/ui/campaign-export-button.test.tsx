@@ -11,7 +11,7 @@ vi.mock("sonner", () => ({ toast: toastMock }));
 import { useCampaignExport } from "@/hooks/campaign";
 
 /**
- * #1892: the admin and campaign export buttons were ~95% identical. They now
+ * the admin and campaign export buttons were ~95% identical. They now
  * share this hook, so the flow is covered once.
  */
 describe("useCampaignExport", () => {

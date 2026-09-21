@@ -66,7 +66,7 @@ const MP3_ENCODE_ARGS = [
 ];
 
 /**
- * Encoder flags for the Twilio-facing WAV sidecar (#1842): mono, 8 kHz,
+ * Encoder flags for the Twilio-facing WAV sidecar: mono, 8 kHz
  * 16-bit PCM — what Twilio's `<Play>` streams without transcoding. Kept
  * separate from MP3_ENCODE_ARGS because the two serve different consumers
  * (library storage vs telephony playback).
@@ -216,7 +216,7 @@ export async function transcodeAudioBuffer(inputBuffer: Buffer) {
 /**
  * Transcode any audio buffer to a Twilio-friendly WAV: mono, 8 kHz, 16-bit
  * PCM. Twilio plays WAV without re-encoding, while MP3 prompts are transcoded
- * on their side before playback — one source of first-audio delay (#1842).
+ * on their side before playback — one source of first-audio delay.
  */
 export async function transcodeToWavBuffer(inputBuffer: Buffer) {
   // Same seekable-temp-file reason as transcodeAudioBuffer: MP4/M4A `moov`

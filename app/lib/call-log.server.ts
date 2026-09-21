@@ -240,7 +240,7 @@ export async function loadCallLogPage(args: {
       .offset(offset),
   ]);
 
-  // Prefer our stored copy for playback (#1844): sign the object paths once for
+  // Prefer our stored copy for playback: sign the object paths once for
   // the page so "Listen" plays in-app instead of opening the Twilio URL.
   const audioPaths = [
     ...new Set(

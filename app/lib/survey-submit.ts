@@ -1,5 +1,5 @@
 /**
- * Shared mutation plumbing for the create/edit survey routes (#1892). The two
+ * Shared mutation plumbing for the create/edit survey routes. The two
  * routes submit through a fetcher (a plain submit would land on the bare
  * `/api/surveys` JSON response) and navigate on success.
  *

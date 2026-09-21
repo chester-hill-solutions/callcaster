@@ -93,7 +93,7 @@ const AUTHORITATIVE_STRATEGIES = [
     re: /\bdataPlaneSessionMinRoleAuth\s*\(/,
     authClass: "session",
   },
-  // Plain membership-only sibling (#1265): no role floor at all, same as the
+  // Plain membership-only sibling: no role floor at all, same as the
   // generic dataPlaneSessionMinRoleAuth case above — any member, including
   // `caller`, may proceed.
   {

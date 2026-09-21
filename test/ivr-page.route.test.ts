@@ -211,7 +211,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     };
 
     // machine, drop off => hang up with no redirect and no IVR audio. From the
-    // operator's view nothing was left, so the call is a No Answer (#1888).
+    // operator's view nothing was left, so the call is a No Answer.
     vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({
       workspace: "w1",
       campaign_id: 1,
@@ -253,7 +253,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
       { disposition: "voicemail", answered_at: expect.any(String) },
     );
 
-    // human => the first block renders inline, no redirect (#1842)
+    // human => the first block renders inline, no redirect
     vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({
       workspace: "w1",
       campaign_id: 1,

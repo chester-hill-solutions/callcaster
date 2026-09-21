@@ -18,7 +18,7 @@ describe("audienceUploadChunkDelayMs", () => {
   });
 
   test("keeps yield delay for multi-chunk uploads", () => {
-    // Pinned literal (#1925): the 100ms yield is the contract; changing
+    // Pinned literal: the 100ms yield is the contract; changing
     // AUDIENCE_UPLOAD_CHUNK_DELAY_MS must fail this test, not echo it.
     expect(audienceUploadChunkDelayMs(41)).toBe(100);
     expect(audienceUploadChunkDelayMs(AUDIENCE_UPLOAD_CHUNK_SIZE + 1)).toBe(100);

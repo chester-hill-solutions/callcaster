@@ -9,7 +9,7 @@ import {
 import type { TwimlResponse } from "@/lib/twilio-twiml.server";
 
 /**
- * Shared outbound IVR block renderer (#1842).
+ * Shared outbound IVR block renderer.
  *
  * The flow-entry page route used to answer with a `<Redirect>` to the first
  * block's URL, so every call paid an extra Twilio round-trip (and a second
@@ -55,7 +55,7 @@ type AudioBlock = {
  * writes speech into; blocks authored before that (every text-only script,
  * including the seeded sample) carry their words in `content`, so fall
  * back through the script text rather than emit an empty <Say> that plays
- * as silence (#1673).
+ * as silence.
  */
 export function synthesizedSpeechText(block: AudioBlock): string {
   for (const candidate of [block.audioFile, block.content, block.prompt, block.title]) {
@@ -72,7 +72,7 @@ const renderAudio = async (
 ) => {
   const { type, audioFile } = block;
   if (type === "recorded") {
-    // Prefer the Twilio-friendly WAV sidecar when it exists (#1842); the MP3
+    // Prefer the Twilio-friendly WAV sidecar when it exists; the MP3
     // stays the fallback, so prompts uploaded before the sidecar existed still
     // play.
     const objectKey = await resolveIvrPromptObjectKey(workspace, audioFile);

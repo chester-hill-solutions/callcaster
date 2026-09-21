@@ -103,7 +103,7 @@ export const action = defineAction({
       recordingStatusCallback: `${baseUrl}/api/recording`,
       recordingStatusCallbackEvent: ["completed"],
     } as Record<string, unknown>);
-    // No machineDetection on a manual/handset dial (#1845): the agent is
+    // No machineDetection on a manual/handset dial: the agent is
     // already on the line, so waiting for an AMD verdict is pure added latency.
     // Predictive dialing keeps AMD (app/lib/auto-dial.server.ts); an agent
     // drops a voicemail from the Audio Drop control instead.

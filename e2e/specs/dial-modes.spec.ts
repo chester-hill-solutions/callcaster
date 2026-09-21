@@ -5,7 +5,7 @@ import { setWorkspaceCredits } from "../fixtures/factories";
 
 ownerTest.describe("Dial modes @authenticated @slow", () => {
   ownerTest("DIAL-01 predictive toggle in settings", async ({ page }) => {
-    // #1863: the dial options moved from Launch's collapsed "Calling options"
+    // the dial options moved from Launch's collapsed "Calling options"
     // to the Setup page, where they are always visible.
     await page.goto(
       workspacePath(
@@ -30,7 +30,7 @@ ownerTest.describe("Dial modes @authenticated @slow", () => {
   });
 
   ownerTest("DIAL-08 zero credits owner billing link", async ({ page }) => {
-    // #1435: try/finally guarantees the credit restore runs even when
+    // try/finally guarantees the credit restore runs even when
     // the banner assertion fails. Same shape as RBAC-18 — the trailing
     // `setWorkspaceCredits(..., 500)` used to be a plain statement
     // that never fired on assertion timeout, cascading credits=0 into

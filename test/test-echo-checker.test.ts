@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 
-// Falsification for check-test-echo.mjs (#1931): the check must flag an
+// Falsification for check-test-echo.mjs: the check must flag an
 // expectation whose value is a SUT export, and pass a clean fixture. These
 // fail if the "expected identifier imported from app/shared" heuristic is
 // removed or inverted.

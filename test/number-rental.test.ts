@@ -8,7 +8,7 @@ import {
 
 describe("number-rental", () => {
   test("price label and confirm copy reference monthly credits", () => {
-    // Pinned literal (#1925): a change to NUMBER_RENTAL_MONTHLY_CREDITS must
+    // Pinned literal: a change to NUMBER_RENTAL_MONTHLY_CREDITS must
     // fail these copy assertions, not move both sides in lockstep.
     expect(numberRentalPriceLabel()).toContain("100");
     expect(numberRentalConfirmCopy()).toContain("100");

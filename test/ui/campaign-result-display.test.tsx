@@ -38,7 +38,7 @@ describe("app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.
     ).toBeInTheDocument();
     expect(screen.getByText("Total Messages: 0")).toBeInTheDocument();
     // Messages are not contacts: the empty state must not show a contact
-    // denominator either (#1334).
+    // denominator either.
     expect(screen.queryByText("of 40")).not.toBeInTheDocument();
   });
 
@@ -51,7 +51,7 @@ describe("app/components/campaign/home/CampaignHomeScreen/CampaignResultDisplay.
     expect(screen.queryByText(/of /)).not.toBeInTheDocument();
   });
 
-  // #1334: the headline used to mix units — `totalOfAllResults` (attempts) over
+  // the headline used to mix units — `totalOfAllResults` (attempts) over
   // `queueCounts.fullCount` (contacts) — so a contact attempted twice read
   // "Total Calls: 2 of 1". Both sides are now contacts.
   test("call results headline counts contacts, not attempts", async () => {

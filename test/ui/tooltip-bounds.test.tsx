@@ -30,7 +30,7 @@ describe("TooltipContent bounds (#1148)", () => {
     const bubble = screen.getAllByText(/A long explanation/).at(-1)?.closest("[data-state]");
     expect(bubble).not.toBeNull();
     const className = bubble?.className ?? "";
-    // Pinned literals (#1931): the default tooltip bounds are the contract.
+    // Pinned literals: the default tooltip bounds are the contract.
     expect(className).toContain("max-w-xs");
     expect(className).toContain("max-h-64");
     expect(className).toContain("overflow-y-auto");
