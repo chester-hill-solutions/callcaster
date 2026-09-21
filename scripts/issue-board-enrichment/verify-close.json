@@ -281,27 +281,6 @@
     "trackerRecommendation": "PR #1902 merge f081cee8 is on dev, not yet master. Closes on master promotion."
   },
   {
-    "issueNumber": 1939,
-    "verdict": "verify-close",
-    "summary": "Merged to dev in PR #1943 (ec1d8075): scripts/check-unscoped-db-imports.mjs bans @/server/admin-db in app/lib with a ratchet baseline of 31 importers.",
-    "resolution": "Verify the guard fails on a new admin-db import in app/lib and on a stale baseline entry, and that ci:local runs check:unscoped-db-imports. Close on master promotion.",
-    "lookIn": [
-      "scripts/check-unscoped-db-imports.mjs",
-      "scripts/baselines/unscoped-db-imports.txt",
-      "package.json",
-      ".github/workflows/ci.yml"
-    ],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "A new app/lib admin-db import fails the guard",
-      "A stale baseline entry fails the guard"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "PR #1943 merge ec1d8075 is on dev, not yet master."
-  },
-  {
     "issueNumber": 1940,
     "verdict": "verify-close",
     "summary": "Merged to dev in PR #1941 (58bea105): workspace and data-plane middleware build the scoped Drizzle client once and expose it as tdb on the context; 14 workspaces+/$id routes read it.",
@@ -323,47 +302,6 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "PR #1941 merge 58bea105 is on dev, not yet master."
-  },
-  {
-    "issueNumber": 1942,
-    "verdict": "verify-close",
-    "summary": "Merged to dev in PR #1944 (dda06a62): the guard also bans @/server/db in app/lib; baseline grew to 81 (50 base, 31 admin).",
-    "resolution": "Verify the guard fails on a new base-db import in app/lib and that ci:local is green. Close on master promotion.",
-    "lookIn": [
-      "scripts/check-unscoped-db-imports.mjs",
-      "scripts/baselines/unscoped-db-imports.txt"
-    ],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "A new app/lib @/server/db import fails the guard"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "PR #1944 merge dda06a62 is on dev, not yet master."
-  },
-  {
-    "issueNumber": 1148,
-    "verdict": "verify-close",
-    "recommendedTitle": "verify-close: SMS business identity fields on the Identity step",
-    "summary": "Fixed on dev in PR #1903 (3103b835): toll-free and US registration business details are collected on the Identity step after the number path is chosen, not expanded on the Goal step. Changelog records the change.",
-    "resolution": "Verify on the review environment that the Goal step no longer shows the identity fields and that Identity collects them for the SMS paths, with saved data unchanged. Close on master promotion. Do not reimplement tooltip bounds (already shipped in #1608).",
-    "lookIn": [
-      "app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx",
-      "app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx"
-    ],
-    "existingTests": [
-      "test/ui/onboarding-goal-step.test.tsx"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "SMS compliance fields only on Identity",
-      "Goal has no duplicate guidance",
-      "Saved data unchanged"
-    ],
-    "size": "M",
-    "risk": "low",
-    "trackerRecommendation": "PR #1903 merge 3103b835 is on dev, not yet master. Closes on master promotion."
   },
   {
     "issueNumber": 1703,
@@ -402,28 +340,6 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "PR #1906 merge 14d29f1c is on dev, not yet master."
-  },
-  {
-    "issueNumber": 1702,
-    "verdict": "verify-close",
-    "recommendedTitle": "verify-close: IVR Answer label help in a tooltip",
-    "summary": "Merged to dev in PR #1946 (8e3c8668): the IVR response Answer label help shows in a hover/focus tooltip beside the label, via a new FormField labelTooltip prop, instead of a paragraph under the field.",
-    "resolution": "Verify on the review environment that the Answer label help appears on hover/focus and no paragraph renders under the field. Close on master promotion.",
-    "lookIn": [
-      "app/components/campaign/settings/script/ScriptBlockEditor.IvrResponses.tsx",
-      "app/components/ui/form-field.tsx"
-    ],
-    "existingTests": [
-      "test/ui/form-field.test.tsx",
-      "test/ui/script-block-editor-ivr.test.tsx"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Answer label help is a tooltip, not a paragraph under the field"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "PR #1946 merge 8e3c8668 is on dev, not yet master."
   },
   {
     "issueNumber": 1701,
@@ -482,26 +398,6 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Merged on dev in PR #1950 (2180c94d); closes on master promotion."
-  },
-  {
-    "issueNumber": 1810,
-    "verdict": "verify-close",
-    "summary": "Tracking-only board refresh. Regenerates ISSUE_BOARD.md and prunes/moves enrichment records after verified dev fixes.",
-    "resolution": "This PR is the refresh. Review the generated board and enrichment diff, then close on master promotion.",
-    "lookIn": [
-      "ISSUE_BOARD.md",
-      "scripts/issue-board-enrichment/"
-    ],
-    "existingTests": [
-      "test/issue-board-generator.test.ts",
-      "test/issue-board-atomic.test.ts"
-    ],
-    "acceptanceCriteria": [
-      "Verified merged work leaves Fix now; closed issues' records pruned; no issue closed early."
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Recurring tracking ticket; the active refresh PR owns it. Do not duplicate."
   },
   {
     "issueNumber": 1822,
@@ -966,32 +862,6 @@
     ],
     "blockedBy": [],
     "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
-  },
-  {
-    "issueNumber": 1911,
-    "verdict": "verify-close",
-    "recommendedTitle": "verify-close: useSurveyForm mutators collapsed onto index primitives (#1920)",
-    "summary": "useSurveyForm routes nested mutations through updatePages/withPage/withQuestions/withQuestion/withOptions/withOption, with generic field setters linking field and value types. Shipped to dev in PR #1920 (95f084c9); NOT yet master.",
-    "rootCause": "Ten hand-written map-replace handlers duplicated index threading and immutability.",
-    "resolution": "Verify on dev: test/ui/use-survey-form.test.tsx stays green and the primitives are the only traversal. No new code expected.",
-    "lookIn": [
-      "app/hooks/surveys/useSurveyForm.ts"
-    ],
-    "existingTests": [
-      "test/ui/use-survey-form.test.tsx"
-    ],
-    "missingTests": [
-      "Type-level assertion that the generic setters reject mismatched field/value pairs"
-    ],
-    "acceptanceCriteria": [
-      "Index primitives own traversal once.",
-      "All mutators are expressed through them.",
-      "Setters are generic."
-    ],
-    "blockedBy": [],
-    "size": "S",
     "risk": "low",
     "trackerRecommendation": "Verify and close after dev verification; promote #1920 to master first."
   },

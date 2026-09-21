@@ -274,7 +274,7 @@
   {
     "issueNumber": 1752,
     "verdict": "blocked-epic",
-    "summary": "Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket \u2014 split PDF pipeline, CSV, and aggregation layers first.",
+    "summary": "Large multi-part export feature (PDF report with appendices + CSV + run/aggregation + inbound detail) referencing the Lee Fairclough format. Too large for one ticket — split PDF pipeline, CSV, and aggregation layers first.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -283,7 +283,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1802,
@@ -313,10 +313,10 @@
     "issueNumber": 1892,
     "verdict": "blocked-epic",
     "recommendedTitle": "DRY pass: de-duplicate the largest copy-paste clones (jscpd)",
-    "summary": "Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930. The remaining ranked clones are each tracked as an open child issue (#1911-#1919).",
+    "summary": "Umbrella tracking issue. The gate dropped from 214 clones / 2884 lines to 178 / 1902 via PRs #1920, #1923, #1930 (and 177 / 1895 in #1987). The remaining ranked clones are tracked as open child issues (#1912-#1919; #1911 closed in the 2026-09-21 release).",
     "currentBehavior": "scripts/dry-baseline.json holds the gate at 178 clones / 1902 duplicated lines (1.28%).",
     "rootCause": "Copy-paste duplication across the ranked files; each row needs a behaviour-preserving extraction.",
-    "resolution": "Do not schedule this issue directly. Work the child issues #1911-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.",
+    "resolution": "Do not schedule this issue directly. Work the child issues #1912-#1919 one atomic PR each, then lower scripts/dry-baseline.json with npm run tools:dry:baseline after every extraction.",
     "lookIn": [
       "scripts/dry-baseline.json",
       "scripts/check-dry.mjs"
@@ -330,7 +330,6 @@
       "One implementation per clone; call sites behave the same"
     ],
     "blockedBy": [
-      1911,
       1912,
       1913,
       1914,
@@ -342,7 +341,7 @@
     ],
     "size": "L",
     "risk": "medium",
-    "trackerRecommendation": "Umbrella/tracker; do not pick directly. Work the open children #1911-#1919."
+    "trackerRecommendation": "Umbrella/tracker; do not pick directly. Work the open children #1912-#1919."
   },
   {
     "issueNumber": 268,
