@@ -26,6 +26,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- IVR steps that route to `end` now hang up cleanly instead of redirecting to a missing step and playing an error first ([#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884)).
 - Call History recordings now play inside CallCaster instead of opening the raw Twilio URL; the Twilio link is only a fallback when no stored copy exists ([#1844](https://github.com/chester-hill-solutions/callcaster/issues/1844)).
 - Completing caller-ID verification from onboarding now flips the verification sheet to **Number verified** without a reload, matching Settings → Numbers ([#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846)).
 - Call campaign results now show **Contacts completed** against the queue total, instead of mixing call attempts with contacts — a contact attempted twice no longer reads as more results than contacts ([#1334](https://github.com/chester-hill-solutions/callcaster/issues/1334)).
