@@ -1,6 +1,9 @@
 import {
+  appRowToView,
   createWorkspaceInvitation,
   getPendingWorkspaceInvitationByEmail,
+  toWorkspaceInvitationView,
+  type InvitationRole,
   type WorkspaceInvitationView,
 } from "@/lib/workspace-invitations.server";
 import { sendWorkspaceInviteEmail } from "@/lib/send-workspace-invite-email.server";
@@ -27,7 +30,7 @@ export async function inviteUserByEmail({
 }: {
   workspaceId: string;
   email: string;
-  role: "owner" | "admin" | "member" | "caller";
+  role: InvitationRole;
   invitedByUserId: string;
 }): Promise<InviteUserByEmailResult> {
   const cleanedEmail = email.toLowerCase().trim();
@@ -39,16 +42,7 @@ export async function inviteUserByEmail({
   if (pendingInvite) {
     return {
       ok: true,
-      invite: {
-        id: pendingInvite.id,
-        email: pendingInvite.email,
-        role: pendingInvite.role_id,
-        status: pendingInvite.status,
-        workspace: workspaceId,
-        created_at: pendingInvite.created_at.toISOString(),
-        expires_at: pendingInvite.expires_at.toISOString(),
-        isNew: false,
-      },
+      invite: appRowToView(pendingInvite, workspaceId),
       warning: "An invite is already pending for this email.",
     };
   }
@@ -71,16 +65,7 @@ export async function inviteUserByEmail({
 
     return {
       ok: true,
-      invite: {
-        id: invitation.id,
-        email: invitation.email,
-        role: invitation.roleId,
-        status: invitation.status,
-        workspace: workspaceId,
-        created_at: invitation.createdAt.toISOString(),
-        expires_at: invitation.expiresAt.toISOString(),
-        isNew: true,
-      },
+      invite: toWorkspaceInvitationView(invitation, workspaceId),
     };
   } catch (error) {
     logger.error("invite_user_by_email.failed", {

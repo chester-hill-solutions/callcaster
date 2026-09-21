@@ -11243,9 +11243,6 @@
             "format": "date-time",
             "nullable": true
           },
-          "isNew": {
-            "type": "boolean"
-          },
           "user": {
             "type": "object",
             "nullable": true,

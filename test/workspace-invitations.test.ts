@@ -102,7 +102,6 @@ describe("workspace-invitations.server (SEC-03 email-first)", () => {
         role: "member",
         status: "pending",
         workspace: "w1",
-        isNew: true,
       });
       expect(pkgMocks.createInvitation).toHaveBeenCalledWith(
         expect.anything(),

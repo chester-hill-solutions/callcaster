@@ -499,16 +499,7 @@ export async function listPendingInvites(userId: string) {
   if (!email) {
     return { invites: [] };
   }
-  const rows = await listUserPendingInvitationsByEmail(email);
-  const invites = rows.map((row) => ({
-    id: row.id,
-    email: row.email,
-    role: row.role,
-    status: row.status,
-    created_at: row.created_at,
-    expires_at: row.expires_at,
-    workspace: row.workspace,
-  }));
+  const invites = await listUserPendingInvitationsByEmail(email);
   return { invites };
 }
 

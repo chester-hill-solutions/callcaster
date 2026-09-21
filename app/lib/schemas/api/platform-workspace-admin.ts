@@ -36,11 +36,26 @@ export const updateMemberBodySchema = z.object({
   role: z.enum(["owner", "admin", "member", "caller"]),
 });
 
-export const deleteMemberBodySchema = z.object({
-  user_id: z.string().uuid().optional(),
-  invite_id: z.string().min(1).optional(),
-  target: z.enum(["member", "invite"]).optional(),
-});
+export const deleteMemberBodySchema = z
+  .object({
+    user_id: z.string().uuid().optional(),
+    invite_id: z.string().min(1).optional(),
+    target: z.enum(["member", "invite"]).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.target === "invite" && !value.invite_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "invite_id is required when target=invite",
+      });
+    }
+    if (value.target !== "invite" && !value.user_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "user_id is required when removing a member",
+      });
+    }
+  });
 
 export const upsertWebhookBodySchema = z.object({
   destination_url: z.string().url(),

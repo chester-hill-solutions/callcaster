@@ -46,7 +46,17 @@ export type WorkspaceInvitationView = {
   workspace: string;
   created_at: string;
   expires_at: string | null;
-  isNew: boolean;
+};
+
+/** Pending invites a user sees for their own email (accept page, navbar, API). */
+export type PendingUserInvitation = {
+  id: string;
+  email: string;
+  role: InvitationRole;
+  status: string;
+  created_at: string;
+  expires_at: string | null;
+  workspace: { id: string; name: string };
 };
 
 export type WorkspaceInvitationAppRow =
@@ -65,7 +75,8 @@ function adminDbClient() {
   return adminDbPromise;
 }
 
-function toView(
+/** View mapper for package-returned (camelCase) invitation rows. */
+export function toWorkspaceInvitationView(
   row: WorkspaceInvitationRow,
   workspaceId?: string,
 ): WorkspaceInvitationView {
@@ -77,7 +88,22 @@ function toView(
     workspace: workspaceId ?? row.workspaceId,
     created_at: row.createdAt.toISOString(),
     expires_at: row.expiresAt ? row.expiresAt.toISOString() : null,
-    isNew: true,
+  };
+}
+
+/** View mapper for app-schema (snake_case) invitation rows. */
+export function appRowToView(
+  row: WorkspaceInvitationAppRow,
+  workspaceId?: string,
+): WorkspaceInvitationView {
+  return {
+    id: row.id,
+    email: row.email,
+    role: row.role_id,
+    status: row.status,
+    workspace: workspaceId ?? row.workspace_id,
+    created_at: row.created_at.toISOString(),
+    expires_at: row.expires_at ? row.expires_at.toISOString() : null,
   };
 }
 
@@ -134,7 +160,7 @@ export async function getWorkspaceInvitationById(
 export async function listWorkspaceInvitations(workspaceId: string) {
   const db = await adminDbClient();
   const rows = await listPendingInvitations(db, workspaceId);
-  return rows.map((row) => toView(row, workspaceId));
+  return rows.map((row) => toWorkspaceInvitationView(row, workspaceId));
 }
 
 export async function cancelWorkspaceInvitationById(invitationId: string) {
@@ -158,6 +184,9 @@ export async function redeemWorkspaceInvitation(args: {
 > {
   try {
     const db = await adminDbClient();
+    // Pre-read only to derive the deterministic `wm:{workspace}:{user}` member
+    // id (same format as addUserToWorkspace). The package re-reads the row
+    // inside redeemInvitation for its own token/email checks.
     const invite = await getWorkspaceInvitationById(args.invitationId);
     if (!invite) {
       return { ok: false, error: "Invitation not found.", status: 404 };
@@ -185,13 +214,6 @@ export async function redeemWorkspaceInvitation(args: {
       status,
     };
   }
-}
-
-/** Pending invites for one workspace, snake_case, unexpired only. */
-export function toWorkspaceInvitationView(
-  row: WorkspaceInvitationRow,
-): WorkspaceInvitationView {
-  return toView(row);
 }
 
 type PendingInvitationJoin = {
@@ -244,14 +266,7 @@ export async function listUserInvitesWithWorkspace(userId: string) {
   if (!email) {
     return [];
   }
-  const rows = await queryPendingInvitationsByEmail(email);
-  return rows.map(({ invite, workspace }) => ({
-    ...invite,
-    workspace: {
-      id: workspace.id,
-      name: workspace.name ?? "Unnamed workspace",
-    },
-  }));
+  return listUserPendingInvitationsByEmail(email);
 }
 
 /**
@@ -259,12 +274,14 @@ export async function listUserInvitesWithWorkspace(userId: string) {
  * route-ready display shape. Email-first replacement for the legacy
  * user-id-keyed invite list (#1713 / SEC-03).
  */
-export async function listUserPendingInvitationsByEmail(email: string) {
+export async function listUserPendingInvitationsByEmail(
+  email: string,
+): Promise<PendingUserInvitation[]> {
   const rows = await queryPendingInvitationsByEmail(email);
   return rows.map(({ invite, workspace }) => ({
     id: invite.id,
     email: invite.email,
-    role: invite.role_id,
+    role: invite.role_id as InvitationRole,
     status: invite.status,
     created_at: invite.created_at.toISOString(),
     expires_at: invite.expires_at ? invite.expires_at.toISOString() : null,
