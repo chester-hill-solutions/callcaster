@@ -6,6 +6,12 @@ name: Review coverage
 # `Structural review:` line (done | not-needed: <reason>). The pull-request
 # template carries the line, so the marker is enforced, not advisory.
 #
+# #1957: docs/data-only PRs are exempt. A board/enrichment refresh touches
+# only `ISSUE_BOARD.md` and `scripts/issue-board-enrichment/**` — zero
+# application code — yet routinely crosses the line cap, so it would demand a
+# boilerplate marker every time. When every changed file is in that set the
+# gate is skipped. Any other path keeps the rule.
+#
 # This is a gate on the PR itself, not a reviewer: the human/agent structural
 # pass still runs the code-review / thermo-nuclear skill. The gate only makes
 # the declaration a requirement.
@@ -34,13 +40,29 @@ jobs:
           if printf '%s\n' "$files" | grep -qE '^(app/lib/worker/|app/server/|app/db/|client/migrations/)'; then
             high_risk=true
           fi
+          # #1957: docs/data-only PRs carry no application code; skip the gate
+          # when every changed file is board/enrichment data.
+          docs_only=true
+          if [ -n "$files" ]; then
+            while IFS= read -r f; do
+              case "$f" in
+                ISSUE_BOARD.md|scripts/issue-board-enrichment/*) ;;
+                *) docs_only=false; break ;;
+              esac
+            done <<< "$files"
+          else
+            docs_only=false
+          fi
           echo "high_risk=$high_risk"
           echo "changed_lines=$added"
+          echo "docs_only=$docs_only"
           echo "high_risk=$high_risk" >> "$GITHUB_OUTPUT"
           echo "changed_lines=$added" >> "$GITHUB_OUTPUT"
+          echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
 
       - name: Fail when a structural review marker is missing
         if: |
+          steps.risk.outputs.docs_only != 'true' &&
           (steps.risk.outputs.high_risk == 'true' ||
            fromJSON(steps.risk.outputs.changed_lines) > 500) &&
           !contains(github.event.pull_request.body, 'Structural review:')
