@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
   return {
     requireTwilioSignature: vi.fn(),
     env: {
+      BASE_URL: () => "https://base.example",
       BETTER_AUTH_URL: () => "https://sb.example",
       BETTER_AUTH_SERVICE_KEY: () => "svc",
       TWILIO_AUTH_TOKEN: () => "tok",
@@ -77,19 +78,33 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     expect(res.status).toBe(403);
   });
 
-  test("redirects to first block; says error when page invalid; catch path for invalid script and retry failure", async () => {
+  test("renders the first block inline with no redirect; says error when page invalid; catch path for invalid script and retry failure", async () => {
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");
 
-    // success
-    const callData = { workspace: "w1", campaign_id: 1, campaign: { script: { steps: { pages: { page_1: { blocks: ["b1"] } } } } } };
+    // success: the first block is rendered here, not a Redirect to its route
+    // (#1842 removed the extra Twilio round-trip before first audio).
+    const callData = {
+      workspace: "w1",
+      campaign_id: 1,
+      campaign: {
+        script: {
+          steps: {
+            pages: { page_1: { blocks: ["b1"] } },
+            blocks: { b1: { id: "b1", type: "say", audioFile: "hello" } },
+          },
+        },
+      },
+    };
     vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(callData as any);
     let res = await mod.action({
       params: { campaignId: "1", pageId: "page_1" },
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
     } as never);
-    expect(await res.text()).toContain("<Redirect>/api/ivr/1/page_1/b1</Redirect>");
+    const successText = await res.text();
+    expect(successText).not.toContain("<Redirect>");
+    expect(successText).toContain("hello");
 
     // page missing blocks => say+hangup
     const callData2 = { workspace: "w1", campaign_id: 1, campaign: { script: { steps: { pages: { page_1: { blocks: [] } } } } } };
@@ -132,7 +147,14 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
     const callData = {
       workspace: "w1",
       campaign_id: 1,
-      campaign: { script: { steps: { pages: { page_mtugk9ys_1: { blocks: ["b1"] } } } } },
+      campaign: {
+        script: {
+          steps: {
+            pages: { page_mtugk9ys_1: { blocks: ["b1"] } },
+            blocks: { b1: { id: "b1", type: "say", audioFile: "first page" } },
+          },
+        },
+      },
     };
     vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce(callData as any);
 
@@ -141,7 +163,8 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
       request: new Request("http://x", { method: "POST", headers: { "x-twilio-signature": "sig" }, body: fd }),
     } as never);
     const text = await res.text();
-    expect(text).toContain("<Redirect>/api/ivr/1/page_mtugk9ys_1/b1</Redirect>");
+    expect(text).not.toContain("<Redirect>");
+    expect(text).toContain("first page");
     expect(text).not.toContain("There was an error in the IVR flow");
   });
 
@@ -180,7 +203,12 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
         body: fd,
       });
     };
-    const script = { steps: { pages: { page_1: { blocks: ["b1"] } } } };
+    const script = {
+      steps: {
+        pages: { page_1: { blocks: ["b1"] } },
+        blocks: { b1: { id: "b1", type: "say", audioFile: "human path" } },
+      },
+    };
 
     // machine, drop off => hang up with no redirect and no IVR audio. From the
     // operator's view nothing was left, so the call is a No Answer (#1888).
@@ -225,7 +253,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
       { disposition: "voicemail", answered_at: expect.any(String) },
     );
 
-    // human => the flow starts as before
+    // human => the first block renders inline, no redirect (#1842)
     vi.mocked(findCallWithCampaignScriptBySid).mockResolvedValueOnce({
       workspace: "w1",
       campaign_id: 1,
@@ -235,6 +263,8 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
       params: { campaignId: "1", pageId: "page_1" },
       request: req("human"),
     } as never);
-    expect(await res.text()).toContain("<Redirect>/api/ivr/1/page_1/b1</Redirect>");
+    const humanText = await res.text();
+    expect(humanText).not.toContain("<Redirect>");
+    expect(humanText).toContain("human path");
   });
 });

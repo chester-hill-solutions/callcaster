@@ -343,7 +343,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
 
   test("every step of the seeded sample script has something to say (#1673)", async () => {
     const { synthesizedSpeechText } = await import(
-      "../app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server"
+      "../app/lib/ivr-block-render.server"
     );
     const { SAMPLE_SCRIPT_STEPS } = await import("../app/lib/seed/sample-script.server");
     for (const block of Object.values(SAMPLE_SCRIPT_STEPS.blocks)) {
