@@ -1458,5 +1458,42 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "PR #1825's change is present on master (release trunk 807cea82, #1838); verify and close."
+  },
+  {
+    "issueNumber": 1956,
+    "verdict": "verify-close",
+    "summary": "release-close-issues.yml requires a closing keyword (Closes #N) in a dev to master release PR body, with a no-issue override; the local-development skill documents it.",
+    "resolution": "Verify on dev that a master PR without a closing reference fails the gate unless labelled no-issue. Close on master promotion.",
+    "lookIn": [
+      ".github/workflows/release-close-issues.yml",
+      ".agents/skills/local-development/SKILL.md"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A release PR carrying Closes #N closes those issues on merge",
+      "A master PR with no closing reference fails unless labelled no-issue"
+    ],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Merged on dev in PR #1960; closes on master promotion."
+  },
+  {
+    "issueNumber": 1957,
+    "verdict": "verify-close",
+    "summary": "The review-coverage gate now skips docs/data-only PRs, i.e. when every changed file is ISSUE_BOARD.md or under scripts/issue-board-enrichment/.",
+    "resolution": "Verify on dev that a board-only PR over ~500 lines passes without a Structural review marker, and a code PR does not. Close on master promotion.",
+    "lookIn": [
+      ".github/workflows/review-coverage.yml"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A docs/data-only PR over 500 lines passes without the marker",
+      "Any code path keeps the marker requirement"
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Merged on dev in PR #1959; closes on master promotion."
   }
 ]
