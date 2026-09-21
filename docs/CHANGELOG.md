@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- Campaign costs are now shown directly on the Launch page instead of behind a "Campaign cost" disclosure ([#1859](https://github.com/chester-hill-solutions/callcaster/issues/1859)).
 - Manual and power dials no longer wait for Twilio machine detection before connecting, so the agent hears audio as soon as the call is answered; predictive dialing still detects machines and drops the voicemail or hangs up ([#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845)).
 - IVR calls now reach the first prompt sooner: the flow entry renders the first step directly instead of redirecting through a second Twilio request ([#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842)).
 - In an IVR step set to **Play a recording**, the **Upload audio** button now sits with the recording control instead of below its preview and warning. It stays visible on **Speak text** steps, where uploading switches the step to a recording ([#1701](https://github.com/chester-hill-solutions/callcaster/issues/1701)).
