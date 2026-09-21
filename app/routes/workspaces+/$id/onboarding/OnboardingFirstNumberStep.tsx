@@ -157,6 +157,27 @@ export function OnboardingFirstNumberStep({
   );
   const firstNumberReturnTo = `/workspaces/${workspaceId}/onboarding?step=first_number`;
 
+  // Live verification status of the number the dialog is showing, so the sheet
+  // reflects the Twilio callback without a page reload — the same wiring as
+  // Settings → Numbers (#1740), which onboarding was missing (#1846).
+  const validationPhone = activeValidationRequest?.phoneNumber?.trim();
+  const verifyingNumber = validationPhone
+    ? callerIdNumbers.find((number) => number?.phone_number === validationPhone)
+    : null;
+  const rawVerificationStatus = verifyingNumber?.capabilities
+    ? (
+        verifyingNumber.capabilities as {
+          verification_status?: unknown;
+        } | null
+      )?.verification_status
+    : null;
+  const verificationStatus =
+    rawVerificationStatus === "success" ||
+    rawVerificationStatus === "failed" ||
+    rawVerificationStatus === "pending"
+      ? (rawVerificationStatus as "success" | "failed" | "pending")
+      : null;
+
   const requestedStep = searchParams.get("numberStep");
   // Saved resources take precedence over an old URL after purchase or verification.
   const numberStep = hasFirstNumber
@@ -226,6 +247,7 @@ export function OnboardingFirstNumberStep({
           if (!open) setActiveValidationRequest(null);
         }}
         validationRequest={activeValidationRequest}
+        status={verificationStatus}
       />
       <Section variant="flat">
         <SectionHeader

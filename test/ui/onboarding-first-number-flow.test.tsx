@@ -135,4 +135,27 @@ describe("guided phone setup (#1205, #1764)", () => {
     expect(await screen.findByText(/Only workspace owners and admins can verify/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Verify number" })).toBeNull();
   });
+
+  test("the verification sheet reflects the live status without a reload (#1846)", async () => {
+    renderFlow("", {
+      validationRequest: {
+        accountSid: "AC_test",
+        callSid: "CA_test",
+        friendlyName: "Team",
+        phoneNumber: "+14165550100",
+        validationCode: "123456",
+      },
+      phoneNumbers: [
+        number({
+          type: "caller_id",
+          phone_number: "+14165550100",
+          capabilities: { verification_status: "success" },
+        }),
+      ],
+    });
+
+    // Settings → Numbers already flipped to "Number verified" from the live
+    // capability; onboarding used to sit on "Verification pending" (#1846).
+    expect(await screen.findByText("Number verified")).toBeVisible();
+  });
 });
