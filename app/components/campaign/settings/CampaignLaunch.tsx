@@ -447,18 +447,11 @@ export const CampaignLaunch = ({
                 outboundEstimateInputs={outboundEstimateInputs}
               />
               {campaignBilling ? (
-                <details className="rounded-md border border-border/70 p-3">
-                  <summary className="cursor-pointer text-sm font-medium">
-                    Campaign cost
-                  </summary>
-                  <div className="mt-3">
-                    <CampaignCostPanel
-                      billing={campaignBilling}
-                      queuedCount={queueCount}
-                      completedCount={dequeuedCount}
-                    />
-                  </div>
-                </details>
+                <CampaignCostPanel
+                  billing={campaignBilling}
+                  queuedCount={queueCount}
+                  completedCount={dequeuedCount}
+                />
               ) : null}
             </div>
           </Section>
