@@ -43,7 +43,7 @@
       "app/lib/platform-workspace-numbers.server.ts"
     ],
     "existingTests": [
-      "n/a \u2014 operational"
+      "n/a — operational"
     ],
     "missingTests": [
       "before/after evidence, rollback steps"
@@ -64,7 +64,7 @@
     "issueNumber": 1345,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide and add a CHS-managed toll-free SMS verification path",
-    "summary": "Political campaigns have no business number, so toll-free SMS (which requires a BN) does not serve them. Offer a CHS-managed path \u2014 but only after a compliance/ownership decision.",
+    "summary": "Political campaigns have no business number, so toll-free SMS (which requires a BN) does not serve them. Offer a CHS-managed path — but only after a compliance/ownership decision.",
     "currentBehavior": "Goal step offers toll-free (requires customer BN) or local (no BN); readiness requires businessRegistrationNumber for toll-free; twilio-toll-free-provision uses workspace business identity.",
     "rootCause": "No managed-sponsorship model; CHS BN must not be stored as customer identity.",
     "resolution": "Decide if CHS can sponsor customer traffic; if yes, add a support-request flow with clear ownership/review status and local-number alternative.",
@@ -92,7 +92,7 @@
   {
     "issueNumber": 1355,
     "verdict": "needs-decision",
-    "summary": "The current topology is dev\u2192dev and master\u2192staging/production. The request only renames staging to qa; there is no qa branch.",
+    "summary": "The current topology is dev→dev and master→staging/production. The request only renames staging to qa; there is no qa branch.",
     "resolution": "Verify a safe in-place rename before changing IaC. Do not recreate the environment.",
     "lookIn": [
       ".railway/environments/staging.ts"
@@ -245,7 +245,7 @@
     "recommendedTitle": "feature(backup): daily lossless per-workspace CSV snapshots + manifest + retention",
     "summary": "No data backup today. Adopt quick-canvass backup.workspace_csv pattern: daily self-scheduling job snapshots workspace-scoped core tables to a backup bucket with manifest.json, date-keyed retention pruning (BACKUP_RETENTION_DAYS, default 30), per-workspace failure isolation.",
     "currentBehavior": "No daily data backup exists; worker only does job-row retention.",
-    "rootCause": "Gap \u2014 no snapshot job.",
+    "rootCause": "Gap — no snapshot job.",
     "resolution": "Register a schedule:true worker job; reuse uploadObject/listObjects/deleteObject; phase-1 coverage from app/db/workspace-scoped-tables.ts; BACKUP_S3_BUCKET/BACKUP_RETENTION_DAYS env; docs restore procedure.",
     "lookIn": [
       "app/lib/worker/handlers.server.ts",
@@ -281,7 +281,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1700,
@@ -295,7 +295,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1705,
@@ -309,7 +309,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1709,
@@ -323,7 +323,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1710,
@@ -337,21 +337,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
-  },
-  {
-    "issueNumber": 1713,
-    "verdict": "needs-decision",
-    "summary": "Requiring an existing user before invite is documented current design ('They must sign up before being invited'); email delivery TBD in module comment. Pre-account (email-first) invites are a feature decision plus auth/email work.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1717,
@@ -365,7 +351,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1722,
@@ -379,12 +365,12 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1723,
     "verdict": "needs-decision",
-    "summary": "Feature request (template-tag \u2192 contact picker) whose scope depends on the tag UX decisions in 1724/1725; product decision first.",
+    "summary": "Feature request (template-tag → contact picker) whose scope depends on the tag UX decisions in 1724/1725; product decision first.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -393,7 +379,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1724,
@@ -407,12 +393,12 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1725,
     "verdict": "needs-decision",
-    "summary": "Parser tolerance of missing braces is intentional legacy support (single-brace bodies) \u2014 product decides whether to keep it or lint strict double-brace tags.",
+    "summary": "Parser tolerance of missing braces is intentional legacy support (single-brace bodies) — product decides whether to keep it or lint strict double-brace tags.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -421,12 +407,12 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1729,
     "verdict": "needs-decision",
-    "summary": "Auto-disposition mapping needs a spec (which outcome \u2192 which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).",
+    "summary": "Auto-disposition mapping needs a spec (which outcome → which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -435,7 +421,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1732,
@@ -449,7 +435,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1763,
@@ -463,7 +449,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1789,
@@ -496,7 +482,7 @@
     "recommendedTitle": "Finish the on-dev Status config: mint PROJECT_TOKEN",
     "summary": "Resolved shape per #1822: issue-on-dev.yml now moves the CHS backlog Status via `gh project item-edit` (Status is THE signal; the `on-dev` label was removed). ON_DEV_PROJECT_NUMBER=9 is set as a repo variable. The only missing piece is the fine-grained PROJECT_TOKEN secret (GITHUB_TOKEN cannot write org projects). Until it is set, the workflow logs-and-comments and the project-on-dev-status skill backfills the move.",
     "currentBehavior": "issue-on-dev.yml: Status move via gh project item-edit + comment on dev merge; no label. Without PROJECT_TOKEN the move is skipped (logged) and the comment still lands.",
-    "rootCause": "None \u2014 automation now exists and is Status-first; the token secret is the sole unconfigured input.",
+    "rootCause": "None — automation now exists and is Status-first; the token secret is the sole unconfigured input.",
     "resolution": "Mint a fine-grained PAT with Projects read/write and set it as the PROJECT_TOKEN repo secret (steps in .github/workflows/issue-on-dev.yml header). Until then the project-on-dev-status skill covers merges.",
     "lookIn": [
       ".github/workflows/issue-on-dev.yml"
@@ -515,9 +501,9 @@
     "issueNumber": 1814,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide agent verbosity when quoting resolved sibling issues",
-    "summary": "Report: an agent comment on #1325 (M4A upload bug, already verified/closed-tracked) pasted a wra-sol snippet pointing to PR #1731 as if the issue were still open. The M4A bug fix (#1731, merged) is real and verified; the complaint is process/verbosity \u2014 referencing a resolved fix on a non-matching context reads as noise.",
+    "summary": "Report: an agent comment on #1325 (M4A upload bug, already verified/closed-tracked) pasted a wra-sol snippet pointing to PR #1731 as if the issue were still open. The M4A bug fix (#1731, merged) is real and verified; the complaint is process/verbosity — referencing a resolved fix on a non-matching context reads as noise.",
     "currentBehavior": "Issue comments may restate resolved fixes from sibling issues; #1325's record (verify-close) already points at #1731 and #1730.",
-    "rootCause": "None in code \u2014 comment placement/copy discipline for agents.",
+    "rootCause": "None in code — comment placement/copy discipline for agents.",
     "resolution": "Decide the agent guideline: do not re-post resolution snippets from another issue's thread; prefer a one-line pointer and check whether the issue is already marked tested/on-dev before commenting.",
     "lookIn": [],
     "existingTests": [],
@@ -534,9 +520,9 @@
     "issueNumber": 1815,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide TWO_FACTOR_ENABLED kill-switch state per environment",
-    "summary": "Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 \u2014 the #1569 kill-switch default.",
+    "summary": "Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 — the #1569 kill-switch default.",
     "currentBehavior": "Better Auth twoFactor plugin is not registered; no code prompt at sign-in for enrolled users. Enrollment rows are kept (two-factor.server.ts:59) so setting the flag turns it all back on.",
-    "rootCause": "None \u2014 MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.",
+    "rootCause": "None — MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.",
     "resolution": "Decide the intended state. To enable 2FA, set TWO_FACTOR_ENABLED=true|1 on dev + production and retest. Otherwise keep the kill switch and close with the explanation.",
     "lookIn": [
       "app/lib/env.server.ts",
