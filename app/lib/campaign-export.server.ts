@@ -14,6 +14,7 @@ import {
   getCampaignQueueContactIds,
 } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
+import { resolveIvrAnswerLabel } from "@/lib/ivr-results";
 import {
   voiceBillingKindFromCampaignType,
   voiceCreditsFromDurationSeconds,
@@ -516,7 +517,18 @@ export async function processCallCampaignExport(
           campaign.status,
           creditsUsed.toString(),
           pageResponses,
-          ...scriptQuestions.map((q) => responses[q.id]),
+          // Resolve the recorded DTMF value to the option label the caller
+          // actually chose (#1976); fall back to the raw value when the option
+          // is gone from the current script.
+          ...scriptQuestions.map((q) => {
+            const answer = responses[q.id];
+            if (answer == null || String(answer).trim() === "") return "";
+            return resolveIvrAnswerLabel(
+              script?.steps ?? null,
+              q.id,
+              String(answer).trim(),
+            );
+          }),
         ];
 
         csvLines.push(csvRow(rowData, { protectFromInjection: true }));

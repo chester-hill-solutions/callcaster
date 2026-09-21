@@ -33,6 +33,8 @@ export function campaignTypeCollectsIvrResponses(
 
 export type IvrResponseOption = {
   value: string;
+  /** Display label resolved from the script option, falling back to `value`. */
+  label: string;
   count: number;
 };
 
@@ -48,9 +50,18 @@ export type IvrQuestionResults = {
   options: IvrResponseOption[];
 };
 
+export type IvrOptionShape = {
+  value?: string | number | null;
+  label?: string | null;
+  content?: string | null;
+};
+
 export type IvrScriptShape = {
-  pages?: Record<string, { title?: string; blocks?: string[] }> | null;
-  blocks?: Record<string, { title?: string }> | null;
+  pages?: Record<string, { title?: string | null; blocks?: string[] | null }> | null;
+  blocks?: Record<
+    string,
+    { title?: string | null; options?: ReadonlyArray<IvrOptionShape> | null }
+  > | null;
 } | null;
 
 /** Parses `outreach_attempt.result`, which may be stored as JSON or a JSON string. */
@@ -78,6 +89,36 @@ function normalizeAnswer(value: unknown): string | null {
   if (typeof value === "object") return null;
   const text = String(value).trim();
   return text.length > 0 ? text : null;
+}
+
+/**
+ * Display label for a recorded answer, resolved from the block's declared
+ * options (`label ?? content`). Matches the same block title/id the webhook
+ * stores responses under, so the results screen and the export agree. Falls
+ * back to the raw value when the block or option no longer exists in the
+ * current script (renamed/removed), mirroring the stale-key handling.
+ */
+export function resolveIvrAnswerLabel(
+  script: IvrScriptShape,
+  question: string,
+  value: string,
+): string {
+  const blocks = script?.blocks;
+  if (!blocks) return value;
+  for (const [blockId, block] of Object.entries(blocks)) {
+    const key =
+      typeof block?.title === "string" && block.title.length > 0
+        ? block.title
+        : blockId;
+    if (key !== question) continue;
+    const option = block?.options?.find(
+      (candidate) => String(candidate?.value ?? "").trim() === value,
+    );
+    const label = option?.label ?? option?.content;
+    if (typeof label === "string" && label.trim().length > 0) return label.trim();
+    break;
+  }
+  return value;
 }
 
 function currentBlockTitles(script: IvrScriptShape): Set<string> {
@@ -156,7 +197,11 @@ export function aggregateIvrResponses(
     .map(({ counts, ...entry }) => ({
       ...entry,
       options: Array.from(counts.entries())
-        .map(([value, count]) => ({ value, count }))
+        .map(([value, count]) => ({
+          value,
+          label: resolveIvrAnswerLabel(script ?? null, entry.question, value),
+          count,
+        }))
         .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)),
     }))
     .sort(
