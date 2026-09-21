@@ -44,7 +44,7 @@ const QuestionResults = ({ question }: { question: IvrQuestionResults }) => (
     {question.options.map((option) => (
       <ResponseBar
         key={option.value}
-        value={option.value}
+        value={option.label || option.value}
         count={option.count}
         total={question.total}
       />

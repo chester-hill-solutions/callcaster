@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   aggregateIvrResponses,
   parseIvrResult,
+  resolveIvrAnswerLabel,
   type IvrScriptShape,
 } from "../app/lib/ivr-results";
 
@@ -132,6 +133,48 @@ describe("aggregateIvrResponses", () => {
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ total: 1, options: [{ value: "1", count: 1 }] });
+  });
+
+  test("resolves each answer to the option label, falling back to the raw value (#1976)", () => {
+    const withOptions: IvrScriptShape = {
+      pages: { page_1: { title: "Intro", blocks: ["block_1"] } },
+      blocks: {
+        block_1: {
+          title: "Support?",
+          options: [
+            { value: "1", label: "Yes" },
+            { value: "2", label: "No" },
+          ],
+        },
+      },
+    };
+    const results = aggregateIvrResponses(
+      [
+        { result: { page_1: { "Support?": "1" } } },
+        { result: { page_1: { "Support?": "2" } } },
+        { result: { page_1: { "Support?": "9" } } },
+      ],
+      withOptions,
+    );
+
+    const byValue = Object.fromEntries(
+      results[0].options.map((option) => [option.value, option.label]),
+    );
+    expect(byValue).toEqual({ "1": "Yes", "2": "No", "9": "9" });
+  });
+
+  test("resolveIvrAnswerLabel prefers label, then content, then the raw value", () => {
+    const shape: IvrScriptShape = {
+      blocks: {
+        b1: { title: "Q", options: [{ value: "1", content: "Maybe" }] },
+        b2: { title: "R", options: [{ value: "1", label: "Yes", content: "ignored" }] },
+      },
+    };
+    expect(resolveIvrAnswerLabel(shape, "Q", "1")).toBe("Maybe");
+    expect(resolveIvrAnswerLabel(shape, "R", "1")).toBe("Yes");
+    // No matching option / no script => the raw value is the label.
+    expect(resolveIvrAnswerLabel(shape, "Q", "2")).toBe("2");
+    expect(resolveIvrAnswerLabel(null, "Q", "1")).toBe("1");
   });
 
   test("returns an empty list when nothing was recorded", () => {
