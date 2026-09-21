@@ -96,7 +96,11 @@ const handleNextStep = (
   pageId: string,
   baseUrl: string,
 ) => {
-  if (nextStep === "hangup") {
+  if (nextStep === "hangup" || nextStep === "end") {
+    // Both are terminal. `end` is the documented terminal target
+    // (docs/script-json-format.md); the old code fell through and treated it as
+    // a block id, redirecting to a bogus URL that played an error before
+    // hanging up (#1884).
     twiml.hangup();
   } else if (nextStep.includes(":")) {
     const [nextPageId, nextBlockId] = nextStep.split(":");

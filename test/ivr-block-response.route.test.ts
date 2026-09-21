@@ -223,6 +223,29 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     expect(await res.text()).toContain("<Redirect>https://base.example/api/ivr/1/page_2/b2/</Redirect>");
   });
 
+  test("treats next:'end' as terminal, hanging up instead of redirecting (#1884)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: { b1: { id: "b1", options: [{ value: "1", next: "end" }] } },
+    };
+    const campaignData = { script: { steps: script } };
+    mocks.createClient.mockReturnValueOnce(
+      makeDbClient({
+        call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 9 },
+        campaignData,
+        outreachResult: {},
+      }),
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1", Digits: "1" }),
+    } as any);
+    const text = await res.text();
+    expect(text).toContain("<Hangup/>");
+    expect(text).not.toContain("<Redirect>");
+  });
+
   test("timeout/null input does not spuriously match vx-any and falls through to linear next", async () => {
     // vx-any has a distinct target from the linear fallthrough so we can
     // tell which branch actually fired.
