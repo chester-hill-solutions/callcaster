@@ -86,6 +86,27 @@ gh issue create --repo chester-hill-solutions/callcaster \
   --body "One concern, acceptance criteria, verify step"
 ```
 
+## Blocking Work By Another Developer
+
+When an issue cannot proceed until another person does something, that work is not a checklist item and does not belong in the blocked issue's body or a comment. File it as its own `Task`, link the blocking relationship in **one** direction, and assign the person who must do it. A blocker buried in prose hides the dependency, leaves the board verdict dishonest, and has no assignee to pick it up.
+
+```bash
+# The blocking task names what blocks the other issue, and who owns it.
+gh issue create --repo chester-hill-solutions/callcaster \
+  --title "Task: mint the PROJECT_TOKEN secret for issue-on-dev" --type Task \
+  --assignee <login> --blocking <blocked-issue> \
+  --body "What must happen, why it blocks #<blocked-issue>, and how to verify"
+
+# Or create the blocker first and link the blocked issue to it:
+gh issue create --repo chester-hill-solutions/callcaster \
+  --title "Task: provision the QA Twilio account" --type Task --assignee <login> \
+  --body "..."            # note the new issue number
+gh issue edit <blocked-issue> --repo chester-hill-solutions/callcaster \
+  --add-blocked-by <new-task>
+```
+
+Set the edge once: `--blocking` on the blocker or `--blocked-by` on the blocked issue, never both. Use a blocking edge only for a real prerequisite (work not yet done, an external dependency), not for ordering preference. After linking, verify with the fetch in **Issue-Specific Verification**.
+
 ## Create
 
 Use native create flags to assign type and relationships at creation time:
