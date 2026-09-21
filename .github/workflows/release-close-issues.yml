@@ -1,0 +1,69 @@
+name: Release closes its issues
+
+# #1956: a `dev → master` release PR must use a closing keyword so GitHub
+# closes the promoted issues when the release merges. Release bodies list
+# issues as bare `(#1816)` mentions, which GitHub does NOT treat as closing
+# references — so shipped issues stayed open forever and the board kept
+# re-auditing them in its "Verify and close" lane.
+#
+# GitHub only closes an issue from `Closes #N` when the pull request merges
+# into the default branch (`master`), which is exactly the release PR. This
+# gate requires at least one closing reference in a release PR body, with the
+# existing `no-issue` label override for a genuinely issue-free release.
+#
+# The `dev`-branch gate (`pr-issue-reference.yml`) is unchanged: dev PRs may
+# reference an issue with a bare `Issues: #N` line, because a dev merge only
+# marks the issue on-dev, it does not close it.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+    branches: [master]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  require-closing-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for the no-issue override label
+        id: labels
+        env:
+          LABELS: ${{ toJson(github.event.pull_request.labels[*].name) }}
+        run: |
+          if printf '%s' "$LABELS" | grep -q '"no-issue"'; then
+            echo "has_override=true" >> "$GITHUB_OUTPUT"
+            echo "no-issue label present; the closing reference is not required"
+          else
+            echo "has_override=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Find closing references
+        id: closes
+        if: steps.labels.outputs.has_override != 'true'
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          # Closing keywords only — a bare `Issues: #N` line is deliberately
+          # NOT accepted here: it does not close anything on merge. The list
+          # group captures `Closes #1, #2, #3`, not just the first number. The
+          # sort+tr must stay INSIDE the $(...) or the subshell loses the
+          # assignment.
+          numbers=$(
+            printf '%s' "$BODY" \
+              | grep -oiE '\b(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\b[[:space:]]*:?[[:space:]]*#[0-9]+([[:space:],]+#?[0-9]+)*' \
+              | grep -oE '#[0-9]+' | grep -oE '[0-9]+' | sort -un | tr '\n' ' '
+          )
+          echo "numbers=$numbers" >> "$GITHUB_OUTPUT"
+          if [ -n "$numbers" ]; then
+            echo "Closing references: $numbers"
+          fi
+
+      - name: Fail when the release has no closing reference
+        if: steps.labels.outputs.has_override != 'true' && steps.closes.outputs.numbers == ''
+        run: |
+          echo "::error::A dev → master release PR must close the issues it promotes."
+          echo "::error::Add a \"Closes #N, #M\" line for the promoted issues so GitHub closes them on merge,"
+          echo "::error::or label the PR 'no-issue' for a genuinely issue-free release."
+          exit 1
