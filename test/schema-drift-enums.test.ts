@@ -15,7 +15,11 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
 
 // Plain .mjs gate helper — tsconfig excludes *.test.ts, so no shim is needed.
-import { collectSchemaEnums, diffEnums } from "../scripts/lib/app-db-objects.mjs";
+import {
+  collectSchemaEnums,
+  diffEnums,
+  resolveDbCheckGate,
+} from "../scripts/lib/app-db-objects.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
@@ -76,6 +80,46 @@ export const call_status = pgEnum(
     expect(enums.size).toBeGreaterThanOrEqual(10);
     expect(enums.get("campaign_status")).toContain("waiting");
     expect(enums.get("workspace_users_role")).toEqual(["owner", "member", "caller", "admin"]);
+  });
+});
+
+describe("resolveDbCheckGate (#1886)", () => {
+  const env = { DATABASE_URL: "postgresql://readonly@db.example/app" };
+
+  test("--require-db in argv arms the gate and returns the URL", () => {
+    const gate = resolveDbCheckGate({
+      argv: ["node", "check.mjs", "--require-db"],
+      env,
+      requireEnvVar: "SCHEMA_CHECK_REQUIRE_DB",
+    });
+    expect(gate).toEqual({ requireDb: true, databaseUrl: env.DATABASE_URL });
+  });
+
+  test("<envVar>=1 arms the gate without the flag", () => {
+    const gate = resolveDbCheckGate({
+      argv: ["node", "check.mjs"],
+      env: { ...env, SCHEMA_CHECK_REQUIRE_DB: "1" },
+      requireEnvVar: "SCHEMA_CHECK_REQUIRE_DB",
+    });
+    expect(gate.requireDb).toBe(true);
+  });
+
+  test("without the flag or env var the gate stays off", () => {
+    const gate = resolveDbCheckGate({
+      argv: ["node", "check.mjs"],
+      env,
+      requireEnvVar: "SCHEMA_CHECK_REQUIRE_DB",
+    });
+    expect(gate.requireDb).toBe(false);
+  });
+
+  test("a missing DATABASE_URL is null even when armed (the caller exits 1)", () => {
+    const gate = resolveDbCheckGate({
+      argv: ["node", "check.mjs", "--require-db"],
+      env: {},
+      requireEnvVar: "SCHEMA_CHECK_REQUIRE_DB",
+    });
+    expect(gate).toEqual({ requireDb: true, databaseUrl: null });
   });
 });
 

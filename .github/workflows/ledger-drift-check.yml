@@ -21,6 +21,19 @@ name: Ledger drift check
 #     (the check has to fail loudly so the operator wires the secret up
 #      rather than a silent no-op passing forever)
 #
+# Each environment job also runs the object-level sibling, `db:schema:check`
+# (`scripts/db/check-schema-drift.mjs --require-db`). The ledger comparison
+# proves migration *versions* were applied; it cannot prove their *effects*.
+# A deployed database can have a complete ledger and still be missing a table,
+# column, enum value or function the app requires (#1475, #1886). Schema-drift
+# failure modes, also hard-fail:
+#
+#   * a table or column the app reads/writes is absent
+#   * an enum value declared in schema.ts is absent from pg_enum
+#     (the app writes it and Postgres rejects the row)
+#   * a function the app calls does not exist in this database
+#   * DATABASE_URL missing for the environment
+#
 # Environment secrets required (per environment: dev / staging / production):
 #
 #   DATABASE_URL   — read-only creds are enough; the check only SELECTs
@@ -52,7 +65,13 @@ on:
       - master
     paths:
       - client/migrations/**
+      - drizzle/**
+      - app/db/schema.ts
+      - app/db/auth-schema.ts
+      - app/db/schema-transcription.ts
       - scripts/db/check-migration-ledger.mjs
+      - scripts/db/check-schema-drift.mjs
+      - scripts/lib/app-db-objects.mjs
       - .github/workflows/ledger-drift-check.yml
 
 permissions:
@@ -88,6 +107,10 @@ jobs:
         # --require-db forces a hard failure if DATABASE_URL isn't set;
         # otherwise the script exits 0 with a warning and nothing gates.
         run: node scripts/db/check-migration-ledger.mjs --require-db
+      - name: Schema drift check (dev)
+        # Object-level counterpart: the ledger can be complete while a required
+        # table, column, enum value or function is absent (#1886).
+        run: node scripts/db/check-schema-drift.mjs --require-db
 
   staging:
     # Runs on: nightly schedule, dispatch-with-input=staging, and push-to-master
@@ -112,6 +135,8 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - name: Ledger drift check (staging)
         run: node scripts/db/check-migration-ledger.mjs --require-db
+      - name: Schema drift check (staging)
+        run: node scripts/db/check-schema-drift.mjs --require-db
 
   production:
     # Runs on: nightly schedule, dispatch-with-input=production, and push-to-master
@@ -136,3 +161,5 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - name: Ledger drift check (production)
         run: node scripts/db/check-migration-ledger.mjs --require-db
+      - name: Schema drift check (production)
+        run: node scripts/db/check-schema-drift.mjs --require-db
