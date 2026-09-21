@@ -44,7 +44,7 @@ export const SQL_BUILTINS = new Set([
 /**
  * Decide whether a live-database check must hard-fail when it has no database
  * to check, and which URL it should use. Kept pure and shared so the two
- * `scripts/db` gates apply one rule (#1886). The callers implement this
+ * `scripts/db` gates apply one rule. The callers implement this
  * exit-code contract:
  *
  *   - URL present            -> run the check
@@ -174,7 +174,7 @@ export function collectSchemaTables(root) {
  *
  * Tables and columns were checked while enum values were not, and that is how
  * `'waiting'` was added to `campaign_status` in schema.ts without a migration
- * and stayed absent from every environment (#1475). The first string argument
+ * and stayed absent from every environment. The first string argument
  * is the database type name; the exported binding name is irrelevant
  * (`workspace_role` maps to `workspace_users_role`).
  */

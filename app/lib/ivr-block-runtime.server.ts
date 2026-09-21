@@ -2,7 +2,7 @@ import type { TwimlResponse } from "@/lib/twilio-twiml.server";
 import { ivrGatherAttributes, type IvrOption } from "@/lib/ivr-gather.server";
 
 /**
- * The shared IVR block flow (#1877). The outbound campaign route and the inbound
+ * The shared IVR block flow. The outbound campaign route and the inbound
  * IVR route differ only in how they load the call and what a prompt renders to —
  * the gather/navigate shape is identical, so it lives here once.
  */
@@ -93,7 +93,7 @@ export function findNextBlock(
 
 /**
  * Append one block to the response: a `<Gather>` with the prompt nested inside
- * when the block maps responses (#1841), otherwise the prompt then a redirect to
+ * when the block maps responses, otherwise the prompt then a redirect to
  * the next block, or hangup at the end of the script.
  */
 export async function appendBlockResponse<B extends IvrBlock>(args: {

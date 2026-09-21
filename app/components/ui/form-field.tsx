@@ -17,7 +17,7 @@ export interface FormFieldProps extends React.HTMLAttributes<HTMLDivElement> {
   label?: React.ReactNode;
   /**
    * Help text shown in a hover/focus tooltip beside the label, for guidance
-   * that would otherwise sit as a paragraph under the control (#1702).
+   * that would otherwise sit as a paragraph under the control.
    */
   labelTooltip?: string;
   description?: React.ReactNode;

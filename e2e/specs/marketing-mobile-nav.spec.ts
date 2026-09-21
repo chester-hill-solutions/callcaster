@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 /**
  * The marketing home's mobile navigation sheet used inline links, so its items
- * flowed horizontally and wrapped instead of stacking (#1891). Assert each link
+ * flowed horizontally and wrapped instead of stacking. Assert each link
  * starts on its own row on a phone viewport.
  */
 test.describe("Marketing home mobile navigation", () => {

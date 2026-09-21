@@ -73,7 +73,7 @@ export function IvrStepFields({
       const name = await onUploadAudio(file);
       if (!name) return;
       // An upload from a spoken step must also switch the step to a
-      // recording, or playback keeps speaking the old text (#1325).
+      // recording, or playback keeps speaking the old text.
       const patch: Partial<ScriptBlock> =
         block.callcasterType === "recorded"
           ? ({ audioFile: name } as Partial<ScriptBlock>)
@@ -86,11 +86,6 @@ export function IvrStepFields({
 
   const canUploadAudio = !readOnly && Boolean(onUploadAudio);
 
-  // The hidden file input and its trigger are one unit. In "Speak text" mode
-  // the trigger stays visible (users should not have to flip the mode first,
-  // #1325), with a hint about the side effect. In "Play a recording" mode it
-  // renders next to the recording Select instead, because both are ways to
-  // choose what the caller hears (#1701).
   const renderUploadControl = (showModeHint: boolean) =>
     canUploadAudio ? (
       <div className="grid gap-1">

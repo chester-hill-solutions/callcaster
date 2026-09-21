@@ -149,8 +149,8 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     } as any));
     const xml = await res.text();
     // The prompt must sit INSIDE <Gather> so a keypad press interrupts it
-    // (#1841); as a sibling it only played to the end first. A keypad-only
-    // step gathers DTMF only, so speech cannot skip the menu (#1856).
+    //; as a sibling it only played to the end first. A keypad-only
+    // step gathers DTMF only, so speech cannot skip the menu.
     expect(xml).toContain(
       '<Gather action="https://base.example/api/ivr/1/page_1/b1/response" input="dtmf" numDigits="1" timeout="5"><Play>https://signed</Play></Gather>',
     );
@@ -262,7 +262,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     expect(await res.text()).toContain('<Say voice="Polly.Salli-Neural">Hello.</Say>');
   });
 
-  // #1673: every text-only script (including the seeded sample phone menu)
+  // every text-only script (including the seeded sample phone menu)
   // stores its words in `content` with `audioFile: ""`; the runtime read
   // only `audioFile` and emitted an empty <Say>, so the caller heard
   // silence and the queue row still completed.

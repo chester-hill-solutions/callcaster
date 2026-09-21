@@ -25,7 +25,7 @@ export type ButtonProps = VariantProps<typeof buttonVariants> & {
   >;
 
 /**
- * #1319: destructive hover contrast override.
+ * destructive hover contrast override.
  *
  * The upstream shad-cc destructive variant is
  * `bg-destructive text-destructive-foreground hover:bg-destructive/90`

@@ -250,7 +250,7 @@ function issueEntry(issue, record, status, repo) {
   return lines.join("\n");
 }
 
-/** Minimal entry for an open issue with no enrichment record yet (#1910). */
+/** Minimal entry for an open issue with no enrichment record yet. */
 function triageEntry(issue, status) {
   const assignees = (issue.assignees?.nodes ?? []).map((a) => a.login);
   const labels = (issue.labels?.nodes ?? []).map((l) => l.name);
@@ -268,7 +268,7 @@ function triageEntry(issue, status) {
 /**
  * Render the board markdown for a list of open issues and validated records.
  * Pure and deterministic: no timestamps, no I/O. Open issues without an
- * enrichment record land in a "Needs triage" lane (#1910) instead of failing
+ * enrichment record land in a "Needs triage" lane instead of failing
  * the board; a record referencing a closed issue still throws.
  */
 export function buildBoard({ issues, records, repo, projectNumber, reviewedAt }) {
@@ -284,7 +284,7 @@ export function buildBoard({ issues, records, repo, projectNumber, reviewedAt })
 
   const lanes = new Map(LANES.map((l) => [l.key, { ...l, entries: [] }]));
   // Unenriched issues have no verdict yet — they fill a "Needs triage" lane
-  // instead of failing the whole board (#1910).
+  // instead of failing the whole board.
   const triage = {
     key: "needs-triage",
     label: "Needs triage",

@@ -291,7 +291,7 @@ export type DequeuedQueueRow = {
  * Every campaign_queue row that was dequeued before ever producing a
  * message — landline pre-check, opt-out, duplicate suppression. The SMS
  * export uses this to synthesize skipped rows so customers can see
- * whose message never went out and why (#1417).
+ * whose message never went out and why.
  *
  * `dequeued_at IS NOT NULL` covers both writer paths — the TS helper
  * (`buildDequeuedQueueUpdate` stamps `dequeued_at` alongside
@@ -593,7 +593,7 @@ export type DequeueQueueEntryArgs =
   | DequeueQueueEntryByContactArgs;
 
 /**
- * What the dequeue actually did to the row it was called for (#1278).
+ * What the dequeue actually did to the row it was called for.
  *
  * `dequeuedPrimary: false` is not an error — on the guarded RPC path it is the
  * concurrency guard doing its job, and on the Drizzle paths it means the
@@ -618,7 +618,7 @@ function isByIdArgs(args: DequeueQueueEntryArgs): args is DequeueQueueEntryByIdA
 /**
  * Record a failed dispatch attempt on a queued row so the exhaustion sweep
  * (`fail_exhausted_campaign_queue_contacts`) can dead-letter it once the
- * policy maximum is reached, instead of leaving it queued forever (#1513).
+ * policy maximum is reached, instead of leaving it queued forever.
  * The live-call claim path bumps `attempt_count` inside its claim RPC; the
  * SMS and IVR dispatch loops never claim, so they record here.
  */
@@ -691,7 +691,7 @@ export async function dequeueQueueEntry(
 
 
 /**
- * Why a dequeue reported `dequeuedPrimary: false` (#1278).
+ * Why a dequeue reported `dequeuedPrimary: false`.
  *
  * A plain read, run only on the no-op path, so the API can say something true
  * instead of "assigned to another agent" for every zero-row dequeue — the

@@ -463,7 +463,7 @@ export type CampaignQueueApiItem = typeof campaignQueueTable.$inferSelect & {
 
 /**
  * Loads the contact, outreach-attempt, and audience-link rows for a set of
- * queue rows (#1892). Shared by the page and single-item fetchers.
+ * queue rows. Shared by the page and single-item fetchers.
  */
 async function loadQueueItemRelations(
   queueRows: Array<{ contact_id: number }>,

@@ -130,7 +130,7 @@ export async function uploadWorkspaceAudioApi(
       contentType: normalizedAudio.contentType,
     });
 
-    // Derived, best-effort WAV sidecar for IVR playback (#1842). Failure here
+    // Derived, best-effort WAV sidecar for IVR playback. Failure here
     // must not fail the upload; the MP3 is the canonical object.
     await writeIvrWavSidecar(
       workspaceId,

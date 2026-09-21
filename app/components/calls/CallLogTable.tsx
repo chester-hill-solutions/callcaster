@@ -217,8 +217,6 @@ export function CallLogTable({
         id: "voicemail",
         header: "Voicemail",
         cell: ({ row }) => {
-          // Play our stored copy in-app (#1844); only fall back to the raw
-          // Twilio URL when no persisted copy exists.
           if (row.original.recordingPlaybackUrl) {
             return (
               <audio

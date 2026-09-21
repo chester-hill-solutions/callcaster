@@ -22,7 +22,7 @@ describe("Button", () => {
     expect(button.className).not.toContain("cursor-pointer");
   });
 
-  // #1319: upstream shad-cc destructive variant hovers to a lightened
+  // upstream shad-cc destructive variant hovers to a lightened
   // red while keeping near-white text — reads as low-contrast on the
   // "Leave Campaign" / "Delete" buttons the design team flagged. The
   // local wrapper flips text to black on hover so the button stays

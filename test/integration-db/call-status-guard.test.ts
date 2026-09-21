@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 /**
- * The guarded status writes, exercised against a REAL database (#1289).
+ * The guarded status writes, exercised against a REAL database.
  *
  * `call.status` and `message.status` are Postgres ENUMs in every real
  * database lineage, and `lower(<enum>)` does not exist — the un-cast

@@ -9,7 +9,7 @@ import { campaignTypeText } from "@/lib/utils";
 const CUSTOMER_FACING_LABEL = "Automated phone menu";
 
 /**
- * Terminology contract (#1347): the robocall / IVR goal has exactly one
+ * Terminology contract: the robocall / IVR goal has exactly one
  * customer-facing name across goal selection, onboarding, and campaign labels.
  */
 describe("automated phone menu terminology", () => {

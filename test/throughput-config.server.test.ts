@@ -50,7 +50,7 @@ describe("throughput-config.server", () => {
   });
 
   test("legacy dispatcher rates when parallel dispatch is disabled", () => {
-    // Pinned literals (#1925): the legacy rates (2 mps / 1000ms-per-700ms
+    // Pinned literals: the legacy rates (2 mps / 1000ms-per-700ms
     // call) are the contract; changing the constants must fail this test.
     expect(
       configuredDispatcherSmsMps({

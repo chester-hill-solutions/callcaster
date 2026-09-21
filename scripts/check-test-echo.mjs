@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Test echo-shape ratchet (#1931).
+ * Test echo-shape ratchet.
  *
  * Flags assertions whose EXPECTED value is an identifier imported from the
  * system under test itself (`expect(sutOutput).toBe(SUT_CONSTANT)`). Any value

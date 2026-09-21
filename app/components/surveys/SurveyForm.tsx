@@ -260,11 +260,6 @@ function SurveyPageSection({
   );
 }
 
-/**
- * The survey builder form, shared by the create and edit survey routes
- * (#1892). The two routes were ~90% identical; only the page chrome, the
- * submit target, and whether the Survey ID is editable differ.
- */
 export interface SurveyFormProps {
   initialFormData: SurveyFormData;
   onSubmit: (formData: SurveyFormData) => void;

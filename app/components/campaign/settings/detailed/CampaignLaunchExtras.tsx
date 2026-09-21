@@ -73,7 +73,7 @@ function getEtaRange(input: {
    * The campaign's dispatch policy (SMS send window, or IVR calling hours
    * with start/end dates). Projected through so the ETA starts consuming
    * time at the next allowed moment instead of assuming continuous sending
-   * (#1351), and so IVR dates bound it (E2.2).
+* and so IVR dates bound it (E2.2).
    */
   policy: DispatchPolicy;
 }) {
@@ -121,7 +121,6 @@ function OutboundEstimateAlert({
   );
 }
 
-/** Launch-only pacing/split extras. Campaign configuration lives on Setup. */
 export function CampaignLaunchExtras({
   campaignData,
   isBusy,

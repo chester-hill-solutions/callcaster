@@ -4,7 +4,7 @@ import { logger } from "@/lib/logger.server";
 import { objectExists } from "@/lib/object-storage.server";
 
 /**
- * Twilio-friendly WAV sidecars for IVR prompts (#1842).
+ * Twilio-friendly WAV sidecars for IVR prompts.
  *
  * The workspace audio library stores mono 44.1 kHz MP3. Twilio re-encodes an
  * MP3 before it plays, but streams a WAV as-is — one source of first-audio

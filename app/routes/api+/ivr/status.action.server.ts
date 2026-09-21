@@ -64,7 +64,7 @@ export interface CallEvent {
 /**
  * Records the machine-answer disposition, then the status callback continues.
  * The voicemail audio (or the hangup) is emitted by the flow entry route, which
- * acts on the synchronous AMD verdict before any IVR audio plays (#1864); this
+ * acts on the synchronous AMD verdict before any IVR audio plays; this
  * is the callback's safety net and writes the same values.
  */
 export const action = defineAction({

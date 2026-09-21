@@ -1,6 +1,6 @@
 /**
  * Launch-page ETA must project through the campaign's dispatch-time
- * restrictions (#1351): a send window opening later today must push the
+ * restrictions: a send window opening later today must push the
  * "queue completion" range past the window boundary, not assume continuous
  * sending from now.
  */

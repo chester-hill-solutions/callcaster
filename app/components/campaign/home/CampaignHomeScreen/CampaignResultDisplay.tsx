@@ -151,7 +151,6 @@ export const NoResultsYet = ({
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="mb-8 flex flex-col">
           <h2 className="mb-0 text-2xl font-semibold">{totalLabel}: 0</h2>
-          {/* Messages are not contacts: never show a contact denominator. */}
           {!isMessage && (
             <h3 className="mb-4 text-xl font-light">of {expectedTotal}</h3>
           )}

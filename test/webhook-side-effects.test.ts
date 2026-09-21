@@ -177,7 +177,7 @@ describe("webhook side-effect handlers", () => {
       "w1",
       expect.objectContaining({ contact_id: 123 }),
     );
-    // #1218: a provider-terminal status stamps the disposition so the call
+    // a provider-terminal status stamps the disposition so the call
     // shows up in campaign results even when the browser never hit /api/hangup.
     expect(mocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
       "w1",
@@ -205,7 +205,7 @@ describe("webhook side-effect handlers", () => {
     );
   });
 
-  // #1362: a callee hang-up must collapse the queue entry exactly like
+  // a callee hang-up must collapse the queue entry exactly like
   // /api/hangup does, or the agent's nextRecipient keeps showing a finished
   // contact. The assignee comes from the queue row because a webhook has no
   // acting user, and the guarded RPC keeps a double hang-up idempotent.

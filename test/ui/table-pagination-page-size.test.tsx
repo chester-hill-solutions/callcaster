@@ -5,7 +5,7 @@ import { describe, expect, test, vi } from "vitest";
 import TablePagination from "../../app/components/shared/TablePagination";
 
 // The admin panels' hand-rolled pagination consolidated onto the canonical
-// TablePagination (#1892); the page-size select is the piece the admin panels
+// TablePagination; the page-size select is the piece the admin panels
 // needed. These tests pin the summary rendering and the new select wiring.
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];

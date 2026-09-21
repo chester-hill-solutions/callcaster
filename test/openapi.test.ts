@@ -60,7 +60,7 @@ describe("openapi spec", () => {
       const operation = pathItem.post;
       expect(operation).toBeDefined();
       expect(operation?.operationId).toBeTruthy();
-      // Pinned literal (#1931): the integrator spec section name is the contract.
+      // Pinned literal: the integrator spec section name is the contract.
       expect(operation?.tags).toContain("Integrator API");
       expect(operation?.security).toEqual([
         { sessionCookie: [] },

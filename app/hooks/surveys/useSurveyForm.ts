@@ -22,7 +22,7 @@ function nextSuffix(existing: string[]): number {
 }
 
 /**
- * Owns the survey builder's form state (#1892). The create and edit survey
+ * Owns the survey builder's form state. The create and edit survey
  * routes had two near-identical copies of this logic; it lives here once.
  *
  * All nested mutations go through a small set of index primitives

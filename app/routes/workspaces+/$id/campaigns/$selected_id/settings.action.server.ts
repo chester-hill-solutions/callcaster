@@ -114,7 +114,7 @@ export const action = defineAction({
         const nextCampaignData = JSON.parse(campaignDataStr);
         const nextCampaignDetails = JSON.parse(campaignDetailsStr);
 
-        // IVR is a single campaign type (#1741): a campaign saved before the
+        // IVR is a single campaign type: a campaign saved before the
         // simple/complex split was removed persists as robocall from here on.
         nextCampaignData.type = normalizeIvrCampaignType(nextCampaignData.type);
 
@@ -146,7 +146,7 @@ export const action = defineAction({
           },
         });
 
-        // #1816: a live machine campaign whose window was just edited may
+        // a live machine campaign whose window was just edited may
         // have a parked dispatch successor sleeping at the old boundary.
         // Pull it forward to the new next-open (or wake it now when the
         // window is unrestricted) so the edit takes effect within one hop.
@@ -226,7 +226,7 @@ export const action = defineAction({
 
           // Message and machine-dialled voice campaigns launch through
           // launchCampaign, which validates readiness and enqueues durable
-          // dispatch work (#1348). live_call stays human-dialled.
+          // dispatch work. live_call stays human-dialled.
           const launchable =
             campaignRecord.type === "message" ||
             isMachineDispatchedVoiceCampaignType(campaignRecord.type);

@@ -27,7 +27,7 @@ export const IVR_HANDLER_NEXT_DELAY_MS = 500;
  * Assumed average in-flight time per IVR call — ring time, connect, the menu,
  * and hang-up or voicemail. The queue drains at CALL COMPLETION, so
  * completion is bounded by `voiceConcurrentCallLimit / this duration`, not by
- * the dial-start rate (#1874).
+ * the dial-start rate.
  */
 export const IVR_AVG_CALL_DURATION_SECONDS = 75;
 
@@ -76,7 +76,7 @@ export type IvrCampaignEstimate = {
    * Dial starts per second minus the concurrency bound
    * (`voiceConcurrentCallLimit / IVR_AVG_CALL_DURATION_SECONDS`). Rows only
    * dequeue after a call completes, so THIS is the completion rate the ETA
-   * should use (#1874).
+   * should use.
    */
   effectiveCompletionPerSecond: number;
   avgCallDurationSeconds: number;

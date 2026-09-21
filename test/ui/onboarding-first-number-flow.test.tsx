@@ -155,7 +155,7 @@ describe("guided phone setup (#1205, #1764)", () => {
     });
 
     // Settings → Numbers already flipped to "Number verified" from the live
-    // capability; onboarding used to sit on "Verification pending" (#1846).
+    // capability; onboarding used to sit on "Verification pending".
     expect(await screen.findByText("Number verified")).toBeVisible();
   });
 });

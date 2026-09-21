@@ -167,7 +167,7 @@ export async function campaignExportHandler(
 const DISPATCH_BATCH_SIZE = 50;
 /** Retry delay for deferrals without an exact next-open instant (schedule
  *  sweep waiting flips, IVR calling-hours gate). The SMS send-window gate
- *  instead schedules its successor at the exact window boundary (#1352). */
+ * instead schedules its successor at the exact window boundary. */
 const SEND_WINDOW_RETRY_MS = 15 * 60 * 1000;
 
 /** Milliseconds until a campaign's start date; 0 when unset, invalid, or past. */
@@ -406,7 +406,7 @@ export async function campaignDispatchHandler(
 }
 
 /**
- * The non-dispatched tail of the machine dispatch chain (#1892): park on
+ * The non-dispatched tail of the machine dispatch chain: park on
  * insufficient credit, stop on a caller-id config error, or reschedule the
  * successor at the send-window boundary. Shared by the SMS and IVR branches.
  */
@@ -435,7 +435,7 @@ async function resolveDispatchBlockedCase(
       logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
       return { ok: true, campaignId, blocked: "caller_id_required" };
     case "deferred_send_window": {
-      // Schedule the successor at the exact window boundary (#1352): the
+      // Schedule the successor at the exact window boundary: the
       // batch's outcome carries the next open instant, so dispatch resumes
       // the moment sending is allowed. Cap the sleep (see
       // SEND_WINDOW_MAX_DEFER_MS) so a far-future boundary cannot pin the
@@ -454,7 +454,7 @@ async function resolveDispatchBlockedCase(
 }
 
 /**
- * The shared dispatched tail (#1892): keep the chain ticking until the queue
+ * The shared dispatched tail: keep the chain ticking until the queue
  * drains, then try to complete the campaign.
  */
 async function continueOrCompleteDispatch(

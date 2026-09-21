@@ -14,7 +14,7 @@ type UseCampaignExportArgs = {
  * Owns the one implementation of the export flow (POST /api/campaign-export,
  * then poll /api/campaign-export-status every 2s). The admin and campaign
  * surfaces differ only in copy, so they share this hook instead of duplicating
- * the state machine and the poll (#1892).
+ * the state machine and the poll.
  */
 export function useCampaignExport({
   campaignId,

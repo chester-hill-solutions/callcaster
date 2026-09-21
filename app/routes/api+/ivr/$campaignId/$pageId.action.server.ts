@@ -56,7 +56,7 @@ export const action = defineAction({
         });
       }
 
-      // Synchronous AMD sends its verdict on this first request (#1864). Decide
+      // Synchronous AMD sends its verdict on this first request. Decide
       // here so a machine never hears the IVR; the shared policy plays the
       // configured drop when it is on, otherwise hangs up.
       if (isMachineAnswered(answeredBy)) {
@@ -81,7 +81,7 @@ export const action = defineAction({
         firstBlockId && script.blocks ? script.blocks[firstBlockId] : undefined;
 
       // Render the first block here instead of redirecting to its own route
-      // (#1842): a Redirect cost an extra Twilio round-trip plus a second
+      // A Redirect cost an extra Twilio round-trip plus a second
       // call+campaign lookup before any audio played.
       if (firstBlock && firstBlockId && effectivePageId && callData.workspace) {
         await renderIvrBlock({

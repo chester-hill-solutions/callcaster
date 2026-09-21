@@ -18,7 +18,7 @@ export function getDataPlaneRouteContext(
 }
 
 /**
- * The standard data-plane route auth (#1892): workspaceId from the route
+ * The standard data-plane route auth: workspaceId from the route
  * param, user from the middleware context. Routes with extra required params
  * call this, then validate theirs.
  */

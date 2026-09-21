@@ -68,7 +68,7 @@ export type PublicSurveyGuard =
 export type PublicSurveyRequiredField = "questionId" | "pageId";
 
 /**
- * The shared front door for public survey submissions (#1892): rate limit,
+ * The shared front door for public survey submissions: rate limit
  * honeypot, required fields, survey lookup, and respondent-token resolution.
  * `survey-answer` and `survey-complete` carried byte-identical copies.
  */

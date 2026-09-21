@@ -118,7 +118,7 @@ describe("shared/pricing estimateMessageCredits", () => {
     const withMedia = estimateMessageCredits({ body, hasMedia: true });
 
     expect(withoutMedia.credits).toBe(2);
-    // Pinned literal (#1931): the flat MMS rate (4) is the contract.
+    // Pinned literal: the flat MMS rate (4) is the contract.
     expect(withMedia.credits).toBe(4);
   });
 

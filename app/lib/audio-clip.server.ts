@@ -82,7 +82,7 @@ export async function createWorkspaceAudioClip(input: CreateAudioClipInput) {
       },
     );
 
-    // Derived, best-effort WAV sidecar for IVR playback (#1842); a failure
+    // Derived, best-effort WAV sidecar for IVR playback; a failure
     // must not fail the clip save.
     await writeIvrWavSidecar(workspaceId, targetFileName, clip.buffer);
 

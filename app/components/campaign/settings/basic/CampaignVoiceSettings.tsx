@@ -18,7 +18,6 @@ interface CampaignVoiceSettingsProps {
   handleInputChange: (name: string, value: unknown) => void;
 }
 
-/** Campaign types that dial by voice and therefore have voicemail/dial settings. */
 const VOICE_CAMPAIGN_TYPES = new Set([
   "robocall",
   "simple_ivr",
@@ -26,12 +25,6 @@ const VOICE_CAMPAIGN_TYPES = new Set([
   "live_call",
 ]);
 
-/**
- * Setup voice settings (#1839, #1863): everything a voice campaign needs to
- * answer a machine and dial. One section owns the voice-type gate, so the rule
- * for "what a voice campaign shows on Setup" lives in one place. Text campaigns
- * get nothing.
- */
 export function CampaignVoiceSettings({
   campaignData,
   mediaData,

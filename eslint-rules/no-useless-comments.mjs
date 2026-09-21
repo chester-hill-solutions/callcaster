@@ -7,8 +7,17 @@
  * survives review because nothing flags them. This rule flags them so the
  * intent has to be written down or the comment removed.
  *
- * Informative comments are untouched: prose, a number with context
- * (`// #1936 tracks this`), a URL, or a directive (`// falls through`).
+ * Beyond what this rule can catch mechanically, the repo standard is: a
+ * comment must state a reason the code itself cannot — a constraint, a
+ * historical gotcha, a debt. Comments that narrate the adjacent line
+ * ("play our stored copy", "setup voice settings"), restate a component's
+ * purpose its name already says, or breadcrumb a JSX element are noise and
+ * are removed before the PR (#1978 review). If the comment would still be
+ * true after deleting the next line, delete the comment.
+ *
+ * Informative comments are untouched: a non-obvious reason, prose, a number
+ * with context (`// #1936 tracks this follow-up`), a URL, or a directive
+ * (`// falls through`).
  */
 
 /** A bare issue/PR reference: `123`, `#123`. */

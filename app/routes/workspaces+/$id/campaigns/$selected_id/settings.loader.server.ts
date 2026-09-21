@@ -137,7 +137,7 @@ export const loader = defineLoader({
       // Use the TOTAL assigned audience, not the remaining/undequeued
       // queue count -- the latter is 0 both pre-launch and after a
       // campaign finishes sending, which misreports completed campaigns
-      // as "needs attention: add at least one contact" (#1255).
+      // as "needs attention: add at least one contact".
       queueCount: resolveReadinessQueueCount({
         totalCount: campaignWithAudience.total_count,
         queuedCount: campaignWithAudience.queue_count,

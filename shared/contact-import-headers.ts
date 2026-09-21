@@ -13,7 +13,7 @@ export const CONTACT_IMPORT_TARGETS = [
   "external_id",
   "carrier",
   "other_data",
-  // Sentinel target: the user chose not to import this column (#1847). It is
+  // Sentinel target: the user chose not to import this column. It is
   // never a database field — the import skips it, and it cannot collide with a
   // real target in validation.
   "ignore",

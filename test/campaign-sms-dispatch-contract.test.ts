@@ -106,7 +106,7 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
 }));
 vi.mock("@/lib/message-db.server", () => ({
   countCampaignMessagesToPhone: (...args: unknown[]) => mocks.countCampaignMessagesToPhone(...args),
-  // Intent-row helpers (#1582): the contract covers dispatch gates and pacing,
+  // Intent-row helpers: the contract covers dispatch gates and pacing
   // so the row lifecycle is stubbed as a success here.
   pendingMessageSid: (ref: string) => `pending:${ref}`,
   resolveMessageByClientRef: vi.fn(async (_ws: string, _ref: string, update: { sid: string }) => ({ id: 1, ...update })),
@@ -511,7 +511,7 @@ describe("SMS dispatch contract — start rate does not exceed configured MPS", 
   });
 });
 
-// Credit budget (#1483): the entry gate reads the balance once, but debits
+// Credit budget: the entry gate reads the balance once, but debits
 // land after delivery, so every row in a batch would pass on the same stale
 // balance. Both adapters must stop starting sends once the remaining balance
 // cannot cover the next estimated message, and leave those rows queued.
@@ -569,7 +569,7 @@ describe("SMS dispatch contract — balance covers one send, not two", () => {
   });
 });
 
-// Exhaustion (#1513): a send that fails records the attempt on its queue row
+// Exhaustion: a send that fails records the attempt on its queue row
 // and the batch runs the exhaustion sweep, so a row at the attempt maximum is
 // dead-lettered and reported instead of pinning the chain to retries.
 

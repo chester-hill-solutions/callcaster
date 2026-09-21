@@ -41,7 +41,7 @@ export function normalizeCampaignData(
 }
 
 /**
- * IVR is a single campaign type (#1741). A `simple_ivr` / `complex_ivr` row
+ * IVR is a single campaign type. A `simple_ivr` / `complex_ivr` row
  * saved before the split was removed reads and persists as `robocall`.
  */
 export function normalizeIvrCampaignType<

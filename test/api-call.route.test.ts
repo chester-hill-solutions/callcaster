@@ -177,7 +177,7 @@ describe("app/routes/api+/call/route.tsx", () => {
       }),
     );
     expect(body).toContain('<Dial callerId="+15559876543"');
-    // Manual calls no longer wait on AMD (#1845).
+    // Manual calls no longer wait on AMD.
     expect(body).not.toContain("machineDetection");
     expect(body).toContain('statusCallback="https://base.example/api/call-status/"');
     expect(body).toContain(">+15555550100</Number>");

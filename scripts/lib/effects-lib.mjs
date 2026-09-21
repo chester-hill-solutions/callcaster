@@ -1,5 +1,5 @@
 /**
- * Pure compliance rules for the effects-strictness gate (#1924). Kept
+ * Pure compliance rules for the effects-strictness gate. Kept
  * side-effect free so the discipline is unit-testable — check-effects.mjs is
  * the runner.
  */
@@ -10,7 +10,7 @@ export const REQUIRED_TAGS = ["@effect", "@effect-deps", "@effect-side-effects"]
 /**
  * An effect is compliant when it answers the "why not a loader / fetcher /
  * derived render?" question in writing — or carries the `CANDIDATE-REMOVE`
- * marker instead (#1924). The `@effect-why-not-loader` tag exists to force
+ * marker instead. The `@effect-why-not-loader` tag exists to force
  * that answer, so an effect that cannot answer it must be surfaced for
  * removal, not parked silently.
  */

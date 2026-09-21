@@ -4,7 +4,7 @@ import { describe, expect, test } from "vitest";
 import { useSurveyForm } from "../../app/hooks/surveys/useSurveyForm";
 import type { SurveyFormData } from "../../app/lib/types";
 
-// The create/edit survey routes were collapsed onto one hook (#1892). These
+// The create/edit survey routes were collapsed onto one hook. These
 // tests pin the nested index scoping — the part a refactor can silently
 // invert (e.g. `pIndex === pageIndex` becoming `!==`), which the route-level
 // redirect test does not touch.

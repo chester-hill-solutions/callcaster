@@ -6,13 +6,13 @@ import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
 
 /**
- * The IVR answering-machine policy (#1864), in one place.
+ * The IVR answering-machine policy, in one place.
  *
  * The flow-entry route acts on the synchronous AMD verdict before any IVR audio
  * plays; the status callback records the same disposition as a safety net. Both
  * ask this module what "machine" means, how to answer it, and what to record, so
  * the rule cannot drift between them. The recorded disposition follows the drop:
- * `voicemail` when it plays, otherwise `no-answer` (#1888).
+ * `voicemail` when it plays, otherwise `no-answer`.
  */
 
 export type IvrMachineCall = {
@@ -51,7 +51,7 @@ export function isMachineAnswered(
 /**
  * What a detected machine should be recorded as. A machine only counts as
  * `voicemail` when the drop actually plays; with the drop off (or no audio) the
- * caller heard nothing, so the operator sees `no-answer` (#1888).
+ * caller heard nothing, so the operator sees `no-answer`.
  */
 export function machineAnswerDisposition(
   campaign: IvrMachineCampaign,
@@ -64,12 +64,12 @@ export function machineAnswerDisposition(
 /**
  * Records the machine disposition. Idempotent — the flow entry and the status
  * callback both call it for the same machine event, and it writes the same
- * values each time. Test calls (#1653) have no outreach attempt and are
+ * values each time. Test calls have no outreach attempt and are
  * skipped.
  *
  * `answered_at` is stamped only for a voicemail: `isConnectedAttempt` treats a
  * present `answered_at` as a connection, so stamping it on a `no-answer` would
- * count a machine hangup as a connected call in analytics (#1888).
+ * count a machine hangup as a connected call in analytics.
  */
 export async function recordMachineAnswer(
   call: IvrMachineCall,

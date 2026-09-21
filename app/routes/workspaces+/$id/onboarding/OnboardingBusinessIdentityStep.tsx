@@ -189,7 +189,7 @@ function A2pRegistrationFields({ profile, isReadOnly }: ProfileFieldsProps) {
 
 /**
  * Collect the shared business identity, then the carrier identity fields for
- * the SMS channels selected on the Goal step (#1148).
+ * the SMS channels selected on the Goal step.
  */
 export function OnboardingBusinessIdentityStep({
   formId = "onboarding-business-identity-form",
@@ -201,7 +201,7 @@ export function OnboardingBusinessIdentityStep({
   // Website URL is only required when the goal will send SMS — carriers ask
   // for it during 10DLC / toll-free registration. All other goals (voice
   // dialers, IVR) don't need it, so it's optional there and the label
-  // shouldn't render a red asterisk (#1311).
+  // shouldn't render a red asterisk.
   const websiteRequired = goalNeedsSmsCompliance(onboarding.selectedGoal);
   const showSmsIdentity = goalNeedsSmsCompliance(onboarding.selectedGoal);
   const showTollFreeFields =

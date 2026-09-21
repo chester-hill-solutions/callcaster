@@ -389,7 +389,7 @@ export const processAudienceUpload = async (
             //console.log(`Mapping ${actualHeader} (${typeof value}) -> ${dbField}:`, value);
 
           // `name` is handled above; `ignore` means the user dropped this column
-          // (#1847), so nothing is imported for it.
+          //so nothing is imported for it.
           if (dbField !== 'name' && dbField !== 'ignore') {
             if (dbField === 'other_data') {
               // Keep custom values in the same object-per-column shape used by
@@ -518,7 +518,7 @@ export const processAudienceUpload = async (
         );
       }
 
-      // Update progress — durable row every chunk; sidecar throttled (#1078).
+      // Update progress — durable row every chunk; sidecar throttled.
       processedCount += chunk.length;
 
       await tdb.audience_upload.update({

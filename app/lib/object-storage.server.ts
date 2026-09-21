@@ -198,7 +198,7 @@ export async function uploadObject(
         ContentType: options.contentType,
         // Supabase Storage took bare seconds ("60") and expanded them to
         // max-age; S3 stores the header verbatim, so a bare number is an
-        // invalid directive that caches nothing (#1228). Normalize here so
+        // invalid directive that caches nothing. Normalize here so
         // no call site can regress.
         CacheControl:
           options.cacheControl && /^\d+$/.test(options.cacheControl)
@@ -307,7 +307,7 @@ export async function createSignedObjectUrl(
   expiresInSeconds: number,
 ): Promise<string> {
   // Clamp rather than let the signer throw: an over-long TTL silently killed
-  // every voicemail email for months (#1224) because the failure surfaced
+  // every voicemail email for months because the failure surfaced
   // only at send time, deep inside a webhook handler.
   let expiresIn = expiresInSeconds;
   if (expiresIn > MAX_SIGNED_URL_TTL_SECONDS) {

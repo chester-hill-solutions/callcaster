@@ -6,7 +6,7 @@ import { SmokeRouter } from "./_helpers/component-smoke";
 
 // The credit count lives in the workspace sidebar (WorkspaceNav). It was
 // removed from the navbar because it rendered conditionally and shifted the
-// workspace dropdown (#1716).
+// workspace dropdown.
 describe("app/components/layout/Navbar.tsx credits", () => {
   test("does not render a credit readout for an admin workspace with credits", async () => {
     const Navbar = (await import("@/components/layout/Navbar")).default;
