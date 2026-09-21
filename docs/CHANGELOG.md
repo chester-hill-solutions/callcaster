@@ -6,6 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- Call-list uploads can now drop a column: pick **Do not import** in the column mapping instead of forcing it into a custom field ([#1847](https://github.com/chester-hill-solutions/callcaster/issues/1847)).
 - IVR prompts now play from a Twilio-friendly WAV copy when one exists, so Twilio no longer re-encodes the audio before playback. The MP3 stays the canonical library object and the fallback ([#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842)).
 - Campaign costs are now shown directly on the Launch page instead of behind a "Campaign cost" disclosure ([#1859](https://github.com/chester-hill-solutions/callcaster/issues/1859)).
 - Manual and power dials no longer wait for Twilio machine detection before connecting, so the agent hears audio as soon as the call is answered; predictive dialing still detects machines and drops the voicemail or hangs up ([#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845)).
