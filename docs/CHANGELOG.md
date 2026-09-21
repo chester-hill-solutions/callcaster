@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+_No unreleased entries yet._
+
+## 2026-09-21 — release [#1978](https://github.com/chester-hill-solutions/callcaster/pull/1978)
+
 ### Changed
 
 - Call-list uploads can now drop a column: pick **Do not import** in the column mapping instead of forcing it into a custom field ([#1847](https://github.com/chester-hill-solutions/callcaster/issues/1847)).
