@@ -57,6 +57,30 @@ describe("contact import headers", () => {
     expect(issues.filter((issue) => issue.code === "duplicate-target")).toHaveLength(1);
   });
 
+  test("allows dropping columns with the ignore target (#1847)", () => {
+    expect(CONTACT_IMPORT_LABELS.ignore).toBe("Do not import");
+
+    // Dropped columns are not fields, so they cannot collide, and they do not
+    // satisfy or block the phone requirement.
+    const issues = validateContactImportMapping({
+      Phone: "phone",
+      Notes: "ignore",
+      Tags: "ignore",
+    });
+    expect(issues).toHaveLength(0);
+  });
+
+  test("a mapping with only dropped columns still needs a phone column", () => {
+    expect(
+      validateContactImportMapping({ Notes: "ignore" }),
+    ).toContainEqual(expect.objectContaining({ code: "missing-phone" }));
+  });
+
+  test("never suggests the ignore target from a header", () => {
+    expect(matchContactImportHeader("Ignore")).toBeNull();
+    expect(suggestContactImportMapping(["Ignore"])).toEqual({ Ignore: "other_data" });
+  });
+
   test("warns when full and component name mappings compete", () => {
     expect(
       validateContactImportMapping({
