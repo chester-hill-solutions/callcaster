@@ -12,7 +12,13 @@ type MemberUser = Pick<
   role: MemberRole;
 };
 
-type PendingInvite = Tables<"workspace_invite"> & {
+type PendingInvite = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  created_at: string;
+  expires_at: string | null;
   user: Pick<
     Tables<"user">,
     "id" | "username" | "first_name" | "last_name"

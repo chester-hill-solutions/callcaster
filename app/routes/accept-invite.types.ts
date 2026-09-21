@@ -1,22 +1,23 @@
-import type { Database } from "@/lib/db-types";
+/**
+ * Email-first accept flow (#1713 / SEC-03).
+ *
+ * Invites accept ONLY through the emailed link, which carries
+ * `invitationId` + the one-time `token`. The loader resolves the invite and
+ * routes between signup (no account for that email), sign-in (account exists),
+ * and an in-session redeem form.
+ */
 
-export type WorkspaceInviteRow = Database["public"]["Tables"]["workspace_invite"]["Row"];
-export type WorkspaceRow = Database["public"]["Tables"]["workspace"]["Row"];
-export type ExistingUserInvite = Omit<WorkspaceInviteRow, "workspace"> & {
-  workspace: Pick<WorkspaceRow, "id" | "name">;
+export type PendingInvitation = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  created_at: string;
+  expires_at: string | null;
+  workspace: { name: string; id: string };
 };
 
 export type LoaderData =
-  | {
-      status: "verified";
-      invites: WorkspaceInviteRow[];
-      email: string;
-    }
-  | {
-      status: "existing_user";
-      invites: ExistingUserInvite[];
-      email: string;
-    }
   | {
       status: "invalid_link";
       error: string;
@@ -25,36 +26,52 @@ export type LoaderData =
       status: "not_signed_in";
     }
   | {
+      status: "create_account";
+      email: string;
+      invitationId: string;
+      token: string;
+      workspaceName: string;
+    }
+  | {
+      status: "sign_in_required";
+      email: string;
+      invitationId: string;
+      token: string;
+      workspaceName: string;
+    }
+  | {
+      status: "existing_user";
+      invites: PendingInvitation[];
+      email: string;
+    }
+  | {
+      status: "redeem_ready";
+      workspaceName: string;
+      invitationId: string;
+      token: string;
+      alreadyMember: boolean;
+    }
+  | {
       status: "error";
       error: string;
     };
-
-export type AcceptInvitationError = {
-  invitationId: unknown;
-  type: string;
-};
 
 export type ActionData =
   | {
       status: "updated";
-      invites: WorkspaceInviteRow[];
+      invites: PendingInvitation[];
     }
   | {
-      status: "accepted";
+      status: "redeemed";
+    }
+  | {
+      status: "resend_sent";
     }
   | {
       status: "accept_failed";
-      errors: AcceptInvitationError[];
+      error: string;
     }
   | {
       status: "error";
       error: string;
     };
-
-export type RawInviteWithWorkspace = Omit<WorkspaceInviteRow, "workspace"> & {
-  workspace:
-    | (Pick<WorkspaceRow, "id" | "name"> & {
-        name: WorkspaceRow["name"] | null;
-      })
-    | null;
-};

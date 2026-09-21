@@ -37,7 +37,8 @@ export const updateMemberBodySchema = z.object({
 });
 
 export const deleteMemberBodySchema = z.object({
-  user_id: z.string().uuid(),
+  user_id: z.string().uuid().optional(),
+  invite_id: z.string().min(1).optional(),
   target: z.enum(["member", "invite"]).optional(),
 });
 

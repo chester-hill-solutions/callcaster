@@ -21,7 +21,13 @@ type MemberUser = Pick<
   role: MemberRole;
 };
 
-type PendingInvite = Tables<"workspace_invite"> & {
+type PendingInvite = {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  created_at: string;
+  expires_at: string | null;
   user: Pick<
     Tables<"user">,
     "id" | "username" | "first_name" | "last_name"
@@ -240,8 +246,8 @@ export default function WorkspaceUsers() {
                 <ul className="flex w-full flex-col items-center gap-2">
                   {pendingInvites.map((invite) => {
                     const inviteMember: DisplayUser = {
-                      id: invite.user_id,
-                      username: invite.user?.username ?? invite.user_id,
+                      id: invite.id,
+                      username: invite.user?.username ?? invite.email,
                       first_name: invite.user?.first_name ?? null,
                       last_name: invite.user?.last_name ?? null,
                       role: "invited",

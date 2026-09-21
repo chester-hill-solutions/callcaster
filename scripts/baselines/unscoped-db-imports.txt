@@ -46,6 +46,7 @@ app/lib/merge-workspace-twilio-data.server.ts::@/server/admin-db
 app/lib/message-db.server.ts::@/server/db
 app/lib/number-rental-billing.server.ts::@/server/db
 app/lib/platform-analytics.server.ts::@/server/db
+app/lib/platform-auth.server.ts::@/server/admin-db
 app/lib/platform-billing.server.ts::@/server/admin-db
 app/lib/platform-billing.server.ts::@/server/db
 app/lib/platform-data.server.ts::@/server/db
@@ -76,6 +77,7 @@ app/lib/worker/webhook-side-effects.server.ts::@/server/db
 app/lib/workspace-client-projection.server.ts::@/server/admin-db
 app/lib/workspace-credits.server.ts::@/server/admin-db
 app/lib/workspace-events.server.ts::@/server/db
+app/lib/workspace-invitations.server.ts::@/server/admin-db
 app/lib/workspace-members-db.server.ts::@/server/admin-db
 app/lib/workspace-members-db.server.ts::@/server/db
 app/lib/workspace-selector/WorkspaceSelectedNewUtils.server.ts::@/server/db
