@@ -124,7 +124,7 @@ export function useCampaignCallFlow({
       // (including its built-in hangup tone) actually runs instead of the
       // call silently lingering. A no-op if the SDK already tore it down.
       // Guarded: with a dead signaling transport this disconnect THROWS
-      // (31009), and this runs inside the workspace SSE fan-out (#1294).
+      // (31009), and this runs inside the workspace SSE fan-out.
       try {
         activeCall?.disconnect?.();
       } catch (error) {
@@ -225,7 +225,7 @@ export function useCampaignCallFlow({
     previousFsmRef.current = fsmState;
 
     // A new dial always resets the lifecycle — the reducer starts a fresh
-    // generation even from terminal phases (#1220). Drop the previous call's
+    // generation even from terminal phases. Drop the previous call's
     // provider tracking too, so a stale leg's late events can't repaint the
     // old outcome over the new dial.
     if (fsmState === "dialing") {
@@ -280,9 +280,7 @@ export function useCampaignCallFlow({
     }
   }, [agentLegSid]);
 
-  // ---------------------------------------------------------------------------
   // Display derivation: one source of truth for the call screen UI.
-  // ---------------------------------------------------------------------------
   const displayState = ((): string => {
     const { phase } = lifecycle;
 

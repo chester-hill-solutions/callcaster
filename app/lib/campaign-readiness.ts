@@ -31,6 +31,7 @@ export type CampaignReadinessCode =
   | "script_required"
   | "script_unavailable"
   | "audio_unavailable"
+  | "voicemail_audio_required"
   | "message_content_required";
 
 export type CampaignReadinessIssue = {
@@ -299,6 +300,20 @@ function getResourceIssues(
     );
   }
 
+  // turning the drop on without choosing audio would silently do nothing.
+  if (
+    campaignData.type !== "message" &&
+    campaignData.voicemail_drop_enabled &&
+    !campaignData.voicemail_file
+  ) {
+    resourceIssues.push(
+      issue(
+        "voicemail_audio_required",
+        "Voicemail drop is on, but no voicemail audio is selected",
+      ),
+    );
+  }
+
   const configuredAudio = [
     campaignData.voicemail_file,
     campaignData.type === "live_call" && details && "voicedrop_audio" in details
@@ -353,7 +368,7 @@ export type CampaignQueueAudienceCounts = {
  * Resolve the `queueCount` fed into {@link getCampaignReadiness}'s
  * `queue_empty` check from a set of queue counters.
  *
- * Bug history (#1255): callers used to pass the *remaining* queued count
+ * Bug history: callers used to pass the *remaining* queued count
  * (rows not yet dequeued). That count is 0 both before a campaign has any
  * audience AND after a campaign finishes sending to everyone -- so a fully
  * completed campaign was misreported as "needs attention: add at least one
@@ -509,7 +524,7 @@ export function getCampaignReadiness(
     );
   }
 
-  // An admin can take the deliverability risk knowingly (#1482): the block
+  // An admin can take the deliverability risk knowingly: the block
   // stays the default and lifts only for a campaign with the explicit override.
   if (
     campaignData.type === "message" &&

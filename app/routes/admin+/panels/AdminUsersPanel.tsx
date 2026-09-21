@@ -1,5 +1,5 @@
 import { Form, Link } from "react-router";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { useState } from "react";
 import { useFilterPagination } from "@/hooks/utils/useFilterPagination";
 
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import TablePagination from "@/components/shared/TablePagination";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TabsContent } from "@/components/ui/tabs";
 import { AdminTableOverflow } from "@/components/admin/AdminTableOverflow";
@@ -241,75 +242,16 @@ export function AdminUsersPanel({ users, workspaceUsers, workspaces }: AdminUser
                     </AdminTableOverflow>
 
                     {filteredUsers.length > 0 && (
-                        <div className="flex items-center justify-between mt-4">
-                            <div className="flex items-center gap-2">
-                                <Select
-                                    value={String(itemsPerPage)}
-                                    onValueChange={(value) => setItemsPerPage(Number(value))}
-                                >
-                                    <SelectTrigger className="w-[100px]">
-                                        <SelectValue placeholder="Per page" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="5">5 per page</SelectItem>
-                                        <SelectItem value="10">10 per page</SelectItem>
-                                        <SelectItem value="20">20 per page</SelectItem>
-                                        <SelectItem value="50">50 per page</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <span className="text-sm text-muted-foreground">
-                                    Showing {startIndex + 1}-
-                                    {Math.min(startIndex + itemsPerPage, filteredUsers.length)} of{" "}
-                                    {filteredUsers.length}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                                    disabled={currentPage === 1}
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                    Previous
-                                </Button>
-                                <div className="flex items-center gap-1">
-                                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                                        let pageNum;
-                                        if (totalPages <= 5) {
-                                            pageNum = i + 1;
-                                        } else if (currentPage <= 3) {
-                                            pageNum = i + 1;
-                                        } else if (currentPage >= totalPages - 2) {
-                                            pageNum = totalPages - 4 + i;
-                                        } else {
-                                            pageNum = currentPage - 2 + i;
-                                        }
-
-                                        return (
-                                            <Button
-                                                key={pageNum}
-                                                variant={currentPage === pageNum ? "default" : "outline"}
-                                                size="sm"
-                                                onClick={() => setCurrentPage(pageNum)}
-                                                className="w-8 h-8 p-0"
-                                            >
-                                                {pageNum}
-                                            </Button>
-                                        );
-                                    })}
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                                    disabled={currentPage === totalPages}
-                                >
-                                    Next
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
+                        <TablePagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            pageSize={itemsPerPage}
+                            totalCount={filteredUsers.length}
+                            showSummary
+                            pageSizeOptions={[5, 10, 20, 50]}
+                            onPageSizeChange={setItemsPerPage}
+                            onPageChange={setCurrentPage}
+                        />
                     )}
                 </CardContent>
             </Card>

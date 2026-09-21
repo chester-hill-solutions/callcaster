@@ -27,6 +27,7 @@ const CURRENT_READINESS_CODES = [
   "script_required",
   "script_unavailable",
   "audio_unavailable",
+  "voicemail_audio_required",
   "message_content_required",
 ] as const satisfies readonly CampaignReadinessCode[];
 

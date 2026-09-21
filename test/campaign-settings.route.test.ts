@@ -370,6 +370,48 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
     );
   });
 
+  test("save normalizes a legacy simple_ivr campaign to robocall (#1741)", async () => {
+    mocks.updateCampaign.mockResolvedValue({
+      campaign: {
+        id: 7,
+        workspace: "w1",
+        type: "robocall",
+        status: "draft",
+        schedule: null,
+        sms_send_window: {},
+        start_date: null,
+        end_date: null,
+      },
+      campaignDetails: { campaign_id: 7 },
+    });
+    mocks.verifyAuth.mockResolvedValueOnce({
+      user: { id: "u1" },
+    });
+    mocks.parseActionRequest.mockResolvedValueOnce({
+      intent: "save",
+      campaignData: JSON.stringify({
+        title: "Legacy IVR",
+        type: "simple_ivr",
+        schedule: null,
+        sms_send_window: "{}",
+      }),
+      campaignDetails: JSON.stringify({ script_id: 3 }),
+    });
+
+    const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id/settings.route");
+    const res = await asRouteResponse(mod.action(await withWorkspaceRouteArgs({
+      request: new Request("http://x", { method: "POST" }),
+      params: { id: "w1", selected_id: "7" },
+    })));
+
+    expect(res.status).toBe(200);
+    expect(mocks.updateCampaign).toHaveBeenCalledWith(
+      expect.objectContaining({
+        campaignData: expect.objectContaining({ type: "robocall" }),
+      }),
+    );
+  });
+
   test("returns a duplicate-specific, non-technical error when cloning fails", async () => {
     const dbClient = makeDbClientForSettingsRoute({
       duplicateInsertError: new Error("duplicate failed"),

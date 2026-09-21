@@ -74,6 +74,11 @@ const steps = [
   "client/migrations/20260906120000_campaign_allow_bulk_local_send.sql",
   "client/migrations/20260906130000_sample_content_marker.sql",
   "client/migrations/20260916120000_unique_script_workspace_name.sql",
+  "client/migrations/20260918120000_campaign_voicemail_drop_enabled.sql",
+  "client/migrations/20260919120000_drop_legacy_auth_users_fks.sql",
+  "client/migrations/20260920120000_drop_get_outreach_attempts.sql",
+  "client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql",
+  "client/migrations/20260920120200_rewrite_last_access_actor.sql",
 ];
 
 /**

@@ -72,6 +72,8 @@ describe("app/routes/api+/dial/route.$number.tsx", () => {
     expect(res.headers.get("Content-Type")).toBe("text/xml");
     const body = await res.text();
     expect(body).toContain("<Dial");
+    // Manual dials no longer wait on AMD.
+    expect(body).not.toContain("machineDetection");
     expect(body).toContain('statusCallback="https://base.example/api/call-status/"');
     expect(body).toContain(">+15550001111</Number>");
   }, 30000);

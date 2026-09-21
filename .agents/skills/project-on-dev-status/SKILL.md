@@ -6,11 +6,14 @@ description: "Use when a PR that references issue(s) (via 'Fixes #N' / 'Closes #
 # Move merged-to-dev issues to the on-dev Status (CLI)
 
 The repo workflow [`.github/workflows/issue-on-dev.yml`](../../.github/workflows/issue-on-dev.yml)
-moves the CHS backlog Status to "On dev" via `gh project item-edit` on every dev-merge
+moves the CHS backlog Status to `on-dev` via `gh project item-edit` on every dev-merge
 PR, and comments on each referenced issue (no label — #1822). Its project move runs
 **only when** `vars.ON_DEV_PROJECT_NUMBER` and `secrets.PROJECT_TOKEN` are set; otherwise
-it logs and just comments. This skill is the CLI fallback that does the Status move when
-the workflow's `PROJECT_TOKEN` isn't configured (or when you want to backfill a merge the
+it logs and just comments. The Status **option name is the project's lowercase `on-dev`**
+(`vars.ON_DEV_STATUS_VALUE`, default `on-dev`): a stale value like `"On dev"` fails the
+option lookup and skips the move silently while the comment still lands — the #1822
+failure shape. This skill is the CLI fallback that does the Status move when the
+workflow's `PROJECT_TOKEN` isn't configured (or when you want to backfill a merge the
 automation missed).
 
 Extends `github-cli` and `github-issues` — apply their auth/repo rules first.
@@ -116,6 +119,9 @@ gh api graphql -f query='query { repository(owner: "chester-hill-solutions", nam
 - **Do not add any "on-dev" label** — the project Status is the only mechanism for
   signalling "fix on dev" (#1822). The workflow comments only; it sets Status when
   configured, and this skill backfills it. A label adds noise with no kanban effect.
+- **The Status option is lowercase `on-dev`, not `On dev`.** A stale
+  `ON_DEV_STATUS_VALUE` makes `gh project item-edit`'s option lookup fail; the workflow
+  logs "option not found" and skips the move while the comment still posts (#1822).
 - One logical concern per run: move only the issues referenced by the merged PR in
   question. Do not sweep unrelated issues you happen to notice on Backlog.
 
@@ -123,5 +129,6 @@ gh api graphql -f query='query { repository(owner: "chester-hill-solutions", nam
 
 - Next states: `tested-on-dev` (`eaff2ab1`) when QA confirms on the review env, then
   GitHub closes the issue on master promotion (see `github-issues` Closed Reasons).
-- The upstream fix (#1813) is to set `ON_DEV_PROJECT_NUMBER` + `PROJECT_TOKEN` so the
-  workflow does this automatically — this skill is the fallback until then.
+- `ON_DEV_PROJECT_NUMBER=9`, `PROJECT_TOKEN`, and `ON_DEV_STATUS_VALUE=on-dev` are set,
+  so the workflow moves the Status automatically. Keep this skill for backfilling merges
+  the automation missed (or while the token is unset).

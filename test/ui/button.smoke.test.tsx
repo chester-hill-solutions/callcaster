@@ -8,7 +8,21 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Click me" })).toBeInTheDocument();
   });
 
-  // #1319: upstream shad-cc destructive variant hovers to a lightened
+  test("uses a pointer cursor by default", () => {
+    render(<Button>Click me</Button>);
+    expect(screen.getByRole("button", { name: "Click me" }).className).toContain(
+      "cursor-pointer",
+    );
+  });
+
+  test("allows non-pointer controls to opt out", () => {
+    render(<Button cursorPointer={false}>Not a pointer</Button>);
+    const button = screen.getByRole("button", { name: "Not a pointer" });
+    expect(button.className).toContain("cursor-default");
+    expect(button.className).not.toContain("cursor-pointer");
+  });
+
+  // upstream shad-cc destructive variant hovers to a lightened
   // red while keeping near-white text — reads as low-contrast on the
   // "Leave Campaign" / "Delete" buttons the design team flagged. The
   // local wrapper flips text to black on hover so the button stays
@@ -49,4 +63,3 @@ describe("Button", () => {
     expect(btn.className).not.toContain("hover:text-black");
   });
 });
-

@@ -13,9 +13,7 @@ export const zCreateCampaignWithScriptRequest = z.object({
     title: z.string(),
     type: z.enum([
         'live_call',
-        'robocall',
-        'simple_ivr',
-        'complex_ivr'
+        'robocall'
     ]),
     caller_id: z.string(),
     script: z.object({

@@ -4,7 +4,6 @@ import { logger } from "@/lib/logger.server";
 import { listWorkspaceContactsApi } from "@/lib/platform-data.server";
 import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { listWorkspaceCampaignOptions } from "@/lib/database/campaign.server";
-import { createTenantDb } from "@/server/tenant-db";
 import { defineLoader } from "@/lib/handler.server";
 
 const ITEMS_PER_PAGE = 20;
@@ -41,7 +40,7 @@ export const loader = defineLoader({
   sideEffects: ["db-read"],
   handler: async ({ context, url }) => {
   try {
-    const { headers, user, workspaceId, userRole: roleStr } = getWorkspaceRouteContext(context);
+    const { headers, user, workspaceId, userRole: roleStr, tdb } = getWorkspaceRouteContext(context);
     const pageSize = Math.min(ITEMS_PER_PAGE, MAX_PAGE_SIZE);
 
     if (!workspaceId) {
@@ -84,8 +83,6 @@ export const loader = defineLoader({
 
     const pageParam = url.searchParams.get("page");
     const page = Math.max(1, parseInt(pageParam || "1", 10));
-
-    const tdb = createTenantDb(workspaceId);
 
     const [
       workspace,

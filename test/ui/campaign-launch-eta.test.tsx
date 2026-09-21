@@ -1,17 +1,11 @@
 /**
  * Launch-page ETA must project through the campaign's dispatch-time
- * restrictions (#1351): a send window opening later today must push the
+ * restrictions: a send window opening later today must push the
  * "queue completion" range past the window boundary, not assume continuous
  * sending from now.
  */
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-
-vi.hoisted(() => {
-  // The ETA formatter renders in machine-local time — pin it so the window
-  // boundary (20:00 UTC → 8:00 PM) is deterministic.
-  process.env.TZ = "UTC";
-});
 
 import { CampaignLaunchExtras } from "@/components/campaign/settings/detailed/CampaignLaunchExtras";
 import type { WorkspaceTwilioSyncSnapshot } from "@/lib/types";

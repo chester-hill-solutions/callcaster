@@ -1,5 +1,5 @@
 import { TotalCalls } from "./ResultsScreen.TotalCalls";
-import { AsyncExportButton } from "./AsyncExportButton";
+import { CampaignExportButton } from "./CampaignExportButton";
 import { DispositionBreakdown } from "./ResultsScreen.Disposition";
 import { IvrResponseBreakdown } from "./ResultsScreen.IvrResponses";
 import { KeyMetrics } from "./ResultsScreen.KeyMetrics";
@@ -33,6 +33,7 @@ const ResultsScreen = ({
   queueCounts: {
     fullCount: number;
     queuedCount: number;
+    completedCount: number;
   };
   ivrResponses?: IvrQuestionResults[] | null;
 }) => {
@@ -49,8 +50,12 @@ const ResultsScreen = ({
       </div>
       <div className="mb-4 rounded px-8 pb-8 pt-6">
         <div className="flex justify-between">
-          <TotalCalls totalCalls={totalOfAllResults || 0} expectedTotal={queueCounts.fullCount || 0} />
-          <AsyncExportButton campaignId={campaignId} workspaceId={workspaceId} />
+          <TotalCalls
+            label="Contacts Completed"
+            totalCalls={queueCounts.completedCount || 0}
+            expectedTotal={queueCounts.fullCount || 0}
+          />
+          <CampaignExportButton campaignId={campaignId} workspaceId={workspaceId} />
         </div>
         <DispositionBreakdown
           results={results}

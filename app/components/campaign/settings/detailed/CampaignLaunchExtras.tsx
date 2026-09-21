@@ -1,21 +1,8 @@
-import { useState } from "react";
-import { AlertCircle, Plus } from "lucide-react";
-import { AddAudioSheet } from "../AddAudioSheet";
+import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import SelectVoicemail from "./CampaignDetailed.Voicemail";
-import SelectVoiceDrop from "./live/CampaignDetailed.Live.SelectVoiceDrop";
 import { SplitCampaignPrompt } from "./CampaignDetailed.SplitCampaign";
 import {
-  DialTypeSwitch,
-  HouseholdSwitch,
-} from "./live/CampaignDetailed.Live.Switches";
-import {
   Campaign,
-  FileObject,
-  IVRCampaign,
-  LiveCampaign,
-  MessageCampaign,
   WorkspaceNumbers,
   WorkspaceTwilioOpsConfig,
   WorkspaceTwilioSyncSnapshot,
@@ -30,8 +17,6 @@ import {
   smsSendPolicy,
   type DispatchPolicy,
 } from "@/lib/campaign-dispatch-policy";
-
-type CampaignDetails = NonNullable<LiveCampaign | MessageCampaign | IVRCampaign>;
 
 type OutboundEstimateInputs = {
   portalConfig: WorkspaceTwilioOpsConfig;
@@ -88,7 +73,7 @@ function getEtaRange(input: {
    * The campaign's dispatch policy (SMS send window, or IVR calling hours
    * with start/end dates). Projected through so the ETA starts consuming
    * time at the next allowed moment instead of assuming continuous sending
-   * (#1351), and so IVR dates bound it (E2.2).
+* and so IVR dates bound it (E2.2).
    */
   policy: DispatchPolicy;
 }) {
@@ -136,29 +121,19 @@ function OutboundEstimateAlert({
   );
 }
 
-/** Launch-adjacent extras moved out of Setup: dial options, pacing, split. */
 export function CampaignLaunchExtras({
   campaignData,
-  handleInputChange,
-  mediaData,
-  details,
   isBusy,
   queueCount,
   phoneNumbers,
   outboundEstimateInputs,
-  workspaceId,
 }: {
   campaignData: NonNullable<Campaign>;
-  handleInputChange: (name: string, value: unknown) => void;
-  mediaData: FileObject[];
-  details: CampaignDetails;
   isBusy: boolean;
   queueCount: number;
   phoneNumbers: WorkspaceNumbers[];
   outboundEstimateInputs: OutboundEstimateInputs;
-  workspaceId: string;
 }) {
-  const [addAudioOpen, setAddAudioOpen] = useState(false);
   const isIvrCampaign =
     campaignData.type === "robocall" ||
     campaignData.type === "simple_ivr" ||
@@ -201,7 +176,7 @@ export function CampaignLaunchExtras({
   const ivrEtaRange = isIvrCampaign
     ? getEtaRange({
         queueCount,
-        ratePerSecond: ivrEstimate.effectiveDialAttemptsPerSecond,
+        ratePerSecond: ivrEstimate.effectiveCompletionPerSecond,
         policy: ivrCallingPolicy(campaignData),
       })
     : null;
@@ -214,90 +189,27 @@ export function CampaignLaunchExtras({
     ...messageEstimate.warnings,
   ];
   const ivrTooltipLines = [
-    `Estimated effective dial-start rate: ${formatRatePerMinute(ivrEstimate.effectiveDialAttemptsPerSecond)} CPS.`,
+    `Estimated completion rate: ${formatRatePerMinute(
+      ivrEstimate.effectiveCompletionPerSecond,
+    )} calls/sec (dial starts ${formatRatePerMinute(
+      ivrEstimate.effectiveDialAttemptsPerSecond,
+    )} CPS; ${ivrEstimate.voiceConcurrentCallLimit} concurrent × ~${
+      ivrEstimate.avgCallDurationSeconds
+    }s in-flight per call).`,
     ivrEtaRange
-      ? `If started now, queue dial attempts are estimated to complete around ${ivrEtaRange}.`
+      ? `If started now, queue completion is estimated around ${ivrEtaRange}.`
       : "Queue completion ETA appears after contacts are queued.",
     ...ivrEstimate.warnings,
   ];
 
-  const showDialOptions = campaignData.type === "live_call" || isIvrCampaign;
   const showEstimates = campaignData.type === "message" || isIvrCampaign;
 
-  if (!showDialOptions && !showEstimates && campaignData.type !== "message") {
+  if (!showEstimates) {
     return null;
   }
 
   return (
     <div className="space-y-4">
-      {showDialOptions ? (
-        <details className="rounded-md border border-border/70 p-3">
-          <summary className="cursor-pointer text-sm font-medium">
-            {campaignData.type === "live_call"
-              ? "Calling options"
-              : "Audio & dial options"}
-          </summary>
-          <div className="mt-3 flex flex-col gap-3">
-            {campaignData.type !== "message" ? (
-              <div className="flex flex-wrap items-end gap-3">
-                <SelectVoicemail
-                  handleInputChange={handleInputChange}
-                  mediaData={mediaData}
-                  campaignData={{
-                    ...(campaignData.voicemail_file && {
-                      voicemail_file: campaignData.voicemail_file,
-                    }),
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isBusy}
-                  onClick={() => setAddAudioOpen(true)}
-                >
-                  <Plus className="h-4 w-4" aria-hidden />
-                  Add audio
-                </Button>
-              </div>
-            ) : null}
-            {campaignData.type === "live_call" ? (
-              <div className="flex flex-wrap gap-2">
-                <SelectVoiceDrop
-                  handleInputChange={handleInputChange}
-                  mediaData={mediaData}
-                  campaignData={{
-                    ...("voicedrop_audio" in details &&
-                      details.voicedrop_audio && {
-                        voicedrop_audio: details.voicedrop_audio,
-                      }),
-                  }}
-                />
-                <HouseholdSwitch
-                  handleInputChange={handleInputChange}
-                  campaignData={{
-                    group_household_queue: campaignData.group_household_queue,
-                    dial_type: campaignData.dial_type || "call",
-                  }}
-                />
-                <DialTypeSwitch
-                  handleInputChange={handleInputChange}
-                  campaignData={{
-                    group_household_queue: campaignData.group_household_queue,
-                    dial_type: campaignData.dial_type || "call",
-                  }}
-                />
-              </div>
-            ) : null}
-          </div>
-          <AddAudioSheet
-            workspaceId={workspaceId}
-            open={addAudioOpen}
-            onOpenChange={setAddAudioOpen}
-          />
-        </details>
-      ) : null}
-
       {campaignData.type === "message" ? (
         <>
           <OutboundEstimateAlert

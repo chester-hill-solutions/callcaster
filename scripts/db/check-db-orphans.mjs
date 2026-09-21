@@ -6,7 +6,7 @@
  * check-db-rpcs.mjs asserts called ⊆ created. Nothing asserted the reverse,
  * which is how ~45 Supabase-era orphans — including a publicly-executable
  * SECURITY DEFINER contact hard-delete — survived three remediation passes
- * (#1229). This check computes the survivor set (created and never dropped,
+ * This check computes the survivor set (created and never dropped
  * in bootstrap apply order), subtracts functions the app calls, functions
  * other surviving SQL uses (trigger bodies, PERFORM/SELECT inside functions),
  * and a named allowlist. Anything left fails the build.
@@ -38,7 +38,6 @@ const KEEP = new Map([
   ["get_contacts_by_audience", "legacy reporting RPC, pending decision"],
   ["get_conversation_summary_by_campaign", "legacy reporting RPC, pending decision"],
   ["get_dynamic_outreach_results", "legacy reporting RPC, pending decision"],
-  ["get_outreach_attempts", "legacy reporting RPC, pending decision"],
   ["get_outreach_results", "legacy reporting RPC, pending decision"],
   ["get_survey_results", "legacy reporting RPC, pending decision"],
   ["get_conversation_summary", "legacy reporting RPC, pending decision"],

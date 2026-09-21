@@ -217,6 +217,20 @@ export function CallLogTable({
         id: "voicemail",
         header: "Voicemail",
         cell: ({ row }) => {
+          if (row.original.recordingPlaybackUrl) {
+            return (
+              <audio
+                controls
+                preload="none"
+                src={row.original.recordingPlaybackUrl}
+                aria-label="Call recording"
+                className="h-8 w-full max-w-55"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <track kind="captions" />
+              </audio>
+            );
+          }
           if (row.original.recordingUrl) {
             return (
               <a

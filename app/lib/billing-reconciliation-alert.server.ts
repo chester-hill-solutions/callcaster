@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { escapeHtml } from "@/lib/email-html";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import {
@@ -6,7 +7,10 @@ import {
   mergeWorkspaceTwilioData,
   patchWorkspaceTwilioData,
 } from "@/lib/merge-workspace-twilio-data.server";
-import { listWorkspaceOwnerAdminEmails } from "@/lib/workspace-members-db.server";
+import {
+  getWorkspaceById,
+  listWorkspaceOwnerAdminEmails,
+} from "@/lib/workspace-members-db.server";
 import { isObject } from "@/lib/type-safety-utils";
 import {
   buildBillingReconciliationAlertDetails,
@@ -27,18 +31,20 @@ export {
 
 function buildDriftEmail(args: {
   workspaceId: string;
+  workspaceName: string;
   snapshot: BillingReconciliationSnapshot;
   details: ReturnType<typeof buildBillingReconciliationAlertDetails>;
 }) {
   const billingUrl = `${env.BASE_URL()}/workspaces/${args.workspaceId}/billing`;
   const periodLabel = `${args.snapshot.period.startDate} – ${args.snapshot.period.endDate}`;
+  const workspaceNameHtml = escapeHtml(args.workspaceName);
   return {
-    subject: "CallCaster billing reconciliation drift detected",
+    subject: `${args.workspaceName}: CallCaster billing reconciliation drift detected`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Billing reconciliation drift</h2>
+        <h2>${workspaceNameHtml}: billing reconciliation drift</h2>
         <p>Our daily billing reconciliation for period <strong>${periodLabel}</strong>
-        found material variance between Twilio usage and your workspace ledger.</p>
+        found material variance between Twilio usage and the <strong>${workspaceNameHtml}</strong> workspace ledger.</p>
         <ul>
           <li>SMS variance: ${args.details.smsVariance}</li>
           <li>Voice variance: ${args.details.voiceVariance}</li>
@@ -53,6 +59,7 @@ function buildDriftEmail(args: {
     text: `
 Billing reconciliation drift
 
+Workspace: ${args.workspaceName}
 Period: ${periodLabel}
 SMS variance: ${args.details.smsVariance}
 Voice variance: ${args.details.voiceVariance}
@@ -67,6 +74,7 @@ View billing: ${billingUrl}
 
 async function sendBillingReconciliationDriftEmail(args: {
   workspaceId: string;
+  workspaceName: string;
   snapshot: BillingReconciliationSnapshot;
   details: ReturnType<typeof buildBillingReconciliationAlertDetails>;
   recipients: string[];
@@ -74,6 +82,7 @@ async function sendBillingReconciliationDriftEmail(args: {
   const resend = new Resend(env.RESEND_API_KEY());
   const { subject, html, text } = buildDriftEmail({
     workspaceId: args.workspaceId,
+    workspaceName: args.workspaceName,
     snapshot: args.snapshot,
     details: args.details,
   });
@@ -136,9 +145,19 @@ export async function handleBillingReconciliationDrift(args: {
       workspaceId: args.workspaceId,
     });
   } else {
+    let workspaceName = args.workspaceId;
+    try {
+      workspaceName = (await getWorkspaceById(args.workspaceId))?.name ?? args.workspaceId;
+    } catch (error) {
+      logger.warn("billing_reconcile.workspace_name_lookup_failed", {
+        workspaceId: args.workspaceId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     try {
       await sendBillingReconciliationDriftEmail({
         workspaceId: args.workspaceId,
+        workspaceName,
         snapshot: args.snapshot,
         details,
         recipients,

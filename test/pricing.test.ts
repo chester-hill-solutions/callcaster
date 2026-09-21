@@ -118,7 +118,8 @@ describe("shared/pricing estimateMessageCredits", () => {
     const withMedia = estimateMessageCredits({ body, hasMedia: true });
 
     expect(withoutMedia.credits).toBe(2);
-    expect(withMedia.credits).toBe(MMS_CREDITS);
+    // Pinned literal: the flat MMS rate (4) is the contract.
+    expect(withMedia.credits).toBe(4);
   });
 
   test("matches the real billing branch in app/routes/api+/sms/status.action.server.ts for every non-empty body", () => {

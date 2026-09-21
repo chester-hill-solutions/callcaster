@@ -1,6 +1,6 @@
-import { isRcsOnboardingEnabled } from "@/lib/rcs-onboarding.server";
 import type { CallerIdValidationRequest } from "@/lib/caller-id-verification.server";
 import { isWorkspaceOnboardingGoal } from "@/lib/messaging-onboarding/goals";
+import { EMPTY_BUSINESS_PROFILE } from "@/lib/messaging-onboarding/business-profile.server";
 import type {
   WorkspaceMessagingBusinessProfile,
   WorkspaceOnboardingChannel,
@@ -15,39 +15,6 @@ export type OnboardingActionData = {
   error?: string;
   validationRequest?: CallerIdValidationRequest;
 };
-
-const ALL_CHANNEL_OPTIONS: Array<{
-  id: WorkspaceOnboardingChannel;
-  label: string;
-  description: string;
-}> = [
-  {
-    id: "local_number",
-    label: "Local Number",
-    description:
-      "Canadian local number for inbound SMS and calls; rent one in the next step.",
-  },
-  {
-    id: "toll_free_bulk_sms",
-    label: "Toll-free bulk SMS",
-    description:
-      "High-volume SMS to Canadian mobiles; requires a toll-free number + verification.",
-  },
-  {
-    id: "a2p10dlc",
-    label: "A2P 10DLC",
-    description: "Register US application-to-person SMS campaigns and sender trust.",
-  },
-  {
-    id: "rcs",
-    label: "RCS for business",
-    description: "Track rich-messaging readiness while the provider path matures.",
-  },
-];
-
-export const CHANNEL_OPTIONS = ALL_CHANNEL_OPTIONS.filter(
-  (option) => option.id !== "rcs" || isRcsOnboardingEnabled(),
-);
 
 export function asWorkspaceOnboardingStatus(
   value: FormDataEntryValue | null,
@@ -78,31 +45,6 @@ export function readSelectedGoal(formData: FormData): WorkspaceOnboardingGoal | 
   const raw = String(formData.get("selectedGoal") ?? formData.get("selected_goal") ?? "");
   return isWorkspaceOnboardingGoal(raw) ? raw : null;
 }
-
-const EMPTY_BUSINESS_PROFILE: WorkspaceMessagingBusinessProfile = {
-  legalBusinessName: "",
-  businessType: "",
-  websiteUrl: "",
-  privacyPolicyUrl: "",
-  termsOfServiceUrl: "",
-  supportEmail: "",
-  supportPhone: "",
-  useCaseSummary: "",
-  optInWorkflow: "",
-  optInKeywords: "",
-  optOutKeywords: "",
-  helpKeywords: "",
-  sampleMessages: [],
-  doingBusinessAs: "",
-  businessRegistrationNumber: "",
-  ageGatedContent: false,
-  ein: "",
-  industry: "",
-  authorizedRepName: "",
-  authorizedRepEmail: "",
-  authorizedRepPhone: "",
-  authorizedRepTitle: "",
-};
 
 function parseSampleMessages(value: FormDataEntryValue | null): string[] {
   return String(value ?? "")
@@ -149,10 +91,10 @@ export function buildBusinessProfile(
 }
 
 /**
- * Overlays the channel-scoped inline business-profile fields (revealed on the
- * Channels step for `toll_free_bulk_sms` and `a2p10dlc`) onto the current
- * business profile. Only fields actually posted are overwritten, so unchecking a
- * channel or saving from another step never wipes previously-saved values.
+ * Overlays the channel-scoped business-profile fields for
+ * `toll_free_bulk_sms` and `a2p10dlc` onto the current business profile. Only
+ * fields actually posted are overwritten, so saving from another step never
+ * wipes previously-saved values.
  */
 export function readChannelInlineBusinessFields(
   formData: FormData,
@@ -179,7 +121,7 @@ export function readChannelInlineBusinessFields(
     const last = values[values.length - 1];
     next.ageGatedContent = last === "true" || last === "on" || last === "1";
   }
-  // The Channels step reuses the shared `sampleMessages` field for TFV samples.
+  // The SMS identity fields use a separate form name for their TFV samples.
   if (formData.has("channelSampleMessages")) {
     next.sampleMessages = parseSampleMessages(formData.get("channelSampleMessages"));
   }

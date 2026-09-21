@@ -5,7 +5,8 @@ import { asRouteResponse } from "./helpers/route-result";
 const mocks = vi.hoisted(() => ({
   isSignupOpen: vi.fn(() => true),
   signUpEmail: vi.fn(),
-  getInvitesByUserId: vi.fn(),
+  listPending: vi.fn(async () => []),
+  redeemInvitation: vi.fn(),
   getSession: vi.fn(),
   verifyAuth: vi.fn(),
 }));
@@ -23,9 +24,26 @@ vi.mock("@/lib/auth.server", () => ({
   verifyAuth: mocks.verifyAuth,
 }));
 
+vi.mock("@/lib/workspace-members-db.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-members-db.server")>()),
+  listUserPendingInvitationsByEmail: mocks.listPending,
+}));
+
+vi.mock("@/lib/workspace-invitations.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-invitations.server")>()),
+  listUserPendingInvitationsByEmail: mocks.listPending,
+  redeemWorkspaceInvitation: mocks.redeemInvitation,
+  resendWorkspaceInvitation: vi.fn(),
+  getWorkspaceInvitationById: vi.fn(async () => null),
+  getPendingWorkspaceInvitationByEmail: vi.fn(async () => null),
+  createWorkspaceInvitation: vi.fn(),
+  cancelWorkspaceInvitationById: vi.fn(),
+  listWorkspaceInvitations: vi.fn(async () => []),
+}));
+
 vi.mock("@/lib/database/workspace.server", () => ({
   acceptWorkspaceInvitations: vi.fn(async () => ({ errors: [] })),
-  getInvitesByUserId: mocks.getInvitesByUserId,
+  getInvitesByUserId: vi.fn(async () => []),
 }));
 
 vi.mock("@/lib/env.server", async (importOriginal) => ({
@@ -41,6 +59,8 @@ describe("app/routes/accept-invite.action.server.ts", () => {
   beforeEach(() => {
     mocks.isSignupOpen.mockReturnValue(true);
     mocks.signUpEmail.mockClear();
+    mocks.listPending.mockResolvedValue([]);
+    mocks.redeemInvitation.mockReset();
     mocks.getSession.mockResolvedValue({
       session: null,
       user: null,
@@ -55,8 +75,16 @@ describe("app/routes/accept-invite.action.server.ts", () => {
       },
       headers: new Headers([["Set-Cookie", "session=abc; Path=/"]]),
     });
-    mocks.getInvitesByUserId.mockResolvedValueOnce([
-      { id: "i1", workspace_id: "w1" },
+    mocks.listPending.mockResolvedValueOnce([
+      {
+        id: "i1",
+        email: "new@example.com",
+        role: "member",
+        status: "pending",
+        created_at: "2026-09-21T00:00:00.000Z",
+        expires_at: null,
+        workspace: { id: "w1", name: "Workspace One" },
+      },
     ]);
 
     const form = new FormData();
@@ -79,7 +107,17 @@ describe("app/routes/accept-invite.action.server.ts", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       status: "updated",
-      invites: [{ id: "i1", workspace_id: "w1" }],
+      invites: [
+        {
+          id: "i1",
+          email: "new@example.com",
+          role: "member",
+          status: "pending",
+          created_at: "2026-09-21T00:00:00.000Z",
+          expires_at: null,
+          workspace: { id: "w1", name: "Workspace One" },
+        },
+      ],
     });
     expect(mocks.signUpEmail).toHaveBeenCalledWith({
       body: {
@@ -91,6 +129,47 @@ describe("app/routes/accept-invite.action.server.ts", () => {
       returnHeaders: true,
     });
     expect(response.headers.get("Set-Cookie")).toBe("session=abc; Path=/");
+  });
+
+  test("claims an emailed invite right after signup", async () => {
+    mocks.signUpEmail.mockResolvedValueOnce({
+      response: {
+        user: { id: "u-new", email: "new@example.com", name: "First Last" },
+      },
+      headers: new Headers(),
+    });
+    mocks.redeemInvitation.mockResolvedValueOnce({
+      ok: true,
+      workspaceId: "w1",
+      alreadyAccepted: false,
+    });
+
+    const form = new FormData();
+    form.set("actionType", "updateUser");
+    form.set("email", "new@example.com");
+    form.set("password", "newPassword123");
+    form.set("firstName", "First");
+    form.set("lastName", "Last");
+    form.set("invitationId", "wi_invite_1");
+    form.set("token", "raw-token");
+
+    const mod = await import("../app/routes/accept-invite.action.server");
+    const response = await asRouteResponse(mod.action({
+        request: new Request("http://localhost/accept-invite", {
+          method: "POST",
+          body: form,
+        }),
+      } as any),
+    );
+
+    expect(mocks.redeemInvitation).toHaveBeenCalledWith({
+      invitationId: "wi_invite_1",
+      rawToken: "raw-token",
+      userId: "u-new",
+      verifiedEmail: "new@example.com",
+    });
+    expect(response.status).toBe(302);
+    expect(response.headers.get("Location")).toBe("/workspaces?invite=accepted");
   });
 
   test("refuses to create an account while signup is closed", async () => {

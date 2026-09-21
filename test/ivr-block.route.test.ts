@@ -148,13 +148,43 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
       request: ivrBlockRequest(),
     } as any));
     const xml = await res.text();
-    expect(xml).toContain("<Play>https://signed</Play>");
+    // The prompt must sit INSIDE <Gather> so a keypad press interrupts it
+    //; as a sibling it only played to the end first. A keypad-only
+    // step gathers DTMF only, so speech cannot skip the menu.
     expect(xml).toContain(
-      '<Gather action="https://base.example/api/ivr/1/page_1/b1/response" input="dtmf speech" speechTimeout="auto" speechModel="phone_call" timeout="5"/>',
+      '<Gather action="https://base.example/api/ivr/1/page_1/b1/response" input="dtmf" numDigits="1" timeout="5"><Play>https://signed</Play></Gather>',
     );
     expect(xml).toContain(
       "<Redirect>https://base.example/api/ivr/1/page_1/b1/response</Redirect>",
     );
+  });
+
+  test("gathers speech only when the step maps a spoken answer (#1856)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: {
+        b1: {
+          id: "b1",
+          type: "say",
+          audioFile: "Say what you need.",
+          options: [{ value: "vx-any", next: "hangup" }],
+        },
+      },
+    };
+    campaignIvrMocks.fetchCampaignWithScript.mockResolvedValueOnce({
+      workspace: "w1",
+      script: { steps: script },
+    } as any);
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId.route");
+    const res = await asRouteResponse(mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: ivrBlockRequest(),
+    } as any));
+    const xml = await res.text();
+    expect(xml).toContain('input="dtmf speech"');
+    // A speechModel requires a positive-integer speechTimeout; "auto" is invalid.
+    expect(xml).toContain('speechTimeout="3"');
+    expect(xml).toContain('speechModel="phone_call"');
   });
 
   test("synthetic-speech block emits <Say voice='...'> using the block's roster voice (#1401)", async () => {
@@ -232,7 +262,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
     expect(await res.text()).toContain('<Say voice="Polly.Salli-Neural">Hello.</Say>');
   });
 
-  // #1673: every text-only script (including the seeded sample phone menu)
+  // every text-only script (including the seeded sample phone menu)
   // stores its words in `content` with `audioFile: ""`; the runtime read
   // only `audioFile` and emitted an empty <Say>, so the caller heard
   // silence and the queue row still completed.
@@ -313,7 +343,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.tsx", () => {
 
   test("every step of the seeded sample script has something to say (#1673)", async () => {
     const { synthesizedSpeechText } = await import(
-      "../app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server"
+      "../app/lib/ivr-block-render.server"
     );
     const { SAMPLE_SCRIPT_STEPS } = await import("../app/lib/seed/sample-script.server");
     for (const block of Object.values(SAMPLE_SCRIPT_STEPS.blocks)) {

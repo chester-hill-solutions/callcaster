@@ -29,6 +29,11 @@ import {
   outreach_attempt as outreachAttemptTable,
 } from "@/db/schema";
 import { db } from "@/server/db";
+import {
+  attachContactsToQueueRows,
+  loadContactsByQueueRows,
+  requireContactForQueueRow,
+} from "@/lib/campaign-queue-contacts.server";
 
 export type QueueSearchFilters = {
   name: string;
@@ -277,20 +282,10 @@ export async function fetchCampaignQueueWithContacts(args: {
     return [];
   }
 
-  const contactIds = [...new Set(queueRows.map((row) => row.contact_id))];
-  const contacts = await db
-    .select()
-    .from(contactTable)
-    .where(inArray(contactTable.id, contactIds));
-  const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
-
-  return queueRows.map((queueRow) => {
-    const contact = contactById.get(queueRow.contact_id);
-    if (!contact) {
-      throw new Error(`Missing contact ${queueRow.contact_id} for queue row ${queueRow.id}`);
-    }
-    return { ...queueRow, contact };
-  });
+  return attachContactsToQueueRows(
+    queueRows,
+    await loadContactsByQueueRows(queueRows),
+  );
 }
 
 export async function countCompletedCampaignQueueRows(campaignId: number): Promise<number> {
@@ -320,20 +315,10 @@ export async function fetchActiveCampaignQueueWithContacts(args: {
     return [];
   }
 
-  const contactIds = [...new Set(queueRows.map((row) => row.contact_id))];
-  const contacts = await db
-    .select()
-    .from(contactTable)
-    .where(inArray(contactTable.id, contactIds));
-  const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
-
-  return queueRows.map((queueRow) => {
-    const contact = contactById.get(queueRow.contact_id);
-    if (!contact) {
-      throw new Error(`Missing contact ${queueRow.contact_id} for queue row ${queueRow.id}`);
-    }
-    return { ...queueRow, contact };
-  });
+  return attachContactsToQueueRows(
+    queueRows,
+    await loadContactsByQueueRows(queueRows),
+  );
 }
 
 export async function countDialableCampaignQueueRows(campaignId: number): Promise<number> {
@@ -424,20 +409,10 @@ export async function fetchDialableCampaignQueueWithContacts(args: {
     return [];
   }
 
-  const contactIds = [...new Set(queueRows.map((row) => row.contact_id))];
-  const contacts = await db
-    .select()
-    .from(contactTable)
-    .where(inArray(contactTable.id, contactIds));
-  const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
-
-  return queueRows.map((queueRow) => {
-    const contact = contactById.get(queueRow.contact_id);
-    if (!contact) {
-      throw new Error(`Missing contact ${queueRow.contact_id} for queue row ${queueRow.id}`);
-    }
-    return { ...queueRow, contact };
-  });
+  return attachContactsToQueueRows(
+    queueRows,
+    await loadContactsByQueueRows(queueRows),
+  );
 }
 
 export async function countCampaignQueueRows(
@@ -486,6 +461,63 @@ export type CampaignQueueApiItem = typeof campaignQueueTable.$inferSelect & {
   };
 };
 
+/**
+ * Loads the contact, outreach-attempt, and audience-link rows for a set of
+ * queue rows. Shared by the page and single-item fetchers.
+ */
+async function loadQueueItemRelations(
+  queueRows: Array<{ contact_id: number }>,
+  campaignId: number,
+) {
+  const contactIds = [...new Set(queueRows.map((row) => row.contact_id))];
+
+  const [contactById, attempts, audienceLinks] = await Promise.all([
+    loadContactsByQueueRows(queueRows),
+    db
+      .select({
+        id: outreachAttemptTable.id,
+        disposition: outreachAttemptTable.disposition,
+        campaign_id: outreachAttemptTable.campaign_id,
+        contact_id: outreachAttemptTable.contact_id,
+      })
+      .from(outreachAttemptTable)
+      .where(
+        and(
+          inArray(outreachAttemptTable.contact_id, contactIds),
+          eq(outreachAttemptTable.campaign_id, campaignId),
+        ),
+      ),
+    db
+      .select({
+        contact_id: contactAudienceTable.contact_id,
+        audience_id: contactAudienceTable.audience_id,
+        name: audienceTable.name,
+      })
+      .from(contactAudienceTable)
+      .leftJoin(audienceTable, eq(contactAudienceTable.audience_id, audienceTable.id))
+      .where(inArray(contactAudienceTable.contact_id, contactIds)),
+  ]);
+
+  const attemptsByContactId = new Map<number, typeof attempts>();
+  for (const attempt of attempts) {
+    const existing = attemptsByContactId.get(attempt.contact_id) ?? [];
+    existing.push(attempt);
+    attemptsByContactId.set(attempt.contact_id, existing);
+  }
+
+  const audiencesByContactId = new Map<
+    number,
+    Array<{ audience: { name: string | null } | null }>
+  >();
+  for (const link of audienceLinks) {
+    const existing = audiencesByContactId.get(link.contact_id) ?? [];
+    existing.push({ audience: { name: link.name } });
+    audiencesByContactId.set(link.contact_id, existing);
+  }
+
+  return { contactById, attemptsByContactId, audiencesByContactId };
+}
+
 export async function fetchCampaignQueuePage(args: {
   campaignId: number;
   filters: QueueSearchFilters;
@@ -515,59 +547,11 @@ export async function fetchCampaignQueuePage(args: {
     return { items: [], totalCount };
   }
 
-  const contactIds = [...new Set(queueRows.map((row) => row.contact_id))];
-  const campaignIdNum = args.campaignId;
-
-  const [contacts, attempts, audienceLinks] = await Promise.all([
-    db.select().from(contactTable).where(inArray(contactTable.id, contactIds)),
-    db
-      .select({
-        id: outreachAttemptTable.id,
-        disposition: outreachAttemptTable.disposition,
-        campaign_id: outreachAttemptTable.campaign_id,
-        contact_id: outreachAttemptTable.contact_id,
-      })
-      .from(outreachAttemptTable)
-      .where(
-        and(
-          inArray(outreachAttemptTable.contact_id, contactIds),
-          eq(outreachAttemptTable.campaign_id, campaignIdNum),
-        ),
-      ),
-    db
-      .select({
-        contact_id: contactAudienceTable.contact_id,
-        audience_id: contactAudienceTable.audience_id,
-        name: audienceTable.name,
-      })
-      .from(contactAudienceTable)
-      .leftJoin(audienceTable, eq(contactAudienceTable.audience_id, audienceTable.id))
-      .where(inArray(contactAudienceTable.contact_id, contactIds)),
-  ]);
-
-  const contactById = new Map(contacts.map((contact) => [contact.id, contact]));
-  const attemptsByContactId = new Map<number, typeof attempts>();
-  for (const attempt of attempts) {
-    const existing = attemptsByContactId.get(attempt.contact_id) ?? [];
-    existing.push(attempt);
-    attemptsByContactId.set(attempt.contact_id, existing);
-  }
-
-  const audiencesByContactId = new Map<
-    number,
-    Array<{ audience: { name: string | null } | null }>
-  >();
-  for (const link of audienceLinks) {
-    const existing = audiencesByContactId.get(link.contact_id) ?? [];
-    existing.push({ audience: { name: link.name } });
-    audiencesByContactId.set(link.contact_id, existing);
-  }
+  const { contactById, attemptsByContactId, audiencesByContactId } =
+    await loadQueueItemRelations(queueRows, args.campaignId);
 
   const items: CampaignQueueApiItem[] = queueRows.map((queueRow) => {
-    const contact = contactById.get(queueRow.contact_id);
-    if (!contact) {
-      throw new Error(`Missing contact ${queueRow.contact_id} for queue row ${queueRow.id}`);
-    }
+    const contact = requireContactForQueueRow(queueRow, contactById);
 
     return {
       ...queueRow,
@@ -602,52 +586,20 @@ export async function fetchCampaignQueueItemWithContact(args: {
     return null;
   }
 
-  const contactIds = [queueRow.contact_id];
-  const campaignIdNum = args.campaignId;
+  const { contactById, attemptsByContactId, audiencesByContactId } =
+    await loadQueueItemRelations(queueRows, args.campaignId);
 
-  const [contacts, attempts, audienceLinks] = await Promise.all([
-    db.select().from(contactTable).where(inArray(contactTable.id, contactIds)),
-    db
-      .select({
-        id: outreachAttemptTable.id,
-        disposition: outreachAttemptTable.disposition,
-        campaign_id: outreachAttemptTable.campaign_id,
-        contact_id: outreachAttemptTable.contact_id,
-      })
-      .from(outreachAttemptTable)
-      .where(
-        and(
-          inArray(outreachAttemptTable.contact_id, contactIds),
-          eq(outreachAttemptTable.campaign_id, campaignIdNum),
-        ),
-      ),
-    db
-      .select({
-        contact_id: contactAudienceTable.contact_id,
-        audience_id: contactAudienceTable.audience_id,
-        name: audienceTable.name,
-      })
-      .from(contactAudienceTable)
-      .leftJoin(audienceTable, eq(contactAudienceTable.audience_id, audienceTable.id))
-      .where(inArray(contactAudienceTable.contact_id, contactIds)),
-  ]);
-
-  const contact = contacts[0];
+  const contact = contactById.get(queueRow.contact_id);
   if (!contact) {
     return null;
   }
-
-  const attemptsForContact = attempts.filter((attempt) => attempt.contact_id === queueRow.contact_id);
-  const audiencesForContact = audienceLinks
-    .filter((link) => link.contact_id === queueRow.contact_id)
-    .map((link) => ({ audience: { name: link.name } }));
 
   return {
     ...queueRow,
     contact: {
       ...contact,
-      outreach_attempt: attemptsForContact,
-      contact_audience: audiencesForContact,
+      outreach_attempt: attemptsByContactId.get(queueRow.contact_id) ?? [],
+      contact_audience: audiencesByContactId.get(queueRow.contact_id) ?? [],
     },
   };
 }

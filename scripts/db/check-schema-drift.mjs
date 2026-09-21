@@ -18,7 +18,7 @@
  * are in fact present. Only asking the database what it actually has is
  * conclusive.
  *
- * Enum values (#1475): every `pgEnum(name, [...])` in the schema is compared
+ * Enum values: every `pgEnum(name, [...])` in the schema is compared
  * against `pg_enum`. A value declared in schema.ts but absent from the
  * database FAILS the check — the app writes it and Postgres rejects the row,
  * which is how `'waiting'` in `campaign_status` dead-lettered
@@ -30,6 +30,11 @@
  * Usage:
  *   DATABASE_URL=postgresql://... node scripts/db/check-schema-drift.mjs
  *   DATABASE_URL=postgresql://... npm run db:schema:check
+ *
+ * Pass --require-db (or set SCHEMA_CHECK_REQUIRE_DB=1) in a pipeline that must
+ * actually gate: without it a missing DATABASE_URL only prints a repo notice
+ * and exits 2; with it, a missing DATABASE_URL exits 1 (the run gated
+ * nothing). The deployed-environment workflow uses --require-db.
  */
 import { join } from "node:path";
 import postgres from "postgres";
@@ -39,6 +44,7 @@ import {
   collectSchemaEnums,
   collectSchemaTables,
   diffEnums,
+  resolveDbCheckGate,
 } from "../lib/app-db-objects.mjs";
 
 const ROOT = join(import.meta.dirname, "../..");
@@ -54,9 +60,20 @@ if (expectedEnums.size === 0) {
   process.exit(2);
 }
 
-const connectionString = process.env.DATABASE_URL;
+const { requireDb, databaseUrl: connectionString } = resolveDbCheckGate({
+  requireEnvVar: "SCHEMA_CHECK_REQUIRE_DB",
+});
 if (!connectionString) {
-  console.error("DATABASE_URL is not set. Point it at the environment to check.");
+  if (requireDb) {
+    console.error(
+      "\nFAIL: --require-db was set but DATABASE_URL is not. This run gated nothing.",
+    );
+    process.exit(1);
+  }
+  console.error(
+    "DATABASE_URL is not set. Point it at the environment to check.\n" +
+      "To actually gate a deploy, run with DATABASE_URL set and --require-db.",
+  );
   process.exit(2);
 }
 

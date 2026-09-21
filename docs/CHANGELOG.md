@@ -4,6 +4,53 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+_No unreleased entries yet._
+
+## 2026-09-21 — release [#1978](https://github.com/chester-hill-solutions/callcaster/pull/1978)
+
+### Changed
+
+- Workspace invites are now email-first: you can invite anyone by email, whether or not they already have an account. Invitees without an account are prompted to create one and accept through the emailed link; existing users sign in and accept the same way ([#1713](https://github.com/chester-hill-solutions/callcaster/issues/1713)).
+- Call-list uploads can now drop a column: pick **Do not import** in the column mapping instead of forcing it into a custom field ([#1847](https://github.com/chester-hill-solutions/callcaster/issues/1847)).
+- IVR prompts now play from a Twilio-friendly WAV copy when one exists, so Twilio no longer re-encodes the audio before playback. The MP3 stays the canonical library object and the fallback ([#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842)).
+- Campaign costs are now shown directly on the Launch page instead of behind a "Campaign cost" disclosure ([#1859](https://github.com/chester-hill-solutions/callcaster/issues/1859)).
+- Manual and power dials no longer wait for Twilio machine detection before connecting, so the agent hears audio as soon as the call is answered; predictive dialing still detects machines and drops the voicemail or hangs up ([#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845)).
+- IVR calls now reach the first prompt sooner: the flow entry renders the first step directly instead of redirecting through a second Twilio request ([#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842)).
+- In an IVR step set to **Play a recording**, the **Upload audio** button now sits with the recording control instead of below its preview and warning. It stays visible on **Speak text** steps, where uploading switches the step to a recording ([#1701](https://github.com/chester-hill-solutions/callcaster/issues/1701)).
+- The workspace credit count no longer appears in the navbar (desktop or mobile), so the workspace dropdown no longer shifts; the count stays in the workspace sidebar ([#1716](https://github.com/chester-hill-solutions/callcaster/issues/1716)).
+- The account menu now drops the profile-info heading, first name, and Workspace settings link, and shows pending invitations as **Invitations: N** beside an open-mail icon ([#1715](https://github.com/chester-hill-solutions/callcaster/issues/1715)).
+- The IVR editor's **Answer label** help now appears in a hover/focus tooltip beside the label instead of a paragraph under the field, so the response row stays compact ([#1702](https://github.com/chester-hill-solutions/callcaster/issues/1702)).
+- IVR campaign launch estimates now bound completion by the concurrent call limit and average call time, so the ETA reflects when calls actually finish rather than the dial-start rate ([#1874](https://github.com/chester-hill-solutions/callcaster/issues/1874)).
+- Phone-number onboarding now shows Service address as its own step when you rent a number, and the breadcrumb moves from address to number search to review as you progress ([#1764](https://github.com/chester-hill-solutions/callcaster/issues/1764)).
+- SMS onboarding now collects toll-free and US registration business details on the Identity step after you choose the number path, instead of expanding them on the Goal step ([#1148](https://github.com/chester-hill-solutions/callcaster/issues/1148)).
+- IVR speech steps now pass Twilio the answers they expect (recognition hints), use a valid speech model/timeout pairing, and single-key menus submit as soon as the caller presses a key ([#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875)).
+- The public campaign-creation API now accepts `robocall` as the single automated phone-menu type. Requests that send the old `simple_ivr` or `complex_ivr` values get a clear error that directs them to `robocall` ([#1854](https://github.com/chester-hill-solutions/callcaster/issues/1854)).
+- Household grouping and dial type now sit on campaign Setup with the other calling options; Launch no longer folds them away ([#1863](https://github.com/chester-hill-solutions/callcaster/issues/1863)).
+- IVR setup no longer asks you to choose Simple IVR or Complex IVR — there is one automated phone menu. A campaign saved with the old simple/complex type stores as the automated phone menu on its next save ([#1741](https://github.com/chester-hill-solutions/callcaster/issues/1741)).
+- Voicemail drop is now an explicit switch on campaign Setup for phone-menu and live-calling campaigns, next to its audio. Existing campaigns that already had voicemail audio keep dropping; turning the switch on without choosing audio blocks launch. IVR no longer needs a script page named "voicemail" ([#1839](https://github.com/chester-hill-solutions/callcaster/issues/1839)).
+
+### Fixed
+
+- IVR results and the CSV export now show the option label the caller chose (for example **Yes**) instead of the raw keypress code; a value with no matching option in the current script still shows the raw value ([#1976](https://github.com/chester-hill-solutions/callcaster/issues/1976)).
+- IVR steps that route to `end` now hang up cleanly instead of redirecting to a missing step and playing an error first ([#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884)).
+- Call History recordings now play inside CallCaster instead of opening the raw Twilio URL; the Twilio link is only a fallback when no stored copy exists ([#1844](https://github.com/chester-hill-solutions/callcaster/issues/1844)).
+- Completing caller-ID verification from onboarding now flips the verification sheet to **Number verified** without a reload, matching Settings → Numbers ([#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846)).
+- Call campaign results now show **Contacts completed** against the queue total, instead of mixing call attempts with contacts — a contact attempted twice no longer reads as more results than contacts ([#1334](https://github.com/chester-hill-solutions/callcaster/issues/1334)).
+- Calls without an outreach attempt cannot remove a matching contact from a campaign queue, which keeps test calls isolated from real sends ([#1869](https://github.com/chester-hill-solutions/callcaster/issues/1869)).
+- Campaign navigation now groups campaigns as running, waiting, draft, and complete, with newest campaigns first in each group ([#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727)).
+- An IVR call answered by a machine with the voicemail drop switched off now records **No Answer** instead of Voicemail, so the results match what the caller heard ([#1888](https://github.com/chester-hill-solutions/callcaster/issues/1888)).
+- Predictive calls answered by a machine now play and record a voicemail only when the campaign's voicemail drop is on and has audio. Otherwise they record **No Answer** and continue to the next contact ([#1889](https://github.com/chester-hill-solutions/callcaster/issues/1889)).
+- The mobile navigation sheet now stacks its links one per row instead of laying them out side by side ([#1891](https://github.com/chester-hill-solutions/callcaster/issues/1891)).
+- Workspace invites no longer fail on environments migrated off Supabase: the legacy foreign keys pointing at the empty `auth.users` table are dropped, so an invite insert only needs the Better Auth profile row ([#1853](https://github.com/chester-hill-solutions/callcaster/issues/1853)).
+- Message template tags now need balanced braces: `{{field}}` or the legacy `{field}`. An unbalanced `{{field}` or `{field}}` is plain text, and the preview now agrees with how the send replaces tags ([#1725](https://github.com/chester-hill-solutions/callcaster/issues/1725)).
+- IVR keypad menus no longer treat anything a caller says as an answer: speech is only listened for on steps that ask for it, so a stray phrase can no longer skip the menu ([#1856](https://github.com/chester-hill-solutions/callcaster/issues/1856)).
+- IVR campaigns now act on answering-machine detection before the call flow starts: a detected machine is dropped or hung up on immediately, instead of hearing the first prompts while the async status callback catches up ([#1864](https://github.com/chester-hill-solutions/callcaster/issues/1864)).
+- Script response labels keep keyboard focus while you type, so you can enter a complete answer without selecting the field again ([#1698](https://github.com/chester-hill-solutions/callcaster/issues/1698)).
+- IVR test calls now follow the keypad branch you press instead of apologising and hanging up — a test call has no outreach attempt to record, and the key-press handler no longer mistakes that for an error ([#1840](https://github.com/chester-hill-solutions/callcaster/issues/1840)).
+- IVR keypad presses now interrupt the prompt and take the branch straight away, instead of waiting for the audio to finish first ([#1841](https://github.com/chester-hill-solutions/callcaster/issues/1841)).
+- Workspace notification emails now include the workspace name in their subject and message, including low-credit, number-rental, and billing-reconciliation notices, so recipients can identify which workspace needs attention ([#1739](https://github.com/chester-hill-solutions/callcaster/issues/1739)).
+- IVR response removal now uses a compact trash icon beside each response row, keeping the script editor aligned with its field controls ([#1703](https://github.com/chester-hill-solutions/callcaster/issues/1703)).
+
 ## 2026-09-18 — release [#1838](https://github.com/chester-hill-solutions/callcaster/pull/1838)
 
 ### Security

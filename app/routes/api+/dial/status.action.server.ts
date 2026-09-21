@@ -77,7 +77,8 @@ export const action = defineAction({
     );
 
     let voicemailData: { signedUrl: string } | null = null;
-    if (campaign.voicemail_file) {
+    // the drop is only prepared when the campaign has it switched on.
+    if (campaign.voicemail_file && campaign.voicemail_drop_enabled) {
       const signedUrl = await createSignedObjectUrl(
         "workspaceAudio",
         `${dbCall.workspace}/${campaign.voicemail_file}`,

@@ -3,16 +3,18 @@ import { isSignupOpen } from "@/lib/env.server";
 import { auth } from "@/server/auth-instance";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import { isTwoFactorRedirectResponse } from "@/lib/two-factor.server";
-import {
-  acceptWorkspaceInvitations,
-  getInvitesByUserId,
-} from "@/lib/database/workspace.server";
 import { createNewWorkspace } from "@/lib/database/workspace-provisioning.server";
 import {
   getUserById,
   listUserWorkspaceMembershipsForProfile,
   updateOwnUserProfile,
 } from "@/lib/workspace-members-db.server";
+import { authUser } from "@/db/auth-schema";
+import {
+  listUserPendingInvitationsByEmail,
+  redeemWorkspaceInvitation,
+} from "@/lib/workspace-invitations.server";
+import { eq } from "drizzle-orm";
 import type {
   acceptInvitesBodySchema,
   forgotPasswordBodySchema,
@@ -480,18 +482,42 @@ export async function updateMeProfile(
   }
 }
 
+async function userEmailById(userId: string): Promise<string | null> {
+  // Lazy so unit tests that mock sibling services don't force DATABASE_URL on
+  // importing this module (see workspace-invitations.server.ts for the pattern).
+  const { adminDb } = await import("@/server/admin-db");
+  const [row] = await adminDb
+    .select({ email: authUser.email })
+    .from(authUser)
+    .where(eq(authUser.id, userId))
+    .limit(1);
+  return row?.email ?? null;
+}
+
 export async function listPendingInvites(userId: string) {
-  const invites = await getInvitesByUserId(userId);
-  return { invites: invites ?? [] };
+  const email = await userEmailById(userId);
+  if (!email) {
+    return { invites: [] };
+  }
+  const invites = await listUserPendingInvitationsByEmail(email);
+  return { invites };
 }
 
 export async function acceptInvites(userId: string, body: AcceptInvitesBody) {
-  const result = await acceptWorkspaceInvitations(body.invitation_ids, userId);
-  const errors = result?.errors ?? [];
-  if (errors.length > 0) {
-    return { ok: false as const, errors, status: 400 };
+  const email = await userEmailById(userId);
+  if (!email) {
+    return { ok: false as const, errors: ["No account email found"], status: 400 };
   }
-  return { ok: true as const, accepted: body.invitation_ids.length };
+  const result = await redeemWorkspaceInvitation({
+    invitationId: body.invitation_id,
+    rawToken: body.token,
+    userId,
+    verifiedEmail: email,
+  });
+  if (!result.ok) {
+    return { ok: false as const, errors: [result.error], status: result.status };
+  }
+  return { ok: true as const, accepted: 1 };
 }
 
 export async function createWorkspaceForUser(userId: string, name: string) {

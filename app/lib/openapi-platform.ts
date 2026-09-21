@@ -429,7 +429,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       "x-callcaster-capability": "members.invite",
       security: cutoverDataPlaneSecurity,
       description:
-        "Invite a member with a session (role subordination rules apply) or an API key with members.invite (admin-equivalent role assignment: member/caller only). Privileged session role assignment may require MFA enrollment.",
+        "Invite a teammate by email (session with role subordination, or API key with members.invite for member/caller-only roles). Email-first: the invitee does not need an account — the invite is attached to the email and accepted via the emailed link (SEC-03 / #1713). Privileged session role assignment may require MFA enrollment.",
       requestBody: {
         required: true,
         content: {

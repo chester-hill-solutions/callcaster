@@ -27,7 +27,6 @@ import {
   launchChecklistProgress,
 } from "@/lib/workspace-launch-checklist";
 import { buildA2pBlockingIssues } from "@/lib/twilio-a2p.server";
-import { createTenantDb } from "@/server/tenant-db";
 
 type LoaderData = {
   userRole: string | null | undefined;
@@ -51,12 +50,11 @@ export const loader = defineLoader({
   },
   sideEffects: ["db-read"],
   handler: async ({ auth: ws, url }) => {
-    const { headers, userId, userRole, workspaceId } = ws;
+    const { headers, userId, userRole, workspaceId, tdb } = ws;
 
     try {
       const pathname = url.pathname;
       const isExactWorkspaceRoot = pathname === `/workspaces/${workspaceId}`;
-      const tdb = createTenantDb(workspaceId);
       const [
         onboarding,
         phoneNumbersResult,

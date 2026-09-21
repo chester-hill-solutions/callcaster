@@ -10,6 +10,10 @@ import { createVoiceResponse, hangupTwiml, type TwimlResponse } from "@/lib/twil
 import { requireTwilioSignatureForIvrResponse } from "@/lib/ivr-webhook-auth.server";
 import { defineAction } from "@/lib/handler.server";
 import {
+  resolveNoInputTarget,
+  type IvrNoInputConfig,
+} from "@/lib/ivr-block-runtime.server";
+import {
   extractTypedOutreachFields,
   syncContactSupportLevelCache,
 } from "@/lib/outreach-typed-fields.server";
@@ -26,7 +30,12 @@ interface Script {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<
     string,
-    { id: string; title?: string; options?: Array<{ value: string; next?: string }> }
+    {
+      id: string;
+      title?: string;
+      options?: Array<{ value: string; next?: string }>;
+      noInput?: IvrNoInputConfig;
+    }
   >;
 }
 
@@ -87,7 +96,11 @@ const handleNextStep = (
   pageId: string,
   baseUrl: string,
 ) => {
-  if (nextStep === "hangup") {
+  if (nextStep === "hangup" || nextStep === "end") {
+    // Both are terminal. `end` is the documented terminal target
+    // (docs/script-json-format.md); the old code fell through and treated it as
+    // a block id, redirecting to a bogus URL that played an error before
+    // hanging up.
     twiml.hangup();
   } else if (nextStep.includes(":")) {
     const [nextPageId, nextBlockId] = nextStep.split(":");
@@ -158,44 +171,106 @@ export const action = defineAction({
       throw new Error(`Block ${blockId} not found`);
     }
 
-    const resultValue = await getOutreach(call.workspace, call.outreach_attempt_id ?? 0);
-    const result =
-      resultValue && typeof resultValue === "object"
-        ? (resultValue as Record<string, unknown>)
-        : {};
-
-    const blockTitle =
-      "title" in currentBlock && typeof currentBlock.title === "string"
-        ? currentBlock.title
-        : blockId;
-
-    const newResult = {
-      ...result,
-      [pageId]: {
-        ...(result[pageId] && typeof result[pageId] === "object"
-          ? (result[pageId] as Record<string, unknown>)
-          : {}),
-        [blockTitle]: userInput,
-      },
+    // Replay counts live in the call result so the cap survives the round-trip.
+    const hadInput = userInput != null && String(userInput).trim() !== "";
+    const persistResult = async (patch: Record<string, unknown>) => {
+      if (call.outreach_attempt_id == null || !call.workspace) return;
+      await updateOutreachAttemptForWorkspace(
+        call.workspace,
+        call.outreach_attempt_id,
+        patch,
+        { tdb: createTenantDb(call.workspace) },
+      );
     };
 
-    if (!call.outreach_attempt_id) {
-      throw new Error("Missing outreach attempt for IVR response");
-    }
-    const typedFields = extractTypedOutreachFields(newResult as Json);
-    const tdb = createTenantDb(call.workspace);
-    const outreachUpdate = await updateOutreachAttemptForWorkspace(
-      call.workspace,
-      call.outreach_attempt_id,
-      { result: newResult, ...typedFields },
-      { tdb },
-    );
-    if (outreachUpdate instanceof Response) {
-      throw new Error(await outreachUpdate.text());
+    let noInputReplays = 0;
+    if (currentBlock.noInput) {
+      const resultValue =
+        call.outreach_attempt_id != null && call.workspace
+          ? await getOutreach(call.workspace, call.outreach_attempt_id)
+          : null;
+      const result =
+        resultValue && typeof resultValue === "object"
+          ? (resultValue as Record<string, unknown>)
+          : {};
+      const nested = result.__no_input_replays as
+        | Record<string, Record<string, unknown>>
+        | undefined;
+      const perPage = nested?.[pageId] as Record<string, unknown> | undefined;
+      noInputReplays = typeof perPage?.[blockId] === "number" ? (perPage[blockId] as number) : 0;
+
+      if (!hadInput) {
+        const target = resolveNoInputTarget(currentBlock.noInput, noInputReplays);
+        if (target.kind === "hangup") {
+          twiml.hangup();
+          return;
+        }
+        if (target.kind === "route") {
+          handleNextStep(
+            twiml,
+            `${target.pageId}:${target.blockId}`,
+            campaignId,
+            pageId,
+            baseUrl,
+          );
+          return;
+        }
+        if (target.kind === "replay" && call.outreach_attempt_id != null && call.workspace) {
+          await persistResult({
+            result: {
+              __no_input_replays: {
+                ...(nested ?? {}),
+                [pageId]: { ...(perPage ?? {}), [blockId]: noInputReplays + 1 },
+              },
+            },
+          });
+          twiml.redirect(`${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/`);
+          return;
+        }
+        // replay without a store, or past the cap: fall through.
+      }
     }
 
-    if (call.contact_id != null && typedFields.support_level != null) {
-      await syncContactSupportLevelCache(tdb, call.contact_id, typedFields.support_level);
+    // Test calls have no outreach attempt by design: they walk the flow
+    // but record nothing, so results, exports, and analytics never see them.
+    // Guarding here keeps a test key press from speaking the generic error.
+    if (call.outreach_attempt_id) {
+      const resultValue = await getOutreach(call.workspace, call.outreach_attempt_id);
+      const result =
+        resultValue && typeof resultValue === "object"
+          ? (resultValue as Record<string, unknown>)
+          : {};
+
+      const blockTitle =
+        "title" in currentBlock && typeof currentBlock.title === "string"
+          ? currentBlock.title
+          : blockId;
+
+      const newResult = {
+        ...result,
+        [pageId]: {
+          ...(result[pageId] && typeof result[pageId] === "object"
+            ? (result[pageId] as Record<string, unknown>)
+            : {}),
+          [blockTitle]: userInput,
+        },
+      };
+
+      const typedFields = extractTypedOutreachFields(newResult as Json);
+      const tdb = createTenantDb(call.workspace);
+      const outreachUpdate = await updateOutreachAttemptForWorkspace(
+        call.workspace,
+        call.outreach_attempt_id,
+        { result: newResult, ...typedFields },
+        { tdb },
+      );
+      if (outreachUpdate instanceof Response) {
+        throw new Error(await outreachUpdate.text());
+      }
+
+      if (call.contact_id != null && typedFields.support_level != null) {
+        await syncContactSupportLevelCache(tdb, call.contact_id, typedFields.support_level);
+      }
     }
 
     const nextStep = findNextStep(currentBlock, userInput, script, pageId);

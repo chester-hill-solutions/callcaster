@@ -13,7 +13,6 @@ vi.mock("@/lib/workspace-credits.server", () => ({
 }));
 
 import {
-  OUTBOUND_CREDITS_BLOCKED_BODY,
   outboundCreditsBlockedResponse,
   outboundCreditsResponse,
   requireOutboundCredits,
@@ -72,7 +71,6 @@ describe("outboundCreditsResponse (distinguishes workspace_not_found)", () => {
       balance: 0,
     });
     const { data, init } = dataOf(result);
-    expect(data).toEqual(OUTBOUND_CREDITS_BLOCKED_BODY);
     expect(data).toEqual({ error: "Insufficient credits", creditsError: true });
     expect(init?.status).toBe(402);
   });

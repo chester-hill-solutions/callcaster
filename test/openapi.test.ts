@@ -5,19 +5,13 @@ import { openApiSpec } from "../app/lib/openapi";
 import { toOpenApiPath } from "../app/lib/openapi-build";
 import {
   INTEGRATOR_API_PATHS,
-  INTEGRATOR_API_TAG,
 } from "../app/lib/public-api";
 import { createWithScriptBodySchema } from "../app/lib/schemas/api/create-with-script";
 import { chatSmsBodySchema } from "../app/lib/schemas/api/chat-sms";
 import { campaignSmsDispatchBodySchema } from "../app/lib/schemas/api/sms";
 import { tokenBodySchema } from "../app/lib/schemas/api/platform-auth";
 
-const scriptCampaignTypes = [
-  "live_call",
-  "robocall",
-  "simple_ivr",
-  "complex_ivr",
-] as const;
+const scriptCampaignTypes = ["live_call", "robocall"] as const;
 
 describe("openapi spec", () => {
   test("has basic OpenAPI structure", () => {
@@ -66,7 +60,8 @@ describe("openapi spec", () => {
       const operation = pathItem.post;
       expect(operation).toBeDefined();
       expect(operation?.operationId).toBeTruthy();
-      expect(operation?.tags).toContain(INTEGRATOR_API_TAG);
+      // Pinned literal: the integrator spec section name is the contract.
+      expect(operation?.tags).toContain("Integrator API");
       expect(operation?.security).toEqual([
         { sessionCookie: [] },
         { apiKey: [] },
@@ -96,6 +91,26 @@ describe("openapi spec", () => {
       script: { name: "s", steps: {} },
       script_id: 1,
     }).success).toBe(false);
+
+    for (const legacyType of ["simple_ivr", "complex_ivr"] as const) {
+      const result = createWithScriptBodySchema.safeParse({
+        title: "t",
+        type: legacyType,
+        caller_id: "+1",
+        script_id: 1,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              path: ["type"],
+              message: `"${legacyType}" is no longer supported; use "robocall" instead`,
+            }),
+          ]),
+        );
+      }
+    }
   });
 
   test("chat_sms required fields match Zod schema", () => {

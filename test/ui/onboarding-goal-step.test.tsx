@@ -58,11 +58,11 @@ describe("goal-based onboarding UI", () => {
     expect(
       screen.getByText(/Toll-free is the higher-volume path/i),
     ).toBeInTheDocument();
-    // The guidance is the explanation; no tooltip repeats it (#1148).
+    // The guidance is the explanation; no tooltip repeats it.
     expect(screen.queryByRole("button", { name: "More information" })).toBeNull();
   });
 
-  test("toll-free verification fields stay hidden until the customer opts in", () => {
+  test("number-path choice stays on Goal while business identity fields do not", () => {
     const { container } = renderWithRouter(
       createElement(OnboardingGoalStep, {
         onboarding: minimalOnboarding(),
@@ -75,14 +75,18 @@ describe("goal-based onboarding UI", () => {
     expect(screen.queryByText("Toll-free verification details")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /Set Up Toll Free/i }));
-    expect(screen.getByText("Toll-free verification details")).toBeInTheDocument();
-    // DBA pre-fills from the legal business name captured on the first step.
-    expect(screen.getByLabelText(/Doing business as/i)).toHaveValue("Acme");
+    expect(screen.queryByText("Toll-free verification details")).toBeNull();
+    expect(screen.queryByLabelText(/Doing business as/i)).toBeNull();
+
+    let channelInputs = Array.from(
+      container.querySelectorAll<HTMLInputElement>('input[name="selectedChannels"]'),
+    ).map((input) => input.value);
+    expect(channelInputs).toContain("toll_free_bulk_sms");
 
     fireEvent.click(screen.getByRole("button", { name: /Continue with Local Number/i }));
     expect(screen.queryByText("Toll-free verification details")).toBeNull();
 
-    const channelInputs = Array.from(
+    channelInputs = Array.from(
       container.querySelectorAll<HTMLInputElement>('input[name="selectedChannels"]'),
     ).map((input) => input.value);
     expect(channelInputs).toContain("local_number");

@@ -1,13 +1,18 @@
 {
-  "_comment": "Ratchet baseline for check:lint-ratchet — per-rule warning counts from the scoped eslint run. Growth fails CI; rewrite with npm run tools:lint-ratchet:baseline.",
+  "_comment": "Ratchet baseline for check:lint-ratchet — per-rule warning counts from the scoped eslint run. Growth fails CI; rewrite with npm run tools:lint-ratchet:baseline. NOTE: the complexity count (112) reflects ESLint 9's stricter complexity rule (it counts ?? / ?. / default params); the same code was 85 under ESLint 8. The shadcn/* rules are the @shadcn/lint design-system rules, frozen at their first-run counts; whittle them down and lower the baseline.",
   "counts": {
-    "max-lines-per-function": 58,
-    "complexity": 85,
-    "@typescript-eslint/no-non-null-assertion": 119,
-    "max-params": 9,
+    "shadcn/no-restyle": 812,
+    "shadcn/no-arbitrary-values": 170,
+    "max-lines-per-function": 56,
+    "shadcn/no-inline-styles": 43,
+    "shadcn/no-raw-colors": 114,
+    "complexity": 112,
+    "@typescript-eslint/no-non-null-assertion": 117,
+    "shadcn/no-unknown-classes": 21,
+    "shadcn/require-static-classes": 9,
+    "max-params": 6,
     "max-depth": 21,
-    "import/no-cycle": 16,
-    "no-return-await": 23,
+    "no-return-await": 22,
     "no-console": 11
   }
 }

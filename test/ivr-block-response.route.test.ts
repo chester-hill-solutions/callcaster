@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { configureTelephonyStub, telephonyDbMocks } from "./helpers/telephony-db-stub";
+import {
+  configureTelephonyStub,
+  telephonyDbMocks,
+  telephonyStubState,
+} from "./helpers/telephony-db-stub";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -217,6 +221,29 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       request: makeReq({ CallSid: "CA1", Digits: "9" }),
     } as any);
     expect(await res.text()).toContain("<Redirect>https://base.example/api/ivr/1/page_2/b2/</Redirect>");
+  });
+
+  test("treats next:'end' as terminal, hanging up instead of redirecting (#1884)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: { b1: { id: "b1", options: [{ value: "1", next: "end" }] } },
+    };
+    const campaignData = { script: { steps: script } };
+    mocks.createClient.mockReturnValueOnce(
+      makeDbClient({
+        call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 9 },
+        campaignData,
+        outreachResult: {},
+      }),
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1", Digits: "1" }),
+    } as any);
+    const text = await res.text();
+    expect(text).toContain("<Hangup/>");
+    expect(text).not.toContain("<Redirect>");
   });
 
   test("timeout/null input does not spuriously match vx-any and falls through to linear next", async () => {
@@ -442,5 +469,32 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any);
     expect(await res.text()).toMatch(/hangup/i);
+  });
+
+  test("test call with no outreach attempt follows the branch and records nothing (#1840)", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: { b1: { id: "b1", options: [{ value: "2", next: "page_2:b2" }] } },
+    };
+    telephonyDbMocks.findOutreachAttemptById.mockClear();
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockClear();
+    mocks.createClient.mockReturnValueOnce(
+      makeDbClient({
+        call: { sid: "CA1", workspace: "w1", outreach_attempt_id: null },
+        campaignData: { script: { steps: script } },
+      }),
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+    const res = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1", Digits: "2" }),
+    } as any);
+    const text = await res.text();
+    expect(text).toContain("<Redirect>https://base.example/api/ivr/1/page_2/b2/</Redirect>");
+    expect(text).not.toContain("Sorry, we ran into a problem.");
+    expect(telephonyDbMocks.findOutreachAttemptById).not.toHaveBeenCalled();
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
+    expect(telephonyStubState.outreachUpdateCalls).toHaveLength(0);
+    expect(ivrTestState.contactUpdate).not.toHaveBeenCalled();
   });
 });

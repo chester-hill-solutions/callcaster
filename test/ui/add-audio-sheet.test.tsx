@@ -30,7 +30,7 @@ vi.mock("sonner", () => ({
 }));
 
 import { AddAudioSheet } from "@/components/campaign/settings/AddAudioSheet";
-import { CampaignLaunchExtras } from "@/components/campaign/settings/detailed/CampaignLaunchExtras";
+import { CampaignVoiceSettings } from "@/components/campaign/settings/basic/CampaignVoiceSettings";
 
 describe("AddAudioSheet", () => {
   beforeEach(() => {
@@ -162,40 +162,32 @@ describe("AddAudioSheet", () => {
   });
 });
 
-describe("CampaignLaunchExtras add audio trigger", () => {
+describe("CampaignVoiceSettings add audio trigger", () => {
   beforeEach(() => {
     mocks.fetcher.state = "idle";
     mocks.fetcher.data = undefined;
     vi.clearAllMocks();
   });
 
-  test("opens the add audio sheet from calling options", async () => {
+  test("opens the add audio sheet from the Setup voicemail controls (#1839)", async () => {
     const user = userEvent.setup();
     render(
-      <CampaignLaunchExtras
+      <CampaignVoiceSettings
         campaignData={
           {
             id: 1,
             type: "live_call",
             title: "Live",
+            workspace: "ws-1",
             caller_id: "+15555550100",
             status: "draft",
             voicemail_file: null,
-            group_household_queue: false,
-            dial_type: "call",
+            voicemail_drop_enabled: false,
+            voicedrop_audio: null,
           } as never
         }
-        handleInputChange={vi.fn()}
         mediaData={[]}
-        details={{ campaign_id: 1, workspace: "ws-1" } as never}
-        isBusy={false}
-        queueCount={0}
-        phoneNumbers={[]}
-        outboundEstimateInputs={{
-          portalConfig: {} as never,
-          syncSnapshot: {} as never,
-        }}
-        workspaceId="ws-1"
+        handleInputChange={vi.fn()}
       />,
     );
 

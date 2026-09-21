@@ -8,6 +8,7 @@ import {
   WORKSPACE_ROLE_RANK,
 } from "@/lib/workspace-route.server";
 import { sessionContext, workspaceContext } from "@/lib/route-context.server";
+import { createTenantDb } from "@/server/tenant-db";
 
 const VALID_ROLES = Object.keys(WORKSPACE_ROLE_RANK);
 
@@ -50,6 +51,7 @@ export const workspaceMiddleware: MiddlewareFunction = async (
     userId: user.id,
     userRole: userRoleRow.role,
     headers,
+    tdb: createTenantDb(workspaceId),
   });
 
   return next();

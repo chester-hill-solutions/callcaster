@@ -9160,7 +9160,7 @@
             "apiKey": []
           }
         ],
-        "description": "Invite a member with a session (role subordination rules apply) or an API key with members.invite (admin-equivalent role assignment: member/caller only). Privileged session role assignment may require MFA enrollment.",
+        "description": "Invite a teammate by email (session with role subordination, or API key with members.invite for member/caller-only roles). Email-first: the invitee does not need an account — the invite is attached to the email and accepted via the emailed link (SEC-03 / #1713). Privileged session role assignment may require MFA enrollment.",
         "requestBody": {
           "required": true,
           "content": {
@@ -10345,11 +10345,9 @@
             "type": "string",
             "enum": [
               "live_call",
-              "robocall",
-              "simple_ivr",
-              "complex_ivr"
+              "robocall"
             ],
-            "description": "Campaign type (script-based)."
+            "description": "Campaign type (script-based). Use robocall for an automated phone menu."
           },
           "caller_id": {
             "type": "string",
@@ -11213,16 +11211,34 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer"
+            "type": "string"
           },
-          "user_id": {
+          "email": {
             "type": "string",
-            "format": "uuid"
+            "format": "email"
           },
           "role": {
             "$ref": "#/components/schemas/WorkspaceMemberRole"
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "canceled",
+              "superseded",
+              "expired"
+            ]
+          },
+          "workspace": {
+            "type": "string",
+            "format": "uuid"
+          },
           "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -11337,13 +11353,13 @@
       },
       "DeleteMemberRequest": {
         "type": "object",
-        "required": [
-          "user_id"
-        ],
         "properties": {
           "user_id": {
             "type": "string",
             "format": "uuid"
+          },
+          "invite_id": {
+            "type": "string"
           },
           "target": {
             "type": "string",

@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/lib/env.server";
 import { objectStorageUsesPathStyle } from "@/lib/object-storage-config";
@@ -198,7 +198,7 @@ export async function uploadObject(
         ContentType: options.contentType,
         // Supabase Storage took bare seconds ("60") and expanded them to
         // max-age; S3 stores the header verbatim, so a bare number is an
-        // invalid directive that caches nothing (#1228). Normalize here so
+        // invalid directive that caches nothing. Normalize here so
         // no call site can regress.
         CacheControl:
           options.cacheControl && /^\d+$/.test(options.cacheControl)
@@ -219,6 +219,27 @@ export async function uploadObject(
     }
     const message = error instanceof Error ? error.message : "Upload failed";
     throw new Error(message);
+  }
+}
+
+/**
+ * Whether an object exists, without downloading it. A 404 is a normal "no";
+ * any other failure is re-thrown so callers can tell "absent" from "storage
+ * down" (the same distinction `downloadObject` makes).
+ */
+export async function objectExists(
+  logicalBucket: ObjectStorageBucket,
+  objectPath: string,
+): Promise<boolean> {
+  const { bucketName, key } = resolveLocation(logicalBucket, objectPath);
+  try {
+    await getS3Client().send(
+      new HeadObjectCommand({ Bucket: bucketName, Key: key }),
+    );
+    return true;
+  } catch (error) {
+    if (isNotFound(error)) return false;
+    throw error;
   }
 }
 
@@ -286,7 +307,7 @@ export async function createSignedObjectUrl(
   expiresInSeconds: number,
 ): Promise<string> {
   // Clamp rather than let the signer throw: an over-long TTL silently killed
-  // every voicemail email for months (#1224) because the failure surfaced
+  // every voicemail email for months because the failure surfaced
   // only at send time, deep inside a webhook handler.
   let expiresIn = expiresInSeconds;
   if (expiresIn > MAX_SIGNED_URL_TTL_SECONDS) {

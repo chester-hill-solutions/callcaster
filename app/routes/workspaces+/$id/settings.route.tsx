@@ -27,7 +27,8 @@ import ApiKeysSection from "@/components/workspace/ApiKeysSection";
 import type { ProductCapabilityId } from "@/lib/capabilities";
 import { compareMembersByRole } from "@/lib/workspace-members";
 import { getWorkspaceRoleDisplayName } from "@/lib/workspace-role-display";
-import { User, WorkspaceData, WorkspaceInvite, WorkspaceWebhook  } from "@/lib/types";
+import { User, WorkspaceData, WorkspaceWebhook  } from "@/lib/types";
+import type { PendingInvitationRow } from "@/lib/workspace-settings-db.server";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 
@@ -39,7 +40,7 @@ type LoaderData = {
   users: UserWithRole[];
   activeUserId: string;
   phoneNumbers: WorkspaceNumbers[];
-  pendingInvites: (WorkspaceInvite & {user: Partial<User>})[];
+  pendingInvites: PendingInvitationRow[];
   webhook: WorkspaceWebhook;
   hasAccess: boolean;
   canManageApiKeys: boolean;
@@ -249,14 +250,13 @@ export default function WorkspaceSettings() {
               })}
               {pendingInvites?.map((invite) => {
                 if (!invite) return null;
-                const inviteWithUser = invite as WorkspaceInvite & {
-                  user?: Partial<User>;
-                };
                 return (
                   <li key={invite.id} className="py-2">
                     <TeamMember
                       member={{
-                        ...(inviteWithUser.user || {}),
+                        id: invite.id,
+                        ...(invite.user ?? {}),
+                        username: invite.user?.username ?? invite.email,
                         role: "invited",
                       } as UserWithRole}
                       userRole={userRole}

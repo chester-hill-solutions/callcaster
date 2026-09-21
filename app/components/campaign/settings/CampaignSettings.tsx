@@ -6,8 +6,10 @@ import {
   LiveCampaign,
   MessageCampaign,
   WorkspaceNumbers,
+  FileObject,
 } from "@/lib/types";
 import { CampaignBasicInfo } from "./basic/CampaignBasicInfo";
+import { CampaignVoiceSettings } from "./basic/CampaignVoiceSettings";
 import { CampaignTypeSpecificSettings } from "./detailed/CampaignDetailed";
 import { SaveBar } from "@/components/shared/SaveBar";
 import { Section, SectionHeader } from "@/components/shared/Section";
@@ -19,6 +21,7 @@ export type CampaignSettingsProps = {
   flags: Flags;
   isChanged: boolean;
   phoneNumbers: WorkspaceNumbers[];
+  mediaData?: FileObject[];
   handleInputChange: (name: string, value: unknown) => void;
   handleSave?: () => void;
   handleResetData?: () => void;
@@ -39,6 +42,7 @@ export const CampaignSettings = ({
   campaignDetails,
   isChanged = false,
   phoneNumbers = [],
+  mediaData = [],
   handleInputChange,
   handleSave,
   handleResetData,
@@ -99,6 +103,11 @@ export const CampaignSettings = ({
               campaignData.type === "message" &&
               campaignData.sms_send_mode === "messaging_service"
             }
+          />
+          <CampaignVoiceSettings
+            campaignData={campaignData}
+            mediaData={mediaData}
+            handleInputChange={handleInputChange}
           />
           <div className="mt-6">
             <CampaignTypeSpecificSettings

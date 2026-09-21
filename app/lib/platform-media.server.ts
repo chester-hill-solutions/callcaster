@@ -15,6 +15,7 @@ import {
   listMediaObjects,
   putMediaObject,
 } from "@/lib/adapters/media-library.adapter.server";
+import { writeIvrWavSidecar } from "@/lib/ivr-wav.server";
 import {
   createSignedObjectUrls,
   ObjectExistsError,
@@ -128,6 +129,14 @@ export async function uploadWorkspaceAudioApi(
       upsert: false,
       contentType: normalizedAudio.contentType,
     });
+
+    // Derived, best-effort WAV sidecar for IVR playback. Failure here
+    // must not fail the upload; the MP3 is the canonical object.
+    await writeIvrWavSidecar(
+      workspaceId,
+      `${safeMediaName}.${normalizedAudio.extension}`,
+      normalizedAudio.buffer,
+    );
 
     const signedUrl = await getSignedMediaUrl(
       "workspaceAudio",

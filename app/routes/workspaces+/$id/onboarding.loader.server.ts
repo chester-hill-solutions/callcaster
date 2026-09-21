@@ -11,7 +11,6 @@ import {
 import { loadWorkspaceOnboardingView } from "@/lib/platform-onboarding-helpers.server";
 import { data as routeData, redirect } from "react-router";
 import { listObjects } from "@/lib/object-storage.server";
-import { createTenantDb } from "@/server/tenant-db";
 import { defineLoader } from "@/lib/handler.server";
 import type {
   WorkspaceMessagingOnboardingState,
@@ -40,7 +39,7 @@ export const loader = defineLoader({
   auth: workspaceRouteAuth,
   sideEffects: ["db-read", "external"],
   handler: async ({ url, auth }) => {
-    const { headers, user, workspaceId, userRole } = auth;
+    const { headers, user, workspaceId, userRole, tdb } = auth;
     if (!workspaceId) {
       throw redirect("/workspaces", { headers });
     }
@@ -50,7 +49,6 @@ export const loader = defineLoader({
       workspaceId,
     });
 
-    const tdb = createTenantDb(workspaceId);
     const [
       onboardingView,
       { data: workspaceInfo },

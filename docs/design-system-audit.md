@@ -145,7 +145,7 @@ All use `cn()` unless noted.
 | `Section` / `SectionHeader` | layout shell | elevated \| flat | flat = in-panel; default elevated is a nesting hazard |
 | `BrandedCard*` | composition | creation wizards | canonical outside panel; reduced in-panel use post-remediation |
 | `DataTable` | composition | TanStack grids | in `workspace/tables/` — canonical |
-| `TablePagination` | composition | list pagination | canonical |
+| `TablePagination` | composition | list + admin table pagination (page-size select) | canonical |
 | `SaveBar` | ancillary | dirty/save + Cmd+S | sticky z conflict risk |
 | `QueryParamBanner` | notice | URL-driven Alert | canonical |
 | `InfoPopover` | ancillary | tooltip helper | add `type="button"` in forms |

@@ -45,7 +45,7 @@ type OnboardingFirstNumberStepProps = Pick<
 /**
  * One of the two actions on the first-number step. A `fieldset`/`legend`
  * pair drew the legend across the box's top edge, and `overflow-hidden`
- * clipped it, so the title looked struck through (#1113). A labelled group
+ * clipped it, so the title looked struck through. A labelled group
  * keeps the accessible grouping with an ordinary in-flow heading.
  */
 export function FirstNumberActionGroup({
@@ -157,6 +157,27 @@ export function OnboardingFirstNumberStep({
   );
   const firstNumberReturnTo = `/workspaces/${workspaceId}/onboarding?step=first_number`;
 
+  // Live verification status of the number the dialog is showing, so the sheet
+  // reflects the Twilio callback without a page reload — the same wiring as
+  // Settings → Numbers, which onboarding was missing.
+  const validationPhone = activeValidationRequest?.phoneNumber?.trim();
+  const verifyingNumber = validationPhone
+    ? callerIdNumbers.find((number) => number?.phone_number === validationPhone)
+    : null;
+  const rawVerificationStatus = verifyingNumber?.capabilities
+    ? (
+        verifyingNumber.capabilities as {
+          verification_status?: unknown;
+        } | null
+      )?.verification_status
+    : null;
+  const verificationStatus =
+    rawVerificationStatus === "success" ||
+    rawVerificationStatus === "failed" ||
+    rawVerificationStatus === "pending"
+      ? (rawVerificationStatus as "success" | "failed" | "pending")
+      : null;
+
   const requestedStep = searchParams.get("numberStep");
   // Saved resources take precedence over an old URL after purchase or verification.
   const numberStep = hasFirstNumber
@@ -166,6 +187,10 @@ export function OnboardingFirstNumberStep({
       : requestedStep === "rent"
         ? hasServiceAddress ? "rent" : "address"
         : requestedStep === "address" ? "address" : "choose";
+  const isRentalPath =
+    numberStep === "address" ||
+    numberStep === "rent" ||
+    (numberStep === "complete" && rentedCount > 0);
   const rentReturnTo = `${firstNumberReturnTo}&numberStep=rent`;
 
   if (!messagingReady) {
@@ -222,6 +247,7 @@ export function OnboardingFirstNumberStep({
           if (!open) setActiveValidationRequest(null);
         }}
         validationRequest={activeValidationRequest}
+        status={verificationStatus}
       />
       <Section variant="flat">
         <SectionHeader
@@ -243,11 +269,31 @@ export function OnboardingFirstNumberStep({
               1. Choose a method
             </Link>}
             <span aria-hidden="true">/</span>
-            <span aria-current={numberStep === "address" || numberStep === "rent" || numberStep === "verify" ? "step" : undefined}>
-              2. {numberStep === "verify" ? "Verify your number" : "Add your number"}
-            </span>
-            <span aria-hidden="true">/</span>
-            <span aria-current={numberStep === "complete" ? "step" : undefined}>3. Review your number</span>
+            {isRentalPath ? (
+              <>
+                <span aria-current={numberStep === "address" ? "step" : undefined}>
+                  2. Service address
+                </span>
+                <span aria-hidden="true">/</span>
+                <span aria-current={numberStep === "rent" ? "step" : undefined}>
+                  3. Rent a number
+                </span>
+                <span aria-hidden="true">/</span>
+                <span aria-current={numberStep === "complete" ? "step" : undefined}>
+                  4. Review your number
+                </span>
+              </>
+            ) : (
+              <>
+                <span aria-current={numberStep === "verify" ? "step" : undefined}>
+                  2. {numberStep === "verify" ? "Verify your number" : "Add your number"}
+                </span>
+                <span aria-hidden="true">/</span>
+                <span aria-current={numberStep === "complete" ? "step" : undefined}>
+                  3. Review your number
+                </span>
+              </>
+            )}
           </nav>
           {numberStep === "choose" ? (
             <div className="grid gap-4 md:grid-cols-2">
@@ -380,7 +426,7 @@ export function OnboardingFirstNumberStep({
             </Button>
           ) : null}
 
-          {/* Routing only after a rented number exists (#1114). */}
+          {/* Routing only after a rented number exists. */}
           {rentedNumbers.length > 0 && !isReadOnly ? (
             <div className="space-y-2 border-t border-border/60 pt-6">
               <div>

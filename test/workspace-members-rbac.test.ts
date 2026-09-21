@@ -64,6 +64,26 @@ vi.mock("@/lib/two-factor.server", async (importOriginal) => {
   };
 });
 
+const inviteMocks = vi.hoisted(() => ({
+  inviteUserByEmail: vi.fn(async () => ({
+    ok: true,
+    invite: {
+      id: "wi_1",
+      email: "new@example.com",
+      role: "owner",
+      status: "pending",
+      workspace: "w1",
+      created_at: "2026-09-21T00:00:00.000Z",
+      expires_at: null,
+      isNew: true,
+    },
+  })),
+}));
+
+vi.mock("@/lib/invite-user-by-email.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/invite-user-by-email.server")>()),
+  inviteUserByEmail: (...args: unknown[]) => inviteMocks.inviteUserByEmail(...args),
+}));
 vi.mock("@/lib/database/workspace.server", () => ({ ...accessMocks }));
 vi.mock("@/lib/workspace-members-db.server", () => ({ ...membersDbMocks }));
 vi.mock("@/server/db", () => ({ db: dbMock }));
@@ -73,6 +93,20 @@ function resetAll() {
   accessMocks.requireWorkspaceAccess.mockReset();
   accessMocks.getUserRole.mockReset();
   accessMocks.getWorkspaceUsers.mockReset();
+  inviteMocks.inviteUserByEmail.mockReset();
+  inviteMocks.inviteUserByEmail.mockResolvedValue({
+    ok: true,
+    invite: {
+      id: "wi_1",
+      email: "new@example.com",
+      role: "owner",
+      status: "pending",
+      workspace: "w1",
+      created_at: "2026-09-21T00:00:00.000Z",
+      expires_at: null,
+      isNew: true,
+    },
+  });
   membersDbMocks.findWorkspaceMembership.mockReset();
   membersDbMocks.listWorkspaceMembersEnriched.mockReset();
   membersDbMocks.updateWorkspaceMemberRole.mockReset();

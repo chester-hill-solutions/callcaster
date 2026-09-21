@@ -7,7 +7,6 @@ import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server"
 import { listWorkspaceCampaignOptions } from "@/lib/database/campaign.server";
 import { defaultAnalyticsRange } from "../../../../shared/workspace-analytics";
 import { campaign as campaignTable } from "@/db/schema";
-import { createTenantDb } from "@/server/tenant-db";
 import { desc } from "drizzle-orm";
 import { data as routeData } from "react-router";
 import { defineLoader } from "@/lib/handler.server";
@@ -46,7 +45,7 @@ export const loader = defineLoader({
   auth: workspaceRouteAuth,
   sideEffects: ["db-read"],
   handler: async ({ auth, url }) => {
-    const { headers, user, workspaceId, userRole } = auth;
+    const { headers, user, workspaceId, userRole, tdb } = auth;
 
     if (!workspaceId || !user) {
       return routeData(
@@ -62,7 +61,6 @@ export const loader = defineLoader({
         { headers, status: 400 },
       );
     }
-    const tdb = createTenantDb(workspaceId);
     const [workspace, campaigns] = await Promise.all([
       getWorkspaceForClient(workspaceId),
       listWorkspaceCampaignOptions(tdb),

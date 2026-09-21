@@ -21,6 +21,7 @@ import {
 } from "@/lib/audio.server";
 import { resolveAvailableBaseName } from "@/lib/audio-upload";
 import { listMediaObjects } from "@/lib/adapters/media-library.adapter.server";
+import { writeIvrWavSidecar } from "@/lib/ivr-wav.server";
 import { getUserRole } from "@/lib/database/workspace.server";
 import { upsertAudioMetadata } from "@/lib/database/workspace-audio-metadata.server";
 import { logger } from "@/lib/logger.server";
@@ -80,6 +81,10 @@ export async function createWorkspaceAudioClip(input: CreateAudioClipInput) {
         upsert: mode === "overwrite",
       },
     );
+
+    // Derived, best-effort WAV sidecar for IVR playback; a failure
+    // must not fail the clip save.
+    await writeIvrWavSidecar(workspaceId, targetFileName, clip.buffer);
 
     const durationMs = await probeAudioDurationMs(clip.buffer);
 

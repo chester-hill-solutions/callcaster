@@ -73,16 +73,38 @@
   {
     "issueNumber": 1351,
     "verdict": "needs-repro",
-    "summary": "Fix #1375 (estimateOutboundCompletion, window-aware) shipped to dev, but Sai 2026-09-09 reports the estimate still tracks wall clock and suggests a cron-interval minimum; claim vs counter-claim needs an on-dev check before coding.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
+    "recommendedTitle": "SMS Window set to 3:05PM yet estimate says 3pm it'll be done",
+    "summary": "Fix #1375 (e49ce7a1, on master) made the launch-page queue ETA window-aware. Sai's 2026-09-09 counter-claim has not been re-verified, and #1816/#1820 (on master) now pulls a parked dispatch successor forward when the window is edited. The 15-min-cron hypothesis is refuted for SMS: the successor is scheduled at the exact nextOpenAt and the worker polls every 5s; SEND_WINDOW_RETRY_MS=15min applies only to voice 'waiting'.",
+    "currentBehavior": "With an in-window campaign the ETA is now+activeSeconds by design; outside the window it projects to the next open. Editing a window to include now wakes the parked successor. Actual first-send latency vs the ETA has not been measured.",
+    "rootCause": "Unproven counter-claim with no timed repro. No 15-min dispatch floor exists on the SMS path.",
+    "resolution": "Reproduce on master/review env: (1) set a narrow future SMS window and note the ETA; (2) widen it to include now; (3) record the ETA and the actual first-send/completion timestamps. If dispatch still lags, instrument the successor's runAt vs actual execution and decide whether the ETA should add a dispatch-startup floor.",
+    "lookIn": [
+      "app/lib/campaign-outbound-estimate.ts",
+      "app/lib/campaign-dispatch-policy.ts",
+      "app/lib/campaign-execution.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx",
+      "app/lib/throughput-config.ts",
+      "app/lib/worker/poll-jobs.server.ts"
     ],
+    "existingTests": [
+      "test/campaign-dispatch-policy.test.ts",
+      "test/campaign-outbound-estimate.test.ts"
+    ],
+    "missingTests": [
+      "SMS ETA with a future window starts at/after the window boundary",
+      "rescheduleDispatchAfterWindowEdit pulls a parked successor to now when the window is widened",
+      "Timed integration: first-send latency within one poll interval of the ETA"
+    ],
+    "acceptanceCriteria": [
+      "A 3:05 window shows an ETA at/after 3:05",
+      "Widening the window to include now makes both the ETA and actual dispatch start within the poll interval",
+      "No unexplained wall-clock drift remains"
+    ],
+    "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Needs reproduction. Fix #1375 and #1816/#1820 are on master; re-test the window-expansion scenario before scoping code. Keep paired with #1352."
   },
   {
     "issueNumber": 1352,
@@ -127,20 +149,6 @@
     "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
-    "issueNumber": 1714,
-    "verdict": "needs-repro",
-    "summary": "Error matches the 'User not found' path; findUserIdByUsername resolves against the auth users table. The invited account was supposedly created first, so why the miss needs the exact error text and steps; review-env DB resets muddy evidence.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
-  },
-  {
     "issueNumber": 1718,
     "verdict": "needs-repro",
     "summary": "Screenshot only, no repro or expected copy; generic opt-out banner is intentional per #1333 evidence. Needs the specific scenario before coding.",
@@ -158,20 +166,6 @@
     "issueNumber": 1719,
     "verdict": "needs-repro",
     "summary": "Visual layout complaint that cannot be verified from code; sidebar already uses min-h-0 flex-1 overflow so a screenshot/steps on dev are required to identify the overflow.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
-  },
-  {
-    "issueNumber": 1733,
-    "verdict": "needs-repro",
-    "summary": "Generic catch-all IVR error with only a URL \u2014 no steps. Known IVR page-id bug #1348 was fixed via #1744; needs repro + logs to tell stale vs new cause.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -209,5 +203,37 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+  },
+  {
+    "issueNumber": 1857,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Instrument and attribute the ~4s IVR option-press to next-block gap",
+    "summary": "No issue body. The one comment attributes the gap to the flow-entry redirect hop or per-request media render in #1842, but this is the response->block hop after a key press, a path #1842 does not measure.",
+    "currentBehavior": "Pressing an option POSTs to response.action (outreach read/write, findNextStep), which redirects; Twilio then calls the block route, which re-fetches call and campaign in series and renders audio.",
+    "rootCause": "Not confirmed. Candidates: the response->block double round-trip, serial findCallBySid + fetchCampaignWithScript, and MP3 transcoding.",
+    "resolution": "Add structured timing logs at option received, response TwiML returned, next-block request, and first audio. Attribute the gap from real review-env calls, then either fold into #1842 or open a scoped PR. Do not close on the likely-cause comment alone.",
+    "lookIn": [
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId.action.server.ts",
+      "app/lib/ivr-block-runtime.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-block-response.route.test.ts",
+      "test/ivr-block.route.test.ts",
+      "test/ivr-page.route.test.ts"
+    ],
+    "missingTests": [
+      "latency attribution from option-press to next-block first audio"
+    ],
+    "acceptanceCriteria": [
+      "Measured option-press -> next-block first-audio, before and after",
+      "Chosen fix under 2s without regressing #1842/#1864",
+      "Root cause recorded, or folded into #1842 with evidence"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "needs-repro: likely shares the per-request render root cause with #1842 but different hop. Measure before merging the tickets."
   }
 ]

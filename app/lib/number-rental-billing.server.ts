@@ -9,6 +9,7 @@ import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { db } from "@/server/db";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
+import { escapeHtml } from "@/lib/email-html";
 import { notifyOps } from "@/lib/ops-alert.server";
 import {
   rentalActionForUnpaidCycles,
@@ -21,7 +22,10 @@ import {
   createWorkspaceTwilioInstance,
   removeWorkspacePhoneNumber,
 } from "@/lib/database/workspace.server";
-import { listWorkspaceOwnerAdminEmails } from "@/lib/workspace-members-db.server";
+import {
+  getWorkspaceById,
+  listWorkspaceOwnerAdminEmails,
+} from "@/lib/workspace-members-db.server";
 import { env } from "@/lib/env.server";
 
 const NUMBER_RENTAL_MONTHLY_CREDITS = 100;
@@ -119,26 +123,28 @@ function buildReminderEmail(args: {
   daysUntilDue: number;
   dueDate: Date;
   workspaceId: string;
+  workspaceName: string;
 }) {
   const billingUrl = `${env.BASE_URL()}/workspaces/${args.workspaceId}/billing`;
   const dueDateLabel = formatDueDate(args.dueDate);
+  const workspaceNameHtml = escapeHtml(args.workspaceName);
   return {
-    subject: `Your CallCaster number rental renews in ${args.daysUntilDue} days`,
+    subject: `Your ${args.workspaceName} number rental renews in ${args.daysUntilDue} days`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Your number rental renews soon</h2>
+        <h2>Your ${workspaceNameHtml} number rental renews soon</h2>
         <p>The rental for <strong>${args.phoneNumberLabel}</strong> renews in
         <strong>${args.daysUntilDue} days</strong>, on <strong>${dueDateLabel}</strong>, for
         ${NUMBER_RENTAL_MONTHLY_CREDITS} credits.</p>
-        <p>Make sure your workspace has enough credits to avoid an unpaid renewal.</p>
+        <p>Your workspace, <strong>${workspaceNameHtml}</strong>, needs enough credits to avoid an unpaid renewal.</p>
         <p><a href="${billingUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Review billing</a></p>
       </div>
     `,
     text: `
-      Your number rental renews soon
+      Your ${args.workspaceName} number rental renews soon
 
       The rental for ${args.phoneNumberLabel} renews in ${args.daysUntilDue} days, on ${dueDateLabel}, for ${NUMBER_RENTAL_MONTHLY_CREDITS} credits.
-      Make sure your workspace has enough credits to avoid an unpaid renewal.
+      Your workspace, ${args.workspaceName}, needs enough credits to avoid an unpaid renewal.
 
       Review billing: ${billingUrl}
     `,
@@ -151,6 +157,7 @@ async function sendNumberRentalReminderEmail(args: {
   phoneNumberLabel: string;
   daysUntilDue: number;
   dueDate: Date;
+  workspaceName: string;
 }): Promise<void> {
   const resend = new Resend(env.RESEND_API_KEY());
   const { subject, html, text } = buildReminderEmail(args);
@@ -185,10 +192,18 @@ async function applyRentalLifecycleAction(args: {
     rental_warned_cycle?: unknown;
   };
   phoneNumberLabel: string;
+  workspaceName: string;
   unpaidCycles: number;
   tdb: ReturnType<typeof createTenantDb>;
 }): Promise<RentalLifecycleAction> {
-  const { action, number, phoneNumberLabel, unpaidCycles, tdb } = args;
+  const {
+    action,
+    number,
+    phoneNumberLabel,
+    workspaceName,
+    unpaidCycles,
+    tdb,
+  } = args;
   if (action === "none") return "none";
 
   const context = {
@@ -225,7 +240,7 @@ async function applyRentalLifecycleAction(args: {
       dedupeKey: `rental_warn:${number.id}`,
       context,
     });
-    await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel }).catch((error) => {
+    await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel, workspaceName }).catch((error) => {
       logger.error("number_rental_billing.warn_email_failed", { ...context, error: String(error) });
     });
     return "warn";
@@ -246,7 +261,7 @@ async function applyRentalLifecycleAction(args: {
       dedupeKey: `rental_suspend:${number.id}`,
       context,
     });
-    await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel }).catch((error) => {
+    await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel, workspaceName }).catch((error) => {
       logger.error("number_rental_billing.suspend_email_failed", { ...context, error: String(error) });
     });
     return "suspend";
@@ -280,7 +295,7 @@ async function applyRentalLifecycleAction(args: {
   // that ordering is only safe while the release cannot fail, and it can. A
   // false "your number has been released" is worse than a late true one; the
   // release is logged here if the email is what fails.
-  await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel }).catch((error) => {
+  await sendRentalLifecycleEmail({ action, recipients, phoneNumberLabel, workspaceName }).catch((error) => {
     logger.error("number_rental_billing.release_email_failed", { ...context, error: String(error) });
   });
 
@@ -298,20 +313,21 @@ async function sendRentalLifecycleEmail(args: {
   action: RentalLifecycleAction;
   recipients: string[];
   phoneNumberLabel: string;
+  workspaceName: string;
 }): Promise<void> {
   if (args.recipients.length === 0) return;
   const copy = {
     warn: {
-      subject: `Payment needed for ${args.phoneNumberLabel}`,
-      body: `We could not renew ${args.phoneNumberLabel} because your workspace is short on credits. Add credits to keep the number — if it stays unpaid it will be suspended, and then released.`,
+      subject: `Payment needed for ${args.workspaceName}: ${args.phoneNumberLabel}`,
+      body: `Your workspace, ${args.workspaceName}, could not renew ${args.phoneNumberLabel} because it is short on credits. Add credits to keep the number — if it stays unpaid it will be suspended, and then released.`,
     },
     suspend: {
-      subject: `${args.phoneNumberLabel} is suspended`,
-      body: `${args.phoneNumberLabel} has been suspended for outbound use because its rental is unpaid. You can still receive calls on it. Add credits to restore it — if it stays unpaid it will be released and you will lose the number.`,
+      subject: `${args.workspaceName}: ${args.phoneNumberLabel} is suspended`,
+      body: `Your workspace, ${args.workspaceName}, has ${args.phoneNumberLabel} suspended for outbound use because its rental is unpaid. You can still receive calls on it. Add credits to restore it — if it stays unpaid it will be released and you will lose the number.`,
     },
     release: {
-      subject: `${args.phoneNumberLabel} has been released`,
-      body: `${args.phoneNumberLabel} has been released because its rental went unpaid. This cannot be undone and the number is no longer yours. You can rent a new number at any time.`,
+      subject: `${args.workspaceName}: ${args.phoneNumberLabel} has been released`,
+      body: `Your workspace, ${args.workspaceName}, has ${args.phoneNumberLabel} released because its rental went unpaid. This cannot be undone and the number is no longer yours. You can rent a new number at any time.`,
     },
   }[args.action as "warn" | "suspend" | "release"];
   if (!copy) return;
@@ -321,7 +337,7 @@ async function sendRentalLifecycleEmail(args: {
     from: "Callcaster <info@callcaster.ca>",
     to: args.recipients,
     subject: copy.subject,
-    html: `<p>${copy.body}</p>`,
+    html: `<p>${escapeHtml(copy.body)}</p>`,
     text: copy.body,
   });
 }
@@ -488,16 +504,25 @@ export async function runNumberRentalBilling(args: {
   const today = args.today ?? new Date();
   today.setUTCHours(0, 0, 0, 0);
 
-  // Find all rented numbers created after rollout cutoff
-  const tdb = args.workspaceId
-    ? createTenantDb(args.workspaceId)
-    : null;
-
   // If workspaceId is provided, scope to that workspace; otherwise we'd need
   // a global query (not supported by TenantDb). For now, assume per-workspace
   // invocation via cron loop.
-  if (!tdb) {
+  if (!args.workspaceId) {
     throw new Error("workspaceId is required for number rental billing");
+  }
+
+  const workspaceId = args.workspaceId;
+  // Find all rented numbers created after rollout cutoff.
+  const tdb = createTenantDb(workspaceId);
+
+  let workspaceName = workspaceId;
+  try {
+    workspaceName = (await getWorkspaceById(workspaceId))?.name ?? workspaceId;
+  } catch (error) {
+    logger.warn("number_rental_billing.workspace_name_lookup_failed", {
+      workspaceId,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 
   const numbers = await tdb.workspace_number.findMany({
@@ -537,6 +562,7 @@ export async function runNumberRentalBilling(args: {
           } else {
             await sendNumberRentalReminderEmail({
               workspaceId: number.workspace,
+              workspaceName,
               recipients,
               phoneNumberLabel,
               daysUntilDue,
@@ -601,6 +627,7 @@ export async function runNumberRentalBilling(args: {
           action,
           number,
           phoneNumberLabel,
+          workspaceName,
           unpaidCycles: unpaidCyclesForNumber,
           tdb,
         });

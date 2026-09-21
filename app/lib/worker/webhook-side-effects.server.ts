@@ -83,7 +83,7 @@ export async function runCallStatusSideEffects(args: {
 
     // Provider-terminal statuses stamp a disposition so every call yields a
     // results row even when the browser never reaches /api/hangup (callee
-    // hangs up, tab closes) and the agent picks nothing (#1218). The
+    // hangs up, tab closes) and the agent picks nothing. The
     // transition guard keeps AMD "voicemail" and other terminal values from
     // being downgraded, and an explicit agent choice via /api/questions
     // bypasses this guard entirely, so it always wins.
@@ -105,11 +105,14 @@ export async function runCallStatusSideEffects(args: {
   // A provider-terminal status must collapse the contact's queue entry exactly
   // like /api/hangup does; otherwise a callee hang-up leaves the agent's
   // nextRecipient (and the whole queue view) pointing at a finished contact
-  // while an agent hang-up clears it (#1362). Idempotent: if the agent already
+  // while an agent hang-up clears it. Idempotent: if the agent already
   // hung up, the guarded dequeue_contact RPC no-ops on dequeued rows. The
   // assignee id is required for the RPC to cover assigned rows, so take it
-  // from the queue row itself — a webhook has no acting user.
+  // from the queue row itself — a webhook has no acting user. Test calls can
+  // name a campaign and contact, but they deliberately have no outreach
+  // attempt and must leave the matching queue row untouched.
   if (
+    outreachAttemptId != null &&
     CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()] &&
     callRow.contact_id != null
   ) {

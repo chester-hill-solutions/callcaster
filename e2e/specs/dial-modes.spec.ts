@@ -5,13 +5,14 @@ import { setWorkspaceCredits } from "../fixtures/factories";
 
 ownerTest.describe("Dial modes @authenticated @slow", () => {
   ownerTest("DIAL-01 predictive toggle in settings", async ({ page }) => {
+    // the dial options moved from Launch's collapsed "Calling options"
+    // to the Setup page, where they are always visible.
     await page.goto(
       workspacePath(
         E2E_WORKSPACES.ready.id,
-        `campaigns/${E2E_CAMPAIGNS.livePredictive.id}/launch`,
+        `campaigns/${E2E_CAMPAIGNS.livePredictive.id}/settings`,
       ),
     );
-    await page.getByText("Calling options").click();
     await expect(page.getByText("Dial Type:")).toBeVisible();
     await expect(page.locator("#dial_type")).toBeVisible();
   });
@@ -29,7 +30,7 @@ ownerTest.describe("Dial modes @authenticated @slow", () => {
   });
 
   ownerTest("DIAL-08 zero credits owner billing link", async ({ page }) => {
-    // #1435: try/finally guarantees the credit restore runs even when
+    // try/finally guarantees the credit restore runs even when
     // the banner assertion fails. Same shape as RBAC-18 — the trailing
     // `setWorkspaceCredits(..., 500)` used to be a plain statement
     // that never fired on assertion timeout, cascading credits=0 into

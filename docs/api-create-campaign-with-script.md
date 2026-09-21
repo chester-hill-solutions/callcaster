@@ -35,7 +35,7 @@ Provide **exactly one** of `script` or `script_id` in the request body, not both
 |-------|------|----------|-------------|
 | `workspace_id` | string (UUID) | Required for session; optional for API key | Workspace to create the campaign in. Must match API key when using API key auth. |
 | `title` | string | Yes | Campaign title. |
-| `type` | string | Yes | One of: `live_call`, `robocall`, `simple_ivr`, `complex_ivr`. |
+| `type` | string | Yes | One of: `live_call`, `robocall`. Use `robocall` for an automated phone menu. |
 | `caller_id` | string | Yes | Outbound caller ID. Must be a phone number that belongs to the workspace (e.g. from workspace numbers). |
 | `script` | object | One of `script` or `script_id` | Inline script to create and attach. |
 | `script.name` | string | If using `script` | Script display name. |
@@ -160,13 +160,16 @@ Error responses are JSON with an `error` string, e.g.:
 { "error": "caller_id must be a phone number that belongs to this workspace" }
 ```
 
+The legacy values `simple_ivr` and `complex_ivr` are not accepted. Use
+`robocall` for all automated phone-menu campaigns.
+
 ---
 
 ## Validation rules
 
 - **caller_id:** Must appear in the workspace’s phone numbers (e.g. `workspace_number` for that workspace).
 - **audience_ids:** Each ID must be an audience in the same workspace.
-- **type:** Only script-based campaign types are allowed: `live_call`, `robocall`, `simple_ivr`, `complex_ivr`.
+- **type:** Only `live_call` and `robocall` are allowed. Use `robocall` for an automated phone menu.
 - **script vs script_id:** Exactly one of `script` (inline script) or `script_id` (existing script) must be provided.
 
 ---

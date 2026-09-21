@@ -7,11 +7,15 @@ import { PasswordFields } from "./PasswordFields";
 interface NewUserSignupProps {
   email: string;
   state: string;
+  invitationId?: string;
+  token?: string;
 }
 
 export function NewUserSignup({
   state,
-  email
+  email,
+  invitationId,
+  token,
 }: NewUserSignupProps) {
 
   return (
@@ -20,6 +24,10 @@ export function NewUserSignup({
       <EmailField email={email} />
       <PasswordFields />
       <input type="hidden" name="actionType" value="updateUser" />
+      {invitationId ? (
+        <input type="hidden" name="invitationId" value={invitationId} />
+      ) : null}
+      {token ? <input type="hidden" name="token" value={token} /> : null}
       <Button type="submit" disabled={state !== "idle"}>
         Sign Up and Accept Invite
       </Button>

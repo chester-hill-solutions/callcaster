@@ -73,7 +73,7 @@ For a nested control, or a compound component such as `Select`, wrap the focusab
 ## Tables and pagination
 
 - **Tables:** Use [app/components/workspace/tables/DataTable.tsx](app/components/workspace/tables/DataTable.tsx) with TanStack Table for data grids. It supports optional toolbar, loading skeleton rows, custom empty state, and optional pagination.
-- **Pagination:** Use [app/components/shared/TablePagination.tsx](app/components/shared/TablePagination.tsx) as the single pagination composition. Queue and other list screens use it (e.g. via `QueueTablePagination`).
+- **Pagination:** Use [app/components/shared/TablePagination.tsx](app/components/shared/TablePagination.tsx) as the single pagination composition. It renders the range summary and page controls, plus an optional page-size select (`pageSizeOptions` + `onPageSizeChange`) that the admin panels use. Queue and other list screens use it (e.g. via `QueueTablePagination`).
 
 ## Toasts
 

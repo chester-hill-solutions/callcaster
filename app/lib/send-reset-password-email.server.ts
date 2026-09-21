@@ -1,6 +1,4 @@
-import { Resend } from "resend";
-import { env } from "@/lib/env.server";
-import { logger } from "@/lib/logger.server";
+import { sendTransactionalEmail } from "@/lib/transactional-email.server";
 
 /**
  * Better Auth's `emailAndPassword.sendResetPassword` callback. Without this
@@ -9,17 +7,15 @@ import { logger } from "@/lib/logger.server";
  * (see node_modules/better-auth/dist/api/routes/password.mjs), so forgot-password
  * was completely dead: no token, no email, no way to recover an account.
  *
- * Reuses the same `resend` package + `RESEND_API_KEY` the rest of the app's
- * transactional email already relies on (see app/lib/low-credit-notify.server.ts,
- * app/lib/number-rental-billing.server.ts, app/lib/twilio-compliance-notify.server.ts)
- * rather than introducing a new email dependency.
+ * Delivery goes through the shared transactional-email path (Resend +
+ * `RESEND_API_KEY`). Better Auth's requestPasswordReset endpoint already
+ * returns a generic "if this email exists..." response regardless of send
+ * outcome, so this must never throw to it.
  */
 export async function sendResetPasswordEmail(
   { user, url }: { user: { email: string }; url: string; token: string },
   _request?: Request,
 ): Promise<void> {
-  const resend = new Resend(env.RESEND_API_KEY());
-
   const subject = "Reset your CallCaster password";
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -40,21 +36,10 @@ export async function sendResetPasswordEmail(
     If you didn't request this, you can safely ignore this email.
   `;
 
-  try {
-    await resend.emails.send({
-      from: "Callcaster <info@callcaster.ca>",
-      to: [user.email],
-      subject,
-      html,
-      text,
-    });
-  } catch (error) {
-    // Better Auth's requestPasswordReset endpoint already returns a generic
-    // "if this email exists..." response regardless of send outcome, so a
-    // delivery failure here shouldn't surface to the caller — just log it so
-    // it isn't silently invisible.
-    logger.error("send_reset_password_email.failed", {
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
+  await sendTransactionalEmail({
+    to: user.email,
+    subject,
+    html,
+    text,
+  });
 }

@@ -159,7 +159,7 @@ function normalizeBaseUrl(value) {
 
   try {
     parsedUrl = new URL(value);
-  } catch (error) {
+  } catch {
     throw new Error(`Invalid base URL: ${value}`);
   }
 
@@ -211,7 +211,7 @@ async function assertReachable({ label, url }) {
     if (response.status >= 500) {
       throw new Error(`${label} responded with status ${response.status}`);
     }
-  } catch (error) {
+  } catch {
     throw new Error(`${label} is not reachable at ${url}. Start it before syncing.`);
   } finally {
     clearTimeout(timeout);

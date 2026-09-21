@@ -1,10 +1,45 @@
 import { RouterContextProvider } from "react-router";
+import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import type {
   AdminContextValue,
   DataPlaneAuthContextValue,
   SessionContextValue,
   WorkspaceContextValue,
 } from "@/lib/route-context.server";
+
+/**
+ * Lazy workspace-scoped client for tests.
+ *
+ * Built on first property access, so a test for a route that never reads
+ * tenant data does not construct one. When a test mocks `@/server/tenant-db`,
+ * the mock is what `createTenantDb` resolves to and its stub is returned.
+ * When a test mocks only `@/server/db` with a partial client, construction
+ * throws and a permissive stub is used instead.
+ */
+function lazyTdb(workspaceId: string): TenantDb {
+  let cached: TenantDb | undefined;
+  return new Proxy({} as TenantDb, {
+    get(_target, prop) {
+      if (!cached) {
+        try {
+          cached = createTenantDb(workspaceId);
+        } catch {
+          cached = makePermissiveTdb();
+        }
+      }
+      return Reflect.get(cached as object, prop);
+    },
+  });
+}
+
+/** Returns a promise of an empty result for any table method. */
+function makePermissiveTdb(): TenantDb {
+  const callable: unknown = new Proxy(() => Promise.resolve([]), {
+    get: () => callable,
+    apply: () => Promise.resolve([]),
+  });
+  return callable as TenantDb;
+}
 
 export type RouteContextMockOptions = {
   session?: SessionContextValue | null;
@@ -45,11 +80,14 @@ export async function createRouteContextProvider(
 export function mockWorkspaceContext(
   overrides: Partial<WorkspaceContextValue> = {},
 ): WorkspaceContextValue {
+  const workspaceId = overrides.workspaceId ?? "ws-1";
   return {
-    workspaceId: "ws-1",
+    workspaceId,
     userId: "user-1",
     userRole: "admin",
     headers: new Headers(),
+    // Lazy: only built if the route under test actually reads tenant data.
+    tdb: lazyTdb(workspaceId),
     ...overrides,
   };
 }
@@ -86,9 +124,12 @@ function withRouteUrl<T extends RouteHandlerArgs>(
 export function mockDataPlaneContext(
   overrides: Partial<DataPlaneAuthContextValue> = {},
 ): DataPlaneAuthContextValue {
+  const workspaceId = overrides.workspaceId ?? "ws-1";
   return {
     userId: "user-1",
-    workspaceId: "ws-1",
+    workspaceId,
+    // Lazy: see lazyTdb. A test's `@/server/tenant-db` mock flows through.
+    tdb: lazyTdb(workspaceId),
     ...overrides,
   };
 }

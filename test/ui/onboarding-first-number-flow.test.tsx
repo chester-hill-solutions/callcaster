@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider, useLoaderData, redirect } from "react-router";
 import type { ComponentProps } from "react";
 import { describe, expect, test } from "vitest";
@@ -43,11 +43,20 @@ function renderFlow(step = "", overrides: Partial<Props> = {}) {
   return { router, props };
 }
 
-describe("guided phone setup (#1205)", () => {
+describe("guided phone setup (#1205, #1764)", () => {
   test("starts with a choice, then verifies without collecting a service address", async () => {
     renderFlow();
     fireEvent.click(await screen.findByRole("link", { name: "Use an existing number" }));
     expect(await screen.findByLabelText("Your phone number")).toBeEnabled();
+    const setupNav = screen.getByRole("navigation", { name: "Phone number setup" });
+    expect(within(setupNav).getByText("2. Verify your number")).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+    expect(within(setupNav).queryByText(/Service address/)).toBeNull();
+    expect(within(setupNav).getByText("3. Review your number")).not.toHaveAttribute(
+      "aria-current",
+    );
     expect(screen.queryByLabelText("Street address")).toBeNull();
     expect(screen.queryByRole("group", { name: "Rent a Canadian number" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "When someone calls your number" })).toBeNull();
@@ -58,6 +67,17 @@ describe("guided phone setup (#1205)", () => {
   test("requires an address before rental and keeps the rental path through billing", async () => {
     const { router } = renderFlow("rent");
     expect(await screen.findByLabelText(/Street address/)).toBeVisible();
+    const setupNav = screen.getByRole("navigation", { name: "Phone number setup" });
+    expect(within(setupNav).getByText("2. Service address")).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+    expect(within(setupNav).getByText("3. Rent a number")).not.toHaveAttribute(
+      "aria-current",
+    );
+    expect(within(setupNav).getByText("4. Review your number")).not.toHaveAttribute(
+      "aria-current",
+    );
     expect(screen.queryByRole("group", { name: "Rent a Canadian number" })).toBeNull();
     fireEvent.change(screen.getByLabelText(/Street address/), { target: { value: "123 Main St" } });
     fireEvent.change(screen.getByLabelText(/City/), { target: { value: "Toronto" } });
@@ -65,6 +85,13 @@ describe("guided phone setup (#1205)", () => {
     fireEvent.change(screen.getByLabelText(/Postal code/), { target: { value: "M5V 2T6" } });
     fireEvent.click(screen.getByRole("button", { name: "Save address" }));
     expect(await screen.findByRole("group", { name: "Rent a Canadian number" })).toBeVisible();
+    expect(within(setupNav).getByText("2. Service address")).not.toHaveAttribute(
+      "aria-current",
+    );
+    expect(within(setupNav).getByText("3. Rent a number")).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
     const billing = screen.getByRole("link", { name: /Buy credits/i });
     const billingUrl = new URL(billing.getAttribute("href") ?? "", "http://localhost");
     expect(billingUrl.searchParams.get("returnTo")).toBe(`${basePath}?step=first_number&numberStep=rent`);
@@ -80,6 +107,11 @@ describe("guided phone setup (#1205)", () => {
     props.phoneNumbers = [number()];
     await act(() => router.revalidate());
     expect(await screen.findByRole("heading", { name: "When someone calls your number" })).toBeVisible();
+    const setupNav = screen.getByRole("navigation", { name: "Phone number setup" });
+    expect(within(setupNav).getByText("4. Review your number")).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
     expect(screen.queryByLabelText(/Street address/)).toBeNull();
     expect(screen.queryByRole("group", { name: "Rent a Canadian number" })).toBeNull();
     await act(() => router.navigate(`${basePath}?step=first_number&numberStep=rent`));
@@ -102,5 +134,28 @@ describe("guided phone setup (#1205)", () => {
     renderFlow("verify", { isReadOnly: true });
     expect(await screen.findByText(/Only workspace owners and admins can verify/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Verify number" })).toBeNull();
+  });
+
+  test("the verification sheet reflects the live status without a reload (#1846)", async () => {
+    renderFlow("", {
+      validationRequest: {
+        accountSid: "AC_test",
+        callSid: "CA_test",
+        friendlyName: "Team",
+        phoneNumber: "+14165550100",
+        validationCode: "123456",
+      },
+      phoneNumbers: [
+        number({
+          type: "caller_id",
+          phone_number: "+14165550100",
+          capabilities: { verification_status: "success" },
+        }),
+      ],
+    });
+
+    // Settings → Numbers already flipped to "Number verified" from the live
+    // capability; onboarding used to sit on "Verification pending".
+    expect(await screen.findByText("Number verified")).toBeVisible();
   });
 });

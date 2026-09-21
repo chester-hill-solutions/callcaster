@@ -14,7 +14,10 @@ import {
   TwilioAccountData,
 } from "@/lib/types";
 import { data as routeData, redirect } from "react-router";
-import { normalizeCampaignData } from "@/lib/campaign-settings";
+import {
+  normalizeCampaignData,
+  normalizeIvrCampaignType,
+} from "@/lib/campaign-settings";
 import { normalizeSchedule } from "@/lib/workspace-members";
 import { deepEqual } from "@/lib/utils";
 import { parseActionRequest } from "@/lib/request-utils.server";
@@ -47,7 +50,6 @@ import { logger } from "@/lib/logger.server";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import { defineAction } from "@/lib/handler.server";
 import { listWorkspaceAudiosApi } from "@/lib/platform-media.server";
-import { createTenantDb } from "@/server/tenant-db";
 import { MemberRole } from "@/lib/member-role";
 import { toUserMessage } from "@/lib/user-message";
 import { sendCampaignTestSms } from "@/lib/campaign-test-send.server";
@@ -82,7 +84,7 @@ export const action = defineAction({
   sideEffects: ["db-write"],
   handler: async ({ request, params, auth }) => {
   const { id: workspace_id, selected_id } = params;
-  const { user, userRole, headers } = auth;
+  const { user, userRole, headers, tdb } = auth;
 
   if (!selected_id || !workspace_id) return redirect("/");
 
@@ -112,6 +114,10 @@ export const action = defineAction({
         const nextCampaignData = JSON.parse(campaignDataStr);
         const nextCampaignDetails = JSON.parse(campaignDetailsStr);
 
+        // IVR is a single campaign type: a campaign saved before the
+        // simple/complex split was removed persists as robocall from here on.
+        nextCampaignData.type = normalizeIvrCampaignType(nextCampaignData.type);
+
         const schedule = normalizeSchedule(nextCampaignData.schedule);
         const scheduleValidation = getScheduleValidation(schedule);
         if (scheduleValidation.hasInvalidIntervals) {
@@ -140,7 +146,7 @@ export const action = defineAction({
           },
         });
 
-        // #1816: a live machine campaign whose window was just edited may
+        // a live machine campaign whose window was just edited may
         // have a parked dispatch successor sleeping at the old boundary.
         // Pull it forward to the new next-open (or wake it now when the
         // window is unrestricted) so the edit takes effect within one hop.
@@ -203,7 +209,6 @@ export const action = defineAction({
             );
           }
 
-          const tdb = createTenantDb(workspace_id);
           const [campaignDetails, queueCounts, phoneNumbersResult, scripts, audioList] =
             await Promise.all([
               fetchCampaignDetails({
@@ -221,7 +226,7 @@ export const action = defineAction({
 
           // Message and machine-dialled voice campaigns launch through
           // launchCampaign, which validates readiness and enqueues durable
-          // dispatch work (#1348). live_call stays human-dialled.
+          // dispatch work. live_call stays human-dialled.
           const launchable =
             campaignRecord.type === "message" ||
             isMachineDispatchedVoiceCampaignType(campaignRecord.type);

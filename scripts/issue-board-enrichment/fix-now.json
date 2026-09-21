@@ -1,275 +1,621 @@
 [
   {
-    "issueNumber": 1148,
+    "issueNumber": 1883,
     "verdict": "fix-now",
-    "recommendedTitle": "ux(onboarding): move SMS compliance identity fields out of Goal and bound help popovers",
-    "summary": "Tooltip bounds are already implemented, and Goal renders its descriptions without a duplicate InfoPopover. Toll-free business identity fields still render on Goal.",
-    "currentBehavior": "InfoPopover forwards max-width and max-height settings; OnboardingGoalStep still renders TollFreeVerificationFields after SMS number-path selection.",
-    "rootCause": "The remaining issue is placement of SMS identity fields, not the tooltip primitive.",
-    "resolution": "Move SMS business identity fields into the identity step while preserving validation and channel-specific visibility. Do not reimplement tooltip bounds.",
+    "recommendedTitle": "IVR step: configurable no-input handling (wait length + reroute/replay)",
+    "summary": "The runtime half shipped on dev in PR #1937 (e79644b9): per-step gather timeout plus hangup/replay/route with a 2-replay cap. The PR deferred the script-editor panel and the inbound IVR mirror, so the feature is not authorable and not applied inbound.",
+    "currentBehavior": "IvrBlock carries gatherTimeoutSeconds and noInput; appendBlockResponse honours the timeout and the outbound response route branches on resolveNoInputTarget. Nothing writes those fields (no editor control) and the inbound response route has no noInput/timeout handling.",
+    "rootCause": "PR #1937 kept the editor panel and inbound twin out to stay atomic; the wire fields have no producer.",
+    "resolution": "Add the script-editor no-input panel (wait length + action select + conditional target) writing the block fields, mirror the branching into the inbound response route with its own replay store and cap, add editor/inbound route tests. Fold #1843 into this issue or close it as duplicate.",
     "lookIn": [
-      "app/routes/workspaces+/$id/onboarding/OnboardingGoalStep.tsx",
-      "app/routes/workspaces+/$id/onboarding/OnboardingBusinessIdentityStep.tsx",
-      "app/components/shared/InfoPopover.tsx"
+      "app/lib/ivr-block-runtime.server.ts",
+      "app/lib/ivr-gather.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
+      "app/components/campaign/settings/script/ScriptBlockEditor.tsx",
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx",
+      "app/lib/ivr-script-editor.ts"
     ],
     "existingTests": [
-      "test/ui/onboarding-goal-step.test.tsx (expects toll-free on Goal — must move)"
+      "test/ivr-block-runtime.test.ts",
+      "test/ivr-gather.test.ts"
     ],
     "missingTests": [
-      "popover bounds",
-      "SMS-only identity fields"
+      "Editor emits wait/no-input controls",
+      "Inbound response route no-input branches and replay cap"
     ],
     "acceptanceCriteria": [
-      "Goal has short non-duplicated guidance",
-      "Help content wraps/scrolls within bounds",
-      "SMS compliance fields only for SMS goal",
-      "Saved data unchanged"
+      "A step can wait longer than the default and, on no input, replay or route instead of just advancing",
+      "Defaults are unchanged for steps that do not configure it"
+    ],
+    "blockedBy": [],
+    "size": "M-L",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now. Runtime + outbound are dev-only in PR #1937; finish the editor panel and inbound mirror (or fold #1843 in)."
+  },
+  {
+    "issueNumber": 1936,
+    "verdict": "fix-now",
+    "recommendedTitle": "Comment policy: comments must carry information (no-useless-comments rule)",
+    "summary": "Add a local ESLint rule callcaster/no-useless-comments (error) rejecting issue/PR-number-only and punctuation-only comments, sweep the ~20 existing offenders, and document the rule. Not implemented.",
+    "currentBehavior": "eslint.config.mjs only wires upstream plugins; there is no local rule infrastructure and no no-useless-comments rule.",
+    "rootCause": "Comment hygiene is unenforced; a number or a punctuation banner passes lint.",
+    "resolution": "Define the rule (inline plugin object in eslint.config.mjs, or a small local-rules module), set it to error, fix the offenders, add rule unit tests, and document the intent.",
+    "lookIn": [
+      "eslint.config.mjs",
+      "package.json",
+      "app/",
+      "test/"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Rule unit tests: number-only comment fails, punctuation-only comment fails, informative comment passes"
+    ],
+    "acceptanceCriteria": [
+      "Issue/PR-number-only comments are lint errors",
+      "Punctuation-only comments are lint errors",
+      "Existing offenders are zero",
+      "Rule intent is documented"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Fix now as one atomic PR (rule + zero-offender sweep + rule tests)."
+  },
+  {
+    "issueNumber": 1886,
+    "verdict": "fix-now",
+    "recommendedTitle": "Run db:schema:check per deployed environment (DB-backed gate)",
+    "summary": "scripts/db/check-schema-drift.mjs (db:schema:check) compares app-required tables/columns/functions/enum values against the live DB, but nothing invokes it: absent from ci:local and from .github/workflows/ledger-drift-check.yml. It also lacks --require-db. No PR exists.",
+    "currentBehavior": "Running the script with no DATABASE_URL prints a message and exits 2; no workflow runs it. A deployed environment missing a required object is not caught.",
+    "rootCause": "The checker was added as a tool but never connected to a DB-backed per-environment gate.",
+    "resolution": "Add --require-db (or SCHEMA_CHECK_REQUIRE_DB=1) to scripts/db/check-schema-drift.mjs mirroring check-migration-ledger.mjs so a missing URL exits 1; add a --require-db step after each ledger step in ledger-drift-check.yml; extend push paths; factor flag/URL resolution into a pure helper in scripts/lib/app-db-objects.mjs and unit-test it. Type parity is a follow-up.",
+    "lookIn": [
+      "scripts/db/check-schema-drift.mjs",
+      "scripts/db/check-migration-ledger.mjs",
+      ".github/workflows/ledger-drift-check.yml",
+      "scripts/lib/app-db-objects.mjs",
+      "test/schema-drift-enums.test.ts"
+    ],
+    "existingTests": [
+      "test/schema-drift-enums.test.ts"
+    ],
+    "missingTests": [
+      "Shared arg/URL resolver: flag + no URL => exit 1; no flag + no URL => exit 2; URL present => the URL"
+    ],
+    "acceptanceCriteria": [
+      "A deployed environment missing a required object fails the workflow.",
+      "A missing DATABASE_URL fails the workflow rather than no-op passing.",
+      "Push path filters include the schema files and the checker."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now per the accepted grilling decision (existence gate first, type parity deferred)."
+  },
+  {
+    "issueNumber": 1885,
+    "verdict": "fix-now",
+    "recommendedTitle": "Rewrite the two live auth.uid() RPCs, drop get_outreach_attempts, then drop schema auth",
+    "summary": "Not a Supabase dependency: the only auth survivors are our own shim. auth.uid() is defined by drizzle/0001_auth_uid_shim.sql; auth.jwt() has no shim, so get_outreach_attempts is dead. The only live RPCs using auth.uid() are select_and_update_campaign_contacts and update_user_workspace_last_access_time, both called inside withAppCurrentUser. No code has shipped.",
+    "currentBehavior": "Public RPCs still reference auth.uid()/auth.jwt(); schema auth cannot be dropped. get_outreach_attempts is dead.",
+    "rootCause": "Legacy Supabase-era definitions survive in the Drizzle baseline and the auth.uid() shim was never rewritten onto the v2 app.current_user_id identity.",
+    "resolution": "Chunk 1: migration dropping public.get_outreach_attempts, remove its KEEP entry, wire into both bootstrap step lists. Chunk 2: rewrite the two RPCs to nullif(current_setting('app.current_user_id', true), '')::uuid. Chunk 3: fail-closed guard raising while any non-auth function or public policy still matches auth., then DROP SCHEMA IF EXISTS auth CASCADE. Retire or guard drizzle/0001_auth_uid_shim.sql.",
+    "lookIn": [
+      "app/lib/db-rpc.server.ts",
+      "drizzle/0001_auth_uid_shim.sql",
+      "drizzle/0000_baseline.sql",
+      "client/migrations/20260807130000_manual_dial_claim_attempt_count.sql",
+      "client/migrations/20260715140000_drop_legacy_rls.sql",
+      "scripts/db/check-db-orphans.mjs",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs"
+    ],
+    "existingTests": [
+      "test/queue-rpc-contract.test.ts",
+      "test/db-rpc-claim-queue-entry.test.ts",
+      "test/db-rpc-outreach-attempt.test.ts",
+      "test/atomic-manual-dial-claims.integration.test.ts"
+    ],
+    "missingTests": [
+      "test/legacy-auth-sql-guard.test.ts - latest CREATE OR REPLACE per public function has no auth.uid()/auth.jwt()",
+      "test/integration-db/manual-dial-claim-actor.test.ts - claim RPC assigns the withAppCurrentUser actor",
+      "test/queue-rpc-contract.test.ts latest-definition resolver must pick the new migration"
+    ],
+    "acceptanceCriteria": [
+      "No public function or policy references auth.*",
+      "The two RPC flows still pass their tests",
+      "DROP SCHEMA auth succeeds on dev, then prod",
+      "A fresh bootstrap does not recreate auth.uid()"
+    ],
+    "blockedBy": [],
+    "size": "M-L",
+    "risk": "high",
+    "trackerRecommendation": "Keep in Fix now, split into the three PR-sized chunks. Run the zero-auth.* dependency query on prod before the drop and keep the rewrite and the drop in separate releases."
+  },
+  {
+    "issueNumber": 1875,
+    "verdict": "fix-now",
+    "recommendedTitle": "IVR: store speech answers as { value, raw, inputType } (slice B)",
+    "summary": "Slice A shipped on dev in PR #1876 (642f4ee7, not in master). Slice B has not shipped: ivr-webhook-auth.server.ts returns only a bare userInput and never reads Confidence; ivr-results.ts normalizeAnswer returns a bare string. Confidence is deferred to #1880, so slice B is the { value, raw, inputType } shape only.",
+    "currentBehavior": "outreach_attempt.result stores a bare transcript string; readers unwrap only strings; Twilio Confidence is discarded.",
+    "rootCause": "The response parser collapses Digits/SpeechResult into one string and drops Confidence.",
+    "resolution": "Add IvrStoredAnswer + isIvrStoredAnswer + ivrAnswerValue to app/lib/ivr-results.ts; parse Confidence in ivr-webhook-auth.server.ts; store answer in the outbound response route; unwrap to .value in outreach-typed-fields.server.ts and campaign-export.server.ts; keep readers accepting the legacy bare string.",
+    "lookIn": [
+      "app/lib/ivr-results.ts",
+      "app/lib/ivr-webhook-auth.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
+      "app/lib/outreach-typed-fields.server.ts",
+      "app/lib/campaign-export.server.ts",
+      "app/components/campaign/home/CampaignHomeScreen/ResultsScreen.IvrResponses.tsx"
+    ],
+    "existingTests": [
+      "test/ivr-gather.test.ts",
+      "test/ivr-block-response.route.test.ts",
+      "test/inbound-ivr-block-response.route.test.ts",
+      "test/ivr-results.test.ts"
+    ],
+    "missingTests": [
+      "ivr-webhook-auth: digits yields DTMF with no confidence; speech yields the transcript",
+      "ivr-results aggregation over the object shape and mixed legacy/new merge",
+      "outreach-typed-fields unwraps the object shape",
+      "campaign export CSV cell is the value, not [object Object]"
+    ],
+    "acceptanceCriteria": [
+      "A vx-any step stores { value, raw, inputType }",
+      "Legacy bare strings and new objects both aggregate",
+      "Typed fields and CSV export resolve the value",
+      "Confidence capture is deferred to #1880"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now as slice B in one PR. Keep confidence, intent matching and per-campaign language with #1880 and the #268 epic."
+  },
+  {
+    "issueNumber": 1884,
+    "verdict": "fix-now",
+    "recommendedTitle": "IVR: guarantee a terminal hangup (handle next:\"end\", validate dangling targets and cycles)",
+    "summary": "'Hang up' is already an editor routing target. The real remaining ask is the terminal-hangup guarantee: handleNextStep treats only 'hangup' as terminal; next:\"end\" redirects, a dangling target falls back to pageIds[0], and validateDocument only checks startPageId and missing blocks.",
+    "currentBehavior": "A script can route to \"end\" or a dangling target and be redirected instead of hanging up; routing cycles are undetected; the editor shows no validation warning.",
+    "rootCause": "The runtime parses next as an opaque string with no terminal/validation contract.",
+    "resolution": "Treat 'hangup' and 'end' as terminal in handleNextStep and the inbound renderer; hang up instead of redirecting when the page/block does not exist; add app/lib/ivr-script-validation.ts (edge graph + DFS) surfaced in ScriptEditorShell.tsx and wired into validateScriptSteps; add a script_routing_invalid readiness code that blocks launch.",
+    "lookIn": [
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts",
+      "app/components/campaign/settings/script/ScriptBlockEditor.routing.ts",
+      "app/components/campaign/settings/script/ScriptEditorShell.tsx",
+      "app/lib/call-script-service.ts",
+      "vendor/scriptkit/scriptkit-call-script-core/src/parse.ts",
+      "docs/script-json-format.md"
+    ],
+    "existingTests": [
+      "test/ivr-block-response.route.test.ts",
+      "test/ivr-block.route.test.ts",
+      "test/inbound-ivr-block-response.route.test.ts",
+      "test/ui/script-block-editor-ivr.test.tsx",
+      "vendor/scriptkit test/script-editor.test.ts"
+    ],
+    "missingTests": [
+      "ivr-script-routing-validation: dangling target, A->B->A cycle, hangup/end ok, linear end ok",
+      "route tests: next:\"end\" renders <Hangup/>, dangling renders <Hangup/>, last-block fallthrough renders <Hangup/>",
+      "editor shell test shows the validation error for a cyclic script"
+    ],
+    "acceptanceCriteria": [
+      "An author can choose Hang up as an option's next step (already true)",
+      "A published script always has a terminal hangup",
+      "next:\"end\" and \"hangup\" are both terminal at runtime",
+      "Dangling targets and reachable cycles fail validation and block launch"
+    ],
+    "blockedBy": [],
+    "size": "M-L",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now; confirm the already-present 'expose Hang up' half with the reporter, then split runtime safety from editor/launch validation if the PR grows."
+  },
+  {
+    "issueNumber": 1842,
+    "verdict": "fix-now",
+    "recommendedTitle": "IVR first audio: remove the flow-entry redirect and serve WAV prompts",
+    "summary": "Re-scoped from synchronous AMD to the gather/first-audio path. Remaining on dev: the flow entry returns only a Redirect, so the block route re-runs findCallBySid + fetchCampaignWithScript before any prompt, and every IVR prompt is mono MP3. No PR yet; measurement is required.",
+    "currentBehavior": "Time-to-first-audio about 7s: first audio waits on two server round-trips and an MP3 prompt Twilio transcodes.",
+    "rootCause": "The flow entry returns a Redirect before rendering any prompt, and the prompt library only stores MP3.",
+    "resolution": "PR1: extract the shared block renderer into app/lib/ivr-block-runtime.server.ts and render the first block inline from the outbound and inbound page routes. PR2: add a WAV transcode in app/lib/audio.server.ts, an ivr-wav/ object path + signed URL, backfill existing prompts, then point playback at WAV. Instrument answer->flowEntry and flowEntry->firstBlock timestamps; target under 2s.",
+    "lookIn": [
+      "app/routes/api+/ivr/$campaignId/$pageId.action.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId.action.server.ts",
+      "app/lib/audio.server.ts",
+      "app/lib/audio-upload.ts",
+      "app/lib/object-storage.server.ts",
+      "app/lib/platform-media.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/campaign-test-call.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-page.route.test.ts",
+      "test/ivr-block.route.test.ts",
+      "test/audio.server.test.ts",
+      "test/campaign-ivr-dispatch.test.ts",
+      "test/campaign-test-call.test.ts"
+    ],
+    "missingTests": [
+      "page route returns inline first-block TwiML with no Redirect",
+      "signed prompt path is ivr-wav/*.wav",
+      "WAV transcode args; a WAV failure does not fail the MP3 write",
+      "machine branches unchanged"
+    ],
+    "acceptanceCriteria": [
+      "Time-to-first-audio measured before/after with numbers recorded",
+      "Under 2s on the human path",
+      "No redirect hop; the first block is rendered from the flow entry",
+      "IVR prompts served as WAV without breaking legacy objects",
+      "Machine-detection behaviour unchanged"
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now, split into PR1 (redirect removal) and PR2 (WAV + backfill). If measurement shows AMD dominates, open a separate IVR AMD-conditioning ticket (cf. #1845)."
+  },
+  {
+    "issueNumber": 1896,
+    "verdict": "fix-now",
+    "recommendedTitle": "Design-system linting: retire the hand-rolled SaveBar token test",
+    "summary": "Both linter PRs shipped on dev: ESLint 9 flat config in PR #1907 (c5ac39e2) and @shadcn/lint in PR #1908 (f561396f), neither in master. One acceptance item is unmet: the hand-rolled token test test/ui/components-shared-smoke.test.tsx:286 is still present.",
+    "currentBehavior": "eslint.config.mjs registers @shadcn/lint; the SaveBar token smoke test still asserts bg-background / not bg-white.",
+    "rootCause": "The migration PRs covered the linter config but did not remove the now-redundant hand-rolled test.",
+    "resolution": "Delete the 'uses design tokens rather than hardcoded colors' test from test/ui/components-shared-smoke.test.tsx and confirm check:lint-ratchet and the ratchet baseline are unchanged. Keep the component-variant tests.",
+    "lookIn": [
+      "test/ui/components-shared-smoke.test.tsx",
+      "eslint.config.mjs",
+      "scripts/check-lint-ratchet.mjs",
+      "scripts/baselines/lint-ratchet.json"
+    ],
+    "existingTests": [
+      "test/ui/components-shared-smoke.test.tsx (remove line 286)"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "ESLint 9 runs the same rule set with the ratchet baseline unchanged or lower (done on dev)",
+      "@shadcn/lint rules enabled and ratcheted (done on dev)",
+      "The hand-rolled token test is removed (outstanding)"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Fix now (delete the obsolete test), then close. The linter migration reaches master on the next release."
+  },
+  {
+    "issueNumber": 1873,
+    "verdict": "fix-now",
+    "recommendedTitle": "feat(recording): record live and IVR calls under a workspace policy",
+    "summary": "The recording + transcript pipeline already exists for agent calls (record:'record-from-answer' + /api/recording -> Railway Bucket -> ElevenLabs Scribe per ADR-0029). IVR dispatch and test-call never set record; predictive dialing does not either. Consent model recorded in the issue comment.",
+    "currentBehavior": "campaign-ivr-dispatch.server.ts:241 and campaign-test-call.server.ts:105 create calls with no record/recordingStatusCallback; auto-dial.server.ts createTwilioCall also omits record. Manual live paths record.",
+    "rootCause": "Recording is wired per call-creation site, and the IVR/predictive creators were never wired; there is no workspace policy to gate or disclose recording.",
+    "resolution": "Add workspace recording policy (allowed + disclosure text) and a campaign opt-in; set record:'record-from-answer' with recordingStatusCallback/Event on the IVR dispatch, test-call, and predictive paths; play the disclosure before the menu when set; reuse /api/recording and the ADR-0029 pipeline.",
+    "lookIn": [
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/campaign-test-call.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/routes/api+/recording.action.server.ts",
+      "app/lib/call-recording-storage.server.ts",
+      "app/db/schema.ts",
+      "docs/adr/0029-post-call-golden-transcript-cohere-batch-worker.md"
+    ],
+    "existingTests": [
+      "test/recording.route.test.ts",
+      "test/call-recording-storage.server.test.ts",
+      "test/campaign-ivr-dispatch.test.ts",
+      "test/campaign-test-call.test.ts"
+    ],
+    "missingTests": [
+      "IVR and test-call calls.create include record + callback",
+      "disclosure plays before the first menu when configured",
+      "policy off means no record",
+      "policy on + campaign opt-in records and enqueues transcription"
+    ],
+    "acceptanceCriteria": [
+      "Every live and IVR call records when the workspace policy allows and the campaign opts in",
+      "The disclosure message plays before the menu when set",
+      "No recording when the policy disallows it",
+      "Recording flows into the existing bucket + transcript pipeline"
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now, but likely split: (1) workspace recording policy + campaign opt-in, (2) IVR/predictive record wiring + disclosure. Confirm jurisdiction gating and policy storage before coding."
+  },
+  {
+    "issueNumber": 1878,
+    "verdict": "fix-now",
+    "recommendedTitle": "Surface and select the caller audio on the /call welcome dialog",
+    "summary": "The welcome dialog receives voicemail_file as a boolean and only describes the drop in prose. Wants the dialog to show the actual caller audio (machine drop campaign.voicemail_file and agent voice drop campaign.voicedrop_audio) and let the agent change it. Grilling decision: session-only, no campaign write.",
+    "currentBehavior": "CallScreen.Dialogs.tsx renders prose keyed on a voicemail_file boolean; CallScreen.Layout.tsx:495 passes Boolean(campaign.voicemail_file). Audio Drop posts to /api/audiodrop, which loads campaign.voicedrop_audio server-side; no session override.",
+    "rootCause": "The call-loader/Dialogs contract carries booleans and prose only; /api/audiodrop has no override parameter.",
+    "resolution": "Pass campaign voicemail_file and voicedrop_audio strings plus the workspace audio library into the call loader and Dialogs; render the caller audio with a picker; hold the choice in call-screen session state and send it with /api/audiodrop (validate against the workspace library); keep the Setup default.",
+    "lookIn": [
+      "app/components/call/CallScreen.Dialogs.tsx",
+      "app/components/call/CallScreen.Layout.tsx",
+      "app/components/call/CallScreen.CallArea.tsx",
+      "app/hooks/call/useCallScreen.ts",
+      "app/routes/workspaces+/$id/campaigns/$campaign_id/call.loader.server.ts",
+      "app/routes/api+/audiodrop.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-dialogs.test.tsx",
+      "test/ui/call-screen-callarea.test.tsx",
+      "test/audiodrop.test.ts"
+    ],
+    "missingTests": [
+      "dialog shows the configured caller audio name",
+      "changing it updates the session value",
+      "audiodrop POST carries the session override",
+      "default matches the campaign config and no campaign row is written"
+    ],
+    "acceptanceCriteria": [
+      "The welcome dialog surfaces the caller audio (name and a way to change it)",
+      "What is surfaced matches what the dialer actually plays",
+      "The choice is session-only and does not write the campaign config"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "low",
+    "trackerRecommendation": "Fix now; session-only per the recorded decision. Relates to #1839 and #1708."
+  },
+  {
+    "issueNumber": 1845,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(dial): drop synchronous AMD from manual/power dials; keep it predictive-only",
+    "summary": "Manual call-creation paths still send machineDetection:'Enable', so an answered manual call waits for the AMD verdict. Decision couples AMD to dial mode: predictive keeps it, manual/power turns it off and uses the agent's Audio Drop button. IVR keeps AMD (see #1842/#1864).",
+    "currentBehavior": "machineDetection:'Enable' at call.action.server.ts:108 and dial/$number.action.server.ts:73; auto-dial.server.ts:63 keeps it. test/api-call.route.test.ts:180 asserts machineDetection=\"Enable\".",
+    "rootCause": "AMD was added unconditionally to support auto voicemail drop; on manual/power calls an agent is already on the line.",
+    "resolution": "Remove machineDetection (and any AMD-callback wiring) from call.action.server.ts and dial/$number.action.server.ts; keep it in auto-dial.server.ts. Confirm the Audio Drop control stays visible when voicedrop_audio is set. Update the api-call test and add a regression that auto-dial still sets it.",
+    "lookIn": [
+      "app/routes/api+/call.action.server.ts",
+      "app/routes/api+/dial/$number.action.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/routes/api+/dial/status.action.server.ts",
+      "app/components/call/CallScreen.CallArea.tsx"
+    ],
+    "existingTests": [
+      "test/api-call.route.test.ts",
+      "test/dial-number.route.test.ts",
+      "test/dial-status.route.test.ts",
+      "test/auto-dial.server.test.ts"
+    ],
+    "missingTests": [
+      "manual routes emit no machineDetection",
+      "auto-dial still emits machineDetection",
+      "Audio Drop still works on manual/power calls"
+    ],
+    "acceptanceCriteria": [
+      "A manual/power call reaches audio immediately with no AMD wait",
+      "Predictive dialing still drops or hangs up on a detected machine",
+      "A drop-enabled campaign still plays the voicemail when an agent drops it"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now; decision recorded. IVR stays AMD-on per #1842/#1864; #1839 toggle is the Setup layer."
+  },
+  {
+    "issueNumber": 1833,
+    "verdict": "fix-now",
+    "recommendedTitle": "fix(ui): pointer cursor on shared Button + guard raw <button> usage",
+    "summary": "Primary buttons show the arrow cursor because neither shad-cc's buttonVariants nor the local wrapper declares a cursor. The fix already exists on branch origin/bug/1833-primary-button-cursor (1a99dc44): default cursor-pointer with disabled/aria-disabled cursor-default plus test updates.",
+    "currentBehavior": "app/components/ui/button.tsx sets no cursor; the underlying shad-cc buttonVariants base class also has none. The reported onboarding 'Save & continue' uses the shared Button. A large raw-<button> inventory bypasses the shared component.",
+    "rootCause": "Base button styles never declared a cursor; some controls bypass the shared Button.",
+    "resolution": "Land the existing branch/PR (cursor-pointer default + disabled/aria-disabled handling + button.smoke assertions). Then migrate the raw-<button> call sites from the issue inventory in focused groups and add a guard. Treat the inventory as follow-up tickets.",
+    "lookIn": [
+      "app/components/ui/button.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx",
+      "test/ui/button.smoke.test.tsx"
+    ],
+    "existingTests": [
+      "test/ui/button.smoke.test.tsx"
+    ],
+    "missingTests": [
+      "default class includes cursor-pointer",
+      "disabled and aria-disabled use cursor-default",
+      "guard against new raw <button> usages"
+    ],
+    "acceptanceCriteria": [
+      "Interactive shared buttons show the pointer cursor by default",
+      "Disabled buttons show the default cursor",
+      "The reported onboarding save/continue instance is fixed",
+      "A guard prevents recurrence"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Branch origin/bug/1833-primary-button-cursor (1a99dc44) is ready but unmerged; open a PR. File the raw-button inventory migration as follow-up tickets."
+  },
+  {
+    "issueNumber": 1859,
+    "verdict": "fix-now",
+    "recommendedTitle": "Show campaign costs un-collapsed on the Launch page",
+    "summary": "The campaign cost panel is still wrapped in a collapsed <details> labelled 'Campaign cost' in CampaignLaunch.tsx. Remove the fold and render CampaignCostPanel directly.",
+    "currentBehavior": "CampaignLaunch.tsx (~449-462) renders <details><summary>Campaign cost</summary><CampaignCostPanel .../></details> when campaignBilling is present.",
+    "rootCause": "The cost panel was placed inside a disclosure widget split out from the #1839 review.",
+    "resolution": "Render CampaignCostPanel directly (guarded by the existing campaignBilling ternary) and delete the <details>/<summary> wrapper and its inner mt-3 div. Keep the null/absent behaviour when campaignBilling is null.",
+    "lookIn": [
+      "app/components/campaign/settings/CampaignLaunch.tsx"
+    ],
+    "existingTests": [
+      "test/ui/campaign-launch-review.test.tsx"
+    ],
+    "missingTests": [
+      "Cost panel is visible on Launch without expanding any disclosure",
+      "No cost panel renders when campaignBilling is null"
+    ],
+    "acceptanceCriteria": [
+      "Campaign costs are visible on the Launch page without expanding anything",
+      "No 'Campaign cost' details/summary remains",
+      "Absent behaviour unchanged when campaignBilling is null"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Standalone UI change; one PR. Update campaign-launch-review.test.tsx to assert the panel is not behind a disclosure."
+  },
+  {
+    "issueNumber": 1847,
+    "verdict": "fix-now",
+    "recommendedTitle": "Add a 'Do not import' mapping option so columns can be dropped",
+    "summary": "The CSV mapping forces every column to a target and defaults unknown columns to Custom field; users want to drop unwanted columns instead of importing them as custom fields.",
+    "currentBehavior": "Every CSV header maps to a ContactImportTarget (unknown headers default to other_data / Custom field). The Map CSV Headers select offers no ignore/drop option.",
+    "rootCause": "CONTACT_IMPORT_TARGETS has no ignore/drop target, and the mapping, validation, and import paths assume every column is imported.",
+    "resolution": "Add an 'ignore' / 'Do not import' option: offer it in the Map CSV Headers select, exclude it from other_data, exclude it from duplicate-target validation, and skip it in processAudienceUpload. Leave the Data Preview unchanged.",
+    "lookIn": [
+      "shared/contact-import-headers.ts",
+      "app/components/audience/AudienceUploadMapStep.tsx",
+      "app/components/audience/audience-upload-csv.ts",
+      "app/components/audience/AudienceUploader.tsx",
+      "app/lib/audience-upload-process.server.ts"
+    ],
+    "existingTests": [
+      "test/contact-import-headers.test.ts",
+      "test/ui/audience-uploader.test.tsx",
+      "test/audience-upload-parsing.test.ts"
+    ],
+    "missingTests": [
+      "A column mapped to ignore passes validation and is absent from imported contacts",
+      "Ignore is not counted as a duplicate target"
+    ],
+    "acceptanceCriteria": [
+      "A mapping option drops a column",
+      "Dropped columns are not written to other_data",
+      "Dropped columns do not create duplicate-target errors",
+      "Phone and name validation behaviour is unchanged"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Well-scoped UX feature; add the ignore target end to end and test the import exclusion."
+  },
+  {
+    "issueNumber": 1846,
+    "verdict": "fix-now",
+    "recommendedTitle": "Pass the live caller-ID verification status to the onboarding verification sheet",
+    "summary": "From onboarding the verification sheet keeps showing 'Verification pending' after the number is verified; Settings shows 'Number verified' because it passes the live status.",
+    "currentBehavior": "OnboardingFirstNumberStep renders CallerIdVerificationDialog without a status prop, so the sheet defaults to pending. Settings passes status derived from capabilities.verification_status.",
+    "rootCause": "The live-status wiring added for Settings (#1740) was never added to the onboarding render.",
+    "resolution": "Compute the live verification status from callerIdNumbers and pass it to CallerIdVerificationDialog in OnboardingFirstNumberStep, mirroring settings/numbers.route.tsx.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx",
+      "app/routes/workspaces+/$id/settings/numbers.route.tsx",
+      "app/components/phone-numbers/CallerIdVerificationDialog.tsx"
+    ],
+    "existingTests": [
+      "test/ui/caller-id-verification-dialog.test.tsx",
+      "test/ui/onboarding-first-number-flow.test.tsx"
+    ],
+    "missingTests": [
+      "Onboarding dialog shows 'Number verified' after the number's verification_status flips to success"
+    ],
+    "acceptanceCriteria": [
+      "Completing verification from onboarding flips the sheet to 'Number verified' with no reload",
+      "A failed verification still shows 'Verification failed'",
+      "Settings behaviour is unchanged"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Exact fix: pass the live status the way Settings already does."
+  },
+  {
+    "issueNumber": 1844,
+    "verdict": "fix-now",
+    "recommendedTitle": "Play call recordings in-app instead of linking to the Twilio recording URL",
+    "summary": "The Call History 'Listen' link opens call.recording_url, a Twilio API mp3 URL that sends the user to Twilio; recordings are already copied to object storage as call.audio_url.",
+    "currentBehavior": "CallLogTable renders an <a href={recordingUrl}>Listen when recording_url is set. app/lib/call-log.server.ts selects call.recording_url. runRecordingSideEffects already persists recordings to object storage (call.audio_url).",
+    "rootCause": "Call History reads the raw Twilio recording_url and links out to it instead of serving the stored call.audio_url.",
+    "resolution": "Select call.audio_url in app/lib/call-log.server.ts and mint a signed object-storage URL (createSignedObjectUrls, as the voicemails loader does), preferring it for the Listen action; render an in-app player and keep a clear fallback when no persisted copy exists.",
+    "lookIn": [
+      "app/lib/call-log.server.ts",
+      "app/components/calls/CallLogTable.tsx",
+      "app/lib/call-recording-storage.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/platform-media.server.ts",
+      "app/lib/object-storage.server.ts"
+    ],
+    "existingTests": [
+      "test/call-log.test.ts"
+    ],
+    "missingTests": [
+      "Loader returns a non-Twilio playback URL for a call with audio_url",
+      "CallLogTable renders the in-app player and no external Twilio link"
+    ],
+    "acceptanceCriteria": [
+      "Listen plays the recording without leaving CallCaster or opening Twilio",
+      "Works for a call whose recording was persisted to storage",
+      "A clear message when no recording copy exists",
+      "Tenant scoping is preserved"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Confirmed defect with a clear path; recordings are already persisted server-side."
+  },
+  {
+    "issueNumber": 1830,
+    "verdict": "fix-now",
+    "recommendedTitle": "Codify blocking cross-developer tasks as assigned tickets in the GitHub agent skills",
+    "summary": "Request that work another developer must do to unblock an issue becomes a separate ticket, set to block that issue and assigned to the right person, and that the agent skills say so.",
+    "currentBehavior": "github-issues/SKILL.md covers issue types, parent/child decomposition, and the --blocked-by / --blocking flags, but does not require creating a separate assigned ticket when another dev's task blocks an issue.",
+    "rootCause": "The skill documents the mechanics of blocking links but not the policy that blocking work is its own assigned ticket.",
+    "resolution": "Add a section to .agents/skills/github-issues/SKILL.md stating that blocking cross-developer work is created as a new Task, linked with --blocking <blocked issue> (or --blocked-by on the blocked issue), and assigned with --assignee; include a worked example.",
+    "lookIn": [
+      ".agents/skills/github-issues/SKILL.md",
+      ".agents/skills/github-cli/SKILL.md",
+      ".agents/skills/github-pull-request/SKILL.md"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "The skill states blocking work becomes a separate ticket",
+      "The skill shows the blocking link direction and assignment",
+      "The example uses --blocking and --assignee correctly"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Small documentation change. Note: the issue body is a copied #1822 PROJECT_TOKEN comment that does not match the title; confirm scope with the reporter before editing."
+  },
+  {
+    "issueNumber": 1728,
+    "verdict": "fix-now",
+    "recommendedTitle": "IVR: don't mark a campaign complete while calls are still in flight",
+    "summary": "Confirmed defect. IVR dispatch dequeues each queue row right after Twilio calls.create (campaign-ivr-dispatch.server.ts:260-264) and completion fires whenever campaign_queue_has_pending_work is false, so the campaign flips to 'complete' while calls are still ringing. Product decision (2026-09-20): 'complete' means all calls settled, not all dials attempted.",
+    "currentBehavior": "Campaign status turns 'complete' seconds after launch; the recipient's phone rings / the call arrives afterwards. The dequeue reason string 'IVR call completed' is factually wrong.",
+    "rootCause": "dequeued_at is written at dial time, not at call completion, while completion keys only off pending queue rows and never checks in-flight (non-terminal) calls.",
+    "resolution": "Gate completion on no pending queue rows AND no non-terminal calls: teach try_complete_campaign_if_drained / continueOrCompleteDispatch to check for in-flight campaign calls, or defer the IVR dequeue to the terminal status callback in api+/ivr/status.action.server.ts (larger; needs a timeout sweep for missing callbacks). Update the existing 'dequeues on success' test that encodes the current behaviour.",
+    "lookIn": [
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/ivr-initiate.server.ts",
+      "app/lib/campaign-queue-completion.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/routes/api+/ivr/status.action.server.ts",
+      "drizzle/0000_baseline.sql"
+    ],
+    "existingTests": [
+      "test/campaign-ivr-dispatch.test.ts",
+      "test/campaign-dispatch-worker.test.ts",
+      "test/ivr-status.route.test.ts",
+      "test/campaign-queue-throughput.integration.test.ts"
+    ],
+    "missingTests": [
+      "Campaign is not marked complete while it has a non-terminal call",
+      "A terminal status callback completes the campaign only after all calls settle",
+      "Replace the 'dequeues on success' assertion with acknowledgment-on-completion semantics"
+    ],
+    "acceptanceCriteria": [
+      "Campaign status does not read 'complete' while any campaign call is still in flight",
+      "Completion happens after the last call reaches a terminal status",
+      "No stalled campaign when a status callback never arrives"
     ],
     "size": "M",
     "risk": "medium",
-    "trackerRecommendation": "Coordinate with #1345/#1311/#1122.",
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1701,
-    "verdict": "fix-now",
-    "summary": "Well-scoped layout change: move the Upload audio button (rendered in IvrStepFields) adjacent to the 'Select a recording' control (RecordingStepFields).",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1702,
-    "verdict": "fix-now",
-    "summary": "Exact change: convert the Answer label description into a hover tooltip.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1703,
-    "verdict": "fix-now",
-    "summary": "Exact change: replace the full-width 'Remove response' button with an inline trash icon in each response row.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1704,
-    "verdict": "fix-now",
-    "summary": "Confirmed gap: script table has no unique index on (workspace,name) (schema + migrations), yet campaign.server.ts already maps isUniqueViolation to a friendly 'already exists' error — the guard is unreachable. Add the constraint and surface the existing error.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1715,
-    "verdict": "fix-now",
-    "summary": "Precise change list with an exact target component (profile dropdown): remove padding/info/first-name/workspace settings, rename invitations line + icon.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1716,
-    "verdict": "fix-now",
-    "summary": "Navbar order shifts because NavbarCredits/WorkspacePicker render conditionally; issue specifies the exact desired order. Fix is a stable nav-shell order.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1727,
-    "verdict": "fix-now",
-    "summary": "Explicit ordering spec (reverse chrono + status grouping running→waiting→draft→complete); campaigns list renders without that ordering. Well-scoped change at the source.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1739,
-    "verdict": "fix-now",
-    "summary": "Well-scoped template change with example copy: inject the workspace name into the low-credit email subject/body (workspace is in the notify context).",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1764,
-    "verdict": "fix-now",
-    "summary": "Confirmed gap: the rent path has a real address substep but the substep nav collapses address/rent/verify into one crumb. Add an address crumb to the nav state machine.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
-  },
-  {
-    "issueNumber": 1781,
-    "verdict": "fix-now",
-    "recommendedTitle": "Unique index for script names (duplicate-name error has no DB constraint)",
-    "summary": "No unique index on script(workspace,name) — the friendly duplicate error (campaign.server.ts:556/619) is unenforceable. Add citext/lower unique index + map violations to the friendly message.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Implement per ticket"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Filed 2026-09-12 from board triage."
-  },
-  {
-    "issueNumber": 1783,
-    "verdict": "fix-now",
-    "recommendedTitle": "Theme bootstrap <html> hydration mismatch",
-    "summary": "root.tsx inline theme script mutates documentElement pre-hydration; React logs mismatch every boot. Use narrow suppressHydrationWarning or server-rendered theme, keep the anti-flash script.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Implement per ticket"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Filed 2026-09-12 from board triage."
-  },
-  {
-    "issueNumber": 1804,
-    "verdict": "fix-now",
-    "summary": "The audit release-note correction is in progress in PR #1808; it was not merged at this review.",
-    "resolution": "Finish the existing PR and verify each audit fix appears once under Unreleased, with the schedule entry restored.",
-    "lookIn": [
-      "docs/CHANGELOG.md"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Active PR #1808 owns this change; do not create a duplicate."
-  },
-  {
-    "issueNumber": 1809,
-    "verdict": "fix-now",
-    "summary": "PR #1811 contains the qs override and lockfile remediation and is awaiting review/checks. The two advisory inputs, actual Twilio/Stripe serialization, and full local CI passed; the PR has not merged.",
-    "resolution": "Finish the active qs-only change and full checks. Keep parent SDK versions unchanged; verify default-branch alerts after promotion.",
-    "lookIn": [
-      "package.json",
-      "package-lock.json",
-      "bun.lock"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Active PR #1811 owns this remediation; do not start a competing lockfile change."
-  },
-  {
-    "issueNumber": 1810,
-    "verdict": "fix-now",
-    "summary": "This tracking-only refresh updates stale verdicts from live issue states and merged PR evidence.",
-    "resolution": "Review and merge the active board refresh after full local checks.",
-    "lookIn": [
-      "ISSUE_BOARD.md",
-      "scripts/issue-board-enrichment/"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "This board-refresh PR owns the ticket; do not duplicate it."
-  },
-  {
-    "issueNumber": 1816,
-    "verdict": "fix-now",
-    "recommendedTitle": "fix(dispatch): reschedule a parked campaign_dispatch successor when the campaign window is edited",
-    "summary": "Child of #1352 (window widened to include 12:47, send landed 1:12). Deferrals post-#1796 enqueue successors exactly at the boundary computed at defer time (nextDispatchOpenAt, campaign.server.ts waiting/deferred_send_window branches), but editing the calling-hours/send-window of a running or waiting campaign (`$selected_id/settings.action.server.ts` case 'save') never rewrites the queued successor's retry_at, so the campaign keeps sleeping to the stale boundary.",
-    "currentBehavior": "A deferred campaign_dispatch successor is enqueued at min(nextOpenAt, now+60min). A schedule edit updates the campaign row only; rescheduleQueuedJob (enqueue-job.server.ts:133) is called from the launch path only (campaign-execution.server.ts:129).",
-    "rootCause": "The successor parked at defer time is not rescheduled when the window is later widened/opened.",
-    "resolution": "On settings save of `schedule`/`sms_send_window` for a running/waiting/scheduled machine campaign, reschedule the live campaign_dispatch row (same live-dedupe predicate) to min(nextOpenAt, now+60min) via rescheduleQueuedJob.",
-    "lookIn": [
-      "app/lib/worker/handlers/campaign.server.ts",
-      "app/lib/campaign-dispatch-policy.ts",
-      "app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts",
-      "app/lib/worker/enqueue-job.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Campaign dispatched to a deferred successor -> window edited to open now -> queued job retry_at is pulled forward"
-    ],
-    "acceptanceCriteria": [
-      "Editing the window to open now moves the parked successor forward",
-      "Far-future cap (now+60min) still applies on the reschedule"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Parent #1352 still open needs-repro; this is the actionable child."
-  },
-  {
-    "issueNumber": 1822,
-    "verdict": "fix-now",
-    "recommendedTitle": "ops(ci): mint PROJECT_TOKEN so issue-on-dev.yml moves the kanban Status",
-    "summary": "Sai: agents add the `on-dev` label instead of setting the project Status; `gh project item-edit` is the correct command. Root cause: issue-on-dev.yml always labelled and only moved Status when ON_DEV_PROJECT_NUMBER + PROJECT_TOKEN were set — the variable was unset and the secret missing, so every dev merge produced label-only. The workflow has been rewritten to be Status-only (no label) with the variable set to 9; the only remaining gap is minting the PROJECT_TOKEN secret.",
-    "currentBehavior": "issue-on-dev.yml: finds referenced issues (closing keywords AND `Issues: #N` line), moves them to 'On dev' via gh project item-edit, then comments. Without PROJECT_TOKEN it logs the skip and still comments.",
-    "rootCause": "GITHUB_TOKEN cannot write org projects; without the fine-grained PROJECT_TOKEN secret the Status move step was silently skipped and the label was the visible proxy.",
-    "resolution": "Mint a fine-grained PAT with Projects read/write scoped to the CHS backlog project and set it as the repo secret PROJECT_TOKEN. Until then the project-on-dev-status skill backfills merges.",
-    "lookIn": [
-      ".github/workflows/issue-on-dev.yml"
-    ],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "A dev-merge PR moves its referenced issues to the 'On dev' Status",
-      "No on-dev label is applied anywhere"
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Ops/config; overlaps #1813/#1697/#1686."
+    "trackerRecommendation": "Product decided complete = all calls settled. Fix now via the completion gate."
   }
 ]

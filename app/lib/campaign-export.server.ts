@@ -14,6 +14,7 @@ import {
   getCampaignQueueContactIds,
 } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
+import { resolveIvrAnswerLabel } from "@/lib/ivr-results";
 import {
   voiceBillingKindFromCampaignType,
   voiceCreditsFromDurationSeconds,
@@ -60,7 +61,7 @@ async function appendDequeuedRowsToCsv(args: {
   for (const dequeuedRow of dequeuedRows) {
     // A successful SMS is dequeued after Twilio accepts it. The message row
     // above is the canonical export row; adding a synthesized skipped row for
-    // the same queue entry would make one send appear twice (#1788).
+    // the same queue entry would make one send appear twice.
     if (dequeuedRow.dequeued_reason === "SMS message sent") continue;
 
     const contact = contactById.get(String(dequeuedRow.contact_id));
@@ -303,7 +304,7 @@ export async function processMessageCampaignExport(
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    // #1417: append synthesized rows for queue entries that were
+    // append synthesized rows for queue entries that were
     // dequeued before ever producing a `message` — landline pre-check,
     // opt-out, duplicate suppression. Without this, dequeued contacts
     // silently vanish from the CSV (indistinguishable from a bug).
@@ -441,7 +442,7 @@ export async function processCallCampaignExport(
             : 0;
         // A missing, zero, negative, or invalid duration means the call did
         // not connect and has no billable usage. Connected calls use the same
-        // campaign-aware rate card as the billing path (#1789).
+        // campaign-aware rate card as the billing path.
         const creditsUsed = durationSeconds > 0
           ? voiceCreditsFromDurationSeconds(durationSeconds, billingKind)
           : 0;
@@ -516,7 +517,18 @@ export async function processCallCampaignExport(
           campaign.status,
           creditsUsed.toString(),
           pageResponses,
-          ...scriptQuestions.map((q) => responses[q.id]),
+          // Resolve the recorded DTMF value to the option label the caller
+          // actually chose; fall back to the raw value when the option
+          // is gone from the current script.
+          ...scriptQuestions.map((q) => {
+            const answer = responses[q.id];
+            if (answer == null || String(answer).trim() === "") return "";
+            return resolveIvrAnswerLabel(
+              script?.steps ?? null,
+              q.id,
+              String(answer).trim(),
+            );
+          }),
         ];
 
         csvLines.push(csvRow(rowData, { protectFromInjection: true }));

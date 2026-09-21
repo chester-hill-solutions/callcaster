@@ -123,6 +123,7 @@ jobs:
       # service functions a route calls, because this codebase checks there.
       - run: npm run check:route-membership
       - run: npm run check:workspace-projection
+      - run: npm run check:unscoped-db-imports
       - run: npm run check:effects
       - run: npm run check:type-safety
       # A relative `redirect("../…")` in a loader/action resolves against
@@ -141,6 +142,11 @@ jobs:
       # route's catch-all error and nobody connects the two. New factories
       # must spread importOriginal (ratchet baseline keeps existing ones).
       - run: npm run check:test-mocks
+      # A test expectation whose value is an identifier imported from the SUT
+      # itself (expect(x).toBe(SUT_CONSTANT)) passes for any value the SUT
+      # chooses (#1931). The check flags those; the baseline only ratchets
+      # down.
+      - run: npm run check:test-echo
       - run: npm run check:db-rpcs
       # check:db-rpcs only asks whether a function EXISTS — its header says it
       # cannot see inside one. This reads the body: the queue RPCs must write

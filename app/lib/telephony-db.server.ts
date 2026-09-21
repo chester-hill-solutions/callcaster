@@ -8,7 +8,10 @@ import {
 import { db } from "@/server/db";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
-import { canTransitionOutreachDisposition } from "@/lib/outreach-disposition";
+import {
+  canTransitionOutreachDisposition,
+  TERMINAL_OUTREACH_DISPOSITIONS_LIST,
+} from "@/lib/outreach-disposition";
 import { logger } from "@/lib/logger.server";
 import type { OutreachAttempt } from "@/lib/types";
 
@@ -88,6 +91,12 @@ export function canTransitionCallStatus(
 const TERMINAL_CALL_STATUSES_SQL = sql.raw(
   `ARRAY[${Array.from(TERMINAL_CALL_STATUSES)
     .map((status) => `'${status}'`)
+    .join(", ")}]`,
+);
+
+const TERMINAL_OUTREACH_DISPOSITIONS_SQL = sql.raw(
+  `ARRAY[${TERMINAL_OUTREACH_DISPOSITIONS_LIST
+    .map((disposition) => `'${disposition}'`)
     .join(", ")}]`,
 );
 
@@ -183,7 +192,7 @@ export async function claimTerminalCallStatus(
       eq(callTable.sid, sid),
       // ::text — call.status is the call_status ENUM in every real database
       // and lower(call_status) does not exist; without the cast this guard
-      // throws instead of guarding (#1289).
+      // throws instead of guarding.
       or(isNull(callTable.status), sql`LOWER(${callTable.status}::text) <> ${normalized}`),
     ),
   });
@@ -216,7 +225,7 @@ export async function updateCallBySid(
   // ::text on the column: call.status is the call_status ENUM in every real
   // database, and lower(call_status) does not exist — without the cast this
   // UPDATE throws, so every status-bearing webhook/sync write failed and rows
-  // accumulated in 'queued' forever (#1289). The unit tier mocks the db
+  // accumulated in 'queued' forever. The unit tier mocks the db
   // client and could not see it; test/integration-db/call-status-guard.test.ts
   // runs this statement against a real database.
   const guardedStatus = sql`CASE WHEN LOWER(${callTable.status}::text) = ANY(${TERMINAL_CALL_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_CALL_STATUSES_SQL}) THEN ${callTable.status} ELSE ${update.status} END`;
@@ -254,6 +263,43 @@ export async function findOutreachAttemptById(
   return (await tenant.outreach_attempt.findFirst({
     where: eq(outreachAttemptTable.id, id),
   })) as OutreachRow | null;
+}
+
+/**
+ * Atomically records a terminal outreach disposition.
+ *
+ * The returned row belongs only to the delivery that moves the attempt from a
+ * non-terminal disposition. A retry gets null, so callers can guard a
+ * one-time side effect without changing the provider call status.
+ */
+export async function claimTerminalOutreachDisposition(
+  workspaceId: string,
+  id: number | string,
+  disposition: (typeof TERMINAL_OUTREACH_DISPOSITIONS_LIST)[number],
+  options?: { tdb?: TenantDb },
+): Promise<OutreachRow | null | Response> {
+  const attemptId = Number(id);
+  const tdb = options?.tdb ?? createTenantDb(workspaceId);
+
+  try {
+    const [row] = await tdb.outreach_attempt.update({
+      set: { disposition },
+      where: and(
+        eq(outreachAttemptTable.id, attemptId),
+        or(
+          isNull(outreachAttemptTable.disposition),
+          sql`LOWER(${outreachAttemptTable.disposition}) <> ALL(${TERMINAL_OUTREACH_DISPOSITIONS_SQL})`,
+        ),
+      ),
+    });
+    return row ?? null;
+  } catch (error: unknown) {
+    logger.error("Error claiming outreach disposition:", error);
+    return new Response(
+      `Error claiming outreach disposition: ${error instanceof Error ? error.message : "Unknown error"}`,
+      { status: 500 },
+    );
+  }
 }
 
 export async function updateOutreachAttemptForWorkspace(

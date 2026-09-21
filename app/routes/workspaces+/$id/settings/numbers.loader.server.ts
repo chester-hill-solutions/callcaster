@@ -7,7 +7,6 @@ import {
 } from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
 import { getWorkspaceCredits } from "@/lib/workspace-members-db.server";
-import { createTenantDb } from "@/server/tenant-db";
 import { listObjects } from "@/lib/object-storage.server";
 import { defineLoader } from "@/lib/handler.server";
 import { getWorkspaceMessagingOnboardingState } from "@/lib/messaging-onboarding.server";
@@ -16,7 +15,7 @@ export const loader = defineLoader({
   auth: workspaceRouteAuth,
   sideEffects: ["db-read", "external"],
   handler: async ({ auth }) => {
-    const { headers, user, workspaceId, userRole } = auth;
+    const { headers, user, workspaceId, userRole, tdb } = auth;
     if (!user || !workspaceId) {
       return redirect("/signin");
     }
@@ -30,7 +29,6 @@ export const loader = defineLoader({
       );
     }
 
-    const tdb = createTenantDb(workspaceId);
     const [
       { data: users },
       { data: phoneNumbers },

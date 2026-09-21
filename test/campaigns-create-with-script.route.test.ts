@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-import { asRouteResponse } from "./helpers/route-result";
+import { asRouteResponse, routeArgs } from "./helpers/route-result";
 import {
   TEST_WORKSPACE_ID,
   TEST_WORKSPACE_ID_ALT,
@@ -306,6 +306,53 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
       error: expect.stringMatching(/exactly one of script or script_id/i),
     });
   });
+
+  test.each(["simple_ivr", "complex_ivr"] as const)(
+    "rejects legacy campaign type %s before any write and directs callers to robocall",
+    async (legacyType) => {
+      mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
+        authType: "api_key",
+        workspaceId: TEST_WORKSPACE_ID,
+        client: {},
+        keyId: "k1",
+        scopes: ["campaigns.write"],
+      });
+      mocks.parseJsonBodyOrResponse.mockImplementation(async (request, schema) => {
+        const actual = await vi.importActual<typeof import("@/lib/api-parse.server")>(
+          "@/lib/api-parse.server",
+        );
+        return actual.parseJsonBodyOrResponse(request, schema);
+      });
+
+      const mod = await import(
+        "../app/routes/api+/campaigns/create-with-script.route"
+      );
+      const res = await asRouteResponse(
+        mod.action(
+          routeArgs(
+            new Request("http://x", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: "Legacy IVR",
+                type: legacyType,
+                caller_id: "+1555",
+                script_id: 1,
+              }),
+            }),
+          ),
+        ),
+      );
+
+      expect(res.status).toBe(400);
+      await expect(res.json()).resolves.toEqual({
+        error: `type: "${legacyType}" is no longer supported; use "robocall" instead`,
+      });
+      expect(mocks.validateCreateWithScriptPreflight).not.toHaveBeenCalled();
+      expect(mocks.createScriptForCampaign).not.toHaveBeenCalled();
+      expect(mocks.createCampaign).not.toHaveBeenCalled();
+    },
+  );
 
   test("returns 500 when workspace_number query errors", async () => {
     mocks.verifyApiKeyOrSession.mockResolvedValueOnce({
@@ -846,4 +893,3 @@ describe("app/routes/api+/campaigns/route.create-with-script.tsx", () => {
     });
   });
 });
-

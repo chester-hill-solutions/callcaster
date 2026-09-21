@@ -13,7 +13,6 @@ import { parseOptOutKeywords } from "@/lib/chat-opt-out";
 import { workspaceMessagingServiceHasAvailableSenders } from "@/lib/sms-campaign-send-mode";
 import type { Json } from "@/lib/db-types";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
-import { createTenantDb } from "@/server/tenant-db";
 import { eq } from "drizzle-orm";
 import { defineLoader } from "@/lib/handler.server";
 
@@ -21,7 +20,7 @@ export const loader = defineLoader({
   auth: workspaceRouteAuth,
   sideEffects: ["db-read"],
   handler: async ({ params, url, auth }) => {
-  const { headers, user, workspaceId, userRole } = auth;
+  const { headers, user, workspaceId, userRole, tdb } = auth;
   const contact_id = url.searchParams.get("contact_id");
   const campaign_id = url.searchParams.get("campaign_id");
   const search = url.searchParams.get("search") ?? undefined;
@@ -43,8 +42,6 @@ export const loader = defineLoader({
   if (!workspaceId) {
     throw redirect("/workspaces");
   }
-
-  const tdb = createTenantDb(workspaceId);
 
   let optOutKeywords = parseOptOutKeywords(null);
   let attachedSenderPhoneNumbers: string[] = [];

@@ -55,8 +55,9 @@ const schemas = {
       title: { type: "string" as const, description: "Campaign title." },
       type: {
         type: "string" as const,
-        enum: ["live_call", "robocall", "simple_ivr", "complex_ivr"] as const,
-        description: "Campaign type (script-based).",
+        enum: ["live_call", "robocall"] as const,
+        description:
+          "Campaign type (script-based). Use robocall for an automated phone menu.",
       },
       caller_id: {
         type: "string" as const,

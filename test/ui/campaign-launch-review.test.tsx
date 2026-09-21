@@ -8,10 +8,15 @@ vi.mock("@/components/campaign/settings/detailed/CampaignLaunchExtras", () => ({
   CampaignLaunchExtras: () => null,
 }));
 vi.mock("@/components/campaign/settings/CampaignCostPanel", () => ({
-  CampaignCostPanel: () => null,
+  CampaignCostPanel: ({ billing }: { billing?: unknown }) => (
+    <div data-testid="campaign-cost-panel" data-has-billing={billing ? "yes" : "no"} />
+  ),
 }));
 
-function renderLaunchReview(readinessIssues: string[] = []) {
+function renderLaunchReview(
+  readinessIssues: string[] = [],
+  campaignBilling: unknown = null,
+) {
   const props = {
     campaignData: {
       id: 9,
@@ -54,6 +59,7 @@ function renderLaunchReview(readinessIssues: string[] = []) {
       syncSnapshot: {},
     },
     launchActionLabelOverride: "Start text campaign",
+    campaignBilling,
   } as never;
 
   const router = createMemoryRouter(
@@ -94,5 +100,21 @@ describe("campaign launch review", () => {
     expect(
       screen.getByRole("button", { name: "Start text campaign" }),
     ).toBeDisabled();
+  });
+
+  test("shows the campaign cost inline, not behind a disclosure (#1859)", () => {
+    renderLaunchReview([], { estimate: { totalCredits: 12, rateDescription: "1 credit" } });
+
+    const panel = screen.getByTestId("campaign-cost-panel");
+    expect(panel).toHaveAttribute("data-has-billing", "yes");
+    // The old <details><summary>Campaign cost</summary> wrapper is gone.
+    expect(screen.queryByText("Campaign cost")).toBeNull();
+    expect(document.querySelector("details")).toBeNull();
+  });
+
+  test("renders no cost panel when the campaign has no billing summary", () => {
+    renderLaunchReview();
+
+    expect(screen.queryByTestId("campaign-cost-panel")).toBeNull();
   });
 });

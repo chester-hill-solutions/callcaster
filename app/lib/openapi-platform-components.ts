@@ -347,10 +347,16 @@ export const platformOpenApiComponents = {
     WorkspaceInvite: {
       type: "object" as const,
       properties: {
-        id: { type: "integer" as const },
-        user_id: { type: "string" as const, format: "uuid" },
+        id: { type: "string" as const },
+        email: { type: "string" as const, format: "email" },
         role: { $ref: "#/components/schemas/WorkspaceMemberRole" },
-        created_at: { type: "string" as const, format: "date-time", nullable: true },
+        status: {
+          type: "string" as const,
+          enum: ["pending", "accepted", "canceled", "superseded", "expired"] as const,
+        },
+        workspace: { type: "string" as const, format: "uuid" },
+        created_at: { type: "string" as const, format: "date-time" },
+        expires_at: { type: "string" as const, format: "date-time", nullable: true },
         user: {
           type: "object" as const,
           nullable: true,
@@ -411,9 +417,9 @@ export const platformOpenApiComponents = {
     },
     DeleteMemberRequest: {
       type: "object" as const,
-      required: ["user_id"] as const,
       properties: {
         user_id: { type: "string" as const, format: "uuid" },
+        invite_id: { type: "string" as const },
         target: { type: "string" as const, enum: ["member", "invite"] as const },
       },
     },

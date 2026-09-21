@@ -11,7 +11,7 @@ import {
   contact as contactTable,
   workspace_number as workspaceNumberTable,
 } from "@/db/schema";
-import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { type TenantDb } from "@/server/tenant-db";
 import { findMatchingContactIds } from "@/lib/inbound-sms-context.server";
 import { hasTemplateSyntax, processTemplateTags } from "@/lib/message-templates";
 import { logger } from "@/lib/logger.server";
@@ -49,11 +49,12 @@ async function renderChatBody(args: {
   workspaceId: string;
   contactId: string | undefined;
   phone: string;
+  tdb: TenantDb;
 }): Promise<string> {
-  const { body, workspaceId, contactId, phone } = args;
+  const { body, workspaceId, contactId, phone, tdb } = args;
   if (!hasTemplateSyntax(body)) return body;
   const contact = await resolveTemplateContact(
-    createTenantDb(workspaceId),
+    tdb,
     workspaceId,
     contactId,
     phone,
@@ -81,7 +82,7 @@ export const action = defineAction({
   auth: workspaceRouteAuth,
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, params, auth }) => {
-  const { headers, user, workspaceId } = auth;
+  const { headers, user, workspaceId, tdb } = auth;
   const formData = await request.formData();
   const data = Object.fromEntries(formData);
 
@@ -215,7 +216,6 @@ export const action = defineAction({
     }
 
     try {
-      const tdb = createTenantDb(workspaceId);
       const workspaceNumbers = await tdb.workspace_number.findMany({
         where: eq(workspaceNumberTable.type, "rented"),
         columns: { phone_number: true },
@@ -273,6 +273,7 @@ export const action = defineAction({
     workspaceId,
     contactId,
     phone: contact_number,
+    tdb,
   });
 
   try {

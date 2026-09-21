@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 /**
- * The guarded status writes, exercised against a REAL database (#1289).
+ * The guarded status writes, exercised against a REAL database.
  *
  * `call.status` and `message.status` are Postgres ENUMs in every real
  * database lineage, and `lower(<enum>)` does not exist — the un-cast
@@ -18,7 +18,8 @@ import { afterAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 // The realtime side channel is non-fatal in production and covered elsewhere;
 // stubbing keeps this suite to one subject (the guarded UPDATE statements).
-vi.mock("@/lib/workspace-events.server", () => ({
+vi.mock("@/lib/workspace-events.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-events.server")>()),
   emitQueueEvent: vi.fn(async () => undefined),
   emitPostgresChangeEvent: vi.fn(async () => undefined),
   emitChatMessageEvent: vi.fn(async () => undefined),
@@ -43,22 +44,59 @@ const suite = DATABASE_URL ? describe : describe.skip;
 const WORKSPACE_ID = "11111111-2222-4333-8444-555555555555";
 const CALL_SID = "CAintegration_status_guard_01";
 const MESSAGE_SID = "SMintegration_status_guard_01";
+const CAMPAIGN_ID = 1889001;
+const CONTACT_ID = 1889001;
+const OUTREACH_ATTEMPT_ID = 1889001;
 
 suite("guarded status writes against a real database (#1289)", () => {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   let sqlClient: any;
   let updateCallBySid: any;
   let claimTerminalCallStatus: any;
+  let claimTerminalOutreachDisposition: any;
   let updateMessageBySid: any;
   /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  async function deleteOutreachClaimFixture() {
+    await sqlClient`delete from outreach_attempt where id = ${OUTREACH_ATTEMPT_ID}`;
+    await sqlClient`delete from campaign where id = ${CAMPAIGN_ID}`;
+    await sqlClient`delete from contact where id = ${CONTACT_ID}`;
+  }
+
+  async function insertOutreachClaimFixture() {
+    await deleteOutreachClaimFixture();
+    await sqlClient`
+      insert into campaign (
+        id, created_at, dial_ratio, group_household_queue,
+        next_queue_order, title, workspace
+      ) values (
+        ${CAMPAIGN_ID}, ${new Date().toISOString()}, 1, false,
+        1, 'Status Guard Integration Campaign', ${WORKSPACE_ID}
+      )
+    `;
+    await sqlClient`
+      insert into contact (id, created_at, workspace)
+      values (${CONTACT_ID}, ${new Date().toISOString()}, ${WORKSPACE_ID})
+    `;
+    await sqlClient`
+      insert into outreach_attempt (
+        id, campaign_id, contact_id, created_at, disposition, result, workspace
+      ) values (
+        ${OUTREACH_ATTEMPT_ID}, ${CAMPAIGN_ID}, ${CONTACT_ID}, ${new Date().toISOString()},
+        'in-progress', ${sqlClient.json({})}, ${WORKSPACE_ID}
+      )
+    `;
+  }
 
   beforeEach(async () => {
     process.env.DATABASE_URL = DATABASE_URL;
     const postgres = (await import("postgres")).default;
     sqlClient ??= postgres(DATABASE_URL as string, { max: 1 });
-    ({ updateCallBySid, claimTerminalCallStatus } = await import(
-      "@/lib/telephony-db.server"
-    ));
+    ({
+      updateCallBySid,
+      claimTerminalCallStatus,
+      claimTerminalOutreachDisposition,
+    } = await import("@/lib/telephony-db.server"));
     ({ updateMessageBySid } = await import("@/lib/message-db.server"));
 
     await sqlClient`
@@ -82,6 +120,7 @@ suite("guarded status writes against a real database (#1289)", () => {
     if (!sqlClient) return;
     await sqlClient`delete from call where sid = ${CALL_SID}`;
     await sqlClient`delete from message where sid = ${MESSAGE_SID}`;
+    await deleteOutreachClaimFixture();
     await sqlClient`delete from workspace where id = ${WORKSPACE_ID}`;
     await sqlClient.end();
   });
@@ -120,6 +159,39 @@ suite("guarded status writes against a real database (#1289)", () => {
     );
     expect(first).toBe(true);
     expect(duplicate).toBe(false);
+  });
+
+  test("claimTerminalOutreachDisposition has one winner across concurrent deliveries", async () => {
+    await insertOutreachClaimFixture();
+    try {
+      const claims = await Promise.all([
+        claimTerminalOutreachDisposition(
+          WORKSPACE_ID,
+          OUTREACH_ATTEMPT_ID,
+          "no-answer",
+        ),
+        claimTerminalOutreachDisposition(
+          WORKSPACE_ID,
+          OUTREACH_ATTEMPT_ID,
+          "no-answer",
+        ),
+      ]);
+
+      expect(claims.filter(Boolean)).toHaveLength(1);
+      const [persisted] = await sqlClient`
+        select disposition from outreach_attempt where id = ${OUTREACH_ATTEMPT_ID}
+      `;
+      expect(persisted.disposition).toBe("no-answer");
+      await expect(
+        claimTerminalOutreachDisposition(
+          WORKSPACE_ID,
+          OUTREACH_ATTEMPT_ID,
+          "no-answer",
+        ),
+      ).resolves.toBeNull();
+    } finally {
+      await deleteOutreachClaimFixture();
+    }
   });
 
   test("updateMessageBySid moves an open message to a terminal status on the enum column", async () => {

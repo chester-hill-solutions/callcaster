@@ -177,7 +177,7 @@ describe("webhook side-effect handlers", () => {
       "w1",
       expect.objectContaining({ contact_id: 123 }),
     );
-    // #1218: a provider-terminal status stamps the disposition so the call
+    // a provider-terminal status stamps the disposition so the call
     // shows up in campaign results even when the browser never hit /api/hangup.
     expect(mocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
       "w1",
@@ -205,7 +205,7 @@ describe("webhook side-effect handlers", () => {
     );
   });
 
-  // #1362: a callee hang-up must collapse the queue entry exactly like
+  // a callee hang-up must collapse the queue entry exactly like
   // /api/hangup does, or the agent's nextRecipient keeps showing a finished
   // contact. The assignee comes from the queue row because a webhook has no
   // acting user, and the guarded RPC keeps a double hang-up idempotent.
@@ -244,6 +244,71 @@ describe("webhook side-effect handlers", () => {
         exec: mocks.tenantDb,
       }),
     );
+  });
+
+  test("terminal child call uses its resolved parent outreach attempt to dequeue", async () => {
+    mocks.findCallBySid.mockResolvedValue({
+      sid: "CAchild",
+      parent_call_sid: "CAparent",
+      workspace: "w1",
+      status: "completed",
+      contact_id: 123,
+      campaign_id: 7,
+      outreach_attempt_id: null,
+    });
+    mocks.resolveCallOutreachContext.mockResolvedValueOnce({
+      outreachAttemptId: 10,
+      workspaceId: "w1",
+    });
+    mocks.tenantDb.campaign_queue.findFirst.mockResolvedValueOnce({
+      assigned_to_user_id: "user-1",
+    });
+    const { runCallStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runCallStatusSideEffects({
+      callSid: "CAchild",
+      event: parseTwilioVoiceCallback({
+        CallSid: "CAchild",
+        CallStatus: "completed",
+      }),
+    });
+
+    expect(mocks.findOutreachAttemptWithCampaignType).toHaveBeenCalledWith("w1", 10);
+    expect(mocks.dequeueQueueEntry).toHaveBeenCalledTimes(1);
+  });
+
+  test("test call to a queued contact leaves the queue untouched (#1869)", async () => {
+    mocks.findCallBySid.mockResolvedValue({
+      sid: "CAtest",
+      workspace: "w1",
+      status: "completed",
+      contact_id: 123,
+      campaign_id: 7,
+      outreach_attempt_id: null,
+    });
+    mocks.resolveCallOutreachContext.mockResolvedValueOnce({
+      outreachAttemptId: undefined,
+      workspaceId: "w1",
+    });
+    const { runCallStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runCallStatusSideEffects({
+      callSid: "CAtest",
+      event: parseTwilioVoiceCallback({
+        CallSid: "CAtest",
+        CallStatus: "completed",
+      }),
+    });
+
+    expect(mocks.tenantDb.campaign_queue.findFirst).not.toHaveBeenCalled();
+    expect(mocks.tenantDb.campaign.findFirst).not.toHaveBeenCalled();
+    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(mocks.findOutreachAttemptWithCampaignType).not.toHaveBeenCalled();
+    expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 
   test("non-terminal status does not dequeue the queue row", async () => {

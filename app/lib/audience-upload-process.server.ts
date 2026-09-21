@@ -388,7 +388,9 @@ export const processAudienceUpload = async (
           const value = contact[actualHeader];
             //console.log(`Mapping ${actualHeader} (${typeof value}) -> ${dbField}:`, value);
 
-          if (dbField !== 'name') { // Skip the name field as it's handled above
+          // `name` is handled above; `ignore` means the user dropped this column
+          //so nothing is imported for it.
+          if (dbField !== 'name' && dbField !== 'ignore') {
             if (dbField === 'other_data') {
               // Keep custom values in the same object-per-column shape used by
               // the other canonical CSV contact parser.
@@ -516,7 +518,7 @@ export const processAudienceUpload = async (
         );
       }
 
-      // Update progress — durable row every chunk; sidecar throttled (#1078).
+      // Update progress — durable row every chunk; sidecar throttled.
       processedCount += chunk.length;
 
       await tdb.audience_upload.update({

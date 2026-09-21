@@ -8,7 +8,7 @@ import SelectVoicemail from "@/components/campaign/settings/detailed/CampaignDet
 import SelectVoiceDrop from "@/components/campaign/settings/detailed/live/CampaignDetailed.Live.SelectVoiceDrop";
 
 describe("campaign settings orphan values", () => {
-  test("keeps IVR types in Advanced and preserves an unsupported current type", () => {
+  test("shows an unsupported current type as a disabled legacy option and no Advanced IVR", () => {
     render(
       <SelectType
         campaignData={{ type: "email" } as never}
@@ -20,51 +20,45 @@ describe("campaign settings orphan values", () => {
     expect(screen.getByRole("option", { name: "email · Legacy campaign" })).toHaveAttribute(
       "data-disabled",
     );
-
-    fireEvent.keyDown(document.body, { key: "Escape" });
-    fireEvent.click(screen.getByText("Advanced IVR"));
-    fireEvent.click(document.querySelector("#advanced-ivr-type")!);
-    expect(screen.getByRole("option", { name: "Simple IVR" })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: "Complex IVR" })).toBeInTheDocument();
+    expect(screen.queryByText("Advanced IVR")).not.toBeInTheDocument();
   });
 
-  test("opens Advanced IVR for an existing advanced campaign", () => {
-    render(
+  test("shows a legacy simple/complex IVR campaign as the automated phone menu (#1741)", () => {
+    const { rerender } = render(
       <SelectType
         campaignData={{ type: "complex_ivr" } as never}
         handleInputChange={vi.fn()}
       />,
     );
+    expect(document.querySelector("#type")).toHaveTextContent("Automated phone menu");
 
-    expect(document.querySelector("details")).toHaveAttribute("open");
-    expect(document.querySelector("#advanced-ivr-type")).toHaveTextContent("Complex IVR");
+    rerender(
+      <SelectType
+        campaignData={{ type: "simple_ivr" } as never}
+        handleInputChange={vi.fn()}
+      />,
+    );
+    expect(document.querySelector("#type")).toHaveTextContent("Automated phone menu");
   });
 
-  test("hides Advanced IVR for live calling and text campaigns", () => {
+  test("never offers Advanced IVR, for any campaign type (#1741)", () => {
     const { rerender } = render(
       <SelectType
         campaignData={{ type: "live_call" } as never}
         handleInputChange={vi.fn()}
       />,
     );
-
     expect(screen.queryByText("Advanced IVR")).not.toBeInTheDocument();
 
-    rerender(
-      <SelectType
-        campaignData={{ type: "message" } as never}
-        handleInputChange={vi.fn()}
-      />,
-    );
-    expect(screen.queryByText("Advanced IVR")).not.toBeInTheDocument();
-
-    rerender(
-      <SelectType
-        campaignData={{ type: "robocall" } as never}
-        handleInputChange={vi.fn()}
-      />,
-    );
-    expect(screen.getByText("Advanced IVR")).toBeInTheDocument();
+    for (const type of ["message", "robocall", "simple_ivr", "complex_ivr"]) {
+      rerender(
+        <SelectType
+          campaignData={{ type } as never}
+          handleInputChange={vi.fn()}
+        />,
+      );
+      expect(screen.queryByText("Advanced IVR")).not.toBeInTheDocument();
+    }
   });
 
   test("shows unavailable caller ID and script values", () => {

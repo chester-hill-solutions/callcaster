@@ -156,6 +156,9 @@ describe("auto-dial.server", () => {
         from: "+15557654321",
         url: "https://example.test/api/auto-dial/conf-1",
         statusCallback: "https://example.test/api/auto-dial/status",
+        // Predictive dialing keeps synchronous AMD: there is no agent
+        // on the line, so a machine must be detected and dropped/hung up.
+        machineDetection: "Enable",
       }),
     );
   });

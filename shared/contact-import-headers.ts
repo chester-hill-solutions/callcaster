@@ -13,6 +13,10 @@ export const CONTACT_IMPORT_TARGETS = [
   "external_id",
   "carrier",
   "other_data",
+  // Sentinel target: the user chose not to import this column. It is
+  // never a database field — the import skips it, and it cannot collide with a
+  // real target in validation.
+  "ignore",
 ] as const;
 
 export type ContactImportTarget = (typeof CONTACT_IMPORT_TARGETS)[number];
@@ -32,9 +36,13 @@ export const CONTACT_IMPORT_LABELS: Record<ContactImportTarget, string> = {
   external_id: "External ID",
   carrier: "Phone carrier",
   other_data: "Custom field",
+  ignore: "Do not import",
 };
 
-const HEADER_ALIASES: Record<Exclude<ContactImportTarget, "other_data">, readonly string[]> = {
+const HEADER_ALIASES: Record<
+  Exclude<ContactImportTarget, "other_data" | "ignore">,
+  readonly string[]
+> = {
   firstname: ["first", "first name", "firstname", "given name", "givenname", "forename"],
   surname: ["last", "last name", "lastname", "surname", "family name", "familyname"],
   name: ["name", "full name", "fullname", "contact name"],
@@ -78,7 +86,8 @@ const normalizeHeader = (header: string): string =>
 export function matchContactImportHeader(header: string): ContactImportTarget | null {
   const normalized = normalizeHeader(header);
   for (const target of CONTACT_IMPORT_TARGETS) {
-    if (target === "other_data") continue;
+    // `other_data` and `ignore` are not matched by header text.
+    if (target === "other_data" || target === "ignore") continue;
     if (HEADER_ALIASES[target].includes(normalized)) return target;
   }
   return null;
@@ -162,7 +171,8 @@ export function validateContactImportMapping(
   }
 
   for (const target of CONTACT_IMPORT_TARGETS) {
-    if (target === "other_data") continue;
+    // A dropped column is not a field, so it cannot be a duplicate target.
+    if (target === "other_data" || target === "ignore") continue;
     const headers = entries
       .filter(([, mappedTarget]) => mappedTarget === target)
       .map(([header]) => header);

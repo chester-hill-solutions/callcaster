@@ -1,23 +1,19 @@
-import { Call, Campaign, OutreachAttempt, Script, type Block } from "@/lib/types";
-import { resolveCampaignScript, fetchCampaignWithScript } from "@/lib/campaign-ivr.server";
-import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
+import { Call, OutreachAttempt } from "@/lib/types";
+import { fetchCampaignWithScript } from "@/lib/campaign-ivr.server";
 import { data as routeData } from "react-router";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { requireTwilioSignature } from "@/lib/twilio-webhook.server";
 import {
-  hangupTwiml,
-  pausePlayTwiml,
-  pauseSayTwiml,
-} from "@/lib/twilio-twiml.server";
-import {
   buildCallUpsertFromTwilioParams,
   processCallStatusWebhook,
 } from "@/lib/twilio-call-status.server";
 import { findCallBySid, updateOutreachAttemptForWorkspace } from "@/lib/telephony-db.server";
-import { createSignedObjectUrl } from "@/lib/object-storage.server";
+import {
+  isMachineAnswered,
+  recordMachineAnswer,
+} from "@/lib/ivr-machine.server";
 import { defineAction } from "@/lib/handler.server";
-import type Twilio from "twilio";
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 
 export interface CallEvent {
@@ -65,53 +61,12 @@ export interface CallEvent {
     }
 };
 
-interface ScriptSteps {
-    pages?: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }>;
-    blocks?: Record<string, Block>;
-}
-
-function findVoicemailPage(pagesObject: Record<string, { title: string; blocks: string[]; speechType?: string; say?: string }> | undefined): { title: string; blocks: string[]; speechType?: string; say?: string } | null {
-    if (!pagesObject) return null;
-    for (const pageId in pagesObject) {
-        const page = pagesObject[pageId];
-        if (!page) {
-            continue;
-        }
-        if (page.title.toLowerCase() === "voicemail") {
-            return page;
-        }
-    }
-    return null;
-}
-
-const handleVoicemail = async (twilio: Twilio.Twilio, callSid: string, dbCall: Call, campaign: Campaign & { script: Script | Script[] | null }): Promise<void> => {
-    const call = twilio.calls(callSid);
-    // Test calls (#1653) have a campaign but no outreach attempt; the voicemail
-    // drop must still play for them.
-    if (dbCall.outreach_attempt_id) {
-        await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, { disposition: 'voicemail', answered_at: new Date().toISOString() });
-    }
-    const scriptSteps = (resolveCampaignScript(campaign)?.steps as unknown) as ScriptSteps | null | undefined;
-    const step = findVoicemailPage(scriptSteps?.pages);
-    if (!step) {
-        await call.update({ twiml: hangupTwiml() });
-    } else {
-        if (step.speechType === 'synthetic') {
-            await call.update({ twiml: pauseSayTwiml(step.say ?? "") });
-        } else {
-            if (!campaign.voicemail_file) {
-                throw new Error("Voicemail file is undefined");
-            }
-            const signedUrl = await createSignedObjectUrl(
-                "workspaceAudio",
-                `${dbCall.workspace}/${campaign.voicemail_file}`,
-                3600,
-            );
-            await call.update({ twiml: pausePlayTwiml(signedUrl) });
-        }
-    }
-};
-
+/**
+ * Records the machine-answer disposition, then the status callback continues.
+ * The voicemail audio (or the hangup) is emitted by the flow entry route, which
+ * acts on the synchronous AMD verdict before any IVR audio plays; this
+ * is the callback's safety net and writes the same values.
+ */
 export const action = defineAction({
     auth: async ({ request }) => {
         const formData = await request.clone().formData();
@@ -128,7 +83,7 @@ export const action = defineAction({
         const forbidden = await requireTwilioSignature(request, { callSid });
         return forbidden ?? { params, event, callSid };
     },
-    sideEffects: ["db-write", "credit", "twilio", "external"],
+    sideEffects: ["db-write", "credit", "external"],
     handler: async ({ auth }) => {
     const { params, event, callSid } = auth;
 
@@ -143,30 +98,10 @@ export const action = defineAction({
         if (dbCall.campaign_id == null) throw new Error("Call missing campaign_id");
         const campaignData = await fetchCampaignWithScript(dbCall.campaign_id);
 
-        const twilio = await createWorkspaceTwilioInstance({ workspace_id: dbCall.workspace });
-
         const callStatus = event.callStatus;
-        const answeredBy = event.answeredBy ?? "";
-        const isMachine =
-            Boolean(answeredBy) &&
-            answeredBy.includes('machine') &&
-            !answeredBy.includes('other') &&
-            callStatus !== 'completed';
 
-        if (isMachine) {
-            // `dbCall` is already typed as `Call` (`Call` and `findCallBySid`'s
-            // `CallRow` both alias the same Drizzle-inferred `call` row via
-            // `@/lib/db-types`), so it needs no cast here. `fetchCampaignWithScript`'s
-            // `script` field can be `undefined` (a `script_id` set on the campaign
-            // with no matching `script` row), which `handleVoicemail`'s
-            // `Script | Script[] | null` parameter type doesn't cover — normalize
-            // that one field to `null` instead of casting the whole shape away, so
-            // a genuinely ill-shaped campaign/call row still fails to compile
-            // rather than silently becoming `undefined` at runtime.
-            await handleVoicemail(twilio, callSid, dbCall, {
-                ...campaignData,
-                script: campaignData.script ?? null,
-            });
+        if (isMachineAnswered(event.answeredBy, callStatus)) {
+            await recordMachineAnswer(dbCall, campaignData);
         } else if (['failed', 'no-answer', 'completed'].includes(callStatus)) {
             const updateData = buildCallUpsertFromTwilioParams(params);
             await processCallStatusWebhook(updateData, {
@@ -182,9 +117,9 @@ export const action = defineAction({
             // this the attempt keeps a NULL disposition and `get_campaign_stats`
             // filters the call out of campaign results entirely. Twilio's
             // terminal statuses are already valid disposition values; a machine
-            // answer that later reports `completed` keeps its `voicemail`
-            // disposition via the terminal-transition guard in
-            // `updateOutreachAttemptForWorkspace`.
+            // answer that later reports `completed` keeps its machine
+            // disposition (`voicemail` or `no-answer`) via the terminal
+            // transition guard in `updateOutreachAttemptForWorkspace`.
             if (dbCall.outreach_attempt_id) {
                 await updateResult(String(dbCall.workspace), dbCall.outreach_attempt_id, {
                     disposition: callStatus,

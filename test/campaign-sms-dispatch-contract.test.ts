@@ -30,11 +30,9 @@ vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 });
 
-// ---------------------------------------------------------------------------
 // Mocks — union of what both adapters and the real coordinator need. The
 // coordinator itself is NEVER mocked here; that would defeat the point of a
 // shared contract.
-// ---------------------------------------------------------------------------
 
 const mocks = vi.hoisted(() => ({
   // HTTP-adapter deps
@@ -108,7 +106,7 @@ vi.mock("@/lib/campaign-queue-db.server", () => ({
 }));
 vi.mock("@/lib/message-db.server", () => ({
   countCampaignMessagesToPhone: (...args: unknown[]) => mocks.countCampaignMessagesToPhone(...args),
-  // Intent-row helpers (#1582): the contract covers dispatch gates and pacing,
+  // Intent-row helpers: the contract covers dispatch gates and pacing
   // so the row lifecycle is stubbed as a success here.
   pendingMessageSid: (ref: string) => `pending:${ref}`,
   resolveMessageByClientRef: vi.fn(async (_ws: string, _ref: string, update: { sid: string }) => ({ id: 1, ...update })),
@@ -183,9 +181,7 @@ vi.mock("@/lib/twilio-compliance-job.server", () => ({
   runWorkspaceTwilioComplianceJob: vi.fn(),
 }));
 
-// ---------------------------------------------------------------------------
 // Fixture helpers
-// ---------------------------------------------------------------------------
 
 const basePortal = makePortalConfig();
 const USER_ID = "3b6f0a52-6f5e-4b2d-9d55-000000000002";
@@ -368,9 +364,7 @@ function assertSendContract(expectedSends: number) {
   expect(mocks.rpcCreateOutreachAttempt.mock.calls.length).toBe(expectedSends);
 }
 
-// ---------------------------------------------------------------------------
 // The contract
-// ---------------------------------------------------------------------------
 
 describe.each(SCENARIOS)("SMS dispatch contract — $name", (scenario) => {
   beforeEach(() => {
@@ -396,12 +390,10 @@ describe.each(SCENARIOS)("SMS dispatch contract — $name", (scenario) => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Send-window deferral has different observable outcomes per adapter — the
 // HTTP response body vs. worker successor enqueue — so it's not a shape-fits-
 // all `SCENARIOS` row. Both adapters must still refuse to send or dequeue any
 // row, and both must carry the exact `nextOpenAt` boundary forward.
-// ---------------------------------------------------------------------------
 
 describe("SMS dispatch contract — outside send window defers both adapters", () => {
   const NEXT_OPEN = new Date("2026-08-30T12:00:00Z");
@@ -454,11 +446,9 @@ describe("SMS dispatch contract — outside send window defers both adapters", (
   });
 });
 
-// ---------------------------------------------------------------------------
 // MPS pacing is a coordinator-level property: contact-handler starts must be
 // spaced by at least 1000/mps ms. Adapter identity doesn't matter — one test
 // through the HTTP adapter with fake timers is sufficient signal.
-// ---------------------------------------------------------------------------
 
 describe("SMS dispatch contract — start rate does not exceed configured MPS", () => {
   beforeEach(() => {
@@ -521,12 +511,10 @@ describe("SMS dispatch contract — start rate does not exceed configured MPS", 
   });
 });
 
-// ---------------------------------------------------------------------------
-// Credit budget (#1483): the entry gate reads the balance once, but debits
+// Credit budget: the entry gate reads the balance once, but debits
 // land after delivery, so every row in a batch would pass on the same stale
 // balance. Both adapters must stop starting sends once the remaining balance
 // cannot cover the next estimated message, and leave those rows queued.
-// ---------------------------------------------------------------------------
 
 const TWO_ELIGIBLE_ROWS: QueueMember[] = [
   {
@@ -581,11 +569,9 @@ describe("SMS dispatch contract — balance covers one send, not two", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Exhaustion (#1513): a send that fails records the attempt on its queue row
+// Exhaustion: a send that fails records the attempt on its queue row
 // and the batch runs the exhaustion sweep, so a row at the attempt maximum is
 // dead-lettered and reported instead of pinning the chain to retries.
-// ---------------------------------------------------------------------------
 
 describe("SMS dispatch contract — a failing send records its attempt and the sweep dead-letters it", () => {
   beforeEach(() => {
@@ -617,11 +603,9 @@ describe("SMS dispatch contract — a failing send records its attempt and the s
   });
 });
 
-// ---------------------------------------------------------------------------
 // E5.1: the runtime bodies must match the generated OpenAPI/Zod contract, and
 // the two 200 variants must narrow cleanly (a deferred body carries an empty
 // `responses` too, so `creditsExhausted` is what keeps them apart).
-// ---------------------------------------------------------------------------
 
 describe("SMS dispatch contract — response bodies match the generated API contract (E5.1)", () => {
   const ELIGIBLE = [
