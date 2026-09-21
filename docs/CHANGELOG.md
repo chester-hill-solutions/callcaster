@@ -10,6 +10,7 @@ _No unreleased entries yet._
 
 ### Changed
 
+- Workspace invites are now email-first: you can invite anyone by email, whether or not they already have an account. Invitees without an account are prompted to create one and accept through the emailed link; existing users sign in and accept the same way ([#1713](https://github.com/chester-hill-solutions/callcaster/issues/1713)).
 - Call-list uploads can now drop a column: pick **Do not import** in the column mapping instead of forcing it into a custom field ([#1847](https://github.com/chester-hill-solutions/callcaster/issues/1847)).
 - IVR prompts now play from a Twilio-friendly WAV copy when one exists, so Twilio no longer re-encodes the audio before playback. The MP3 stays the canonical library object and the fallback ([#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842)).
 - Campaign costs are now shown directly on the Launch page instead of behind a "Campaign cost" disclosure ([#1859](https://github.com/chester-hill-solutions/callcaster/issues/1859)).
