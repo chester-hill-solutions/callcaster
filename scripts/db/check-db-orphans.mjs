@@ -38,7 +38,6 @@ const KEEP = new Map([
   ["get_contacts_by_audience", "legacy reporting RPC, pending decision"],
   ["get_conversation_summary_by_campaign", "legacy reporting RPC, pending decision"],
   ["get_dynamic_outreach_results", "legacy reporting RPC, pending decision"],
-  ["get_outreach_attempts", "legacy reporting RPC, pending decision"],
   ["get_outreach_results", "legacy reporting RPC, pending decision"],
   ["get_survey_results", "legacy reporting RPC, pending decision"],
   ["get_conversation_summary", "legacy reporting RPC, pending decision"],
