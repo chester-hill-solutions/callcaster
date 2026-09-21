@@ -617,5 +617,50 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Product decided complete = all calls settled. Fix now via the completion gate."
+  },
+  {
+    "issueNumber": 1713,
+    "verdict": "fix-now",
+    "recommendedTitle": "Workspace invites: email-first (invite by email without requiring an account)",
+    "summary": "Product decision confirmed 2026-09-21: inviting an email must not require the invitee to already have an account. If the email maps to an account, invite that user; if not, attach the email to the workspace and prompt the invitee to create an account. SEC-03 in docs/remediation/wave1-membership-migration-2026-07-13.md is the pre-planned implementation; the workspace_invitation table (email, role_id, token_hash, status, expiry, CAS redeem) is already scaffolded in the migration ledger and app/db/schema.ts, and @chester-hill-solutions/auth-postgres already ships createInvitation/redeemInvitation/resendInvitation/cancelInvitation/listPendingInvitations.",
+    "currentBehavior": "Invites are account-keyed: workspace_invite.user_id is uuid NOT NULL (schema.ts:214). app/lib/invite-user-by-email.server.ts:26-31 returns 'User not found. They must sign up before being invited to a workspace.' when no auth user matches, and the module comment says email delivery is TBD - no invitation email is ever sent; the invitee only sees the invite after logging in. The /accept-invite signup branch admits the gap ('invites are keyed by an existing user id, so nothing here proves an invite exists', accept-invite.action.server.ts:26-28).",
+    "rootCause": "Legacy invite model (workspace_invite) has no email column and no delivery; invites were created only for existing user ids. The email-first replacement (workspace_invitation / SEC-03) was scaffolded in 2026-07 but never adopted by the writers/readers.",
+    "resolution": "Adopt SEC-03 from docs/remediation/wave1-membership-migration-2026-07-13.md §6 (implement-PR #4). PR-sized chunks, implemented after the 2026-09-21 release (#1978) merges:\n1. Writers: replace invite-user-by-email.server.ts to call createInvitation (normalized email, role_id, token_hash via package, 7-day expiry) for unknown emails and keep the existing-user invite path; keep the members.invite capability gate; owner never invitational.\n2. Email: send the invite via Resend (infra in send-reset-password-email.server.ts) with an accept link carrying the invite id + raw token; never store raw tokens.\n3. Redeem: replace accept-invite redemption with redeemInvitation (verified-email match + CAS, insert workspace_member in the same transaction); wire signup (new-user) and sign-in (existing-user) claim paths.\n4. List/UI: listPendingInvitations for the settings Team-members list; render invited emails (name 'invited'); cancel/resend actions.\n5. API surface + OpenAPI: POST /api/workspaces/{id}/members response shape (invite may be email-keyed, no user), member list pending_invites shape.\n6. Cleanup: migrate or abandon outstanding workspace_invite rows, then drop the legacy table (Phase D) once readers/writers are on workspace_invitation.\n#1714 (same 'User not found' error path) resolves when the email-first writers land - verify and close, or fold into this issue.",
+    "lookIn": [
+      "app/lib/invite-user-by-email.server.ts",
+      "app/lib/platform-members.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/members.action.server.ts",
+      "app/routes/accept-invite.action.server.ts",
+      "app/routes/accept-invite.loader.server.ts",
+      "app/routes/accept-invite.tsx",
+      "app/routes/workspaces+/$id/settings.route.tsx",
+      "app/db/schema.ts:180",
+      "app/lib/schemas/api/platform-workspace-admin.ts",
+      "app/lib/send-reset-password-email.server.ts",
+      "docs/remediation/wave1-membership-migration-2026-07-13.md"
+    ],
+    "existingTests": [
+      "test/accept-invite* (accept/redeem; see test/ for invite coverage)",
+      "members API invite tests (POST /members)"
+    ],
+    "missingTests": [
+      "createInvitation writer: unknown email creates pending email-keyed invite; existing user creates user-keyed invite; duplicate pending email rejected",
+      "redeemInvitation: wrong token, expired, wrong email vs verified email, concurrent redeem CAS",
+      "signup-claim: new account with invited email lands in the workspace on /accept-invite",
+      "email sent carries id + raw token; token never persisted",
+      "members list renders pending email invitations; cancel/resend"
+    ],
+    "acceptanceCriteria": [
+      "Inviting an unknown email succeeds: the email is attached to the workspace and pending; the invitee gets a prompt (email + signup landing) to create an account",
+      "Inviting a known email behaves as today (user-keyed invite, no duplicate pending)",
+      "After signup/sign-in with the invited email, the invite redeems atomically (verified-email match, CAS) and a workspace_member row is inserted",
+      "Raw invitation tokens are never stored; token_hash only",
+      "members.invite capability gate and role policy (owner never invitational) unchanged",
+      "Legacy workspace_invite rows migrated or abandoned before the table is dropped"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Decision confirmed 2026-09-21 - implement SEC-03 after the 2026-09-21 release (#1978) merges. Adopt the @chester-hill-solutions/auth-postgres invitation APIs; do not hand-roll tokens. Verify #1714 against the new flow."
   }
 ]

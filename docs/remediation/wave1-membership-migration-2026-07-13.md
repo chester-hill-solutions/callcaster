@@ -167,7 +167,7 @@ Attach in a **follow-on PR** once Phase A is on review:
 1. **This scaffold** — design doc + additive DDL (done / in-flight). Apply on review PG18; verify tables empty + roles seeded.
 2. **Hand-sync schema + optional backfill SQL** — `app/db/schema.ts` + `11-chs-membership-backfill.sql` + verify assertions.
 3. **Reader/writer cutover** — membership DB accessors, MFA role list, capability SoT optional flip; keep legacy readable.
-4. **SEC-03** — email-first invite adopt on CHS tables.
+4. **SEC-03** — email-first invite adopt on CHS tables (implementation tracked by [#1713](https://github.com/chester-hill-solutions/callcaster/issues/1713)).
 5. **Import pipeline + drop legacy** — transform writes CHS only; Phase D drops.
 
 ---
