@@ -268,11 +268,9 @@ function NoInputFields({
             } else if (next === "route") {
               const blockId = routeTargets[0]?.value;
               const pageId = blockId ? pageByBlockId[blockId] : undefined;
-              setNoInput(
-                blockId && pageId
-                  ? { action: { pageId, blockId } }
-                  : { action: "route" as unknown as { pageId: string; blockId: string } },
-              );
+              if (blockId && pageId) {
+                setNoInput({ action: { pageId, blockId } });
+              }
             }
           }}
         >
