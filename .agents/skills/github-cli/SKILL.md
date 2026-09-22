@@ -43,10 +43,10 @@ The manual's command surface is: `agent-task`, `alias`, `api`, `attestation`, `a
 
 Use `gh auth refresh -s <scope>` only when the operation requires an additional scope. Project mutations commonly require `project`; do not expose tokens in commands, logs, or issue bodies.
 
-## Project Effort Field
+## Organization Effort Field
 
-- In CallCaster, `Effort` is a custom field on the CHS Backlog GitHub Project (`9`), not an issue label. Never use `gh issue list --label "effort:<value>"` to select work by effort.
-- Load `github-projects`, then inspect the field with `gh project field-list 9 --owner chester-hill-solutions --format json` and the item values with `gh project item-list 9 --owner chester-hill-solutions --field Effort`. Filter the returned project items to `chester-hill-solutions/callcaster` before acting on an issue.
+- In CallCaster, `Effort` is an organization-level GitHub Issue field. Every organization issue has it; it is not an issue label or a GitHub Project field.
+- Never use `gh issue list --label "effort:<value>"` or Project item data to select work by effort. Inspect the organization Issue field with the GitHub API supported by the installed `gh` version before acting on an issue.
 
 ## Issue Development Branches
 
