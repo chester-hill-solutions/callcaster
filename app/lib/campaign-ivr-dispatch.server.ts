@@ -45,7 +45,7 @@ import { logger } from "@/lib/logger.server";
 import { selectEligibleCampaignQueueMembers } from "@/lib/campaign-dispatch-queue.server";
 import { ivrCallingPolicy, nextDispatchOpenAt } from "@/lib/campaign-dispatch-policy";
 
-export const IVR_CALL_DEQUEUED_REASON = "IVR call completed";
+export const IVR_CALL_DEQUEUED_REASON = "IVR dial dispatched";
 export const OPTED_OUT_IVR_DEQUEUED_REASON = "Contact opted out";
 export const DUPLICATE_IVR_DEQUEUED_REASON = "Duplicate IVR call prevented";
 const IVR_WINDOW_RETRY_MS = 15 * 60 * 1000;
