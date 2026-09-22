@@ -81,11 +81,11 @@ interface RegistrationFormProps {
 }
 
 const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 font-Zilla-Slab mb-16 w-full max-w-md">
+  <div className="animate-fade-in-up animation-delay-600 mb-16 w-full font-Zilla-Slab">
     <AuthCard
       title="Sign Up"
       description="Sign up to create a workspace and start calling."
-      className="bg-secondary py-2"
+      
     >
       {error ? (
         <Alert variant="destructive">
@@ -161,12 +161,12 @@ interface ContactFormProps {
 }
 
 const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 font-Zilla-Slab mb-16 w-full max-w-md">
+  <div className="animate-fade-in-up animation-delay-600 mb-16 w-full font-Zilla-Slab">
     <div className="flex flex-wrap gap-8">
       <AuthCard
         title="Request Access"
         description="Registration is currently available by invitation. Contact us to let us know you're interested."
-        className="bg-secondary w-full py-2"
+        
       >
         <fetcher.Form
           className="space-y-4"

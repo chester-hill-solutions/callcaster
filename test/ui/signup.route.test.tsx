@@ -57,4 +57,30 @@ describe("app/routes/signup.tsx", () => {
     ).toBeInTheDocument();
     expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
   });
+
+  test("#2013: centers the layout and uses the sign-in card width and padding", async () => {
+    const mod = await import("../../app/routes/signup");
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/signup",
+          Component: mod.default,
+          loader: () => ({ signupOpen: true }),
+        },
+      ],
+      { initialEntries: ["/signup"] },
+    );
+    const { container } = render(createElement(RouterProvider, { router }));
+
+    await screen.findByText("Create Account");
+
+    const main = container.querySelector("main");
+    expect(main).toHaveClass("justify-center", "py-12");
+    expect(main).not.toHaveClass("py-8");
+    // The card drops the max-w-md wrapper and py-2 override, so it renders
+    // at the AuthCard default width (max-w-xl) with default padding — the
+    // same box the sign-in page uses.
+    expect(container.querySelector(".max-w-md")).toBeNull();
+    expect(container.querySelector("main .max-w-xl")).not.toBeNull();
+  });
 });
