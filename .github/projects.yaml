@@ -15,5 +15,7 @@ projects:
             name: tested-on-dev
           - id: 98236657
             name: on-qa
+          - id: 2f691958
+            name: on-prod
           - id: 2441cbb1
             name: archive

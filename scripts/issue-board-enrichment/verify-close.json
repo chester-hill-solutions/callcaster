@@ -1480,5 +1480,384 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Implemented on dev (PR #1994, merged). Run `npm run tools:gen-wav-sidecars -- --apply` against the review env first, then prod; verify sidecars appear (\\`ivr-wav/<ws>/…\\`) and IVR playback uses them, then close."
+  },
+  {
+    "issueNumber": 1846,
+    "verdict": "verify-close",
+    "recommendedTitle": "Pass the live caller-ID verification status to the onboarding verification sheet",
+    "summary": "From onboarding the verification sheet keeps showing 'Verification pending' after the number is verified; Settings shows 'Number verified' because it passes the live status.",
+    "currentBehavior": "OnboardingFirstNumberStep renders CallerIdVerificationDialog without a status prop, so the sheet defaults to pending. Settings passes status derived from capabilities.verification_status.",
+    "rootCause": "The live-status wiring added for Settings (#1740) was never added to the onboarding render.",
+    "resolution": "Compute the live verification status from callerIdNumbers and pass it to CallerIdVerificationDialog in OnboardingFirstNumberStep, mirroring settings/numbers.route.tsx.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx",
+      "app/routes/workspaces+/$id/settings/numbers.route.tsx",
+      "app/components/phone-numbers/CallerIdVerificationDialog.tsx"
+    ],
+    "existingTests": [
+      "test/ui/caller-id-verification-dialog.test.tsx",
+      "test/ui/onboarding-first-number-flow.test.tsx"
+    ],
+    "missingTests": [
+      "Onboarding dialog shows 'Number verified' after the number's verification_status flips to success"
+    ],
+    "acceptanceCriteria": [
+      "Completing verification from onboarding flips the sheet to 'Number verified' with no reload",
+      "A failed verification still shows 'Verification failed'",
+      "Settings behaviour is unchanged"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Exact fix: pass the live status the way Settings already does."
+  },
+  {
+    "issueNumber": 1980,
+    "verdict": "verify-close",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "",
+    "recommendedTitle": "Trim IVR add-a-recording help copy: drop 'From the workspace audio library'",
+    "summary": "Design nit: the add-a-recording step's recording select shows helper text 'From the workspace audio library.' (ScriptBlockEditor.IvrStep.tsx:304). Remove it (the picker already frames the library context) and any now-redundant spacing.",
+    "currentBehavior": "ScriptBlockEditor.IvrStep.tsx:304 renders 'From the workspace audio library.' under the recording control.",
+    "resolution": "Remove the helper text line; verify the RecordingStepFields block still reads clean with the Select only.",
+    "lookIn": [
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx:304"
+    ],
+    "missingTests": [
+      "UI smoke renders recording step without the label"
+    ],
+    "acceptanceCriteria": [
+      "No 'From the workspace audio library' text in the IVR recording step"
+    ]
+  },
+  {
+    "issueNumber": 1981,
+    "verdict": "verify-close",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "",
+    "recommendedTitle": "Receipts: state how many credits were bought",
+    "summary": "Receipt (billing/receipt.route.tsx) should say how many credits the purchase covered, not just the amount.",
+    "currentBehavior": "Receipt builder shows amount/line items; no credit quantity line.",
+    "resolution": "Add a credit-quantity line to the receipt render (from the ledger row / stripe session metadata). Contact #1982/#1983 for the same receipts surface.",
+    "lookIn": [
+      "app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx"
+    ],
+    "missingTests": [
+      "receipt test asserts credit-quantity line"
+    ],
+    "acceptanceCriteria": [
+      "Receipt states how many credits were bought"
+    ]
+  },
+  {
+    "issueNumber": 1982,
+    "verdict": "verify-close",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "",
+    "recommendedTitle": "Receipts: support email should be contact@callcaster.ca",
+    "summary": "Receipts currently carry a wrong/absent support contact; use contact@callcaster.ca.",
+    "currentBehavior": "Receipt builder contact line differs from the canonical support address.",
+    "resolution": "Swap the contact line to contact@callcaster.ca on the receipt.",
+    "lookIn": [
+      "app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx"
+    ],
+    "missingTests": [
+      "receipt test asserts contact@callcaster.ca"
+    ],
+    "acceptanceCriteria": [
+      "Receipts say contact@callcaster.ca"
+    ]
+  },
+  {
+    "issueNumber": 1883,
+    "verdict": "verify-close",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Implemented on dev (PR #1992, merged). Verify on the review env: #1883 editor no-input panel writes the fields + inbound mirrors the cap; #1884 dangling/cycle scripts block launch with script_routing_invalid and the editor shows the errors. Then close.",
+    "recommendedTitle": "IVR no-input editor panel + inbound mirror",
+    "summary": "IMPLEMENTED on dev (#1992 merged 2026-09-22). Runtime+outbound half of #1937 shipped: ...",
+    "currentBehavior": "Editor: ScriptBlockEditor.IvrStep.tsx has mode/speech/recording/voice controls but no no-input panel; the response rows (IvrResponses.tsx) only set option.next/label. Inbound: inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts:50-69 findNextStep ignores noInput; null userInput falls through to linear next/hangup; renderTerminalTarget (:71-123) has no noInput branch.",
+    "rootCause": "PR #1937 kept the editor panel and inbound twin out to stay atomic; the wire fields have no producer.",
+    "resolution": "Editor: add per-step controls in ScriptBlockEditor.IvrStep.tsx writing block.noInput {action,pageId,blockId,maxReplays} + gatherTimeoutSeconds (defaults unchanged when unset). Inbound: mirror the outbound no-input branching into the inbound response route with a CALL-scoped replay store (no outreach attempt exists inbound; key by call/recurring session) and reuse resolveNoInputTarget + DEFAULT_NO_INPUT_MAX_REPLAYS. Fold #1843 or close it as duplicate.",
+    "lookIn": [
+      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
+      "app/lib/ivr-block-runtime.server.ts",
+      "app/lib/ivr-gather.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-block-runtime.test.ts (resolveNoInputTarget)",
+      "test/ivr-gather.test.ts (timeout attrs)",
+      "test/inbound-ivr-block-response.route.test.ts:144-161 (null-input falls through)"
+    ],
+    "missingTests": [
+      "Editor emits wait/no-input controls",
+      "Inbound no-input branches (hangup/route/replay) + per-call replay cap"
+    ],
+    "acceptanceCriteria": [
+      "A step can wait longer than the default and, on no input, replay or route instead of just advancing",
+      "Defaults unchanged for steps that do not configure it",
+      "Inbound mirrors outbound behavior with its own replay store"
+    ]
+  },
+  {
+    "issueNumber": 1884,
+    "verdict": "verify-close",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Implemented on dev (PR #1991, merged). Verify on the review env: #1883 editor no-input panel writes the fields + inbound mirrors the cap; #1884 dangling/cycle scripts block launch with script_routing_invalid and the editor shows the errors. Then close.",
+    "recommendedTitle": "IVR editor routing validation + terminal-hangup guarantee",
+    "summary": "IMPLEMENTED on dev (#1991 merged 2026-09-22). Runtime half largely shipped (#1975): ou...",
+    "currentBehavior": "Dangling option.next targets redirect to the block route which plays 'There was an error in the IVR flow. Goodbye.' then hangs up (outbound + inbound); routing cycles are undetected; no editor warning. Editor structural validation is scriptkit validateDocument only (parse.ts:22-40): startPageId exists + page/block refs — no next-target/cycle checks. clearDanglingRouting (use-script-editor-state.js:427-440) only clears when an id is deleted, not for malformed imports.",
+    "rootCause": "The runtime parses next as an opaque string with no terminal/validation contract.",
+    "resolution": "Add app/lib/ivr-script-validation.ts: build an edge graph (page/block -> option.next targets) and run a DFS for (a) dangling targets (next refers to a nonexistent page/block), (b) reachable cycles (A->B->A), (c) terminal guarantee (every reachable path ends at hangup/end). Surface errors in ScriptEditorShell.tsx alongside editor.validation. Wire into validateScriptSteps (call-script-service.ts) and add a script_routing_invalid CampaignReadinessCode + readiness-action entry (campaign-readiness.ts:14-35 + campaign-readiness-actions.ts:35-144) so launch blocks (launchCampaign readiness gate campaign-execution.server.ts:86-95 surfaces it automatically). Inbound: make renderTerminalTarget treat 'end' explicitly and render <Hangup/> for dangling/terminal.",
+    "lookIn": [
+      "app/lib/ivr-script-validation.ts (new)",
+      "app/lib/call-script-service.ts",
+      "app/components/campaign/settings/script/ScriptEditorShell.tsx",
+      "app/lib/campaign-readiness.ts",
+      "app/lib/campaign-readiness-actions.ts",
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-block-response.route.test.ts:226-247 (end terminal outbound)"
+    ],
+    "missingTests": [
+      "ivr-script-routing-validation: dangling target, A->B->A cycle, hangup/end ok, linear end ok",
+      "inbound route: next:'end' renders <Hangup/>, dangling renders <Hangup/>",
+      "editor shell test shows the cyclic-script validation error"
+    ],
+    "acceptanceCriteria": [
+      "An author can choose Hang up as an option's next step (already true)",
+      "A published script always has a terminal hangup; next:'end' and 'hangup' are both terminal at runtime (inbound too)",
+      "Dangling targets and reachable cycles fail validation and block launch"
+    ]
+  },
+  {
+    "issueNumber": 1936,
+    "verdict": "verify-close",
+    "recommendedTitle": "Comment policy: comments must carry information (no-useless-comments rule)",
+    "summary": "Add a local ESLint rule callcaster/no-useless-comments (error) rejecting issue/PR-number-only and punctuation-only comments, sweep the ~20 existing offenders, and document the rule. Not implemented.",
+    "currentBehavior": "eslint.config.mjs only wires upstream plugins; there is no local rule infrastructure and no no-useless-comments rule.",
+    "rootCause": "Comment hygiene is unenforced; a number or a punctuation banner passes lint.",
+    "resolution": "Define the rule (inline plugin object in eslint.config.mjs, or a small local-rules module), set it to error, fix the offenders, add rule unit tests, and document the intent.",
+    "lookIn": [
+      "eslint.config.mjs",
+      "package.json",
+      "app/",
+      "test/"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Rule unit tests: number-only comment fails, punctuation-only comment fails, informative comment passes"
+    ],
+    "acceptanceCriteria": [
+      "Issue/PR-number-only comments are lint errors",
+      "Punctuation-only comments are lint errors",
+      "Existing offenders are zero",
+      "Rule intent is documented"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Implemented on dev (PR #1974 5fd10f49 + sweep/docs PR #1979 356e3efe): callcaster/no-useless-comments is error with unit tests (test/no-useless-comments-rule.test.ts), zero offenders, intent documented. Verify eslint passes and close."
+  },
+  {
+    "issueNumber": 1886,
+    "verdict": "verify-close",
+    "recommendedTitle": "Run db:schema:check per deployed environment (DB-backed gate)",
+    "summary": "scripts/db/check-schema-drift.mjs (db:schema:check) compares app-required tables/columns/functions/enum values against the live DB, but nothing invokes it: absent from ci:local and from .github/workflows/ledger-drift-check.yml. It also lacks --require-db. No PR exists.",
+    "currentBehavior": "Running the script with no DATABASE_URL prints a message and exits 2; no workflow runs it. A deployed environment missing a required object is not caught.",
+    "rootCause": "The checker was added as a tool but never connected to a DB-backed per-environment gate.",
+    "resolution": "Add --require-db (or SCHEMA_CHECK_REQUIRE_DB=1) to scripts/db/check-schema-drift.mjs mirroring check-migration-ledger.mjs so a missing URL exits 1; add a --require-db step after each ledger step in ledger-drift-check.yml; extend push paths; factor flag/URL resolution into a pure helper in scripts/lib/app-db-objects.mjs and unit-test it. Type parity is a follow-up.",
+    "lookIn": [
+      "scripts/db/check-schema-drift.mjs",
+      "scripts/db/check-migration-ledger.mjs",
+      ".github/workflows/ledger-drift-check.yml",
+      "scripts/lib/app-db-objects.mjs",
+      "test/schema-drift-enums.test.ts"
+    ],
+    "existingTests": [
+      "test/schema-drift-enums.test.ts"
+    ],
+    "missingTests": [
+      "Shared arg/URL resolver: flag + no URL => exit 1; no flag + no URL => exit 2; URL present => the URL"
+    ],
+    "acceptanceCriteria": [
+      "A deployed environment missing a required object fails the workflow.",
+      "A missing DATABASE_URL fails the workflow rather than no-op passing.",
+      "Push path filters include the schema files and the checker."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Implemented on dev (PR #1958 d8d5639e): ledger-drift-check.yml runs db:schema:check --require-db per environment; resolver tests in test/schema-drift-enums.test.ts. Verify the workflow gates a missing object and close."
+  },
+  {
+    "issueNumber": 1845,
+    "verdict": "verify-close",
+    "recommendedTitle": "fix(dial): drop synchronous AMD from manual/power dials; keep it predictive-only",
+    "summary": "Manual call-creation paths still send machineDetection:'Enable', so an answered manual call waits for the AMD verdict. Decision couples AMD to dial mode: predictive keeps it, manual/power turns it off and uses the agent's Audio Drop button. IVR keeps AMD (see #1842/#1864).",
+    "currentBehavior": "machineDetection:'Enable' at call.action.server.ts:108 and dial/$number.action.server.ts:73; auto-dial.server.ts:63 keeps it. test/api-call.route.test.ts:180 asserts machineDetection=\"Enable\".",
+    "rootCause": "AMD was added unconditionally to support auto voicemail drop; on manual/power calls an agent is already on the line.",
+    "resolution": "Remove machineDetection (and any AMD-callback wiring) from call.action.server.ts and dial/$number.action.server.ts; keep it in auto-dial.server.ts. Confirm the Audio Drop control stays visible when voicedrop_audio is set. Update the api-call test and add a regression that auto-dial still sets it.",
+    "lookIn": [
+      "app/routes/api+/call.action.server.ts",
+      "app/routes/api+/dial/$number.action.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/routes/api+/dial/status.action.server.ts",
+      "app/components/call/CallScreen.CallArea.tsx"
+    ],
+    "existingTests": [
+      "test/api-call.route.test.ts",
+      "test/dial-number.route.test.ts",
+      "test/dial-status.route.test.ts",
+      "test/auto-dial.server.test.ts"
+    ],
+    "missingTests": [
+      "manual routes emit no machineDetection",
+      "auto-dial still emits machineDetection",
+      "Audio Drop still works on manual/power calls"
+    ],
+    "acceptanceCriteria": [
+      "A manual/power call reaches audio immediately with no AMD wait",
+      "Predictive dialing still drops or hangs up on a detected machine",
+      "A drop-enabled campaign still plays the voicemail when an agent drops it"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Implemented on dev (PR #1969 86794a3d): manual/power dials no longer send machineDetection (call.action.server.ts, dial/$number), auto-dial keeps it; tests assert both. Verify on the review env and close."
+  },
+  {
+    "issueNumber": 1844,
+    "verdict": "verify-close",
+    "recommendedTitle": "Play call recordings in-app instead of linking to the Twilio recording URL",
+    "summary": "The Call History 'Listen' link opens call.recording_url, a Twilio API mp3 URL that sends the user to Twilio; recordings are already copied to object storage as call.audio_url.",
+    "currentBehavior": "CallLogTable renders an <a href={recordingUrl}>Listen when recording_url is set. app/lib/call-log.server.ts selects call.recording_url. runRecordingSideEffects already persists recordings to object storage (call.audio_url).",
+    "rootCause": "Call History reads the raw Twilio recording_url and links out to it instead of serving the stored call.audio_url.",
+    "resolution": "Select call.audio_url in app/lib/call-log.server.ts and mint a signed object-storage URL (createSignedObjectUrls, as the voicemails loader does), preferring it for the Listen action; render an in-app player and keep a clear fallback when no persisted copy exists.",
+    "lookIn": [
+      "app/lib/call-log.server.ts",
+      "app/components/calls/CallLogTable.tsx",
+      "app/lib/call-recording-storage.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/platform-media.server.ts",
+      "app/lib/object-storage.server.ts"
+    ],
+    "existingTests": [
+      "test/call-log.test.ts"
+    ],
+    "missingTests": [
+      "Loader returns a non-Twilio playback URL for a call with audio_url",
+      "CallLogTable renders the in-app player and no external Twilio link"
+    ],
+    "acceptanceCriteria": [
+      "Listen plays the recording without leaving CallCaster or opening Twilio",
+      "Works for a call whose recording was persisted to storage",
+      "A clear message when no recording copy exists",
+      "Tenant scoping is preserved"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Implemented on dev (PR #1972 d1c6049d): Call History plays the stored object-storage copy in-app via signed URL; raw Twilio link remains only as the no-copy fallback. Verify on the review env and close."
+  },
+  {
+    "issueNumber": 1830,
+    "verdict": "verify-close",
+    "recommendedTitle": "Codify blocking cross-developer tasks as assigned tickets in the GitHub agent skills",
+    "summary": "Request that work another developer must do to unblock an issue becomes a separate ticket, set to block that issue and assigned to the right person, and that the agent skills say so.",
+    "currentBehavior": "github-issues/SKILL.md covers issue types, parent/child decomposition, and the --blocked-by / --blocking flags, but does not require creating a separate assigned ticket when another dev's task blocks an issue.",
+    "rootCause": "The skill documents the mechanics of blocking links but not the policy that blocking work is its own assigned ticket.",
+    "resolution": "Add a section to .agents/skills/github-issues/SKILL.md stating that blocking cross-developer work is created as a new Task, linked with --blocking <blocked issue> (or --blocked-by on the blocked issue), and assigned with --assignee; include a worked example.",
+    "lookIn": [
+      ".agents/skills/github-issues/SKILL.md",
+      ".agents/skills/github-cli/SKILL.md",
+      ".agents/skills/github-pull-request/SKILL.md"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "The skill states blocking work becomes a separate ticket",
+      "The skill shows the blocking link direction and assignment",
+      "The example uses --blocking and --assignee correctly"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Implemented on dev (PR #1965 ac6aaef6): github-issues SKILL.md documents cross-developer blockers as assigned, one-direction blocking tickets. Verify and close."
+  },
+  {
+    "issueNumber": 1859,
+    "verdict": "verify-close",
+    "recommendedTitle": "Show campaign costs un-collapsed on the Launch page",
+    "summary": "The campaign cost panel is still wrapped in a collapsed <details> labelled 'Campaign cost' in CampaignLaunch.tsx. Remove the fold and render CampaignCostPanel directly.",
+    "currentBehavior": "CampaignLaunch.tsx (~449-462) renders <details><summary>Campaign cost</summary><CampaignCostPanel .../></details> when campaignBilling is present.",
+    "rootCause": "The cost panel was placed inside a disclosure widget split out from the #1839 review.",
+    "resolution": "Render CampaignCostPanel directly (guarded by the existing campaignBilling ternary) and delete the <details>/<summary> wrapper and its inner mt-3 div. Keep the null/absent behaviour when campaignBilling is null.",
+    "lookIn": [
+      "app/components/campaign/settings/CampaignLaunch.tsx"
+    ],
+    "existingTests": [
+      "test/ui/campaign-launch-review.test.tsx"
+    ],
+    "missingTests": [
+      "Cost panel is visible on Launch without expanding any disclosure",
+      "No cost panel renders when campaignBilling is null"
+    ],
+    "acceptanceCriteria": [
+      "Campaign costs are visible on the Launch page without expanding anything",
+      "No 'Campaign cost' details/summary remains",
+      "Absent behaviour unchanged when campaignBilling is null"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Implemented on dev (PR #1970 829e3b9e): CampaignLaunch renders CampaignCostPanel directly; the <details><summary>Campaign cost</summary> wrapper is gone; campaign-launch-review.test.tsx asserts no disclosure remains. Verify and close."
+  },
+  {
+    "issueNumber": 1847,
+    "verdict": "verify-close",
+    "recommendedTitle": "Add a 'Do not import' mapping option so columns can be dropped",
+    "summary": "The CSV mapping forces every column to a target and defaults unknown columns to Custom field; users want to drop unwanted columns instead of importing them as custom fields.",
+    "currentBehavior": "Every CSV header maps to a ContactImportTarget (unknown headers default to other_data / Custom field). The Map CSV Headers select offers no ignore/drop option.",
+    "rootCause": "CONTACT_IMPORT_TARGETS has no ignore/drop target, and the mapping, validation, and import paths assume every column is imported.",
+    "resolution": "Add an 'ignore' / 'Do not import' option: offer it in the Map CSV Headers select, exclude it from other_data, exclude it from duplicate-target validation, and skip it in processAudienceUpload. Leave the Data Preview unchanged.",
+    "lookIn": [
+      "shared/contact-import-headers.ts",
+      "app/components/audience/AudienceUploadMapStep.tsx",
+      "app/components/audience/audience-upload-csv.ts",
+      "app/components/audience/AudienceUploader.tsx",
+      "app/lib/audience-upload-process.server.ts"
+    ],
+    "existingTests": [
+      "test/contact-import-headers.test.ts",
+      "test/ui/audience-uploader.test.tsx",
+      "test/audience-upload-parsing.test.ts"
+    ],
+    "missingTests": [
+      "A column mapped to ignore passes validation and is absent from imported contacts",
+      "Ignore is not counted as a duplicate target"
+    ],
+    "acceptanceCriteria": [
+      "A mapping option drops a column",
+      "Dropped columns are not written to other_data",
+      "Dropped columns do not create duplicate-target errors",
+      "Phone and name validation behaviour is unchanged"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Implemented on dev (PR #1973 41d45f6d): shared/contact-import-headers.ts includes a drop-column option with tests (test/contact-import-headers.test.ts) + CHANGELOG entry. Verify the mapping UI and close."
   }
 ]
