@@ -17,6 +17,28 @@ vi.mock("../../app/routes/signup.action.server", () => ({ action: vi.fn() }));
 // page already renders its own h1. This covers both branches of signup.tsx
 // (registration open vs. closed), since both used to double up.
 describe("app/routes/signup.tsx heading structure", () => {
+  test("renders the background mural outside the accessibility tree", async () => {
+    const mod = await import("../../app/routes/signup");
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/signup",
+          Component: mod.default,
+          loader: () => ({ signupOpen: true }),
+        },
+      ],
+      { initialEntries: ["/signup"] },
+    );
+    const { container } = render(createElement(RouterProvider, { router }));
+
+    await screen.findByText("Create Account");
+    const mural = container.querySelector('img[src="/Hero-1.png"]');
+
+    expect(mural).toHaveAttribute("alt", "");
+    expect(mural).toHaveAttribute("aria-hidden", "true");
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  });
+
   test("renders exactly one h1 when signup is open (registration form)", async () => {
     const mod = await import("../../app/routes/signup");
     const router = createMemoryRouter(

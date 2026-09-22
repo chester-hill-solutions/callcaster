@@ -56,15 +56,21 @@ export default function SignUp() {
   });
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-background px-4 py-8 sm:px-6 lg:px-8">
+    <main className="relative isolate flex min-h-screen flex-col items-center bg-background px-4 py-8 sm:px-6 lg:px-8">
+      <img
+        alt=""
+        aria-hidden="true"
+        src="/Hero-1.png"
+        className="pointer-events-none absolute inset-0 z-0 h-full w-full object-cover opacity-10"
+      />
       <Heading
         branded
         level={1}
-        className="animate-fade-in-up my-4 font-Tabac-Slab"
+        className="relative z-10 animate-fade-in-up my-4 font-Tabac-Slab"
       >
         {signupOpen ? "Sign Up" : "Request Access"}
       </Heading>
-      <div className="z-10 flex w-full max-w-6xl justify-center space-y-16">
+      <div className="relative z-10 flex w-full max-w-6xl justify-center space-y-16">
         {signupOpen ? (
           <RegistrationForm isBusy={state !== "idle"} error={actionData?.error} />
         ) : (
