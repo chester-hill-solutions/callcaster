@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/lib/env.server";
 import { objectStorageUsesPathStyle } from "@/lib/object-storage-config";
@@ -283,6 +283,38 @@ export async function downloadObject(
 
   const bytes = await response.Body.transformToByteArray();
   return Buffer.from(bytes);
+}
+
+/**
+ * Copy one object to a new key in the same logical bucket (server-side).
+ * Used by the media-namespace migration: same bucket, different prefix, so
+ * CopyObject avoids a download/upload round-trip and keeps object metadata.
+ * The source key must be URL-encoded per path segment for the `CopySource`
+ * header ("+" phone numbers break an unencoded copy).
+ */
+export async function copyObject(
+  logicalBucket: ObjectStorageBucket,
+  sourcePath: string,
+  targetPath: string,
+): Promise<void> {
+  const { bucketName, key: sourceKey } = resolveLocation(logicalBucket, sourcePath);
+  const { key: targetKey } = resolveLocation(logicalBucket, targetPath);
+  const copySource = `${bucketName}/${sourceKey
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`;
+  try {
+    await getS3Client().send(
+      new CopyObjectCommand({
+        Bucket: bucketName,
+        Key: targetKey,
+        CopySource: copySource,
+      }),
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Copy failed";
+    throw new Error(message);
+  }
 }
 
 export async function deleteObject(

@@ -23,12 +23,15 @@ function parseTwilioDataColumn(raw: unknown): unknown {
   return raw;
 }
 
+/** Twilio call-recording copies live under their own prefix, never the library. */
+const CALL_RECORDINGS_OBJECT_PREFIX = "call-recordings";
+
 /** Railway Buckets object path for a Twilio call recording copy. */
 export function callRecordingStoragePath(
   workspaceId: string,
   callSid: string,
 ): string {
-  return `${workspaceId}/recording-${callSid}.mp3`;
+  return `${CALL_RECORDINGS_OBJECT_PREFIX}/${workspaceId}/recording-${callSid}.mp3`;
 }
 
 function sleep(ms: number): Promise<void> {

@@ -17,10 +17,6 @@ import { hasMinRole, workspaceRouteAuth } from "@/lib/workspace-route.server";
 
 /**
  * Named for when it was taken; the user renames by clipping.
- *
- * Deliberately NOT "recording-": that prefix is reserved for Twilio call
- * recordings and isWorkspaceAudioFile() filters it out of the library, so a
- * take named that way would upload successfully and then be invisible.
  */
 function defaultRecordingName() {
   const stamp = new Date()

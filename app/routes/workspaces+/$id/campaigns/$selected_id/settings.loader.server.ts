@@ -164,7 +164,7 @@ export const loader = defineLoader({
     dequeuedCount: campaignWithAudience.dequeued_count,
     totalCount: campaignWithAudience.total_count,
     scripts: campaignWithAudience.scripts.filter((s: unknown): s is NonNullable<typeof s> => s !== null),
-    mediaData: mediaData.filter((media: FileObject) => !media.name.startsWith("voicemail-")),
+    mediaData: mediaData,
     user: user,
     mediaLinks,
     surveys,

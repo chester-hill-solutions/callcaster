@@ -20,44 +20,35 @@ import {
   createSignedObjectUrls,
   ObjectExistsError,
 } from "@/lib/object-storage.server";
+import { voicemailListPrefix, voicemailObjectPath } from "@/lib/voicemail-media.server";
 
 const SIGNED_URL_TTL_SECONDS = 3600;
 
-function isVoicemailFile(name: string): boolean {
-  return name.includes("voicemail-+") || name.includes("voicemail-undefined");
-}
-
-function isWorkspaceAudioFile(name: string): boolean {
-  return (
-    !isVoicemailFile(name) &&
-    !name.includes("recording-")
-  );
-}
-
 async function listWorkspaceMediaWithUrls(
   workspaceId: string,
-  filter: (name: string) => boolean,
+  listPrefix: string,
+  objectPathFor: (name: string) => string,
 ) {
   try {
-    const mediaData = await listMediaObjects("workspaceAudio", workspaceId, {
+    const mediaData = await listMediaObjects("workspaceAudio", listPrefix, {
       sortBy: { column: "created_at", order: "desc" },
     });
 
-    const filtered = mediaData.filter((item) => filter(item.name));
-    if (filtered.length === 0) {
+    if (mediaData.length === 0) {
       return { ok: true as const, audios: [] };
     }
 
-    const mediaPaths = filtered.map((media) => `${workspaceId}/${media.name}`);
+    const mediaPaths = mediaData.map((media) => objectPathFor(media.name));
     const signedUrls = await createSignedObjectUrls(
       "workspaceAudio",
       mediaPaths,
       SIGNED_URL_TTL_SECONDS,
     );
 
-    const audios = filtered.map((media) => {
+    const audios = mediaData.map((media) => {
+      const path = objectPathFor(media.name);
       const signedUrl = signedUrls.find(
-        (entry) => entry.path === `${workspaceId}/${media.name}`,
+        (entry) => entry.path === path,
       )?.signedUrl;
       return {
         name: media.name,
@@ -85,7 +76,14 @@ export async function listWorkspaceAudiosApi(
     workspaceId,
   });
 
-  return listWorkspaceMediaWithUrls(workspaceId, isWorkspaceAudioFile);
+  // Library prompt files only: caller voicemails (`voicemail/<ws>/`) and
+  // Twilio call recordings (`call-recordings/<ws>/`) live under their own
+  // top-level prefixes, so this prefix can never list them.
+  return listWorkspaceMediaWithUrls(
+    workspaceId,
+    workspaceId,
+    (name) => `${workspaceId}/${name}`,
+  );
 }
 
 export async function listWorkspaceVoicemailsApi(
@@ -97,7 +95,11 @@ export async function listWorkspaceVoicemailsApi(
     workspaceId,
   });
 
-  return listWorkspaceMediaWithUrls(workspaceId, isVoicemailFile);
+  return listWorkspaceMediaWithUrls(
+    workspaceId,
+    voicemailListPrefix(workspaceId),
+    (name) => voicemailObjectPath(workspaceId, name),
+  );
 }
 
 export async function uploadWorkspaceAudioApi(

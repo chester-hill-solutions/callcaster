@@ -11,6 +11,7 @@ import {
   updateCallRecordingUrlBySid,
 } from "@/lib/telephony-db.server";
 import { uploadObject, createSignedObjectUrl } from "@/lib/object-storage.server";
+import { voicemailObjectPath } from "@/lib/voicemail-media.server";
 import { defineAction } from "@/lib/handler.server";
 import { isConservativeEmail } from "../../../shared/inbound-routing-presets";
 import type { ActionFunctionArgs } from "react-router";
@@ -177,7 +178,13 @@ export const action = defineAction({
 
       const recording = await recordingResponse.blob();
 
-      const fileName = `${number.workspace.id}/voicemail-${call.from}-${now.toISOString()}.mp3`;
+      // Caller audio never lands in the library prefix: `voicemail/<ws>/…` is a
+      // disjoint namespace, so library lists and prompts can never mix caller
+      // messages in (see voicemail-media.server).
+      const fileName = voicemailObjectPath(
+        number.workspace.id,
+        `voicemail-${call.from}-${now.toISOString()}.mp3`,
+      );
       try {
         await uploadObject(
           "workspaceAudio",
