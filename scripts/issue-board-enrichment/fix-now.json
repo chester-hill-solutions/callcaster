@@ -335,36 +335,6 @@
     "trackerRecommendation": "Well-scoped UX feature; add the ignore target end to end and test the import exclusion."
   },
   {
-    "issueNumber": 1846,
-    "verdict": "fix-now",
-    "recommendedTitle": "Pass the live caller-ID verification status to the onboarding verification sheet",
-    "summary": "From onboarding the verification sheet keeps showing 'Verification pending' after the number is verified; Settings shows 'Number verified' because it passes the live status.",
-    "currentBehavior": "OnboardingFirstNumberStep renders CallerIdVerificationDialog without a status prop, so the sheet defaults to pending. Settings passes status derived from capabilities.verification_status.",
-    "rootCause": "The live-status wiring added for Settings (#1740) was never added to the onboarding render.",
-    "resolution": "Compute the live verification status from callerIdNumbers and pass it to CallerIdVerificationDialog in OnboardingFirstNumberStep, mirroring settings/numbers.route.tsx.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx",
-      "app/routes/workspaces+/$id/settings/numbers.route.tsx",
-      "app/components/phone-numbers/CallerIdVerificationDialog.tsx"
-    ],
-    "existingTests": [
-      "test/ui/caller-id-verification-dialog.test.tsx",
-      "test/ui/onboarding-first-number-flow.test.tsx"
-    ],
-    "missingTests": [
-      "Onboarding dialog shows 'Number verified' after the number's verification_status flips to success"
-    ],
-    "acceptanceCriteria": [
-      "Completing verification from onboarding flips the sheet to 'Number verified' with no reload",
-      "A failed verification still shows 'Verification failed'",
-      "Settings behaviour is unchanged"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Exact fix: pass the live status the way Settings already does."
-  },
-  {
     "issueNumber": 1844,
     "verdict": "fix-now",
     "recommendedTitle": "Play call recordings in-app instead of linking to the Twilio recording URL",
@@ -458,69 +428,6 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Product decided complete = all calls settled. Fix now via the completion gate."
-  },
-  {
-    "issueNumber": 1980,
-    "verdict": "fix-now",
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "",
-    "recommendedTitle": "Trim IVR add-a-recording help copy: drop 'From the workspace audio library'",
-    "summary": "Design nit: the add-a-recording step's recording select shows helper text 'From the workspace audio library.' (ScriptBlockEditor.IvrStep.tsx:304). Remove it (the picker already frames the library context) and any now-redundant spacing.",
-    "currentBehavior": "ScriptBlockEditor.IvrStep.tsx:304 renders 'From the workspace audio library.' under the recording control.",
-    "resolution": "Remove the helper text line; verify the RecordingStepFields block still reads clean with the Select only.",
-    "lookIn": [
-      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx:304"
-    ],
-    "missingTests": [
-      "UI smoke renders recording step without the label"
-    ],
-    "acceptanceCriteria": [
-      "No 'From the workspace audio library' text in the IVR recording step"
-    ]
-  },
-  {
-    "issueNumber": 1981,
-    "verdict": "fix-now",
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "",
-    "recommendedTitle": "Receipts: state how many credits were bought",
-    "summary": "Receipt (billing/receipt.route.tsx) should say how many credits the purchase covered, not just the amount.",
-    "currentBehavior": "Receipt builder shows amount/line items; no credit quantity line.",
-    "resolution": "Add a credit-quantity line to the receipt render (from the ledger row / stripe session metadata). Contact #1982/#1983 for the same receipts surface.",
-    "lookIn": [
-      "app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx"
-    ],
-    "missingTests": [
-      "receipt test asserts credit-quantity line"
-    ],
-    "acceptanceCriteria": [
-      "Receipt states how many credits were bought"
-    ]
-  },
-  {
-    "issueNumber": 1982,
-    "verdict": "fix-now",
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "",
-    "recommendedTitle": "Receipts: support email should be contact@callcaster.ca",
-    "summary": "Receipts currently carry a wrong/absent support contact; use contact@callcaster.ca.",
-    "currentBehavior": "Receipt builder contact line differs from the canonical support address.",
-    "resolution": "Swap the contact line to contact@callcaster.ca on the receipt.",
-    "lookIn": [
-      "app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx"
-    ],
-    "missingTests": [
-      "receipt test asserts contact@callcaster.ca"
-    ],
-    "acceptanceCriteria": [
-      "Receipts say contact@callcaster.ca"
-    ]
   },
   {
     "issueNumber": 1873,
