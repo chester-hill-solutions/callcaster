@@ -19,6 +19,14 @@ mutating the project. Do not guess opaque GitHub IDs.
 For project `9` in this repository, use the list element with `id: 9` in
 `.github/projects.yaml` and keep its `fields` as a subkey of that element.
 
+## CHS Backlog Status
+
+Project `9` (`CHS Backlog`) currently uses these `Status` values: `Backlog`, `In progress`, `on-dev`, `tested-on-dev`, `on-qa`, `on-prod`, and `archive`.
+
+- Resolve statuses with `gh project field-list 9 --owner chester-hill-solutions --format json` before filtering or changing items.
+- The installed CLI supports the verified query `gh project item-list 9 --owner chester-hill-solutions --query "status:Backlog" --limit 500 --format json`. Filter those results to the target repository before acting.
+- To select work by both an organization Issue field and a Project status, query the Issue field first, query the Project status separately, then intersect the issue numbers. Do not treat a Project status as an issue label.
+
 ## Safe Workflow
 
 1. Confirm authentication and the target owner with `gh auth status` and `gh repo view --json nameWithOwner,url`.
