@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Text , Heading } from "@/components/ui/typography";
+import { Text } from "@/components/ui/typography";
 
 // Neutral on purpose: this page is registration when signup is open and a
 // request-access form when it is closed, and meta cannot read loader data here.
@@ -56,17 +56,13 @@ export default function SignUp() {
   });
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-background px-4 py-8 sm:px-6 lg:px-8">
-      <Heading
-        branded
-        level={1}
-        className="animate-fade-in-up my-4 font-Tabac-Slab"
-      >
-        {signupOpen ? "Sign Up" : "Request Access"}
-      </Heading>
+    <main className="bg-background flex min-h-screen flex-col items-center px-4 py-8 sm:px-6 lg:px-8">
       <div className="z-10 flex w-full max-w-6xl justify-center space-y-16">
         {signupOpen ? (
-          <RegistrationForm isBusy={state !== "idle"} error={actionData?.error} />
+          <RegistrationForm
+            isBusy={state !== "idle"}
+            error={actionData?.error}
+          />
         ) : (
           <ContactForm
             isBusy={state !== "idle"}
@@ -85,25 +81,38 @@ interface RegistrationFormProps {
 }
 
 const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 mb-16 w-full max-w-md font-Zilla-Slab">
+  <div className="animate-fade-in-up animation-delay-600 font-Zilla-Slab mb-16 w-full max-w-md">
     <AuthCard
-      title="Create Account"
+      title="Sign Up"
       description="Sign up to create a workspace and start calling."
       className="bg-secondary py-2"
-      headingAs="h2"
     >
       {error ? (
         <Alert variant="destructive">
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : null}
-      <Form method="POST" className="flex w-full flex-col gap-4" id="signup-form">
+      <Form
+        method="POST"
+        className="flex w-full flex-col gap-4"
+        id="signup-form"
+      >
         <div className="flex w-full gap-4">
           <FormField htmlFor="firstName" label="First Name" className="flex-1">
-            <Input type="text" name="firstName" id="firstName" autoComplete="given-name" />
+            <Input
+              type="text"
+              name="firstName"
+              id="firstName"
+              autoComplete="given-name"
+            />
           </FormField>
           <FormField htmlFor="lastName" label="Last Name" className="flex-1">
-            <Input type="text" name="lastName" id="lastName" autoComplete="family-name" />
+            <Input
+              type="text"
+              name="lastName"
+              id="lastName"
+              autoComplete="family-name"
+            />
           </FormField>
         </div>
         <FormField htmlFor="email" label="Email">
@@ -127,7 +136,7 @@ const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
         </FormField>
       </Form>
       <Button
-        className="min-h-[48px] w-full font-Zilla-Slab text-2xl font-bold tracking-[1px]"
+        className="font-Zilla-Slab min-h-[48px] w-full text-2xl font-bold tracking-[1px]"
         type="submit"
         form="signup-form"
         disabled={isBusy}
@@ -136,7 +145,7 @@ const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
       </Button>
       <NavLink
         to="/signin"
-        className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-foreground transition-colors duration-150 hover:text-brand-primary hover:underline"
+        className="font-Zilla-Slab text-foreground hover:text-brand-primary text-center text-xl font-bold tracking-[1px] transition-colors duration-150 hover:underline"
       >
         Already have an account? Click{" "}
         <span className="text-brand-primary">HERE</span> to sign in!
@@ -152,13 +161,12 @@ interface ContactFormProps {
 }
 
 const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 mb-16 w-full max-w-md font-Zilla-Slab">
+  <div className="animate-fade-in-up animation-delay-600 font-Zilla-Slab mb-16 w-full max-w-md">
     <div className="flex flex-wrap gap-8">
       <AuthCard
         title="Request Access"
         description="Registration is currently available by invitation. Contact us to let us know you're interested."
-        className="w-full bg-secondary py-2"
-        headingAs="h2"
+        className="bg-secondary w-full py-2"
       >
         <fetcher.Form
           className="space-y-4"
@@ -200,11 +208,7 @@ const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
               />
             </FormFieldControl>
           </FormField>
-          <Button
-            disabled={isBusy}
-            type="submit"
-            className="w-full"
-          >
+          <Button disabled={isBusy} type="submit" className="w-full">
             Send Message
           </Button>
         </fetcher.Form>
