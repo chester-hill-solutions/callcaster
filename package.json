@@ -13,6 +13,7 @@
     "dev:local": "node ./scripts/local/dev-local.mjs",
     "dev:calling:sync": "bun ./scripts/local/sync-calling-dev.mjs",
     "tools:sync-inbound-sms": "bun ./scripts/one-off/sync-inbound-sms-from-twilio.mjs",
+    "tools:gen-wav-sidecars": "bun run scripts/gen-wav-sidecars.ts",
     "tools:routes:baseline": "node scripts/verify-route-tree.mjs --update-baseline",
     "tools:routes:verify": "node scripts/verify-route-tree.mjs",
     "db:generate": "drizzle-kit generate",
