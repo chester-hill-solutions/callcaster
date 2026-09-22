@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
-vi.mock("@/lib/env.server", () => {
+vi.mock("@/lib/env.server", async (importOriginal) => {
   const handler = { get: (_target: unknown, prop: string) => () => `test-${prop}` };
-  return { env: new Proxy({}, handler) };
+  return {
+    ...(await importOriginal<typeof import("@/lib/env.server")>()),
+    env: new Proxy({}, handler),
+  };
 });
 
-vi.mock("@/lib/logger.server", () => ({
+vi.mock("@/lib/logger.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/logger.server")>()),
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
 
@@ -29,9 +33,16 @@ vi.mock("@/server/admin-db", () => ({
   },
 }));
 vi.mock("@/server/tenant-db", () => ({ createTenantDb: vi.fn() }));
-vi.mock("@/lib/database/stripe.server", () => ({ createStripeContact: vi.fn() }));
-vi.mock("@/lib/database/workspace.server", () => ({ requireWorkspaceAccess: vi.fn() }));
-vi.mock("@/lib/transaction-history.server", () => ({
+vi.mock("@/lib/database/stripe.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/database/stripe.server")>()),
+  createStripeContact: vi.fn(),
+}));
+vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/database/workspace.server")>()),
+  requireWorkspaceAccess: vi.fn(),
+}));
+vi.mock("@/lib/transaction-history.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/transaction-history.server")>()),
   insertTransactionHistoryIdempotent: vi.fn(),
 }));
 
