@@ -11,6 +11,7 @@ import {
 import {
   resolveNoInputTarget,
   type IvrNoInputConfig,
+  type NoInputTarget,
 } from "@/lib/ivr-block-runtime.server";
 import {
   bumpInboundNoInputReplay,
@@ -78,13 +79,16 @@ const findNextStep = (
 };
 
 const renderTerminalTarget = async (
-  twiml: TwimlResponse,
-  target: string,
-  numberId: string,
-  workspace: string,
-  baseUrl: string,
-  script: Script,
+  options: {
+    twiml: TwimlResponse;
+    target: string;
+    numberId: string;
+    workspace: string;
+    baseUrl: string;
+    script: Script;
+  },
 ) => {
+  const { twiml, target, numberId, workspace, baseUrl, script } = options;
   if (target === "hangup" || target === "end") {
     // Both are terminal (#1884): `end` is the documented terminal target; the
     // old code fell through and redirected to a bogus inbound block URL that
@@ -142,6 +146,45 @@ const renderTerminalTarget = async (
   twiml.hangup();
 };
 
+/**
+ * No-input branch (#1883): mirror the outbound route (hangup / route / replay
+ * with a per-call cap). Returns true when the branch produced TwiML and the
+ * handler should return early; false for `next`, meaning the caller falls
+ * through to the standard linear flow.
+ */
+const renderInboundNoInputBranch = (
+  twiml: TwimlResponse,
+  options: {
+    target: NoInputTarget;
+    numberId: string;
+    pageId: string;
+    blockId: string;
+    callSid: string;
+    baseUrl: string;
+    script: Script;
+  },
+): boolean => {
+  const { target, numberId, pageId, blockId, callSid, baseUrl, script } = options;
+  if (target.kind === "next") {
+    return false;
+  }
+  if (target.kind === "hangup") {
+    twiml.hangup();
+  } else if (target.kind === "route") {
+    if (script.pages[target.pageId]?.blocks.includes(target.blockId)) {
+      twiml.redirect(
+        `${baseUrl}/api/inbound-ivr/${numberId}/${target.pageId}/${target.blockId}/`,
+      );
+    } else {
+      twiml.hangup();
+    }
+  } else if (target.kind === "replay") {
+    bumpInboundNoInputReplay(callSid, blockId);
+    twiml.redirect(`${baseUrl}/api/inbound-ivr/${numberId}/${pageId}/${blockId}/`);
+  }
+  return true;
+};
+
 export const action = defineAction({
   auth: ({ request, params }) =>
     requireTwilioSignatureForIvrResponse(request, [params.numberId, params.pageId, params.blockId]),
@@ -183,25 +226,21 @@ export const action = defineAction({
     // No-input handling (#1883): mirror the outbound route's noInput branches
     // with a per-call replay counter (no outreach attempt exists inbound).
     const hadInput = userInput != null && String(userInput).trim() !== "";
-    const noInputConfig = currentBlock.noInput;
-    if (!hadInput && noInputConfig) {
-      const replays = inboundNoInputReplayCount(callSid, blockId);
-      const target = resolveNoInputTarget(noInputConfig, replays);
-      if (target.kind !== "next") {
-        if (target.kind === "hangup") {
-          twiml.hangup();
-        } else if (target.kind === "route") {
-          if (script.pages[target.pageId]?.blocks.includes(target.blockId)) {
-            twiml.redirect(
-              `${baseUrl}/api/inbound-ivr/${numberId}/${target.pageId}/${target.blockId}/`,
-            );
-          } else {
-            twiml.hangup();
-          }
-        } else if (target.kind === "replay") {
-          bumpInboundNoInputReplay(callSid, blockId);
-          twiml.redirect(`${baseUrl}/api/inbound-ivr/${numberId}/${pageId}/${blockId}/`);
-        }
+    if (!hadInput && currentBlock.noInput) {
+      const target = resolveNoInputTarget(
+        currentBlock.noInput,
+        inboundNoInputReplayCount(callSid, blockId),
+      );
+      const handled = renderInboundNoInputBranch(twiml, {
+        target,
+        numberId,
+        pageId,
+        blockId,
+        callSid,
+        baseUrl,
+        script: script as Script,
+      });
+      if (handled) {
         return new Response(twiml.toString(), {
           headers: { "Content-Type": "application/xml" },
         });
@@ -210,14 +249,14 @@ export const action = defineAction({
     }
 
     const nextStep = findNextStep(currentBlock, userInput, script as Script, pageId);
-    await renderTerminalTarget(
+    await renderTerminalTarget({
       twiml,
-      nextStep,
+      target: nextStep,
       numberId,
-      number.workspaceId,
+      workspace: number.workspaceId,
       baseUrl,
-      script as Script,
-    );
+      script: script as Script,
+    });
   } catch (e) {
     // Never read raw internal error text aloud to the caller — log it and speak
     // a fixed generic message instead.
