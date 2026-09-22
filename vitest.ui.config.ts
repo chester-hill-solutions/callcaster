@@ -26,6 +26,13 @@ export default mergeConfig(
       pool: "forks",
       maxWorkers: 2,
       isolate: true,
+      // Vitest defaults to 5s, which already-imported route modules miss when
+      // the box is under load (repeated full gates, CI peers): hydration tests
+      // burn time in React-router import + render, and a timed-out test leaves
+      // a mounted router behind, failing the next test in the same file. The
+      // node suite already runs at 60s; 20s absorbs the load spike without
+      // hiding real hangs.
+      testTimeout: 20_000,
       coverage: {
         provider: "istanbul",
         reportsDirectory: "coverage/vitest-ui",
