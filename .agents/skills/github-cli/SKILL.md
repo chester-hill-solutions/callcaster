@@ -46,7 +46,18 @@ Use `gh auth refresh -s <scope>` only when the operation requires an additional 
 ## Organization Effort Field
 
 - In CallCaster, `Effort` is an organization-level GitHub Issue field. Every organization issue has it; it is not an issue label or a GitHub Project field.
-- Never use `gh issue list --label "effort:<value>"` or Project item data to select work by effort. Inspect the organization Issue field with the GitHub API supported by the installed `gh` version before acting on an issue.
+- `gh issue view --json` does not expose organization Issue fields. Use GraphQL `issueFieldValues`; do not use `gh issue list --label "effort:<value>"` or Project item data.
+- Resolve the current field and option IDs before filtering. On 2026-09-22, `Effort` is `IFSS_kgDOAZggGQ` and `nothing-burger` is `IFSSO_kgDOBLhcrg`:
+
+```bash
+gh api graphql -f query='query { organization(login: "chester-hill-solutions") { issueFields(first: 100) { nodes { ... on IssueFieldSingleSelect { id name options { id name } } } } } }'
+```
+
+- List open CallCaster issues for an Effort option with the verified repository filter. Replace the IDs only with values returned by the preceding query:
+
+```bash
+gh api graphql -f query='query { repository(owner: "chester-hill-solutions", name: "callcaster") { issues(first: 100, filterBy: { states: OPEN, issueFieldValues: [{ fieldId: "IFSS_kgDOAZggGQ", singleSelectOptionId: "IFSSO_kgDOBLhcrg" }] }) { nodes { number title url } } } }'
+```
 
 ## Issue Development Branches
 
