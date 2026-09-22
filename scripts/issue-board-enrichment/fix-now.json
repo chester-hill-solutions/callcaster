@@ -1,65 +1,5 @@
 [
   {
-    "issueNumber": 1936,
-    "verdict": "fix-now",
-    "recommendedTitle": "Comment policy: comments must carry information (no-useless-comments rule)",
-    "summary": "Add a local ESLint rule callcaster/no-useless-comments (error) rejecting issue/PR-number-only and punctuation-only comments, sweep the ~20 existing offenders, and document the rule. Not implemented.",
-    "currentBehavior": "eslint.config.mjs only wires upstream plugins; there is no local rule infrastructure and no no-useless-comments rule.",
-    "rootCause": "Comment hygiene is unenforced; a number or a punctuation banner passes lint.",
-    "resolution": "Define the rule (inline plugin object in eslint.config.mjs, or a small local-rules module), set it to error, fix the offenders, add rule unit tests, and document the intent.",
-    "lookIn": [
-      "eslint.config.mjs",
-      "package.json",
-      "app/",
-      "test/"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Rule unit tests: number-only comment fails, punctuation-only comment fails, informative comment passes"
-    ],
-    "acceptanceCriteria": [
-      "Issue/PR-number-only comments are lint errors",
-      "Punctuation-only comments are lint errors",
-      "Existing offenders are zero",
-      "Rule intent is documented"
-    ],
-    "blockedBy": [],
-    "size": "S-M",
-    "risk": "low",
-    "trackerRecommendation": "Fix now as one atomic PR (rule + zero-offender sweep + rule tests)."
-  },
-  {
-    "issueNumber": 1886,
-    "verdict": "fix-now",
-    "recommendedTitle": "Run db:schema:check per deployed environment (DB-backed gate)",
-    "summary": "scripts/db/check-schema-drift.mjs (db:schema:check) compares app-required tables/columns/functions/enum values against the live DB, but nothing invokes it: absent from ci:local and from .github/workflows/ledger-drift-check.yml. It also lacks --require-db. No PR exists.",
-    "currentBehavior": "Running the script with no DATABASE_URL prints a message and exits 2; no workflow runs it. A deployed environment missing a required object is not caught.",
-    "rootCause": "The checker was added as a tool but never connected to a DB-backed per-environment gate.",
-    "resolution": "Add --require-db (or SCHEMA_CHECK_REQUIRE_DB=1) to scripts/db/check-schema-drift.mjs mirroring check-migration-ledger.mjs so a missing URL exits 1; add a --require-db step after each ledger step in ledger-drift-check.yml; extend push paths; factor flag/URL resolution into a pure helper in scripts/lib/app-db-objects.mjs and unit-test it. Type parity is a follow-up.",
-    "lookIn": [
-      "scripts/db/check-schema-drift.mjs",
-      "scripts/db/check-migration-ledger.mjs",
-      ".github/workflows/ledger-drift-check.yml",
-      "scripts/lib/app-db-objects.mjs",
-      "test/schema-drift-enums.test.ts"
-    ],
-    "existingTests": [
-      "test/schema-drift-enums.test.ts"
-    ],
-    "missingTests": [
-      "Shared arg/URL resolver: flag + no URL => exit 1; no flag + no URL => exit 2; URL present => the URL"
-    ],
-    "acceptanceCriteria": [
-      "A deployed environment missing a required object fails the workflow.",
-      "A missing DATABASE_URL fails the workflow rather than no-op passing.",
-      "Push path filters include the schema files and the checker."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now per the accepted grilling decision (existence gate first, type parity deferred)."
-  },
-  {
     "issueNumber": 1885,
     "verdict": "fix-now",
     "recommendedTitle": "Rewrite the two live auth.uid() RPCs, drop get_outreach_attempts, then drop schema auth",
@@ -204,42 +144,6 @@
     "trackerRecommendation": "Fix now; session-only per the recorded decision. Relates to #1839 and #1708."
   },
   {
-    "issueNumber": 1845,
-    "verdict": "fix-now",
-    "recommendedTitle": "fix(dial): drop synchronous AMD from manual/power dials; keep it predictive-only",
-    "summary": "Manual call-creation paths still send machineDetection:'Enable', so an answered manual call waits for the AMD verdict. Decision couples AMD to dial mode: predictive keeps it, manual/power turns it off and uses the agent's Audio Drop button. IVR keeps AMD (see #1842/#1864).",
-    "currentBehavior": "machineDetection:'Enable' at call.action.server.ts:108 and dial/$number.action.server.ts:73; auto-dial.server.ts:63 keeps it. test/api-call.route.test.ts:180 asserts machineDetection=\"Enable\".",
-    "rootCause": "AMD was added unconditionally to support auto voicemail drop; on manual/power calls an agent is already on the line.",
-    "resolution": "Remove machineDetection (and any AMD-callback wiring) from call.action.server.ts and dial/$number.action.server.ts; keep it in auto-dial.server.ts. Confirm the Audio Drop control stays visible when voicedrop_audio is set. Update the api-call test and add a regression that auto-dial still sets it.",
-    "lookIn": [
-      "app/routes/api+/call.action.server.ts",
-      "app/routes/api+/dial/$number.action.server.ts",
-      "app/lib/auto-dial.server.ts",
-      "app/routes/api+/dial/status.action.server.ts",
-      "app/components/call/CallScreen.CallArea.tsx"
-    ],
-    "existingTests": [
-      "test/api-call.route.test.ts",
-      "test/dial-number.route.test.ts",
-      "test/dial-status.route.test.ts",
-      "test/auto-dial.server.test.ts"
-    ],
-    "missingTests": [
-      "manual routes emit no machineDetection",
-      "auto-dial still emits machineDetection",
-      "Audio Drop still works on manual/power calls"
-    ],
-    "acceptanceCriteria": [
-      "A manual/power call reaches audio immediately with no AMD wait",
-      "Predictive dialing still drops or hangs up on a detected machine",
-      "A drop-enabled campaign still plays the voicemail when an agent drops it"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now; decision recorded. IVR stays AMD-on per #1842/#1864; #1839 toggle is the Setup layer."
-  },
-  {
     "issueNumber": 1833,
     "verdict": "fix-now",
     "recommendedTitle": "fix(ui): pointer cursor on shared Button + guard raw <button> usage",
@@ -333,65 +237,6 @@
     "size": "S-M",
     "risk": "low",
     "trackerRecommendation": "Well-scoped UX feature; add the ignore target end to end and test the import exclusion."
-  },
-  {
-    "issueNumber": 1844,
-    "verdict": "fix-now",
-    "recommendedTitle": "Play call recordings in-app instead of linking to the Twilio recording URL",
-    "summary": "The Call History 'Listen' link opens call.recording_url, a Twilio API mp3 URL that sends the user to Twilio; recordings are already copied to object storage as call.audio_url.",
-    "currentBehavior": "CallLogTable renders an <a href={recordingUrl}>Listen when recording_url is set. app/lib/call-log.server.ts selects call.recording_url. runRecordingSideEffects already persists recordings to object storage (call.audio_url).",
-    "rootCause": "Call History reads the raw Twilio recording_url and links out to it instead of serving the stored call.audio_url.",
-    "resolution": "Select call.audio_url in app/lib/call-log.server.ts and mint a signed object-storage URL (createSignedObjectUrls, as the voicemails loader does), preferring it for the Listen action; render an in-app player and keep a clear fallback when no persisted copy exists.",
-    "lookIn": [
-      "app/lib/call-log.server.ts",
-      "app/components/calls/CallLogTable.tsx",
-      "app/lib/call-recording-storage.server.ts",
-      "app/lib/worker/webhook-side-effects.server.ts",
-      "app/lib/platform-media.server.ts",
-      "app/lib/object-storage.server.ts"
-    ],
-    "existingTests": [
-      "test/call-log.test.ts"
-    ],
-    "missingTests": [
-      "Loader returns a non-Twilio playback URL for a call with audio_url",
-      "CallLogTable renders the in-app player and no external Twilio link"
-    ],
-    "acceptanceCriteria": [
-      "Listen plays the recording without leaving CallCaster or opening Twilio",
-      "Works for a call whose recording was persisted to storage",
-      "A clear message when no recording copy exists",
-      "Tenant scoping is preserved"
-    ],
-    "blockedBy": [],
-    "size": "S-M",
-    "risk": "medium",
-    "trackerRecommendation": "Confirmed defect with a clear path; recordings are already persisted server-side."
-  },
-  {
-    "issueNumber": 1830,
-    "verdict": "fix-now",
-    "recommendedTitle": "Codify blocking cross-developer tasks as assigned tickets in the GitHub agent skills",
-    "summary": "Request that work another developer must do to unblock an issue becomes a separate ticket, set to block that issue and assigned to the right person, and that the agent skills say so.",
-    "currentBehavior": "github-issues/SKILL.md covers issue types, parent/child decomposition, and the --blocked-by / --blocking flags, but does not require creating a separate assigned ticket when another dev's task blocks an issue.",
-    "rootCause": "The skill documents the mechanics of blocking links but not the policy that blocking work is its own assigned ticket.",
-    "resolution": "Add a section to .agents/skills/github-issues/SKILL.md stating that blocking cross-developer work is created as a new Task, linked with --blocking <blocked issue> (or --blocked-by on the blocked issue), and assigned with --assignee; include a worked example.",
-    "lookIn": [
-      ".agents/skills/github-issues/SKILL.md",
-      ".agents/skills/github-cli/SKILL.md",
-      ".agents/skills/github-pull-request/SKILL.md"
-    ],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "The skill states blocking work becomes a separate ticket",
-      "The skill shows the blocking link direction and assignment",
-      "The example uses --blocking and --assignee correctly"
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Small documentation change. Note: the issue body is a copied #1822 PROJECT_TOKEN comment that does not match the title; confirm scope with the reporter before editing."
   },
   {
     "issueNumber": 1728,
