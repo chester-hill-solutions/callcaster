@@ -31,11 +31,14 @@ Project `9` (`CHS Backlog`) currently uses these `Status` values: `Backlog`, `In
 
 Each pull request must link to the issue it resolves.
 
-CallCaster pull requests base on `dev`. The repository default branch is `master`. GitHub reads closing keywords (`Closes #N`, `Fixes #N`, `Resolves #N`) in a pull request description only when the pull request targets the default branch. For a `dev`-based pull request, GitHub ignores these keywords: no linked pull request appears on the issue, the issue does not close on merge, and `gh pr view --json closingIssuesReferences` returns empty. Verified 2026-09-22 on pull requests #2020-#2025: each body contained `Closes #N` yet `closingIssuesReferences` stayed empty.
+CallCaster pull requests base on `dev`. The repository default branch is `master`. GitHub reads closing keywords (`Closes #N`, `Fixes #N`, `Resolves #N`) in a pull request description only when the pull request targets the default branch. For a `dev`-based pull request, GitHub ignores these keywords: no linked pull request appears on the issue and the issue does not close on merge. Verified 2026-09-22 on pull requests #2020-#2025: each body contained `Closes #N` yet `closingIssuesReferences` stayed empty until linked explicitly.
 
-1. Put the issue reference in the pull request body (convention: `Closes #N`). This creates a timeline cross-reference only; it is not a true link.
-2. A true GitHub link requires the manual Development sidebar on the pull request or issue page. There is no official REST or GraphQL API to link an existing pull request to an issue. State clearly in the pull request or in your reply when a manual link is required.
-3. Verify with the issue timeline: look for a `connected` event (manual link) or a `cross-referenced` event (body reference). `closingIssuesReferences` is authoritative only for pull requests that target the default branch.
+1. Put the issue reference in the pull request body (convention: `Closes #N`). This creates a timeline cross-reference only; it is not a link.
+2. Create the Development link with the official GraphQL mutation `addCloseIssueReferences`. It works for any base branch and supports existing pull requests:
+   - Resolve the node IDs with `repository.issue(number: N) { id }` and `repository.pullRequest(number: N) { id }`.
+   - `mutation { addCloseIssueReferences(input: { issueId: "<ISSUE_ID>", pullRequestIds: ["<PR_ID>"] }) { issue { id } } }`
+3. Verify after linking: `gh pr view NUMBER --json closingIssuesReferences` returns the issue, and `GET repos/{owner}/{repo}/issues/{N}/events` contains a `connected` event.
+4. Linking does not auto-close the issue. A `dev`-based pull request merges into a non-default branch, so closing-keyword semantics do not apply; close the issue in the normal verify/close flow.
 
 ## Safe Workflow
 
