@@ -73,9 +73,13 @@ const renderTerminalTarget = async (
   target: string,
   numberId: string,
   workspace: string,
-    baseUrl: string,
+  baseUrl: string,
+  script: Script,
 ) => {
-  if (target === "hangup") {
+  if (target === "hangup" || target === "end") {
+    // Both are terminal (#1884): `end` is the documented terminal target; the
+    // old code fell through and redirected to a bogus inbound block URL that
+    // played an error before hanging up.
     twiml.hangup();
     return;
   }
@@ -108,17 +112,24 @@ const renderTerminalTarget = async (
 
   if (target.includes(":")) {
     const [nextPageId, nextBlockId] = target.split(":");
-    if (nextPageId && nextBlockId) {
+    if (
+      nextPageId &&
+      nextBlockId &&
+      script.pages[nextPageId]?.blocks.includes(nextBlockId)
+    ) {
       twiml.redirect(`${baseUrl}/api/inbound-ivr/${numberId}/${nextPageId}/${nextBlockId}/`);
       return;
     }
   }
 
-  if (target.startsWith("page_")) {
+  if (target.startsWith("page_") && script.pages[target]) {
     twiml.redirect(`${baseUrl}/api/inbound-ivr/${numberId}/${target}/`);
     return;
   }
 
+  // Dangling or malformed target: hang up instead of redirecting into an
+  // error prompt. The launch gate (script_routing_invalid) should have blocked
+  // this, but never play an error to a caller if one slips through.
   twiml.hangup();
 };
 
@@ -167,6 +178,7 @@ export const action = defineAction({
       numberId,
       number.workspaceId,
       baseUrl,
+      script as Script,
     );
   } catch (e) {
     // Never read raw internal error text aloud to the caller — log it and speak

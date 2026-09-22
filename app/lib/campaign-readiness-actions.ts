@@ -113,6 +113,11 @@ export const CAMPAIGN_READINESS_ACTIONS = {
     template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
     label: "Replace script",
   },
+  script_routing_invalid: {
+    type: "route",
+    template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,
+    label: "Fix script routing",
+  },
   audio_unavailable: {
     type: "route",
     template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignContent,

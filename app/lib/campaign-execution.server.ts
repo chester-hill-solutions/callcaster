@@ -4,6 +4,10 @@ import { findLiveJobId, rescheduleQueuedJob } from "@/lib/worker/enqueue-job.ser
 import { getCampaignReadiness, type CampaignReadinessIssue } from "@/lib/campaign-readiness";
 import { updateCampaignStatusInWorkspace } from "@/lib/campaign-ivr.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
+import { validateScriptSteps } from "@/lib/call-script-service";
+import { createTenantDb } from "@/server/tenant-db";
+import { script as scriptTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { CAMPAIGN_DISPATCH_JOB_TYPE } from "@/lib/worker/job-types.server";
 import {
   ivrCallingPolicy,
@@ -55,6 +59,43 @@ export function isMachineDispatchedVoiceCampaignType(
 }
 
 /**
+ * Returns a `script_routing_invalid` readiness issue when a machine-dispatched
+ * voice campaign's script has a dangling option target or a routing cycle.
+ * Null when the campaign is not a voice campaign, has no script, or validates.
+ */
+export async function scriptRoutingIssue(
+  workspaceId: string,
+  campaign: Campaign,
+  campaignDetails: CampaignDetails,
+): Promise<CampaignReadinessIssue | null> {
+  if (
+    campaign.type == null ||
+    !isMachineDispatchedVoiceCampaignType(campaign.type) ||
+    campaignDetails == null ||
+    !("script_id" in campaignDetails) ||
+    campaignDetails.script_id == null
+  ) {
+    return null;
+  }
+  const tdb = createTenantDb(workspaceId);
+  const scriptRow = await tdb.script.findFirst({
+    where: eq(scriptTable.id, campaignDetails.script_id),
+    columns: { steps: true },
+  });
+  if (scriptRow?.steps == null) {
+    return null;
+  }
+  const validation = validateScriptSteps(scriptRow.steps);
+  if (validation.ok) {
+    return null;
+  }
+  return {
+    code: "script_routing_invalid",
+    message: `Script routing is invalid: ${validation.errors.join("; ")}`,
+  };
+}
+
+/**
  * Launch a campaign (message or machine-dialled voice).
  *
  * 1. Validates configuration readiness.
@@ -92,6 +133,14 @@ export async function launchCampaign(args: {
     mode === "scheduled" ? readiness.scheduleDisabledReason : readiness.startDisabledReason;
   if (readinessError) {
     return { ok: false, error: readinessError, issue: readiness.issues[0] };
+  }
+
+  // Routing stopgap (#1884): a machine-dispatched voice campaign with a script
+  // whose option routing dangles or cycles must not dial. validateScriptSteps
+  // folds the routing check into the structural one.
+  const routingError = await scriptRoutingIssue(workspaceId, campaign, campaignDetails);
+  if (routingError) {
+    return { ok: false, error: routingError.message, issue: routingError };
   }
 
   // Check expired dates.

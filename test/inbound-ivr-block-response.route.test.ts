@@ -159,4 +159,50 @@ describe("inbound IVR block response", () => {
     const text = await res.text();
     expect(text).toMatch(/hangup/i);
   });
+
+  test("next:'end' is terminal and hangs up (#1884)", async () => {
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: {
+        pages: { page_1: { blocks: ["b1"] } },
+        blocks: { b1: { id: "b1", options: [{ value: "1", next: "end" }] } },
+      },
+    });
+
+    const mod = await import(
+      "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+    );
+    const res = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1", Digits: "1" }),
+    } as any);
+
+    const text = await res.text();
+    expect(text).toMatch(/hangup/i);
+    expect(text).not.toContain("Sorry, we ran into a problem.");
+  });
+
+  test("dangling page:block target hangs up instead of playing an error (#1884)", async () => {
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: {
+        pages: { page_1: { blocks: ["b1"] } },
+        blocks: {
+          b1: { id: "b1", options: [{ value: "1", next: "page_missing:block_missing" }] },
+        },
+      },
+    });
+
+    const mod = await import(
+      "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+    );
+    const res = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1", Digits: "1" }),
+    } as any);
+
+    const text = await res.text();
+    expect(text).toMatch(/hangup/i);
+    expect(text).not.toContain("Sorry, we ran into a problem.");
+  });
 });
