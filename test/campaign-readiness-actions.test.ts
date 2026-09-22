@@ -29,6 +29,7 @@ const CURRENT_READINESS_CODES = [
   "audio_unavailable",
   "voicemail_audio_required",
   "message_content_required",
+  "script_routing_invalid",
 ] as const satisfies readonly CampaignReadinessCode[];
 
 describe("app/lib/campaign-readiness-actions.ts", () => {

@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type {
   ScriptBlock,
   ScriptDocument,
@@ -22,6 +22,7 @@ import {
   nextIvrStepTitle,
   type IvrPlaybackMode,
 } from "@/lib/ivr-script-editor";
+import { validateIvrRouting } from "@/lib/ivr-script-validation";
 import { cn } from "@/lib/utils";
 import { ScriptBlockEditor, isIvrStepBlock } from "./ScriptBlockEditor";
 
@@ -64,6 +65,18 @@ export function ScriptEditorShell({
     palette: "callcaster",
     onChange,
   });
+
+  // Routing validation (#1884): option `next` targets that dangle or form
+  // cycles without a terminal are surfaced alongside scriptkit's structural
+  // errors. Same logic runs server-side at the launch gate.
+  const routingIssues = useMemo(
+    () => validateIvrRouting(editor.document).issues,
+    [editor.document],
+  );
+  const validationErrors = [
+    ...(editor.validation.ok ? [] : editor.validation.errors),
+    ...routingIssues.map((issue) => issue.error),
+  ];
 
   const activePageIndex = editor.orderedPages.findIndex(
     (page) => page.id === editor.activePageId,
@@ -374,9 +387,9 @@ export function ScriptEditorShell({
         </div>
       </div>
 
-      {!editor.validation.ok && (
+      {validationErrors.length > 0 && (
         <div className="text-sm text-destructive-text" role="alert">
-          {editor.validation.errors.join("; ")}
+          {validationErrors.join("; ")}
         </div>
       )}
     </div>

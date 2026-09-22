@@ -32,7 +32,8 @@ export type CampaignReadinessCode =
   | "script_unavailable"
   | "audio_unavailable"
   | "voicemail_audio_required"
-  | "message_content_required";
+  | "message_content_required"
+  | "script_routing_invalid";
 
 export type CampaignReadinessIssue = {
   code: CampaignReadinessCode;
@@ -84,6 +85,7 @@ export const CAMPAIGN_CONTENT_READINESS_CODES = [
   "script_unavailable",
   "audio_unavailable",
   "message_content_required",
+  "script_routing_invalid",
 ] as const satisfies readonly CampaignReadinessCode[];
 
 function issue(
