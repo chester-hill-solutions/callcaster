@@ -1410,5 +1410,44 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Verify on the review env after the 2026-09-21 release: invite an email with no account, receive the Resend link, sign up, land in the workspace; ensure token-less accept is not reachable. Then close."
+  },
+  {
+    "issueNumber": 1976,
+    "verdict": "verify-close",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "",
+    "recommendedTitle": "IVR results/export show the option label (not raw DTMF)",
+    "summary": "Shipped in #1977 via resolveIvrAnswerLabel (app/lib/ivr-results.ts): results screen and CSV export render the option label for known keys; unknown values fall back to the raw value. Verify on the review env and close.",
+    "currentBehavior": "Before fix: IvrOption labels ignored; raw DTMF was shown.",
+    "resolution": "Verify on dev: a script with keypad options displays the chosen label in Results + export; a key with no matching option still shows the raw value.",
+    "lookIn": [
+      "app/lib/ivr-results.ts"
+    ],
+    "existingTests": [
+      "test/ivr-results* and route tests for label resolution"
+    ],
+    "acceptanceCriteria": [
+      "Results + export show the label the caller chose (or raw when unmatched)"
+    ]
+  },
+  {
+    "issueNumber": 1961,
+    "verdict": "verify-close",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "",
+    "recommendedTitle": "issue-on-dev abort when PR bodies reference non-issue numbers",
+    "summary": "Fixed by #1964: issue-on-dev.yml now parses closing keywords and 'Issues:' lines with PR-number robustness, and the parser ignores bare PR-number references. Verify a merge with a body containing issue numbers doesn't abort the loop, then close.",
+    "currentBehavior": "Before: 'gh issue view' on a PR number returned MERGED and the GraphQL move loop aborted.",
+    "resolution": "Verify with a reference PR whose body names issues + a PR number; confirm Status moves complete. #1961 is docs/automation only.",
+    "lookIn": [
+      ".github/workflows/issue-on-dev.yml"
+    ],
+    "acceptanceCriteria": [
+      "The move loop completes when a PR body references issue numbers"
+    ]
   }
 ]
