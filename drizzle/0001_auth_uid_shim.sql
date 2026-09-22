@@ -1,6 +1,9 @@
--- Route auth.uid() through app.current_user_id for Drizzle RPC callers (ADR-0004).
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
-    LANGUAGE sql STABLE
-    AS $$
-  SELECT nullif(current_setting('app.current_user_id', true), '')::uuid
-$$;
+-- Retired (#1885 chunk 3).
+--
+-- This file used to define auth.uid() for Drizzle RPC callers (ADR-0004).
+-- The last public function calling it was rewritten onto the v2
+-- `app.current_user_id` actor in chunk 2, and the legacy `auth` schema is
+-- dropped by client/migrations/20260922120000_drop_legacy_auth_schema.sql.
+-- The file stays in the bootstrap step lists and the migration ledger so the
+-- lineage stays replayable, but deliberately defines nothing: a fresh
+-- bootstrap must not recreate auth.uid().

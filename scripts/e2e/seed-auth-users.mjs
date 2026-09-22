@@ -16,17 +16,6 @@ export async function seedAuthUser(sql, user, password) {
   const displayName = [user.first, user.last].filter(Boolean).join(" ").trim() || user.email;
   const passwordHash = await hashPassword(password);
 
-  // Legacy Supabase auth.users (must precede public.user when insert_new_user trigger exists).
-  try {
-    await sql`
-      INSERT INTO auth.users (id, email)
-      VALUES (${user.id}::uuid, ${user.email})
-      ON CONFLICT (id) DO NOTHING
-    `;
-  } catch {
-    // auth schema absent on fully migrated databases.
-  }
-
   await sql`
     INSERT INTO auth_user (id, name, email, email_verified, two_factor_enabled, created_at, updated_at)
     VALUES (${user.id}, ${displayName}, ${user.email}, ${true}, ${false}, ${now}, ${now})
