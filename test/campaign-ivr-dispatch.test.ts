@@ -195,7 +195,7 @@ describe("dispatchCampaignIvrBatch", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 501 },
       userId: USER_ID,
-      reason: "IVR call completed",
+      reason: "IVR dial dispatched",
     });
     expect(outcome.kind).toBe("dispatched");
     expect(outcome.counts).toEqual({ called: 1, failed: 0, dequeued: 0, deferred: 0, exhausted: 0 });

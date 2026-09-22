@@ -101,7 +101,7 @@ export const action = defineAction({
       await dequeueQueueEntry({
         by: { id: Number(queue_id) },
         userId: user_id,
-        reason: "IVR call completed",
+        reason: "IVR dial dispatched",
       });
 
       return new Response(JSON.stringify({ success: true, callSid: call.sid }), {

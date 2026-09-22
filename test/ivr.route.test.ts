@@ -181,7 +181,7 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
       by: { id: 3 },
       userId: "u1",
-      reason: "IVR call completed",
+      reason: "IVR dial dispatched",
     });
   });
 
