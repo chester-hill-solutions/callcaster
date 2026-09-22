@@ -59,14 +59,14 @@ export default function ChatsList() {
   } = useChatsPage();
 
   return (
-    <main className="flex min-h-[68vh] w-full flex-col gap-4 md:flex-row">
+    <main className="flex min-h-[68vh] w-full flex-col gap-4 md:flex-row lg:h-full lg:min-h-0">
       <div
-        className={`hidden ${workspacePanelHeightClass} flex-col overflow-hidden rounded-lg border border-border/80 md:flex md:max-w-[40%] md:basis-2/5`}
+        className={`hidden ${workspacePanelHeightClass} flex-col overflow-hidden rounded-lg border border-border/80 md:flex md:max-w-[40%] md:basis-2/5 lg:h-full lg:min-h-0`}
       >
         <ConversationSidebar {...sidebarProps} />
       </div>
 
-      <div className="flex min-h-[68vh] w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/80 md:basis-3/5">
+      <div className="flex min-h-[68vh] w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/80 md:basis-3/5 lg:h-full lg:min-h-0">
         <ChatHeader
           contact={contact}
           outlet={Boolean(outlet)}
@@ -87,7 +87,7 @@ export default function ChatsList() {
           setDialog={(nextContact) => setDialog(nextContact as typeof contact)}
           onShowConversationList={() => setIsMobileConversationListOpen(true)}
         />
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-muted/30">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-muted/30">
           <Outlet
             context={{
               workspace,
