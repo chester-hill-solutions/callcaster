@@ -51,7 +51,7 @@ export function SmsComplianceGate({
         <input
           type="hidden"
           name="returnTo"
-          value={`/workspaces/${workspaceId}/settings/numbers`}
+          value={`/workspaces/${workspaceId}/phone-numbers`}
         />
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2 md:col-span-2">

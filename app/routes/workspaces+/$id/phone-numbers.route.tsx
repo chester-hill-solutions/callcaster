@@ -1,5 +1,5 @@
-export { loader } from "./numbers.loader.server";
-export { action } from "./numbers.action.server";
+export { loader } from "./phone-numbers.loader.server";
+export { action } from "./phone-numbers.action.server";
 
 import type { NumbersSearchFetcherData } from "@/components/phone-numbers/NumberPurchase";
 
@@ -91,7 +91,7 @@ type LoaderData = {
   userRole: string | null | undefined;
 };
 
-const WorkspaceSettings = () => {
+const PhoneNumbersPage = () => {
   const {
     phoneNumbers: initNumbers,
     workspaceId,
@@ -337,4 +337,4 @@ const WorkspaceSettings = () => {
   );
 };
 
-export default WorkspaceSettings;
+export default PhoneNumbersPage;

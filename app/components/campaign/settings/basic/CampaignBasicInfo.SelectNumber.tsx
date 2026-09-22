@@ -36,7 +36,7 @@ export default function SelectNumber({
     return (
       <FormField label="Outbound number">
         <Button variant="outline" asChild>
-          <NavLink to="../../../settings/numbers/purchase">Get a Number</NavLink>
+          <NavLink to="../../../phone-numbers/purchase">Get a Number</NavLink>
         </Button>
       </FormField>
     );

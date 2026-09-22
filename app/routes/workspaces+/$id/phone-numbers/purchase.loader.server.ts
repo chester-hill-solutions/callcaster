@@ -13,11 +13,8 @@ export const loader = defineLoader({
       return redirect("/signin");
     }
     if (userRole === MemberRole.Caller) {
-      // Callers can't reach any /settings/* route. Explicit absolute
-      // URL — `..` resolved against
-      // `/workspaces/$id/settings/numbers/purchase` per RFC 3986 lands
-      // on `/workspaces/$id/settings/numbers/`, which a Caller also
-      // can't access; bounce to workspace root instead.
+      // An explicit workspace-root URL avoids a relative redirect back to a
+      // route the caller cannot access.
       return redirect(`/workspaces/${workspaceId}`);
     }
 

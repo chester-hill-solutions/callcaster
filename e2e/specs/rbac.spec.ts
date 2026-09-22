@@ -27,9 +27,9 @@ test.describe("RBAC @rbac @security", () => {
     await expect(page.getByText(/invite user/i)).toHaveCount(0);
   });
 
-  callerTest("RBAC-04 caller blocked from numbers settings", async ({ page }) => {
-    await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "settings/numbers"));
-    await expect(page).not.toHaveURL(/settings\/numbers$/);
+  callerTest("RBAC-04 caller blocked from Phone Numbers", async ({ page }) => {
+    await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "phone-numbers"));
+    await expect(page).not.toHaveURL(/phone-numbers$/);
   });
 
   memberTest("RBAC-09 member empty campaign CTA", async ({ page }) => {

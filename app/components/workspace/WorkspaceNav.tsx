@@ -135,6 +135,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     name: "Setup",
     items: [
+      {
+        name: "Phone Numbers",
+        path: "phone-numbers",
+        minRole: MemberRole.Member,
+        icon: Phone,
+      },
       { name: "Settings", path: "settings", icon: Settings },
     ],
   },

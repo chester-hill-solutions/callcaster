@@ -54,7 +54,7 @@ export const loader = defineLoader({
     ]);
     const hasAccess = userRole !== MemberRole.Caller;
     if (!hasAccess) {
-      return redirect(`/workspaces/${workspaceId}/settings`, { headers });
+      return redirect(`/workspaces/${workspaceId}`, { headers });
     }
 
     return routeData(

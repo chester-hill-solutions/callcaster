@@ -150,6 +150,7 @@ new
 numbers
 onboarding
 other-services
+phone-numbers
 pricing
 purchase
 queue

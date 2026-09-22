@@ -10,9 +10,9 @@ import {
 } from "@/lib/database/workspace.server";
 import { MemberRole } from "@/lib/member-role";
 import { parseActionRequest } from "@/lib/request-utils.server";
-import { normalizeInboundRingCount } from "../../../../../shared/inbound-rings";
+import { normalizeInboundRingCount } from "../../../../shared/inbound-rings";
 import { defineAction } from "@/lib/handler.server";
-import type { InboundRoutingPresetApplication } from "../../../../../shared/inbound-routing-presets";
+import type { InboundRoutingPresetApplication } from "../../../../shared/inbound-routing-presets";
 import { parseRoutingPresetApplication } from "@/lib/routing-preset-form";
 import { data as routeData } from "react-router";
 import { toUserMessage } from "@/lib/user-message";

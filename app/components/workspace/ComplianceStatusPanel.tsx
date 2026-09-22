@@ -104,7 +104,7 @@ export function ComplianceStatusPanel({
       ) : null}
       <div className="mt-4 flex flex-wrap gap-2">
         <Button asChild variant="outline" size="sm">
-          <Link to={`/workspaces/${workspaceId}/settings/numbers`}>
+          <Link to={`/workspaces/${workspaceId}/phone-numbers`}>
             Numbers & address
           </Link>
         </Button>
