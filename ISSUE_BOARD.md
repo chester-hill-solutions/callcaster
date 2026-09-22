@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@39046a98` · 154 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@cd5d85d5` · 155 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -15,7 +15,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 18
+## Fix now — 22
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -32,56 +32,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: No public function or policy references auth.*; The two RPC flows still pass their tests; DROP SCHEMA auth succeeds on dev, then prod; A fresh bootstrap does not recreate auth.uid()
 - Tracker: Keep in Fix now, split into the three PR-sized chunks. Run the zero-auth.* dependency query on prod before the drop and keep the rewrite and the drop in separate releases.
 
-### [#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842) IVR audio takes ~7s to start after answer (synchronous AMD suspected)
-- Verdict: **Fix now** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
-- Recommended title: **IVR first audio: remove the flow-entry redirect and serve WAV prompts**
-- Re-scoped from synchronous AMD to the gather/first-audio path. Remaining on dev: the flow entry returns only a Redirect, so the block route re-runs findCallBySid + fetchCampaignWithScript before any prompt, and every IVR prompt is mono MP3. No PR yet; measurement is required.
-- Current behavior: Time-to-first-audio about 7s: first audio waits on two server round-trips and an MP3 prompt Twilio transcodes.
-- Root cause: The flow entry returns a Redirect before rendering any prompt, and the prompt library only stores MP3.
-- Resolution: PR1: extract the shared block renderer into app/lib/ivr-block-runtime.server.ts and render the first block inline from the outbound and inbound page routes. PR2: add a WAV transcode in app/lib/audio.server.ts, an ivr-wav/ object path + signed URL, backfill existing prompts, then point playback at WAV. Instrument answer->flowEntry and flowEntry->firstBlock timestamps; target under 2s.
-- Look in: `app/routes/api+/ivr/$campaignId/$pageId.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId.action.server.ts`, `app/lib/audio.server.ts`, `app/lib/audio-upload.ts`, `app/lib/object-storage.server.ts`, `app/lib/platform-media.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/campaign-test-call.server.ts`
-- Existing tests: test/ivr-page.route.test.ts; test/ivr-block.route.test.ts; test/audio.server.test.ts; test/campaign-ivr-dispatch.test.ts; test/campaign-test-call.test.ts
-- Missing tests: page route returns inline first-block TwiML with no Redirect; signed prompt path is ivr-wav/*.wav; WAV transcode args; a WAV failure does not fail the MP3 write; machine branches unchanged
-- Done when: Time-to-first-audio measured before/after with numbers recorded; Under 2s on the human path; No redirect hop; the first block is rendered from the flow entry; IVR prompts served as WAV without breaking legacy objects; Machine-detection behaviour unchanged
-- Tracker: Fix now, split into PR1 (redirect removal) and PR2 (WAV + backfill). If measurement shows AMD dominates, open a separate IVR AMD-conditioning ticket (cf. #1845).
-
 ### [#1873](https://github.com/chester-hill-solutions/callcaster/issues/1873) record every call and IVR
 - Verdict: **Fix now** · Size: L · Risk: medium · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-09-19
-- Recommended title: **feat(recording): record live and IVR calls under a workspace policy**
-- The recording + transcript pipeline already exists for agent calls (record:'record-from-answer' + /api/recording -> Railway Bucket -> ElevenLabs Scribe per ADR-0029). IVR dispatch and test-call never set record; predictive dialing does not either. Consent model recorded in the issue comment.
-- Current behavior: campaign-ivr-dispatch.server.ts:241 and campaign-test-call.server.ts:105 create calls with no record/recordingStatusCallback; auto-dial.server.ts createTwilioCall also omits record. Manual live paths record.
-- Root cause: Recording is wired per call-creation site, and the IVR/predictive creators were never wired; there is no workspace policy to gate or disclose recording.
-- Resolution: Add workspace recording policy (allowed + disclosure text) and a campaign opt-in; set record:'record-from-answer' with recordingStatusCallback/Event on the IVR dispatch, test-call, and predictive paths; play the disclosure before the menu when set; reuse /api/recording and the ADR-0029 pipeline.
-- Look in: `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/lib/auto-dial.server.ts`, `app/routes/api+/recording.action.server.ts`, `app/lib/call-recording-storage.server.ts`, `app/db/schema.ts`, `docs/adr/0029-post-call-golden-transcript-cohere-batch-worker.md`
-- Existing tests: test/recording.route.test.ts; test/call-recording-storage.server.test.ts; test/campaign-ivr-dispatch.test.ts; test/campaign-test-call.test.ts
-- Missing tests: IVR and test-call calls.create include record + callback; disclosure plays before the first menu when configured; policy off means no record; policy on + campaign opt-in records and enqueues transcription
-- Done when: Every live and IVR call records when the workspace policy allows and the campaign opts in; The disclosure message plays before the menu when set; No recording when the policy disallows it; Recording flows into the existing bucket + transcript pipeline
-- Tracker: Fix now, but likely split: (1) workspace recording policy + campaign opt-in, (2) IVR/predictive record wiring + disclosure. Confirm jurisdiction gating and policy storage before coding.
-
-### [#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884) IVR editor: expose an explicit Hang up routing target and a guaranteed terminal hangup
-- Verdict: **Fix now** · Size: M-L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
-- Recommended title: **IVR: guarantee a terminal hangup (handle next:"end", validate dangling targets and cycles)**
-- 'Hang up' is already an editor routing target. The real remaining ask is the terminal-hangup guarantee: handleNextStep treats only 'hangup' as terminal; next:"end" redirects, a dangling target falls back to pageIds[0], and validateDocument only checks startPageId and missing blocks.
-- Current behavior: A script can route to "end" or a dangling target and be redirected instead of hanging up; routing cycles are undetected; the editor shows no validation warning.
-- Root cause: The runtime parses next as an opaque string with no terminal/validation contract.
-- Resolution: Treat 'hangup' and 'end' as terminal in handleNextStep and the inbound renderer; hang up instead of redirecting when the page/block does not exist; add app/lib/ivr-script-validation.ts (edge graph + DFS) surfaced in ScriptEditorShell.tsx and wired into validateScriptSteps; add a script_routing_invalid readiness code that blocks launch.
-- Look in: `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId.action.server.ts`, `app/components/campaign/settings/script/ScriptBlockEditor.routing.ts`, `app/components/campaign/settings/script/ScriptEditorShell.tsx`, `app/lib/call-script-service.ts`, `vendor/scriptkit/scriptkit-call-script-core/src/parse.ts`, `docs/script-json-format.md`
-- Existing tests: test/ivr-block-response.route.test.ts; test/ivr-block.route.test.ts; test/inbound-ivr-block-response.route.test.ts; test/ui/script-block-editor-ivr.test.tsx; vendor/scriptkit test/script-editor.test.ts
-- Missing tests: ivr-script-routing-validation: dangling target, A->B->A cycle, hangup/end ok, linear end ok; route tests: next:"end" renders <Hangup/>, dangling renders <Hangup/>, last-block fallthrough renders <Hangup/>; editor shell test shows the validation error for a cyclic script
-- Done when: An author can choose Hang up as an option's next step (already true); A published script always has a terminal hangup; next:"end" and "hangup" are both terminal at runtime; Dangling targets and reachable cycles fail validation and block launch
-- Tracker: Fix now; confirm the already-present 'expose Hang up' half with the reporter, then split runtime safety from editor/launch validation if the PR grows.
-
-### [#1883](https://github.com/chester-hill-solutions/callcaster/issues/1883) IVR step: configurable no-input handling (wait length + reroute/replay)
-- Verdict: **Fix now** · Size: M-L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
-- The runtime half shipped on dev in PR #1937 (e79644b9): per-step gather timeout plus hangup/replay/route with a 2-replay cap. The PR deferred the script-editor panel and the inbound IVR mirror, so the feature is not authorable and not applied inbound.
-- Current behavior: IvrBlock carries gatherTimeoutSeconds and noInput; appendBlockResponse honours the timeout and the outbound response route branches on resolveNoInputTarget. Nothing writes those fields (no editor control) and the inbound response route has no noInput/timeout handling.
-- Root cause: PR #1937 kept the editor panel and inbound twin out to stay atomic; the wire fields have no producer.
-- Resolution: Add the script-editor no-input panel (wait length + action select + conditional target) writing the block fields, mirror the branching into the inbound response route with its own replay store and cap, add editor/inbound route tests. Fold #1843 into this issue or close it as duplicate.
-- Look in: `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-gather.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/components/campaign/settings/script/ScriptBlockEditor.tsx`, `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/lib/ivr-script-editor.ts`
-- Existing tests: test/ivr-block-runtime.test.ts; test/ivr-gather.test.ts
-- Missing tests: Editor emits wait/no-input controls; Inbound response route no-input branches and replay cap
-- Done when: A step can wait longer than the default and, on no input, replay or route instead of just advancing; Defaults are unchanged for steps that do not configure it
-- Tracker: Fix now. Runtime + outbound are dev-only in PR #1937; finish the editor panel and inbound mirror (or fold #1843 in).
+- Recommended title: **Call recording: workspace recording policy + campaign opt-in, wired into IVR/predictive/test dials**
+- Recording pipeline EXISTS for agent/handset calls: Twilio <Dial record='record-from-answer'> + recordingStatusCallback=/api/recording (call.action.server.ts:100-105), webhook persists recording_url (recording.action.server.ts:27-85), worker downloads MP3 to Railway Bucket workspaceAudio/{ws}/recording-{sid}.mp3 (call-recording-storage.server.ts) and optionally (flag batchTranscription, default OFF) transcribes via ElevenLabs Scribe (ADR-0029, 1 credit/call). IVR (ivr-dispatch/ivr-initiate), test calls, predictive (auto-dial), and ACD inbound are NEVER recorded. No workspace or campaign recording column/toggle exists; no disclosure text anywhere.
+- Current behavior: Only manual/agent dials record+PERSIST. dial/$number and connect-campaign-conference set Twilio record WITHOUT the /api/recording callback -> orphaned recordings (see filed bug). All calls.create dials (IVR dispatch 237-244, test call 101-108, ivr-initiate 66-73, ivr.action 78-85, auto-dial 59-66, auto-dial-start 122-126, acd-router 215-223) never set record.
+- Root cause: Recording was built bespoke for agent calls only; the policy/opt-in model and the other dial families were never wired.
+- Resolution: Phase 1 (policy+opt-in): add workspace flag `callRecordingPolicy` (feature_flags, zero-migration, mirrors batchTranscription) + `campaign.record_audio boolean default false` (schema-campaign.ts + migration + Tables<campaign>). CampaignVoiceSettings toggle beside voicemail-drop (45-59), disabled unless policy on. Save path auto-flows new columns (settings.action -> updateCampaign). Phase 2 (wiring): set record-from-answer + /api/recording + completed events on IVR dispatch/test-call/ivr-initiate/ivr.action and predictive callee leg (auto-dial server.ts:59-66); worker resolves call by CallSid (auto-dial row created 397-424). Conference-level recording needs conference-SID -> call resolution (findCallsByConferenceId) + dedupe vs recording_side_effects key. Fix the 2 dead-recording sites. Phase 3 (disclosure, decision): add spoken 'call may be recorded' disclosure at IVR page top, conference join, and live-dial TwiML; optional reuse of unused disclosureEnabled coaching config; jurisdiction gate decision - hooks: recipientCallingWindowStatus (TCPA/CRTC), voice_compliance/emergencyVoice, contact.country; NO DID-country exists yet (would need Twilio isoCountry persisted). Batch transcription: if shipping with this, flip/repurpose batchTranscription gate (UNDECIDED policy, default-off).
+- Look in: `app/routes/api+/call.action.server.ts`, `app/routes/api+/recording.action.server.ts`, `app/lib/call-recording-storage.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/lib/auto-dial.server.ts`, `app/components/campaign/settings/basic/CampaignVoiceSettings.tsx`, `app/db/schema-campaign.ts`, `app/lib/coaching-schemas.ts`
+- Existing tests: test/recording.route.test.ts; test/webhook-side-effects.test.ts:445-560; test/call-recording-storage.server.test.ts; test/batch-transcription-gating.test.ts; test/api-call.route.test.ts:106 (dial record attrs)
+- Missing tests: dial sites emit record+callback only when policy+opt-in on; call rows for IVR/predictive/test calls have audio_url after runRecordingSideEffects; conference recording resolves call + dedupes; disclosure spoken on gated paths
+- Done when: Workspace policy + per-campaign opt-in exist and gate recording; IVR/predictive/test calls record and persist (audio_url) when opted; Dead recording sites fixed; One-party-consent disclosure decision recorded before default-on
+- Tracker: Fix now. Split into: (1) policy + campaign opt-in + agent-dial wiring, (2) IVR/predictive/test wiring + dead-site fixes, (3) disclosure + jurisdiction decision before default-on. #1844 UI playback already exists.
 
 ### [#1886](https://github.com/chester-hill-solutions/callcaster/issues/1886) Run db:schema:check per deployed environment (DB-backed gate)
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: @wra-sol · Updated: 2026-09-21
@@ -121,6 +83,48 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Listen plays the recording without leaving CallCaster or opening Twilio; Works for a call whose recording was persisted to storage; A clear message when no recording copy exists; Tenant scoping is preserved
 - Tracker: Confirmed defect with a clear path; recordings are already persisted server-side.
 
+### [#1982](https://github.com/chester-hill-solutions/callcaster/issues/1982) Receipts should say contact@callcaster.ca
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
+- Recommended title: **Receipts: support email should be contact@callcaster.ca**
+- Receipts currently carry a wrong/absent support contact; use contact@callcaster.ca.
+- Current behavior: Receipt builder contact line differs from the canonical support address.
+- Resolution: Swap the contact line to contact@callcaster.ca on the receipt.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx`
+- Missing tests: receipt test asserts contact@callcaster.ca
+- Done when: Receipts say contact@callcaster.ca
+
+### [#1981](https://github.com/chester-hill-solutions/callcaster/issues/1981) Receipts should say how many credits were bought
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
+- Recommended title: **Receipts: state how many credits were bought**
+- Receipt (billing/receipt.route.tsx) should say how many credits the purchase covered, not just the amount.
+- Current behavior: Receipt builder shows amount/line items; no credit quantity line.
+- Resolution: Add a credit-quantity line to the receipt render (from the ledger row / stripe session metadata). Contact #1982/#1983 for the same receipts surface.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx`
+- Missing tests: receipt test asserts credit-quantity line
+- Done when: Receipt states how many credits were bought
+
+### [#1980](https://github.com/chester-hill-solutions/callcaster/issues/1980) Remove "From the workspace audio library" from IVR Script add a recording step
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-21
+- Recommended title: **Trim IVR add-a-recording help copy: drop 'From the workspace audio library'**
+- Design nit: the add-a-recording step's recording select shows helper text 'From the workspace audio library.' (ScriptBlockEditor.IvrStep.tsx:304). Remove it (the picker already frames the library context) and any now-redundant spacing.
+- Current behavior: ScriptBlockEditor.IvrStep.tsx:304 renders 'From the workspace audio library.' under the recording control.
+- Resolution: Remove the helper text line; verify the RecordingStepFields block still reads clean with the Select only.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx:304`
+- Missing tests: UI smoke renders recording step without the label
+- Done when: No 'From the workspace audio library' text in the IVR recording step
+
+### [#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884) IVR editor: expose an explicit Hang up routing target and a guaranteed terminal hangup
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
+- Recommended title: **IVR editor routing validation + terminal-hangup guarantee**
+- Runtime half largely shipped (#1975): outbound handleNextStep treats hangup AND end as terminal (response.action.server.ts:99-104, tested ivr-block-response.route.test.ts:226-247), and 'Hang up' is already a selectable editor routing target (use-script-editor-state builds kind:'hangup'). MISSING: inbound renderTerminalTarget has no explicit 'end'/dangling-terminal handling (inbound-ivr/..response.action.server.ts:71-123), app/lib/ivr-script-validation.ts does not exist (edge graph + DFS), validateScriptSteps (call-script-service.ts:35-38) is dead code with NO save/launch wiring, script_routing_invalid readiness code absent, and ScriptEditorShell.tsx:377-381 only surfaces scriptkit structural errors.
+- Current behavior: Dangling option.next targets redirect to the block route which plays 'There was an error in the IVR flow. Goodbye.' then hangs up (outbound + inbound); routing cycles are undetected; no editor warning. Editor structural validation is scriptkit validateDocument only (parse.ts:22-40): startPageId exists + page/block refs — no next-target/cycle checks. clearDanglingRouting (use-script-editor-state.js:427-440) only clears when an id is deleted, not for malformed imports.
+- Root cause: The runtime parses next as an opaque string with no terminal/validation contract.
+- Resolution: Add app/lib/ivr-script-validation.ts: build an edge graph (page/block -> option.next targets) and run a DFS for (a) dangling targets (next refers to a nonexistent page/block), (b) reachable cycles (A->B->A), (c) terminal guarantee (every reachable path ends at hangup/end). Surface errors in ScriptEditorShell.tsx alongside editor.validation. Wire into validateScriptSteps (call-script-service.ts) and add a script_routing_invalid CampaignReadinessCode + readiness-action entry (campaign-readiness.ts:14-35 + campaign-readiness-actions.ts:35-144) so launch blocks (launchCampaign readiness gate campaign-execution.server.ts:86-95 surfaces it automatically). Inbound: make renderTerminalTarget treat 'end' explicitly and render <Hangup/> for dangling/terminal.
+- Look in: `app/lib/ivr-script-validation.ts (new)`, `app/lib/call-script-service.ts`, `app/components/campaign/settings/script/ScriptEditorShell.tsx`, `app/lib/campaign-readiness.ts`, `app/lib/campaign-readiness-actions.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts`
+- Existing tests: test/ivr-block-response.route.test.ts:226-247 (end terminal outbound)
+- Missing tests: ivr-script-routing-validation: dangling target, A->B->A cycle, hangup/end ok, linear end ok; inbound route: next:'end' renders <Hangup/>, dangling renders <Hangup/>; editor shell test shows the cyclic-script validation error
+- Done when: An author can choose Hang up as an option's next step (already true); A published script always has a terminal hangup; next:'end' and 'hangup' are both terminal at runtime (inbound too); Dangling targets and reachable cycles fail validation and block launch
+
 ### [#1845](https://github.com/chester-hill-solutions/callcaster/issues/1845) Live campaign calls keep synchronous AMD latency when voicemail drop is off
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
 - Recommended title: **fix(dial): drop synchronous AMD from manual/power dials; keep it predictive-only**
@@ -133,6 +137,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: manual routes emit no machineDetection; auto-dial still emits machineDetection; Audio Drop still works on manual/power calls
 - Done when: A manual/power call reaches audio immediately with no AMD wait; Predictive dialing still drops or hangs up on a detected machine; A drop-enabled campaign still plays the voicemail when an agent drops it
 - Tracker: Fix now; decision recorded. IVR stays AMD-on per #1842/#1864; #1839 toggle is the Setup layer.
+
+### [#1883](https://github.com/chester-hill-solutions/callcaster/issues/1883) IVR step: configurable no-input handling (wait length + reroute/replay)
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-20
+- Recommended title: **IVR no-input editor panel + inbound mirror**
+- Runtime+outbound half of #1937 shipped: IvrBlock carries gatherTimeoutSeconds/noInput (ivr-block-runtime.server.ts:19-32), resolveNoInputTarget handles next/hangup/replay/route with a 2-replay default cap (:46-57), appendBlockResponse honors the timeout, and the OUTBOUND response route branches with the __no_input_replays outreach store (response.action.server.ts:186-232). NOTHING writes those fields (no editor control) and the INBOUND response route has zero noInput/timeout handling and no replay store/cap.
+- Current behavior: Editor: ScriptBlockEditor.IvrStep.tsx has mode/speech/recording/voice controls but no no-input panel; the response rows (IvrResponses.tsx) only set option.next/label. Inbound: inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts:50-69 findNextStep ignores noInput; null userInput falls through to linear next/hangup; renderTerminalTarget (:71-123) has no noInput branch.
+- Root cause: PR #1937 kept the editor panel and inbound twin out to stay atomic; the wire fields have no producer.
+- Resolution: Editor: add per-step controls in ScriptBlockEditor.IvrStep.tsx writing block.noInput {action,pageId,blockId,maxReplays} + gatherTimeoutSeconds (defaults unchanged when unset). Inbound: mirror the outbound no-input branching into the inbound response route with a CALL-scoped replay store (no outreach attempt exists inbound; key by call/recurring session) and reuse resolveNoInputTarget + DEFAULT_NO_INPUT_MAX_REPLAYS. Fold #1843 or close it as duplicate.
+- Look in: `app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/ivr-gather.server.ts`
+- Existing tests: test/ivr-block-runtime.test.ts (resolveNoInputTarget); test/ivr-gather.test.ts (timeout attrs); test/inbound-ivr-block-response.route.test.ts:144-161 (null-input falls through)
+- Missing tests: Editor emits wait/no-input controls; Inbound no-input branches (hangup/route/replay) + per-call replay cap
+- Done when: A step can wait longer than the default and, on no input, replay or route instead of just advancing; Defaults unchanged for steps that do not configure it; Inbound mirrors outbound behavior with its own replay store
 
 ### [#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875) Improve IVR speech capture: hints, valid speech model, confidence, intent matching
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-19
@@ -184,6 +200,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A mapping option drops a column; Dropped columns are not written to other_data; Dropped columns do not create duplicate-target errors; Phone and name validation behaviour is unchanged
 - Tracker: Well-scoped UX feature; add the ignore target end to end and test the import exclusion.
 
+### [#1989](https://github.com/chester-hill-solutions/callcaster/issues/1989) Two dial paths record at Twilio but never persist: dial/:number and connect-campaign-conference
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-22
+- Recommended title: **Dead Twilio recording callbacks on dial/:number and connect-campaign-conference**
+- Two outbound paths set record on Twilio but never send recordingStatusCallback, so audio is orphaned and never appears in Call History. Fix or remove record on both (part of the #1873 recording surface).
+- Current behavior: dial/$number.action.server.ts:68 record-from-answer with [in-progress] and no callback URL; connect-campaign-conference loader:58 record-from-start with no callback. Working reference: call.action.server.ts:100-105 wires /api/recording + completed.
+- Resolution: Wire recordingStatusCallback: ${BASE_URL}/api/recording + event completed on both sites (or drop record), so runRecordingSideEffects persists audio_url. Fold into #1873's wiring pass or land standalone.
+- Look in: `app/routes/api+/dial/$number.action.server.ts`, `app/routes/api+/connect-campaign-conference/$workspaceId/$campaignId.loader.server.ts`, `app/routes/api+/recording.action.server.ts`
+- Blocked by: [#1873](https://github.com/chester-hill-solutions/callcaster/issues/1873)
+- Existing tests: test/api-call.route.test.ts:106
+- Missing tests: dial/:number and conference include the callback URL when recording
+- Done when: No dial path records without a persisted callback; Conference recordings persist (or record is removed)
+- Tracker: Fix now. Small; can ride the #1873 wiring PR or land independently.
+
 ### [#1846](https://github.com/chester-hill-solutions/callcaster/issues/1846) Phone number verification pending doesn't switch to verified from onboarding steps
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: none · Updated: 2026-09-21
 - Recommended title: **Pass the live caller-ID verification status to the onboarding verification sheet**
@@ -196,6 +225,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Onboarding dialog shows 'Number verified' after the number's verification_status flips to success
 - Done when: Completing verification from onboarding flips the sheet to 'Number verified' with no reload; A failed verification still shows 'Verification failed'; Settings behaviour is unchanged
 - Tracker: Exact fix: pass the live status the way Settings already does.
+
+### [#1842](https://github.com/chester-hill-solutions/callcaster/issues/1842) IVR audio takes ~7s to start after answer (synchronous AMD suspected)
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-21
+- Recommended title: **WAV sidecar backfill for existing prompts (gen-wav-sidecars)**
+- PR #1968 wires WAV sidecar creation only on NEW audio (upload: platform-media.server.ts:135-139; clip save: audio-clip.server.ts:87). The in-browser recording path (audios/record.action.server.ts:76) never writes a sidecar either. Backfill needed so EXISTING prompts (incl. recorded-*) stop being re-encoded by Twilio.
+- Current behavior: Sidecar logic lives in app/lib/ivr-wav.server.ts: ivrWavObjectKey (ivr-wav/<workspace>/<base>.wav), writeIvrWavSidecar (skips .wav, transcodeToWavBuffer, putMediaObject upsert), resolveIvrPromptObjectKey prefers the sidecar via objectExists. Transcode: app/lib/audio.server.ts transcodeToWavBuffer (mono 8kHz 16-bit PCM, WAV_ENCODE_ARGS:74-84) via raw ffmpeg spawn (runAudioTool:143-186); ffmpeg is a runtime dep (Dockerfile:33-38). Storage is S3 (MinIO local / Railway Bucket prod) with workspaceAudio/ prefix; workspace_audio is metadata-only. Prompt filter isWorkspaceAudioFile excludes voicemail-+/voicemail-undefined/recording- (platform-media.server.ts:30-35).
+- Root cause: Sidecar generation is opportunistic (only at write time); thousands of pre-existing MP3 prompts and recorded-* files never got one.
+- Resolution: Add scripts/gen-wav-sidecars.ts (bun-resolved @/ aliases; package.json tools:gen-wav-sidecars) modeled on scripts/db/reconcile-stuck-calls.ts (env placeholder bootstrap BEFORE app imports 28-50; dry-run default, --apply, per-workspace error isolation, non-zero exit on residual). Loop: select workspaces; listMediaObjects('workspaceAudio', ws) prefix ws/; filter to prompts (isWorkspaceAudioFile, skip existing .wav); dedupe gate objectExists(ivrWavObjectKey) unless --force; downloadObject -> transcodeToWavBuffer -> putMediaObject(upsert:true). Factor a pure core with injectable Deps (DI style of audio.server.ts:42-52) for unit tests mocking listObjects/objectExists/transcode/upload (ivr-wav.server.test.ts pattern). Include recorded-* library recordings (the record path never sidecared them); keep the voicemail- exclusion. Never pipe:0 input (seekable temp file required for mp4/m4a moov), skip empty transcode output.
+- Look in: `app/lib/ivr-wav.server.ts`, `app/lib/audio.server.ts`, `app/lib/object-storage.server.ts`, `scripts/db/reconcile-stuck-calls.ts`, `app/routes/workspaces+/$id/audios/record.action.server.ts`
+- Existing tests: test/ivr-wav.server.test.ts (key/sidecar/resolve); test/audio.server.test.ts (transcode)
+- Missing tests: Backfill core: lists prompts, skips existing sidecars + .wav, dedupes/--force, records per-workspace failures
+- Done when: All prompts incl. recorded-* have a sidecar after a apply run (idempotent re-runs); No new deps; reuses ivrWavObjectKey/transcodeToWavBuffer/putMediaObject
+- Tracker: Fix now. Implement after the 2026-09-21 release is stabilized; script-only, no runtime change.
 
 ### [#1833](https://github.com/chester-hill-solutions/callcaster/issues/1833) Primary button hover needs the hover mouse
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-09-21
@@ -247,7 +289,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 57
+## Verify and close — 59
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -263,6 +305,25 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: createInvitation writer: unknown email creates pending email-keyed invite; existing user creates user-keyed invite; duplicate pending email rejected; redeemInvitation: wrong token, expired, wrong email vs verified email, concurrent redeem CAS; signup-claim: new account with invited email lands in the workspace on /accept-invite; email sent carries id + raw token; token never persisted; members list renders pending email invitations; cancel/resend
 - Done when: Inviting an unknown email succeeds: the email is attached to the workspace and pending; the invitee gets a prompt (email + signup landing) to create an account; Inviting a known email behaves as today (user-keyed invite, no duplicate pending); After signup/sign-in with the invited email, the invite redeems atomically (verified-email match, CAS) and a workspace_member row is inserted; Raw invitation tokens are never stored; token_hash only; members.invite capability gate and role policy (owner never invitational) unchanged; Legacy workspace_invite rows migrated or abandoned before the table is dropped
 - Tracker: Verify on the review env after the 2026-09-21 release: invite an email with no account, receive the Resend link, sign up, land in the workspace; ensure token-less accept is not reachable. Then close.
+
+### [#1976](https://github.com/chester-hill-solutions/callcaster/issues/1976) IVR results and export show the raw DTMF code instead of the option label
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
+- Recommended title: **IVR results/export show the option label (not raw DTMF)**
+- Shipped in #1977 via resolveIvrAnswerLabel (app/lib/ivr-results.ts): results screen and CSV export render the option label for known keys; unknown values fall back to the raw value. Verify on the review env and close.
+- Current behavior: Before fix: IvrOption labels ignored; raw DTMF was shown.
+- Resolution: Verify on dev: a script with keypad options displays the chosen label in Results + export; a key with no matching option still shows the raw value.
+- Look in: `app/lib/ivr-results.ts`
+- Existing tests: test/ivr-results* and route tests for label resolution
+- Done when: Results + export show the label the caller chose (or raw when unmatched)
+
+### [#1961](https://github.com/chester-hill-solutions/callcaster/issues/1961) issue-on-dev aborts the Status move when a PR body references a non-issue number
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
+- Recommended title: **issue-on-dev abort when PR bodies reference non-issue numbers**
+- Fixed by #1964: issue-on-dev.yml now parses closing keywords and 'Issues:' lines with PR-number robustness, and the parser ignores bare PR-number references. Verify a merge with a body containing issue numbers doesn't abort the loop, then close.
+- Current behavior: Before: 'gh issue view' on a PR number returned MERGED and the GraphQL move loop aborted.
+- Resolution: Verify with a reference PR whose body names issues + a PR number; confirm Status moves complete. #1961 is docs/automation only.
+- Look in: `.github/workflows/issue-on-dev.yml`
+- Done when: The move loop completes when a PR body references issue numbers
 
 ### [#1957](https://github.com/chester-hill-solutions/callcaster/issues/1957) Exempt docs/data-only PRs from the review-coverage gate
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-21
@@ -965,9 +1026,27 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 33
+## Needs decision — 35
 
 Product, security, or operations decision required before implementation can be scoped.
+
+### [#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347) need to verify consistency for Robocall vs IVR vs Automated Phone Menu
+- **IN PROGRESS** · Verdict: **Needs decision** · Size: S · Risk: medium · Labels: design · Assignee: none · Updated: 2026-09-21
+- Recommended title: **Robocall vs IVR vs Automated Phone Menu — terminology consistency**
+- Consistency audit for customer-facing naming. #1854 (API type robocall) and #1741 (one automated phone menu) set the direction, but UI still mixes terms: 'Robocall' appears in CampaignLaunch.tsx, CampaignLaunchExtras.tsx, CampaignVoiceSettings.tsx, SelectType.tsx, while the product language moved to 'automated phone menu'. Decide the canonical customer term + sweep scope.
+- Current behavior: Mixed labels (Robocall/IVR/automated phone menu) across campaign setup surfaces.
+- Resolution: Decide the canonical term (suggestion: 'Automated phone menu' in UI; 'robocall' stays the API value), then a copy sweep replacing IVR/Robocall labels.
+- Look in: `app/components/campaign/settings/CampaignLaunch.tsx`, `app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx`, `app/components/campaign/settings/basic/CampaignVoiceSettings.tsx`, `app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx`
+- Done when: One customer-facing term; API values unaffected
+
+### [#1983](https://github.com/chester-hill-solutions/callcaster/issues/1983) Receipts should have tax (and the charges themselves should be taxed)
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-21
+- Recommended title: **Receipts and charges should include tax**
+- Product/legal decision: receipts currently show untaxed charges. Adding tax display (and taxing charges) needs a jurisdiction/tax-configuration decision (rates, exemptions, remittance) before implementation.
+- Current behavior: Billing shows amounts without tax; receipts have no tax line; ledgers store pretax totals.
+- Resolution: Decide: (1) tax on CallCaster charges scope (which products, jurisdictions, rate config), (2) display-only receipts vs taxed ledger amounts. Then implement in the receipt builder + pricing path.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx`, `shared/pricing.ts`
+- Done when: No implementation until the tax decision is recorded
 
 ### [#1725](https://github.com/chester-hill-solutions/callcaster/issues/1725) should template tags allow for no closing bracket? the preview renderer and the parser seems to think so
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: question · Assignee: @wra-sol · Updated: 2026-09-19
@@ -1556,34 +1635,8 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 7
+## Needs triage — 0
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
-### [#1347](https://github.com/chester-hill-solutions/callcaster/issues/1347) need to verify consistency for Robocall vs IVR vs Automated Phone Menu
-- Status: In progress · Labels: design · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1983](https://github.com/chester-hill-solutions/callcaster/issues/1983) Receipts should have tax (and the charges themselves should be taxed)
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1982](https://github.com/chester-hill-solutions/callcaster/issues/1982) Receipts should say contact@callcaster.ca
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1981](https://github.com/chester-hill-solutions/callcaster/issues/1981) Receipts should say how many credits were bought
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1980](https://github.com/chester-hill-solutions/callcaster/issues/1980) Remove "From the workspace audio library" from IVR Script add a recording step
-- Status: Backlog · Labels: design · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1976](https://github.com/chester-hill-solutions/callcaster/issues/1976) IVR results and export show the raw DTMF code instead of the option label
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
-
-### [#1961](https://github.com/chester-hill-solutions/callcaster/issues/1961) issue-on-dev aborts the Status move when a PR body references a non-issue number
-- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-21
-- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+_None._

@@ -668,5 +668,45 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "needs-decision: the reporter questions the overhead; confirm the heuristic is wanted before implementing."
+  },
+  {
+    "issueNumber": 1983,
+    "verdict": "needs-decision",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "",
+    "recommendedTitle": "Receipts and charges should include tax",
+    "summary": "Product/legal decision: receipts currently show untaxed charges. Adding tax display (and taxing charges) needs a jurisdiction/tax-configuration decision (rates, exemptions, remittance) before implementation.",
+    "currentBehavior": "Billing shows amounts without tax; receipts have no tax line; ledgers store pretax totals.",
+    "resolution": "Decide: (1) tax on CallCaster charges scope (which products, jurisdictions, rate config), (2) display-only receipts vs taxed ledger amounts. Then implement in the receipt builder + pricing path.",
+    "lookIn": [
+      "app/routes/api+/workspaces+/$workspaceId/billing/receipt.route.tsx",
+      "shared/pricing.ts"
+    ],
+    "acceptanceCriteria": [
+      "No implementation until the tax decision is recorded"
+    ]
+  },
+  {
+    "issueNumber": 1347,
+    "verdict": "needs-decision",
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "",
+    "recommendedTitle": "Robocall vs IVR vs Automated Phone Menu — terminology consistency",
+    "summary": "Consistency audit for customer-facing naming. #1854 (API type robocall) and #1741 (one automated phone menu) set the direction, but UI still mixes terms: 'Robocall' appears in CampaignLaunch.tsx, CampaignLaunchExtras.tsx, CampaignVoiceSettings.tsx, SelectType.tsx, while the product language moved to 'automated phone menu'. Decide the canonical customer term + sweep scope.",
+    "currentBehavior": "Mixed labels (Robocall/IVR/automated phone menu) across campaign setup surfaces.",
+    "resolution": "Decide the canonical term (suggestion: 'Automated phone menu' in UI; 'robocall' stays the API value), then a copy sweep replacing IVR/Robocall labels.",
+    "lookIn": [
+      "app/components/campaign/settings/CampaignLaunch.tsx",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.SelectType.tsx",
+      "app/components/campaign/settings/basic/CampaignVoiceSettings.tsx",
+      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx"
+    ],
+    "acceptanceCriteria": [
+      "One customer-facing term; API values unaffected"
+    ]
   }
 ]
