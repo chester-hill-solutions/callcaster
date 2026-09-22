@@ -8,6 +8,14 @@ import {
   appendInboundVoicemailTwiml,
   resolveInboundVoicemailAudio,
 } from "@/lib/inbound-voicemail-twiml.server";
+import {
+  resolveNoInputTarget,
+  type IvrNoInputConfig,
+} from "@/lib/ivr-block-runtime.server";
+import {
+  bumpInboundNoInputReplay,
+  inboundNoInputReplayCount,
+} from "@/lib/inbound-no-input-replay.server";
 import { defineAction } from "@/lib/handler.server";
 
 interface Script {
@@ -15,6 +23,7 @@ interface Script {
   blocks: Record<string, {
     id: string;
     title?: string;
+    noInput?: IvrNoInputConfig;
     options?: Array<{ value: string; next?: string }>;
   }>;
 }
@@ -169,6 +178,35 @@ export const action = defineAction({
       : undefined;
     if (!currentBlock) {
       throw new Error(`Block ${blockId} not found`);
+    }
+
+    // No-input handling (#1883): mirror the outbound route's noInput branches
+    // with a per-call replay counter (no outreach attempt exists inbound).
+    const hadInput = userInput != null && String(userInput).trim() !== "";
+    const noInputConfig = currentBlock.noInput;
+    if (!hadInput && noInputConfig) {
+      const replays = inboundNoInputReplayCount(callSid, blockId);
+      const target = resolveNoInputTarget(noInputConfig, replays);
+      if (target.kind !== "next") {
+        if (target.kind === "hangup") {
+          twiml.hangup();
+        } else if (target.kind === "route") {
+          if (script.pages[target.pageId]?.blocks.includes(target.blockId)) {
+            twiml.redirect(
+              `${baseUrl}/api/inbound-ivr/${numberId}/${target.pageId}/${target.blockId}/`,
+            );
+          } else {
+            twiml.hangup();
+          }
+        } else if (target.kind === "replay") {
+          bumpInboundNoInputReplay(callSid, blockId);
+          twiml.redirect(`${baseUrl}/api/inbound-ivr/${numberId}/${pageId}/${blockId}/`);
+        }
+        return new Response(twiml.toString(), {
+          headers: { "Content-Type": "application/xml" },
+        });
+      }
+      // target.kind === "next": fall through to the normal linear flow.
     }
 
     const nextStep = findNextStep(currentBlock, userInput, script as Script, pageId);

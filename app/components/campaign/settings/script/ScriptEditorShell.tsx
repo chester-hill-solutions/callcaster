@@ -85,6 +85,17 @@ export function ScriptEditorShell({
   const isStartPage =
     editor.activePageId === editor.document.startPageId;
 
+  // blockId -> owning pageId, for the IVR no-input route target (#1883).
+  const pageByBlockId = useMemo(() => {
+    const lookup: Record<string, string> = {};
+    for (const page of Object.values(editor.document.pages)) {
+      for (const blockId of page.blockIds) {
+        lookup[blockId] = page.id;
+      }
+    }
+    return lookup;
+  }, [editor.document.pages]);
+
   // The hook's addBlock only knows the agent-form palette, and a follow-up
   // patch in the same tick would read a stale document. Build the audio step
   // whole and hand the hook the finished document instead.
@@ -353,6 +364,7 @@ export function ScriptEditorShell({
                           audioPreviewUrl={audioPreviewUrl}
                           onUploadAudio={onUploadAudio}
                           routingTargets={editor.routingTargets}
+                          pageByBlockId={pageByBlockId}
                           onChange={(patch) =>
                             editor.updateBlock(blockId, patch)
                           }
