@@ -6,10 +6,12 @@ import {
   type ReactNode,
 } from "react";
 import type { ScriptBlock } from "@chester-hill-solutions/scriptkit-call-script-core";
+import type { RoutingTarget } from "@chester-hill-solutions/scriptkit-call-script-react";
 import { Mic, Volume2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -34,6 +36,9 @@ export type IvrStepFieldsProps = {
   mediaNames: string[];
   audioPreviewUrl?: (fileName: string) => string;
   onUploadAudio?: (file: File) => Promise<string | null>;
+  routingTargets: RoutingTarget[];
+  /** blockId -> owning pageId, for the no-input route target. */
+  pageByBlockId: Record<string, string>;
   onChange: (patch: Partial<ScriptBlock>) => void;
 };
 
@@ -51,6 +56,8 @@ export function IvrStepFields({
   mediaNames,
   audioPreviewUrl,
   onUploadAudio,
+  routingTargets,
+  pageByBlockId,
   onChange,
 }: IvrStepFieldsProps) {
   const mode = getIvrPlaybackMode(block);
@@ -168,6 +175,160 @@ export function IvrStepFields({
           onChange={onChange}
           uploadControl={renderUploadControl(false)}
         />
+      )}
+
+      <NoInputFields
+        block={block}
+        readOnly={readOnly}
+        routingTargets={routingTargets}
+        pageByBlockId={pageByBlockId}
+        onChange={onChange}
+      />
+    </div>
+  );
+}
+
+/**
+ * Per-step no-input behavior (#1883): how long to wait for a keypress and what
+ * to do when the caller stays silent. Writes `gatherTimeoutSeconds` +
+ * `noInput` straight onto the block; the wire model is
+ * `ivr-block-runtime.server.ts`'s `IvrNoInputConfig`.
+ */
+function NoInputFields({
+  block,
+  readOnly,
+  routingTargets,
+  pageByBlockId,
+  onChange,
+}: {
+  block: ScriptBlock;
+  readOnly: boolean;
+  routingTargets: RoutingTarget[];
+  pageByBlockId: Record<string, string>;
+  onChange: (patch: Partial<ScriptBlock>) => void;
+}) {
+  const timeoutSeconds = (block as { gatherTimeoutSeconds?: number }).gatherTimeoutSeconds ?? 5;
+  const noInput = (block as {
+    noInput?: { action: string | { pageId: string; blockId: string }; maxReplays?: number };
+  }).noInput;
+  const action: string = noInput
+    ? typeof noInput.action === "object"
+      ? "route"
+      : noInput.action
+    : "next";
+  const maxReplays = noInput?.maxReplays ?? 2;
+  const routeBlockId =
+    noInput && typeof noInput.action === "object" ? noInput.action.blockId : "";
+  const timeoutId = useId();
+  const actionId = useId();
+  const maxId = useId();
+  const routeId = useId();
+
+  const setNoInput = (patch: { action: string | { pageId: string; blockId: string }; maxReplays?: number }) => {
+    onChange({ noInput: patch } as Partial<ScriptBlock>);
+  };
+
+  const routeBlockOptions = routingTargets.filter((target) => target.kind === "block");
+  const routeTargets = routeBlockOptions
+    .filter((target) => pageByBlockId[target.id])
+    .map((target) => ({ value: target.id, label: target.label }));
+
+  return (
+    <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3">
+      <span className="text-sm font-semibold">If the caller stays silent</span>
+
+      <FormField label="Wait (seconds)" htmlFor={timeoutId}>
+        <Input
+          id={timeoutId}
+          type="number"
+          min={1}
+          max={60}
+          value={timeoutSeconds}
+          readOnly={readOnly}
+          onChange={(event) => {
+            const value = parseInt(event.target.value, 10);
+            const gathered =
+              Number.isFinite(value) && value >= 1 && value <= 60
+                ? value
+                : undefined;
+            onChange({ gatherTimeoutSeconds: gathered } as Partial<ScriptBlock>);
+          }}
+        />
+      </FormField>
+
+      <FormField label="On no input" htmlFor={actionId}>
+        <Select
+          value={action}
+          disabled={readOnly}
+          onValueChange={(next) => {
+            if (next === "next") setNoInput({ action: "next" });
+            else if (next === "hangup") setNoInput({ action: "hangup" });
+            else if (next === "replay") {
+              setNoInput({ action: "replay", maxReplays: noInput?.maxReplays ?? 2 });
+            } else if (next === "route") {
+              const blockId = routeTargets[0]?.value;
+              const pageId = blockId ? pageByBlockId[blockId] : undefined;
+              if (blockId && pageId) {
+                setNoInput({ action: { pageId, blockId } });
+              }
+            }
+          }}
+        >
+          <SelectTrigger id={actionId}>
+            <SelectValue placeholder="Select…" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="next">Continue to the next step</SelectItem>
+            <SelectItem value="hangup">Hang up</SelectItem>
+            <SelectItem value="replay">Replay these instructions</SelectItem>
+            <SelectItem value="route">Route to a step</SelectItem>
+          </SelectContent>
+        </Select>
+      </FormField>
+
+      {action === "replay" && (
+        <FormField label="Max replays" htmlFor={maxId}>
+          <Input
+            id={maxId}
+            type="number"
+            min={1}
+            max={10}
+            value={maxReplays}
+            readOnly={readOnly}
+            onChange={(event) => {
+              const value = parseInt(event.target.value, 10);
+              const parsed =
+                Number.isFinite(value) && value >= 1 && value <= 10 ? value : 2;
+              setNoInput({ action: "replay", maxReplays: parsed });
+            }}
+          />
+        </FormField>
+      )}
+
+      {action === "route" && (
+        <FormField label="Route to" htmlFor={routeId}>
+          <Select
+            value={routeBlockId || routeTargets[0]?.value || ""}
+            disabled={readOnly || routeTargets.length === 0}
+            onValueChange={(nextBlockId) => {
+              const pageId = pageByBlockId[nextBlockId];
+              if (pageId) {
+                setNoInput({ action: { pageId, blockId: nextBlockId } });
+              }
+            }}
+          >
+            <SelectTrigger id={routeId}>
+              <SelectValue placeholder="Select a step…" />
+            </SelectTrigger>
+            <SelectContent>
+              {routeTargets.map((target) => (
+                <SelectItem key={target.value} value={target.value}>
+                  {target.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FormField>
       )}
     </div>
   );

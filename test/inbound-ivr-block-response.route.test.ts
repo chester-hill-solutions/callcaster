@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import {
+  bumpInboundNoInputReplay,
+  resetInboundNoInputReplays,
+} from "@/lib/inbound-no-input-replay.server";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -35,6 +39,7 @@ function makeReq(form: Record<string, string>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetInboundNoInputReplays();
   mocks.requireTwilioSignatureForIvrResponse.mockImplementation(
     async () => ({ callSid: "CA1", userInput: "1" }),
   );
@@ -204,5 +209,89 @@ describe("inbound IVR block response", () => {
     const text = await res.text();
     expect(text).toMatch(/hangup/i);
     expect(text).not.toContain("Sorry, we ran into a problem.");
+  });
+
+  test("no input with noInput:hangup hangs up (#1883)", async () => {
+    mocks.requireTwilioSignatureForIvrResponse.mockImplementation(
+      async () => ({ callSid: "CA1", userInput: null }),
+    );
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: {
+        pages: { page_1: { blocks: ["b1"] } },
+        blocks: {
+          b1: { id: "b1", noInput: { action: "hangup" }, options: [{ value: "1", next: "hangup" }] },
+        },
+      },
+    });
+
+    const mod = await import(
+      "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+    );
+    const res = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1" }),
+    } as any);
+    expect(await res.text()).toMatch(/hangup/i);
+  });
+
+  test("no input with noInput:replay redirects back until the cap, then continues (#1883)", async () => {
+    mocks.requireTwilioSignatureForIvrResponse.mockImplementation(
+      async () => ({ callSid: "CA1", userInput: null }),
+    );
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: {
+        pages: { page_1: { blocks: ["b1", "b2"] } },
+        blocks: {
+          b1: { id: "b1", noInput: { action: "replay", maxReplays: 2 }, options: [{ value: "1", next: "hangup" }] },
+          b2: { id: "b2", options: [{ value: "1", next: "hangup" }] },
+        },
+      },
+    });
+
+    const mod = await import(
+      "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+    );
+    const first = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1" }),
+    } as any);
+    expect(await first.text()).toMatch(/Redirect/i);
+
+    bumpInboundNoInputReplay("CA1", "b1");
+    bumpInboundNoInputReplay("CA1", "b1");
+    const overCap = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1" }),
+    } as any);
+    // Past the cap: fall through to the next step (redirect to b2).
+    const text = await overCap.text();
+    expect(text).toContain("page_1/b2/");
+  });
+
+  test("no input with noInput:route redirects to the target step (#1883)", async () => {
+    mocks.requireTwilioSignatureForIvrResponse.mockImplementation(
+      async () => ({ callSid: "CA1", userInput: null }),
+    );
+    mocks.loadInboundIvrBlockContext.mockResolvedValue({
+      number: { phoneNumber: "+15551234567", workspaceId: "w1" },
+      script: {
+        pages: { page_1: { blocks: ["b1"] }, page_2: { blocks: ["b2"] } },
+        blocks: {
+          b1: { id: "b1", noInput: { action: { pageId: "page_2", blockId: "b2" } }, options: [] },
+          b2: { id: "b2", options: [{ value: "1", next: "hangup" }] },
+        },
+      },
+    });
+
+    const mod = await import(
+      "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+    );
+    const res = await mod.action({
+      params: { numberId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({ CallSid: "CA1" }),
+    } as any);
+    expect(await res.text()).toContain("page_2/b2/");
   });
 });

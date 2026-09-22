@@ -35,6 +35,8 @@ export type ScriptBlockEditorProps = {
   audioPreviewUrl?: (fileName: string) => string;
   onUploadAudio?: (file: File) => Promise<string | null>;
   routingTargets: RoutingTarget[];
+  /** blockId -> owning pageId, for the IVR no-input route target. */
+  pageByBlockId: Record<string, string>;
   onChange: (patch: Partial<ScriptBlock>) => void;
   onRemove: () => void;
   onDuplicate: () => void;
@@ -62,6 +64,7 @@ export function ScriptBlockEditor({
   audioPreviewUrl,
   onUploadAudio,
   routingTargets,
+  pageByBlockId,
   onChange,
   onRemove,
   onDuplicate,
@@ -119,6 +122,8 @@ export function ScriptBlockEditor({
           mediaNames={mediaNames}
           audioPreviewUrl={audioPreviewUrl}
           onUploadAudio={onUploadAudio}
+          routingTargets={routingTargets}
+          pageByBlockId={pageByBlockId}
           onChange={onChange}
         />
         <IvrResponsesEditor
