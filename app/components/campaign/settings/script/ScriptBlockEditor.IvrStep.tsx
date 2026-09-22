@@ -461,9 +461,7 @@ function RecordingStepFields({
         label="Recording"
         htmlFor={fileId}
         description={
-          hasChoices
-            ? "From the workspace audio library."
-            : "No recordings in the library yet. Upload one below."
+          hasChoices ? undefined : "No recordings in the library yet. Upload one below."
         }
       >
         {hasChoices ? (

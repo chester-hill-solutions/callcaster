@@ -14,6 +14,7 @@
     "dev:calling:sync": "bun ./scripts/local/sync-calling-dev.mjs",
     "tools:sync-inbound-sms": "bun ./scripts/one-off/sync-inbound-sms-from-twilio.mjs",
     "tools:gen-wav-sidecars": "bun run scripts/gen-wav-sidecars.ts",
+    "tools:stripe:set-support-email": "bun run scripts/set-stripe-support-email.ts",
     "tools:routes:baseline": "node scripts/verify-route-tree.mjs --update-baseline",
     "tools:routes:verify": "node scripts/verify-route-tree.mjs",
     "db:generate": "drizzle-kit generate",
