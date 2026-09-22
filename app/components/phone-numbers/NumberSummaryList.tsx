@@ -104,9 +104,7 @@ function PresetFields({
     number.inbound_action && isConservativeEmail(number.inbound_action)
       ? number.inbound_action
       : "";
-  const audioOptions = mediaNames.filter(
-    (media) => !media.name.startsWith("voicemail-+"),
-  );
+  const audioOptions = mediaNames;
 
   switch (presetId) {
     case "agent":

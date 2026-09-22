@@ -32,12 +32,7 @@ export default function WorkspaceAudiosPage() {
   }
 
   const isWorkspaceAudioEmpty = error === "No Audio in Workspace";
-  const workspaceAudios = audioMedia?.filter(
-    (media: FileObject) =>
-      !media.name.includes("voicemail-undefined") &&
-      !media.name.includes("voicemail-+") &&
-      !media.name.includes("recording-"),
-  );
+  const workspaceAudios = audioMedia;
 
   const title = "Audio Library";
 

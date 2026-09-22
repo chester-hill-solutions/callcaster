@@ -41,11 +41,10 @@ export type WavBackfillResult = {
 };
 
 function isPromptFile(fileName: string): boolean {
-  return (
-    !isWavFileName(fileName) &&
-    !fileName.includes("recording-") &&
-    !/voicemail[-+]/.test(fileName)
-  );
+  // The caller's list inputs only library prompts (`<ws>/` prefix); voicemails
+  // (`voicemail/<ws>/`) and call recordings (`call-recordings/<ws>/`) never
+  // appear there, so no name heuristics are needed.
+  return !isWavFileName(fileName);
 }
 
 export async function backfillWorkspaceWavs(

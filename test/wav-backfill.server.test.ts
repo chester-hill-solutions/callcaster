@@ -12,8 +12,6 @@ function deps(overrides: Partial<WavBackfillDeps> = {}): WavBackfillDeps {
       "greeting.mp3",
       "prompt.wav",
       "recorded-20260101.mp3",
-      "recording-CA123.mp3",
-      "voicemail-CA456.mp3",
     ]),
     sidecarExists: vi.fn(async () => false),
     writeSidecar: vi.fn(async () => undefined),
@@ -22,11 +20,13 @@ function deps(overrides: Partial<WavBackfillDeps> = {}): WavBackfillDeps {
 }
 
 describe("backfillWorkspaceWavs (#1842)", () => {
-  test("filters prompts (no .wav, no recording-*, no voicemail) and counts candidates", async () => {
+  test("treats every non-wav library object as a prompt (call media never lists here)", async () => {
     const probe = deps();
     const result = await backfillWorkspaceWavs("w1", probe);
 
-    // greeting + recorded-* are prompts; prompt.wav / recording- / voicemail- are not.
+    // greeting + recorded-* are prompts; prompt.wav is excluded. Caller
+    // voicemails and call recordings live under their own prefixes, so they
+    // never reach this list.
     expect(result.scanned).toBe(2);
     expect(probe.writeSidecar).toHaveBeenCalledTimes(2);
     expect(result.created).toBe(2);

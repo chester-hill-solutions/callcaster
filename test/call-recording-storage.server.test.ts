@@ -52,7 +52,7 @@ describe("call-recording-storage.server", () => {
       "@/lib/call-recording-storage.server"
     );
     expect(callRecordingStoragePath("w1", "CA123")).toBe(
-      "w1/recording-CA123.mp3",
+      "call-recordings/w1/recording-CA123.mp3",
     );
   });
 
@@ -128,12 +128,12 @@ describe("call-recording-storage.server", () => {
 
     expect(result).toEqual({
       ok: true,
-      audioUrl: "w1/recording-CA1.mp3",
+      audioUrl: "call-recordings/w1/recording-CA1.mp3",
       skipped: false,
     });
     expect(mocks.uploadObject).toHaveBeenCalledWith(
       "workspaceAudio",
-      "w1/recording-CA1.mp3",
+      "call-recordings/w1/recording-CA1.mp3",
       expect.any(Buffer),
       expect.objectContaining({
         contentType: "audio/mpeg",
@@ -153,7 +153,7 @@ describe("call-recording-storage.server", () => {
         callSid: "CA1",
         accountSid: "ACmain",
         recordingSid: "RE1",
-        existingAudioUrl: "w1/recording-CA1.mp3",
+        existingAudioUrl: "call-recordings/w1/recording-CA1.mp3",
       },
       {
         fetch: mocks.fetch,
@@ -164,7 +164,7 @@ describe("call-recording-storage.server", () => {
 
     expect(result).toEqual({
       ok: true,
-      audioUrl: "w1/recording-CA1.mp3",
+      audioUrl: "call-recordings/w1/recording-CA1.mp3",
       skipped: true,
       reason: "already_persisted",
     });
