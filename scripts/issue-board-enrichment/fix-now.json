@@ -523,37 +523,6 @@
     ]
   },
   {
-    "issueNumber": 1842,
-    "verdict": "fix-now",
-    "recommendedTitle": "WAV sidecar backfill for existing prompts (gen-wav-sidecars)",
-    "summary": "PR #1968 wires WAV sidecar creation only on NEW audio (upload: platform-media.server.ts:135-139; clip save: audio-clip.server.ts:87). The in-browser recording path (audios/record.action.server.ts:76) never writes a sidecar either. Backfill needed so EXISTING prompts (incl. recorded-*) stop being re-encoded by Twilio.",
-    "currentBehavior": "Sidecar logic lives in app/lib/ivr-wav.server.ts: ivrWavObjectKey (ivr-wav/<workspace>/<base>.wav), writeIvrWavSidecar (skips .wav, transcodeToWavBuffer, putMediaObject upsert), resolveIvrPromptObjectKey prefers the sidecar via objectExists. Transcode: app/lib/audio.server.ts transcodeToWavBuffer (mono 8kHz 16-bit PCM, WAV_ENCODE_ARGS:74-84) via raw ffmpeg spawn (runAudioTool:143-186); ffmpeg is a runtime dep (Dockerfile:33-38). Storage is S3 (MinIO local / Railway Bucket prod) with workspaceAudio/ prefix; workspace_audio is metadata-only. Prompt filter isWorkspaceAudioFile excludes voicemail-+/voicemail-undefined/recording- (platform-media.server.ts:30-35).",
-    "rootCause": "Sidecar generation is opportunistic (only at write time); thousands of pre-existing MP3 prompts and recorded-* files never got one.",
-    "resolution": "Add scripts/gen-wav-sidecars.ts (bun-resolved @/ aliases; package.json tools:gen-wav-sidecars) modeled on scripts/db/reconcile-stuck-calls.ts (env placeholder bootstrap BEFORE app imports 28-50; dry-run default, --apply, per-workspace error isolation, non-zero exit on residual). Loop: select workspaces; listMediaObjects('workspaceAudio', ws) prefix ws/; filter to prompts (isWorkspaceAudioFile, skip existing .wav); dedupe gate objectExists(ivrWavObjectKey) unless --force; downloadObject -> transcodeToWavBuffer -> putMediaObject(upsert:true). Factor a pure core with injectable Deps (DI style of audio.server.ts:42-52) for unit tests mocking listObjects/objectExists/transcode/upload (ivr-wav.server.test.ts pattern). Include recorded-* library recordings (the record path never sidecared them); keep the voicemail- exclusion. Never pipe:0 input (seekable temp file required for mp4/m4a moov), skip empty transcode output.",
-    "lookIn": [
-      "app/lib/ivr-wav.server.ts",
-      "app/lib/audio.server.ts",
-      "app/lib/object-storage.server.ts",
-      "scripts/db/reconcile-stuck-calls.ts",
-      "app/routes/workspaces+/$id/audios/record.action.server.ts"
-    ],
-    "existingTests": [
-      "test/ivr-wav.server.test.ts (key/sidecar/resolve)",
-      "test/audio.server.test.ts (transcode)"
-    ],
-    "missingTests": [
-      "Backfill core: lists prompts, skips existing sidecars + .wav, dedupes/--force, records per-workspace failures"
-    ],
-    "acceptanceCriteria": [
-      "All prompts incl. recorded-* have a sidecar after a apply run (idempotent re-runs)",
-      "No new deps; reuses ivrWavObjectKey/transcodeToWavBuffer/putMediaObject"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Fix now. Implement after the 2026-09-21 release is stabilized; script-only, no runtime change."
-  },
-  {
     "issueNumber": 1873,
     "verdict": "fix-now",
     "recommendedTitle": "Call recording: workspace recording policy + campaign opt-in, wired into IVR/predictive/test dials",

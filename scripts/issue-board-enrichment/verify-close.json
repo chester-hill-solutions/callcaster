@@ -1451,71 +1451,34 @@
     ]
   },
   {
-    "issueNumber": 1883,
+    "issueNumber": 1842,
     "verdict": "verify-close",
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Implemented on dev (PR #1992, merged). Verify on the review env: #1883 editor no-input panel writes the fields + inbound mirrors the cap; #1884 dangling/cycle scripts block launch with script_routing_invalid and the editor shows the errors. Then close.",
-    "recommendedTitle": "IVR no-input editor panel + inbound mirror",
-    "summary": "IMPLEMENTED on dev (#1992 merged 2026-09-22). Runtime+outbound half of #1937 shipped: ...",
-    "currentBehavior": "Editor: ScriptBlockEditor.IvrStep.tsx has mode/speech/recording/voice controls but no no-input panel; the response rows (IvrResponses.tsx) only set option.next/label. Inbound: inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts:50-69 findNextStep ignores noInput; null userInput falls through to linear next/hangup; renderTerminalTarget (:71-123) has no noInput branch.",
-    "rootCause": "PR #1937 kept the editor panel and inbound twin out to stay atomic; the wire fields have no producer.",
-    "resolution": "Editor: add per-step controls in ScriptBlockEditor.IvrStep.tsx writing block.noInput {action,pageId,blockId,maxReplays} + gatherTimeoutSeconds (defaults unchanged when unset). Inbound: mirror the outbound no-input branching into the inbound response route with a CALL-scoped replay store (no outreach attempt exists inbound; key by call/recurring session) and reuse resolveNoInputTarget + DEFAULT_NO_INPUT_MAX_REPLAYS. Fold #1843 or close it as duplicate.",
+    "recommendedTitle": "WAV sidecar backfill for existing prompts (gen-wav-sidecars)",
+    "summary": "PR #1968 wires WAV sidecar creation only on NEW audio (upload: platform-media.server.ts:135-139; clip save: audio-clip.server.ts:87). The in-browser recording path (audios/record.action.server.ts:76) never writes a sidecar either. Backfill needed so EXISTING prompts (incl. recorded-*) stop being re-encoded by Twilio.",
+    "currentBehavior": "Sidecar logic lives in app/lib/ivr-wav.server.ts: ivrWavObjectKey (ivr-wav/<workspace>/<base>.wav), writeIvrWavSidecar (skips .wav, transcodeToWavBuffer, putMediaObject upsert), resolveIvrPromptObjectKey prefers the sidecar via objectExists. Transcode: app/lib/audio.server.ts transcodeToWavBuffer (mono 8kHz 16-bit PCM, WAV_ENCODE_ARGS:74-84) via raw ffmpeg spawn (runAudioTool:143-186); ffmpeg is a runtime dep (Dockerfile:33-38). Storage is S3 (MinIO local / Railway Bucket prod) with workspaceAudio/ prefix; workspace_audio is metadata-only. Prompt filter isWorkspaceAudioFile excludes voicemail-+/voicemail-undefined/recording- (platform-media.server.ts:30-35).",
+    "rootCause": "Sidecar generation is opportunistic (only at write time); thousands of pre-existing MP3 prompts and recorded-* files never got one.",
+    "resolution": "Add scripts/gen-wav-sidecars.ts (bun-resolved @/ aliases; package.json tools:gen-wav-sidecars) modeled on scripts/db/reconcile-stuck-calls.ts (env placeholder bootstrap BEFORE app imports 28-50; dry-run default, --apply, per-workspace error isolation, non-zero exit on residual). Loop: select workspaces; listMediaObjects('workspaceAudio', ws) prefix ws/; filter to prompts (isWorkspaceAudioFile, skip existing .wav); dedupe gate objectExists(ivrWavObjectKey) unless --force; downloadObject -> transcodeToWavBuffer -> putMediaObject(upsert:true). Factor a pure core with injectable Deps (DI style of audio.server.ts:42-52) for unit tests mocking listObjects/objectExists/transcode/upload (ivr-wav.server.test.ts pattern). Include recorded-* library recordings (the record path never sidecared them); keep the voicemail- exclusion. Never pipe:0 input (seekable temp file required for mp4/m4a moov), skip empty transcode output.",
     "lookIn": [
-      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx",
-      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
-      "app/lib/ivr-block-runtime.server.ts",
-      "app/lib/ivr-gather.server.ts"
+      "app/lib/ivr-wav.server.ts",
+      "app/lib/audio.server.ts",
+      "app/lib/object-storage.server.ts",
+      "scripts/db/reconcile-stuck-calls.ts",
+      "app/routes/workspaces+/$id/audios/record.action.server.ts"
     ],
     "existingTests": [
-      "test/ivr-block-runtime.test.ts (resolveNoInputTarget)",
-      "test/ivr-gather.test.ts (timeout attrs)",
-      "test/inbound-ivr-block-response.route.test.ts:144-161 (null-input falls through)"
+      "test/ivr-wav.server.test.ts (key/sidecar/resolve)",
+      "test/audio.server.test.ts (transcode)"
     ],
     "missingTests": [
-      "Editor emits wait/no-input controls",
-      "Inbound no-input branches (hangup/route/replay) + per-call replay cap"
+      "Backfill core: lists prompts, skips existing sidecars + .wav, dedupes/--force, records per-workspace failures"
     ],
     "acceptanceCriteria": [
-      "A step can wait longer than the default and, on no input, replay or route instead of just advancing",
-      "Defaults unchanged for steps that do not configure it",
-      "Inbound mirrors outbound behavior with its own replay store"
-    ]
-  },
-  {
-    "issueNumber": 1884,
-    "verdict": "verify-close",
+      "All prompts incl. recorded-* have a sidecar after a apply run (idempotent re-runs)",
+      "No new deps; reuses ivrWavObjectKey/transcodeToWavBuffer/putMediaObject"
+    ],
     "blockedBy": [],
     "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Implemented on dev (PR #1991, merged). Verify on the review env: #1883 editor no-input panel writes the fields + inbound mirrors the cap; #1884 dangling/cycle scripts block launch with script_routing_invalid and the editor shows the errors. Then close.",
-    "recommendedTitle": "IVR editor routing validation + terminal-hangup guarantee",
-    "summary": "IMPLEMENTED on dev (#1991 merged 2026-09-22). Runtime half largely shipped (#1975): ou...",
-    "currentBehavior": "Dangling option.next targets redirect to the block route which plays 'There was an error in the IVR flow. Goodbye.' then hangs up (outbound + inbound); routing cycles are undetected; no editor warning. Editor structural validation is scriptkit validateDocument only (parse.ts:22-40): startPageId exists + page/block refs — no next-target/cycle checks. clearDanglingRouting (use-script-editor-state.js:427-440) only clears when an id is deleted, not for malformed imports.",
-    "rootCause": "The runtime parses next as an opaque string with no terminal/validation contract.",
-    "resolution": "Add app/lib/ivr-script-validation.ts: build an edge graph (page/block -> option.next targets) and run a DFS for (a) dangling targets (next refers to a nonexistent page/block), (b) reachable cycles (A->B->A), (c) terminal guarantee (every reachable path ends at hangup/end). Surface errors in ScriptEditorShell.tsx alongside editor.validation. Wire into validateScriptSteps (call-script-service.ts) and add a script_routing_invalid CampaignReadinessCode + readiness-action entry (campaign-readiness.ts:14-35 + campaign-readiness-actions.ts:35-144) so launch blocks (launchCampaign readiness gate campaign-execution.server.ts:86-95 surfaces it automatically). Inbound: make renderTerminalTarget treat 'end' explicitly and render <Hangup/> for dangling/terminal.",
-    "lookIn": [
-      "app/lib/ivr-script-validation.ts (new)",
-      "app/lib/call-script-service.ts",
-      "app/components/campaign/settings/script/ScriptEditorShell.tsx",
-      "app/lib/campaign-readiness.ts",
-      "app/lib/campaign-readiness-actions.ts",
-      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
-      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts"
-    ],
-    "existingTests": [
-      "test/ivr-block-response.route.test.ts:226-247 (end terminal outbound)"
-    ],
-    "missingTests": [
-      "ivr-script-routing-validation: dangling target, A->B->A cycle, hangup/end ok, linear end ok",
-      "inbound route: next:'end' renders <Hangup/>, dangling renders <Hangup/>",
-      "editor shell test shows the cyclic-script validation error"
-    ],
-    "acceptanceCriteria": [
-      "An author can choose Hang up as an option's next step (already true)",
-      "A published script always has a terminal hangup; next:'end' and 'hangup' are both terminal at runtime (inbound too)",
-      "Dangling targets and reachable cycles fail validation and block launch"
-    ]
+    "risk": "low",
+    "trackerRecommendation": "Implemented on dev (PR #1994, merged). Run `npm run tools:gen-wav-sidecars -- --apply` against the review env first, then prod; verify sidecars appear (\\`ivr-wav/<ws>/…\\`) and IVR playback uses them, then close."
   }
 ]
