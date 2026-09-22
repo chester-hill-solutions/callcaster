@@ -158,8 +158,11 @@ export async function createBillingCheckoutSession(args: {
           price_data: {
             currency: "cad",
             product_data: {
-              name: "Workspace credits",
-              description: `${formatCredits(amount)} credits for your workspace`,
+              // The count is in the line name, not the quantity (#1981): the
+              // receipt then reads "12,500 workspace credits" instead of
+              // "Workspace credits × 1", and no Stripe Checkout quantity
+              // ceiling is ever hit (packages go up to 25,000 credits).
+              name: `${formatCredits(amount)} workspace credits`,
             },
             unit_amount: priceInCents,
             tax_behavior: "exclusive",
