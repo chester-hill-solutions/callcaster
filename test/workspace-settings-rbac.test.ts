@@ -32,7 +32,6 @@ const utilsMocks = vi.hoisted(() => ({
   handleAddUser: vi.fn(async () => ({ data: "ok", error: null })),
   handleUpdateUser: vi.fn(async () => ({ data: "ok", error: null })),
   handleDeleteUser: vi.fn(async () => ({ data: "ok", error: null })),
-  handleDeleteSelf: vi.fn(async () => new Response(null, { status: 302 })),
   handleTransferWorkspace: vi.fn(async () => ({ data: "ok", error: null })),
   handleDeleteWorkspace: vi.fn(async () => new Response(null, { status: 302 })),
   removeInvite: vi.fn(async () => ({ data: "ok", error: null })),
@@ -133,23 +132,6 @@ describe("workspace settings RBAC", () => {
 
       expect(utilsMocks.handleTransferWorkspace).not.toHaveBeenCalled();
       expect(utilsMocks.handleDeleteWorkspace).not.toHaveBeenCalled();
-    });
-
-    test("rejects deleteSelf when form user_id does not match the session user", async () => {
-      const mod = await import("../app/routes/workspaces+/$id/settings.action.server");
-
-      const fd = new FormData();
-      fd.set("formName", "deleteSelf");
-      fd.set("user_id", "u2");
-      const res = await asRouteResponse(mod.action(
-          await withWorkspaceRouteArgs(
-            { request: buildRequest(fd), params: { id: "w1" } },
-            { userId: "u1", workspaceId: "w1", userRole: "member" },
-          ),
-        ),
-      );
-      expect(res.status).toBe(403);
-      expect(utilsMocks.handleDeleteSelf).not.toHaveBeenCalled();
     });
 
     test("passes the session user as the invite actor for addUser", async () => {

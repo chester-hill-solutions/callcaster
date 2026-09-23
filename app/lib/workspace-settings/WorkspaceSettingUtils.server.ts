@@ -122,39 +122,6 @@ export async function handleDeleteUser(
   }
 }
 
-export async function handleDeleteSelf(
-  formData: FormData,
-  workspaceId: string,
-  headers: Headers,
-  actorUserId: string,
-) {
-  const userId = formData.get("user_id") as string;
-  if (userId == null) {
-    return routeData({ error: `User ${userId} not found` }, { headers });
-  }
-
-  if (userId !== actorUserId) {
-    return routeData(
-      { error: "You don't have permission to delete this user" },
-      { headers, status: 403 },
-    );
-  }
-
-  try {
-    const result = await removeWorkspaceMember(actorUserId, workspaceId, userId);
-    if (!result.ok) {
-      throw new Error(result.error ?? "Delete failed");
-    }
-    return redirect("/workspaces", { headers });
-  } catch (errorDeletingSelf) {
-    logger.error("Error deleting current user from workspace", errorDeletingSelf);
-    return {
-      data: null,
-      error: errorDeletingSelf instanceof Error ? errorDeletingSelf.message : "Delete failed",
-    };
-  }
-}
-
 export async function handleTransferWorkspace(
   formData: FormData,
   workspaceId: string,

@@ -211,27 +211,6 @@ describe("WorkspaceSettingUtils", () => {
     expect(await resDeleteOk.json()).toEqual({ data: { id: "u1" }, error: null });
   });
 
-  test("handleDeleteSelf returns json when missing userId; returns object error on delete error; redirects on success", async () => {
-    const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
-    const headers = new Headers();
-
-    const fdMissing = new FormData();
-    const resMissing = await asRouteResponse(mod.handleDeleteSelf(fdMissing, "w1", headers, "u1"));
-    expect(resMissing.status).toBe(200);
-
-    const fd = new FormData();
-    fd.set("user_id", "u1");
-
-    membersDbMocks.removeWorkspaceMember.mockRejectedValueOnce(new Error("del"));
-    const errObj = await mod.handleDeleteSelf(fd, "w1", headers, "u1");
-    expect(errObj).toEqual({ data: null, error: "del" });
-
-    membersDbMocks.removeWorkspaceMember.mockResolvedValueOnce({ ok: 1 });
-    const res = await asRouteResponse(mod.handleDeleteSelf(fd, "w1", headers, "u1"));
-    expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("/workspaces");
-  });
-
   test("handleTransferWorkspace handles errors for each update and returns json on success", async () => {
     const mod = await import("../app/lib/workspace-settings/WorkspaceSettingUtils.server");
     const headers = new Headers();

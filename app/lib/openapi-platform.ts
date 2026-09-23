@@ -488,7 +488,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       tags: ["Platform API", "Workspace"],
       security: sessionOnlySecurity,
       description:
-        "Session-only trust-root route. Pass `target: invite` to cancel a pending invite.",
+        "Session-only trust-root route for removing another member. Self-removal is not supported. Pass `target: invite` to cancel a pending invite.",
       requestBody: {
         required: true,
         content: {
