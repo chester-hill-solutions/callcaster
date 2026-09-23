@@ -13,12 +13,11 @@ import type { MetaFunction } from "react-router";
 import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Text , Heading } from "@/components/ui/typography";
+import { Heading } from "@/components/ui/typography";
 
 // Neutral on purpose: this page is registration when signup is open and a
 // request-access form when it is closed, and meta cannot read loader data here.
@@ -66,7 +65,7 @@ export default function SignUp() {
       </Heading>
       <div className="z-10 flex w-full max-w-6xl justify-center space-y-16">
         {signupOpen ? (
-          <RegistrationForm isBusy={state !== "idle"} error={actionData?.error} />
+          <RegistrationForm isBusy={state !== "idle"} />
         ) : (
           <ContactForm
             isBusy={state !== "idle"}
@@ -81,10 +80,9 @@ export default function SignUp() {
 
 interface RegistrationFormProps {
   isBusy: boolean;
-  error?: string;
 }
 
-const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
+const RegistrationForm = ({ isBusy }: RegistrationFormProps) => (
   <div className="animate-fade-in-up animation-delay-600 mb-16 w-full max-w-md font-Zilla-Slab">
     <AuthCard
       title="Create Account"
@@ -92,11 +90,6 @@ const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
       className="bg-secondary py-2"
       headingAs="h2"
     >
-      {error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
       <Form method="POST" className="flex w-full flex-col gap-4" id="signup-form">
         <div className="flex w-full gap-4">
           <FormField htmlFor="firstName" label="First Name" className="flex-1">
