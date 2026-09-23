@@ -275,6 +275,7 @@ export default function Workspaces() {
             accepted: {
               title: "Invitation accepted",
               description: "You can open your workspace from the list below.",
+              variant: "success",
             },
           }}
         />

@@ -5,6 +5,7 @@ type QueryParamBannerVariant = {
   title?: string;
   description?: string;
   className?: string;
+  variant?: "default" | "destructive" | "success" | "warning" | "info";
 };
 
 type QueryParamBannerProps = {
@@ -41,7 +42,7 @@ export function QueryParamBanner({
   };
 
   return (
-    <Alert className={variant.className}>
+    <Alert variant={variant.variant} className={variant.className}>
       {variant.title ? <AlertTitle>{variant.title}</AlertTitle> : null}
       <AlertDescription className="flex items-center justify-between gap-4">
         <span>{variant.description}</span>
