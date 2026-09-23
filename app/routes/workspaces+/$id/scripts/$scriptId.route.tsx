@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Link, useLoaderData } from "react-router";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { Button } from "@/components/ui/button";
 import { Heading, Text } from "@/components/ui/typography";
 import { useWorkspaceAudioUpload } from "@/hooks/media/useWorkspaceAudioUpload";
+import { useSearchParamFlash } from "@/hooks/utils/useSearchParamFlash";
 import { workspaceAudioPreviewPath } from "@/lib/ivr-script-editor";
 
 import CampaignSettingsScript from "@/components/campaign/settings/script/CampaignSettings.Script";
@@ -37,6 +37,15 @@ export default function ScriptEditor() {
   );
   const isChanged = useHasChanges(script, initScript, normalizeScriptForComparison);
   useUnsavedChangesGuard(isChanged);
+  useSearchParamFlash({
+    created: (value) => {
+      if (value === "1") {
+        toast.success("Script created", {
+          description: "Your new script is ready to edit.",
+        });
+      }
+    },
+  });
 
   const handleSaveUpdate = async () => {
     setIsSaving(true);
@@ -74,15 +83,6 @@ export default function ScriptEditor() {
 
   return (
     <div className="relative flex h-full flex-col overflow-visible">
-      <QueryParamBanner
-        param="created"
-        variants={{
-          "1": {
-            title: "Script created",
-            description: "Your new script is ready to edit.",
-          },
-        }}
-      />
       <SaveBar
         isChanged={isChanged}
         isSaving={isSaving}

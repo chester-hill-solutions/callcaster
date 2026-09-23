@@ -13,12 +13,10 @@ import type { MetaFunction } from "react-router";
 import { useRef } from "react";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 import { AuthCard } from "@/components/shared/AuthCard";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { FormField, FormFieldControl } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Text } from "@/components/ui/typography";
 
 // Neutral on purpose: this page is registration when signup is open and a
 // request-access form when it is closed, and meta cannot read loader data here.
@@ -58,7 +56,7 @@ export default function SignUp() {
   return (
     <main className="relative flex w-full flex-1 flex-col items-center justify-center px-4 py-8 text-foreground sm:px-6 lg:px-8">
       {signupOpen ? (
-        <RegistrationForm isBusy={state !== "idle"} error={actionData?.error} />
+        <RegistrationForm isBusy={state !== "idle"} />
       ) : (
         <ContactForm
           isBusy={state !== "idle"}
@@ -77,20 +75,14 @@ export default function SignUp() {
 
 interface RegistrationFormProps {
   isBusy: boolean;
-  error?: string;
 }
 
-const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
+const RegistrationForm = ({ isBusy }: RegistrationFormProps) => (
   <div className="animate-fade-in-up animation-delay-600 mb-16 w-full max-w-xl font-Zilla-Slab">
     <AuthCard
       title="Sign Up"
       description="Sign up to create a workspace and start calling."
     >
-      {error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
       <Form
         method="POST"
         className="flex w-full flex-col gap-4"
