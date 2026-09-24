@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Added
+
+- Admins can now load credits into any workspace manually from the admin workspace page, with the grant recorded in the workspace transaction history as a `Manual credit load` entry naming the admin and reason ([#2041](https://github.com/chester-hill-solutions/callcaster/issues/2041)).
+
 ### Changed
 
 - Phone number management is now a dedicated workspace page in the sidebar, rather than a section inside Settings ([#2001](https://github.com/chester-hill-solutions/callcaster/issues/2001)).

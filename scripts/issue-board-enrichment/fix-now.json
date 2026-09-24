@@ -1,5 +1,37 @@
 [
   {
+    "issueNumber": 2041,
+    "verdict": "fix-now",
+    "recommendedTitle": "Admins can manually load credits into a workspace",
+    "summary": "A signed-in sudo admin can load credits into any workspace from a new Credits tab on /admin/workspaces/$workspaceId: amount (1-100,000) + required reason, granted through the canonical ledger path (apply_ledger_entry_and_sync_credits via insertTransactionHistoryIdempotent). Idempotency via manualCreditLoadKey(workspaceId, nonce) so a retried form submit credits once.",
+    "currentBehavior": "The only credit path is Stripe Checkout; a workspace that runs out mid-campaign or is topped up by invoice/goodwill requires a raw DB poke.",
+    "rootCause": "No admin-facing manual credit entry point existed; ledger writes were all Stripe/welcome/usage-driven.",
+    "resolution": "shared/billing-keys.ts manualCreditLoadKey(workspaceId, nonce) (manual-credit:<ws>:<nonce>); admin Credits tab (credits.route.tsx + loader + action) following the invite/twilio tab pattern; action validates amount + reason, inserts CREDIT with the key and a 'Manual credit load by <username>: <reason>' note; loader shows balance + last 10 ledger rows + a per-render nonce.",
+    "lookIn": [
+      "shared/billing-keys.ts",
+      "app/routes/admin+/workspaces/$workspaceId/credits.route.tsx",
+      "app/routes/admin+/workspaces/$workspaceId/credits.action.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/credits.loader.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId.route.tsx"
+    ],
+    "existingTests": [
+      "test/billing-keys.test.ts",
+      "test/admin-workspace-credits.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Admin adds credits; balance updates on refresh",
+      "Repeated POST with the same nonce credits exactly once",
+      "Invalid amounts (0, negative, non-numeric, >100,000) rejected with a clear message",
+      "Ledger shows the grant as CREDIT with the admin note; reconciliation buckets it as purchase",
+      "npm run ci:local green"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "low",
+    "trackerRecommendation": "Fix now, one PR. Do not pick up without completing the ledger-path tests."
+  },
+  {
     "issueNumber": 1885,
     "verdict": "fix-now",
     "recommendedTitle": "Rewrite the two live auth.uid() RPCs, drop get_outreach_attempts, then drop schema auth",
