@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, render, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
   createMockFetcher,
@@ -112,5 +112,52 @@ describe("chats hooks", () => {
 
     expect(registerChatActions).toHaveBeenCalled();
     expect(result.current.messages.length).toBeGreaterThan(0);
+  });
+
+  test("useChatThread starts at and follows the newest message", async () => {
+    const { client } = createWorkspaceRealtimeMock();
+    const { useChatThread } = await import("@/hooks/chats/useChatThread");
+    const registerChatActions = vi.fn();
+    const setScrollTop = vi.fn();
+
+    function ThreadScrollProbe() {
+      const thread = useChatThread({
+        client: client as never,
+        workspace: { id: "ws" } as never,
+        registerChatActions,
+      });
+
+      return (
+        <div
+          ref={(node) => {
+            (thread.scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            if (!node) return;
+            Object.defineProperties(node, {
+              scrollHeight: { configurable: true, value: 500 },
+              scrollTop: {
+                configurable: true,
+                get: () => 0,
+                set: setScrollTop,
+              },
+            });
+          }}
+        >
+          <div ref={thread.messagesEndRef} />
+        </div>
+      );
+    }
+
+    render(<ThreadScrollProbe />);
+
+    await waitFor(() => expect(setScrollTop).toHaveBeenLastCalledWith(500));
+    setScrollTop.mockClear();
+
+    const actions = registerChatActions.mock.calls.at(-1)?.[0];
+    expect(actions?.addOptimisticMessage).toBeDefined();
+    act(() => {
+      actions?.addOptimisticMessage?.({ body: "Sent", to: "+15551234567" });
+    });
+
+    await waitFor(() => expect(setScrollTop).toHaveBeenLastCalledWith(500));
   });
 });

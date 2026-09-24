@@ -1,6 +1,6 @@
 export { loader } from "./$contact_number.loader.server";
 
-import { useOutletContext } from "react-router";
+import { useOutletContext, useParams } from "react-router";
 import { ChatThreadView } from "@/components/chats/ChatThreadView";
 import type { Workspace, WorkspaceNumber } from "@/lib/types";
 
@@ -23,9 +23,11 @@ type ChatThreadOutletContext = {
 export default function ChatScreen() {
   const { workspace, workspaceNumbers, registerChatActions, contactOptOut } =
     useOutletContext<ChatThreadOutletContext>();
+  const { contact_number } = useParams();
 
   return (
     <ChatThreadView
+      key={contact_number}
       workspace={workspace}
       workspaceNumbers={workspaceNumbers}
       registerChatActions={registerChatActions}
