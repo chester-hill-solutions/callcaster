@@ -136,12 +136,6 @@ export default function Account() {
               )
             }
           />
-          {actionData?.error ? (
-            <Alert variant="destructive" role="alert" className="mb-4">
-              <AlertTitle>Could not update your profile</AlertTitle>
-              <AlertDescription>{actionData.error}</AlertDescription>
-            </Alert>
-          ) : null}
           <Form ref={profileFormRef} id="profile-form" method="POST" className="space-y-5">
             <div className="grid gap-5 sm:grid-cols-2">
               <FormField htmlFor="first_name" label="First name" required>

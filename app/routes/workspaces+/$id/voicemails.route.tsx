@@ -2,11 +2,12 @@ export { loader } from "./voicemails.loader.server";
 
 import { Link, Outlet, useLoaderData, useOutlet, useOutletContext } from "react-router";
 import { Voicemail } from "lucide-react";
+import { toast } from "sonner";
 import { mediaColumns } from "@/components/file-assets/columns";
-import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
 import { Button } from "@/components/ui/button";
+import { useSearchParamFlash } from "@/hooks/utils/useSearchParamFlash";
 
 import { ContextType } from "@/lib/types";
 
@@ -14,6 +15,17 @@ export default function WorkspaceVoicemailsPage() {
   const outlet = useOutlet();
   const parentContext = useOutletContext<ContextType>();
   const { audioMedia, error } = useLoaderData();
+
+  useSearchParamFlash({
+    configured: (value) => {
+      if (value === "1") {
+        toast.success("Voicemail is set up", {
+          description:
+            "Callers will hear your greeting and can leave a message. Their messages will show up here.",
+        });
+      }
+    },
+  });
 
   if (outlet) {
     return <Outlet context={parentContext} />;
@@ -30,16 +42,6 @@ export default function WorkspaceVoicemailsPage() {
 
   return (
     <>
-      <QueryParamBanner
-        param="configured"
-        variants={{
-          "1": {
-            title: "Voicemail is set up",
-            description:
-              "Callers will hear your greeting and can leave a message. Their messages will show up here.",
-          },
-        }}
-      />
       <WorkspaceResourceListShell
         title="Voicemails"
         error={error}

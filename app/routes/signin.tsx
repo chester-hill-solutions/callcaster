@@ -9,13 +9,6 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 
-
-import { Text } from "@/components/ui/typography";
-
-
-
-
-
 export const meta: MetaFunction = () => [{ title: "Sign In — CallCaster" }];
 
 export default function SignIn() {
@@ -33,11 +26,6 @@ export default function SignIn() {
         description="Sign in to manage your workspaces, calls, and messaging."
         id="login-hero"
       >
-        {actionData?.error ? (
-          <Text className="block text-center text-destructive-text">
-            {actionData.error}
-          </Text>
-        ) : null}
         <Form
           method="POST"
           className="flex w-full flex-col gap-4"

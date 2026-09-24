@@ -133,9 +133,6 @@ export default function AcceptInvite() {
             <ExistingUserInvites invites={loaderData.invites} state={state} />
           ))}
         {loaderData.status === "error" && <div>{loaderData.error}</div>}
-        {actionData?.status === "accept_failed" && (
-          <div role="alert">{actionData.error}</div>
-        )}
       </AuthCard>
     </main>
   );
