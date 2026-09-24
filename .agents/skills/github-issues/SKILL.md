@@ -11,6 +11,8 @@ This skill extends `github-cli`; apply its authentication, repository-targeting,
 
 Use a GitHub issue type for primary work classification. Do not use a label such as `bug` as a substitute for the `Bug` type. Labels remain appropriate for orthogonal metadata, such as component, priority, status, or team ownership.
 
+`Effort` is an organization-level GitHub Issue field, not an issue label or a GitHub Project field. `gh issue view --json` does not expose it. Resolve its field and option IDs with the GraphQL query in `github-cli`, then use `repository.issues(filterBy: { issueFieldValues: [...] })` to select issues by effort.
+
 The following enabled organization types were verified for `chester-hill-solutions/callcaster` on **2026-08-08** using `gh 2.85.0` (closed-reason commands re-verified **2026-08-27** on `gh 2.96.0`):
 
 | Type | Use for |

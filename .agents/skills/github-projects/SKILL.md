@@ -19,6 +19,27 @@ mutating the project. Do not guess opaque GitHub IDs.
 For project `9` in this repository, use the list element with `id: 9` in
 `.github/projects.yaml` and keep its `fields` as a subkey of that element.
 
+## CHS Backlog Status
+
+Project `9` (`CHS Backlog`) currently uses these `Status` values: `Backlog`, `In progress`, `on-dev`, `tested-on-dev`, `on-qa`, `on-prod`, and `archive`.
+
+- Resolve statuses with `gh project field-list 9 --owner chester-hill-solutions --format json` before filtering or changing items.
+- The installed CLI supports the verified query `gh project item-list 9 --owner chester-hill-solutions --query "status:Backlog" --limit 500 --format json`. Filter those results to the target repository before acting.
+- To select work by both an organization Issue field and a Project status, query the Issue field first, query the Project status separately, then intersect the issue numbers. Do not treat a Project status as an issue label.
+
+## Pull Request and Issue Linking
+
+Each pull request must link to the issue it resolves.
+
+CallCaster pull requests base on `dev`. The repository default branch is `master`. GitHub reads closing keywords (`Closes #N`, `Fixes #N`, `Resolves #N`) in a pull request description only when the pull request targets the default branch. For a `dev`-based pull request, GitHub ignores these keywords: no linked pull request appears on the issue and the issue does not close on merge. Verified 2026-09-22 on pull requests #2020-#2025: each body contained `Closes #N` yet `closingIssuesReferences` stayed empty until linked explicitly.
+
+1. Put the issue reference in the pull request body (convention: `Closes #N`). This creates a timeline cross-reference only; it is not a link.
+2. Create the Development link with the official GraphQL mutation `addCloseIssueReferences`. It works for any base branch and supports existing pull requests:
+   - Resolve the node IDs with `repository.issue(number: N) { id }` and `repository.pullRequest(number: N) { id }`.
+   - `mutation { addCloseIssueReferences(input: { issueId: "<ISSUE_ID>", pullRequestIds: ["<PR_ID>"] }) { issue { id } } }`
+3. Verify after linking: `gh pr view NUMBER --json closingIssuesReferences` returns the issue, and `GET repos/{owner}/{repo}/issues/{N}/events` contains a `connected` event.
+4. Linking does not auto-close the issue. A `dev`-based pull request merges into a non-default branch, so closing-keyword semantics do not apply; close the issue in the normal verify/close flow.
+
 ## Safe Workflow
 
 1. Confirm authentication and the target owner with `gh auth status` and `gh repo view --json nameWithOwner,url`.
