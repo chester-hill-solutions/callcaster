@@ -56,21 +56,21 @@ export default function SignUp() {
   });
 
   return (
-    <main className="bg-background flex flex-col items-center px-4 py-8 sm:px-6 lg:px-8">
-      <div className="z-10 flex w-full max-w-6xl justify-center space-y-16">
-        {signupOpen ? (
-          <RegistrationForm
-            isBusy={state !== "idle"}
-            error={actionData?.error}
-          />
-        ) : (
-          <ContactForm
-            isBusy={state !== "idle"}
-            formRef={formRef}
-            fetcher={fetcher}
-          />
-        )}
-      </div>
+    <main className="relative flex w-full flex-1 flex-col items-center justify-center px-4 py-8 text-foreground sm:px-6 lg:px-8">
+      {signupOpen ? (
+        <RegistrationForm isBusy={state !== "idle"} error={actionData?.error} />
+      ) : (
+        <ContactForm
+          isBusy={state !== "idle"}
+          formRef={formRef}
+          fetcher={fetcher}
+        />
+      )}
+      <img
+        alt="background"
+        src="/Hero-1.png"
+        className="absolute left-0 top-2.5 z-[-1] h-screen overflow-hidden object-cover opacity-10"
+      />
     </main>
   );
 }
@@ -81,11 +81,10 @@ interface RegistrationFormProps {
 }
 
 const RegistrationForm = ({ isBusy, error }: RegistrationFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 font-Zilla-Slab mb-16 w-full max-w-md">
+  <div className="animate-fade-in-up animation-delay-600 mb-16 w-full max-w-xl font-Zilla-Slab">
     <AuthCard
       title="Sign Up"
       description="Sign up to create a workspace and start calling."
-      className="bg-secondary py-2"
     >
       {error ? (
         <Alert variant="destructive">
@@ -161,58 +160,55 @@ interface ContactFormProps {
 }
 
 const ContactForm = ({ isBusy, formRef, fetcher }: ContactFormProps) => (
-  <div className="animate-fade-in-up animation-delay-600 font-Zilla-Slab mb-16 w-full max-w-md">
-    <div className="flex flex-wrap gap-8">
-      <AuthCard
-        title="Request Access"
-        description="Registration is currently available by invitation. Contact us to let us know you're interested."
-        className="bg-secondary w-full py-2"
+  <div className="animate-fade-in-up animation-delay-600 mb-16 w-full max-w-xl font-Zilla-Slab">
+    <AuthCard
+      title="Request Access"
+      description="Registration is currently available by invitation. Contact us to let us know you're interested."
+    >
+      <fetcher.Form
+        className="space-y-4"
+        action="/api/contact-form"
+        method="POST"
+        ref={formRef}
       >
-        <fetcher.Form
-          className="space-y-4"
-          action="/api/contact-form"
-          method="POST"
-          ref={formRef}
-        >
-          <input type="hidden" value={"signup"} id="signup" name="signup" />
-          <FormField htmlFor="name" label="Name">
-            <FormFieldControl>
-              <Input
-                type="text"
-                id="name"
-                name="name"
-                required
-                className="bg-background text-foreground"
-              />
-            </FormFieldControl>
-          </FormField>
-          <FormField htmlFor="contact-email" label="Email">
-            <FormFieldControl>
-              <Input
-                type="email"
-                id="contact-email"
-                name="email"
-                required
-                className="bg-background text-foreground"
-              />
-            </FormFieldControl>
-          </FormField>
-          <FormField htmlFor="message" label="Message">
-            <FormFieldControl>
-              <Textarea
-                id="message"
-                name="message"
-                rows={4}
-                required
-                className="border-input bg-background text-foreground"
-              />
-            </FormFieldControl>
-          </FormField>
-          <Button disabled={isBusy} type="submit" className="w-full">
-            Send Message
-          </Button>
-        </fetcher.Form>
-      </AuthCard>
-    </div>
+        <input type="hidden" value={"signup"} id="signup" name="signup" />
+        <FormField htmlFor="name" label="Name">
+          <FormFieldControl>
+            <Input
+              type="text"
+              id="name"
+              name="name"
+              required
+              className="bg-background text-foreground"
+            />
+          </FormFieldControl>
+        </FormField>
+        <FormField htmlFor="contact-email" label="Email">
+          <FormFieldControl>
+            <Input
+              type="email"
+              id="contact-email"
+              name="email"
+              required
+              className="bg-background text-foreground"
+            />
+          </FormFieldControl>
+        </FormField>
+        <FormField htmlFor="message" label="Message">
+          <FormFieldControl>
+            <Textarea
+              id="message"
+              name="message"
+              rows={4}
+              required
+              className="border-input bg-background text-foreground"
+            />
+          </FormFieldControl>
+        </FormField>
+        <Button disabled={isBusy} type="submit" className="w-full">
+          Send Message
+        </Button>
+      </fetcher.Form>
+    </AuthCard>
   </div>
 );

@@ -57,4 +57,28 @@ describe("app/routes/signup.tsx", () => {
     ).toBeInTheDocument();
     expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
   });
+
+  test("#2013: uses the shared auth layout and sign-in card width", async () => {
+    const mod = await import("../../app/routes/signup");
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/signup",
+          Component: mod.default,
+          loader: () => ({ signupOpen: true }),
+        },
+      ],
+      { initialEntries: ["/signup"] },
+    );
+    const { container } = render(createElement(RouterProvider, { router }));
+
+    await screen.findByRole("heading", { level: 1, name: "Sign Up" });
+
+    const main = container.querySelector("main");
+    expect(main).toHaveClass("w-full", "flex-1", "justify-center", "py-8");
+    expect(main).not.toHaveClass("min-h-screen");
+    // The form uses one centered max-w-xl wrapper, matching the sign-in page.
+    expect(container.querySelector(".max-w-md")).toBeNull();
+    expect(container.querySelector("main .max-w-xl")).not.toBeNull();
+  });
 });

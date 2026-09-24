@@ -27,69 +27,71 @@ export default function SignIn() {
   });
 
   return (
-    <main className="relative flex min-h-[calc(100vh-80px)] items-center justify-center px-4 py-12 text-foreground">
-      <AuthCard
-        title="Login"
-        description="Sign in to manage your workspaces, calls, and messaging."
-        id="login-hero"
-      >
-        {actionData?.error ? (
-          <Text className="block text-center text-destructive-text">
-            {actionData.error}
-          </Text>
-        ) : null}
-        <Form
-          method="POST"
-          className="flex w-full flex-col gap-4"
-          id="signin-form"
+    <main className="relative flex w-full flex-1 flex-col items-center justify-center px-4 py-8 text-foreground sm:px-6 lg:px-8">
+      <div className="z-10 flex w-full justify-center">
+        <AuthCard
+          title="Login"
+          description="Sign in to manage your workspaces, calls, and messaging."
+          id="login-hero"
         >
-          <FormField htmlFor="email" label="Email">
-            <Input
-              autoComplete="email"
-              type="text"
-              name="email"
-              id="email"
-            />
-          </FormField>
-
-          <FormField htmlFor="password" label="Password">
-            <Input
-              autoComplete="current-password"
-              type="password"
-              name="password"
-              id="password"
-            />
-          </FormField>
-        </Form>
-
-        <Button
-          className="min-h-[48px] w-full font-Zilla-Slab text-2xl font-bold tracking-[1px]"
-          type="submit"
-          form="signin-form"
-        >
-          Login
-        </Button>
-        <div className="flex flex-col space-y-3">
-          <NavLink
-            to={"/signup"}
-            className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-foreground transition-colors duration-150 hover:text-brand-primary hover:underline"
+          {actionData?.error ? (
+            <Text className="block text-center text-destructive-text">
+              {actionData.error}
+            </Text>
+          ) : null}
+          <Form
+            method="POST"
+            className="flex w-full flex-col gap-4"
+            id="signin-form"
           >
-            Don't Have an Account Yet? Click{" "}
-            <span className="text-brand-primary">HERE</span> to Sign-Up!
-          </NavLink>
+            <FormField htmlFor="email" label="Email">
+              <Input
+                autoComplete="email"
+                type="text"
+                name="email"
+                id="email"
+              />
+            </FormField>
+
+            <FormField htmlFor="password" label="Password">
+              <Input
+                autoComplete="current-password"
+                type="password"
+                name="password"
+                id="password"
+              />
+            </FormField>
+          </Form>
+
           <Button
-            asChild
-            variant="outline"
-            className="min-h-[44px] w-full font-Zilla-Slab text-lg font-bold tracking-[1px]"
+            className="min-h-[48px] w-full font-Zilla-Slab text-2xl font-bold tracking-[1px]"
+            type="submit"
+            form="signin-form"
           >
-            <NavLink to="/remember">Forgot password?</NavLink>
+            Login
           </Button>
-        </div>
-      </AuthCard>
+          <div className="flex flex-col space-y-3">
+            <NavLink
+              to={"/signup"}
+              className="text-center font-Zilla-Slab text-xl font-bold tracking-[1px] text-foreground transition-colors duration-150 hover:text-brand-primary hover:underline"
+            >
+              Don't Have an Account Yet? Click{" "}
+              <span className="text-brand-primary">HERE</span> to Sign-Up!
+            </NavLink>
+            <Button
+              asChild
+              variant="outline"
+              className="min-h-[44px] w-full font-Zilla-Slab text-lg font-bold tracking-[1px]"
+            >
+              <NavLink to="/remember">Forgot password?</NavLink>
+            </Button>
+          </div>
+        </AuthCard>
+      </div>
       <img
         alt="background"
         src="/Hero-1.png"
-        className="absolute left-0 top-[10px] z-[-1] h-screen overflow-hidden object-cover opacity-10"
+        className="absolute left-0 top-2.5 z-[-1] h-screen overflow-hidden object-cover opacity-10"
       />
     </main>
   );
