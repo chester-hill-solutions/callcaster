@@ -187,6 +187,12 @@ export function OnboardingFirstNumberStep({
       : requestedStep === "rent"
         ? hasServiceAddress ? "rent" : "address"
         : requestedStep === "address" ? "address" : "choose";
+  const firstNumberWidthClass =
+    numberStep === "rent"
+      ? undefined
+      : numberStep === "choose"
+        ? "mx-auto w-full max-w-3xl"
+        : "mx-auto w-full max-w-2xl";
   const isRentalPath =
     numberStep === "address" ||
     numberStep === "rent" ||
@@ -205,7 +211,7 @@ export function OnboardingFirstNumberStep({
     const reasons = onboarding.reviewState.blockingIssues;
 
     return (
-      <Section variant="flat">
+      <Section variant="flat" className={firstNumberWidthClass}>
         <SectionHeader
           compact
           title="Phone number"
@@ -251,7 +257,7 @@ export function OnboardingFirstNumberStep({
         validationRequest={activeValidationRequest}
         status={verificationStatus}
       />
-      <Section variant="flat">
+      <Section variant="flat" className={firstNumberWidthClass}>
         <SectionHeader
           compact
           title="Phone number"
