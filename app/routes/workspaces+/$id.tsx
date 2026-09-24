@@ -141,6 +141,7 @@ function WorkspaceResolvedView({
   // "Leave Campaign" is the only way off the page (#1313) — no "Add
   // credits" link here that would bypass that.
   const isCallScreen = location.pathname.endsWith("call");
+  const isChatsScreen = /\/chats(?:\/|$)/.test(location.pathname);
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
@@ -190,7 +191,11 @@ function WorkspaceResolvedView({
           </Alert>
         ) : null}
         <div
-          className={`min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ${workspacePanelHeightLgClass} lg:overflow-y-auto`}
+          className={
+            isChatsScreen
+              ? "min-w-0 flex-1 lg:overflow-visible"
+              : `min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ${workspacePanelHeightLgClass} lg:overflow-y-auto`
+          }
         >
           {!outlet ? (
             <div className="space-y-4">

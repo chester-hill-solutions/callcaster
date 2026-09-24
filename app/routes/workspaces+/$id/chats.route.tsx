@@ -3,7 +3,7 @@ export { action } from "./chats.action.server";
 
 import { Outlet, useRouteError } from "react-router";
 import type { MetaFunction } from "react-router";
-import { workspacePanelHeightClass } from "@/components/workspace/workspace-panel-classes";
+import { workspaceViewportHeightClass } from "@/components/workspace/workspace-panel-classes";
 import {
   Sheet,
   SheetContent,
@@ -60,7 +60,7 @@ export default function ChatsList() {
 
   return (
     <main
-      className={`flex min-h-[68vh] w-full flex-col gap-4 md:flex-row lg:min-h-0 ${workspacePanelHeightClass}`}
+      className={`flex min-h-[68vh] w-full flex-col gap-4 md:flex-row lg:min-h-0 ${workspaceViewportHeightClass}`}
     >
       <div
         className="hidden flex-col overflow-hidden rounded-lg border border-border/80 md:flex md:max-w-[40%] md:basis-2/5 lg:h-full lg:min-h-0"
@@ -68,7 +68,7 @@ export default function ChatsList() {
         <ConversationSidebar {...sidebarProps} />
       </div>
 
-      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/80 md:basis-3/5 lg:h-full">
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden md:basis-3/5 lg:h-full">
         <ChatHeader
           contact={contact}
           outlet={Boolean(outlet)}
