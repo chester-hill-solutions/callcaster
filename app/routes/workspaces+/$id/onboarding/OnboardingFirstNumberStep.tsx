@@ -264,7 +264,11 @@ export function OnboardingFirstNumberStep({
         <div className="space-y-6">
           <nav aria-label="Phone number setup" className="flex flex-wrap items-center gap-2 text-sm">
             <Link
-              className="underline underline-offset-4"
+              className={
+                numberStep === "choose"
+                  ? "underline underline-offset-4"
+                  : undefined
+              }
               to={numberStepPath("choose")}
               aria-current={numberStep === "choose" ? "step" : undefined}
             >
@@ -274,7 +278,13 @@ export function OnboardingFirstNumberStep({
             {isRentalPath ? (
               <>
                 <Link
-                  className="underline underline-offset-4"
+                  className={
+                    numberStep === "address"
+                      ? "underline underline-offset-4"
+                      : numberStep === "rent" || numberStep === "complete"
+                        ? undefined
+                        : "text-muted-foreground"
+                  }
                   to={numberStepPath("address")}
                   aria-current={numberStep === "address" ? "step" : undefined}
                 >
@@ -283,31 +293,51 @@ export function OnboardingFirstNumberStep({
                 <span aria-hidden="true">/</span>
                 {hasServiceAddress ? (
                   <Link
-                    className="underline underline-offset-4"
+                      className={
+                        numberStep === "rent"
+                          ? "underline underline-offset-4"
+                          : numberStep === "address"
+                            ? "text-muted-foreground"
+                            : undefined
+                    }
                     to={numberStepPath("rent")}
                     aria-current={numberStep === "rent" ? "step" : undefined}
                   >
                     3. Rent a number
                   </Link>
                 ) : (
-                  <span>3. Rent a number</span>
+                  <span className="text-muted-foreground">3. Rent a number</span>
                 )}
                 <span aria-hidden="true">/</span>
-                <span aria-current={numberStep === "complete" ? "step" : undefined}>
+                <span
+                  className={numberStep === "complete" ? undefined : "text-muted-foreground"}
+                  aria-current={numberStep === "complete" ? "step" : undefined}
+                >
                   4. Review your number
                 </span>
               </>
             ) : (
               <>
-                <Link
-                  className="underline underline-offset-4"
-                  to={numberStepPath("verify")}
-                  aria-current={numberStep === "verify" ? "step" : undefined}
-                >
-                  2. {numberStep === "verify" ? "Verify your number" : "Add your number"}
-                </Link>
+                {numberStep === "choose" ? (
+                  <span className="text-muted-foreground">2. Add your number</span>
+                ) : (
+                  <Link
+                    className={
+                      numberStep === "verify"
+                        ? "underline underline-offset-4"
+                        : undefined
+                    }
+                    to={numberStepPath("verify")}
+                    aria-current={numberStep === "verify" ? "step" : undefined}
+                  >
+                    2. Verify your number
+                  </Link>
+                )}
                 <span aria-hidden="true">/</span>
-                <span aria-current={numberStep === "complete" ? "step" : undefined}>
+                <span
+                  className={numberStep === "complete" ? undefined : "text-muted-foreground"}
+                  aria-current={numberStep === "complete" ? "step" : undefined}
+                >
                   3. Review your number
                 </span>
               </>

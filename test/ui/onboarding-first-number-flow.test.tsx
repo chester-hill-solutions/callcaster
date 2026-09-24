@@ -46,6 +46,14 @@ function renderFlow(step = "", overrides: Partial<Props> = {}) {
 describe("guided phone setup (#1205, #1763, #1764)", () => {
   test("starts with a choice, then verifies without collecting a service address", async () => {
     renderFlow();
+    const initialNav = await screen.findByRole("navigation", { name: "Phone number setup" });
+    expect(within(initialNav).getByRole("link", { name: "1. Choose a method" })).toHaveClass(
+      "underline",
+    );
+    expect(within(initialNav).queryByRole("link", { name: "2. Add your number" })).toBeNull();
+    expect(within(initialNav).getByText("2. Add your number")).toHaveClass(
+      "text-muted-foreground",
+    );
     fireEvent.click(await screen.findByRole("link", { name: "Use an existing number" }));
     expect(await screen.findByLabelText("Your phone number")).toBeEnabled();
     const setupNav = screen.getByRole("navigation", { name: "Phone number setup" });
