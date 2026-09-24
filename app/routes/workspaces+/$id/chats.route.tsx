@@ -59,14 +59,16 @@ export default function ChatsList() {
   } = useChatsPage();
 
   return (
-    <main className="flex min-h-[68vh] w-full flex-col gap-4 md:flex-row lg:h-full lg:min-h-0">
+    <main
+      className={`flex min-h-[68vh] w-full flex-col gap-4 md:flex-row lg:min-h-0 ${workspacePanelHeightClass}`}
+    >
       <div
-        className={`hidden ${workspacePanelHeightClass} flex-col overflow-hidden rounded-lg border border-border/80 md:flex md:max-w-[40%] md:basis-2/5 lg:h-full lg:min-h-0`}
+        className="hidden flex-col overflow-hidden rounded-lg border border-border/80 md:flex md:max-w-[40%] md:basis-2/5 lg:h-full lg:min-h-0"
       >
         <ConversationSidebar {...sidebarProps} />
       </div>
 
-      <div className="flex min-h-[68vh] w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/80 md:basis-3/5 lg:h-full lg:min-h-0">
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border/80 md:basis-3/5 lg:h-full">
         <ChatHeader
           contact={contact}
           outlet={Boolean(outlet)}

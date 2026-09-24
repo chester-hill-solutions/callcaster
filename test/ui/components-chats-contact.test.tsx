@@ -57,7 +57,7 @@ describe("app/components/sms-ui/ChatMessages.tsx", () => {
   test("renders a distinct failed/undelivered state with error_message", async () => {
     const ChatMessages = (await import("@/components/sms-ui/ChatMessages"))
       .default;
-    render(
+    const { container } = render(
       <ChatMessages
         messages={[
           {
@@ -93,6 +93,11 @@ describe("app/components/sms-ui/ChatMessages.tsx", () => {
     const okItem = screen.getByText("world").closest("[data-message-status]");
     expect(okItem).toHaveAttribute("data-message-status", "delivered");
     expect(screen.queryByText(/Landline/)).not.toBeNull();
+    expect(container.firstElementChild).toHaveClass(
+      "min-h-0",
+      "flex-1",
+      "overflow-y-auto",
+    );
   });
 
   test("keeps data-message-status intact for both failed and normal messages", async () => {
