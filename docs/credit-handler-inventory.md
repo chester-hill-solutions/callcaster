@@ -7,10 +7,11 @@
 > `sideEffects` is enforced bidirectionally against these signals; see
 > [handler-strictness.md](./handler-strictness.md).
 
-**12** route modules can touch the credit ledger.
+**13** route modules can touch the credit ledger.
 
 | Route module | Declared sideEffects | Write signals | Timing |
 | --- | --- | --- | --- |
+| `app/routes/admin+/workspaces/$workspaceId/credits.action.server.ts` | `db-write`, `credit` | direct-ledger-insert | sync |
 | `app/routes/api+/auto-dial/status.action.server.ts` | `db-write`, `credit`, `twilio` | sync-call-billing | sync |
 | `app/routes/api+/call-status.action.server.ts` | `db-write`, `credit` | async-call-billing | async (worker) |
 | `app/routes/api+/ivr/status.action.server.ts` | `db-write`, `credit`, `external` | sync-call-billing | sync |
