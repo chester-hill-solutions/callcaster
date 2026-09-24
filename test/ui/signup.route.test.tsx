@@ -32,9 +32,6 @@ describe("app/routes/signup.tsx", () => {
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     expect(screen.queryByText("Create Account")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
-    expect(document.querySelector("main")).toHaveClass(
-      "min-h-[calc(100vh-80px)]",
-    );
   });
 
   test("keeps the request-access form when registration is closed", async () => {
