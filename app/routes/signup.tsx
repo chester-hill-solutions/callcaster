@@ -56,7 +56,7 @@ export default function SignUp() {
   });
 
   return (
-    <main className="bg-background flex min-h-screen flex-col items-center px-4 py-8 sm:px-6 lg:px-8">
+    <main className="bg-background flex flex-col items-center px-4 py-8 sm:px-6 lg:px-8">
       <div className="z-10 flex w-full max-w-6xl justify-center space-y-16">
         {signupOpen ? (
           <RegistrationForm
