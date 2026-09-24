@@ -2,6 +2,9 @@
 export const workspacePanelHeightClass =
   "h-[calc(100vh-112px)] min-h-[560px]";
 
+/** Strict desktop viewport height for panels that scroll their own content. */
+export const workspaceViewportHeightLgClass = "lg:h-[calc(100vh-112px)]";
+
 /** Same height as {@link workspacePanelHeightClass}, scoped to large breakpoints. */
 export const workspacePanelHeightLgClass =
   "lg:h-[calc(100vh-112px)] lg:min-h-[560px]";

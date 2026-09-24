@@ -13,7 +13,10 @@ import {
 import WorkspaceNav from "@/components/workspace/WorkspaceNav";
 import { OnboardingProgressStrip } from "./$id/onboarding/OnboardingProgressStrip";
 import type { OnboardingLoaderData } from "./$id/onboarding.loader.server";
-import { workspacePanelHeightLgClass } from "@/components/workspace/workspace-panel-classes";
+import {
+  workspacePanelHeightLgClass,
+  workspaceViewportHeightLgClass,
+} from "@/components/workspace/workspace-panel-classes";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -141,9 +144,14 @@ function WorkspaceResolvedView({
   // "Leave Campaign" is the only way off the page (#1313) — no "Add
   // credits" link here that would bypass that.
   const isCallScreen = location.pathname.endsWith("call");
+  const isChatsScreen = /\/chats(?:\/|$)/.test(location.pathname);
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
+    <div
+      className={`flex flex-col gap-4 lg:flex-row lg:items-stretch ${
+        isChatsScreen ? `${workspaceViewportHeightLgClass} lg:min-h-0` : ""
+      }`}
+    >
       {showSidebar ? (
         <WorkspaceNav
           workspace={workspace}
@@ -157,7 +165,9 @@ function WorkspaceResolvedView({
       <main
         id="workspace-main-content"
         tabIndex={-1}
-        className="flex min-w-0 flex-1 flex-col gap-4 focus:outline-none"
+        className={`flex min-w-0 flex-1 flex-col gap-4 focus:outline-none ${
+          isChatsScreen ? "lg:min-h-0" : ""
+        }`}
       >
         {showLowCreditBanner && liveCredits <= 0 ? (
           <Alert variant="destructive">
@@ -190,7 +200,11 @@ function WorkspaceResolvedView({
           </Alert>
         ) : null}
         <div
-          className={`min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ${workspacePanelHeightLgClass} lg:overflow-y-auto`}
+          className={
+            isChatsScreen
+              ? "flex min-h-0 min-w-0 flex-1 flex-col lg:overflow-visible"
+              : `min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ${workspacePanelHeightLgClass} lg:overflow-y-auto`
+          }
         >
           {!outlet ? (
             <div className="space-y-4">
