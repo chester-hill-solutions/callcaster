@@ -14,7 +14,6 @@ import { Heading, Text } from "@/components/ui/typography";
 
 
 
-import { MdCached, MdCheckCircle, MdError } from "react-icons/md";
 import { Section, SectionHeader } from "@/components/shared/Section";
 import {
   Accordion,
@@ -39,7 +38,6 @@ type LoaderData = {
   userRole: MemberRole;
   users: UserWithRole[];
   activeUserId: string;
-  phoneNumbers: WorkspaceNumbers[];
   pendingInvites: PendingInvitationRow[];
   webhook: WorkspaceWebhook;
   hasAccess: boolean;
@@ -54,14 +52,6 @@ type LoaderData = {
   }[];
 }
 
-type WorkspaceNumbers = {
-  id: string;
-  phone_number: string;
-  capabilities: {
-    verification_status: 'success' | 'failed' | 'pending';
-  };
-};
-
 export default function WorkspaceSettings() {
   const outlet = useOutlet();
   const {
@@ -71,7 +61,6 @@ export default function WorkspaceSettings() {
     userRole,
     users,
     activeUserId,
-    phoneNumbers,
     pendingInvites,
     webhook,
     workspace,
@@ -281,58 +270,6 @@ export default function WorkspaceSettings() {
             )}
           </div>
         </div>
-      </Section>
-
-      <Section variant="flat">
-        <SectionHeader
-          branded={false}
-          compact
-          title="Phone numbers"
-          actions={
-            hasAccess ? (
-              <Button asChild size="sm" variant="outline">
-                <NavLink to="./numbers" relative="path">
-                  Manage numbers
-                </NavLink>
-              </Button>
-            ) : undefined
-          }
-        />
-        {phoneNumbers?.length ? (
-          <ul className="divide-y divide-border">
-            {phoneNumbers.map((number) => {
-              if (!number) return null;
-              return (
-                <li
-                  key={number.id}
-                  className="flex items-center justify-between gap-4 py-3"
-                >
-                  <p className="font-medium">{number.phone_number}</p>
-                  <div>
-                    {number.capabilities?.verification_status === "success" ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="text-xs uppercase">Verified</span>
-                        <MdCheckCircle className="text-emerald-600" size={20} />
-                      </div>
-                    ) : number.capabilities?.verification_status === "failed" ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="text-xs uppercase">Failed</span>
-                        <MdError className="text-destructive-text" size={20} />
-                      </div>
-                    ) : number.capabilities?.verification_status === "pending" ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="text-xs uppercase">Pending</span>
-                        <MdCached size={20} />
-                      </div>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <Text variant="muted">No phone numbers configured yet.</Text>
-        )}
       </Section>
 
       {hasAccess ? (

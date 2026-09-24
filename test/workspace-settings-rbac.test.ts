@@ -21,7 +21,6 @@ const settingsPageMocks = vi.hoisted(() => ({
     workspace: { id: "w1", name: "Acme" },
     userRole: "member",
     users: [],
-    phoneNumbers: [],
     pendingInvites: [],
     webhook: null,
     hasAccess: true,
@@ -229,7 +228,6 @@ describe("workspace settings RBAC", () => {
         workspace: { id: "w1", name: "Acme" },
         userRole: "owner",
         users: [],
-        phoneNumbers: [],
         pendingInvites: [],
         webhook: null,
         hasAccess: true,
@@ -257,7 +255,6 @@ describe("workspace settings RBAC", () => {
           "grantableApiKeyScopes",
           "hasAccess",
           "pendingInvites",
-          "phoneNumbers",
           "userRole",
           "users",
           "webhook",
@@ -270,10 +267,10 @@ describe("workspace settings RBAC", () => {
     });
   });
 
-  describe("settings/numbers loader", () => {
+  describe("phone-numbers loader", () => {
     test("returns 404 for non-members", async () => {
       dbMocks.requireWorkspaceAccess.mockRejectedValue(new Error("Workspace not found"));
-      const mod = await import("../app/routes/workspaces+/$id/settings/numbers.loader.server");
+      const mod = await import("../app/routes/workspaces+/$id/phone-numbers.loader.server");
 
       const res = await asRouteResponse(mod.loader(
           await withWorkspaceRouteArgs(

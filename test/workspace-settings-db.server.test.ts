@@ -8,11 +8,7 @@ const workspaceDbMocks = vi.hoisted(() => ({
   listWorkspaceApiKeyRows: vi.fn(),
 }));
 
-const tdbMocks = vi.hoisted(() => ({
-  workspace_number: {
-    findMany: vi.fn(),
-  },
-}));
+const tdbMocks = vi.hoisted(() => ({}));
 
 describe("app/lib/workspace-settings-db.server.ts", () => {
   beforeEach(() => {
@@ -20,7 +16,6 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
     for (const fn of Object.values(workspaceDbMocks)) {
       fn.mockReset();
     }
-    tdbMocks.workspace_number.findMany.mockReset();
     workspaceDbMocks.listWorkspaceApiKeyRows.mockResolvedValue([]);
     vi.doMock("@/lib/workspace-members-db.server", () => workspaceDbMocks);
     vi.doMock("@/server/tenant-db", () => ({
@@ -52,13 +47,6 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
         role: "caller",
       },
     ]);
-    tdbMocks.workspace_number.findMany.mockResolvedValueOnce([
-      {
-        id: 1,
-        phone_number: "+15550001111",
-        capabilities: { verification_status: "success" },
-      },
-    ]);
     workspaceDbMocks.listWorkspaceInvitesEnriched.mockResolvedValueOnce([
       {
         id: "inv1",
@@ -82,7 +70,6 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
         { id: "u1", username: "owner@example.com", role: "owner" },
         { id: "u2", username: "caller@example.com", role: "caller" },
       ],
-      phoneNumbers: [{ id: 1, phone_number: "+15550001111" }],
       pendingInvites: [
         expect.objectContaining({
           id: "inv1",
@@ -108,7 +95,6 @@ describe("app/lib/workspace-settings-db.server.ts", () => {
         role: "caller",
       },
     ]);
-    tdbMocks.workspace_number.findMany.mockResolvedValueOnce([]);
     workspaceDbMocks.listWorkspaceInvitesEnriched.mockResolvedValueOnce([]);
     workspaceDbMocks.getWorkspaceWebhookRow.mockResolvedValueOnce(null);
 

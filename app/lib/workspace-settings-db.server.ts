@@ -23,9 +23,6 @@ export type WorkspaceSettingsPageData = {
   workspace: { id: string; name: string | null };
   userRole: MemberRole | undefined;
   users: UserWithRole[];
-  phoneNumbers: Awaited<
-    ReturnType<ReturnType<typeof createTenantDb>["workspace_number"]["findMany"]>
-  >;
   pendingInvites: PendingInvitationRow[];
   webhook: WorkspaceWebhook | null;
   hasAccess: boolean;
@@ -57,9 +54,8 @@ export async function getWorkspaceSettingsPageData(
   }
 
   const tdb = createTenantDb(workspaceId);
-  const [members, phoneNumbers, pendingInvites, webhookRow] = await Promise.all([
+  const [members, pendingInvites, webhookRow] = await Promise.all([
     listWorkspaceMembersEnriched(workspaceId),
-    tdb.workspace_number.findMany(),
     listWorkspaceInvitesEnriched(workspaceId),
     getWorkspaceWebhookRow(workspaceId, tdb),
   ]);
@@ -81,7 +77,6 @@ export async function getWorkspaceSettingsPageData(
     workspace: { id: workspace.id, name: workspace.name },
     userRole,
     users,
-    phoneNumbers,
     pendingInvites: pendingInvites.map((invite) => ({
       ...invite,
       user: invite.user ?? null,

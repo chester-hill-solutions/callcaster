@@ -2,13 +2,13 @@ import { useCallback } from "react";
 import { useFetcher } from "react-router";
 import type { RoutingPresetSubmission } from "@/components/phone-numbers/NumberSummaryList";
 
-function numbersSettingsActionPath(workspaceId: string): string {
-  return `/workspaces/${workspaceId}/settings/numbers`;
+function phoneNumbersActionPath(workspaceId: string): string {
+  return `/workspaces/${workspaceId}/phone-numbers`;
 }
 
 export function useWorkspaceNumberSettingsMutations(workspaceId: string) {
   const fetcher = useFetcher();
-  const actionPath = numbersSettingsActionPath(workspaceId);
+  const actionPath = phoneNumbersActionPath(workspaceId);
   const isBusy = fetcher.state !== "idle";
 
   const submit = useCallback(

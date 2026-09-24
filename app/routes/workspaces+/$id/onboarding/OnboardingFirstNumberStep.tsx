@@ -513,8 +513,8 @@ export function OnboardingFirstNumberStep({
 
           <p className="text-sm text-muted-foreground">
             Manage numbers later in{" "}
-            <Link className="underline" to={`/workspaces/${workspaceId}/settings/numbers`}>
-              Settings
+            <Link className="underline" to={`/workspaces/${workspaceId}/phone-numbers`}>
+              Phone Numbers
             </Link>
             .
           </p>

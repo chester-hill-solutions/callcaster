@@ -210,7 +210,7 @@ function buildPhoneNumberStep(
         "Rent or connect an outbound phone number so this campaign can place calls or send messages. Renting a number also lets you set up inbound call routing and handset ringing for it.",
       action: {
         type: "link",
-        href: `/workspaces/${workspaceId}/settings/numbers/purchase`,
+        href: `/workspaces/${workspaceId}/phone-numbers/purchase`,
         label: "Get a number",
       },
     };

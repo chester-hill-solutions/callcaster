@@ -20,7 +20,6 @@ export const loader = defineLoader({
         userRole: settings.userRole,
         users: settings.users,
         activeUserId: user.id,
-        phoneNumbers: settings.phoneNumbers,
         pendingInvites: settings.pendingInvites,
         webhook: settings.webhook,
         hasAccess: settings.hasAccess,

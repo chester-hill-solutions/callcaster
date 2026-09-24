@@ -54,7 +54,7 @@ export function ServiceAddressGate({
   const isSaving = pendingAction === "save_service_address";
   const isReviewing = pendingAction === "review_emergency_voice";
   const returnPath =
-    returnTo ?? `/workspaces/${workspaceId}/settings/numbers`;
+    returnTo ?? `/workspaces/${workspaceId}/phone-numbers`;
   const showForm = !complete || isEditing;
 
   return (
