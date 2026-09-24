@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { reactRouter } from "@react-router/dev/vite";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
@@ -45,17 +45,21 @@ function clientExcludePostgres(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [
-    tailwindcss(),
-    clientExcludePostgres(),
-    resolveAppModuleSuffix(".server"),
-    resolveAppModuleSuffix(".client"),
-    reactRouter(),
-    tsconfigPaths({ projects: ["./tsconfig.json"] }),
-  ],
-  server: {
-    host: "127.0.0.1",
-    port: Number(process.env.PORT ?? 3000),
-  },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "VITE_");
+
+  return {
+    plugins: [
+      tailwindcss(),
+      clientExcludePostgres(),
+      resolveAppModuleSuffix(".server"),
+      resolveAppModuleSuffix(".client"),
+      reactRouter(),
+      tsconfigPaths({ projects: ["./tsconfig.json"] }),
+    ],
+    server: {
+      host: env.VITE_DEV_HOST || "127.0.0.1",
+      port: Number(process.env.PORT ?? 3000),
+    },
+  };
 });
