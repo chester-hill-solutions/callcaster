@@ -58,7 +58,7 @@ describe("app/routes/signup.tsx", () => {
     expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
   });
 
-  test("#2013: centers the layout and uses the sign-in card width and padding", async () => {
+  test("#2013: uses the shared auth layout and sign-in card width", async () => {
     const mod = await import("../../app/routes/signup");
     const router = createMemoryRouter(
       [
@@ -72,14 +72,12 @@ describe("app/routes/signup.tsx", () => {
     );
     const { container } = render(createElement(RouterProvider, { router }));
 
-    await screen.findByText("Create Account");
+    await screen.findByRole("heading", { level: 1, name: "Sign Up" });
 
     const main = container.querySelector("main");
-    expect(main).toHaveClass("justify-center", "py-12");
-    expect(main).not.toHaveClass("py-8");
-    // The card drops the max-w-md wrapper and py-2 override, so it renders
-    // at the AuthCard default width (max-w-xl) with default padding — the
-    // same box the sign-in page uses.
+    expect(main).toHaveClass("w-full", "flex-1", "justify-center", "py-8");
+    expect(main).not.toHaveClass("min-h-screen");
+    // The form uses one centered max-w-xl wrapper, matching the sign-in page.
     expect(container.querySelector(".max-w-md")).toBeNull();
     expect(container.querySelector("main .max-w-xl")).not.toBeNull();
   });
