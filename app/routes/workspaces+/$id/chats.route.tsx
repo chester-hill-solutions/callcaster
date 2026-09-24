@@ -3,7 +3,6 @@ export { action } from "./chats.action.server";
 
 import { Outlet, useRouteError } from "react-router";
 import type { MetaFunction } from "react-router";
-import { workspaceViewportHeightClass } from "@/components/workspace/workspace-panel-classes";
 import {
   Sheet,
   SheetContent,
@@ -60,7 +59,7 @@ export default function ChatsList() {
 
   return (
     <main
-      className={`flex min-h-[68vh] w-full flex-col gap-4 md:flex-row lg:min-h-0 ${workspaceViewportHeightClass}`}
+      className="flex min-h-[68vh] w-full flex-col gap-4 md:flex-row lg:h-full lg:min-h-0"
     >
       <div
         className="hidden flex-col overflow-hidden rounded-lg border border-border/80 md:flex md:max-w-[40%] md:basis-2/5 lg:h-full lg:min-h-0"
