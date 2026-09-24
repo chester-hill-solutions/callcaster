@@ -93,6 +93,6 @@ describe("signup closed state width", () => {
     });
     const signupSource = Object.values(source)[0];
     expect(signupSource).not.toContain("min-w-[400px]");
-    expect(signupSource).toContain("max-w-md");
+    expect(signupSource).toContain("max-w-xl");
   });
 });
