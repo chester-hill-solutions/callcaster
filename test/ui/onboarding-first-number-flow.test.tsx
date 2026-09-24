@@ -43,9 +43,17 @@ function renderFlow(step = "", overrides: Partial<Props> = {}) {
   return { router, props };
 }
 
-describe("guided phone setup (#1205, #1764)", () => {
+describe("guided phone setup (#1205, #1763, #1764)", () => {
   test("starts with a choice, then verifies without collecting a service address", async () => {
     renderFlow();
+    const initialNav = await screen.findByRole("navigation", { name: "Phone number setup" });
+    expect(within(initialNav).getByRole("link", { name: "1. Choose a method" })).toHaveClass(
+      "underline",
+    );
+    expect(within(initialNav).queryByRole("link", { name: "2. Add your number" })).toBeNull();
+    expect(within(initialNav).getByText("2. Add your number")).toHaveClass(
+      "text-muted-foreground",
+    );
     fireEvent.click(await screen.findByRole("link", { name: "Use an existing number" }));
     expect(await screen.findByLabelText("Your phone number")).toBeEnabled();
     const setupNav = screen.getByRole("navigation", { name: "Phone number setup" });
@@ -56,6 +64,10 @@ describe("guided phone setup (#1205, #1764)", () => {
     expect(within(setupNav).queryByText(/Service address/)).toBeNull();
     expect(within(setupNav).getByText("3. Review your number")).not.toHaveAttribute(
       "aria-current",
+    );
+    expect(within(setupNav).getByRole("link", { name: "2. Verify your number" })).toHaveAttribute(
+      "href",
+      `${basePath}?step=first_number&numberStep=verify`,
     );
     expect(screen.queryByLabelText("Street address")).toBeNull();
     expect(screen.queryByRole("group", { name: "Rent a Canadian number" })).toBeNull();
@@ -78,6 +90,11 @@ describe("guided phone setup (#1205, #1764)", () => {
     expect(within(setupNav).getByText("4. Review your number")).not.toHaveAttribute(
       "aria-current",
     );
+    expect(within(setupNav).getByRole("link", { name: "2. Service address" })).toHaveAttribute(
+      "href",
+      `${basePath}?step=first_number&numberStep=address`,
+    );
+    expect(within(setupNav).queryByRole("link", { name: "3. Rent a number" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Rent a Canadian number" })).toBeNull();
     fireEvent.change(screen.getByLabelText(/Street address/), { target: { value: "123 Main St" } });
     fireEvent.change(screen.getByLabelText(/City/), { target: { value: "Toronto" } });
@@ -91,6 +108,10 @@ describe("guided phone setup (#1205, #1764)", () => {
     expect(within(setupNav).getByText("3. Rent a number")).toHaveAttribute(
       "aria-current",
       "step",
+    );
+    expect(within(setupNav).getByRole("link", { name: "3. Rent a number" })).toHaveAttribute(
+      "href",
+      `${basePath}?step=first_number&numberStep=rent`,
     );
     const billing = screen.getByRole("link", { name: /Buy credits/i });
     const billingUrl = new URL(billing.getAttribute("href") ?? "", "http://localhost");

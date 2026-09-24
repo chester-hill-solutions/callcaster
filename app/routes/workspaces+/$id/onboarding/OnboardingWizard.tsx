@@ -374,7 +374,7 @@ export function OnboardingWizard({
             {activeStep === "first_number" && !hasFirstNumber && !isReadOnly ? (
               <Form method="post">
                 <input type="hidden" name="_action" value="skip_first_number" />
-                <Button type="submit" variant="ghost" disabled={isFormSubmitting}>
+                <Button type="submit" variant="outline" disabled={isFormSubmitting}>
                   Skip for now
                 </Button>
               </Form>
