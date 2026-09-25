@@ -46,6 +46,41 @@ vi.mock("@/hooks/utils", async (importOriginal) => {
 const imageFetcher = createMockFetcher({ state: "idle", data: undefined });
 const olderFetcher = createMockFetcher({ state: "idle" });
 
+/**
+ * Loader data is built ONCE, not per call.
+ *
+ * `useChatRealTime` (app/hooks/realtime/useChatRealtime.ts) synchronises local
+ * state from the loader list with `useEffect(..., [initial])` — an
+ * ARRAY-IDENTITY dependency, which is correct because the real
+ * `useLoaderData()` returns a stable object for the lifetime of a navigation.
+ *
+ * Building this object inside the mock instead made every call return a fresh
+ * array, so the effect re-fired on every render, `setMessages` produced a new
+ * render, the next call produced another new array, and the test spun in an
+ * unbounded render loop: measured at 4.20 GB peak RSS and 6m04s, finishing 1
+ * of 3 tests before the worker was killed. That is the same failure the `ui`
+ * suite shows in CI as `148 passed (149)` / `907 passed (910)`.
+ *
+ * The fixed timestamp matters for the same reason as the hoisting: a stable
+ * array holding a fresh `new Date()` would still be a new object per call.
+ */
+const LOADER_DATA = {
+  messages: [
+    {
+      sid: "m1",
+      body: "hi",
+      date_created: "2026-01-01T00:00:00.000Z",
+      status: "received",
+      direction: "inbound",
+      from: "+1",
+      to: "+2",
+    },
+  ],
+  hasMore: false,
+  contact_number: "+15551234567",
+  optOutKeywords: ["stop"],
+} as const;
+
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
   return {
@@ -54,12 +89,7 @@ vi.mock("react-router", async () => {
       if (key === "images") return imageFetcher;
       return olderFetcher;
     },
-    useLoaderData: () => ({
-      messages: [{ sid: "m1", body: "hi", date_created: new Date().toISOString(), status: "received", direction: "inbound", from: "+1", to: "+2" }],
-      hasMore: false,
-      contact_number: "+15551234567",
-      optOutKeywords: ["stop"],
-    }),
+    useLoaderData: () => LOADER_DATA,
     useParams: () => ({ contact_number: encodeURIComponent("+15551234567") }),
     useLocation: () => ({ pathname: "/workspaces/ws/chats/+15551234567" }),
   };
