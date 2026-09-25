@@ -3,7 +3,7 @@ export { action } from "./settings.action.server";
 
 import TeamMember, { MemberRole } from "@/components/workspace/TeamMember";
 
-import { ActionFunctionArgs, LoaderFunctionArgs , Form, Link, NavLink, Outlet, useSearchParams, useActionData, useLoaderData, useOutlet, useOutletContext } from "react-router";
+import { ActionFunctionArgs, LoaderFunctionArgs , Form, NavLink, Outlet, useSearchParams, useActionData, useLoaderData, useOutlet, useOutletContext } from "react-router";
 import type { MetaFunction } from "react-router";
 
 export const meta: MetaFunction = () => [{ title: "Settings — CallCaster" }];
@@ -164,23 +164,6 @@ export default function WorkspaceSettings() {
     </Form>
   );
 
-  const callerSelfDeleteForm = (
-    <Form method="POST" className="w-full">
-      <input type="hidden" name="formName" value="deleteSelf" />
-      <input type="hidden" name="user_id" value={activeUserId} />
-      <div className="flex w-full gap-2">
-        <Button className="flex-1" variant="destructive">
-          Quit This Workspace
-        </Button>
-        <Button asChild variant="outline" className="shrink-0">
-          <Link to=".." relative="path">
-            Back
-          </Link>
-        </Button>
-      </div>
-    </Form>
-  );
-
   if (outlet) {
     return <Outlet context={outletContext} />;
   }
@@ -265,9 +248,7 @@ export default function WorkspaceSettings() {
                 </p>
                 {addUserTabs}
               </>
-            ) : (
-              callerSelfDeleteForm
-            )}
+            ) : null}
           </div>
         </div>
       </Section>

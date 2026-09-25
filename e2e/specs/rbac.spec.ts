@@ -21,9 +21,8 @@ test.describe("RBAC @rbac @security", () => {
     await expect(page.getByRole("link", { name: "Exports" })).toHaveCount(0);
   });
 
-  callerTest("RBAC-03 caller settings limited", async ({ page }) => {
+  callerTest("RBAC-03 caller settings hide member management", async ({ page }) => {
     await page.goto(workspacePath(E2E_WORKSPACES.ready.id, "settings"));
-    await expect(page.getByText(/quit this workspace/i)).toBeVisible();
     await expect(page.getByText(/invite user/i)).toHaveCount(0);
   });
 
