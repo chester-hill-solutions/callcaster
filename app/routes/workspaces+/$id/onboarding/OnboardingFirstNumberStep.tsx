@@ -385,7 +385,7 @@ export function OnboardingFirstNumberStep({
             </div>
           ) : null}
           {hasFirstNumber ? (
-            <Alert>
+            <Alert variant="success">
               <AlertDescription>
                 {rentedCount > 0
                   ? `You have ${rentedCount} rented number${rentedCount === 1 ? "" : "s"} on this workspace.`
@@ -482,7 +482,7 @@ export function OnboardingFirstNumberStep({
 
           {/* Routing only after a rented number exists. */}
           {rentedNumbers.length > 0 && !isReadOnly ? (
-            <div className="space-y-2 border-t border-border/60 pt-6">
+            <div className="space-y-2 border-t border-border/60">
               <div>
                 <h3 className="font-medium">When someone calls your number</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
