@@ -47,7 +47,11 @@ export const action = defineAction({
       }
 
       case 'POST': {
-        const audienceId = data.audience_id != null ? Number(data.audience_id) : undefined;
+        const audienceIdValue =
+          typeof data.audience_id === "string"
+            ? data.audience_id.trim()
+            : data.audience_id;
+        const audienceId = audienceIdValue ? Number(audienceIdValue) : undefined;
         if (audienceId != null && !isNaN(audienceId)) {
           const audienceWorkspaceId = await findAudienceWorkspaceById(audienceId);
           if (audienceWorkspaceId !== workspaceId) {
@@ -58,12 +62,12 @@ export const action = defineAction({
             const bulkResult = await bulkCreateContacts(
               data.contacts,
               workspaceId,
-              data.audience_id,
+              audienceIdValue,
               user.id,
             );
           return routeData(bulkResult);
         } else {
-          const newContact = await createContact({ ...data, workspace: workspaceId }, data.audience_id, user.id, {
+          const newContact = await createContact({ ...data, workspace: workspaceId }, audienceIdValue, user.id, {
             assignDefaultAudienceIfMissing: data.assign_default_sms_audience === "true",
           });
           return routeData(newContact);
