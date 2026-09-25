@@ -37,7 +37,7 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
 export type ScriptEditorShellProps = {
   document: ScriptDocument;
   onChange: (doc: ScriptDocument) => void;
-  /** Author audio steps for a caller instead of form blocks for an agent. */
+  /** Author audio steps for a recipient instead of form blocks for an agent. */
   audioFlow?: boolean;
   mediaNames?: string[];
   audioPreviewUrl?: (fileName: string) => string;
@@ -335,7 +335,7 @@ export function ScriptEditorShell({
                 {editor.activePage.blockIds.length === 0 ? (
                   <p className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
                     {audioFlow
-                      ? "Add a step to this page. Callers hear steps in order."
+                      ? "Add a step to this page. Recipients hear steps in order."
                       : "Add a block to this page."}
                   </p>
                 ) : (

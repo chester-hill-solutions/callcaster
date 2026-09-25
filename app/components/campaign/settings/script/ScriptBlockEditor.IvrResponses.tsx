@@ -28,7 +28,7 @@ export type IvrResponsesEditorProps = {
 };
 
 /**
- * Caller responses for one IVR step. Each row is what the runtime's Gather
+ * Recipient responses for one IVR step. Each row is what the runtime's Gather
  * matches (`value`: a keypad digit, or any spoken reply), how the answer is
  * labelled in results, and where the call goes next.
  */
@@ -45,7 +45,7 @@ export function IvrResponsesEditor({
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold">Caller responses</span>
+        <span className="text-sm font-semibold">Recipient responses</span>
         {!readOnly && (
           <Button type="button" size="sm" variant="outline" onClick={onOptionAdd}>
             Add response
@@ -98,7 +98,7 @@ function IvrResponseRow({
 
   return (
     <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3 sm:grid-cols-[repeat(3,minmax(0,1fr))_auto] sm:items-end">
-      <FormField label="Caller answers with" htmlFor={keyId}>
+      <FormField label="Recipient answers with" htmlFor={keyId}>
         <Select
           value={value}
           disabled={readOnly}

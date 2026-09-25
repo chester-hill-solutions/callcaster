@@ -43,7 +43,7 @@ export type IvrStepFieldsProps = {
 };
 
 /**
- * The audio half of an IVR step: what plays to the caller, and how.
+ * The audio half of an IVR step: what plays to the recipient, and how.
  *
  * Two modes map onto the runtime's two verbs — a spoken step becomes
  * `<Say>` of the step's text in the chosen voice, a recording step becomes
@@ -124,7 +124,7 @@ export function IvrStepFields({
   return (
     <div className="grid gap-3 rounded-md border border-border bg-muted/30 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-semibold">What the caller hears</span>
+        <span className="text-sm font-semibold">What the recipient hears</span>
         <div role="group" aria-label="Playback mode" className="flex gap-1">
           <Button
             type="button"
@@ -190,7 +190,7 @@ export function IvrStepFields({
 
 /**
  * Per-step no-input behavior (#1883): how long to wait for a keypress and what
- * to do when the caller stays silent. Writes `gatherTimeoutSeconds` +
+ * to do when the recipient stays silent. Writes `gatherTimeoutSeconds` +
  * `noInput` straight onto the block; the wire model is
  * `ivr-block-runtime.server.ts`'s `IvrNoInputConfig`.
  */
@@ -235,7 +235,7 @@ function NoInputFields({
 
   return (
     <div className="grid gap-2 rounded-md border border-border bg-muted/30 p-3">
-      <span className="text-sm font-semibold">If the caller stays silent</span>
+      <span className="text-sm font-semibold">If the recipient stays silent</span>
 
       <FormField label="Wait (seconds)" htmlFor={timeoutId}>
         <Input
@@ -360,7 +360,7 @@ function SpokenStepFields({
       <FormField
         label="Speech text"
         htmlFor={textId}
-        description="Read aloud to the caller in the selected voice."
+        description="Read aloud to the recipient in the selected voice."
       >
         <Textarea
           id={textId}
@@ -420,7 +420,7 @@ function SpokenStepFields({
       {isSilent && (
         <Alert variant="warning">
           <AlertDescription>
-            Callers hear nothing at this step yet. Enter the text to speak, or
+            Recipients hear nothing at this step yet. Enter the text to speak, or
             switch to a recording.
           </AlertDescription>
         </Alert>
@@ -505,7 +505,7 @@ function RecordingStepFields({
       {fileName.length === 0 && (
         <Alert variant="warning">
           <AlertDescription>
-            Choose or upload a recording, or callers hear nothing at this step.
+            Choose or upload a recording, or recipients hear nothing at this step.
           </AlertDescription>
         </Alert>
       )}
