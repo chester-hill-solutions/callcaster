@@ -223,4 +223,24 @@ describe("requireTwoFactorEnrollmentForPrivilegedUser (sudo path)", () => {
     ).resolves.toBeUndefined();
     delete process.env.NODE_ENV;
   });
+
+  test("DISABLE_2FA_ENFORCEMENT on QA short-circuits enforcement", () => {
+    const savedFeatureFlag = process.env.TWO_FACTOR_ENABLED;
+    process.env.TWO_FACTOR_ENABLED = "1";
+    process.env.DISABLE_2FA_ENFORCEMENT = "1";
+    process.env.NODE_ENV = "production";
+    process.env.RAILWAY_ENVIRONMENT_NAME = "qa";
+    try {
+      expect(isTwoFactorEnforcementDisabled()).toBe(true);
+    } finally {
+      if (savedFeatureFlag === undefined) {
+        delete process.env.TWO_FACTOR_ENABLED;
+      } else {
+        process.env.TWO_FACTOR_ENABLED = savedFeatureFlag;
+      }
+      delete process.env.DISABLE_2FA_ENFORCEMENT;
+      delete process.env.NODE_ENV;
+      delete process.env.RAILWAY_ENVIRONMENT_NAME;
+    }
+  });
 });

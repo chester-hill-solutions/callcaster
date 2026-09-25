@@ -42,14 +42,14 @@ function isNonProductionRailwayEnvironment(): boolean {
   }
   return (
     envName === "dev" ||
-    envName === "staging" ||
+    envName === "qa" ||
     envName.startsWith("callcaster-pr-")
   );
 }
 
 /**
  * Whether privileged-role 2FA enrollment / disable protection is turned off.
- * Honored in local dev, E2E, and non-production Railway envs (dev, staging, PR
+ * Honored in local dev, E2E, and non-production Railway envs (dev, QA, PR
  * previews). Never honored on Railway production.
  */
 export function isTwoFactorEnforcementDisabled(): boolean {

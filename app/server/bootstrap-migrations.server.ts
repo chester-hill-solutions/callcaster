@@ -8,7 +8,7 @@ import { logger } from "@/lib/logger.server";
  * Opt-in, forward-only replay of `client/migrations/*.sql` at boot.
  *
  * Why this exists: the Docker entrypoint only starts the app — it never applies
- * the raw SQL migrations. Persistent environments (dev/staging/production) had
+ * the raw SQL migrations. Persistent environments (dev/QA/production) had
  * their ledger applied once by hand, but every ephemeral PR-preview environment
  * gets a fresh database that has none of them, so the app crashes on the
  * `assertRequiredDbFunctions` guard ("Required database function is missing:
@@ -17,7 +17,7 @@ import { logger } from "@/lib/logger.server";
  *
  * Safety — three independent interlocks so this can never touch the wrong DB:
  *   1. Off by default. Only runs when RUN_CLIENT_MIGRATIONS_ON_BOOT is "1"/"true".
- *      Every Railway environment (dev, staging, production) sets it via
+ *      Every Railway environment (dev, QA, production) sets it via
  *      .railway/environments/*.ts, so a merged migration reaches each database
  *      on the next deploy of that environment (#1477). Local and test runs
  *      leave it unset.
@@ -46,7 +46,7 @@ const E2E_SEED_TRACKING_TABLE = "e2e_seed_bootstrap";
 const E2E_SEED_SCRIPT = path.join("scripts", "e2e", "seed-database.mjs");
 // Managed (non-ephemeral) Railway environments. The image sets NODE_ENV=prod
 // everywhere, so RAILWAY_ENVIRONMENT_NAME is the truthful selector.
-const MANAGED_ENV_NAMES = new Set(["production", "staging", "dev"]);
+const MANAGED_ENV_NAMES = new Set(["production", "qa", "dev"]);
 /**
  * Session advisory lock key held for the whole bootstrap pass. Two instances
  * booting at once (overlapping deploy, extra replica) would otherwise both
@@ -91,7 +91,7 @@ export function bootstrapEnabled(env: NodeJS.ProcessEnv = process.env): boolean 
 /**
  * E2E fixture seeding is a second opt-in layered on the ephemeral bootstrap
  * (E2E_SEED_ON_BOOT). It only ever fires for unmanaged Railway preview
- * environments — never local, dev, staging, or production.
+ * environments — never local, dev, QA, or production.
  */
 export function e2eSeedEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   const value = env.E2E_SEED_ON_BOOT;
@@ -271,7 +271,7 @@ async function applyClientMigrations(
 
 /**
  * Opt-in E2E fixture seeding for ephemeral previews. Never for local, dev,
- * staging, or production; idempotent via the marker table; a failed seed does
+ * QA, or production; idempotent via the marker table; a failed seed does
  * not block boot (no marker is written so a later boot retries).
  */
 async function decideSeed(
