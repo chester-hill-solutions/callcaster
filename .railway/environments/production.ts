@@ -1,5 +1,5 @@
 import { bucket, postgres, service, volume } from "railway/iac";
-import { preservedVariables, source } from "../config/shared.js";
+import { preservedVariables, source } from "../config/shared.ts";
 
 const appVariables = [
   "BASE_URL",
