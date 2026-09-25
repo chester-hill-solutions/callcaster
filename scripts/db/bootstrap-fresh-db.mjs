@@ -120,6 +120,7 @@ const steps = [
   "client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql",
   "client/migrations/20260920120200_rewrite_last_access_actor.sql",
   "client/migrations/20260922120000_gate_campaign_completion_on_settled_calls.sql",
+  "client/migrations/20260925140000_index_message_date_sent_backfill.sql",
 ];
 
 /**
