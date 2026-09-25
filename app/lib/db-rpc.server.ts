@@ -184,6 +184,32 @@ export async function rpcTryCompleteCampaignIfDrained(
   return rows[0]?.completed ?? false;
 }
 
+/**
+ * Campaigns in this workspace whose completion gate is currently refusing
+ * because at least one message is unsettled at the provider (#2048).
+ *
+ * The settled/pending rule lives in SQL so there is exactly one definition of
+ * it — see campaign_ids_with_unsettled_messages in the #2048 migration. Do not
+ * re-derive this filter in TypeScript: `status NOT IN (...)` silently drops
+ * NULL rows, which is how a NULL-status campaign first became permanently
+ * invisible to the recovery sweep while still being blocked by the gate.
+ *
+ * Returns campaign ids as numbers, oldest-stranded-message first, capped at
+ * `limit` DISTINCT campaigns (a campaign holding tens of thousands of unsettled
+ * rows cannot crowd others out).
+ */
+export async function rpcCampaignIdsWithUnsettledMessages(
+  executor: RpcExecutor,
+  workspaceId: string,
+  limit = 200,
+): Promise<number[]> {
+  const rows = await queryRows<{ campaign_id: number }>(
+    executor,
+    sql`select campaign_id from campaign_ids_with_unsettled_messages(${workspaceId}, ${limit})`,
+  );
+  return rows.map((row) => Number(row.campaign_id));
+}
+
 export async function rpcCreateOutreachAttempt(
   executor: RpcExecutor,
   args: {

@@ -271,6 +271,14 @@ export async function campaignDispatchHandler(
   // campaign stuck "running" with an undrained queue. Only active/queued
   // states move to complete; paused/draft/archived/complete keep the status
   // the user chose.
+  //
+  // Known gap: this writes `complete` without the settled-message gate (#2048),
+  // so an expired message campaign can still read complete while Twilio holds
+  // unsettled messages. Routing it through try_complete_campaign_if_drained
+  // would re-break the anti-stuck behaviour above, because that RPC also needs
+  // an empty queue — the exact state this path exists to escape. Deciding
+  // whether "expired" means "complete" or "cancel the remainder, then settle"
+  // is a product call, tracked on #2048.
   if (
     campaignRecord.end_date &&
     new Date(campaignRecord.end_date) < new Date()
