@@ -32,6 +32,12 @@ vi.mock("@/components/ui/select", () => ({
   ),
 }));
 
+// Stable, like the real hook: `useFetcher` returns one object for the life of
+// the route. `AgentDesktop` puts the whole fetcher in a useCallback dep
+// (`app/components/agent/AgentDesktop.tsx:79`), so a per-call object rebuilds
+// that callback every render (#2054).
+const STABLE_FETCHER = { submit: vi.fn() };
+
 vi.mock("react-router", () => ({
   Link: ({ children, to, ...props }: any) => (
     <a href={typeof to === "string" ? to : "/"} {...props}>
@@ -52,7 +58,7 @@ vi.mock("react-router", () => ({
     userId: "u1",
   }),
   useNavigate: () => vi.fn(),
-  useFetcher: () => ({ submit: vi.fn() }),
+  useFetcher: () => STABLE_FETCHER,
   useOutletContext: () => ({ env: { BASE_URL: "http://localhost" } }),
 }));
 
