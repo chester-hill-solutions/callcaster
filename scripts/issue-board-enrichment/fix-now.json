@@ -1,5 +1,200 @@
 [
   {
+    "issueNumber": 2053,
+    "verdict": "fix-now",
+    "recommendedTitle": "E2E gate is red on master and every branch: docker compose pull hits Docker Hub anonymous rate limiting",
+    "summary": "The E2E gate fails within ~1s of starting, at the image-pull step, before any app code runs. Log from master run 36103098899: 'postgres Pulling / inbucket Pulling / minio Pulling / minio Error unauthorized: access to the requested resource is not authorized / postgres Interrupted / inbucket Interrupted / Error response from daemon: unauthorized'. The two 'Interrupted' lines are compose aborting the other pulls once one fails. All ten most recent E2E runs are failures, including master, and it reproduced on #2055 too. Zero storage/minio/s3/presign content in any recent diff, so no branch change can be the cause. CORRECTION (my first version of this record was wrong): the three images are NOT all from Docker Hub. postgres is postgres:18-alpine (Docker Hub), inbucket is inbucket/inbucket:latest (Docker Hub), but minio is quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z-cpuv1 (QUAY), pinned on purpose with the in-file comment 'Pin a published Quay image; Docker Hub's moving latest tag is unavailable in CI.' So the original suggested fix of logging in to Docker Hub would NOT have fixed the MinIO pull.",
+    "currentBehavior": "The gate measures nothing. A red E2E check carries no information and is indistinguishable from a real regression.",
+    "rootCause": "'Error response from daemon: unauthorized' is the DOCKER DAEMON, not MinIO — the MinIO service never starts, so no MinIO credential can be wrong. Credentials are in fact consistent (docker-compose.dev.yml:43-44 and scripts/e2e/ensure-minio-bucket.mjs:25-26 both use callcaster/callcaster-dev-secret), and the runner is GitHub-hosted so there is no stale volume. What remains is anonymous image-pull rate limiting on the shared GitHub-hosted runner IP pool. The failure names minio on every run, consistent with the QUAY pull being refused, since Quay enforces its own anonymous quota. It depends on shared runner IP reputation, not on the commit, which is why master and every branch fail identically. Note a prior fix attempt already moved MinIO off Docker Hub to Quay to dodge a moving-latest problem; that fixed the tag but not the rate limit.",
+    "resolution": "Do NOT spend effort on the MinIO pull: #1800 replaces MinIO with Stow, a Docker-free S3-compatible service, which removes that image pull from the compose step entirely, and that work is in progress. Scope this ticket to what Stow leaves behind — postgres and inbucket, both Docker Hub. Preferred: mirror both to GHCR (ghcr.io/chester-hill-solutions/postgres-18-alpine and .../inbucket) and repoint docker-compose.dev.yml, because GHCR has no anonymous per-IP limit so it removes the class of failure and needs no CI credentials. Interim alternative: docker/login-action with secrets.DOCKERHUB_USERNAME plus a read-scoped DOCKERHUB_TOKEN in the job running npm run test:e2e:compose — but that only helps postgres/inbucket and must be paired with Quay credentials or the MinIO pull stays broken until Stow lands. The retry loop in run-compose-e2e.mjs cannot help: rate limiting is a quota, not a transient fault.",
+    "lookIn": [
+      ".github/workflows/e2e.yml:40,55 (runs-on) and the test:e2e:compose step",
+      "docker-compose.dev.yml:12,36,49 (the three image sources — note line 36 is quay.io)",
+      "scripts/e2e/run-compose-e2e.mjs:20,57-58,84 (composeFile, up -d, ensure-minio-bucket)",
+      "scripts/e2e/ensure-minio-bucket.mjs:12-13,25-26 (endpoint and credentials)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "E2E gate passes on master from a GitHub-hosted runner",
+      "ten consecutive PRs with no image-pull failure"
+    ],
+    "acceptanceCriteria": [
+      "npm run test:e2e:compose passes on master from a GitHub-hosted runner",
+      "No image in docker-compose.dev.yml is pulled anonymously from a rate-limited registry",
+      "No image-pull failure across ten consecutive PR runs",
+      "If the gate is not required, that is recorded deliberately"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Fix now. Smallest change in the repo that restores a real signal from a gate that currently carries none. The quality job in ci.yml is unaffected because it does not pull these images, so E2E is the only broken gate. Found while triaging #2050."
+  },
+  {
+    "issueNumber": 2054,
+    "verdict": "fix-now",
+    "recommendedTitle": "test:ui worker OOMs on test/ui/hooks-chats.test.tsx intermittently, on every branch including master",
+    "summary": "The quality job fails with 'Error: [vitest-pool]: Worker forks emitted error' / 'Worker exited unexpectedly', always on test/ui/hooks-chats.test.tsx. That file never reports: 148 passed (149) and 907 passed (910). test:node passes 431/431 in the same job, so the node tier is unaffected. PROVEN environmental, not either diff: #2048 (PR 2050) and #2049 (PR 2055) are branches off the same origin/dev sharing ZERO application code (2048 rewrites a Postgres completion function; 2049 adds a message write guard), and both fail quality with a byte-identical signature — 148/149 files, 907/910 tests, worker exited unexpectedly. A transitive import walk from hooks-chats.test.tsx reaches none of the changed modules: the file is 163 lines with no application imports at all, only @testing-library/react, vitest, and four vi.mock() calls (logger.client, chats/messaging-client, hooks/utils, react-router).",
+    "currentBehavior": "A red quality check on unrelated PRs, with a non-deterministic result: bug/2010-auth-page-scrollbar failed at 15:12 and passed at 15:21; bug/2013-auth-form-alignment failed at 15:40 and passed at 15:57, with no code change in between. #2048 failed three times in a row, which looked like a real regression until an unrelated branch failed identically.",
+    "rootCause": "Runner memory pressure on the largest file in the UI suite, not a code regression. Two independent controls: (1) master run 36104746387 on 2026-09-25T06:51 passed 149/149 UI files at the base commit these branches are cut from, so the file is passable, and the failures cluster in the 16:00-18:00 window; (2) the same file OOMs reproducibly on a developer laptop at 4.41GB resident with the working tree stashed, i.e. on clean dev with no diff. vitest.ui.config.ts uses pool forks, maxWorkers 2, isolate true; forks isolate address spaces but nothing caps a single worker's heap, and the default ceiling on a 7GB runner is reached before the OS intervenes.",
+    "resolution": "Preferred: set poolOptions.forks.execArgv ['--max-old-space-size=3072'] for the UI config. A deterministic ceiling turns a worker OOM into a readable heap error and keeps the file inside the runner's 7GB; test it against hooks-chats specifically. Better still: find why hooks-chats retains ~4GB (unremoved listeners, unmocked module graph, render loops that never unmount) and get it under its neighbours, since a bigger box hides the cause. Raising the runner is the bluntext option. Triage technique worth reusing: when a red gate might be yours, push any other server-only branch off the same base — if it fails the same way, the environment is the cause. That costs one CI run and settles it.",
+    "lookIn": [
+      "vitest.ui.config.ts (pool, maxWorkers, isolate)",
+      "test/ui/hooks-chats.test.tsx",
+      "test/setup.ui.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "npm run test:ui completes 149/149 on a GitHub-hosted runner",
+      "hooks-chats does not kill its worker under memory pressure",
+      "stable result on a clean dev checkout with no rerun"
+    ],
+    "acceptanceCriteria": [
+      "test:ui completes 149/149 on a GitHub-hosted runner",
+      "hooks-chats no longer kills its worker under memory pressure",
+      "No rerun needed for a stable result on a clean dev checkout",
+      "Any new heap ceiling is documented in vitest.ui.config.ts beside the setting with its reason"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Fix now. Repo rule is to rerun before diffing, which is right, but a rerun is not conclusive when the same commit is not deterministic — the auth-form-alignment pair is the proof. The check that settles it is running the BASE commit: master at 149/149. Risk of leaving it is the worst property a gate can have: a red check indistinguishable from a real regression, which trains reviewers to rerun until green. Found while triaging #2050."
+  },
+  {
+    "issueNumber": 2049,
+    "verdict": "fix-now",
+    "recommendedTitle": "Persist Twilio's send time: the recovery sweep fetches dateSent and discards it",
+    "summary": "The only automated source of the provider send time is the Twilio Message Resource, and the recovery sweep already reads it. app/lib/twilio-open-sync.server.ts:44 declares dateSent on ProviderMessage, :49 uses it only as a sort fallback, and the row write at :312-317 persists status/date_updated/error_code while omitting date_sent. Result: message.date_sent is NULL for all 23,503 outbound rows of the Lombardi blast. Joining a raw Twilio log export showed a gap of 378.6-464.7 minutes between our date_created and Twilio SentDate, median 439.8. CORRECTED PREMISE: the Twilio status callback does NOT carry a send timestamp (docs: 'MessageSid along with the other standard request parameters as well as MessageStatus and ErrorCode'), and the create response is null because a new message is still queued, so neither webhook nor send path can supply it.",
+    "currentBehavior": "A campaign message row never carries the provider-reported send time. The value is in memory at the moment of the sweep's row write and is discarded.",
+    "rootCause": "The sweep's write was built to drive status, date_updated and billing side effects. date_sent was never added to it, and OPEN_MESSAGE_STATUSES (accepted/scheduled/queued/sending) excludes every settled state, so a message that settles before the sweep observes it is never re-selected.",
+    "resolution": "Add date_sent to the existing updateMessageBySid call in twilio-open-sync.server.ts, writing remote.dateSent when present. Because the open-row sweep can never revisit a message that already settled, add a second bounded selection for rows with date_sent IS NULL in a settled status, oldest first, self-limiting once filled, and age-bounded so a message with no provider dateSent is abandoned instead of re-selected forever. Reuse the existing list prefetch and the canonical updateMessageBySid path. Never overwrite an existing date_sent and never infer it from date_created. Then surface send time separately from request time in the export (#1752).",
+    "lookIn": [
+      "app/lib/twilio-open-sync.server.ts:44,49,233-319",
+      "app/lib/message-db.server.ts:202-249",
+      "app/lib/worker/job-params.server.ts:52-56",
+      "app/lib/worker/handlers/cron.server.ts:73-107",
+      "app/db/schema.ts:390-420",
+      "app/lib/campaign-export.server.ts"
+    ],
+    "existingTests": [
+      "test/twilio-open-sync.server.test.ts",
+      "test/message-db.server.test.ts",
+      "test/sms-status-webhook.test.ts"
+    ],
+    "missingTests": [
+      "the open-row path writes date_sent",
+      "the settled-row backfill writes date_sent",
+      "a filled row is not re-selected",
+      "an existing date_sent is not overwritten",
+      "a message with no provider dateSent is abandoned after the age bound"
+    ],
+    "acceptanceCriteria": [
+      "Message row carries the provider-reported date_sent after the sweep runs",
+      "Messages that settle before any sweep observed them still receive a date_sent",
+      "A message with no provider dateSent is abandoned after the age bound, not re-selected forever",
+      "date_sent is never overwritten once written and never inferred from date_created",
+      "Backfill selection is bounded, self-limiting, and its cost is measured",
+      "Export can show send time separately from request time"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now. Audit trail for the #2048 settlement gate: that gate knows a message settled but not when. The one-line write is NOT sufficient on its own — verified that the open-row sweep can never revisit an already-settled message, so without the backfill selection the fix would appear to work while leaving the Lombardi data unfixed."
+  },
+  {
+    "issueNumber": 2048,
+    "verdict": "fix-now",
+    "recommendedTitle": "Block SMS campaign completion while messages are unsettled at Twilio",
+    "summary": "try_complete_campaign_if_drained gates completion on campaign_queue_has_pending_work + campaign_has_unsettled_calls — calls only. Message campaigns complete the instant the last queue row is dequeued, even with thousands of message rows still queued/sending at Twilio. Dequeue == handed-to-Twilio, not delivered. Lombardi (2026-09-24): 23,504 sends, 6,904 with provider error codes; export needed status reconciliation. Twilio open-sync already reconciles OPEN_MESSAGE_STATUSES (accepted/scheduled/queued/sending) — completion must run it and only then complete.",
+    "currentBehavior": "SMS campaign flips to 'complete' when campaign_queue has no pending rows, regardless of unsettled message rows at the provider.",
+    "rootCause": "campaign_has_unsettled_calls (added #1728/#2028 for IVR) has no message counterpart; campaign_queue_has_pending_work considers a row done at dequeue time.",
+    "resolution": "Add campaign_has_unsettled_messages(campaign_id) gating completion on non-terminal message statuses (OPEN_MESSAGE_STATUSES). Run twilio-open-sync before re-checking so no-terminal-callback messages are resolved/failed, not silently counted done. Keep IVR path unchanged. Route the dequeue-completion helpers through the settled gate.",
+    "lookIn": [
+      "client/migrations/20260922120000_gate_campaign_completion_on_settled_calls.sql",
+      "app/lib/twilio-open-sync.server.ts",
+      "app/lib/sms-status.ts",
+      "app/lib/campaign-queue-completion.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "integration: message row still queued => campaign not complete",
+      "integration: all settled (delivered/failed/undelivered) => complete",
+      "open-sync resolves a no-callback message to failed, then completion proceeds"
+    ],
+    "acceptanceCriteria": [
+      "SMS campaign with queued/sending messages is not complete",
+      "Settled campaign completes normally",
+      "No-callback messages resolved by open-sync, don't block forever",
+      "IVR completion unchanged"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Fix now; direct corollary of #1728's call gate, evidenced by the Lombardi blast statuses."
+  },
+  {
+    "issueNumber": 2047,
+    "verdict": "fix-now",
+    "recommendedTitle": "Warn when a message campaign has no end time on its send window",
+    "summary": "A message campaign with sms_send_window = null dispatches unrestricted (smsSendPolicy allowedWithoutSchedule: true) — the readiness gate comments 'null = unrestricted (send anytime) — no issue' (campaign-readiness.ts:479), so there is zero warning before an overnight blast. Proven in production: all Eric Lombardi message campaigns had sms_send_window = null yet carried a voice schedule (13:00-01:00) that SMS dispatch ignores; sends ran 18:30-22:29 UTC and replies/STOPs continued overnight.",
+    "currentBehavior": "Message campaign with null sms_send_window launches with no warning and sends at any hour; a set-but-ignored voice `schedule` gives false confidence it is restricted.",
+    "rootCause": "The readiness gate deliberately treats null send windows as a non-issue, and SMS dispatch never consults `campaign.schedule` (voice field). Interval end-times that are missing/malformed are silently dropped by parseSendWindow.",
+    "resolution": "Emit an unrestricted-send warning issue in campaign-readiness.ts when type=message and sms_send_window is null/empty (warn, not block). When sms_send_window is null but `schedule` is set, state the voice schedule does not gate SMS. Flag active days with start but missing/malformed end via getScheduleValidation (don't silently drop). Optionally reuse sendWindowQuietHoursOverlap for an inline overnight warning in Schedule editor.",
+    "lookIn": [
+      "app/lib/campaign-readiness.ts",
+      "app/lib/campaign-dispatch-policy.ts",
+      "app/lib/campaign-send-window.ts",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Schedule.tsx",
+      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "campaign-readiness: null sms_send_window → unrestricted-send warning",
+      "campaign-readiness: null sms_send_window + voice schedule set → same warning",
+      "getScheduleValidation: active day with start but missing end flagged"
+    ],
+    "acceptanceCriteria": [
+      "No sms_send_window → visible unrestricted-send warning at launch",
+      "Voice schedule with null sms_send_window → same warning",
+      "Missing/malformed interval end flagged, not dropped",
+      "Warning only, no new blocker for legitimately 24/7 campaigns"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now; caused night-time sends on the Eric Lombardi blast (2026-09-24)."
+  },
+  {
+    "issueNumber": 2046,
+    "verdict": "fix-now",
+    "recommendedTitle": "Attribute inbound SMS replies to a campaign",
+    "summary": "Inbound message rows store only contact_id — campaign_id is always NULL (app/routes/api+/inbound-sms.action.server.ts inserts the row without it, lines 164-186). Production evidence: Eric Lombardi workspace, 1,273 inbound replies all campaign_id=NULL, attributed at query time via contact overlap (reply_to_campaign_ids). Works for single-blast campaigns but is a heuristic: a contact blasted by 2 campaigns same day is assigned to both.",
+    "currentBehavior": "Inbound SMS webhook resolves workspace + contact by caller number but never sets campaign_id; exports/lookup reconstruct attribution by contact-vs-outbound joins.",
+    "rootCause": "The inbound write path knows only the contact (matched by From number); the outbound path knows its queue/campaign at dispatch. No conversation/thread link is written on the inbound row.",
+    "resolution": "Option 1 (recommended): in the inbound handler, after contact match, look up the most recent outbound message for that contact + same messaging_service_sid within a short window and copy campaign_id (latest-send-wins, expose ambiguity). Option 2: formalize the contact-overlap join in campaign-export-db.server with documented precedence. Option 3: thread via outreach_attempt_id. Export must list reply_to_campaign_ids + document precedence; STOP dequeues must not regress.",
+    "lookIn": [
+      "app/routes/api+/inbound-sms.action.server.ts",
+      "app/lib/campaign-export.server.ts",
+      "app/lib/campaign-export-db.server.ts",
+      "app/db/schema.ts (message table)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Inbound handler unit test: reply after a single-blast campaign attributes exactly that campaign",
+      "Export test: reply_to_campaign_ids deterministic for multi-blast contacts; precedence documented"
+    ],
+    "acceptanceCriteria": [
+      "Single-blast reply attributed to exactly that campaign",
+      "Export lists replies with deterministic reply_to_campaign_ids + documented precedence",
+      "STOP/opt-out dequeue unaffected",
+      "Attribution covered by a test"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now. Needed by #1498 reply-conversation sections; v2 (#1272/#1268) will replace via interaction_endpoint correlation."
+  },
+  {
     "issueNumber": 1885,
     "verdict": "fix-now",
     "recommendedTitle": "Rewrite the two live auth.uid() RPCs, drop get_outreach_attempts, then drop schema auth",
@@ -283,5 +478,446 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Fix now. Small; can ride the #1873 wiring PR or land independently."
+  },
+  {
+    "issueNumber": 2013,
+    "verdict": "fix-now",
+    "recommendedTitle": "auth pages: one shared form container — same width, padding, centring",
+    "summary": "Login and sign-up are aligned inconsistently: not centred vertically or horizontally, the form boxes are different widths, and the padding differs. This is the baseline for the whole auth-pages cluster (#2057) — it is the first thing to land and it unblocks #2010, #2011, #2012 and #2014.",
+    "currentBehavior": "The two pages were laid out independently, so neither the centring, the form width, nor the padding matches between them.",
+    "rootCause": "No shared container component; each page sets its own geometry.",
+    "resolution": "Introduce or fix one AuthCard-style container used by both routes, with width, padding and centring defined once. Then check #2010 first — a scrollbar on a page that should fit in the viewport is very often a symptom of an over-sized container rather than a separate bug, so close it if it resolves rather than fixing the symptom independently.",
+    "lookIn": [
+      "app/routes/account.sign-in.*",
+      "app/routes/account.sign-up.*",
+      "app/components/shared/AuthCard.tsx",
+      "AGENTS.md (AuthCard named as the page-structure primitive)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "both pages render identical geometry",
+      "no scrollbar at viewport height"
+    ],
+    "acceptanceCriteria": [
+      "Identical form width on both pages",
+      "Identical padding on both pages",
+      "Centred vertically and horizontally on both pages",
+      "Geometry defined in one place, not per page",
+      "#2010 re-checked against this change"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Do this one first. It is small, it is the unblocking work for four sibling issues in #2057, and #2010 may close as a side effect."
+  },
+  {
+    "issueNumber": 2058,
+    "verdict": "fix-now",
+    "recommendedTitle": "Rule and inventory: inline error text used where a toast belongs",
+    "summary": "Split out of #2014. The sign-in page fix is small and stayed there; the codebase-wide sweep is a different size and risk. Inline error text is not a bug by default: it is correct when the error is about the field the user is looking at, and wrong when it is about something that happened elsewhere. Deciding that per site is a rule plus an inventory, not a find-and-replace.",
+    "currentBehavior": "The codebase mixes both patterns. AGENTS.md names toast() from sonner as the single pattern, but inline error text is still used in places where the failure is page-level rather than field-level.",
+    "rootCause": "No written rule distinguishing field-level from page-level error presentation, so each site was decided locally.",
+    "resolution": "Deliver three things, in order. (1) A rule, stated once, in a place a contributor will actually find it: an error about the value in a specific input belongs next to that input; an error about a page-level action — submitting, saving, loading — belongs in a toast. (2) An inventory of every site that renders an error inline, each marked keep-or-change with a one-line reason. (3) A separate list of pages that show the same failure twice, once inline and once as a toast, which is a distinct defect from either alone. Land the inventory before any changes, so a later diff is reviewable.",
+    "lookIn": [
+      "AGENTS.md (design-system section)",
+      "app/components/ui/",
+      "app/components/**/Form*.tsx",
+      "app/routes/**"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "no test asserts the error-presentation rule, which is itself a finding"
+    ],
+    "acceptanceCriteria": [
+      "A written rule exists where a contributor will find it",
+      "Every inline error site is listed with a keep-or-change verdict and a reason",
+      "Pages rendering the same failure twice are identified",
+      "Changes, if any, land in reviewable batches after the inventory, not mixed into it",
+      "No form validation is removed in the name of consistency"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Do the rule and the inventory first, and stop there if that is all the time there is. The inventory is the deliverable; without it, any change is unreviewable because a reviewer cannot tell whether a removed inline error was deliberate."
+  },
+  {
+    "issueNumber": 2015,
+    "verdict": "fix-now",
+    "recommendedTitle": "auth pages: sign-in hides the real error behind \"We couldn't sign you in, Try again shortly\"",
+    "summary": "A failed sign-in shows generic reassurance instead of the actual failure. The logged error is specific and actionable — loginWithPassword failed [APIError: Invalid email or password] { status: UNAUTHORIZED, body: { message: Invalid email or password, code: INVALID_EMAIL_OR_PASSWORD } } — so the operator loses the one thing that distinguishes a typo from an outage. Grouped under the auth-pages epic (#2057) but independent of the layout work.",
+    "currentBehavior": "Every sign-in failure renders the same message regardless of cause.",
+    "rootCause": "The route catches the auth error and substitutes a fixed string, discarding the code and message the provider returned.",
+    "resolution": "Surface the underlying error through the toast pattern, mapped to something a person can act on: a wrong password or unknown email reads as a credentials problem, an outage or a rate limit reads as a temporary failure worth retrying. Keep the distinction the provider already makes — INVALID_EMAIL_OR_PASSWORD and UNAUTHORIZED are different situations and collapsing them is what made this confusing. Do not leak the raw provider payload to the UI; map it.",
+    "lookIn": [
+      "app/routes/account.sign-in.action.server.ts",
+      "app/routes/account.sign-in.*",
+      "app/lib/auth-layout.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "invalid credentials render a credentials-specific message",
+      "a provider outage renders a retryable message, not a credentials one"
+    ],
+    "acceptanceCriteria": [
+      "The UI distinguishes invalid credentials from a provider outage or rate limit",
+      "A wrong password no longer reads as a generic temporary failure",
+      "The raw provider payload is mapped, not passed through to the user",
+      "The error is surfaced through the toast pattern, not inline text"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Independent of the layout work in #2057, so it can go in parallel. The lowest-risk high-value item in the cluster, because it is pure diagnosis and needs no design decision. Watch the security review angle: this is the one item where a wrong fix leaks information."
+  },
+  {
+    "issueNumber": 2040,
+    "verdict": "fix-now",
+    "recommendedTitle": "Add contact from the Messages page silently fails: the form posts workspace, the endpoint reads workspace_id",
+    "summary": "Confirmed defect, three independent causes stacked in one click. (1) Field-name mismatch: app/components/contact/ContactForm.tsx:107 posts a hidden input named `workspace`, but app/routes/api+/contacts.action.server.ts:35 reads `String(data.workspace_id ?? \"\")` and returns 400 'Workspace ID is required' when it is empty. Every other caller uses the correct name (app/components/queue/ContactSearchDialog.tsx:65 `formData.set(\"workspace_id\", workspaceId)`), so the endpoint contract is `workspace_id` and the shared form is the odd one out. (2) The response is thrown away: ChatAddContactDialog.tsx:67 submits with `navigate: false` and never reads the fetcher result, then calls `setDialog(false)` on line 68 immediately, so a 400 is indistinguishable from success and the sheet just closes. (3) Double submit: the form is a react-router <Form> (ContactForm.tsx:45-51, onSubmit=handleSaveContact, navigate=false) and React Router submits it itself; handleSaveContact then submits the same FormData again by hand, so a successful save POSTs twice.",
+    "currentBehavior": "The sheet accepts the input, closes, and nothing is created. No toast, no error, no row in the contact list afterwards.",
+    "rootCause": "A shared form component and its endpoint disagree on the tenancy field name, and the caller has no feedback path: `navigate: false` with no response handling plus an unconditional close. The route test does not catch it because test/contacts.route.test.ts mocks parseRequestData with an object that already has `workspace_id`, so no test ever exercises the real form field name.",
+    "resolution": "Three changes, one PR. (1) Align the field name: rename the hidden input in ContactForm.tsx:107 to `workspace_id` (and keep `workspace` only if another caller needs it — the two other ContactForm call sites are sign-up forms that do not use this component's hidden field). Audit for any consumer reading `data.workspace` before deleting the old name. (2) Replace the manual `useSubmit` in ChatAddContactDialog with a `useFetcher`, keep the sheet open while the fetcher is submitting, and on settle toast the outcome: success closes the sheet, failure toasts the message the action returned and keeps the sheet open with the typed values intact. Delete the duplicate manual submit so exactly one POST happens per click. (3) Add a route test that posts the real FormData shape the form produces (no parseRequestData mock) and asserts the workspace is resolved, plus a UI test that a failed save keeps the sheet open and toasts.",
+    "lookIn": [
+      "app/components/contact/ContactForm.tsx:45-51 (Form action/method/navigate) and :107 (hidden input name)",
+      "app/components/sms-ui/ChatAddContactDialog.tsx:62-69 (submit, navigate:false, unconditional setDialog(false))",
+      "app/routes/api+/contacts.action.server.ts:35-40 (reads data.workspace_id, 400 on empty)",
+      "app/lib/request-utils.server.ts:10-20 (parseRequestData does no field-name mapping)",
+      "app/components/queue/ContactSearchDialog.tsx:65 (the correct workspace_id caller, and the working pattern to copy)"
+    ],
+    "existingTests": [
+      "test/contacts.route.test.ts (mocks parseRequestData, so it never exercises the real form field name)",
+      "test/ui/chat-header.test.tsx (nearby chats UI coverage to extend)"
+    ],
+    "missingTests": [
+      "a route test that posts the actual field names the form produces and asserts the contact is created (no parseRequestData mock)",
+      "a UI test that a failed save keeps the sheet open and surfaces the error instead of closing silently",
+      "a UI test that exactly one POST is issued per save click (catches the double submit)",
+      "a UI test that the sheet closes and the contact appears after a successful save"
+    ],
+    "acceptanceCriteria": [
+      "Saving a contact from the Messages sheet creates exactly one contact row",
+      "The POST carries the tenancy field the endpoint reads, agreed in one place rather than two",
+      "A rejected save keeps the sheet open with the typed values and shows the reason",
+      "A successful save closes the sheet and toasts",
+      "One click produces one request, verified by a test that counts requests"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Fix now. A user-visible feature that has never worked, with a one-line field-name cause and a fully identified cause for the silence. Small, and the fix is testable end to end without a database."
+  },
+  {
+    "issueNumber": 2042,
+    "verdict": "fix-now",
+    "recommendedTitle": "Side Sheet has no default padding, so any body between header and footer renders flush to the edge",
+    "summary": "Confirmed at the primitive. vendor/chester-hill-solutions/shad-cc/src/components/ui/sheet.tsx puts `p-6` on SheetHeader (line 132) and SheetFooter (line 142) but NOT on SheetContent (the className list at line 81 has no padding). Every child placed directly under SheetContent is therefore flush to the panel edge, which is exactly the screenshot: the title and description are inset, the 'Number of segments' label, its input and the checklist start at x=0. There are 11 SheetContent call sites; 9 of them rely on the primitive for their body padding, 2 deliberately opt out with `p-0` (app/routes/workspaces+/$id/chats.route.tsx:122 and app/components/workspace/WorkspaceNav.tsx:411).",
+    "currentBehavior": "Body content in a side Sheet is flush against the left edge while the header and footer are inset, so the panel reads as broken rather than dense.",
+    "rootCause": "The padding defaults live on the header and footer slots instead of on the content slot, so a caller adding a body has to remember to add its own padding. Every one of the 9 call sites either forgot it or compensated with a vertical-only class (CampaignDetailed.SplitCampaign.tsx:262 uses `space-y-4 py-4`).",
+    "resolution": "One change at the primitive: give the local SheetContent wrapper in app/components/ui/sheet.tsx a default of `p-6` merged through `cn`, so a call site's own `p-0` / `px-*` still wins via tailwind-merge. That fixes all 9 un-padded bodies at once and keeps the 2 full-bleed sheets full-bleed. Then drop the now-redundant `py-4` on the SplitCampaign body (CampaignDetailed.SplitCampaign.tsx:262) so the spacing is defined once. Do NOT edit the vendored shad-cc package to get this: the repo's convention is that app/components/ui/ is the local adaptation layer, and changing vendor/ changes every consumer including other projects. After the change, walk the 9 call sites and delete any padding that was added by hand to compensate.",
+    "lookIn": [
+      "app/components/ui/sheet.tsx:50-54 (the local SheetContent wrapper, where the default belongs)",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/sheet.tsx:81 (no padding on the content slot), :132 and :142 (p-6 on header and footer only)",
+      "app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx:262-263 (the sheet in the screenshot)",
+      "the 9 other SheetContent call sites: CallScreen.Layout.tsx:253,274,302; NumberSummaryList.tsx:467; CallerIdVerificationDialog.tsx:44; ChatAddContactDialog.tsx:72; TeamMember.tsx:128; Navbar.MobileMenu.tsx:44; AddAudioSheet.tsx:125"
+    ],
+    "existingTests": [
+      "test/ui/add-audio-sheet.test.tsx (one sheet's behaviour, not its padding)"
+    ],
+    "missingTests": [
+      "a smoke test asserting the SheetContent primitive ships a default horizontal padding",
+      "a smoke test asserting a call site that passes p-0 still renders with no padding (the opt-out must survive the default)",
+      "a smoke test asserting a body rendered under SheetContent is not flush to the panel edge",
+      "no test currently asserts any of the 9 un-padded bodies, which is why this is invisible to CI"
+    ],
+    "acceptanceCriteria": [
+      "Body content in a side Sheet has the same horizontal inset as its header and footer",
+      "The two full-bleed sheets (chats mobile list, workspace nav) still render edge to edge",
+      "Padding is defined in one place, and hand-compensating padding at call sites is removed",
+      "A test fails if a new SheetContent call site reintroduces flush body content",
+      "The vendored shad-cc package is unchanged"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Fix now. Smallest item in this batch and the only one that fixes nine call sites with one line. Do it before #2036, which changes spacing on the same call screen, so the two do not fight."
+  },
+  {
+    "issueNumber": 2039,
+    "verdict": "fix-now",
+    "recommendedTitle": "Onboarding 'you have N rented numbers' uses the default Alert, whose dark-mode wash is crimson and reads as an error",
+    "summary": "Confirmed in the tokens. app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:388 renders `<Alert>` with no variant for a success statement ('You have 1 rented number on this workspace... Continue when you are ready'). The Alert default variant is `border-brand-tertiary bg-brand-wash` (vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx, defaultVariants variant:'default'), and in dark mode `--brand-wash` is hsl(340 28% 18%) — a maroon. So the neutral default reads as a red error banner in dark mode, which is what the screenshot shows. The second half of the report is layout: the step wraps its blocks in `space-y-6` (line 270) and the section that follows the alert adds `border-t ... pt-6` (line 485), so the gap under the banner is 24px + 24px.",
+    "currentBehavior": "A green-meaning message is rendered in the destructive-looking tone, and it sits in a 48px hole before the next section.",
+    "rootCause": "The tone is left to the primitive default instead of being stated, and the default happens to be a brand-tinted wash that reads as crimson in dark mode. Spacing is set by two independent containers that both own vertical rhythm, so the gap is additive rather than deliberate.",
+    "resolution": "State the tone: pass `variant=\"success\"` on that Alert (the primitive has a success variant) so a completed rental reads as a success, and give it an AlertTitle if the copy needs the hierarchy. Collapse the double gap: pick one owner for the vertical rhythm in this step — either drop `pt-6` from the following section (line 485) and keep the parent's `space-y-6`, or drop the parent's gap for this transition. Do not change the Alert primitive's default variant to fix this: many call sites rely on it, and this is one mis-toned call site. While here, check the other <Alert> usages in the onboarding wizard for the same missing variant, since they share the same default-wash problem in dark mode.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:387-400 (the Alert), :270 (space-y-6), :485 (border-t pt-6)",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx (default variant = border-brand-tertiary bg-brand-wash; success/destructive/warning/info exist)",
+      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:161 (--brand-wash dark = hsl(340 28% 18%))",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx (sibling steps to sweep for the same missing variant)"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-first-number-flow.test.tsx",
+      "test/ui/onboarding-first-number-groups.test.tsx"
+    ],
+    "missingTests": [
+      "the rented-number confirmation renders the success variant, not the default (assert the variant class or the alert role's tone attribute)",
+      "a caller with zero rented numbers and zero verified caller IDs does not render an empty alert",
+      "the reviewed step has exactly one owner for its vertical rhythm, asserted at a documented gap value",
+      "no test anywhere asserts an Alert's tone, which is why a red success banner shipped"
+    ],
+    "acceptanceCriteria": [
+      "The rented-number confirmation reads as a success, not an error, in both light and dark themes",
+      "The gap under the banner matches the rest of the step's rhythm",
+      "The Alert primitive's default variant is unchanged",
+      "Every Alert in the onboarding wizard states its tone explicitly",
+      "A test fails if a success-state Alert renders with the default variant"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Fix now, and pair it with the #2036 spacing pass since both are the same onboarding/call-screen geometry complaint from the same reporter. Toggling the theme is the fastest way to confirm the tone claim before changing anything."
+  },
+  {
+    "issueNumber": 2035,
+    "verdict": "fix-now",
+    "recommendedTitle": "Leave Campaign is hidden in the call-screen kebab menu and fires immediately, with no confirmation for an action that hangs up and requeues contacts",
+    "summary": "Both halves confirmed. (1) Visibility: on the live calling dashboard, Leave Campaign lives in the 'Campaign actions' kebab (app/components/call/CallScreen.Header.tsx:282-288, inside the DropdownMenu at :266-290), while the settings-only variant of the same header renders it as a visible destructive button (:143-150). The same action is therefore prominent in one header and buried in the other. (2) No confirmation: app/components/call/CallScreen.Layout.tsx:167-172 wires handleLeaveCampaign straight to hangUp() + device.destroy() + requeueContacts() + navigate(-1), and no confirmation is requested anywhere on the path.",
+    "currentBehavior": "The only way off a live campaign is two clicks into an overflow menu, and the second click takes effect immediately — ending the call, tearing down the Twilio device, and requeueing the contacts the agent is standing in the middle of.",
+    "rootCause": "The top chrome treats Leave Campaign as a low-frequency action (menu item) even though it is the single destructive action available mid-call, and the one sanctioned exit path (#1313) was centralised as a function without a guard at the call site.",
+    "resolution": "Two changes. (1) Surface the action: render a visible destructive Leave Campaign button in the TopChrome action row (app/components/call/CallScreen.Header.tsx, the flex row at :264) instead of only as a DropdownMenuItem, and keep Report Issue in the menu. The row is already `flex shrink-0 items-center gap-1` with a child slot for the queue-sheet trigger, so a labelled destructive button fits; if the width at small breakpoints is tight, collapse to an icon with an aria-label rather than hiding it behind the menu. (2) Add a confirmation: a Dialog owned by the call screen that names what leaving does (ends the active call, disconnects the device, returns the current contact to the queue) and has an explicit confirm action calling the existing handleLeaveCampaign. One dialog, shared by the TopChrome button, the settings-only header button, and the two existing leave actions in CallScreen.Dialogs.tsx:142 and :177, so the copy and the behaviour cannot drift. Keep handleLeaveCampaign as the single implementation; the dialog only gates it.",
+    "lookIn": [
+      "app/components/call/CallScreen.Header.tsx:239 (TopChrome header), :264-291 (the kebab menu holding Leave Campaign), :143-150 (the settings-only visible button)",
+      "app/components/call/CallScreen.Layout.tsx:164-172 (handleLeaveCampaign: hangUp, device.destroy, requeueContacts, navigate(-1)) and :238, :315, :504 (the three call sites)",
+      "app/components/call/CallScreen.Dialogs.tsx:142 and :177 (the existing leave actions), and the Dialog imports at :4-11 for the pattern to copy"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-header.test.tsx (covers CampaignHeader only; TopChrome is not rendered by any test)"
+    ],
+    "missingTests": [
+      "Leave Campaign is reachable without opening the overflow menu on the live call screen",
+      "clicking Leave Campaign opens a confirmation and performs no hangup, device teardown or requeue until confirm",
+      "cancelling the confirmation leaves the call and the queue untouched",
+      "the confirm path performs exactly one hangup, one device destroy and one requeue",
+      "every leave entry point (top chrome, settings header, both dialogs) is gated by the same confirmation"
+    ],
+    "acceptanceCriteria": [
+      "Leave Campaign is visible on the live call screen, not only inside the kebab menu",
+      "Leaving the campaign requires an explicit confirmation that states what it does",
+      "No hangup, device teardown or requeue happens before the confirmation is accepted",
+      "All leave entry points share one confirmation and one implementation",
+      "The confirmation is keyboard accessible and has a focus-visible cancel action"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Fix now. The destructive-action half is the important one and is not a taste question; the visibility half is a small placement call the record already bounds (icon-with-label rather than menu). Do it with #2036, since both change the call screen chrome."
+  },
+  {
+    "issueNumber": 2004,
+    "verdict": "fix-now",
+    "recommendedTitle": "A 403 renders as \"Something went wrong\" with a Reload Page button and the raw status text",
+    "summary": "Confirmed. app/components/shared/RouteErrorBoundary.tsx has a dedicated branch for 404 (:13-32) and no branch for 401 or 403, so a 403 falls through to the generic block at :38-56: the heading is 'Something went wrong', the Alert shows `${error.status} ${error.statusText}` — literally '403 Forbidden', the action is a destructive 'Reload Page' button, and the server's actual message is discarded. 403s are a normal, expected outcome in this app: app/lib/workspace-middleware.server.ts:68-72 returns one for every min-role-gated route, and app/lib/workspace-membership.server.ts:181 and :184 throw `AppError('Access denied to workspace', 403, ErrorCode.FORBIDDEN)` from requireWorkspaceAccess, which has 81 call sites. The message is already written ('You don't have permission to perform this action') and never reaches the user.",
+    "currentBehavior": "A signed-in member who lacks the role for a page sees a generic crash card with '403 Forbidden' and a Reload Page button that reloads the same forbidden page.",
+    "rootCause": "The boundary was written around 404 and 500 and treats every other status as an unexpected crash. There is no map from status to user-facing meaning, so a deliberate authorization decision is presented as a system fault.",
+    "resolution": "Add a status-to-meaning branch to RouteErrorBoundary, following the shape of the existing 404 branch: for 403, a heading that says the signed-in account does not have access, the server's message where one exists (the thrown AppError message, or the middleware's 'You don't have permission to perform this action'), and a useful next action — go back, or contact a workspace admin — never Reload Page. Add the same treatment for 401. Keep the generic block for 5xx. Also check how `routeData(..., { status: 403 })` from middleware surfaces: if it becomes a route error response the branch is enough; if it renders as data instead, the min-role middleware should redirect or the boundary will not see it, so verify with a real min-role-gated route before declaring it done. This is independent of the permission-model work in the authz cluster — 403-versus-404 is already decided in AGENTS.md (non-member gets 404 to avoid workspace-id inference; a known member lacking a capability gets 403).",
+    "lookIn": [
+      "app/components/shared/RouteErrorBoundary.tsx:13-32 (the 404 branch to copy), :34-56 (the generic 403 fallthrough)",
+      "app/lib/workspace-middleware.server.ts:62-75 (createWorkspaceMiddlewareWithMinRole returning 403 with a real message)",
+      "app/lib/workspace-membership.server.ts:158-187 (requireWorkspaceAccess, 403 AppError, 81 call sites)",
+      "app/routes/workspaces+/$id.tsx:303 (the workspace layout re-exports this boundary, so every workspace page inherits it)"
+    ],
+    "existingTests": [
+      "test/ui/ components assert 404 handling on some routes (none assert 403 copy)"
+    ],
+    "missingTests": [
+      "a 403 renders an access-denied message, not \"Something went wrong\"",
+      "a 403 never renders a Reload Page action",
+      "the server's message is shown for 403 rather than the raw status text",
+      "404 still renders its existing not-found copy (guard against regressing the branch next door)",
+      "a 5xx still renders the generic block",
+      "an end-to-end check on a real min-role-gated route that an under-privileged member sees the new copy, which is the only way to prove the middleware response actually reaches the boundary"
+    ],
+    "acceptanceCriteria": [
+      "A 403 tells the user they lack access, in the app's voice, with the server's message where one exists",
+      "No 403 renders the generic crash heading or a Reload Page action",
+      "The boundary offers a next step the user can actually take",
+      "401 gets the same treatment",
+      "404 and 5xx behaviour is unchanged",
+      "A test covers each status branch, including one on a real min-role-gated route"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Fix now. Small, entirely local to one component, and it makes every authorization decision in the product legible instead of looking like a crash. Independent of the authz cluster, so it can land before or after that model work."
+  },
+  {
+    "issueNumber": 2005,
+    "verdict": "fix-now",
+    "recommendedTitle": "Quit This Workspace posts a self-leave that always 403s for the role it is shown to; remove the button and the self-leave path behind it",
+    "summary": "Confirmed and already investigated in detail by sai-sy in the issue comments. The two visible forms (app/routes/workspaces+/$id/settings.route.tsx:167-183 and app/components/workspace/TeamMember.tsx:220-228) both post formName=deleteSelf with user_id set to the actor's own id, which routes through app/routes/workspaces+/$id/settings.action.server.ts:104-106 to handleDeleteSelf (app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:125-156) and on to removeWorkspaceMember(actor, workspaceId, actor). requireMemberManager returns { ok:false, error:'Not authorized', status:403 } for a `caller` (app/lib/platform-members.server.ts:71), and the settings loader only shows the button to callers (hasAccess = userRole !== MemberRole.Caller, app/lib/workspace-settings-db.server.ts:69). So the button is offered to exactly the one role for which it can never work.",
+    "currentBehavior": "A caller sees a red 'Quit This Workspace' button on the settings page; pressing it fails with a 403 that the page renders as an error.",
+    "rootCause": "deleteSelf was never a domain operation — it is a thin adapter over member removal — and member removal is a management-of-others operation. Because it exists as a named intent, the UI could offer it to a role the underlying service forbids, and the same intent is reachable through the public member-delete endpoint, where a same-rank actor can currently target their own user_id.",
+    "resolution": "Follow the six steps in the issue comment, which are correct and complete. Remove both forms and the `deleteSelf` cases (settings.action.server.ts:76 and :104, and admin invite.action.server.ts:35) and delete handleDeleteSelf. Then close the undocumented API self-leave hole: make removeWorkspaceMember reject actorId === targetId with a clear 403 in app/lib/platform-members.server.ts, so the operation is unambiguously about managing other members. Update the member-delete description in app/lib/openapi-platform.ts:406+ to say self-removal is unsupported and regenerate openapi/public-api.json (ci:codegen:verify will fail otherwise). Do NOT add a migration and do NOT touch owner transfer, invite cancellation, or platform-admin removal — the comment identifies each as a separate operation and they must stay separate. The comment's named follow-up (member-side invite cancellation not verifying the invite belongs to the workspace) is out of scope here; file it separately rather than folding it in.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/settings.route.tsx:167-183 and app/components/workspace/TeamMember.tsx:220-228 (the two forms)",
+      "app/routes/workspaces+/$id/settings.action.server.ts:76,104-106 and app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts:35-36 (the three deleteSelf dispatch sites)",
+      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:125-156 (handleDeleteSelf)",
+      "app/lib/platform-members.server.ts:53-75 (requireMemberManager, the 403 at :71) and :440-475 (removeWorkspaceMember, where the self-target guard belongs)",
+      "app/lib/workspace-settings-db.server.ts:67-75 (hasAccess, why only callers see the button)",
+      "app/routes/api+/workspaces+/$workspaceId/members.action.server.ts:161-194 and app/lib/openapi-platform.ts:406+ (the API self-leave path and its description)"
+    ],
+    "existingTests": [
+      "e2e/specs/rbac.spec.ts:24-28 (RBAC-03 asserts the button IS visible for callers — this assertion must be inverted or removed)",
+      "test/workspace-setting-utils.test.ts:214-233 (handleDeleteSelf coverage — remove with the function)"
+    ],
+    "missingTests": [
+      "removeWorkspaceMember returns 403 when actorId === targetId, for caller, member, admin and owner",
+      "an owner with another owner present still cannot self-remove through the member endpoint",
+      "a manager can still remove a different member (the permitted path must stay green)",
+      "owner transfer still works after the guard is added",
+      "invite cancellation still works after handleDeleteSelf is deleted",
+      "platform-admin member removal still works",
+      "the OpenAPI description states self-removal is unsupported, and the generated openapi/public-api.json matches (ci:codegen:verify)"
+    ],
+    "acceptanceCriteria": [
+      "No Quit This Workspace form renders anywhere",
+      "The deleteSelf intent is gone from all three actions and handleDeleteSelf no longer exists",
+      "Member removal refuses a self-target with a clear 403 for every role",
+      "Removing a different member, owner transfer, invite cancellation and platform-admin removal are unchanged",
+      "The OpenAPI description and the generated spec state that self-removal is unsupported",
+      "The e2e RBAC-03 assertion that the button is visible is removed, and the invite-authorization follow-up is filed as its own issue"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now. The investigation is already done and the plan is exact, so this is a small implementation with a known test surface. Risk is medium because it deliberately breaks an undocumented API behaviour — that is the intent of the issue, but say so in the PR so a reviewer does not read it as a regression. The invite-authorization gap the comment found should be filed as a separate issue now, while the context is fresh."
+  },
+  {
+    "issueNumber": 2032,
+    "verdict": "fix-now",
+    "recommendedTitle": "Invite acceptance shows a persistent, replayable inline banner instead of a one-time success toast",
+    "summary": "The issue is fully specified and its premise checks out. Accepting an invite redirects to /workspaces?invite=accepted at two sites (app/routes/accept-invite.action.server.ts:58 and :183) and app/routes/workspaces+/index.tsx:272-280 renders that parameter with QueryParamBanner, which draws a dismissible <Alert> (app/components/shared/QueryParamBanner.tsx:43-56). Two consequences: the success state replays on every refresh or revisit because it lives in the URL, and this one redirect-only success uses a different feedback surface from the toast.success paths the rest of the app uses. One extra finding: the banner is an Alert, so it carries role=\"alert\" and is picked up by app/lib/flash-telemetry.client.ts, which beacons every role=alert surface to /api/workspaces/:id/client-flash as an error-flash event. A successful invite acceptance is currently logged as an error flash.",
+    "currentBehavior": "A dismissible inline banner on the workspaces page, backed by a shareable URL that reproduces it indefinitely.",
+    "rootCause": "One-time state is being carried in a shareable URL because there is no server-owned flash mechanism to carry it instead. AGENTS.md names toast() from sonner as the single feedback pattern and a single root Toaster already exists (app/root.tsx:123), so the app has the right tool and the wrong transport.",
+    "resolution": "Implement the five steps in the issue body; they are sound. Add a small server-only flash helper: a signed, HttpOnly, SameSite=Lax cookie scoped to /workspaces whose payload is an allow-listed identifier (invite_accepted), never arbitrary text. In accept-invite.action.server.ts set it in BOTH redemption paths and redirect to the clean /workspaces, APPENDING the Set-Cookie to the existing Better Auth headers rather than replacing them (replacing them drops the session cookie created during sign-up). In app/routes/workspaces+/index.loader.server.ts read and validate the flash, return a typed flash value, and append a clearing Set-Cookie whether the workspace load succeeds or fails, so it is one-time even on error. In index.tsx consume it with toast.success in an effect guarded against a double render. Update the assertion at test/accept-invite.route.test.ts:172, which currently expects Location /workspaces?invite=accepted. Leave QueryParamBanner itself unchanged — other routes use it.",
+    "lookIn": [
+      "app/routes/accept-invite.action.server.ts:58 and :183 (the two redirects to /workspaces?invite=accepted)",
+      "app/routes/workspaces+/index.tsx:272-280 (the QueryParamBanner invite configuration)",
+      "app/components/shared/QueryParamBanner.tsx:16-57 (unchanged by this issue; note the Alert inside it)",
+      "app/routes/workspaces+/index.loader.server.ts:32-72 (where the flash is read and cleared)",
+      "app/lib/flash-telemetry.client.ts (beacons role=alert surfaces, so the success banner is logged as an error flash today)",
+      "app/root.tsx:123 (the single root Toaster, so no infrastructure change is needed)"
+    ],
+    "existingTests": [
+      "test/accept-invite.route.test.ts:172 (asserts the current redirect URL and must be updated)"
+    ],
+    "missingTests": [
+      "both redemption paths redirect to /workspaces with no invite parameter",
+      "both redemption paths set the allow-listed flash cookie AND preserve the Better Auth Set-Cookie headers (the regression that would silently break sign-up)",
+      "the loader returns the flash once and the response clears the cookie",
+      "the cookie is cleared even when the workspace load throws",
+      "a malformed, expired or unknown flash payload is ignored, the cookie is cleared, and no user content reaches the client",
+      "the client effect calls toast.success exactly once for one loader payload (guards a revalidation double-fire)",
+      "no inline invitation banner remains on /workspaces",
+      "the flash identifier and its message stay server-owned allow-listed values"
+    ],
+    "acceptanceCriteria": [
+      "Invite acceptance shows a one-time success toast, not an inline banner",
+      "The redirect URL no longer carries invite=accepted, and refreshing it does not reproduce the message",
+      "The Better Auth session cookie survives the redirect in both redemption paths",
+      "An unknown, malformed or expired flash payload produces no client-visible output and is still cleared",
+      "A loader revalidation does not fire the toast twice",
+      "The success banner stops being reported to client-flash as an error flash",
+      "No support, analytics or e2e flow still depends on ?invite=accepted (checked before removal)"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now — the issue is a complete spec that survives review. Medium risk for one reason: the Set-Cookie merge on the sign-up path, where getting it wrong logs the new user out silently. The two-tab flash duplication the issue lists is an accepted cookie-flash limitation; record it in the test as a known bound rather than trying to solve it."
+  },
+  {
+    "issueNumber": 2045,
+    "verdict": "fix-now",
+    "recommendedTitle": "Unread message badge counts only the newest 100 conversations, so it undercounts and drifts down as volume grows",
+    "summary": "The count half is confirmed by the code, and the code already documents the defect. The sidebar badge and the server-rendered Today number both come from a bounded page: app/hooks/chats/useUnreadConversationsCount.ts:15-22 fetches one page of conversations at page_size=100 and sums unread_count client-side, with the comment 'Workspaces with more than 100 distinct conversations will undercount unread messages sitting in conversations beyond the first page'. The server side is the same shortcut: app/lib/database/workspace-conversations.server.ts:490-505 getWorkspaceUnreadConversationCount calls fetchConversationSummary with limit=UNREAD_CONVERSATION_PAGE_SIZE and sums, and its own comment says it exists 'so the server-rendered Today action and client badge agree'. Two consequences beyond the flat undercount: the summed page is ordered by conversation_last_update DESC (workspace-conversations.server.ts:259), so a new conversation pushes an unread one off the page and the badge goes DOWN, which matches 'resets after a while'; and every inbound INSERT bumps the count optimistically (useUnreadConversationsCount.ts:86-90) until the next 30s poll reconciles it downward. Production scale confirms the page is too small: the Eric Lombardi workspace has 1,273 inbound replies from one campaign. NOT CONFIRMED: the second half of the report, that the conversation LIST itself resets. The list has working pagination (handleLoadMore at app/hooks/chats/useChatsPage.ts:303-325 accumulating pages through mergeConversationPages), but the sync effect at :153-164 calls setLoadedChats(chats) — replacing the accumulated list with the loader's first page — whenever the loader data changes and no newer fetcher page is in hand. That is a plausible reset path, and it is exactly the kind of thing that must be observed before it is 'fixed'.",
+    "currentBehavior": "The Messages badge and the Today number report a count that stops growing at the newest 100 conversations, and can decrease between polls while unread messages exist.",
+    "rootCause": "A workspace-wide total is being computed client-side from one page of a paginated endpoint, because the conversations API exposes no aggregate. Two code paths then had to be kept in agreement, and the optimistic realtime bump guarantees visible drift until the next poll corrects it.",
+    "resolution": "Replace the page-sum with a real aggregate, which is cheap here because the grouping does not change the number. unread_count is COUNT(*) FILTER (WHERE direction='inbound' AND status='received') grouped by conv_key (workspace-conversations.server.ts:234), and every inbound row has a non-null conv_key (the CASE at :203-208 resolves inbound rows to from_key), so the workspace total is exactly COUNT(*) over inbound+received messages — no grouping needed. Add that as a dedicated query in workspace-conversations.server.ts, have getWorkspaceUnreadConversationCount call it, and have the client hook read the aggregate from the loader/endpoint instead of summing a page. Keep the per-row unread_count on the list itself, which is correct and already used for the per-conversation pill. While in the file, update the two comments that assert the 100-conversation window is intentional so the next reader does not restore it. Do NOT touch the conversation list's reset behaviour in this change: it is a separate, unconfirmed hypothesis (see missingTests) and bundling a speculative UI change with a correct server fix makes both hard to review and hard to revert.",
+    "lookIn": [
+      "app/hooks/chats/useUnreadConversationsCount.ts:15-22 (the documented 100-conversation limit), :39-61 (page fetch and sum), :78-91 (optimistic inbound bump), :13 (30s poll)",
+      "app/lib/database/workspace-conversations.server.ts:486-505 (getWorkspaceUnreadConversationCount and its 'agree with the badge' comment)",
+      "app/lib/database/workspace-conversations.server.ts:223-241 (the agg CTE: unread_count definition and conv_key grouping)",
+      "app/lib/chats/unread-count.ts:1-11 (UNREAD_CONVERSATION_PAGE_SIZE = 100)",
+      "app/routes/workspaces+/$id.loader.server.ts:73 (the server-rendered unread count, workspace root only)",
+      "app/hooks/chats/useChatsPage.ts:153-164 (the setLoadedChats reset path — the unconfirmed list symptom)"
+    ],
+    "existingTests": [
+      "test/workspace-conversations-sql-parity.test.ts (real-Postgres parity harness for the conversation SQL — the right place to prove the aggregate equals the sum of per-group counts)",
+      "test/ui/hooks-chats.test.tsx (badge and list hook coverage)"
+    ],
+    "missingTests": [
+      "the workspace unread count is a plain aggregate and equals the sum of per-conversation unread_count over ALL conversations, proven in the Postgres parity test with more than 100 conversations",
+      "the count does not decrease when a new conversation pushes an older unread one out of a page (this is the regression the fix exists to prevent)",
+      "a marked-as-read message reduces the aggregate",
+      "the aggregate is scoped to the workspace and does not leak another workspace's unread messages",
+      "the badge no longer drifts after an optimistic realtime bump followed by a poll",
+      "LIST RESET, NOT YET REPRODUCED: after scrolling to load several pages, a loader revalidation (navigate into a conversation, or a change to the campaign/sort/search filter) drops the user back to page 1",
+      "LIST RESET: the same does not happen when the realtime message subscription fires, which is the other path that touches the list"
+    ],
+    "acceptanceCriteria": [
+      "The badge and the Today number report the true workspace-wide unread total for workspaces with more than 100 conversations",
+      "The count never decreases while unread messages exist and no message is marked read",
+      "A Postgres test proves the aggregate equals the per-conversation sum beyond the first page",
+      "Per-conversation unread pills are unchanged",
+      "The comments asserting the 100-conversation window is by design are corrected",
+      "The list-reset symptom is either reproduced and filed as its own issue, or explicitly closed as not reproducible, with evidence"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Fix now, scoped to the count only. The count defect is confirmed, cheap to fix, and the code has been carrying a comment admitting it. The list-reset half is a real but unreproduced hypothesis and is deliberately excluded — file it separately if the repro below confirms it, rather than guessing at a UI fix inside a server change."
+  },
+  {
+    "issueNumber": 2041,
+    "verdict": "fix-now",
+    "recommendedTitle": "Admins can only grant credits by direct database write; add an audited manual credit load on the admin workspace page",
+    "summary": "A missing feature with a complete design in the issue body, and the named integration points all exist. Today the only way to add credits outside Stripe is a hand-written UPDATE, which bypasses the ledger, the idempotency key and the audit trail. The canonical path is insertTransactionHistoryIdempotent (app/lib/transaction-history.server.ts:70-122), which calls the atomic apply_ledger_entry_and_sync_credits RPC and emits the insert event; the closest existing grant is the workspace welcome bonus at app/lib/database/workspace-provisioning.server.ts:228-244, which is the template to copy. The admin workspace page already uses a tab-per-concern pattern (app/routes/admin+/$workspaceId.route.tsx:47-53 maps URL suffix to tab, with campaigns/invite/twilio/users as index routes), and adminRouteAuth from @/lib/admin-route.server is the auth helper its child actions use (app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts:11). ONE FACTUAL ERROR IN THE ISSUE: it says the grant 'is not attributed to Stripe/SMS/voice buckets in reconciliation (CREDIT rows already bucket as purchase, same as welcome credits)'. bucketFromIdempotencyKey in shared/billing-keys.ts only recognises the stripe and welcome prefixes, and it does NOT include WELCOME_CREDITS_PREFIX at all — welcome credits bucket as 'other', not 'purchase'. A new manual-credit prefix will also bucket as 'other' unless added.",
+    "currentBehavior": "An admin who needs to goodwill-grant credits or cover an invoice-paid customer has no in-product path; the only recourse is an un-audited direct database write.",
+    "rootCause": "The billing ledger was designed around automated, provider-keyed writes. There is no human-initiated grant concept, no key namespace for one, and no UI for one — and the guard that would catch an unsafe write (check:credit-writes, scripts/check-credit-write-paths.mjs) treats any direct workspace.credits write as a violation, which is the correct default and the reason a supported path is needed rather than a bypass.",
+    "resolution": "Implement the three scope items in the issue, with the correction above. (1) shared/billing-keys.ts: add manualCreditLoadKey(workspaceId, nonce) producing a manual-credit:<workspace>:<nonce> key, and add the prefix to bucketFromIdempotencyKey with a deliberate bucket — 'other' is the safe choice since these grants are not a provider charge and must not be reconciled against Twilio usage, and 'purchase' would be wrong for both this key and the existing welcome-credits key. Decide in the same PR whether to fix the welcome-credits prefix while there; it is a one-line classifier addition, and leaving it is how the next reader repeats this error. (2) Admin UI: a Credits index route under app/routes/admin+/workspaces/$workspaceId/ following the existing tab pattern, with adminRouteAuth on the action, amount validated as a positive integer in 1..100000, a required reason, and the insert via insertTransactionHistoryIdempotent with a note naming the admin and the reason. The nonce must be generated per rendered form and carried in a hidden field so a retried submit credits exactly once — generate it server-side in the loader, never client-side, or a double-click produces two grants with two keys. (3) Tests: action validation (0, negative, non-numeric, over the cap), idempotency on a repeated nonce, and the audit note content. The nonce test is the one that matters: without it, the idempotency requirement is unverified.",
+    "lookIn": [
+      "shared/billing-keys.ts (add manualCreditLoadKey; bucketFromIdempotencyKey is missing WELCOME_CREDITS_PREFIX, so 'already bucket as purchase' is wrong)",
+      "app/lib/transaction-history.server.ts:70-122 (insertTransactionHistoryIdempotent — the only approved write path)",
+      "app/lib/database/workspace-provisioning.server.ts:228-244 (the welcome-credit grant to copy)",
+      "app/routes/admin+/workspaces/$workspaceId.route.tsx:47-53 (tab pattern) and app/routes/admin+/workspaces/$workspaceId/invite.action.server.ts:11-13 (adminRouteAuth + defineAction model)",
+      "app/lib/admin-route.server.ts (adminRouteAuth) and app/routes/admin+/requireSudoAdmin.server.ts (sudo check)",
+      "scripts/check-credit-write-paths.mjs (the guard a correct implementation must satisfy; a direct credits write fails CI)"
+    ],
+    "existingTests": [
+      "test/ledger.test.ts (ledger and idempotency coverage)",
+      "test/billing-keys*.test.ts if present (run the shared billing-keys unit test the issue asks for alongside these)"
+    ],
+    "missingTests": [
+      "amount 0, negative, non-numeric and over 100000 are each rejected with a distinct, clear message",
+      "a repeated submit with the same nonce credits exactly once (this is the idempotency requirement and currently has no test)",
+      "two different nonces for the same admin and workspace each credit, so the key is not accidentally constant",
+      "the ledger note names the acting admin and the reason",
+      "the grant appears in the workspace transaction history and in the admin credits list",
+      "a non-sudo admin is refused",
+      "the resulting row is not picked up as a provider charge by the billing reconciliation mapper (the classification correction)"
+    ],
+    "acceptanceCriteria": [
+      "A sudo admin can grant credits to any workspace from the admin page, and the balance updates on refresh",
+      "The grant is written through insertTransactionHistoryAndSyncCredits-equivalent RPC path only; no direct workspace.credits write and check:credit-writes stays green",
+      "A retried submit with the same nonce credits exactly once",
+      "Invalid amounts are rejected with a clear message and nothing is written",
+      "The ledger row shows type CREDIT, a positive amount, and a note naming the admin and the reason",
+      "The grant's bucket is decided deliberately and documented, and the welcome-credits prefix classification is corrected in the same change",
+      "npm run ci:local is green, including the codegen and surface checks"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now. It is a small, well-specified gap with a real operational need and no live defect to reproduce. Risk is medium because it moves money: the nonce must be server-generated (a client-generated nonce makes a double-click grant twice and the idempotency test will not catch it if the test also uses a client-style nonce), and the bucket decision in the issue is wrong as written. Split the bucket-classifier correction into its own line of the PR so it is reviewable, and do not bundle invoice or offline-payment flows."
   }
 ]
