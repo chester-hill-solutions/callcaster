@@ -43,7 +43,7 @@ railway config apply
 - Use `replicas` for scaling; advanced placement can still specify region names.
 - Use `group("Name", [resources])` to keep large projects organized on the Railway canvas.
 - Secrets imported from Railway are rendered as `preserve()` so existing values are retained without writing secret values to source. Use `railway config pull --omit-preserved-variables` for a smaller import.
-- Custom domains are managed separately with `railway domain`; the current CLI planner rejects custom-domain registration in IaC even though the SDK reference documents `domains`.
+- Custom domains use the `domains` field on the service and include the target port when the service exposes more than one port.
 - The GitHub Actions workflow applies only after pushes to `dev` or `master`; pull requests run plan-only checks.
 
 ## GitHub Actions setup

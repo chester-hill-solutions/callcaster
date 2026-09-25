@@ -36,13 +36,7 @@ pnpm-debug.log*
 .DS_Store
 *.swp
 
-# Local tooling
-.cursor/
-.agents/*
-!.agents/skills/
-.opencode/*
-!.opencode/tools/
-!.opencode/agents/
+# Local tooling folders are tracked.
 skills-lock.json
 
 # Secrets — never commit
@@ -50,4 +44,3 @@ app/transcribe.json
 *.serviceaccount.json
 scripts/dev/certs/
 /CLIPBOARD.md
-/.agent/

@@ -1,5 +1,5 @@
 import { bucket, postgres, service, volume } from "railway/iac";
-import { preservedVariables, source } from "../config/shared.js";
+import { preservedVariables, source } from "../config/shared.ts";
 
 // Staging is a Railway environment mirroring production (#1300): v2 topology,
 // same code lineage, test-mode Stripe keys as the only intended difference.
