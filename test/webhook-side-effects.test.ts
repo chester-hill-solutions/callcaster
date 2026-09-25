@@ -29,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   persistCallRecordingToStorage: vi.fn(),
   isBatchTranscriptionEnabled: vi.fn(),
   enqueueJob: vi.fn(),
+  recheckCampaignCompletion: vi.fn(async () => false),
+  recheckCampaignsWithUnsettledMessages: vi.fn(async () => 0),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
@@ -115,6 +117,14 @@ vi.mock("@/lib/env.server", () => {
   const handler = { get: () => () => "test" };
   return { env: new Proxy({}, handler) };
 });
+
+vi.mock("@/lib/campaign-settle-recheck.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-settle-recheck.server")>()),
+  recheckCampaignCompletion: (...args: unknown[]) =>
+    mocks.recheckCampaignCompletion(...args),
+  recheckCampaignsWithUnsettledMessages: (...args: unknown[]) =>
+    mocks.recheckCampaignsWithUnsettledMessages(...args),
+}));
 
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 
@@ -356,6 +366,68 @@ describe("webhook side-effect handlers", () => {
       event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "in-progress" }),
     });
     expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
+  });
+
+  test("runSmsStatusSideEffects re-checks campaign completion (#2048)", async () => {
+    // The dispatch chain stops when the local queue empties, so this callback is
+    // the only moment the settled-message gate can be re-asked. Without it, a
+    // campaign whose queue drained before its messages settled would stay
+    // `running` forever.
+    const { runSmsStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runSmsStatusSideEffects({
+      messageSid: "SM1",
+      twilioParams: { SmsSid: "SM1", SmsStatus: "delivered" },
+    });
+
+    expect(mocks.recheckCampaignCompletion).toHaveBeenCalledWith(
+      { workspaceId: "w1", campaignId: 7, reason: "sms_status:delivered" },
+    );
+  });
+
+  test("runSmsStatusSideEffects re-checks on a non-terminal status too (#2048)", async () => {
+    // A non-terminal callback still carries fresh message state, and asking is
+    // cheap. Pinning this stops a future "only re-check terminal statuses"
+    // optimisation from re-opening the stranding hole.
+    const { runSmsStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runSmsStatusSideEffects({
+      messageSid: "SM1",
+      twilioParams: { SmsSid: "SM1", SmsStatus: "sending" },
+    });
+
+    expect(mocks.recheckCampaignCompletion).toHaveBeenCalledWith(
+      { workspaceId: "w1", campaignId: 7, reason: "sms_status:sending" },
+    );
+  });
+
+  test("runSmsStatusSideEffects does not re-check completion for an inbound reply (#2048)", async () => {
+    // The inbound write path leaves message.campaign_id NULL (#2046), so there
+    // is no campaign to re-check and no RPC to make.
+    mocks.findMessageBySid.mockResolvedValue({
+      sid: "SM4",
+      workspace: "w1",
+      campaign_id: null,
+      status: "received",
+      num_segments: "1",
+      num_media: "0",
+    });
+    const { runSmsStatusSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runSmsStatusSideEffects({
+      messageSid: "SM4",
+      twilioParams: { SmsSid: "SM4", SmsStatus: "received" },
+    });
+
+    expect(mocks.recheckCampaignCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({ campaignId: null }),
+    );
   });
 
   test("runSmsStatusSideEffects bills terminal SMS", async () => {
