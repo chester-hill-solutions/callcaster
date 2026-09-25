@@ -17,7 +17,7 @@ test.describe("Full sign-up flow", () => {
     const workspaceName = `Signup Workspace ${Date.now()}`;
 
     await page.goto("/signup");
-    await expect(page.getByRole("heading", { name: "Create Account" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign Up" })).toBeVisible();
     await page.getByLabel("First Name").fill("Sam");
     await page.getByLabel("Last Name").fill("Signup");
     await page.getByLabel("Email").fill(email);

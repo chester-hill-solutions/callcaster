@@ -63,7 +63,7 @@ const missing = ["docker", "psql", "bun"].filter(
 if (missing.length > 0) {
   console.error(
     `[setup] Missing required tool(s): ${missing.join(", ")}\n` +
-      "  docker — local Postgres, MinIO and mail (skip with --skip-docker)\n" +
+      "  docker — local Postgres and mail (skip with --skip-docker)\n" +
       "  psql   — applies the database schema\n" +
       "  bun    — runs the production server and the job worker",
   );
@@ -93,8 +93,11 @@ if (skipDocker) {
   console.log("\n[setup] 2. Local services — skipped (--skip-docker)");
   step += 1;
 } else {
-  heading("Local services (Postgres :5433, MinIO :9000, mail :9002)");
+  heading("Local services (Postgres :5433, object storage :9000, mail :9002)");
   run("docker", ["compose", "-f", "docker-compose.dev.yml", "up", "-d"]);
+  // Object storage is the stow binary, not a compose service: both registries
+  // that used to host minio now 401 anonymous pulls (#1800).
+  run("node", ["scripts/e2e/start-stow.mjs", "--start"]);
 
   process.stdout.write("[setup] waiting for Postgres");
   let ready = false;
@@ -123,7 +126,7 @@ run("node", ["scripts/e2e/bootstrap-compose-db.mjs"]);
 
 // ── 4. Object storage bucket ───────────────────────────────────────────
 heading("Object storage bucket");
-run("node", ["scripts/e2e/ensure-minio-bucket.mjs"]);
+run("node", ["scripts/e2e/ensure-bucket.mjs"]);
 
 // ── 5. Seed data ───────────────────────────────────────────────────────
 // Without this the app runs against an empty database and nothing says so.
