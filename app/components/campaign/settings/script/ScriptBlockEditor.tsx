@@ -26,7 +26,7 @@ export type ScriptBlockEditorProps = {
   block: ScriptBlock;
   readOnly?: boolean;
   /**
-   * The script is played to a caller rather than read by an agent, so every
+   * The script is played to a recipient rather than read by an agent, so every
    * block is an audio step — including ones that still carry an input wire
    * type from an older editor or a live-call script.
    */
