@@ -311,8 +311,8 @@ describe("bootstrap-migrations.server", () => {
     expect(dbState.spawnCalls).toHaveLength(0);
   });
 
-  test("never seeds dev/staging/production environments", async () => {
-    for (const name of ["production", "staging", "dev"]) {
+  test("never seeds dev/QA/production environments", async () => {
+    for (const name of ["production", "qa", "dev"]) {
       dbState.spawnCalls = [];
       const result = await applyClientMigrationsOnBoot({
         env: {

@@ -215,7 +215,7 @@ Relevant runtime wiring:
 
 Production sets `TWILIO_APP_SID` explicitly and owns the `calldiv` app.
 
-Every other Railway environment (PR previews, `dev`, `staging`) provisions its own
+Every other Railway environment (PR previews, `dev`, `qa`) provisions its own
 TwiML App at boot via `app/server/environment-twiml-app.server.ts`, named
 `env:<railway-environment-name>` and pointed at that environment's own
 `${BASE_URL}/api/call`. This runs before the required-env check, and deliberately

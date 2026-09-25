@@ -3,7 +3,7 @@
 **Added:** 2026-07-29 · **Script:** `scripts/probe-surfaces.mjs`
 
 ```bash
-npm run probe:dev       # or probe:staging / probe:prod / probe:local
+npm run probe:dev       # or probe:qa / probe:prod / probe:local
 npm run probe -- --help
 ```
 
@@ -11,8 +11,8 @@ Named targets carry the right defaults, so the common case takes no flags:
 deployed targets probe with strict provider auth and page routes on; `local`
 relaxes provider auth because the compose harness disables it. Override with
 `--strict` / `--relaxed` / `--no-pages`; point at an arbitrary host with
-`npm run probe -- https://…`. Staging has no URL until it is provisioned —
-set `PROBE_URL_STAGING` (the script says so if you forget).
+`npm run probe -- https://…`. QA has no URL until it is provisioned — set
+`PROBE_URL_QA` (the script says so if you forget).
 
 ## Why this exists
 
@@ -74,7 +74,7 @@ Consequently:
 Run against a deployed environment before every production release:
 
 ```bash
-npm run probe:prod        # or probe:staging / probe:dev
+npm run probe:prod        # or probe:qa / probe:dev
 ```
 
 Result on deployed dev, 2026-07-30: **261/261 OK** (191 API + 70 page).

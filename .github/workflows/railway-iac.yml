@@ -1,8 +1,8 @@
 name: Railway IaC
 
 # Topology (#1300, directive 2026-08-31): master is the release trunk.
-# Promotion is dev → master; the production and staging Railway environments
-# both deploy master, dev deploys dev. Staging is not a branch — it is a
+# Promotion is dev → master; the production and QA Railway environments
+# both deploy master, dev deploys dev. QA is not a branch — it is a
 # Railway environment mirroring production with test-mode Stripe keys.
 # IaC flow: a dev push applies the dev environment; a master push applies
 # staging and production; PRs only plan. Destructive plans are never applied
@@ -73,14 +73,14 @@ jobs:
         if: github.event_name == 'push'
         run: railway config apply --file "$GITHUB_WORKSPACE/.railway/railway.ts" --yes
 
-  staging:
+  qa:
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/master') ||
       (github.event_name == 'pull_request' &&
       (github.base_ref == 'dev' || github.base_ref == 'master') &&
       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
-    environment: staging
+    environment: qa
     env:
       RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
@@ -100,18 +100,18 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
       - name: Install Railway CLI
         run: npm install --global @railway/cli@5.41.2
-      - name: Plan Railway staging configuration
+      - name: Plan Railway QA configuration
         run: |
           set +e
-          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-staging-plan.json
+          railway config plan --file "$GITHUB_WORKSPACE/.railway/railway.ts" --detailed-exit-code --json > railway-qa-plan.json
           status=$?
-          cat railway-staging-plan.json
+          cat railway-qa-plan.json
           if [ "$status" -ne 0 ] && [ "$status" -ne 2 ]; then
             exit "$status"
           fi
-          if jq -e '.changeSet.changes[]? | select(.severity == "destructive")' railway-staging-plan.json > /dev/null; then
+          if jq -e '.changeSet.changes[]? | select(.severity == "destructive")' railway-qa-plan.json > /dev/null; then
             if [ "${{ github.event_name }}" = "push" ]; then
-              echo "Refusing to apply a destructive staging Railway plan. Review it manually."
+              echo "Refusing to apply a destructive QA Railway plan. Review it manually."
               exit 1
             fi
             echo "Plan contains destructive changes — reported only; PRs never apply."
