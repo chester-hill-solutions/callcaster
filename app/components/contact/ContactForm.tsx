@@ -29,7 +29,7 @@ export interface ContactFormData {
   phone?: string;
   email?: string;
   address?: string;
-  workspace: string;
+  workspace_id: string;
   audience_id: string | null;
 }
 
@@ -104,7 +104,7 @@ const ContactForm: React.FC<ContactFormProps> = ({
         onChange={handleInputChange}
       />
     </FormField>
-    <input hidden name="workspace" value={workspace_id} readOnly />
+    <input hidden name="workspace_id" value={workspace_id} readOnly />
     <input hidden name="audience_id" value={audience_id ?? ""} readOnly />
     <input
       hidden
