@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, like, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, like, lt, or, sql, type SQL } from "drizzle-orm";
 import { message as messageTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
@@ -200,24 +200,67 @@ export async function findMessageBySid(sid: string): Promise<MessageRow | null> 
 }
 
 /**
+ * The columns whose guarded writes are SQL fragments rather than plain values.
+ *
+ * `message.status` is the `message_status` ENUM and `message.date_sent` a
+ * timestamptz in every real database, while the schema types both as text. A
+ * `sql` fragment's result is therefore legitimately not the text the schema
+ * promises, and assigning one needs a widening that the compiler cannot
+ * verify.
+ *
+ * Rather than cast that widening inside every guard — which is what this
+ * module used to do, once per guard, as `as unknown as Partial<MessageRow>` —
+ * it is declared once, here, where the reason is visible. Two casts became
+ * zero and the type-safety ratchet moved down with them.
+ */
+type GuardedMessageColumn = "status" | "date_sent";
+
+/** A message write, where the two guarded columns may carry a SQL fragment. */
+type MessageUpdate = Omit<Partial<MessageRow>, GuardedMessageColumn> &
+  Partial<Record<GuardedMessageColumn, MessageRow[GuardedMessageColumn] | SQL>>;
+
+/**
  * Status-transition guard, enforced atomically inside the UPDATE (same shape
  * as updateCallBySid): keep the row's current status when it is already
  * terminal and the incoming status is not — out-of-order Twilio callbacks
  * must not regress delivered/failed back to sent/sending. `::text` because
  * message.status is the message_status ENUM in every real database (#1289).
  */
-function withTerminalStatusGuard(update: Partial<MessageRow>): Partial<MessageRow> {
+function withTerminalStatusGuard(update: MessageUpdate): MessageUpdate {
   if (update.status == null) return update;
   return {
     ...update,
     status: sql`CASE WHEN LOWER(${messageTable.status}::text) = ANY(${TERMINAL_MESSAGE_STATUSES_SQL}) AND LOWER(${update.status}) <> ALL(${TERMINAL_MESSAGE_STATUSES_SQL}) THEN ${messageTable.status} ELSE ${update.status} END`,
-  } as unknown as Partial<MessageRow>;
+  };
+}
+
+/**
+ * Provider send-time guard, first-write-wins (#2049).
+ *
+ * `date_sent` is the historical fact of when the carrier took the message. It
+ * is NOT a piece of mutable message state like `status`, so this cannot reuse
+ * the terminal-wins guard above: a later sweep, or a straggling callback, must
+ * never rewrite a send time the provider has already reported. `coalesce`
+ * also means an update that says nothing about `date_sent` leaves the column
+ * alone, which is what lets a status-only write run without clearing it.
+ *
+ * Note this is deliberately NOT inferred from `date_created`. Writing the
+ * request time into the send time is the exact defect this guard exists to
+ * prevent: on the Eric Lombardi blast the two differed by up to 7.7 hours, and
+ * an inferred value would have made that look like zero.
+ */
+function withDateSentGuard(update: MessageUpdate): MessageUpdate {
+  if (update.date_sent == null) return update;
+  return {
+    ...update,
+    date_sent: sql`coalesce(${messageTable.date_sent}, ${update.date_sent})`,
+  };
 }
 
 export async function updateMessageBySid(
   workspaceId: string,
   sid: string,
-  update: Partial<MessageRow>,
+  update: MessageUpdate,
   options?: { tdb?: TenantDb },
 ): Promise<MessageRow | null> {
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
@@ -231,7 +274,8 @@ export async function updateMessageBySid(
   // shape as updateCallBySid): keep the row's current status when it is
   // already terminal and the incoming status is not — out-of-order Twilio
   // callbacks must not regress delivered/failed back to sent/sending.
-  const set = withTerminalStatusGuard(update);
+  // The send-time guard composes on top so one call can safely carry both.
+  const set = withDateSentGuard(withTerminalStatusGuard(update));
 
   const [row] = await tdb.message.update({
     set,

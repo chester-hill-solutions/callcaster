@@ -187,7 +187,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
   });
 
   test("a Twilio-404 message is never terminalized (billing side-effects risk)", async () => {
-    mocks.messageFindMany.mockResolvedValue([
+    mocks.messageFindMany.mockResolvedValueOnce([
       { sid: "SM404", status: "queued", date_created: "2026-07-01T00:00:00Z", date_updated: null },
     ]);
     mocks.messagesList.mockResolvedValue([]);
@@ -202,7 +202,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
   });
 
   test("terminal message discovery updates the row and enqueues the billing side-effects job", async () => {
-    mocks.messageFindMany.mockResolvedValue([
+    mocks.messageFindMany.mockResolvedValueOnce([
       { sid: "SM1", status: "sending", date_created: "2026-07-29T00:00:00Z", date_updated: null },
     ]);
     mocks.messagesList.mockResolvedValue([
@@ -225,8 +225,161 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
     );
   });
 
+  describe("provider send time (#2049)", () => {
+    // Twilio does NOT put a send timestamp in the status callback — the
+    // documented callback fields are MessageSid, MessageStatus/SmsStatus,
+    // ErrorCode and the standard request parameters, with no DateSent. The
+    // create response is no help either, because a new message is still
+    // `queued` and its dateSent is null. The Message Resource is the only
+    // automated source, and this sweep already reads it.
+    //
+    // Before this, the sweep received `remote.dateSent` and dropped it on the
+    // floor: message.date_sent was NULL for all 23,503 outbound rows of the
+    // Lombardi blast, whose real send times ran up to 7.7 hours after our
+    // recorded request time.
+
+    test("persists the provider send time it already fetched", async () => {
+      mocks.messageFindMany.mockResolvedValueOnce([
+        { sid: "SM1", status: "sending", date_created: "2026-07-29T00:00:00Z", date_updated: null, date_sent: null },
+      ]);
+      mocks.messagesList.mockResolvedValue([
+        {
+          sid: "SM1",
+          status: "delivered",
+          errorCode: null,
+          dateUpdated: new Date("2026-07-29T00:05:00Z"),
+          dateSent: new Date("2026-07-29T00:04:30Z"),
+        },
+      ]);
+
+      await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+
+      expect(mocks.updateMessageBySid).toHaveBeenCalledWith(
+        "ws-1",
+        "SM1",
+        expect.objectContaining({ date_sent: "2026-07-29T00:04:30.000Z" }),
+      );
+    });
+
+    test("backfills a row that already settled but never recorded a send time", async () => {
+      // This is the case that made the obvious one-line fix useless. A message
+      // leaves OPEN_MESSAGE_STATUSES the instant it settles, so during a
+      // 23,504-message blast the sweep (600 rows/hour) never observes most rows
+      // while they are open, and they become unreachable by the open-row
+      // selection forever. Their status already matches the provider, so the
+      // "nothing changed" early-exit must not skip them.
+      mocks.messageFindMany.mockResolvedValueOnce([]); // open rows: none
+      mocks.messageFindMany.mockResolvedValueOnce([
+        { sid: "SM_old", status: "delivered", date_created: "2026-05-01T00:00:00.000Z", date_updated: null, date_sent: null },
+      ]); // backfill: the settled row with no send time
+      mocks.messagesList.mockResolvedValue([]);
+      mocks.messageFetch.mockResolvedValue({
+        sid: "SM_old",
+        status: "delivered",
+        errorCode: null,
+        dateUpdated: new Date("2026-05-01T00:06:00.000Z"),
+        dateSent: new Date("2026-05-01T00:05:00.000Z"),
+      });
+
+      await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+
+      expect(mocks.updateMessageBySid).toHaveBeenCalledWith(
+        "ws-1",
+        "SM_old",
+        expect.objectContaining({ date_sent: "2026-05-01T00:05:00.000Z" }),
+      );
+      // Billing must NOT re-run. The row's status already matches the
+      // provider, so its side effects already happened; a 23,504-row backfill
+      // that re-enqueued billing per row would be 23,504 jobs rediscovering
+      // that every message was already debited.
+      expect(mocks.enqueueJob).not.toHaveBeenCalled();
+    });
+
+    test("skips a row that already has both the status and the send time", async () => {
+      // Nothing to do means no write: the row already matches the provider on
+      // every field this sweep owns, so re-writing it would emit a pointless
+      // chat event.
+      mocks.messageFindMany.mockResolvedValueOnce([
+        { sid: "SM_done", status: "delivered", date_created: "2026-05-01T00:00:00.000Z", date_updated: "2026-05-01T00:05:00.000Z", date_sent: "2026-05-01T00:05:00.000Z" },
+      ]);
+      mocks.messagesList.mockResolvedValue([]);
+      mocks.messageFetch.mockResolvedValue({
+        sid: "SM_done",
+        status: "delivered",
+        errorCode: null,
+        dateSent: new Date("2026-05-01T00:05:00.000Z"),
+      });
+
+      await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+
+      expect(mocks.updateMessageBySid).not.toHaveBeenCalled();
+    });
+
+    test("never infers a send time from our own request time", async () => {
+      // The provider reported no dateSent. Writing date_created into date_sent
+      // would be the exact defect this ticket exists to remove: it would make
+      // a 7-hour discrepancy look like a 0-second one.
+      mocks.messageFindMany.mockResolvedValueOnce([
+        { sid: "SM_none", status: "sending", date_created: "2026-07-29T00:00:00.000Z", date_updated: null, date_sent: null },
+      ]);
+      mocks.messagesList.mockResolvedValue([
+        { sid: "SM_none", status: "delivered", errorCode: null, dateSent: null },
+      ]);
+
+      await triggerTwilioOpenSync({ workspaceId: "ws-1" });
+
+      const update = mocks.updateMessageBySid.mock.calls[0]?.[2] as Record<string, unknown>;
+      expect(update).toBeDefined();
+      expect(update.date_sent).toBeUndefined();
+    });
+
+    test("the backfill selection is bounded and does not consume the open-row budget", async () => {
+      // Two independent budgets. The open-row sweep must stay a pure
+      // lost-callback recovery path with no age bound (#1289: an age bound here
+      // let stuck rows escape forever), so a large send-time backlog must not
+      // be able to starve it.
+      mocks.messagesList.mockResolvedValue([]);
+
+      await triggerTwilioOpenSync({ workspaceId: "ws-1", messageLimit: 7, dateSentBackfillLimit: 3 });
+
+      expect(mocks.messageFindMany).toHaveBeenCalledTimes(2);
+
+      const referencedColumns = (callIndex: number) => {
+        const columns = new Set<string>();
+        const seen = new Set<object>();
+        const walk = (node: unknown) => {
+          if (node == null || typeof node !== "object" || seen.has(node)) return;
+          seen.add(node);
+          const name = (node as { name?: unknown }).name;
+          const table = (node as { table?: unknown }).table;
+          if (typeof name === "string" && table != null) {
+            columns.add(name);
+            return;
+          }
+          for (const value of Object.values(node)) walk(value);
+        };
+        walk(mocks.messageFindMany.mock.calls[callIndex]?.[0]?.where);
+        return [...columns];
+      };
+
+      // Open rows: unchanged selection, its own limit, still no age bound.
+      const openQuery = mocks.messageFindMany.mock.calls[0]?.[0] as { limit: number };
+      expect(openQuery.limit).toBe(7);
+      expect(referencedColumns(0)).toContain("status");
+      expect(referencedColumns(0)).not.toContain("date_created");
+      expect(referencedColumns(0)).not.toContain("date_sent");
+
+      // Backfill: only rows that are missing a send time, inside an age window.
+      const backfillQuery = mocks.messageFindMany.mock.calls[1]?.[0] as { limit: number };
+      expect(backfillQuery.limit).toBe(3);
+      expect(referencedColumns(1)).toContain("date_sent");
+      expect(referencedColumns(1)).toContain("status");
+      expect(referencedColumns(1)).toContain("date_created");
+    });
+  });
+
   test("a failed side-effects enqueue leaves the message open so the next sweep retries the debit", async () => {
-    mocks.messageFindMany.mockResolvedValue([
+    mocks.messageFindMany.mockResolvedValueOnce([
       { sid: "SM_lost", status: "sent", date_created: "2026-05-01T00:00:00.000Z", date_updated: null },
     ]);
     mocks.messagesList.mockResolvedValue([
@@ -241,7 +394,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
   });
 
   test("queues the billing job before writing the terminal status", async () => {
-    mocks.messageFindMany.mockResolvedValue([
+    mocks.messageFindMany.mockResolvedValueOnce([
       { sid: "SM_order", status: "sent", date_created: "2026-05-01T00:00:00.000Z", date_updated: null },
     ]);
     mocks.messagesList.mockResolvedValue([
@@ -270,7 +423,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
     });
 
     test("a young pending intent is left alone", async () => {
-      mocks.messageFindMany.mockResolvedValue([intent({ date_created: new Date().toISOString() })]);
+      mocks.messageFindMany.mockResolvedValueOnce([intent({ date_created: new Date().toISOString() })]);
       mocks.messagesList.mockResolvedValue([]);
       await triggerTwilioOpenSync({ workspaceId: "ws-1" });
       expect(mocks.updateMessageBySid).not.toHaveBeenCalled();
@@ -278,7 +431,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
     });
 
     test("a stale pending intent with a provider match is resolved, then billed through the normal path", async () => {
-      mocks.messageFindMany.mockResolvedValue([intent()]);
+      mocks.messageFindMany.mockResolvedValueOnce([intent()]);
       mocks.messagesList.mockResolvedValue([
         { sid: "SM_other", status: "delivered", to: "+15555550199", from: "+15550000001", dateCreated: new Date(), errorCode: null },
         { sid: "SM_match", status: "delivered", to: "+15555550100", from: "+15550000001", dateCreated: new Date(Date.now() - 29 * 60_000), errorCode: null, dateUpdated: new Date() },
@@ -292,7 +445,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
     });
 
     test("a stale intent without a from (Messaging Service send) matches on to alone", async () => {
-      mocks.messageFindMany.mockResolvedValue([intent({ from: null })]);
+      mocks.messageFindMany.mockResolvedValueOnce([intent({ from: null })]);
       mocks.messagesList.mockResolvedValue([
         { sid: "SM_svc", status: "delivered", to: "+15555550100", from: "+15550009999", dateCreated: new Date(Date.now() - 29 * 60_000), errorCode: null, dateUpdated: new Date() },
       ]);
@@ -301,7 +454,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
     });
 
     test("a stale pending intent with nothing at the provider is failed without a debit", async () => {
-      mocks.messageFindMany.mockResolvedValue([intent()]);
+      mocks.messageFindMany.mockResolvedValueOnce([intent()]);
       mocks.messagesList.mockResolvedValue([
         { sid: "SM_before", status: "delivered", to: "+15555550100", from: "+15550000001", dateCreated: new Date(Date.now() - 60 * 60_000), errorCode: null },
       ]);
@@ -317,7 +470,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
   });
 
   test("non-terminal message drift updates the row but does not enqueue billing", async () => {
-    mocks.messageFindMany.mockResolvedValue([
+    mocks.messageFindMany.mockResolvedValueOnce([
       { sid: "SM2", status: "queued", date_created: "2026-07-29T00:00:00Z", date_updated: null },
     ]);
     mocks.messagesList.mockResolvedValue([

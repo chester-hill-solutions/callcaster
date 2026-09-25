@@ -200,4 +200,62 @@ suite("guarded status writes against a real database (#1289)", () => {
     });
     expect(row?.status).toBe("delivered");
   });
+
+  // ── #2049: the provider send-time guard ─────────────────────────────────
+  //
+  // Same class of bug as the status guard above, same reason it needs a real
+  // database: `date_sent` is a timestamptz column that the schema models as
+  // text, and the guard is a SQL fragment the mocked unit tier never
+  // executes.
+  //
+  // The rule is first-write-wins, NOT terminal-wins. A send time, once the
+  // provider has reported it, is the historical fact of when the carrier took
+  // the message. Re-writing it from a later sweep would silently rewrite
+  // history, which is the opposite of what an audit field is for.
+
+  test("updateMessageBySid writes a send time onto a row that has none (#2049)", async () => {
+    const sentAt = "2026-05-01T00:05:00.000Z";
+    await updateMessageBySid(WORKSPACE_ID, MESSAGE_SID, {
+      status: "delivered",
+      date_sent: sentAt,
+    });
+
+    const [row] = await sqlClient`
+      select date_sent from message where sid = ${MESSAGE_SID}
+    `;
+    expect(new Date(row.date_sent).toISOString()).toBe(sentAt);
+  });
+
+  test("updateMessageBySid never overwrites a send time the row already has (#2049)", async () => {
+    const original = "2026-05-01T00:05:00.000Z";
+    await updateMessageBySid(WORKSPACE_ID, MESSAGE_SID, {
+      status: "delivered",
+      date_sent: original,
+    });
+    // A later sweep, or a straggling callback, must not rewrite it.
+    await updateMessageBySid(WORKSPACE_ID, MESSAGE_SID, {
+      date_sent: "2026-05-01T09:00:00.000Z",
+    });
+
+    const [row] = await sqlClient`
+      select date_sent from message where sid = ${MESSAGE_SID}
+    `;
+    expect(new Date(row.date_sent).toISOString()).toBe(original);
+  });
+
+  test("a later status write does not clear an existing send time (#2049)", async () => {
+    const original = "2026-05-01T00:05:00.000Z";
+    await updateMessageBySid(WORKSPACE_ID, MESSAGE_SID, {
+      status: "delivered",
+      date_sent: original,
+    });
+    // An update that says nothing about date_sent must leave it alone.
+    await updateMessageBySid(WORKSPACE_ID, MESSAGE_SID, { status: "read" });
+
+    const [row] = await sqlClient`
+      select status::text as status, date_sent from message where sid = ${MESSAGE_SID}
+    `;
+    expect(row.status).toBe("read");
+    expect(new Date(row.date_sent).toISOString()).toBe(original);
+  });
 });

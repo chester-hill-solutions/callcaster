@@ -28,6 +28,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Messages now record when the mobile carrier actually accepted them, separately from when CallCaster asked Twilio to send them. The two can differ by many hours, because a provider may hold a message and release it later, and CallCaster previously had no way to see the real send time. Messages already sent before this change keep an empty send time unless the provider can still confirm it ([#2049](https://github.com/chester-hill-solutions/callcaster/issues/2049)).
 - A campaign no longer shows as **Complete** the moment its last dial is placed: it stays running until every call it placed rings through to a terminal status (completed, failed, busy, no-answer, canceled), so the Launch page no longer reports done while the recipient's phone is still ringing ([#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728)).
 - IVR results and the CSV export now show the option label the caller chose (for example **Yes**) instead of the raw keypress code; a value with no matching option in the current script still shows the raw value ([#1976](https://github.com/chester-hill-solutions/callcaster/issues/1976)).
 - IVR steps that route to `end` now hang up cleanly instead of redirecting to a missing step and playing an error first ([#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884)).
