@@ -14,7 +14,10 @@ import {
 import { billingPricingSchema } from "@/lib/schemas/api/platform-billing";
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
-import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
+import {
+  LEDGER_ACTIVITY_COLUMNS,
+  insertTransactionHistoryIdempotent,
+} from "@/lib/transaction-history.server";
 import { stripeSessionKey } from "@/lib/billing-keys";
 import { adminDb } from "@/server/admin-db";
 import { createTenantDb } from "@/server/tenant-db";
@@ -100,14 +103,7 @@ export async function getWorkspaceBilling(
 
   const tdb = createTenantDb(workspaceId);
   const history = await tdb.transaction_history.findMany({
-    columns: {
-      id: true,
-      created_at: true,
-      type: true,
-      amount: true,
-      note: true,
-      idempotency_key: true,
-    },
+    columns: LEDGER_ACTIVITY_COLUMNS,
     orderBy: (row, { desc: descFn }) => [descFn(row.created_at)],
     limit: 500,
   });
