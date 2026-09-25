@@ -270,36 +270,6 @@
     "trackerRecommendation": "Co-ordinate with #1770."
   },
   {
-    "issueNumber": 1773,
-    "verdict": "needs-decision",
-    "recommendedTitle": "feature(backup): daily lossless per-workspace CSV snapshots + manifest + retention",
-    "summary": "No data backup today. Adopt quick-canvass backup.workspace_csv pattern: daily self-scheduling job snapshots workspace-scoped core tables to a backup bucket with manifest.json, date-keyed retention pruning (BACKUP_RETENTION_DAYS, default 30), per-workspace failure isolation.",
-    "currentBehavior": "No daily data backup exists; worker only does job-row retention.",
-    "rootCause": "Gap — no snapshot job.",
-    "resolution": "Register a schedule:true worker job; reuse uploadObject/listObjects/deleteObject; phase-1 coverage from app/db/workspace-scoped-tables.ts; BACKUP_S3_BUCKET/BACKUP_RETENTION_DAYS env; docs restore procedure.",
-    "lookIn": [
-      "app/lib/worker/handlers.server.ts",
-      "app/lib/object-storage.server.ts",
-      "app/db/workspace-scoped-tables.ts",
-      "app/lib/env.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "daily snapshot + manifest appear",
-      "retention pruned",
-      "one failing workspace does not stop others"
-    ],
-    "acceptanceCriteria": [
-      "per-workspace snapshot + manifest daily",
-      "older-than-retention pruned",
-      "failure isolation + errored job",
-      "restore documented"
-    ],
-    "size": "L",
-    "risk": "medium",
-    "trackerRecommendation": "Phase-1: core tables; document coverage in the manifest format."
-  },
-  {
     "issueNumber": 1699,
     "verdict": "needs-decision",
     "summary": "Terminology question: in the IVR Gather semantics the interacting party is the 'caller' on the keypad, so 'caller response' is defensible. Product must pick the canonical term and the sweep scope before any rename.",
@@ -805,7 +775,7 @@
     "issueNumber": 1996,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide whether a daily full PII snapshot ships, into which bucket, with what retention and who can restore it",
-    "summary": "The code half is fully mapped and none of it is built, so the engineering risk is low and the open questions are product and data-protection ones. Every integration point the issue names exists: the job type constant file (app/lib/worker/job-types.server.ts), the params and registry (app/lib/worker/job-params.server.ts, app/lib/worker/handlers.server.ts), the cron handler pattern (app/lib/worker/handlers/cron.server.ts) with withReschedule from handlers/shared.server.ts, the per-workspace error isolation fanout (app/lib/cron-workspace-fanout.server.ts), the CSV serializer (app/lib/rpc-csv.server.ts rowsToCsv, app/lib/csv.ts escapeCsvCell), and the object-storage bucket union (app/lib/object-storage.server.ts ObjectStorageBucket, which today has no 'backups' member). ONE FACTUAL DRIFT to correct in the issue: it says 27 tenant tables and AGENTS.md says 26; WORKSPACE_SCOPED_TABLES in app/db/workspace-scoped-tables.ts currently has 28. Enumerate the table list from the constant rather than from either number, so the snapshot cannot silently miss a table. The unresolved decisions are below.",
+    "summary": "Canonical for the daily backup work; #1773 was folded in here as a duplicate. The code half is fully mapped and none of it is built, so the engineering risk is low and the open questions are product and data-protection ones. Every integration point the issue names exists: the job type constant file (app/lib/worker/job-types.server.ts), the params and registry (app/lib/worker/job-params.server.ts, app/lib/worker/handlers.server.ts), the cron handler pattern (app/lib/worker/handlers/cron.server.ts) with withReschedule from handlers/shared.server.ts, the per-workspace error isolation fanout (app/lib/cron-workspace-fanout.server.ts), the CSV serializer (app/lib/rpc-csv.server.ts rowsToCsv, app/lib/csv.ts escapeCsvCell), and the object-storage bucket union (app/lib/object-storage.server.ts ObjectStorageBucket, which today has no 'backups' member). ONE FACTUAL DRIFT to correct in the issue: it says 27 tenant tables and AGENTS.md says 26; WORKSPACE_SCOPED_TABLES in app/db/workspace-scoped-tables.ts currently has 28. Enumerate the table list from the constant rather than from either number, so the snapshot cannot silently miss a table. The unresolved decisions are below.",
     "currentBehavior": "No scheduled backup exists. A workspace's data exists only in the live database.",
     "rootCause": "The backup system was never ported; the gocanvass blueprint it copies is described in the issue and nothing in CallCaster implements it.",
     "resolution": "Answer the four questions, then implement. (1) What is in the snapshot: the issue proposes every tenant table, which includes contact PII (names, phones, emails, street addresses) and the full billing ledger. Options: everything (maximum recoverability, maximum exposure), or contacts and the ledger excluded (a schema-and-reference backup that cannot restore customer records), or a middle option that includes contact identifiers without free-text fields. This is the decision that has to be made by someone accountable for the data, not by the implementer. (2) Where it lands: a dedicated backups bucket with its own retention, or the existing S3_BUCKET under a backups/ prefix. A dedicated bucket is the better answer on isolation grounds and the issue already designs for it; the prefix is cheaper and needs no new env var. Pick one and say why, because the object-storage bucket union has to grow either way. (3) Retention and deletion: BACKUP_RETENTION_DAYS defaults to 30 and pruning deletes objects. Confirm the default and confirm the retention is long enough to be useful for the incident it is insurance against. (4) Who can restore: the issue explicitly puts restore tooling out of scope, which means the snapshots are written and never read. Decide whether that is acceptable as phase one, or whether a restore runbook is part of the deliverable — an unread backup is a liability, since it is a full copy of customer data with no access control beyond the bucket. Once those are answered the implementation is the issue's own step list: job type and registry entry, daily dedupe via an idempotency key of backups:<YYYY-MM-DD> (or a self-scheduling chain seeded by ensure-scheduled-jobs), per-workspace fanout so one failure does not error the job, one CSV per table from createTenantDb over the 28 tables, a manifest.json, and a prune pass over the date segments.",
@@ -845,5 +815,64 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Needs decision before implementation, then it is well-specified work. The engineering is a known pattern in this repo, but shipping a daily full copy of customer PII with a 30-day retention, no access story and no restore path is a decision with an owner, not an implementation detail. Ask the four questions in one go; do not start by writing the job handler, because the answers change which tables the handler walks and where it writes."
+  },
+  {
+    "issueNumber": 2116,
+    "verdict": "needs-decision",
+    "recommendedTitle": "runCronWorkspaceFanout never skips workspace.disabled, so a disabled workspace is still debited and still reconciled",
+    "summary": "`runCronWorkspaceFanout` is the entry point for `twilio_open_sync`, `billing_reconcile` and `number_rental_billing`. It does not check `workspace.disabled`. A workspace an admin has disabled — the platform's suspension lever for non-payment or abuse — still gets its daily number-rental debits posted against its credit balance, and still gets its Twilio usage pulled and reconciled.",
+    "currentBehavior": "`disabled` is the platform's kill switch for a workspace. Suspending a workspace for non-payment and then continuing to debit it is a product contradiction: the workspace is being punished twice, and the balance can go negative while suspended.",
+    "resolution": "1. In `runCronWorkspaceFanout`, `continue` (and count as `skipped`, with the same `logger.info` shape as the no-credentials branch) when `workspace.disabled` is true. One guard, applied to all three money jobs consistently. 2. **Confirm with the product owner first** that `disabled` is intended to mean \"stop all billing\", since the only existing precedent is the webhook audit. Record the decision in the issue — if the intent is \"stop outbound but keep billing\", then the guard belongs in the dispatch path, not here, and that is a different change. 3. Once decided, state the rule in a comment at the top of `runCronWorkspaceFanout` so the next job added to it inherits the behaviour deliberately.",
+    "lookIn": [
+      "app/lib/worker/handlers/cron.server.ts:64,121,167,190-225",
+      "app/lib/cron-workspace-fanout.server.ts",
+      "app/lib/database/workspace.server.ts (the `disabled` column and the sibling sweep that filters it)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "A disabled workspace is skipped by all three jobs.",
+      "The skip is counted and logged with a reason."
+    ],
+    "acceptanceCriteria": [
+      "A disabled workspace receives no `number_rental_billing` debit, no `billing_reconcile` run and no `twilio_open_sync` run (kill-check: remove the guard and confirm the test goes red).",
+      "The fanout summary counts the workspace as `skipped` with a reason.",
+      "An enabled workspace is unaffected (positive control).",
+      "The decided meaning of `disabled` is written down in the issue and in a code comment."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
+  },
+  {
+    "issueNumber": 2139,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Member-level role management is server-permitted but UI-invisible, so the Member floor on updateUser/deleteUser is dead code",
+    "summary": "A workspace `member` who clicks the gear icon on a peer sees the manage sheet with their own name in the title and the text \"You do not have permission to edit this user\" — for an operation the server explicitly authorises and has unit tests for. The message actively tells the user the product forbids something it allows.",
+    "currentBehavior": "One side of the permission model is implemented and the other is not, and the user-visible message is on the wrong side. A test that asserts the server permits it and a UI that asserts the user cannot do it are both green, which is why this survived.",
+    "resolution": "Decide the policy and make one side match. Given that `assertNoRoleEscalation`, `requireActorOutranksTarget` and `requireSoleOwnerProtection` already exist, the smaller fix is to **render the form**: 1. `TeamMember.tsx:139-141` → `userRole !== MemberRole.Caller && memberRole !== MemberRole.Admin` (keep the existing `memberRole === \"owner\"` exclusion from the sheet wrapper at `:78`). 2. Filter the `updateUser` role select by `assertNoRoleEscalation(userRole, role)` so a `member` is never offered `admin`. 3. If admin-only is the intent instead, raise the floor in `settings.action.server.ts:46` to `MemberRole.Admin` and add a member-floor test asserting 403. 4. **Either way, add the e2e assertion.** There should be a test that a `member` sees (or does not see) the manage control, matching whichever policy is chosen. Right now neither side is asserted in the UI and the server test asserts th",
+    "lookIn": [
+      "app/components/workspace/TeamMember.tsx:78,139-141",
+      "app/routes/workspaces+/$id/settings.action.server.ts:44-53",
+      "app/lib/platform-members.server.ts:53-75",
+      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts (`assertNoRoleEscalation`, `requireActorOutranksTarget`)",
+      "e2e/specs/rbac.spec.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "The UI visibility matches the chosen policy (kill-check).",
+      "A `member` is not offered `admin`.",
+      "The e2e assertion."
+    ],
+    "acceptanceCriteria": [
+      "The UI and the server agree: a `member` either sees a working manage form, or is told the truth and the server agrees (kill-check: flip one side and confirm a test goes red).",
+      "A `member` is never offered a role they cannot grant.",
+      "The sole owner still cannot be removed or demoted.",
+      "An e2e assertion covers the visibility, matching the chosen policy."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
   }
 ]
