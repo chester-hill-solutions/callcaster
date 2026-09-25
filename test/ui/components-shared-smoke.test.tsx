@@ -106,6 +106,7 @@ describe("app/components/shared/QueryParamBanner.tsx", () => {
       title: "Saved",
       description: "Your changes were saved",
       className: "banner-saved",
+      variant: "success" as const,
     },
   };
 
@@ -124,6 +125,7 @@ describe("app/components/shared/QueryParamBanner.tsx", () => {
     );
     expect(screen.getByText("Saved")).toBeInTheDocument();
     expect(screen.getByText("Your changes were saved")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveClass("border-success/40");
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByText("Saved")).not.toBeInTheDocument();
   });
