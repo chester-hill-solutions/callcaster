@@ -79,6 +79,7 @@ function WorkspaceResolvedView({
   onboardingReadiness,
   today,
   showSidebar,
+  isOnboarding,
   complianceOnboarding,
   a2pBlockingIssues,
   campaignQueueProgress,
@@ -90,6 +91,7 @@ function WorkspaceResolvedView({
   onboardingReadiness: WorkspaceMessagingReadiness;
   today?: WorkspaceTodaySelection;
   showSidebar: boolean;
+  isOnboarding: boolean;
   complianceOnboarding?: WorkspaceMessagingOnboardingState;
   a2pBlockingIssues?: string[];
   campaignQueueProgress: Record<string, CampaignQueueProgressCounts>;
@@ -135,7 +137,8 @@ function WorkspaceResolvedView({
   const location = useLocation();
   // Credits page is where users top up — keep the low-credit banner off it (#1097).
   const isBillingPage = /\/billing(?:\/|$)/.test(location.pathname);
-  const showLowCreditBanner = !isBillingPage && liveCredits < LOW_CREDIT_THRESHOLD;
+  const showLowCreditBanner =
+    !isBillingPage && !isOnboarding && liveCredits < LOW_CREDIT_THRESHOLD;
   // A workspace with nothing in it has not spent anything: "depleted" and
   // "resume" would imply prior usage that never happened (#1069).
   const hasNeverBeenSetUp =
@@ -291,6 +294,7 @@ export default function Workspace() {
           onboardingReadiness={onboardingReadiness}
           today={today}
           showSidebar={showSidebar}
+          isOnboarding={Boolean(onboardingStrip)}
           complianceOnboarding={complianceOnboarding}
           a2pBlockingIssues={a2pBlockingIssues}
           campaignQueueProgress={campaignQueueProgress}
