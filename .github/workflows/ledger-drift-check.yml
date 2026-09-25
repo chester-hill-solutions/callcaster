@@ -34,7 +34,7 @@ name: Ledger drift check
 #   * a function the app calls does not exist in this database
 #   * DATABASE_URL missing for the environment
 #
-# Environment secrets required (per environment: dev / staging / production):
+# Environment secrets required (per environment: dev / qa / production):
 #
 #   DATABASE_URL   — read-only creds are enough; the check only SELECTs
 #                    from AUTH_migrations.schema_migrations
@@ -56,7 +56,7 @@ on:
         type: choice
         options:
           - dev
-          - staging
+          - qa
           - production
   # Re-verify right after a migration lands on the trunk of a deployed env.
   push:
@@ -112,15 +112,15 @@ jobs:
         # table, column, enum value or function is absent (#1886).
         run: node scripts/db/check-schema-drift.mjs --require-db
 
-  staging:
-    # Runs on: nightly schedule, dispatch-with-input=staging, and push-to-master
-    # (staging deploys master under the 2026-08-31 topology, #1300).
+  qa:
+    # Runs on: nightly schedule, dispatch-with-input=qa, and push-to-master
+    # (QA deploys master under the 2026-08-31 topology, #1300).
     if: >-
       github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_dispatch' && inputs.environment == 'staging') ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'qa') ||
       (github.event_name == 'push' && github.ref == 'refs/heads/master')
     runs-on: ubuntu-latest
-    environment: staging
+    environment: qa
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
@@ -133,9 +133,9 @@ jobs:
         run: npm ci
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
-      - name: Ledger drift check (staging)
+      - name: Ledger drift check (QA)
         run: node scripts/db/check-migration-ledger.mjs --require-db
-      - name: Schema drift check (staging)
+      - name: Schema drift check (QA)
         run: node scripts/db/check-schema-drift.mjs --require-db
 
   production:
