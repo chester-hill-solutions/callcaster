@@ -263,6 +263,15 @@ export function TopChrome({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {children}
+          <Button
+            type="button"
+            size="sm"
+            variant="destructive"
+            onClick={onLeaveCampaign}
+          >
+            <PhoneOff className="mr-2 h-4 w-4" />
+            Leave Campaign
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -278,13 +287,6 @@ export function TopChrome({
               <DropdownMenuItem onSelect={onReportError}>
                 <AlertTriangle className="mr-2 h-4 w-4" />
                 Report Issue
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={onLeaveCampaign}
-                className="text-destructive-text focus:text-destructive-text"
-              >
-                <PhoneOff className="mr-2 h-4 w-4" />
-                Leave Campaign
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
