@@ -1,19 +1,19 @@
 import { bucket, postgres, service, volume } from "railway/iac";
 import { preservedVariables, source } from "../config/shared.js";
 
-// Staging is a Railway environment mirroring production (#1300): v2 topology,
+// QA is a Railway environment mirroring production (#1300): v2 topology,
 // same code lineage, test-mode Stripe keys as the only intended difference.
-// Values are populated from dev by scripts/railway/sync-staging-vars.sh —
+// Values are populated from dev by scripts/railway/sync-qa-vars.sh —
 // dev's Stripe keys are already test-mode and Twilio is shared for now.
 //
 // Applying this DELETES the legacy hearty-expression service (the Supabase-era
-// staging app, frozen since 2026-06-24). That is the point of phase 2, but the
+// QA app, frozen since 2026-06-24). That is the point of phase 2, but the
 // apply is destructive and stays human-reviewed/manual — CI refuses to apply
 // destructive plans on push, so the conversion runs once by hand (see
-// docs/staging-rehearsal-runbook.md) and CI takes over from there.
+// docs/qa-rehearsal-runbook.md) and CI takes over from there.
 //
 // Source: `master`, permanently. Topology directive 2026-08-31 (#1300):
-// production and staging both track master; there is no `production` deploy
+// production and QA both track master; there is no `production` deploy
 // branch.
 const appVariables = [
   "BASE_URL",
@@ -42,7 +42,7 @@ const appVariables = [
   "TWILIO_PHONE_NUMBER",
   "TWILIO_SID",
 ] as const;
-// DISABLE_2FA_ENFORCEMENT is deliberately absent: dev-only. Staging matches
+// DISABLE_2FA_ENFORCEMENT is deliberately absent: dev-only. QA matches
 // production behavior.
 
 const workerVariables = [
@@ -64,11 +64,11 @@ const workerVariables = [
   "TWILIO_SID",
 ] as const;
 
-export function stagingResources() {
+export function qaResources() {
   const appSource = source("master");
   // Standard Railway Postgres template. The 2026-08-18 apply silently failed
   // to create dev's custom-image database ("PostgreSQL 18" / xlab image —
-  // plans fine, never materializes), so staging got `railway add --database
+  // plans fine, never materializes), so QA got `railway add --database
   // postgres` instead; this models what actually exists. Note for phase 3:
   // do NOT model a custom-image database for a fresh environment.
   const database = postgres("Postgres-mgzk", { region: "us-east4-eqdc4a" });
