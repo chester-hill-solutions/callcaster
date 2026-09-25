@@ -60,7 +60,7 @@ export function resolveObjectStorageEnvRequired(
 
   throw new Error(
     `Missing object storage configuration for "${setting}". ` +
-      "Set S3_* variables (local MinIO) or Railway bucket variables " +
+      "Set S3_* variables (local object storage) or Railway bucket variables " +
       "(ENDPOINT, REGION, ACCESS_KEY_ID, SECRET_ACCESS_KEY, BUCKET).",
   );
 }
@@ -82,13 +82,13 @@ export function validateObjectStorageEnv(
 
   throw new Error(
     "Missing object storage environment variables. Provide either S3_* " +
-      "(local MinIO) or Railway bucket credentials " +
+      "(local object storage) or Railway bucket credentials " +
       "(ENDPOINT, REGION, ACCESS_KEY_ID, SECRET_ACCESS_KEY, BUCKET).",
   );
 }
 
 /**
- * MinIO (local dev) requires path-style URLs; Railway Buckets use virtual-hosted
+ * Local object storage (stow) requires path-style URLs; Railway Buckets use virtual-hosted
  * style. Override with S3_FORCE_PATH_STYLE or S3_URL_STYLE when needed.
  */
 export function objectStorageUsesPathStyle(

@@ -134,7 +134,7 @@ Order by risk. Phase 1 is the highest-risk security fix and should go first.
    - `.railway/config/shared.ts:5` `checkSuites:false` — gate deploys.
    - Protect destructive tools: `scripts/e2e/run-compose-e2e.mjs` (line ~22,
      docker compose up), `scripts/e2e/bootstrap-compose-reset.sql` (DROP SCHEMA),
-     `scripts/e2e/ensure-minio-bucket.mjs` (purge default, line ~56). Add
+     `scripts/e2e/ensure-bucket.mjs` (purge default, line ~56). Add
      target-safety guards so a stray env var can't point them at prod.
    - 6 `SUPABASE_*` env vars still in production — flag, do NOT revoke without
      approval.

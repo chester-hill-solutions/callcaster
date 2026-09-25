@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /* eslint-env node */
 /**
- * Seed MinIO objects and workspace_audio sidecar rows for E2E audio-library tests.
+ * Seed object-storage objects and workspace_audio sidecar rows for E2E
+ * audio-library tests.
  *
- * MinIO is erasure-coded — objects must be written through the S3 API, not copied
- * into the container filesystem. See docs/audio-library-editing-plan.md.
+ * Objects must be written through the S3 API, not copied into the store's
+ * data directory. See docs/audio-library-editing-plan.md.
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";

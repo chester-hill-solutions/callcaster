@@ -94,10 +94,11 @@ docker compose -f docker-compose.dev.yml up -d
 node scripts/e2e/bootstrap-compose-db.mjs
 ```
 
-4. Create the MinIO bucket:
+4. Create the object-storage bucket (stow runs as a local binary, not a container):
 
 ```bash
-node scripts/e2e/ensure-minio-bucket.mjs
+node scripts/e2e/start-stow.mjs --start
+node scripts/e2e/ensure-bucket.mjs
 ```
 
 5. Start the media-stream Bun service (optional; needed for the dashboard audio stream):

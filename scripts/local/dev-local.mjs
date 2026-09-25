@@ -2,13 +2,14 @@
 /* eslint-env node */
 /**
  * Local-infra dev entrypoint: loads secrets from `.env`, then forces Postgres +
- * MinIO onto the docker-compose.dev.yml stack so loaders are not paying Railway
- * public-proxy RTT. Does not modify `.env`.
+ * object storage (the stow binary) onto the local stack so loaders are not
+ * paying Railway public-proxy RTT. Does not modify `.env`.
  *
  * Usage: npm run dev:local
  *
  * Prerequisites:
- *   docker compose -f docker-compose.dev.yml up -d postgres minio inbucket
+ *   docker compose -f docker-compose.dev.yml up -d postgres inbucket
+ *   node scripts/e2e/start-stow.mjs --start
  *   DATABASE_URL=postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster \
  *     node scripts/e2e/bootstrap-compose-db.mjs
  *   DATABASE_URL=postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster \
@@ -104,7 +105,7 @@ if (nodeMajor >= 25) {
 console.log(
   "[dev:local] DATABASE_URL → local compose Postgres @ 127.0.0.1:5433",
 );
-console.log("[dev:local] S3_* → local MinIO @ 127.0.0.1:9000");
+console.log("[dev:local] S3_* → local object storage (stow) @ 127.0.0.1:9000");
 console.log(`[dev:local] node ${process.versions.node}`);
 
 const child = spawn("bunx", ["react-router", "dev"], {
