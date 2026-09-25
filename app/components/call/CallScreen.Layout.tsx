@@ -10,6 +10,14 @@ import { CallWorkbench } from "@/components/call/CallScreen.Workbench";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -26,7 +34,7 @@ import {
 import type { Call } from "@twilio/voice-sdk";
 import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
 import type { ActiveCall, CampaignDetails, QueueItem } from "@/lib/types";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Tables } from "@/lib/db-types";
 import { normalizeDispositionOptions } from "@/lib/outreach-disposition";
 
@@ -76,6 +84,7 @@ export function CallScreenLayout({
   callSid,
   initialCoaching,
 }: CallScreenLayoutProps) {
+  const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
   const {
     hangUp,
     answer,
@@ -170,6 +179,7 @@ export function CallScreenLayout({
     requeueContacts();
     navigate(-1);
   };
+  const requestLeaveCampaign = () => setLeaveDialogOpen(true);
 
   // One queue list instance shared by the mobile sheet and the desktop rail.
   const queueList = (
@@ -235,7 +245,7 @@ export function CallScreenLayout({
         creditState={creditState}
         hasAccess={hasAccess}
         predictive={campaign.dial_type === "predictive"}
-        onLeaveCampaign={handleLeaveCampaign}
+        onLeaveCampaign={requestLeaveCampaign}
         onReportError={() => setReportDialog(!isReportDialogOpen)}
       >
         <Sheet>
@@ -342,6 +352,24 @@ export function CallScreenLayout({
           </SheetContent>
         </Sheet>
       </TopChrome>
+      <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Leave campaign?</DialogTitle>
+            <DialogDescription>
+              Your active call will end and available contacts will return to the queue.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setLeaveDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleLeaveCampaign}>
+              Leave Campaign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <CallWorkbench
         incoming={
           incomingCall &&
@@ -501,7 +529,7 @@ export function CallScreenLayout({
         householdMap={householdMap}
         currentState={currentState}
         isActive={isActive}
-        onLeaveCampaign={handleLeaveCampaign}
+        onLeaveCampaign={requestLeaveCampaign}
         onJoin={onJoin}
       />
     </div>
