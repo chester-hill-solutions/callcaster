@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Copy dev's service variables into the staging environment (#1300 phase 2).
+# Copy dev's service variables into the QA environment (#1300 phase 2).
 #
-# Staging mirrors production with dev's values (Stripe keys in dev are already
+# QA mirrors production with dev's values (Stripe keys in dev are already
 # test-mode; Twilio is the shared account). Environment-shaped variables are
 # set as Railway REFERENCE variables, never literals, so they follow domain
 # and service changes automatically:
@@ -14,7 +14,7 @@
 # DISABLE_2FA_ENFORCEMENT is dev-only and never copied.
 #
 # Usage:
-#   scripts/railway/sync-staging-vars.sh
+#   scripts/railway/sync-qa-vars.sh
 #
 # Requires: railway CLI authenticated with account scope, jq.
 set -euo pipefail
@@ -51,19 +51,19 @@ sync_service() {
   for name in "${names[@]}"; do
     value=$(jq -r --arg k "$name" '.[$k] // empty' <<<"$dev_json")
     if [[ -z "$value" ]]; then
-      echo "!! $name is unset in dev — skipped (set it manually if staging needs it)" >&2
+      echo "!! $name is unset in dev — skipped (set it manually if QA needs it)" >&2
       continue
     fi
-    railway variable set "$name=$value" --service "$service_id" --environment staging --skip-deploys >/dev/null
+    railway variable set "$name=$value" --service "$service_id" --environment qa --skip-deploys >/dev/null
     echo "   $name"
   done
 }
 
 echo "== CallCaster (app) =="
 sync_service "$APP_SERVICE_ID" "${APP_COPY_VARS[@]}"
-railway variable set "DATABASE_URL=$DB_REFERENCE" --service "$APP_SERVICE_ID" --environment staging --skip-deploys >/dev/null
-railway variable set "BASE_URL=$SELF_URL_REFERENCE" --service "$APP_SERVICE_ID" --environment staging --skip-deploys >/dev/null
-railway variable set "BETTER_AUTH_URL=$SELF_URL_REFERENCE" --service "$APP_SERVICE_ID" --environment staging --skip-deploys >/dev/null
+railway variable set "DATABASE_URL=$DB_REFERENCE" --service "$APP_SERVICE_ID" --environment qa --skip-deploys >/dev/null
+railway variable set "BASE_URL=$SELF_URL_REFERENCE" --service "$APP_SERVICE_ID" --environment qa --skip-deploys >/dev/null
+railway variable set "BETTER_AUTH_URL=$SELF_URL_REFERENCE" --service "$APP_SERVICE_ID" --environment qa --skip-deploys >/dev/null
 set_bucket_refs() {
   local svc="$1"
   railway variable set \
@@ -72,16 +72,16 @@ set_bucket_refs() {
     "S3_SECRET_ACCESS_KEY=\${{${BUCKET}.SECRET_ACCESS_KEY}}" \
     "S3_REGION=\${{${BUCKET}.REGION}}" \
     "S3_BUCKET=\${{${BUCKET}.BUCKET}}" \
-    --service "$svc" --environment staging --skip-deploys >/dev/null
+    --service "$svc" --environment qa --skip-deploys >/dev/null
 }
 set_bucket_refs "$APP_SERVICE_ID"
 echo "   DATABASE_URL, BASE_URL, BETTER_AUTH_URL, S3_* (references)"
 
 echo "== callcaster-worker =="
 sync_service "$WORKER_SERVICE_ID" "${WORKER_COPY_VARS[@]}"
-railway variable set "DATABASE_URL=$DB_REFERENCE" --service "$WORKER_SERVICE_ID" --environment staging --skip-deploys >/dev/null
-railway variable set "BASE_URL=$APP_URL_REFERENCE" --service "$WORKER_SERVICE_ID" --environment staging --skip-deploys >/dev/null
+railway variable set "DATABASE_URL=$DB_REFERENCE" --service "$WORKER_SERVICE_ID" --environment qa --skip-deploys >/dev/null
+railway variable set "BASE_URL=$APP_URL_REFERENCE" --service "$WORKER_SERVICE_ID" --environment qa --skip-deploys >/dev/null
 set_bucket_refs "$WORKER_SERVICE_ID"
 echo "   DATABASE_URL, BASE_URL, S3_* (references)"
 
-echo "Done. Redeploy staging services to pick up the variables."
+echo "Done. Redeploy QA services to pick up the variables."

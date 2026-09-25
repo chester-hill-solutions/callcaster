@@ -55,7 +55,7 @@ function flagValue(name, fallback = null) {
 
 /**
  * Named targets so nobody has to remember a Railway hostname. Override any of
- * them with an env var (that is how staging gets a URL before it is a
+ * them with an env var (that is how QA gets a URL before it is a
  * hard-coded constant).
  */
 const TARGETS = {
@@ -63,13 +63,13 @@ const TARGETS = {
   dev:
     process.env.PROBE_URL_DEV ??
     "https://callcaster-review-visual-asset-review.up.railway.app",
-  staging: process.env.PROBE_URL_STAGING ?? null,
+  qa: process.env.PROBE_URL_QA ?? null,
   prod: process.env.PROBE_URL_PROD ?? "https://callcaster.ca",
 };
 
 function usage() {
   return [
-    "Usage: npm run probe:<target>        (target: local | dev | staging | prod)",
+    "Usage: npm run probe:<target>        (target: local | dev | qa | prod)",
     "   or: npm run probe -- <target|url> [flags]",
     "",
     "Defaults are chosen per target — you should not normally need flags:",
@@ -78,7 +78,7 @@ function usage() {
     "                    TWILIO_VALIDATE_WEBHOOKS=false), page routes ON",
     "",
     "Flags: --strict | --relaxed | --no-pages | --json <file> | --timeout <ms>",
-    "Env:   PROBE_URL_LOCAL / PROBE_URL_DEV / PROBE_URL_STAGING / PROBE_URL_PROD",
+    "Env:   PROBE_URL_LOCAL / PROBE_URL_DEV / PROBE_URL_QA / PROBE_URL_PROD",
   ].join("\n");
 }
 
@@ -97,9 +97,9 @@ if (targetName && !(targetName in TARGETS)) {
   console.error(`Unknown target "${targetName}".\n\n${usage()}`);
   process.exit(1);
 }
-if (targetName === "staging" && !TARGETS.staging) {
+if (targetName === "qa" && !TARGETS.qa) {
   console.error(
-    "Staging has no URL yet. Set PROBE_URL_STAGING=https://… (or add it to\n" +
+    "QA has no URL yet. Set PROBE_URL_QA=https://… (or add it to\n" +
       "TARGETS in this file once the environment is provisioned).",
   );
   process.exit(1);
