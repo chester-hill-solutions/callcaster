@@ -1,4 +1,4 @@
-import { asc, inArray } from "drizzle-orm";
+import { and, asc, gt, inArray, isNull, lt, notInArray } from "drizzle-orm";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { call, message } from "@/db/schema";
 import { createTenantDb } from "@/server/tenant-db";
@@ -33,6 +33,44 @@ const OPEN_MESSAGE_STATUSES = [
   "queued",
   "sending",
 ] as const;
+
+/**
+ * Age window for the provider send-time backfill (#2049).
+ *
+ * LOWER bound — a row younger than this has only just left an open status, so
+ * a `dateSent` may not be readable yet. Re-checking it next run costs one
+ * cheap API call and, because the row stays selected, it costs nothing
+ * persistent. The window exists only to avoid pointless calls, not for
+ * correctness: `dateSent` is set at carrier handoff, which precedes the
+ * terminal status we are keying off, so in practice it is already there.
+ *
+ * UPPER bound — the self-limiter. Without it, a row the provider can never
+ * report a `dateSent` for (a message cancelled before handoff, or one that
+ * failed as unreachable) would be re-selected on every sweep forever. The
+ * failure mode of stopping too early is a NULL column, which is recoverable
+ * and honest; the failure mode of never stopping is an unbounded bill of API
+ * calls. So err toward stopping.
+ *
+ * This is deliberately an age bound, which the open-row sweep above must never
+ * grow one: there, a row that cannot be resolved is still *live work* and
+ * silently escaping the sweep strands a contact forever (#1289). Here, a row
+ * with no recoverable send time is simply missing an audit field. Same
+ * technique, opposite reason.
+ */
+const DATE_SENT_BACKFILL_MIN_AGE_MS = 30 * 60_000;
+const DATE_SENT_BACKFILL_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+
+/**
+ * Rows per run given to the send-time backfill.
+ *
+ * A large blast leaves a large one-time backlog: the Lombardi campaign had
+ * 23,504 outbound rows, none of which recorded a send time. At the open-row
+ * default of 50 per 5 minutes that backlog takes ~39 hours to drain. 100
+ * halves it to ~20 hours while still costing at most 100 extra reads per run,
+ * which is nothing against Twilio's read rate limit. Steady state is one
+ * indexed query that returns zero rows.
+ */
+const DATE_SENT_BACKFILL_LIMIT = 100;
 
 type ProviderMessage = {
   sid: string;
@@ -108,6 +146,11 @@ async function reconcilePendingIntent<T extends ProviderMessage>(args: {
  * age before a Twilio-404 call row is terminalized — it does NOT bound which
  * rows are swept. Selection is every locally-open row, oldest first (#1289).
  *
+ * Messages have a second, separate population (#2049): rows that have left
+ * the open statuses but never recorded the provider's send time. They get
+ * their own query and their own limit so a send-time backlog can never starve
+ * lost-callback recovery, but they are reconciled in the same loop.
+ *
  * The sync is driven by local rows stuck in an open (non-terminal) status —
  * the population left behind when a Twilio status callback was lost. Each
  * such row is compared with Twilio's authoritative status and any change is
@@ -127,11 +170,13 @@ export async function triggerTwilioOpenSync({
   callLimit = 50,
   messageLimit = 50,
   maxAgeMinutes = 120,
+  dateSentBackfillLimit = DATE_SENT_BACKFILL_LIMIT,
 }: {
   workspaceId: string;
   callLimit?: number;
   messageLimit?: number;
   maxAgeMinutes?: number;
+  dateSentBackfillLimit?: number;
 }): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   try {
     const twilio = await createWorkspaceTwilioInstance({
@@ -247,15 +292,45 @@ export async function triggerTwilioOpenSync({
       limit: messageLimit,
     });
 
-    if (localOpenMessages.length > 0) {
-      const twilioMessages = await twilio.messages.list({
-        limit: messageLimit,
-        pageSize: messageLimit,
-        dateSentAfter: since,
-      });
+    // Send-time backfill (#2049). A separate population on a separate budget,
+    // deliberately NOT merged into the open-row query: merging them would let
+    // a large send-time backlog starve lost-callback recovery, which is the
+    // one job this sweep must never drop. Two queries, two limits, one loop.
+    //
+    // "Not open" rather than "settled" on purpose. The provider sets dateSent
+    // at carrier handoff, which is before any terminal status, so a `sent` row
+    // has a real send time worth recording; excluding it would leave the rows
+    // most worth auditing (the ones still awaiting delivery) blank.
+    const localUntimedMessages = await tdb.message.findMany({
+      where: and(
+        isNull(message.date_sent),
+        notInArray(message.status, [...OPEN_MESSAGE_STATUSES]),
+        // ISO strings, not Dates: the schema models every timestamp column on
+        // this table as text, so Drizzle's typed comparators reject a Date.
+        gt(message.date_created, new Date(Date.now() - DATE_SENT_BACKFILL_MAX_AGE_MS).toISOString()),
+        lt(message.date_created, new Date(Date.now() - DATE_SENT_BACKFILL_MIN_AGE_MS).toISOString()),
+      ),
+      orderBy: [asc(message.date_created)],
+      limit: dateSentBackfillLimit,
+    });
+
+    const localMessages = [...localOpenMessages, ...localUntimedMessages];
+    // The status sets are disjoint, so the populations cannot overlap.
+    if (localMessages.length > 0) {
+      // Only the open population benefits: backfill rows are by definition
+      // outside the prefetch window, so the list call would miss them all and
+      // every one of them costs an individual fetch.
+      const twilioMessages =
+        localOpenMessages.length > 0
+          ? await twilio.messages.list({
+              limit: messageLimit,
+              pageSize: messageLimit,
+              dateSentAfter: since,
+            })
+          : [];
       const twilioBySid = new Map(twilioMessages.map((m) => [m.sid, m]));
 
-      for (const localRow of localOpenMessages) {
+      for (const localRow of localMessages) {
         let local = localRow;
         let remote = twilioBySid.get(local.sid);
 
@@ -284,7 +359,18 @@ export async function triggerTwilioOpenSync({
         }
 
         const twilioStatus = remote.status?.toLowerCase();
-        if (!twilioStatus || twilioStatus === local.status) continue;
+        if (!twilioStatus) continue;
+
+        // "Nothing to do" is now narrower than "status matches" (#2049). A
+        // settled row with no send time still has work: its status matches the
+        // provider exactly, and it is precisely that kind of row this loop
+        // could never have written a date_sent for, because the old
+        // early-exit fired first.
+        const statusUnchanged = twilioStatus === local.status;
+        const remoteDateSent = remote.dateSent?.toISOString();
+        if (statusUnchanged && (local.date_sent != null || !remoteDateSent)) {
+          continue;
+        }
 
         const errorCode = remote.errorCode ? Number(remote.errorCode) : null;
 
@@ -294,7 +380,15 @@ export async function triggerTwilioOpenSync({
         // job would never be billed. The job + ledger are both idempotent, so
         // a retry of this row (status write failed) or a late-arriving webhook
         // cannot double-debit.
-        if (isTerminalSmsStatus(normalizeSmsStatus(twilioStatus))) {
+        //
+        // Only on a status CHANGE. A backfill row already matches the provider,
+        // so re-running its side effects would be safe but pure waste — and a
+        // 23,504-row backfill would enqueue 23,504 billing jobs to rediscover
+        // that every message had already been debited.
+        if (
+          !statusUnchanged &&
+          isTerminalSmsStatus(normalizeSmsStatus(twilioStatus))
+        ) {
           await enqueueRegisteredJob({
             type: SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
             workspaceId,
@@ -310,9 +404,14 @@ export async function triggerTwilioOpenSync({
         }
 
         await updateMessageBySid(workspaceId, local.sid, {
-          status: twilioStatus,
+          // Omit `status` when it is unchanged so this is a pure send-time
+          // write: updateMessageBySid only reports a status regression, and a
+          // same-value write would otherwise be indistinguishable from a real
+          // transition in the logs.
+          ...(statusUnchanged ? {} : { status: twilioStatus }),
           date_updated:
             remote.dateUpdated?.toISOString() ?? local.date_updated,
+          ...(remoteDateSent ? { date_sent: remoteDateSent } : {}),
           ...(errorCode != null ? { error_code: errorCode } : {}),
         });
         messagesUpdated++;
