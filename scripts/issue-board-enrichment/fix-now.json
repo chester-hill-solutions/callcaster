@@ -2592,22 +2592,26 @@
   {
     "issueNumber": 2124,
     "verdict": "fix-now",
-    "recommendedTitle": "check:relative-redirects cannot match the multi-line redirect(...) shape this repo actually uses, and its ratchet passes on stale baseline entries",
-    "summary": "The gate exists to make the #1396 class (an absolute/relative redirect mistake) un-shippable. It can only do that for a **one-line** `redirect(\"…\")` call. The multi-line form — which this repo actually uses — is unmatchable by construction, and no CI step or lint rule covers it. The `stale` branch also does not fail, so `--update` can silently grow the allowlist with no signal.",
-    "currentBehavior": "Two defects in one guard: the match is structurally incapable of covering the codebase's real formatting, and the ratchet cannot be shown to shrink. A guard with both properties reports green while enforcing nothing. The same stale-entry pattern appears in `check-test-mocks` (three baseline entries are already stale) — so this is a family, not a one-off.",
-    "resolution": "1. Normalise before matching: collapse `redirect(` … `)` argument lists onto one logical line, or scan the whole file with a `/gs` pattern instead of line by line. 2. Change the `stale` branch to `process.exit(1)` with the `npm run tools:relative-redirects:baseline` hint, matching how `check:queue-rpc-contract` behaves. 3. Apply the same `stale` fix to `scripts/check-test-mocks.mjs`, and count occurrences instead of collapsing N replacing factories per `(file, module)` into one key — the guard exists to catch a *second* replacing factory, and a per-module key makes that count invisible. 4. Add a fixture-based test for each guard: a file with a multi-line relative redirect must fail, and a file with a legitimate baseline entry must pass. A guard with no test that proves it can fail is the same class of problem this issue is about.",
+    "recommendedTitle": "Two ratcheting guards tolerate stale baseline entries, so a ratchet that should only shrink can silently grow",
+    "summary": "CORRECTED THE SAME DAY: the first version of this issue claimed check:relative-redirects cannot match the multi-line redirect(...) shape. That was wrong and is withdrawn - `\\s*` in a JS regex matches newlines, so the shipped pattern already matches it. Verified empirically and the proof is in the issue. Two claims survive: check:relative-redirects exits 0 on stale baseline entries while check:queue-rpc-contract (the correct sibling) exits 1, and check:test-mocks has no stale branch at all while its Map value is `true`, so N replacing factories for one (file, module) collapse into one key. The guard the ratchet is named for is about a count, and the count is destroyed at write time.",
+    "currentBehavior": "check:relative-redirects.mjs:134-142 prints a ratchet hint and calls process.exit(0) on stale entries. check-test-mock-coverage.mjs:88-89 computes only `fresh` (current not in baseline) and never computes stale; line 72 sets the Map value to `true`, collapsing occurrences.",
+    "resolution": "1. check:relative-redirects: change the stale branch to process.exit(1) with the rewrite hint, matching check-queue-rpc-contract.mjs:135-145. 2. check:test-mocks: add the stale branch that check-queue-rpc-contract already has. 3. check:test-mocks: count occurrences - current.set(key, (current.get(key) ?? 0) + 1) - and store file::module#n in the baseline. 4. Add a fixture-based test to each guard proving it can fail AND can pass. 5. Put the stale-fails rule in the guard-writing guidance so the next ratchet starts correct.",
     "lookIn": [
-      "scripts/check-relative-redirects.mjs:4-20",
-      "scripts/check-test-mocks.mjs",
-      "scripts/check-queue-rpc-contract.mjs (the correct stale behaviour)",
-      "scripts/baselines/",
-      ".github/workflows/ci.yml"
+      "scripts/check-relative-redirects.mjs:36,134-142 (the regex is correct; the stale branch is not)",
+      "scripts/check-test-mock-coverage.mjs:15-16,72-76,80-93,112",
+      "scripts/check-queue-rpc-contract.mjs:135-145 (the correct pattern to copy)",
+      "scripts/baselines/relative-redirects.json",
+      "scripts/baselines/test-mock-replace.txt"
     ],
-    "existingTests": [],
+    "existingTests": [
+      "None. Neither guard has a fixture test that proves it can fail in the stale direction."
+    ],
     "missingTests": [
-      "Multi-line relative redirect → the gate fails (kill-check).",
-      "A stale baseline entry → the gate fails.",
-      "Per-occurrence counting in `check:test-mocks` (kill-check)."
+      "check:relative-redirects fails on a stale baseline entry (kill-check: restore process.exit(0))",
+      "check:test-mocks fails on a stale baseline entry (kill-check)",
+      "check:test-mocks reports per-occurrence counts (kill-check: collapse the count back to true)",
+      "A fixture for each guard proving the fail case and the pass case",
+      "A regression assertion that the shipped regex matches the multi-line form, so the withdrawn claim is not re-raised"
     ],
     "acceptanceCriteria": [
       "A fixture with `redirect(\\n  \"/foo\"\\n)` fails the gate (kill-check: restore line-by-line matching and confirm the test goes red).",
