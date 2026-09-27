@@ -7,12 +7,13 @@ import {
   useOutlet,
   useOutletContext,
 } from "react-router";
+import { toast } from "sonner";
 import type { ContextType, FileObject } from "@/lib/types";
-import { QueryParamBanner } from "@/components/shared/QueryParamBanner";
 import { mediaColumns } from "@/components/file-assets/columns";
 import { DataTable } from "@/components/workspace/tables/DataTable";
 import { WorkspaceResourceListShell } from "@/components/workspace/WorkspaceResourceListShell";
 import { Button } from "@/components/ui/button";
+import { useSearchParamFlash } from "@/hooks/utils/useSearchParamFlash";
 
 
 type LoaderData = {
@@ -27,6 +28,16 @@ export default function WorkspaceAudiosPage() {
   const parentContext = useOutletContext<ContextType>();
   const { audioMedia, workspace, error } = useLoaderData<LoaderData>();
 
+  useSearchParamFlash({
+    uploaded: (value) => {
+      if (value === "1") {
+        toast.success("Audio uploaded", {
+          description: "Your audio file was added to this workspace.",
+        });
+      }
+    },
+  });
+
   if (outlet) {
     return <Outlet context={parentContext} />;
   }
@@ -38,15 +49,6 @@ export default function WorkspaceAudiosPage() {
 
   return (
     <>
-      <QueryParamBanner
-        param="uploaded"
-        variants={{
-          "1": {
-            title: "Audio uploaded",
-            description: "Your audio file was added to this workspace.",
-          },
-        }}
-      />
       <WorkspaceResourceListShell
         title={title}
         error={error}

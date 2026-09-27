@@ -18,7 +18,6 @@ import { Button } from "@/components/ui/button";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 import { PageShell } from "@/components/ui/page-shell";
-import { Text } from "@/components/ui/typography";
 import { validatePeopleReturnPath } from "@/lib/people-return-path";
 
 export default function NewScript() {
@@ -71,16 +70,6 @@ export default function NewScript() {
   return (
     <section id="form">
       <PageShell title="Add Script" maxWidth="narrow">
-        {actionData?.error != null ? (
-          <Text className="text-center text-destructive-text">
-            Error:{" "}
-            {actionData.error instanceof Error
-              ? actionData.error.message
-              : typeof actionData.error === "string"
-                ? actionData.error
-                : "An error occurred"}
-          </Text>
-        ) : null}
         <Form method="POST" className="space-y-6" encType="multipart/form-data">
           <Section variant="flat" className="space-y-6">
             <input hidden value={ref ?? ""} id="ref" name="ref" readOnly />
