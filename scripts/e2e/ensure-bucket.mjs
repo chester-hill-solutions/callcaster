@@ -28,7 +28,7 @@ const client = new S3Client({
   forcePathStyle: true,
 });
 
-// MinIO may still be starting when compose reports the container as running —
+// the object store may still be starting when its launcher reports ready —
 // retry connection-level failures for up to ~30s before giving up.
 const MAX_ATTEMPTS = 15;
 const RETRY_DELAY_MS = 2000;
@@ -38,21 +38,21 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function ensureBucket() {
   try {
     await client.send(new HeadBucketCommand({ Bucket: bucket }));
-    console.log(`[e2e-minio] bucket ${bucket} already exists`);
+    console.log(`[e2e-bucket] bucket ${bucket} already exists`);
     return;
   } catch (error) {
     const status = error?.$metadata?.httpStatusCode;
-    // 404/403 means MinIO answered — the bucket just doesn't exist yet.
+    // 404/403 means the store answered — the bucket just doesn't exist yet.
     if (status !== 404 && status !== 403 && status !== 301) {
       throw error;
     }
   }
   await client.send(new CreateBucketCommand({ Bucket: bucket }));
-  console.log(`[e2e-minio] created bucket ${bucket}`);
+  console.log(`[e2e-bucket] created bucket ${bucket}`);
 }
 
 // Objects written by prior runs (e.g. voicemail uploads, audio-clip edits) persist
-// across `docker compose down`-less re-runs since Postgres resets don't touch MinIO.
+// across `docker compose down`-less re-runs since Postgres resets do not touch object storage.
 // Purge everything so empty-state assertions (e.g. the audios-empty-copy spec) are
 // deterministic. This must run BEFORE any seed step re-populates fixture objects.
 async function purgeBucket() {
@@ -77,7 +77,7 @@ async function purgeBucket() {
     }
     continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
   } while (continuationToken);
-  console.log(`[e2e-minio] purged ${purged} object(s) from bucket ${bucket}`);
+  console.log(`[e2e-bucket] purged ${purged} object(s) from bucket ${bucket}`);
 }
 
 let lastError;
@@ -85,7 +85,7 @@ for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
   try {
     await ensureBucket();
     if (keepObjects) {
-      console.log(`[e2e-minio] keeping existing objects in ${bucket} (--keep-objects)`);
+      console.log(`[e2e-bucket] keeping existing objects in ${bucket} (--keep-objects)`);
     } else {
       await purgeBucket();
     }
@@ -93,12 +93,12 @@ for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
   } catch (error) {
     lastError = error;
     console.log(
-      `[e2e-minio] attempt ${attempt}/${MAX_ATTEMPTS} failed (${error?.code ?? error?.name ?? "error"}); retrying in ${RETRY_DELAY_MS}ms…`,
+      `[e2e-bucket] attempt ${attempt}/${MAX_ATTEMPTS} failed (${error?.code ?? error?.name ?? "error"}); retrying in ${RETRY_DELAY_MS}ms…`,
     );
     await sleep(RETRY_DELAY_MS);
   }
 }
 
-console.error(`[e2e-minio] could not reach MinIO at ${endpoint}`);
+console.error(`[e2e-bucket] could not reach the object store at ${endpoint}`);
 console.error(lastError);
 process.exit(1);

@@ -189,6 +189,18 @@ export async function uploadObject(
   const { bucketName, key } = resolveLocation(logicalBucket, objectPath);
   const payload = await toBuffer(body);
 
+  // `If-None-Match: "*"` alone does not honour `upsert: false`. The header is
+  // optional in the S3 spec and at least one implementation ignores it
+  // outright — answering 200 and overwriting — so the only guard would be
+  // silently absent on that backend. For audio that is a user-facing
+  // uniqueness guarantee ("a greeting with that name already exists"), not
+  // just a lost file, so check existence explicitly first and let the
+  // conditional write remain only as the race backstop for two writers that
+  // pass this check together.
+  if (options.upsert === false && (await objectExists(logicalBucket, objectPath))) {
+    throw new ObjectExistsError(objectPath);
+  }
+
   try {
     await getS3Client().send(
       new PutObjectCommand({
@@ -209,7 +221,7 @@ export async function uploadObject(
         // were overwriting anyway. For audio that is not just a lost file: a
         // filename is how campaigns and IVR steps point at a recording, so a
         // clobbered key changes what live callers hear. A conditional write
-        // makes the flag mean what it says.
+        // closes the race between the existence check above and this put.
         ...(options.upsert === false ? { IfNoneMatch: "*" } : {}),
       }),
     );

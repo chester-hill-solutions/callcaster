@@ -109,8 +109,8 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       # Single entry point, identical to the local gate: docker compose
-      # (postgres + minio + inbucket) → schema bootstrap → seed → build →
-      # bun server on :3100 → full Playwright suite.
+      # (postgres + inbucket) + the stow object-storage binary → schema
+      # bootstrap → seed → build → bun server on :3100 → full Playwright suite.
       - name: Run compose E2E gate
         run: npm run test:e2e:compose
         env:

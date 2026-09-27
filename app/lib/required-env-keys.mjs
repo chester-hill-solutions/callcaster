@@ -33,7 +33,7 @@ function validateObjectStorageEnv(env) {
 
   throw new Error(
     "Missing object storage environment variables. Provide either S3_* " +
-      "(local MinIO) or Railway bucket credentials " +
+      "(local object storage) or Railway bucket credentials " +
       "(ENDPOINT, REGION, ACCESS_KEY_ID, SECRET_ACCESS_KEY, BUCKET).",
   );
 }

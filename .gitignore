@@ -51,3 +51,7 @@ app/transcribe.json
 scripts/dev/certs/
 /CLIPBOARD.md
 /.agent/
+
+# Object storage (stow) — downloaded release binary, pidfile and bucket data
+/.stow-bin/
+/.stow/
