@@ -176,6 +176,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       request: makeReq({ CallSid: "CA1", Digits: "1" }),
     } as any));
     expect(res.status).toBe(403);
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
   });
 
   test("advances flow for matched option, vx-any, and fallthrough next/hangup; merges outreach result", async () => {
@@ -436,7 +437,14 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       expect.objectContaining({
         support_level: 2,
         result: expect.objectContaining({
-          page_1: expect.objectContaining({ "Support Level": "2" }),
+          page_1: expect.objectContaining({
+            "Support Level": {
+              value: "2",
+              raw: "2",
+              confidence: null,
+              inputType: "dtmf",
+            },
+          }),
         }),
       }),
       expect.objectContaining({ tdb: expect.anything() }),
@@ -445,6 +453,49 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
       set: { support_level: 2 },
       where: expect.anything(),
     });
+  });
+
+  test("stores the transcript, raw speech, and Twilio confidence", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["b1"] } },
+      blocks: { b1: { id: "b1", title: "Caller response", options: [] } },
+    };
+    mocks.createClient.mockReturnValueOnce(
+      makeDbClient({
+        call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 9 },
+        campaignData: { script: { steps: script } },
+        outreachResult: {},
+      }),
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+
+    const response = await mod.action({
+      params: { campaignId: "1", pageId: "page_1", blockId: "b1" },
+      request: makeReq({
+        CallSid: "CA1",
+        SpeechResult: "  yes, please  ",
+        Confidence: "0.87",
+      }),
+    } as any);
+
+    expect(await response.text()).toMatch(/hangup/i);
+    expect(telephonyDbMocks.updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
+      "w1",
+      9,
+      expect.objectContaining({
+        result: expect.objectContaining({
+          page_1: expect.objectContaining({
+            "Caller response": {
+              value: "yes, please",
+              raw: "  yes, please  ",
+              confidence: 0.87,
+              inputType: "speech",
+            },
+          }),
+        }),
+      }),
+      expect.objectContaining({ tdb: expect.anything() }),
+    );
   });
 
   test("returns hangup when campaign_id mismatches URL or call is missing", async () => {

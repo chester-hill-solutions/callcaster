@@ -135,7 +135,7 @@ export const action = defineAction({
   const blockId = params.blockId as string;
   const campaignId = params.campaignId as string;
 
-  const { callSid, userInput } = auth;
+  const { callSid, userInput, answer } = auth;
 
   try {
     const [call, campaignData] = await Promise.all([
@@ -252,7 +252,7 @@ export const action = defineAction({
           ...(result[pageId] && typeof result[pageId] === "object"
             ? (result[pageId] as Record<string, unknown>)
             : {}),
-          [blockTitle]: userInput,
+          [blockTitle]: answer,
         },
       };
 

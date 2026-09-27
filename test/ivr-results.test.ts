@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
   aggregateIvrResponses,
+  normalizeIvrAnswerValue,
   parseIvrResult,
   resolveIvrAnswerLabel,
   type IvrScriptShape,
@@ -42,6 +43,26 @@ describe("parseIvrResult", () => {
   });
 });
 
+describe("normalizeIvrAnswerValue", () => {
+  test("unwraps valid structured answers and keeps legacy string answers", () => {
+    expect(
+      normalizeIvrAnswerValue({
+        value: "yes",
+        raw: "Yes, please.",
+        confidence: 0.91,
+        inputType: "speech",
+      }),
+    ).toBe("yes");
+    expect(normalizeIvrAnswerValue("1")).toBe("1");
+  });
+
+  test("rejects malformed structured answers", () => {
+    expect(
+      normalizeIvrAnswerValue({ value: "yes", raw: "yes", confidence: 2, inputType: "speech" }),
+    ).toBeNull();
+  });
+});
+
 describe("aggregateIvrResponses", () => {
   test("counts each distinct answer per question", () => {
     const results = aggregateIvrResponses(
@@ -64,6 +85,32 @@ describe("aggregateIvrResponses", () => {
         { value: "1", count: 2 },
         { value: "2", count: 1 },
       ],
+    });
+  });
+
+  test("aggregates structured speech answers by value and keeps legacy answers", () => {
+    const results = aggregateIvrResponses(
+      [
+        {
+          result: {
+            page_1: {
+              "Support?": {
+                value: "yes",
+                raw: "Yes, please.",
+                confidence: 0.91,
+                inputType: "speech",
+              },
+            },
+          },
+        },
+        { result: { page_1: { "Support?": "yes" } } },
+      ],
+      script,
+    );
+
+    expect(results[0]).toMatchObject({
+      total: 2,
+      options: [{ value: "yes", count: 2 }],
     });
   });
 
