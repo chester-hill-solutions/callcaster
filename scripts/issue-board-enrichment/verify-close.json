@@ -208,21 +208,20 @@
   {
     "issueNumber": 1794,
     "verdict": "verify-close",
-    "summary": "PR #1797 (88f73343) made schedule writes conditional on the status read by the sweep. The requested real database interleaving check is still missing.",
-    "resolution": "Verify pause/completion interleaving against a real database. The existing sweep test mocks the status helper, so it does not prove the SQL concurrency behavior.",
+    "summary": "PR #1797 (88f73343) made schedule writes conditional on the status read by the sweep. A new real-Postgres regression test covers pause and completion after candidate selection.",
+    "resolution": "Keep the issue open until this test is merged to dev and the guarded status transition is verified there.",
     "lookIn": [
       "app/lib/campaign-schedule-sync.server.ts",
       "app/lib/campaign-ivr.server.ts"
     ],
-    "missingTests": [
-      "Real database pause/completion after candidate selection; confirm state and emitted events."
-    ],
+    "missingTests": [],
     "risk": "high",
     "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
     "blockedBy": [],
-    "currentBehavior": "A concurrent status change causes the guarded update to return no transition; events follow successful updates only.",
+    "currentBehavior": "A concurrent status change causes the guarded update to return no transition; a real-Postgres test verifies paused and complete states are preserved and no transition event is emitted.",
     "existingTests": [
-      "test/campaign-schedule-sync.server.test.ts (sweep orchestration with mocked status helper)"
+      "test/campaign-schedule-sync.server.test.ts (sweep orchestration with mocked status helper)",
+      "test/integration-db/campaign-schedule-sync-status-race.test.ts (pause/completion interleaving against Postgres)"
     ]
   },
   {
