@@ -57,6 +57,7 @@ export default function WorkspaceDetails() {
         if (path.endsWith('/users')) return 'users';
         if (path.endsWith('/invite')) return 'access';
         if (path.endsWith('/campaigns')) return 'campaigns';
+        if (path.endsWith('/credits')) return 'credits';
         return 'overview';
     };
 
@@ -104,6 +105,9 @@ export default function WorkspaceDetails() {
                     </TabsTrigger>
                     <TabsTrigger value="campaigns" asChild>
                         <Link to="campaigns">Campaigns</Link>
+                    </TabsTrigger>
+                    <TabsTrigger value="credits" asChild>
+                        <Link to="credits">Credits</Link>
                     </TabsTrigger>
                 </TabsList>
                 {getActiveTab() === "overview" ? (
