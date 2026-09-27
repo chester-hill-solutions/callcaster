@@ -10,7 +10,10 @@ import {
   dispatchCampaignSmsBatch,
   type CampaignSmsDispatchCounts,
 } from "@/lib/campaign-sms-dispatch.server";
-import { dispatchCampaignIvrBatch } from "@/lib/campaign-ivr-dispatch.server";
+import {
+  dispatchCampaignIvrBatch,
+  type CampaignIvrDispatchCounts,
+} from "@/lib/campaign-ivr-dispatch.server";
 import {
   isMachineDispatchedVoiceCampaignType,
 } from "@/lib/campaign-execution.server";
@@ -422,7 +425,7 @@ async function resolveDispatchBlockedCase(
     | {
         kind: "deferred_send_window";
         nextOpenAt: Date;
-        progress?: { counts: CampaignSmsDispatchCounts; queuedRemaining: number };
+        progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
       },
 ): Promise<
   | { ok: true; campaignId: number; blocked: "insufficient_credits" }
@@ -431,7 +434,7 @@ async function resolveDispatchBlockedCase(
       ok: true;
       campaignId: number;
       deferred: "send_window";
-      progress?: { counts: CampaignSmsDispatchCounts; queuedRemaining: number };
+      progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
     }
 > {
   const { workspaceId, campaignId, userId } = args;
