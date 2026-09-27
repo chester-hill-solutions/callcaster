@@ -14,7 +14,7 @@ import {
   getCampaignQueueContactIds,
 } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
-import { resolveIvrAnswerLabel } from "@/lib/ivr-results";
+import { normalizeIvrAnswerValue, resolveIvrAnswerLabel } from "@/lib/ivr-results";
 import {
   voiceBillingKindFromCampaignType,
   voiceCreditsFromDurationSeconds,
@@ -471,7 +471,7 @@ export async function processCallCampaignExport(
                 Object.entries(pageData as Record<string, unknown>).forEach(
                   ([key, value]) => {
                     // Store response by the key directly - we'll match with script questions later
-                    responses[key] = String(value);
+                    responses[key] = normalizeIvrAnswerValue(value) ?? "";
                   },
                 );
               }

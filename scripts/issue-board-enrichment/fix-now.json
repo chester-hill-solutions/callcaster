@@ -238,10 +238,10 @@
     "issueNumber": 1875,
     "verdict": "fix-now",
     "recommendedTitle": "IVR: store speech answers as { value, raw, inputType } (slice B)",
-    "summary": "Slice A shipped on dev in PR #1876 (642f4ee7, not in master). Slice B has not shipped: ivr-webhook-auth.server.ts returns only a bare userInput and never reads Confidence; ivr-results.ts normalizeAnswer returns a bare string. Confidence is deferred to #1880, so slice B is the { value, raw, inputType } shape only.",
+    "summary": "Slice A shipped on dev in PR #1876 (642f4ee7, not in master). Slice B has not shipped: ivr-webhook-auth.server.ts returns only userInput and drops Twilio Confidence; ivr-results.ts only normalizes bare strings. The current #1875 acceptance criteria require confidence capture. Live #1880 says this result-capture slice proceeds independently of its Jev intent-routing investigation.",
     "currentBehavior": "outreach_attempt.result stores a bare transcript string; readers unwrap only strings; Twilio Confidence is discarded.",
-    "rootCause": "The response parser collapses Digits/SpeechResult into one string and drops Confidence.",
-    "resolution": "Add IvrStoredAnswer + isIvrStoredAnswer + ivrAnswerValue to app/lib/ivr-results.ts; parse Confidence in ivr-webhook-auth.server.ts; store answer in the outbound response route; unwrap to .value in outreach-typed-fields.server.ts and campaign-export.server.ts; keep readers accepting the legacy bare string.",
+    "rootCause": "The response parser collapses Digits/SpeechResult into one string and drops the optional Confidence value.",
+    "resolution": "Store each outbound IVR answer as { value, raw, confidence, inputType }; parse optional Twilio Confidence only when it is a finite value from 0 to 1; preserve legacy string answers; keep userInput unchanged for routing; unwrap .value in typed-field extraction, result aggregation, and CSV question columns.",
     "lookIn": [
       "app/lib/ivr-results.ts",
       "app/lib/ivr-webhook-auth.server.ts",
@@ -254,24 +254,22 @@
       "test/ivr-gather.test.ts",
       "test/ivr-block-response.route.test.ts",
       "test/inbound-ivr-block-response.route.test.ts",
-      "test/ivr-results.test.ts"
+      "test/ivr-results.test.ts",
+      "test/ivr-webhook-auth.server.test.ts",
+      "test/outreach-typed-fields.server.test.ts",
+      "test/campaign-export-voice-credits.test.ts"
     ],
-    "missingTests": [
-      "ivr-webhook-auth: digits yields DTMF with no confidence; speech yields the transcript",
-      "ivr-results aggregation over the object shape and mixed legacy/new merge",
-      "outreach-typed-fields unwraps the object shape",
-      "campaign export CSV cell is the value, not [object Object]"
-    ],
+    "missingTests": [],
     "acceptanceCriteria": [
-      "A vx-any step stores { value, raw, inputType }",
-      "Legacy bare strings and new objects both aggregate",
-      "Typed fields and CSV export resolve the value",
-      "Confidence capture is deferred to #1880"
+      "A speech answer stores { value, raw, confidence, inputType }; confidence is null when Twilio omits or sends an invalid value",
+      "DTMF answers store inputType=dtmf and no confidence; route matching still receives the same userInput string",
+      "Legacy bare strings and new objects both aggregate and export as the answer value",
+      "Typed fields and CSV export resolve the value"
     ],
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Fix now as slice B in one PR. Keep confidence, intent matching and per-campaign language with #1880 and the #268 epic."
+    "trackerRecommendation": "Fix now as slice B in one PR. Keep intent matching with #1880 and per-campaign language with the #268 epic."
   },
   {
     "issueNumber": 1896,

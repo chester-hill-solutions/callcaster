@@ -10,6 +10,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Changed
 
+- IVR results now keep the keypad or speech input type and the caller's transcript; speech answers also keep Twilio's confidence score when Twilio sends one ([#2160](https://github.com/chester-hill-solutions/callcaster/pull/2160), [#1875](https://github.com/chester-hill-solutions/callcaster/issues/1875)).
 - Phone number management is now a dedicated workspace page in the sidebar, rather than a section inside Settings ([#2001](https://github.com/chester-hill-solutions/callcaster/issues/2001)).
 - The Messages page keeps the contact header and composer visible while the conversation list and message history scroll inside their own panels ([#1719](https://github.com/chester-hill-solutions/callcaster/issues/1719)).
 - Call-list uploads can now drop a column: pick **Do not import** in the column mapping instead of forcing it into a custom field ([#1847](https://github.com/chester-hill-solutions/callcaster/issues/1847)).

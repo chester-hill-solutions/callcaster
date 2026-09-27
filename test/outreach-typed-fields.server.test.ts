@@ -39,6 +39,27 @@ describe("extractTypedOutreachFields", () => {
     });
     expect(extractTypedOutreachFields({ support_level: 9 })).toEqual({});
   });
+
+  test("extracts typed fields from structured speech answers", () => {
+    expect(
+      extractTypedOutreachFields({
+        page_1: {
+          "Support Level": {
+            value: "2",
+            raw: "lean support",
+            confidence: 0.82,
+            inputType: "speech",
+          },
+          "Lawn Sign": {
+            value: "yes",
+            raw: "yes please",
+            confidence: null,
+            inputType: "speech",
+          },
+        },
+      }),
+    ).toEqual({ support_level: 2, lawn_sign: true });
+  });
 });
 
 describe("syncContactSupportLevelCache", () => {

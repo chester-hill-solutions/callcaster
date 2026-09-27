@@ -1,5 +1,6 @@
 import { contact as contactTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { isIvrRecordedAnswer } from "@/lib/ivr-results";
 import type { TenantDb } from "@/server/tenant-db";
 import type { Json } from "@/lib/db-types";
 
@@ -96,7 +97,8 @@ export function extractTypedOutreachFields(update: Json | undefined): TypedOutre
   const flatten = (obj: Record<string, unknown>, prefix = "") => {
     for (const [key, value] of Object.entries(obj)) {
       const lowerKey = `${prefix}${key}`.toLowerCase();
-      lookup.set(lowerKey, value);
+      const wrappedAnswer = isIvrRecordedAnswer(value) ? value.value : value;
+      lookup.set(lowerKey, wrappedAnswer);
       if (value === null || typeof value !== "object" || Array.isArray(value)) {
         const leafKey = key.toLowerCase();
         if (!lookup.has(leafKey)) {
@@ -104,6 +106,11 @@ export function extractTypedOutreachFields(update: Json | undefined): TypedOutre
         }
       }
       if (value && typeof value === "object" && !Array.isArray(value)) {
+        if (wrappedAnswer !== value) {
+          const leafKey = key.toLowerCase();
+          if (!lookup.has(leafKey)) lookup.set(leafKey, wrappedAnswer);
+          continue;
+        }
         flatten(value as Record<string, unknown>, `${prefix}${key}.`);
       }
     }

@@ -3,7 +3,7 @@
  *
  * The IVR response webhook writes a nested shape keyed by page and block title:
  *
- *   { [pageId]: { [blockTitle]: userInput } }
+ *   { [pageId]: { [blockTitle]: userInput | IvrRecordedAnswer } }
  *
  * Block titles are user-editable, so renaming a script block mid-campaign leaves
  * older attempts keyed by the previous title. Aggregation therefore groups on the
@@ -37,6 +37,33 @@ export type IvrResponseOption = {
   label: string;
   count: number;
 };
+
+export type IvrRecordedAnswer = {
+  value: string;
+  raw: string;
+  confidence: number | null;
+  inputType: "dtmf" | "speech";
+};
+
+export function isIvrRecordedAnswer(value: unknown): value is IvrRecordedAnswer {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const answer = value as Record<string, unknown>;
+  if (
+    typeof answer.value !== "string" ||
+    typeof answer.raw !== "string" ||
+    (answer.inputType !== "dtmf" && answer.inputType !== "speech")
+  ) {
+    return false;
+  }
+  if (answer.inputType === "dtmf") return answer.confidence === null;
+  return (
+    answer.confidence === null ||
+    (typeof answer.confidence === "number" &&
+      Number.isFinite(answer.confidence) &&
+      answer.confidence >= 0 &&
+      answer.confidence <= 1)
+  );
+}
 
 export type IvrQuestionResults = {
   pageId: string;
@@ -84,9 +111,12 @@ export function parseIvrResult(result: unknown): Record<string, unknown> | null 
 }
 
 /** Normalizes a recorded answer to a display value; `null` means "no answer given". */
-function normalizeAnswer(value: unknown): string | null {
+export function normalizeIvrAnswerValue(value: unknown): string | null {
   if (value == null) return null;
-  if (typeof value === "object") return null;
+  if (typeof value === "object") {
+    if (!isIvrRecordedAnswer(value)) return null;
+    value = value.value;
+  }
   const text = String(value).trim();
   return text.length > 0 ? text : null;
 }
@@ -159,7 +189,7 @@ export function aggregateIvrResponses(
       for (const [question, rawAnswer] of Object.entries(
         pageData as Record<string, unknown>,
       )) {
-        const answer = normalizeAnswer(rawAnswer);
+        const answer = normalizeIvrAnswerValue(rawAnswer);
         if (answer === null) continue;
 
         const mapKey = `${pageId}\u0000${question}`;

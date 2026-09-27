@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { parseCSV } from "@/lib/csv";
 
 const mocks = vi.hoisted(() => ({
   campaignExportDb: {
@@ -160,5 +161,60 @@ describe("voice campaign export credits", () => {
 
   test("reports zero credits when there is no billable duration", async () => {
     await expect(runCallExport({ campaignType: "simple_ivr", duration: null })).resolves.toBe("0");
+  });
+
+  test("exports a structured IVR answer value and preserves confidence in full_result", async () => {
+    mocks.uploads.length = 0;
+    mocks.campaignExportDb.findCampaignWithScriptForExport.mockResolvedValue({
+      id: 123,
+      type: "simple_ivr",
+      title: "Test campaign",
+      workspace: "w1",
+      start_date: "2026-01-01T00:00:00.000Z",
+      end_date: "2026-01-02T00:00:00.000Z",
+      status: "completed",
+      script: {
+        steps: {
+          pages: { page_1: { title: "Intro", blocks: ["block_1"] } },
+          blocks: {
+            block_1: {
+              id: "block_1",
+              title: "Support?",
+              content: "Support?",
+              type: "choice",
+            },
+          },
+        },
+      },
+    });
+    mocks.campaignExportDb.countExportOutreachAttempts.mockResolvedValue(1);
+    mocks.campaignExportDb.listExportOutreachAttempts.mockResolvedValue([
+      {
+        ...attempt,
+        result: {
+          page_1: {
+            "Support?": {
+              value: "yes",
+              raw: "Yes, please.",
+              confidence: 0.87,
+              inputType: "speech",
+            },
+          },
+        },
+      },
+    ]);
+    mocks.campaignExportDb.findExportContactsByIds.mockResolvedValue([contact]);
+    mocks.campaignExportDb.findExportCallsByOutreachAttemptIds.mockResolvedValue([]);
+
+    const { processCallCampaignExport } = await import("@/lib/campaign-export.server");
+    await processCallCampaignExport(123, "w1", "export-ivr-answer", "Test campaign");
+
+    const csvUpload = mocks.uploads.find((upload) => upload.path.endsWith(".csv"));
+    if (!csvUpload) throw new Error("expected a .csv upload from the export");
+    const { contacts: rows } = parseCSV(csvUpload.text);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]["Support?"]).toBe("yes");
+    expect(rows[0].full_result).toContain('"confidence":0.87');
+    expect(rows[0]["Support?"]).not.toContain("[object Object]");
   });
 });
