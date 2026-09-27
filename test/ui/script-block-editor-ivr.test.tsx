@@ -101,7 +101,7 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
     expect(screen.getByLabelText("Speech text")).toHaveValue("");
     expect(screen.queryByText("Prompt")).not.toBeInTheDocument();
     expect(
-      screen.getByText(/Callers hear nothing at this step yet/),
+      screen.getByText(/Recipients hear nothing at this step/),
     ).toBeInTheDocument();
   });
 
@@ -187,8 +187,8 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
       }),
     });
 
-    expect(screen.getByText("Caller responses")).toBeInTheDocument();
-    expect(screen.getByLabelText("Caller answers with")).toBeInTheDocument();
+    expect(screen.getByText("Recipient responses")).toBeInTheDocument();
+    expect(screen.getByLabelText("Recipient answers with")).toBeInTheDocument();
     expect(screen.getByLabelText("Then go to")).toBeInTheDocument();
     expect(screen.getByLabelText("Answer label")).toHaveValue("Yes");
 
@@ -244,8 +244,8 @@ describe("ScriptBlockEditor — IVR audio steps", () => {
   test("the IVR no-input panel writes gatherTimeoutSeconds and noInput on edits (#1883)", () => {
     const { onChange } = renderStep({ block: spokenBlock() });
 
-    // The "If the caller stays silent" panel is present with defaults.
-    expect(screen.getByText("If the caller stays silent")).toBeInTheDocument();
+    // The "If the recipient stays silent" panel is present with defaults.
+    expect(screen.getByText("If the recipient stays silent")).toBeInTheDocument();
     expect(screen.getByLabelText("Wait (seconds)")).toHaveValue(5);
     expect(screen.getByLabelText("On no input")).toHaveTextContent("Continue to the next step");
 
