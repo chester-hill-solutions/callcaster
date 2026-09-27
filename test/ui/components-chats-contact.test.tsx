@@ -16,6 +16,22 @@ vi.mock("@/hooks/chats/useChatThread", () => ({
   }),
 }));
 
+// Hoisted so the double hands out ONE stable reference per test, matching the
+// real hooks: `useSearchParams` memoises its URLSearchParams and returns a
+// stable setter, and `useFetcher` returns a stable object. Rebuilding either
+// per call would put a new identity in any consumer effect dep (#2054).
+const STABLE_SEARCH_PARAMS = new URLSearchParams();
+const STABLE_SET_SEARCH_PARAMS = vi.fn();
+const STABLE_FETCHER_FORM = ({ children, ...p }: any) => (
+  <form {...p}>{children}</form>
+);
+const STABLE_FETCHER = {
+  submit: vi.fn(),
+  state: "idle" as const,
+  data: null,
+  Form: STABLE_FETCHER_FORM,
+};
+
 vi.mock("react-router", async () => {
   const actual = await vi.importActual<typeof import("react-router")>("react-router");
   return {
@@ -33,8 +49,8 @@ vi.mock("react-router", async () => {
         totalPages: 1,
       },
     }),
-    useSearchParams: () => [new URLSearchParams(), vi.fn()],
-    useFetcher: () => ({ submit: vi.fn(), state: "idle", data: null, Form: ({ children, ...p }: any) => <form {...p}>{children}</form> }),
+    useSearchParams: () => [STABLE_SEARCH_PARAMS, STABLE_SET_SEARCH_PARAMS],
+    useFetcher: () => STABLE_FETCHER,
     useNavigate: () => vi.fn(),
   };
 });

@@ -2,6 +2,11 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import Workspace from "@/routes/workspaces+/$id";
 
+// Stable, like the real hook: `useRevalidator` returns one object for the life
+// of the route. A per-call object with a fresh `revalidate` puts a new identity
+// in any consumer effect dep (#2054).
+const STABLE_REVALIDATOR = { revalidate: vi.fn() };
+
 // The zero-credit banner must not claim a balance was "depleted" or that
 // campaigns can "resume" on a workspace that never had anything (#1069).
 const state = vi.hoisted(() => ({
@@ -31,7 +36,7 @@ vi.mock("react-router", async () => {
     }),
     useOutlet: () => null,
     useOutletContext: () => ({}),
-    useRevalidator: () => ({ revalidate: vi.fn() }),
+    useRevalidator: () => STABLE_REVALIDATOR,
     useMatches: () => [],
     useLocation: () => ({ pathname: "/workspaces/ws-1" }),
   };
