@@ -345,13 +345,23 @@ describe("campaignDispatchHandler", () => {
     mocks.dispatchCampaignSmsBatch.mockResolvedValue({
       kind: "deferred_send_window",
       nextOpenAt,
+      progress: {
+        counts: { sent: 1, failed: 0, dequeued: 0, deferred: 1, unaffordable: 0, exhausted: 0 },
+        queuedRemaining: 1,
+      },
     });
-    await campaignDispatchHandler(makeJob());
+    const result = await campaignDispatchHandler(makeJob());
+    expect(result).toMatchObject({
+      ok: true,
+      deferred: "send_window",
+      progress: { counts: { sent: 1, deferred: 1 }, queuedRemaining: 1 },
+    });
     const call = mocks.enqueueJob.mock.calls.at(-1)?.[0] as { runAt: Date };
     expect(call.runAt).toBeInstanceOf(Date);
     // Two Date.now() calls (handler + successor) may differ by a tick —
     // require the scheduled instant to land on the window boundary.
     expect(Math.abs(call.runAt.getTime() - nextOpenAt.getTime())).toBeLessThanOrEqual(50);
+    expect(mocks.rpcTryCompleteCampaignIfDrained).not.toHaveBeenCalled();
   });
 
   test("a far-future window boundary is capped so a stale schedule cannot pin the chain", async () => {

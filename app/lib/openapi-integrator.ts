@@ -257,7 +257,8 @@ const schemas = {
       responses: {
         type: "array" as const,
         items: { type: "object" as const, additionalProperties: true },
-        description: "Always empty on a deferral; present so clients can treat both variants alike.",
+        description:
+          "Results for contacts processed before the send window closed. Contacts that remain queued are not included.",
       },
     },
   },

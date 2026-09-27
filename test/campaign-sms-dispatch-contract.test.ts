@@ -267,10 +267,9 @@ const SCENARIOS: Scenario[] = [
       },
     ],
     expect: {
-      // Order: first row sends and dequeues as sent; second row dequeues as
-      // duplicate. Order is deterministic because handleMember reserves the
-      // number synchronously before its first await.
-      dequeueReasons: ["Duplicate SMS prevented", "SMS message sent"],
+      // The same-number row waits for the first row's send result, so the
+      // sent dequeue completes before the duplicate dequeue.
+      dequeueReasons: ["SMS message sent", "Duplicate SMS prevented"],
       sendsAttempted: 1,
     },
   },

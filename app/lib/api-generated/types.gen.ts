@@ -202,7 +202,7 @@ export type CampaignSmsDeferred = {
      */
     nextOpenAt: string;
     /**
-     * Always empty on a deferral; present so clients can treat both variants alike.
+     * Results for contacts processed before the send window closed. Contacts that remain queued are not included.
      */
     responses: Array<{
         [key: string]: unknown;

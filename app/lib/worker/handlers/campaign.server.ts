@@ -6,7 +6,10 @@ import {
 import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
 import { runWorkspaceTwilioComplianceJob } from "@/lib/twilio-compliance-job.server";
 import { enqueueRegisteredJob } from "@/lib/worker/job-params.server";
-import { dispatchCampaignSmsBatch } from "@/lib/campaign-sms-dispatch.server";
+import {
+  dispatchCampaignSmsBatch,
+  type CampaignSmsDispatchCounts,
+} from "@/lib/campaign-sms-dispatch.server";
 import { dispatchCampaignIvrBatch } from "@/lib/campaign-ivr-dispatch.server";
 import {
   isMachineDispatchedVoiceCampaignType,
@@ -416,11 +419,20 @@ async function resolveDispatchBlockedCase(
   outcome:
     | { kind: "insufficient_credits" }
     | { kind: "caller_id_required" }
-    | { kind: "deferred_send_window"; nextOpenAt: Date },
+    | {
+        kind: "deferred_send_window";
+        nextOpenAt: Date;
+        progress?: { counts: CampaignSmsDispatchCounts; queuedRemaining: number };
+      },
 ): Promise<
   | { ok: true; campaignId: number; blocked: "insufficient_credits" }
   | { ok: true; campaignId: number; blocked: "caller_id_required" }
-  | { ok: true; campaignId: number; deferred: "send_window" }
+  | {
+      ok: true;
+      campaignId: number;
+      deferred: "send_window";
+      progress?: { counts: CampaignSmsDispatchCounts; queuedRemaining: number };
+    }
 > {
   const { workspaceId, campaignId, userId } = args;
 
@@ -448,7 +460,12 @@ async function resolveDispatchBlockedCase(
         completedJobId: job.id,
         delayMs: Math.min(exactDelayMs, SEND_WINDOW_MAX_DEFER_MS),
       });
-      return { ok: true, campaignId, deferred: "send_window" };
+      return {
+        ok: true,
+        campaignId,
+        deferred: "send_window",
+        ...(outcome.progress ? { progress: outcome.progress } : {}),
+      };
     }
   }
 }
