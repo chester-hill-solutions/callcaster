@@ -33,6 +33,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 ### Fixed
 
 - Workspace settings no longer show a broken **Quit This Workspace** action, and the member-management API now rejects self-removal requests ([#2005](https://github.com/chester-hill-solutions/callcaster/issues/2005)).
+- IVR campaign calls that reach the end of calling hours during setup stay queued until the next open time. Duplicate phone rows stay queued when the first call defers ([#1782](https://github.com/chester-hill-solutions/callcaster/issues/1782)).
 - A campaign no longer shows as **Complete** the moment its last dial is placed: it stays running until every call it placed rings through to a terminal status (completed, failed, busy, no-answer, canceled), so the Launch page no longer reports done while the recipient's phone is still ringing ([#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728)).
 - IVR results and the CSV export now show the option label the caller chose (for example **Yes**) instead of the raw keypress code; a value with no matching option in the current script still shows the raw value ([#1976](https://github.com/chester-hill-solutions/callcaster/issues/1976)).
 - IVR steps that route to `end` now hang up cleanly instead of redirecting to a missing step and playing an error first ([#1884](https://github.com/chester-hill-solutions/callcaster/issues/1884)).

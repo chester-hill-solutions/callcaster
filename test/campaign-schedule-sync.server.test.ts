@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.hoisted(() => {
+  process.env.TZ = "UTC";
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 });
 
@@ -88,6 +89,28 @@ describe("runCampaignScheduleSync", () => {
 
   test("waiting campaign inside its window flips back to running", async () => {
     mocks.findMany.mockResolvedValueOnce([makeCampaign({ status: "waiting" })]);
+
+    const result = await runCampaignScheduleSync();
+
+    expect(result.transitioned).toBe(1);
+    expect(mocks.updateCampaignStatusInWorkspace).toHaveBeenCalledWith(
+      "ws-1",
+      1,
+      { status: "running" },
+      { expectedStatus: "waiting" },
+    );
+  });
+
+  test("waiting campaign flips to running at the exact calling-window opening", async () => {
+    vi.setSystemTime(new Date("2026-08-12T14:05:00.000Z"));
+    mocks.findMany.mockResolvedValueOnce([
+      makeCampaign({
+        status: "waiting",
+        schedule: {
+          wednesday: { active: true, intervals: [{ start: "14:05", end: "21:00" }] },
+        },
+      }),
+    ]);
 
     const result = await runCampaignScheduleSync();
 

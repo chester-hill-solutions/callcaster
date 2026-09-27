@@ -6,6 +6,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.hoisted(() => {
+  process.env.TZ = "UTC";
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 });
 
@@ -13,11 +14,13 @@ const mocks = vi.hoisted(() => ({
   requireOutboundCredits: vi.fn(),
   findCampaignInWorkspace: vi.fn(),
   getCampaignQueueById: vi.fn(),
-  checkSchedule: vi.fn(),
   getWorkspaceTwilioPortalConfig: vi.fn(),
   createWorkspaceTwilioInstance: vi.fn(),
   twilioCallCreate: vi.fn(),
-  withTwilioRetry: vi.fn((fn: () => unknown) => fn()),
+  withTwilioRetry: vi.fn((fn: () => unknown, options?: { beforeAttempt?: () => void }) => {
+    options?.beforeAttempt?.();
+    return fn();
+  }),
   resolveIvrCallUrls: vi.fn(() => ({
     flowUrl: "https://base.test/api/ivr/42/page_1/",
     statusCallback: "https://base.test/api/ivr/status",
@@ -29,8 +32,12 @@ const mocks = vi.hoisted(() => ({
   dequeueQueueEntry: vi.fn(),
   recordQueueAttemptFailure: vi.fn(async () => undefined),
   rpcFailExhaustedCampaignQueueContacts: vi.fn(async () => 0),
+  deleteOutreachAttempt: vi.fn(async () => undefined),
   recipientCallingWindowStatus: vi.fn(),
-  createTenantDb: vi.fn(() => ({ tenant: true })),
+  createTenantDb: vi.fn(() => ({
+    tenant: true,
+    outreach_attempt: { delete: mocks.deleteOutreachAttempt },
+  })),
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
@@ -41,7 +48,6 @@ vi.mock("@/lib/database/workspace.server", () => ({
 }));
 vi.mock("@/lib/database/campaign.server", () => ({
   getCampaignQueueById: mocks.getCampaignQueueById,
-  checkSchedule: mocks.checkSchedule,
 }));
 vi.mock("@/lib/campaign-ivr.server", () => ({
   findCampaignInWorkspace: mocks.findCampaignInWorkspace,
@@ -95,6 +101,11 @@ function runningCampaign(overrides?: Record<string, unknown>) {
     status: "running",
     caller_id: "+16135550000",
     end_date: null,
+    schedule: Object.fromEntries(
+      ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"].map(
+        (day) => [day, { active: true, intervals: [{ start: "00:00", end: "23:59" }] }],
+      ),
+    ),
     ...overrides,
   };
 }
@@ -102,7 +113,6 @@ function runningCampaign(overrides?: Record<string, unknown>) {
 function defaultMocks() {
   mocks.requireOutboundCredits.mockResolvedValue({ ok: true, credits: 100 });
   mocks.findCampaignInWorkspace.mockResolvedValue(runningCampaign());
-  mocks.checkSchedule.mockReturnValue(true);
   mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({
     parallelDispatchEnabled: false,
   });
@@ -150,7 +160,7 @@ describe("dispatchCampaignIvrBatch", () => {
   });
 
   test("outside the campaign calling schedule defers the whole batch", async () => {
-    mocks.checkSchedule.mockReturnValue(false);
+    mocks.findCampaignInWorkspace.mockResolvedValue(runningCampaign({ schedule: null }));
     const outcome = await dispatchCampaignIvrBatch({
       workspaceId: WORKSPACE_ID,
       campaignId: "42",
@@ -161,6 +171,88 @@ describe("dispatchCampaignIvrBatch", () => {
       nextOpenAt: expect.any(Date),
     });
     expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
+  });
+
+  test("does not start a call when preparation crosses the campaign window boundary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.750Z"));
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningCampaign({
+        schedule: {
+          wednesday: { active: true, intervals: [{ start: "09:00", end: "21:00" }] },
+          thursday: { active: true, intervals: [{ start: "09:00", end: "21:00" }] },
+        },
+      }),
+    );
+    mocks.rpcCreateOutreachAttempt.mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve(777), 500)),
+    );
+
+    try {
+      const dispatch = dispatchCampaignIvrBatch({
+        workspaceId: WORKSPACE_ID,
+        campaignId: "42",
+        userId: USER_ID,
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+      const outcome = await dispatch;
+
+      expect(outcome).toMatchObject({
+        kind: "deferred_send_window",
+        nextOpenAt: new Date("2026-09-10T09:00:00.000Z"),
+        progress: {
+          counts: { called: 0, failed: 0, deferred: 1 },
+          queuedRemaining: 1,
+        },
+      });
+      expect(mocks.rpcCreateOutreachAttempt).toHaveBeenCalledTimes(1);
+      expect(mocks.deleteOutreachAttempt).toHaveBeenCalledTimes(1);
+      expect(mocks.twilioCallCreate).not.toHaveBeenCalled();
+      expect(mocks.recordQueueAttemptFailure).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("keeps same-number siblings queued when the first row defers at the boundary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.750Z"));
+    mocks.findCampaignInWorkspace.mockResolvedValue(
+      runningCampaign({
+        schedule: {
+          wednesday: { active: true, intervals: [{ start: "09:00", end: "21:00" }] },
+        },
+      }),
+    );
+    mocks.getCampaignQueueById.mockResolvedValueOnce([
+      queuedRow(),
+      queuedRow({ id: 502, contact_id: 9002, contact: { id: 9002, phone: "+16135550100", opt_out: false } }),
+    ]);
+    mocks.rpcCreateOutreachAttempt.mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve(777), 500)),
+    );
+
+    try {
+      const dispatch = dispatchCampaignIvrBatch({
+        workspaceId: WORKSPACE_ID,
+        campaignId: "42",
+        userId: USER_ID,
+      });
+      await vi.advanceTimersByTimeAsync(1_000);
+      const outcome = await dispatch;
+
+      expect(outcome).toMatchObject({
+        kind: "deferred_send_window",
+        progress: {
+          counts: { called: 0, failed: 0, dequeued: 0, deferred: 2 },
+          queuedRemaining: 2,
+        },
+      });
+      expect(mocks.twilioCallCreate).not.toHaveBeenCalled();
+      expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test("dials the Twilio flow URL with machine detection and dequeues on success", async () => {
@@ -180,7 +272,7 @@ describe("dispatchCampaignIvrBatch", () => {
       }),
     );
     expect(mocks.rpcCreateOutreachAttempt).toHaveBeenCalledWith(
-      { tenant: true },
+      expect.objectContaining({ tenant: true }),
       expect.objectContaining({
         contactId: 9001,
         campaignId: 42,
