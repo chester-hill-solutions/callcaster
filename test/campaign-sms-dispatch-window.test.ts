@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.hoisted(() => {
+  process.env.TZ = "UTC";
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 });
 
@@ -151,6 +152,98 @@ describe("campaign SMS dispatch send-window boundary", () => {
     expect(mocks.sendSingleCampaignSms).toHaveBeenCalledTimes(1);
     expect(outcome).toMatchObject({ kind: "deferred_send_window" });
     expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+  });
+
+  test("keeps same-number siblings queued when preparation reaches the window boundary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.750Z"));
+    mocks.getCampaignQueueById.mockResolvedValueOnce([
+      queueRow(701, 30, "+15551110001"),
+      queueRow(702, 31, "+15551110001"),
+    ]);
+    mocks.getOrLookupLineType.mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve(null), 500)),
+    );
+
+    const dispatch = dispatchCampaignSmsBatch({
+      workspaceId: WORKSPACE_ID,
+      campaignId: CAMPAIGN_ID,
+      userId: "3b6f0a52-6f5e-4b2d-9d55-000000000002",
+    });
+    await vi.advanceTimersByTimeAsync(2_000);
+    const outcome = await dispatch;
+
+    expect(outcome).toMatchObject({
+      kind: "deferred_send_window",
+      progress: {
+        counts: { sent: 0, failed: 0, dequeued: 0, deferred: 2 },
+        queuedRemaining: 2,
+      },
+    });
+    expect(mocks.sendSingleCampaignSms).not.toHaveBeenCalled();
+    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+  });
+
+  test("returns completed contacts when a later contact hits the window boundary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.750Z"));
+    mocks.sendSingleCampaignSms.mockResolvedValueOnce({
+      message: { sid: "SM30" },
+      persisted: true,
+    });
+
+    const dispatch = dispatchCampaignSmsBatch({
+      workspaceId: WORKSPACE_ID,
+      campaignId: CAMPAIGN_ID,
+      userId: "3b6f0a52-6f5e-4b2d-9d55-000000000002",
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+    const outcome = await dispatch;
+
+    expect(outcome).toMatchObject({
+      kind: "deferred_send_window",
+      responses: [{ 30: { success: true, message: { sid: "SM30" }, persisted: true } }],
+    });
+    expect(mocks.sendSingleCampaignSms).toHaveBeenCalledTimes(1);
+  });
+
+  test("returns a durable window deferral when final send preparation crosses the boundary", async () => {
+    const nextOpenAt = new Date("2026-09-16T09:00:00.000Z");
+    mocks.getCampaignQueueById.mockResolvedValueOnce([
+      queueRow(701, 30, "+15551110001"),
+    ]);
+    mocks.loadCampaignSmsDispatchData.mockResolvedValueOnce({
+      campaign: {
+        id: Number(CAMPAIGN_ID),
+        sms_send_mode: null,
+        sms_send_window: null,
+        caller_id: "+15550000000",
+      },
+      body_text: "Hello {{firstname}}",
+      message_media: [],
+    });
+    mocks.sendSingleCampaignSms.mockResolvedValueOnce({
+      kind: "deferred_send_window",
+      nextOpenAt,
+    });
+
+    const outcome = await dispatchCampaignSmsBatch({
+      workspaceId: WORKSPACE_ID,
+      campaignId: CAMPAIGN_ID,
+      userId: "3b6f0a52-6f5e-4b2d-9d55-000000000002",
+    });
+
+    expect(outcome).toMatchObject({
+      kind: "deferred_send_window",
+      nextOpenAt,
+      responses: [],
+      progress: {
+        counts: { sent: 0, deferred: 1 },
+        queuedRemaining: 1,
+      },
+    });
+    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(mocks.recordQueueAttemptFailure).not.toHaveBeenCalled();
   });
 
   test("skips deferred queue-head rows when filling a bounded batch", async () => {

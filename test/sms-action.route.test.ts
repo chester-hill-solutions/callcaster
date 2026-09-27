@@ -208,6 +208,65 @@ describe("app/routes/api+/sms.action.server.ts (campaign SMS dispatch)", () => {
     );
   });
 
+  test("returns completed sends when the next contact crosses the campaign window", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.750Z"));
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue({
+      campaign: {
+        end_date: null,
+        sms_send_mode: null,
+        sms_send_window: {
+          wednesday: {
+            active: true,
+            intervals: [{ start: "09:00", end: "21:00" }],
+          },
+        },
+      },
+      body_text: "Hello {{firstname}}",
+      message_media: [],
+    });
+    mocks.getCampaignQueueById.mockResolvedValue([
+      {
+        id: 511,
+        contact_id: 20,
+        contact: { id: 20, phone: "+15550000020", firstname: "D", opt_out: false },
+      },
+      {
+        id: 512,
+        contact_id: 21,
+        contact: { id: 21, phone: "+15550000021", firstname: "E", opt_out: false },
+      },
+    ]);
+    mocks.parseJsonBodyOrResponse.mockResolvedValueOnce({
+      campaign_id: "1",
+      workspace_id: TEST_WORKSPACE_ID,
+      caller_id: "+15550000000",
+    });
+
+    try {
+      const mod = await import("../app/routes/api+/sms.action.server");
+      const responsePromise = asRouteResponse(
+        mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
+      );
+      await vi.advanceTimersByTimeAsync(1_000);
+      const res = await responsePromise;
+
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        deferred: boolean;
+        responses: Array<Record<string, { success: boolean; message?: { sid?: string } }>>;
+      };
+      expect(body.deferred).toBe(true);
+      expect(body.responses).toHaveLength(1);
+      expect(body.responses[0][20]).toMatchObject({
+        success: true,
+        message: { sid: "SM1" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test("skips and dequeues landline contacts without sending", async () => {
     mocks.loadCampaignSmsDispatchData.mockResolvedValue(baseCampaignData());
     mocks.getCampaignQueueById.mockResolvedValue([

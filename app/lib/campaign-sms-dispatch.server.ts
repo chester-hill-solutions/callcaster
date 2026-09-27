@@ -54,25 +54,34 @@ export type ContactDispatchResult = Record<
   }
 >;
 
+export type CampaignSmsDispatchCounts = {
+  sent: number;
+  failed: number;
+  /** Dequeued without a send: opt-out, landline, duplicate. */
+  dequeued: number;
+  /** Left queued for a later tick (recipient quiet hours). */
+  deferred: number;
+  /** Left queued because the remaining balance could not cover the estimated cost. */
+  unaffordable: number;
+  /** Dead-lettered by the exhaustion sweep: failed rows at the attempt maximum. */
+  exhausted: number;
+};
+
 export type CampaignSmsBatchOutcome =
   | { kind: "insufficient_credits" }
   | { kind: "caller_id_required" }
-  | { kind: "deferred_send_window"; nextOpenAt: Date }
+  | {
+      kind: "deferred_send_window";
+      nextOpenAt: Date;
+      /** Results from contacts that completed before a later contact hit the window boundary. */
+      responses: ContactDispatchResult[];
+      /** Aggregate work completed before the batch deferred. */
+      progress: { counts: CampaignSmsDispatchCounts; queuedRemaining: number };
+    }
   | {
       kind: "dispatched";
       responses: ContactDispatchResult[];
-      counts: {
-        sent: number;
-        failed: number;
-        /** Dequeued without a send: opt-out, landline, duplicate. */
-        dequeued: number;
-        /** Left queued for a later tick (recipient quiet hours). */
-        deferred: number;
-        /** Left queued because the remaining balance could not cover the estimated cost. */
-        unaffordable: number;
-        /** Dead-lettered by the exhaustion sweep: failed rows at the attempt maximum. */
-        exhausted: number;
-      };
+      counts: CampaignSmsDispatchCounts;
       /**
        * Rows still queued after this batch: quiet-hours deferrals, failed
        * sends that still have attempts left, unaffordable rows, and contacts
@@ -195,6 +204,18 @@ export async function dispatchCampaignSmsBatch(args: {
       // is somehow violated.
       nextOpenAt:
         nextDispatchOpenAt(sendPolicy) ?? new Date(Date.now() + 15 * 60 * 1000),
+      responses: [],
+      progress: {
+        counts: {
+          sent: 0,
+          failed: 0,
+          dequeued: 0,
+          deferred: 0,
+          unaffordable: 0,
+          exhausted: 0,
+        },
+        queuedRemaining: audience?.length ?? 0,
+      },
     };
   }
 
@@ -241,14 +262,10 @@ export async function dispatchCampaignSmsBatch(args: {
   const startRateMps = configuredDispatcherSmsMps(portalConfig);
   const minStartIntervalMs = 1000 / Math.max(startRateMps, 0.1);
 
-  // In-batch normalized-number reservation. `hasDuplicateCampaignSms` reads
-  // persisted history and cannot see other rows still executing in this same
-  // Promise.all batch — two queue entries for the same phone would both pass
-  // its check and both send. Reserve the number synchronously before the
-  // first `await` so the second occurrence sees the reservation and dequeues
-  // as a duplicate. Reservation lives for the whole dispatch call so pacing
-  // gaps within one call still deduplicate.
-  const claimedNumbers = new Set<string>();
+  // Same-number rows wait for the first row's send result. A reservation set
+  // alone can dequeue a sibling while the first row is still preparing and
+  // later defers at the campaign-window boundary.
+  const claimedNumbers = new Map<string, SmsPhoneClaim>();
 
   const ctx: HandleMemberCtx = {
     workspaceId,
@@ -273,29 +290,34 @@ export async function dispatchCampaignSmsBatch(args: {
     minStartIntervalMs,
     responses,
   });
-  if (deferredAt) {
-    return { kind: "deferred_send_window", nextOpenAt: deferredAt };
-  }
-
-  // Rows that failed for the last time are dead-lettered now so a bad number
-  // cannot pin the chain to retries forever (#1513). Exhausted rows may also
-  // include failures from earlier ticks, so clamp the remaining count.
   if (counts.failed > 0) {
     counts.exhausted = await rpcFailExhaustedCampaignQueueContacts(
       createTenantDb(workspaceId),
       Number(campaignId),
     );
   }
+  const queuedRemaining = Math.max(
+    0,
+    queueSelection.unselectedEligibleCount +
+      counts.deferred +
+      counts.failed +
+      counts.unaffordable -
+      counts.exhausted,
+  );
+  if (deferredAt) {
+    return {
+      kind: "deferred_send_window",
+      nextOpenAt: deferredAt,
+      responses,
+      progress: { counts, queuedRemaining },
+    };
+  }
 
-  const truncated = queueSelection.unselectedEligibleCount;
   return {
     kind: "dispatched",
     responses,
     counts,
-    queuedRemaining: Math.max(
-      0,
-      truncated + counts.deferred + counts.failed + counts.unaffordable - counts.exhausted,
-    ),
+    queuedRemaining,
     creditsExhausted: counts.unaffordable > 0 && budget.exhausted,
   };
 }
@@ -340,20 +362,17 @@ async function runPacedSendBatches(args: {
     }
     const batchResults = await Promise.all(startingPromises);
     const deferredAt = batchResults.find((result) => result.deferredSendWindow)?.deferredSendWindow;
+    responses.push(
+      ...batchResults
+        .filter((result) => !result.deferredSendWindow)
+        .map((result) => result.response),
+    );
     if (deferredAt) return deferredAt;
-    responses.push(...batchResults.map((result) => result.response));
   }
   return null;
 }
 
-type DispatchCounts = {
-  sent: number;
-  failed: number;
-  dequeued: number;
-  deferred: number;
-  unaffordable: number;
-  exhausted: number;
-};
+type DispatchCounts = CampaignSmsDispatchCounts;
 
 /** The row stays queued; a relaunch after a top-up picks it up. */
 function skipForInsufficientCredits(
@@ -387,7 +406,7 @@ type HandleMemberCtx = {
   messagingServiceSidFromRequest: string | null;
   campaign: CampaignData;
   counts: DispatchCounts;
-  claimedNumbers: Set<string>;
+  claimedNumbers: Map<string, SmsPhoneClaim>;
   budget: DispatchCreditBudget;
   sendPolicy: ReturnType<typeof smsSendPolicy>;
 };
@@ -396,6 +415,24 @@ type HandleMemberResult = {
   response: ContactDispatchResult;
   deferredSendWindow?: Date;
 };
+
+type SmsPhoneClaimResult =
+  | { kind: "handled" }
+  | { kind: "unaffordable" }
+  | { kind: "deferred_send_window"; nextOpenAt: Date };
+
+type SmsPhoneClaim = {
+  result: Promise<SmsPhoneClaimResult>;
+  resolve: (result: SmsPhoneClaimResult) => void;
+};
+
+function createSmsPhoneClaim(): SmsPhoneClaim {
+  let resolve!: (result: SmsPhoneClaimResult) => void;
+  const result = new Promise<SmsPhoneClaimResult>((resolveResult) => {
+    resolve = resolveResult;
+  });
+  return { result, resolve };
+}
 
 function memberResponse(response: ContactDispatchResult): HandleMemberResult {
   return { response };
@@ -448,29 +485,59 @@ async function handleMember(
     });
   }
 
-  // In-batch dedup — check + reserve BEFORE the first async gate so a
-  // sibling row starting later in the same dispatch call sees the
-  // reservation. Placed after opt_out so a persistent opt-out reason wins
-  // over a transient in-batch reason on the same contact.
-  if (normalizedPhone && claimedNumbers.has(normalizedPhone)) {
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId,
-      reason: DUPLICATE_SMS_DEQUEUED_REASON,
-    });
-    counts.dequeued += 1;
-    return memberResponse({
-      [member.contact_id]: {
-        success: true,
-        skipped: true,
-        reason: DUPLICATE_SMS_DEQUEUED_REASON,
-      },
-    });
-  }
+  let phoneClaim: SmsPhoneClaim | null = null;
   if (normalizedPhone) {
-    claimedNumbers.add(normalizedPhone);
+    const existingClaim = claimedNumbers.get(normalizedPhone);
+    if (existingClaim) {
+      const firstResult = await existingClaim.result;
+      if (firstResult.kind === "deferred_send_window") {
+        counts.deferred += 1;
+        return { response: {}, deferredSendWindow: firstResult.nextOpenAt };
+      }
+      if (firstResult.kind === "unaffordable") {
+        return memberResponse(skipForInsufficientCredits(member, counts));
+      }
+      await dequeueQueueEntry({
+        by: { id: member.id },
+        userId,
+        reason: DUPLICATE_SMS_DEQUEUED_REASON,
+      });
+      counts.dequeued += 1;
+      return memberResponse({
+        [member.contact_id]: {
+          success: true,
+          skipped: true,
+          reason: DUPLICATE_SMS_DEQUEUED_REASON,
+        },
+      });
+    }
+    phoneClaim = createSmsPhoneClaim();
+    claimedNumbers.set(normalizedPhone, phoneClaim);
   }
 
+  return handleClaimedMember(member, ctx, normalizedPhone, phoneClaim).then(
+    (result) => {
+      phoneClaim?.resolve(
+        result.deferredSendWindow
+          ? { kind: "deferred_send_window", nextOpenAt: result.deferredSendWindow }
+          : { kind: "handled" },
+      );
+      return result;
+    },
+    (error: unknown) => {
+      phoneClaim?.resolve({ kind: "handled" });
+      throw error;
+    },
+  );
+}
+
+async function handleClaimedMember(
+  member: QueueMember,
+  ctx: HandleMemberCtx,
+  normalizedPhone: string,
+  phoneClaim: SmsPhoneClaim | null,
+): Promise<HandleMemberResult> {
+  const { counts, workspaceId, campaignId, userId } = ctx;
   const lineType = member.contact
     ? await getOrLookupLineType({
         workspaceId,
@@ -529,6 +596,7 @@ async function handleMember(
     hasMedia: ctx.media.length > 0,
   }).credits;
   if (!ctx.budget.reserve(cost)) {
+    phoneClaim?.resolve({ kind: "unaffordable" });
     return memberResponse(skipForInsufficientCredits(member, counts));
   }
 
@@ -538,6 +606,7 @@ async function handleMember(
   // that have not started remain queued for the next window.
   if (!isDispatchAllowedAt(ctx.sendPolicy)) {
     ctx.budget.release(cost);
+    counts.deferred += 1;
     return deferredSendWindowResponse(ctx.sendPolicy);
   }
 
@@ -554,9 +623,15 @@ async function handleMember(
     portalConfig: ctx.portalConfig,
     messageIntent: ctx.messageIntent,
     messagingServiceSidFromRequest: ctx.messagingServiceSidFromRequest,
+    sendPolicy: ctx.sendPolicy,
     campaignSmsRow: ctx.campaign.campaign,
   }).then(
     (result) => {
+      if (result.kind === "deferred_send_window") {
+        ctx.budget.release(cost);
+        counts.deferred += 1;
+        return { response: {}, deferredSendWindow: result.nextOpenAt };
+      }
       counts.sent += 1;
       return memberResponse({ [member.contact_id]: { success: true, ...result } });
     },

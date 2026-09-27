@@ -28,6 +28,11 @@ import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
 import { resolveTwilioSmsMessagingServiceSid } from "@/lib/sms-send-resolve";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
+import {
+  isDispatchAllowedAt,
+  nextDispatchOpenAt,
+  type DispatchPolicy,
+} from "@/lib/campaign-dispatch-policy";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 
 export const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
@@ -47,12 +52,24 @@ export interface SendSingleSmsParams {
   portalConfig: WorkspaceTwilioOpsConfig;
   messageIntent?: TwilioMessageIntent | null;
   messagingServiceSidFromRequest: string | null;
+  sendPolicy: DispatchPolicy;
   campaignSmsRow?: {
     end_time: string;
     sms_send_mode?: string | null;
     sms_messaging_service_sid?: string | null;
     caller_id?: string | null;
   };
+}
+
+class CampaignSmsSendWindowClosedError extends Error {
+  constructor(readonly nextOpenAt: Date) {
+    super("Campaign SMS send window closed before the provider request");
+    this.name = "CampaignSmsSendWindowClosedError";
+  }
+}
+
+function nextCampaignSmsWindowOpenAt(policy: DispatchPolicy): Date {
+  return nextDispatchOpenAt(policy) ?? new Date(Date.now() + 15 * 60 * 1000);
 }
 
 export async function hasDuplicateCampaignSms(args: {
@@ -77,6 +94,7 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
     body, to, from, media, campaign_id, workspace,
     contact_id, queue_id, user_id, portalConfig,
     messageIntent, messagingServiceSidFromRequest, campaignSmsRow,
+    sendPolicy,
   } = params;
 
   await assertWorkspaceCanSendSms({ workspaceId: workspace });
@@ -113,29 +131,70 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
     throw new Error(`Could not record the message before sending: ${intent.error.message}`);
   }
 
-  const [message, outreachAttempt] = await Promise.all([
-    withTwilioRetry(
-      () =>
-        twilio.messages.create(
-          buildTwilioOutboundSmsCreateParams({
-            body,
-            to,
-            from,
-            media,
-            statusCallback: `${env.BASE_URL()}/api/sms/status`,
-            portalConfig,
-            messageIntent,
-            explicitMessagingServiceSid: resolvedMessagingServiceSid,
-            campaignSmsSendMode: campaignSmsRow?.sms_send_mode,
-            campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
-          }),
-        ),
-      { workspaceId: workspace, operation: "messages.create.campaign" },
-    ).catch((e) => ({ error: e })),
-    createOutreachAttempt({ contact_id, campaign_id, queue_id, workspace, user_id }),
-  ]);
+  // The dispatch loop checks before entering this function. Its preparation
+  // steps above can await database work, so check again before starting any
+  // provider or outreach request. The provider callback below checks every
+  // retry too, because a retry delay can cross the campaign-window boundary.
+  if (!isDispatchAllowedAt(sendPolicy)) {
+    await deleteMessageByClientRef(workspace, clientRef);
+    return {
+      kind: "deferred_send_window" as const,
+      nextOpenAt: nextCampaignSmsWindowOpenAt(sendPolicy),
+    };
+  }
 
-  if ('error' in message) {
+  let outreachAttemptPromise: Promise<number> | null = null;
+  const sendResult = await withTwilioRetry(
+    () => {
+      // The retry callback runs only after beforeAttempt passes. This prevents
+      // a closed window from creating an outreach row or spending an attempt.
+      outreachAttemptPromise ??= createOutreachAttempt({
+        contact_id,
+        campaign_id,
+        queue_id,
+        workspace,
+        user_id,
+      });
+      return twilio.messages.create(
+        buildTwilioOutboundSmsCreateParams({
+          body,
+          to,
+          from,
+          media,
+          statusCallback: `${env.BASE_URL()}/api/sms/status`,
+          portalConfig,
+          messageIntent,
+          explicitMessagingServiceSid: resolvedMessagingServiceSid,
+          campaignSmsSendMode: campaignSmsRow?.sms_send_mode,
+          campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
+        }),
+      );
+    },
+    {
+      workspaceId: workspace,
+      operation: "messages.create.campaign",
+      beforeAttempt: () => {
+        if (!isDispatchAllowedAt(sendPolicy)) {
+          throw new CampaignSmsSendWindowClosedError(
+            nextCampaignSmsWindowOpenAt(sendPolicy),
+          );
+        }
+      },
+    },
+  ).then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
+
+  if (!sendResult.ok) {
+    if (sendResult.error instanceof CampaignSmsSendWindowClosedError) {
+      if (outreachAttemptPromise) await outreachAttemptPromise;
+      await deleteMessageByClientRef(workspace, clientRef);
+      return {
+        kind: "deferred_send_window" as const,
+        nextOpenAt: sendResult.error.nextOpenAt,
+      };
+    }
     // Twilio refused: the text never left, so the intent must not block a
     // later legitimate attempt.
     await deleteMessageByClientRef(workspace, clientRef).catch((error) => {
@@ -145,11 +204,21 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
         error: error instanceof Error ? error.message : String(error),
       });
     });
-    throw message.error;
+    if (outreachAttemptPromise) await outreachAttemptPromise;
+    throw sendResult.error;
   }
 
+  if (!outreachAttemptPromise) {
+    throw new Error("Twilio returned a message without starting an outreach attempt");
+  }
+  const outreachAttempt = await outreachAttemptPromise;
+  const message = sendResult.value;
+
   const messageFields = twilioMessageToPersistFields(
-    { ...message, sid: message.sid || `failed-${to}-${Date.now()}` },
+    {
+      ...sendResult.value,
+      sid: sendResult.value.sid || `failed-${to}-${Date.now()}`,
+    },
     { workspace, campaign_id, contact_id },
   );
 

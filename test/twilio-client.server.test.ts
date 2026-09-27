@@ -37,6 +37,29 @@ describe("withTwilioRetry", () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
+  test("checks before every attempt and stops a retry when the preflight closes", async () => {
+    const fn = vi.fn().mockRejectedValueOnce({ status: 429, message: "rate limit" });
+    const beforeAttempt = vi
+      .fn()
+      .mockImplementationOnce(() => undefined)
+      .mockImplementationOnce(() => {
+        throw new Error("send window closed");
+      });
+
+    const promise = withTwilioRetry(fn, {
+      operation: "test",
+      maxAttempts: 3,
+      baseDelayMs: 10,
+      beforeAttempt,
+    });
+    const rejected = expect(promise).rejects.toThrow("send window closed");
+
+    await vi.runAllTimersAsync();
+    await rejected;
+    expect(beforeAttempt).toHaveBeenCalledTimes(2);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
   test("isRetryableTwilioError aligns with client", () => {
     expect(isRetryableTwilioError({ status: 503 })).toBe(true);
     expect(isRetryableTwilioError({ status: 404 })).toBe(false);

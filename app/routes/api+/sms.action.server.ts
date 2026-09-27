@@ -128,7 +128,7 @@ export const action = defineAction({
             deferred: true,
             reason: "Outside campaign send window",
             nextOpenAt: outcome.nextOpenAt.toISOString(),
-            responses: [],
+            responses: outcome.responses,
           }),
           {
             headers: { "Content-Type": "application/json" },
