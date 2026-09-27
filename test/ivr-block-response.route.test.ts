@@ -273,6 +273,73 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     expect(text).toContain("<Redirect>https://base.example/api/ivr/1/page_1/bX/</Redirect>");
   });
 
+  test("replay keeps every earlier and later caller answer across repeated timeouts", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["first", "second", "third"] } },
+      blocks: {
+        first: { id: "first", title: "First answer" },
+        second: { id: "second", title: "Second answer" },
+        third: {
+          id: "third",
+          title: "Third answer",
+          noInput: { action: "replay", maxReplays: 2 },
+        },
+      },
+    };
+    const campaignData = { script: { steps: script } };
+    let persistedResult: Record<string, unknown> = {};
+    const client = makeDbClient({
+      call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 9 },
+      campaignData,
+    });
+    mocks.createClient.mockReturnValue(client);
+    telephonyDbMocks.findOutreachAttemptById.mockImplementation(async () => ({
+      result: persistedResult,
+    }));
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockImplementation(
+      async (_workspaceId, _id, patch) => {
+        if ("result" in patch) {
+          persistedResult = patch.result as Record<string, unknown>;
+        }
+        return { result: persistedResult };
+      },
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+
+    const respond = async (blockId: string, fields: Record<string, string>) => {
+      const response = await mod.action({
+        params: { campaignId: "1", pageId: "page_1", blockId },
+        request: makeReq({ CallSid: "CA1", ...fields }),
+      } as any);
+      return response.text();
+    };
+
+    await respond("first", { Digits: "1" });
+    await respond("second", { Digits: "2" });
+    const earlierAnswers = {
+      "First answer": "1",
+      "Second answer": "2",
+    };
+    expect(persistedResult).toMatchObject({ page_1: earlierAnswers });
+
+    expect(await respond("third", {})).toContain("/api/ivr/1/page_1/third/");
+    expect(persistedResult).toMatchObject({ page_1: earlierAnswers });
+    expect(await respond("third", {})).toContain("/api/ivr/1/page_1/third/");
+    expect(persistedResult).toMatchObject({ page_1: earlierAnswers });
+    expect(persistedResult).toMatchObject({
+      __no_input_replays: { page_1: { third: 2 } },
+    });
+
+    await respond("third", { Digits: "3" });
+    expect(persistedResult).toMatchObject({
+      page_1: {
+        ...earlierAnswers,
+        "Third answer": "3",
+      },
+      __no_input_replays: { page_1: { third: 2 } },
+    });
+  });
+
   test("covers page_ redirect branch and error handling branches", async () => {
     const script = {
       pages: { page_1: { blocks: ["b1"] } },

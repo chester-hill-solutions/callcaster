@@ -4,6 +4,7 @@ import {
   normalizeIvrAnswerValue,
   parseIvrResult,
   resolveIvrAnswerLabel,
+  stripInternalIvrResultMetadata,
   type IvrScriptShape,
 } from "../app/lib/ivr-results";
 
@@ -64,6 +65,20 @@ describe("normalizeIvrAnswerValue", () => {
 });
 
 describe("aggregateIvrResponses", () => {
+  test("keeps replay bookkeeping out of visible answers and export data", () => {
+    const result = {
+      page_1: { "Support?": "1" },
+      __no_input_replays: { page_1: { block_1: 2 } },
+    };
+
+    expect(aggregateIvrResponses([{ result }], script)).toMatchObject([
+      { pageId: "page_1", question: "Support?", total: 1 },
+    ]);
+    expect(JSON.parse(JSON.stringify(stripInternalIvrResultMetadata(result)))).toEqual({
+      page_1: { "Support?": "1" },
+    });
+  });
+
   test("counts each distinct answer per question", () => {
     const results = aggregateIvrResponses(
       [

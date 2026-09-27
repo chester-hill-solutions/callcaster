@@ -14,7 +14,11 @@ import {
   getCampaignQueueContactIds,
 } from "@/lib/campaign-queue-db.server";
 import { logger } from "@/lib/logger.server";
-import { normalizeIvrAnswerValue, resolveIvrAnswerLabel } from "@/lib/ivr-results";
+import {
+  normalizeIvrAnswerValue,
+  resolveIvrAnswerLabel,
+  stripInternalIvrResultMetadata,
+} from "@/lib/ivr-results";
 import {
   voiceBillingKindFromCampaignType,
   voiceCreditsFromDurationSeconds,
@@ -490,7 +494,7 @@ export async function processCallCampaignExport(
         const rowData = [
           item.id,
           item.disposition || item.call.status || "",
-          JSON.stringify(item.result),
+          JSON.stringify(stripInternalIvrResultMetadata(item.result)),
           item.created_at,
           item.call.sid,
           durationSeconds.toString(),

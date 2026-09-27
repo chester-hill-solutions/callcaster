@@ -110,6 +110,16 @@ export function parseIvrResult(result: unknown): Record<string, unknown> | null 
   return value as Record<string, unknown>;
 }
 
+/** Remove runtime bookkeeping that older IVR attempts stored beside answers. */
+export function stripInternalIvrResultMetadata(result: unknown): unknown {
+  const parsed = parseIvrResult(result);
+  if (!parsed || !("__no_input_replays" in parsed)) return result;
+
+  return Object.fromEntries(
+    Object.entries(parsed).filter(([key]) => key !== "__no_input_replays"),
+  );
+}
+
 /** Normalizes a recorded answer to a display value; `null` means "no answer given". */
 export function normalizeIvrAnswerValue(value: unknown): string | null {
   if (value == null) return null;
@@ -178,7 +188,7 @@ export function aggregateIvrResponses(
   const byQuestion = new Map<string, IvrQuestionResults & { counts: Map<string, number> }>();
 
   for (const attempt of attempts) {
-    const parsed = parseIvrResult(attempt?.result);
+    const parsed = parseIvrResult(stripInternalIvrResultMetadata(attempt?.result));
     if (!parsed) continue;
 
     for (const [pageId, pageData] of Object.entries(parsed)) {
