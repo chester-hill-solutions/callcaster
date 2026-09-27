@@ -72,6 +72,8 @@ const attempt = {
 async function runCallExport(args: {
   campaignType: string;
   duration?: string | null;
+  result?: unknown;
+  script?: unknown;
 }) {
   mocks.uploads.length = 0;
   mocks.campaignExportDb.findCampaignWithScriptForExport.mockResolvedValue({
@@ -82,10 +84,12 @@ async function runCallExport(args: {
     start_date: "2026-01-01T00:00:00.000Z",
     end_date: "2026-01-02T00:00:00.000Z",
     status: "completed",
-    script: { steps: { pages: {}, blocks: {} } },
+    script: args.script ?? { steps: { pages: {}, blocks: {} } },
   });
   mocks.campaignExportDb.countExportOutreachAttempts.mockResolvedValue(1);
-  mocks.campaignExportDb.listExportOutreachAttempts.mockResolvedValue([attempt]);
+  mocks.campaignExportDb.listExportOutreachAttempts.mockResolvedValue([
+    { ...attempt, result: args.result ?? attempt.result },
+  ]);
   mocks.campaignExportDb.findExportContactsByIds.mockResolvedValue([contact]);
   mocks.campaignExportDb.findExportCallsByOutreachAttemptIds.mockResolvedValue([
     {
@@ -216,5 +220,25 @@ describe("voice campaign export credits", () => {
     expect(rows[0]["Support?"]).toBe("yes");
     expect(rows[0].full_result).toContain('"confidence":0.87');
     expect(rows[0]["Support?"]).not.toContain("[object Object]");
+  });
+
+  test("does not export a no-input replay counter as a block answer", async () => {
+    await runCallExport({
+      campaignType: "simple_ivr",
+      result: {
+        page_1: { block_1: "answer" },
+        __no_input_replays: { page_1: { block_1: 2 } },
+      },
+      script: {
+        steps: {
+          pages: { page_1: { title: "Page 1", blocks: ["block_1"] } },
+          blocks: { block_1: { id: "block_1", content: "Question" } },
+        },
+      },
+    });
+
+    const csv = mocks.uploads.find((upload) => upload.path.endsWith(".csv"))?.text;
+    expect(csv).toMatch(/,answer\r?\n$/);
+    expect(csv).not.toContain("__no_input_replays");
   });
 });

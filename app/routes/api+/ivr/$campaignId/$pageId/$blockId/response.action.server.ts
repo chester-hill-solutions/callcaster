@@ -130,6 +130,10 @@ export const action = defineAction({
   const baseUrl = env.BASE_URL();
 
   const twiml = createVoiceResponse();
+  const twimlResponse = () =>
+    new Response(twiml.toString(), {
+      headers: { "Content-Type": "application/xml" },
+    });
 
   const pageId = params.pageId as string;
   const blockId = params.blockId as string;
@@ -203,7 +207,7 @@ export const action = defineAction({
         const target = resolveNoInputTarget(currentBlock.noInput, noInputReplays);
         if (target.kind === "hangup") {
           twiml.hangup();
-          return;
+          return twimlResponse();
         }
         if (target.kind === "route") {
           handleNextStep(
@@ -213,11 +217,12 @@ export const action = defineAction({
             pageId,
             baseUrl,
           );
-          return;
+          return twimlResponse();
         }
         if (target.kind === "replay" && call.outreach_attempt_id != null && call.workspace) {
           await persistResult({
             result: {
+              ...result,
               __no_input_replays: {
                 ...(nested ?? {}),
                 [pageId]: { ...(perPage ?? {}), [blockId]: noInputReplays + 1 },
@@ -225,7 +230,7 @@ export const action = defineAction({
             },
           });
           twiml.redirect(`${baseUrl}/api/ivr/${campaignId}/${pageId}/${blockId}/`);
-          return;
+          return twimlResponse();
         }
         // replay without a store, or past the cap: fall through.
       }
@@ -283,8 +288,6 @@ export const action = defineAction({
     twiml.hangup();
   }
 
-  return new Response(twiml.toString(), {
-    headers: { "Content-Type": "application/xml" },
-  });
+  return twimlResponse();
   },
 });

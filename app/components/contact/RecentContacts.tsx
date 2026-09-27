@@ -9,6 +9,7 @@ import {
 import { Heading } from '@/components/ui/typography';
 import type { Contact, OutreachAttempt } from '@/lib/types';
 import type { Json } from '@/lib/db-types';
+import { stripInternalIvrResultMetadata } from '@/lib/ivr-results';
 import { safeString, formatDate, isObject, isArray } from '@/lib/type-safety-utils';
 import { logger } from '@/lib/logger.client';
 
@@ -99,9 +100,10 @@ function AttemptAccordionItem({
 
   const getResultData = useCallback((): Array<{ key: string; value: Json }> => {
     try {
-      if (!attempt.result || !isObject(attempt.result)) return [];
+      const visibleResult = stripInternalIvrResultMetadata(attempt.result);
+      if (!visibleResult || !isObject(visibleResult)) return [];
 
-      return Object.entries(attempt.result)
+      return Object.entries(visibleResult)
         .map(([key, value]) => ({ key, value }))
         .filter((entry): entry is { key: string; value: Json } => entry.value != null);
     } catch (error) {
