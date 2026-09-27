@@ -4,7 +4,6 @@ import {
 } from "@/lib/database/workspace.server";
 import {
   handleAddUser,
-  handleDeleteSelf,
   handleDeleteUser,
   handleDeleteWorkspace,
   handleTransferWorkspace,
@@ -73,16 +72,6 @@ export const action = defineAction({
         }
         break;
       }
-      case "deleteSelf": {
-        const userId = formData.get("user_id") as string;
-        if (userId !== user.id) {
-          return routeData(
-            { error: "You don't have permission to perform this action" },
-            { headers, status: 403 },
-          );
-        }
-        break;
-      }
       default: {
         break;
       }
@@ -100,9 +89,6 @@ export const action = defineAction({
       }
       case "deleteUser": {
         return handleDeleteUser(formData, workspaceId, headers, user.id);
-      }
-      case "deleteSelf": {
-        return handleDeleteSelf(formData, workspaceId, headers, user.id);
       }
       case "transferWorkspaceOwnership": {
         return handleTransferWorkspace(formData, workspaceId, headers, user.id);

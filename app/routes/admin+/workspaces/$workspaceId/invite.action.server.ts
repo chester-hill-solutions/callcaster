@@ -1,7 +1,6 @@
 import { data as routeData } from "react-router";
 import {
   handleAddUser,
-  handleDeleteSelf,
   handleDeleteUser,
   handleUpdateUser,
   removeInvite,
@@ -31,9 +30,6 @@ export const action = defineAction({
       }
       case "deleteUser": {
         return handleDeleteUser(formData, workspaceId, headers, user.id);
-      }
-      case "deleteSelf": {
-        return handleDeleteSelf(formData, workspaceId, headers, user.id);
       }
       case "cancelInvite": {
         return removeInvite({ workspaceId, formData, headers });

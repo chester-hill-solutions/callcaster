@@ -217,15 +217,6 @@ export default function TeamMember({
                   You do not have permission to edit this user
                 </p>
               )}
-              {memberIsUser && (
-                <Form method="POST" className="w-full">
-                  <input type="hidden" name="formName" value="deleteSelf" />
-                  <input type="hidden" name="user_id" value={member.id} />
-                  <Button className="w-full" variant="destructive">
-                    Quit This Workspace
-                  </Button>
-                </Form>
-              )}
             </SheetContent>
           </Sheet>
         )}

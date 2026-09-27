@@ -443,6 +443,14 @@ export async function removeWorkspaceMember(
   workspaceId: string,
   targetUserId: string,
 ) {
+  if (userId === targetUserId) {
+    return {
+      ok: false as const,
+      error: "Self-removal is not supported.",
+      status: 403,
+    };
+  }
+
   const access = await requireMemberManager(userId, workspaceId);
   if (!access.ok) return access;
 
