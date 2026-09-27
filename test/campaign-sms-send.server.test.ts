@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   messagesCreate: vi.fn(),
   dequeueQueueEntry: vi.fn(async () => undefined),
   persistMessageRecord: vi.fn(async () => ({ data: [{ id: 1 }], error: null as { message: string } | null })),
+  isDispatchAllowedAt: vi.fn(() => true),
   updateOutreachAttemptForWorkspace: vi.fn(async () => ({ campaign_id: 1 })),
   rpcCreateOutreachAttempt: vi.fn(async () => 7),
   resolveMessageByClientRef: vi.fn(async () => ({ id: 1 })),
@@ -39,6 +40,10 @@ vi.mock("@/lib/telephony-db.server", async (importOriginal) => ({
 vi.mock("@/lib/db-rpc.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/db-rpc.server")>()),
   rpcCreateOutreachAttempt: (...args: unknown[]) => mocks.rpcCreateOutreachAttempt(...args),
+}));
+vi.mock("@/lib/campaign-dispatch-policy", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-dispatch-policy")>()),
+  isDispatchAllowedAt: (...args: unknown[]) => mocks.isDispatchAllowedAt(...args),
 }));
 vi.mock("@/lib/twilio-readiness.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/twilio-readiness.server")>()),
@@ -82,6 +87,7 @@ function params() {
 describe("sendSingleCampaignSms intent row (#1582)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.isDispatchAllowedAt.mockReset().mockReturnValue(true);
     mocks.messagesCreate.mockResolvedValue({ sid: "SM_sent", status: "queued", to: "+15555550100", from: "+15555550101", body: "hello", numSegments: "1", dateCreated: new Date() });
     mocks.persistMessageRecord.mockResolvedValue({ data: [{ id: 1 }], error: null });
     mocks.resolveMessageByClientRef.mockResolvedValue({ id: 1, sid: "SM_sent" });
@@ -131,6 +137,7 @@ describe("sendSingleCampaignSms intent row (#1582)", () => {
   test("defers and removes the intent when preparation crosses the send-window boundary", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-09T20:59:59.900Z"));
+    mocks.isDispatchAllowedAt.mockReturnValueOnce(false);
     mocks.persistMessageRecord.mockImplementationOnce(async () => {
       vi.setSystemTime(new Date("2026-09-09T21:00:00.100Z"));
       return { data: [{ id: 1 }], error: null };
@@ -159,6 +166,10 @@ describe("sendSingleCampaignSms intent row (#1582)", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-09T20:59:59.900Z"));
     vi.spyOn(Math, "random").mockReturnValue(0);
+    mocks.isDispatchAllowedAt
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
     mocks.messagesCreate.mockRejectedValueOnce(
       Object.assign(new Error("temporary provider error"), { status: 503 }),
     );
@@ -179,8 +190,31 @@ describe("sendSingleCampaignSms intent row (#1582)", () => {
 
     expect(result).toMatchObject({ kind: "deferred_send_window" });
     expect(mocks.messagesCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.rpcCreateOutreachAttempt).toHaveBeenCalledTimes(1);
     const [, fields] = mocks.persistMessageRecord.mock.calls[0] as [string, Record<string, unknown>];
     expect(mocks.deleteMessageByClientRef).toHaveBeenCalledWith("ws_1", fields.client_ref);
+  });
+
+  test("does not count an outreach attempt when the final gate blocks the first provider call", async () => {
+    mocks.isDispatchAllowedAt
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
+
+    const result = await sendSingleCampaignSms({
+      ...params(),
+      sendPolicy: smsSendPolicy({
+        sms_send_window: {
+          wednesday: {
+            active: true,
+            intervals: [{ start: "09:00", end: "21:00" }],
+          },
+        },
+      }),
+    });
+
+    expect(result).toMatchObject({ kind: "deferred_send_window" });
+    expect(mocks.messagesCreate).not.toHaveBeenCalled();
+    expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
   });
 });
 

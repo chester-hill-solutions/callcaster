@@ -143,44 +143,56 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
     };
   }
 
-  const [message, outreachAttempt] = await Promise.all([
-    withTwilioRetry(
-      () =>
-        twilio.messages.create(
-          buildTwilioOutboundSmsCreateParams({
-            body,
-            to,
-            from,
-            media,
-            statusCallback: `${env.BASE_URL()}/api/sms/status`,
-            portalConfig,
-            messageIntent,
-            explicitMessagingServiceSid: resolvedMessagingServiceSid,
-            campaignSmsSendMode: campaignSmsRow?.sms_send_mode,
-            campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
-          }),
-        ),
-      {
-        workspaceId: workspace,
-        operation: "messages.create.campaign",
-        beforeAttempt: () => {
+  let outreachAttemptPromise: Promise<number> | null = null;
+  const sendResult = await withTwilioRetry(
+    () => {
+      // The retry callback runs only after beforeAttempt passes. This prevents
+      // a closed window from creating an outreach row or spending an attempt.
+      outreachAttemptPromise ??= createOutreachAttempt({
+        contact_id,
+        campaign_id,
+        queue_id,
+        workspace,
+        user_id,
+      });
+      return twilio.messages.create(
+        buildTwilioOutboundSmsCreateParams({
+          body,
+          to,
+          from,
+          media,
+          statusCallback: `${env.BASE_URL()}/api/sms/status`,
+          portalConfig,
+          messageIntent,
+          explicitMessagingServiceSid: resolvedMessagingServiceSid,
+          campaignSmsSendMode: campaignSmsRow?.sms_send_mode,
+          campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
+        }),
+      );
+    },
+    {
+      workspaceId: workspace,
+      operation: "messages.create.campaign",
+      beforeAttempt: () => {
         if (!isDispatchAllowedAt(sendPolicy)) {
           throw new CampaignSmsSendWindowClosedError(
             nextCampaignSmsWindowOpenAt(sendPolicy),
           );
         }
-        },
       },
-    ).catch((e) => ({ error: e })),
-    createOutreachAttempt({ contact_id, campaign_id, queue_id, workspace, user_id }),
-  ]);
+    },
+  ).then(
+    (value) => ({ ok: true as const, value }),
+    (error: unknown) => ({ ok: false as const, error }),
+  );
 
-  if ('error' in message) {
-    if (message.error instanceof CampaignSmsSendWindowClosedError) {
+  if (!sendResult.ok) {
+    if (sendResult.error instanceof CampaignSmsSendWindowClosedError) {
+      if (outreachAttemptPromise) await outreachAttemptPromise;
       await deleteMessageByClientRef(workspace, clientRef);
       return {
         kind: "deferred_send_window" as const,
-        nextOpenAt: message.error.nextOpenAt,
+        nextOpenAt: sendResult.error.nextOpenAt,
       };
     }
     // Twilio refused: the text never left, so the intent must not block a
@@ -192,11 +204,21 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
         error: error instanceof Error ? error.message : String(error),
       });
     });
-    throw message.error;
+    if (outreachAttemptPromise) await outreachAttemptPromise;
+    throw sendResult.error;
   }
 
+  if (!outreachAttemptPromise) {
+    throw new Error("Twilio returned a message without starting an outreach attempt");
+  }
+  const outreachAttempt = await outreachAttemptPromise;
+  const message = sendResult.value;
+
   const messageFields = twilioMessageToPersistFields(
-    { ...message, sid: message.sid || `failed-${to}-${Date.now()}` },
+    {
+      ...sendResult.value,
+      sid: sendResult.value.sid || `failed-${to}-${Date.now()}`,
+    },
     { workspace, campaign_id, contact_id },
   );
 
