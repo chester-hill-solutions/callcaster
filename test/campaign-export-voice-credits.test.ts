@@ -220,6 +220,8 @@ describe("voice campaign export credits", () => {
     expect(rows[0]["Support?"]).toBe("yes");
     expect(rows[0].full_result).toContain('"confidence":0.87');
     expect(rows[0]["Support?"]).not.toContain("[object Object]");
+  });
+
   test("does not export a no-input replay counter as a block answer", async () => {
     await runCallExport({
       campaignType: "simple_ivr",

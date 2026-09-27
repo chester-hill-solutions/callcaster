@@ -317,8 +317,8 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     await respond("first", { Digits: "1" });
     await respond("second", { Digits: "2" });
     const earlierAnswers = {
-      "First answer": "1",
-      "Second answer": "2",
+      "First answer": { value: "1", raw: "1", confidence: null, inputType: "dtmf" },
+      "Second answer": { value: "2", raw: "2", confidence: null, inputType: "dtmf" },
     };
     expect(persistedResult).toMatchObject({ page_1: earlierAnswers });
 
@@ -334,7 +334,7 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     expect(persistedResult).toMatchObject({
       page_1: {
         ...earlierAnswers,
-        "Third answer": "3",
+        "Third answer": { value: "3", raw: "3", confidence: null, inputType: "dtmf" },
       },
       __no_input_replays: { page_1: { third: 2 } },
     });
