@@ -15,6 +15,8 @@ export type TwilioClientCallOptions = {
   operation: string;
   maxAttempts?: number;
   baseDelayMs?: number;
+  /** Synchronous gate checked before every provider attempt, including retries. */
+  beforeAttempt?: () => void;
 };
 
 const DEFAULT_MAX_ATTEMPTS = 3;
@@ -42,6 +44,7 @@ export async function withTwilioRetry<T>(
   let lastError: unknown;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    options.beforeAttempt?.();
     try {
       return await fn();
     } catch (error) {

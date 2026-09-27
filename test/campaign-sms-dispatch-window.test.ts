@@ -153,6 +153,34 @@ describe("campaign SMS dispatch send-window boundary", () => {
     expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
   });
 
+  test("returns a durable window deferral when final send preparation crosses the boundary", async () => {
+    const nextOpenAt = new Date("2026-09-16T09:00:00.000Z");
+    mocks.loadCampaignSmsDispatchData.mockResolvedValueOnce({
+      campaign: {
+        id: Number(CAMPAIGN_ID),
+        sms_send_mode: null,
+        sms_send_window: null,
+        caller_id: "+15550000000",
+      },
+      body_text: "Hello {{firstname}}",
+      message_media: [],
+    });
+    mocks.sendSingleCampaignSms.mockResolvedValueOnce({
+      kind: "deferred_send_window",
+      nextOpenAt,
+    });
+
+    const outcome = await dispatchCampaignSmsBatch({
+      workspaceId: WORKSPACE_ID,
+      campaignId: CAMPAIGN_ID,
+      userId: "3b6f0a52-6f5e-4b2d-9d55-000000000002",
+    });
+
+    expect(outcome).toEqual({ kind: "deferred_send_window", nextOpenAt });
+    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(mocks.recordQueueAttemptFailure).not.toHaveBeenCalled();
+  });
+
   test("skips deferred queue-head rows when filling a bounded batch", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-09T15:00:00.000Z"));

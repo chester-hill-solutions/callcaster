@@ -28,6 +28,11 @@ import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
 import { resolveTwilioSmsMessagingServiceSid } from "@/lib/sms-send-resolve";
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
+import {
+  isDispatchAllowedAt,
+  nextDispatchOpenAt,
+  type DispatchPolicy,
+} from "@/lib/campaign-dispatch-policy";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 
 export const DUPLICATE_SMS_DEQUEUED_REASON = "Duplicate SMS prevented";
@@ -47,12 +52,24 @@ export interface SendSingleSmsParams {
   portalConfig: WorkspaceTwilioOpsConfig;
   messageIntent?: TwilioMessageIntent | null;
   messagingServiceSidFromRequest: string | null;
+  sendPolicy: DispatchPolicy;
   campaignSmsRow?: {
     end_time: string;
     sms_send_mode?: string | null;
     sms_messaging_service_sid?: string | null;
     caller_id?: string | null;
   };
+}
+
+class CampaignSmsSendWindowClosedError extends Error {
+  constructor(readonly nextOpenAt: Date) {
+    super("Campaign SMS send window closed before the provider request");
+    this.name = "CampaignSmsSendWindowClosedError";
+  }
+}
+
+function nextCampaignSmsWindowOpenAt(policy: DispatchPolicy): Date {
+  return nextDispatchOpenAt(policy) ?? new Date(Date.now() + 15 * 60 * 1000);
 }
 
 export async function hasDuplicateCampaignSms(args: {
@@ -77,6 +94,7 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
     body, to, from, media, campaign_id, workspace,
     contact_id, queue_id, user_id, portalConfig,
     messageIntent, messagingServiceSidFromRequest, campaignSmsRow,
+    sendPolicy,
   } = params;
 
   await assertWorkspaceCanSendSms({ workspaceId: workspace });
@@ -113,6 +131,18 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
     throw new Error(`Could not record the message before sending: ${intent.error.message}`);
   }
 
+  // The dispatch loop checks before entering this function. Its preparation
+  // steps above can await database work, so check again before starting any
+  // provider or outreach request. The provider callback below checks every
+  // retry too, because a retry delay can cross the campaign-window boundary.
+  if (!isDispatchAllowedAt(sendPolicy)) {
+    await deleteMessageByClientRef(workspace, clientRef);
+    return {
+      kind: "deferred_send_window" as const,
+      nextOpenAt: nextCampaignSmsWindowOpenAt(sendPolicy),
+    };
+  }
+
   const [message, outreachAttempt] = await Promise.all([
     withTwilioRetry(
       () =>
@@ -130,12 +160,29 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
             campaignSmsMessagingServiceSid: campaignSmsRow?.sms_messaging_service_sid,
           }),
         ),
-      { workspaceId: workspace, operation: "messages.create.campaign" },
+      {
+        workspaceId: workspace,
+        operation: "messages.create.campaign",
+        beforeAttempt: () => {
+        if (!isDispatchAllowedAt(sendPolicy)) {
+          throw new CampaignSmsSendWindowClosedError(
+            nextCampaignSmsWindowOpenAt(sendPolicy),
+          );
+        }
+        },
+      },
     ).catch((e) => ({ error: e })),
     createOutreachAttempt({ contact_id, campaign_id, queue_id, workspace, user_id }),
   ]);
 
   if ('error' in message) {
+    if (message.error instanceof CampaignSmsSendWindowClosedError) {
+      await deleteMessageByClientRef(workspace, clientRef);
+      return {
+        kind: "deferred_send_window" as const,
+        nextOpenAt: message.error.nextOpenAt,
+      };
+    }
     // Twilio refused: the text never left, so the intent must not block a
     // later legitimate attempt.
     await deleteMessageByClientRef(workspace, clientRef).catch((error) => {

@@ -554,9 +554,14 @@ async function handleMember(
     portalConfig: ctx.portalConfig,
     messageIntent: ctx.messageIntent,
     messagingServiceSidFromRequest: ctx.messagingServiceSidFromRequest,
+    sendPolicy: ctx.sendPolicy,
     campaignSmsRow: ctx.campaign.campaign,
   }).then(
     (result) => {
+      if (result.kind === "deferred_send_window") {
+        ctx.budget.release(cost);
+        return { response: {}, deferredSendWindow: result.nextOpenAt };
+      }
       counts.sent += 1;
       return memberResponse({ [member.contact_id]: { success: true, ...result } });
     },

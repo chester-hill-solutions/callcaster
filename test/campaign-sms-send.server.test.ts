@@ -58,6 +58,7 @@ vi.mock("@/server/tenant-db", async (importOriginal) => ({
 }));
 
 import { sendSingleCampaignSms } from "../app/lib/campaign-sms-send.server";
+import { smsSendPolicy } from "@/lib/campaign-dispatch-policy";
 import { makePortalConfig } from "./fixtures/workspace-twilio-portal-config";
 
 function params() {
@@ -74,6 +75,7 @@ function params() {
     portalConfig: makePortalConfig(),
     messageIntent: null,
     messagingServiceSidFromRequest: null,
+    sendPolicy: smsSendPolicy(null),
   };
 }
 
@@ -124,6 +126,61 @@ describe("sendSingleCampaignSms intent row (#1582)", () => {
 
     await expect(sendSingleCampaignSms(params())).rejects.toThrow(/before sending/);
     expect(mocks.messagesCreate).not.toHaveBeenCalled();
+  });
+
+  test("defers and removes the intent when preparation crosses the send-window boundary", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.900Z"));
+    mocks.persistMessageRecord.mockImplementationOnce(async () => {
+      vi.setSystemTime(new Date("2026-09-09T21:00:00.100Z"));
+      return { data: [{ id: 1 }], error: null };
+    });
+
+    const result = await sendSingleCampaignSms({
+      ...params(),
+      sendPolicy: smsSendPolicy({
+        sms_send_window: {
+          wednesday: {
+            active: true,
+            intervals: [{ start: "09:00", end: "21:00" }],
+          },
+        },
+      }),
+    });
+
+    expect(result).toMatchObject({ kind: "deferred_send_window" });
+    expect(mocks.messagesCreate).not.toHaveBeenCalled();
+    expect(mocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+    const [, fields] = mocks.persistMessageRecord.mock.calls[0] as [string, Record<string, unknown>];
+    expect(mocks.deleteMessageByClientRef).toHaveBeenCalledWith("ws_1", fields.client_ref);
+  });
+
+  test("does not retry a provider request after the campaign window closes", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-09T20:59:59.900Z"));
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    mocks.messagesCreate.mockRejectedValueOnce(
+      Object.assign(new Error("temporary provider error"), { status: 503 }),
+    );
+    const send = sendSingleCampaignSms({
+      ...params(),
+      sendPolicy: smsSendPolicy({
+        sms_send_window: {
+          wednesday: {
+            active: true,
+            intervals: [{ start: "09:00", end: "21:00" }],
+          },
+        },
+      }),
+    });
+
+    await vi.advanceTimersByTimeAsync(200);
+    const result = await send;
+
+    expect(result).toMatchObject({ kind: "deferred_send_window" });
+    expect(mocks.messagesCreate).toHaveBeenCalledTimes(1);
+    const [, fields] = mocks.persistMessageRecord.mock.calls[0] as [string, Record<string, unknown>];
+    expect(mocks.deleteMessageByClientRef).toHaveBeenCalledWith("ws_1", fields.client_ref);
   });
 });
 
