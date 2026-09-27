@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**114** documented / **116** total effects (2 grandfathered, ratcheting to 0).
+**115** documented / **117** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -24,6 +24,7 @@
 | `app/components/queue/ContactSearchDialog.tsx` | When the create POST resolves, add the new contact to the queue and | [createFetcher.state, createFetcher.data, searchQuery] | queue enqueue + search refetch | Client-side search-panel flow, no loader needed. |
 | `app/components/shared/SaveBar.tsx` | Wire a global Cmd/Ctrl+S keyboard shortcut to trigger onSave while there are unsaved changes. | isChanged, isSaving, onSave — the handler must see current values to guard the save and avoid double-submits. | dom (document keydown listener; removed on cleanup/re-run) | A global keyboard shortcut requires a document-level event listener; there's no loader/fetcher equivalent for DOM key events. |
 | `app/components/shared/mode-toggle.tsx` | Flag that we are past hydration so the resolved-theme icon can render. | none (mount only) | none (local setState) | The theme comes from localStorage/`prefers-color-scheme`, |
+| `app/components/sms-ui/ChatAddContactDialog.tsx` | Handle the completed contact-create request once per submission. | createFetcher state/data (waits for the POST result), setDialog | toast + closes the sheet after a successful create | The result is from this client-side form submission. |
 | `app/components/sms-ui/ChatInput.tsx` | KEEP: align the controlled From selection with available sender | initialFrom, workspaceNumbers (available sender option values) | setSelectedFrom only | selectedFrom is intentional user-controlled state; |
 | `app/components/sms-ui/ChatInput.tsx` | After a scheduled-send submission completes, clear the schedule | messageFetcher.data, messageFetcher.state (tracks the | setSendLater, setSendAtLocal only | Schedule UI state is client-controlled; we only |
 | `app/hooks/agent/useAgentStatus.ts` | Load the agent's current status on mount and send a heartbeat POST every 30s while mounted. | workspaceId, userId (guards + re-arms the heartbeat when either changes), refreshStatus | timer (setInterval heartbeat) + fetch (initial refreshStatus() and each heartbeat POST); interval cleared on unmount/dep change | The recurring heartbeat is live client-only polling a loader can't express; |
