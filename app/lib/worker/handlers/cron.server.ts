@@ -6,6 +6,7 @@ import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentia
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import { runLowCreditNotify } from "@/lib/low-credit-notify.server";
 import { runCampaignScheduleSync } from "@/lib/campaign-schedule-sync.server";
+import { recheckCampaignsWithUnsettledMessages } from "@/lib/campaign-settle-recheck.server";
 import { pruneExpiredIdempotencyRecords } from "@/lib/platform-idempotency.server";
 import { pruneCompletedJobs, pruneWorkspaceEvents } from "@/lib/worker/job-retention.server";
 import {
@@ -100,7 +101,17 @@ export async function twilioOpenSyncHandler(
           if (!sync.ok) {
             throw new Error(sync.error);
           }
-          return sync;
+          // #2048: the sweep just repaired message rows whose status callback
+          // was lost. A repaired row is the only signal that a stranded
+          // campaign can complete, so turn the repair into a completion
+          // decision here. Without this, a lost callback leaves the campaign at
+          // `running` forever even though its messages have settled.
+          const campaignsCompleted =
+            await recheckCampaignsWithUnsettledMessages({
+              workspaceId: id,
+              reason: "twilio_open_sync",
+            });
+          return { ...sync, campaignsCompleted };
         },
       }),
   );

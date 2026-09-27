@@ -13,6 +13,7 @@ import {
   smsStatusToOutreachDisposition,
 } from "@/lib/sms-status";
 import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
+import { recheckCampaignCompletion } from "@/lib/campaign-settle-recheck.server";
 import { MMS_CREDITS, SMS_SEGMENT_CREDITS, debitAmountFromCredits } from "@/lib/pricing";
 import { smsKey } from "@/lib/billing-keys";
 import type { TwilioSmsStatusWebhook, OutreachDisposition } from "@/lib/twilio.types";
@@ -295,6 +296,18 @@ export async function runSmsStatusSideEffects(args: {
   if (!webhookResult.success) {
     logger.error("SMS status webhook delivery failed", webhookResult.error);
   }
+
+  // #2048: a message campaign is complete only when every message has settled.
+  // The dispatch chain stops when the local queue empties, so this callback is
+  // the moment the last message can actually open the gate. Re-check on EVERY
+  // status, not just terminal ones: a non-terminal callback still carries fresh
+  // message state, and asking is cheap because the RPC is the only work done.
+  // Inbound replies have campaign_id NULL, so they fall out here.
+  await recheckCampaignCompletion({
+    workspaceId: messageData.workspace,
+    campaignId: messageData.campaign_id,
+    reason: `sms_status:${messageStatus}`,
+  });
 
   return { ok: true };
 }
