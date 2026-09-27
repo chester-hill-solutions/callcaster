@@ -454,17 +454,18 @@ export async function processCallCampaignExport(
         // Track visited pages and responses
         const visitedPages = new Set<string>();
         const responses: Record<string, string> = {};
+        const exportResult = stripInternalIvrResultMetadata(item.result);
 
         // Extract responses from the attempt result
-        if (item.result) {
+        if (exportResult) {
           try {
             let resultObj: Record<string, unknown>;
 
             // Parse result if it's a string
-            if (typeof item.result === "string") {
-              resultObj = JSON.parse(item.result) as Record<string, unknown>;
+            if (typeof exportResult === "string") {
+              resultObj = JSON.parse(exportResult) as Record<string, unknown>;
             } else {
-              resultObj = item.result as Record<string, unknown>;
+              resultObj = exportResult as Record<string, unknown>;
             }
 
             Object.entries(resultObj).forEach(([pageId, pageData]) => {
@@ -494,7 +495,7 @@ export async function processCallCampaignExport(
         const rowData = [
           item.id,
           item.disposition || item.call.status || "",
-          JSON.stringify(stripInternalIvrResultMetadata(item.result)),
+          JSON.stringify(exportResult),
           item.created_at,
           item.call.sid,
           durationSeconds.toString(),
