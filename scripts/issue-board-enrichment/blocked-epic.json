@@ -620,5 +620,309 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "blocked-epic: #1356 (dev DNS/IaC) first. Confirm the IaC-vs-manual decision when unblocked; this unblocks #1826."
+  },
+  {
+    "issueNumber": 2057,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "epic(auth-pages): sign-in and sign-up share one layout, copy and error treatment",
+    "summary": "Six filed sign-in/sign-up issues (#2010, #2011, #2012, #2013, #2014, #2015) are one piece of work on one pair of pages. Filed as loose tickets they guarantee a churn loop: fix alignment (#2013), the scrollbar returns (#2010), add the mural (#2011), and the box is off-centre again. Created 2026-09-25 during board triage, when all six sat unenriched in Needs triage.",
+    "currentBehavior": "The two pages drift independently: different centring, different form width, different padding, one has a mural and the other does not, and two different copy treatments.",
+    "rootCause": "No shared form container between the pages, so every layout change is made twice and any one change can undo the other.",
+    "resolution": "Land #2013 first as the shared baseline. Then treat #2010 as a probable symptom rather than a separate defect — a mis-sized container is the usual cause of a scrollbar on a page that should fit — and close it if it resolves instead of carrying a fix for a symptom that is gone. #2011 and #2012 land after #2013 so the final visual pass sees final copy. #2014 keeps the sign-in page fix; its codebase-wide half is #2058. #2015 is business logic, independent of all of it, and is the one with real diagnostic value.",
+    "lookIn": [
+      "app/routes/account.sign-in.*",
+      "app/routes/account.sign-up.*",
+      "app/components/shared/AuthCard.tsx",
+      "app/routes.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "both pages share one form container",
+      "no scrollbar at 1x viewport height"
+    ],
+    "acceptanceCriteria": [
+      "Both pages share one form container with identical width, padding and centring",
+      "Sign-up carries the same mural treatment as sign-in",
+      "Copy is consistent across the two pages",
+      "The sign-in page surfaces the real error through a toast",
+      "The inline-error sweep ships as its own issue with a rule and an inventory, not a blanket change",
+      "#2010 is closed as resolved by #2013, or reopened with the specific remaining cause"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "low",
+    "trackerRecommendation": "Parent epic. Sequencing lives here, not in the children. #2015 can proceed in parallel with the whole thing."
+  },
+  {
+    "issueNumber": 2010,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "auth pages: scrollbar appears even though the page fits the viewport",
+    "summary": "The sign-in and sign-up pages show a scrollbar even though the content fits within the viewport height. Grouped under the auth-pages epic (#2057).",
+    "currentBehavior": "A vertical scrollbar renders on pages whose content should fit.",
+    "rootCause": "Most likely an over-sized form container rather than genuinely long content.",
+    "resolution": "Blocked by #2013. Fix the shared container geometry first, then re-check. If the scrollbar is gone, close this as resolved-by rather than carrying a separate fix for a symptom that no longer exists. If it persists, reopen with the specific remaining cause rather than assuming it is the same issue.",
+    "lookIn": [
+      "app/routes/account.sign-in.*",
+      "app/routes/account.sign-up.*",
+      "app/components/shared/AuthCard.tsx"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "no scrollbar at 1x viewport height",
+      "regression guard once the container is fixed"
+    ],
+    "acceptanceCriteria": [
+      "No scrollbar at the supported viewport range",
+      "Either closed as resolved by #2013, or reopened with the specific remaining cause"
+    ],
+    "blockedBy": [
+      2013
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Suspect this closes for free with #2013. Do not fix it first — a scrollbar fix that is really a layout fix will be undone by the next alignment change."
+  },
+  {
+    "issueNumber": 2011,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "auth pages: sign-up is missing the background mural that sign-in has",
+    "summary": "The sign-up page lacks the background mural treatment the sign-in page already uses. Grouped under the auth-pages epic (#2057).",
+    "currentBehavior": "Sign-in has a background mural; sign-up does not.",
+    "rootCause": "The treatment was applied to one route only.",
+    "resolution": "Blocked by #2013 so the final visual pass sees the finished layout. Apply the same treatment to sign-up, ideally by extracting it so the two pages cannot drift apart again.",
+    "lookIn": [
+      "app/routes/account.sign-in.*",
+      "app/routes/account.sign-up.*"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "both routes render the mural treatment"
+    ],
+    "acceptanceCriteria": [
+      "Sign-up renders the same mural treatment as sign-in",
+      "The treatment is shared, not duplicated per route"
+    ],
+    "blockedBy": [
+      2013
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Trivial, but land it after #2013 so nobody has to re-verify alignment afterwards."
+  },
+  {
+    "issueNumber": 2014,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "auth pages: sign-in errors should be a toast, not inline text (sweep split to #2058)",
+    "summary": "The sign-in page renders errors as inline text under the form instead of a toast. The issue also asked for a codebase-wide sweep of the same mistake; that half is too large and too risky to bundle with a one-page fix, so it was split into #2058. This issue keeps the sign-in page instance only.",
+    "currentBehavior": "A failed sign-in renders inline error text under the form.",
+    "rootCause": "The page renders the error in place rather than through the app-wide toast pattern.",
+    "resolution": "Blocked by #2013 so the change sees the finished layout. Render the sign-in failure through toast() from sonner, against the single root Toaster named in AGENTS.md. Do NOT widen the scope here — the codebase-wide inventory and the keep/change judgement live in #2058, and a blanket find-and-replace would delete legitimate form validation.",
+    "lookIn": [
+      "app/routes/account.sign-in.*",
+      "app/components/ui/sonner.tsx",
+      "AGENTS.md (design-system section)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "a failed sign-in raises a toast"
+    ],
+    "acceptanceCriteria": [
+      "A failed sign-in surfaces through a toast, not inline text",
+      "No inline error text remains on the sign-in page",
+      "The change is scoped to this page; the sweep ships separately as #2058"
+    ],
+    "blockedBy": [
+      2013,
+      2058
+    ],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Small fix, but deliberately not where the codebase-wide question gets answered. Doing both at once is how form validation gets deleted."
+  },
+  {
+    "issueNumber": 2002,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "epic(authz): permission-based authorization instead of role checks",
+    "summary": "Parent of the authorization cluster. The product currently gates on three broad roles — Admin sees and edits everything, Coordinator sees and edits campaigns and agents, Agent can join campaigns — and the request is to move to permissions applied to people, with the existing roles kept as default groupings. Explicitly excludes UX around building grouped access policies: plan and implement the permission model first.",
+    "currentBehavior": "Access is decided by comparing a role string. Route loaders and actions check the role, not whether the specific action is permitted.",
+    "rootCause": "Authorization was modelled as a role comparison from the start and every check since has followed that shape.",
+    "resolution": "Do not start here. Blocked by #2030, because the issue text for #2030 is explicit that the implementation and architecture decisions need the options weighed first against what better-auth already provides. The sequencing is: #2030 investigates and recommends, then #2003 and #2008 can be specified, #2009 builds on #2008, and #2031 is the codebase-wide consistency sweep that lands last because it depends on the model existing everywhere.",
+    "lookIn": [
+      "app/lib/admin-middleware.server.ts",
+      "app/lib/workspace-middleware.server.ts",
+      "app/lib/data-plane-middleware.server.ts",
+      "app/lib/auth-layout.server.ts",
+      "eslint.config.mjs (no-restricted-imports, tenant boundary)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "permission model exists",
+      "each permission has a test at the route that enforces it"
+    ],
+    "acceptanceCriteria": [
+      "A permission model exists that roles map onto as default groupings",
+      "Authorization checks a permission rather than comparing a role string",
+      "Existing roles continue to work as groupings without a migration per user",
+      "No route is left checking a broad role where a specific permission is meant"
+    ],
+    "blockedBy": [
+      2030
+    ],
+    "size": "XL",
+    "risk": "high",
+    "trackerRecommendation": "Parent epic. Explicitly out of scope per the issue text: the UX for building grouped access policies. Do not begin implementation before #2030 reports."
+  },
+  {
+    "issueNumber": 2030,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Spike: weigh permission models against what the auth system already provides",
+    "summary": "The root of the authorization cluster and the first thing that must land. The issue text is explicit: before making implementation and architecture decisions, weigh the options and investigate what systems the codebase already has in place, and what the tools being used — better-auth — can provide. Everything else in the cluster is unspecified until this reports.",
+    "currentBehavior": "Unknown until investigated. The risk is building a hand-rolled permission layer over an auth system that already has an administration/permission plugin, which is the most expensive possible outcome here because it doubles the model and leaves two sources of truth.",
+    "rootCause": "Roles were adopted as the model without first checking whether a permission primitive was available.",
+    "resolution": "Produce a written recommendation, not code. Cover: what better-auth already provides for roles and permissions, including its admin plugin, and whether it is already installed or only nominally a dependency; what the codebase already has, since the tenant-scoped client and the middleware boundary are a de facto authorization layer; the realistic options with their migration cost; and a recommendation with the reason. State explicitly what was ruled out and why, so the next person does not re-derive it.",
+    "lookIn": [
+      "package.json (better-auth version and plugins in use)",
+      "app/lib/admin-middleware.server.ts",
+      "app/lib/workspace-middleware.server.ts",
+      "app/server/tenant-db.ts",
+      "app/lib/data-plane-middleware.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A written recommendation exists, reviewed before any implementation begins",
+      "better-auth permission capabilities are established from the installed version, not from documentation memory",
+      "Existing in-repo authorization is inventoried so it is extended rather than duplicated",
+      "Ruled-out options are recorded with reasons"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "low",
+    "trackerRecommendation": "Highest value-per-size item in the entire board, and it blocks five others. Do this before writing any authorization code anywhere. Sizing is M because it is investigation, not implementation — the implementation is the XL."
+  },
+  {
+    "issueNumber": 2003,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Agent role can reach the billing page by URL even though the sidebar link is hidden",
+    "summary": "A concrete live instance of the gap the cluster is about. The Credits entry is correctly absent from the sidebar for the Agent role, but an Agent who types the billing path directly reaches the page. Hiding a link is not access control.",
+    "currentBehavior": "Sidebar hides the link; the route does not enforce the permission. The route renders.",
+    "rootCause": "UI visibility was treated as the control. The route has no permission check for this resource.",
+    "resolution": "Blocked by #2030, because the right fix is a permission check and which permission depends on the model. When it lands: the route must enforce, not merely render, and a direct URL request must be refused. Note the existing convention from AGENTS.md — a non-member gets a uniform 404 rather than a 403, to avoid workspace-id inference, so match whatever the sibling billing routes already do rather than inventing a response shape.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/billing.*",
+      "app/components/layout/WorkspaceSidebar.tsx",
+      "app/lib/workspace-middleware.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "an Agent requesting the billing path directly is refused"
+    ],
+    "acceptanceCriteria": [
+      "An Agent requesting the billing path by URL is refused",
+      "The refusal matches the convention used by sibling routes (404 for non-members)",
+      "The check is a permission check at the route, not a UI-visibility check"
+    ],
+    "blockedBy": [
+      2030
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "The smallest concrete instance of the cluster and the easiest to verify, so it makes a good first implementation once #2030 reports. Keep it separate from the model work so the model is not judged by one route."
+  },
+  {
+    "issueNumber": 2008,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Agent role: define the permission surface for calling, messages and handset",
+    "summary": "The broad policy question behind the cluster. Decide which capabilities an Agent has over live-call campaigns, IVR campaigns and SMS campaigns. The issue proposes defaults of all live-call campaigns, no IVR campaigns, no SMS campaigns, and states that without access those pages must be hidden from the sidebar AND return 403 on a direct attempt.",
+    "currentBehavior": "Partly implicit. The sidebar is the main gate, so a denied user can often still reach a page by URL.",
+    "rootCause": "Capability-by-capability policy was never written down, so it is enforced ad hoc in whichever component happened to check it.",
+    "resolution": "Blocked by #2030, which supplies the permission vocabulary. Then: write the default capability set down as data, not as scattered conditionals; enforce at the route for every surface in the set, so hiding the sidebar and refusing the URL are the same rule applied twice; and confirm the 403 requirement, noting it differs from the 404-for-non-members convention in AGENTS.md — that convention is about workspace membership, whereas this is about a known member lacking a capability, so 403 is defensible here. Worth deciding that boundary explicitly rather than by accident.",
+    "lookIn": [
+      "app/components/layout/WorkspaceSidebar.tsx",
+      "app/lib/workspace-middleware.server.ts",
+      "app/routes/workspaces+/$id/**",
+      "app/db/workspace-scoped-tables.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "each capability has a route-level enforcement test",
+      "sidebar visibility and route enforcement agree"
+    ],
+    "acceptanceCriteria": [
+      "The Agent capability set is written down as data, not scattered conditionals",
+      "Every denied surface returns 403 on a direct URL attempt, not only when hidden",
+      "The 403-versus-404 boundary is decided and documented rather than incidental",
+      "Sidebar visibility and route enforcement read from the same source"
+    ],
+    "blockedBy": [
+      2030
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "This is the product decision the cluster is really waiting on. The defaults in the issue are a proposal, not a decision — get them confirmed before building enforcement, or the enforcement work gets thrown away when the policy changes."
+  },
+  {
+    "issueNumber": 2009,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Agent ABAC: adding an Agent to a campaign unlocks that campaign type for them",
+    "summary": "The attribute-based half of the cluster. Adding an Agent to a specific campaign should also unlock their broader ability to see and act on that campaign type: added to a live-call campaign, it appears on their list and is callable if open; added to an SMS campaign, its numbers become visible on the chats page.",
+    "currentBehavior": "Campaign membership is a relation, but it does not appear to confer the broader capability, and the broader capability does not appear to be scoped back down to the campaigns they are actually on.",
+    "rootCause": "Two separate concerns — which campaign types you may touch, and which campaigns within a type — are not expressed in the same model, so membership cannot imply the first.",
+    "resolution": "Blocked by #2008, which defines the type-level capability set this refines. Two distinct grants are needed and they must not be conflated: a type-level capability from the role defaults, and a campaign-level grant from membership. The test that matters is negative — an Agent with access to one SMS campaign must not see another campaign's numbers.",
+    "lookIn": [
+      "app/db/schema.ts (campaign membership relation)",
+      "app/lib/workspace-middleware.server.ts",
+      "app/routes/workspaces+/$id/**/chats",
+      "app/components/**/CampaignList"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "membership grants visibility of exactly that campaign",
+      "an Agent on one SMS campaign cannot see another campaign numbers"
+    ],
+    "acceptanceCriteria": [
+      "Campaign membership confers a campaign-level grant",
+      "An Agent sees only the campaigns they are on, within the types they may touch",
+      "The negative case is tested: one campaign membership does not leak another campaign",
+      "Type-level and campaign-level grants are separate and both readable in the code"
+    ],
+    "blockedBy": [
+      2008
+    ],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Blocked by #2008 on purpose — the two are easy to conflate and building this first would bake in the wrong model. The negative test is the one that proves it; without it a permissive implementation looks correct."
+  },
+  {
+    "issueNumber": 2031,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Sweep: authorization checks a permission, not a broad role",
+    "summary": "The codebase-wide consistency pass: every authorization check should test the underlying permission rather than comparing a broad role. Thin on its own — it is a consequence of the model, not a design.",
+    "currentBehavior": "Checks are inconsistent, comparing roles in some places and something narrower in others.",
+    "rootCause": "Each check was written locally against whatever was convenient at the time.",
+    "resolution": "Blocked by #2030 and, in practice, by the rest of the cluster: a sweep before the model exists would have nothing correct to sweep toward. Land it last. Use the existing structural gates rather than grep alone — check:route-authz is the natural home for an assertion that no route compares a raw role string, and a lint rule would keep it from regressing.",
+    "lookIn": [
+      "app/lib/**-middleware.server.ts",
+      "scripts/checks/check-route-authz.mjs",
+      "eslint.config.mjs"
+    ],
+    "existingTests": [
+      "check:route-authz structural gate"
+    ],
+    "missingTests": [
+      "a gate that fails when a new route compares a role string directly"
+    ],
+    "acceptanceCriteria": [
+      "No route or loader compares a broad role string where a permission check is meant",
+      "check:route-authz fails when a new role comparison is introduced",
+      "The sweep lands after the model, not before"
+    ],
+    "blockedBy": [
+      2030,
+      2008
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice."
   }
 ]

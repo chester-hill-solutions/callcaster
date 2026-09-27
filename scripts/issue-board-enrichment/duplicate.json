@@ -11,7 +11,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1843,
@@ -40,5 +40,39 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Duplicate of #1883; the goto half belongs to #1884. Close, do not re-scope."
+  },
+  {
+    "issueNumber": 2000,
+    "verdict": "duplicate",
+    "duplicateOf": 2032,
+    "recommendedTitle": "Invite-accepted confirmation is an inline banner in the destructive tone; it should be a one-time green success toast",
+    "summary": "Same surface as #2032, and #2032 removes it. The invite acceptance renders through QueryParamBanner (app/routes/workspaces+/index.tsx:272-280), which draws a dismissible Alert with no variant (app/components/shared/QueryParamBanner.tsx:43-56). The Alert default is `border-brand-tertiary bg-brand-wash`, and in dark mode --brand-wash is hsl(340 28% 18%), a maroon, so a success message reads as a red error banner. That is the 'should be green' report exactly. Doing it as a colour change would only make the banner green and leave it persistent, shareable through the URL, and inconsistent with the toast pattern the rest of the app uses. One extra finding from the same code: the banner is an Alert, so it carries role=\"alert\" and is beaconed by app/lib/flash-telemetry.client.ts to /api/workspaces/:id/client-flash as an error flash, so a successful invite acceptance is currently logged as an error.",
+    "currentBehavior": "A maroon, dismissible, URL-replayable inline banner on the workspaces page announcing a successful invite acceptance.",
+    "rootCause": "One-time success state is carried in a shareable query parameter because there is no server-owned flash mechanism, and the tone is left to a primitive default that happens to be crimson in dark mode.",
+    "resolution": "Do not implement separately. Fold the tone question into #2032 and close this one. #2032 replaces the banner with a server-owned, signed, one-time session flash that renders as toast.success, which is green by construction and drops the URL-replay and the false error-flash beacon at the same time. A colour-only fix here would be thrown away when #2032 lands. If #2032 is deprioritised and the banner has to stay for a while, the minimal correct interim is variant=\"success\" on that Alert plus removing the role=\"alert\" beacon pollution, and it should be filed as a comment on #2032 rather than a second PR.",
+    "lookIn": [
+      "app/routes/workspaces+/index.tsx:272-280 (the invite QueryParamBanner)",
+      "app/components/shared/QueryParamBanner.tsx:43-56 (the Alert with no variant)",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx (default variant = border-brand-tertiary bg-brand-wash)",
+      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:161 (--brand-wash dark = hsl(340 28% 18%))",
+      "app/lib/flash-telemetry.client.ts (role=alert surfaces are beaconed as error flashes)"
+    ],
+    "existingTests": [
+      "test/accept-invite.route.test.ts:172 (asserts the current redirect URL, updated by #2032)"
+    ],
+    "missingTests": [
+      "no test asserts the invite success surface is a toast rather than a banner, so it can regress back without failing anything",
+      "no test asserts that a success surface is not beaconed to client-flash as an error"
+    ],
+    "acceptanceCriteria": [
+      "Invite acceptance shows a green one-time success toast",
+      "The message does not replay on refresh or revisit",
+      "The success surface is no longer beaconed to client-flash as an error",
+      "No colour-only change is shipped on its own"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Duplicate of #2032. Same component, same redirect, same root cause, and #2032 deletes the surface rather than recolouring it. Implement once, in #2032, and close this."
   }
 ]

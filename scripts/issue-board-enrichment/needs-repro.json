@@ -37,18 +37,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1666,
-    "verdict": "needs-repro",
-    "summary": "A successful audio upload is reported as an error toast.",
-    "resolution": "Capture the action response and redirect flash, then verify the success/error discriminator. Keep independent from toast layout changes.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/audios/new.action.server.ts",
-      "app/routes/workspaces+/$id/audios/new.route.tsx",
-      "app/lib/audio-upload.ts"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1670,
     "verdict": "needs-repro",
     "summary": "Searching Pickering does not find South Pickering. PR #1675 changed rate-centre display names; it did not prove search matching.",
@@ -58,81 +46,6 @@
       "app/lib/number-locality.ts"
     ],
     "blockedBy": []
-  },
-  {
-    "issueNumber": 1671,
-    "verdict": "needs-repro",
-    "summary": "A new report shows campaign date boundaries at 20:00 and says the boundaries are not enforced. This is separate from weekly calling-hours defaults, already shipped in #1590.",
-    "resolution": "Reproduce date-only serialization and display in the campaign timezone, then check dispatch against exact start/end instants before selecting a fix.",
-    "lookIn": [
-      "app/components/campaign/settings/basic/CampaignBasicInfo.Dates.tsx",
-      "app/lib/campaign-schedule-sync.server.ts"
-    ],
-    "blockedBy": []
-  },
-  {
-    "issueNumber": 1351,
-    "verdict": "needs-repro",
-    "recommendedTitle": "SMS Window set to 3:05PM yet estimate says 3pm it'll be done",
-    "summary": "Fix #1375 (e49ce7a1, on master) made the launch-page queue ETA window-aware. Sai's 2026-09-09 counter-claim has not been re-verified, and #1816/#1820 (on master) now pulls a parked dispatch successor forward when the window is edited. The 15-min-cron hypothesis is refuted for SMS: the successor is scheduled at the exact nextOpenAt and the worker polls every 5s; SEND_WINDOW_RETRY_MS=15min applies only to voice 'waiting'.",
-    "currentBehavior": "With an in-window campaign the ETA is now+activeSeconds by design; outside the window it projects to the next open. Editing a window to include now wakes the parked successor. Actual first-send latency vs the ETA has not been measured.",
-    "rootCause": "Unproven counter-claim with no timed repro. No 15-min dispatch floor exists on the SMS path.",
-    "resolution": "Reproduce on master/review env: (1) set a narrow future SMS window and note the ETA; (2) widen it to include now; (3) record the ETA and the actual first-send/completion timestamps. If dispatch still lags, instrument the successor's runAt vs actual execution and decide whether the ETA should add a dispatch-startup floor.",
-    "lookIn": [
-      "app/lib/campaign-outbound-estimate.ts",
-      "app/lib/campaign-dispatch-policy.ts",
-      "app/lib/campaign-execution.server.ts",
-      "app/lib/worker/handlers/campaign.server.ts",
-      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx",
-      "app/lib/throughput-config.ts",
-      "app/lib/worker/poll-jobs.server.ts"
-    ],
-    "existingTests": [
-      "test/campaign-dispatch-policy.test.ts",
-      "test/campaign-outbound-estimate.test.ts"
-    ],
-    "missingTests": [
-      "SMS ETA with a future window starts at/after the window boundary",
-      "rescheduleDispatchAfterWindowEdit pulls a parked successor to now when the window is widened",
-      "Timed integration: first-send latency within one poll interval of the ETA"
-    ],
-    "acceptanceCriteria": [
-      "A 3:05 window shows an ETA at/after 3:05",
-      "Widening the window to include now makes both the ETA and actual dispatch start within the poll interval",
-      "No unexplained wall-clock drift remains"
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Needs reproduction. Fix #1375 and #1816/#1820 are on master; re-test the window-expansion scenario before scoping code. Keep paired with #1352."
-  },
-  {
-    "issueNumber": 1352,
-    "verdict": "needs-repro",
-    "summary": "Fix #1374 (nextSendWindowOpenAt exact-boundary scheduling) shipped, but Sai 2026-09-09 gives a 12-step repro: window widened to 12:47 yet the message fired 1:12 \u2014 likely a periodic sweep floor or opt-in edge; same subsystem as 1351, verify together on dev.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
-  },
-  {
-    "issueNumber": 1698,
-    "verdict": "needs-repro",
-    "summary": "Focus loss on each keystroke in Answer label is reproduced but root cause unproven; candidates are the option row key with id regeneration on document round-trip (documentToScript) and block onFocusCapture wrappers. Issue explicitly demands a systemic component-level fix, so evidence-first.",
-    "lookIn": [],
-    "existingTests": [],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "See rationale in .agent/board-dig-results.md"
-    ],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1707,
@@ -146,7 +59,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1718,
@@ -160,7 +73,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1719,
@@ -174,7 +87,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1750,
@@ -188,7 +101,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1765,
@@ -202,7 +115,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
   },
   {
     "issueNumber": 1857,
@@ -235,5 +148,46 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "needs-repro: likely shares the per-request render root cause with #1842 but different hop. Measure before merging the tickets."
+  },
+  {
+    "issueNumber": 2034,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Campaign results disagree with themselves: 0 of 1 contacts completed while the disposition breakdown reports 2 completed",
+    "summary": "The inconsistency is real and the two numbers are computed from different tables, but I could not confirm which write produces the extra rows, so I am not specifying a fix. 'Contacts Completed' is queueRows, not attempts: ResultsScreen.tsx:53-57 passes queueCounts.completedCount, which is countDialableCompletedCampaignQueueRows (app/lib/campaign-queue-search.server.ts:338-342) counting campaign_queue rows where queue_state='dequeued' OR dequeued_at IS NOT NULL (the predicate is right, verified at :59-67). The disposition breakdown is attempts: it comes from the get_campaign_stats RPC (drizzle/0000_baseline.sql:2565, `COUNT(*) as count ... FROM outreach_attempt oa`) for non-message campaigns. So the screen compares a count of queue rows with a count of attempt rows, and they can only agree if there is exactly one attempt per contact. The report says the agent pressed hang up several times, and the breakdown says 2, so something produced two attempt rows — or one attempt plus a duplicate. I could not find it: the repeated-hangup guard in app/hooks/call/useCallHandling.ts:408-426 returns early without a server call when there is no active call, and the server-side /api/hangup is guarded (Twilio error 21220 is swallowed at app/routes/api+/hangup.action.server.ts:43-47, and the disposition update is scoped to the attempt and described as terminal-guarded at :67-80). Also unexplained: completedCount is 0, meaning the queue row was never dequeued, yet a disposition of completed exists. The remote-hangup button symptom is separately known and already guarded (the #1292 comment at useCallHandling.ts:409-412), so the visible half may already be fixed while the numbers half is not.",
+    "currentBehavior": "One contact, one call, the contact hangs up remotely, the agent presses hang up repeatedly: the headline reads 'Contacts Completed: 0 of 1' with a 100.0% completion rate, and the disposition bar reads 'Completed 2 (100.0%)'.",
+    "rootCause": "Not established. Two candidate causes, and the repro distinguishes them. (a) A write-side duplication: something creates a second outreach_attempt row for the same contact in the same campaign, so the row count is 2 while the contact count is 1. (b) An aggregate-unit mismatch only: the queue row was never marked dequeued (so completedCount is 0) while one or more attempts carry a completed disposition, and the 2 comes from two attempts created by the dial, not by the hang-up presses. (b) is the more likely reading of completedCount=0, and it would mean the real defect is a dequeue that never happens, not a hang-up that happens twice.",
+    "resolution": "Reproduce first, then choose. Steps: (1) create a 1-contact call campaign, launch it, dial, let the contact answer, then hang up remotely from a second handset; (2) press hang up in the agent UI two or three times and note whether the button is still enabled and what the network tab shows for each press; (3) open the Results tab and record both numbers. Then, for that campaign id, query campaign_queue for the row (queue_state, dequeued_at), outreach_attempt for every row (id, contact_id, disposition, created_at) and call for every row (outreach_attempt_id, duration). The reading decides the fix: two attempt rows for one contact means a write-side duplication to find in the dial/hangup path and the aggregate is right; one attempt plus queue_state still 'queued' means the dequeue never ran, which points at dequeueQueueEntry in /api/hangup (app/routes/api+/hangup.action.server.ts:59-66) failing silently for this path — note it dequeues by contactId with a household-fanout branch, and an early return or a swallowed error there would produce exactly completedCount=0. If the numbers are right and only the units differ, the fix is in the presentation: state the unit ('contacts' versus 'attempts') or make the breakdown count distinct contacts. Do not change get_campaign_stats on the strength of a screenshot.",
+    "lookIn": [
+      "app/components/campaign/home/CampaignHomeScreen/ResultsScreen.tsx:51-64 (the two numbers side by side)",
+      "app/lib/campaign-queue-search.server.ts:265-267 and :338-342 (completedCount = dequeued queue rows)",
+      "drizzle/0000_baseline.sql:2495-2571 (get_campaign_stats, COUNT(*) over outreach_attempt rows for non-message campaigns)",
+      "app/routes/api+/hangup.action.server.ts:49-81 (dequeueQueueEntry by contactId, then the attempt disposition update)",
+      "app/hooks/call/useCallHandling.ts:404-426 (the #1292 stale-hangup guard) and app/hooks/call/useCallScreen.ts:178",
+      "app/lib/dequeueQueueEntry in app/lib/campaign-queue-db.server.ts (the fanout branch that could fail silently)"
+    ],
+    "existingTests": [
+      "test/integration-db/campaign-completion-gate.test.ts",
+      "test/integration-db/dequeue-contact-assigned.test.ts",
+      "test/integration-db/call-status-guard.test.ts",
+      "test/ui/call-lifecycle-regression.test.tsx"
+    ],
+    "missingTests": [
+      "no test asserts that a remote hangup followed by repeated agent hang-up presses leaves exactly one attempt row and one dequeued queue row",
+      "no test asserts that the results headline and the disposition breakdown agree for a 1-contact campaign — this is the assertion that would have caught the report",
+      "no test covers a /api/hangup for an already-ended call, which is the exact path the repro exercises",
+      "no test asserts that a failed dequeueQueueEntry surfaces rather than resolving quietly",
+      "no test pins the unit of the disposition breakdown (attempts versus contacts), so the two numbers can drift apart freely"
+    ],
+    "acceptanceCriteria": [
+      "The exact reproduction is recorded with the campaign_queue, outreach_attempt and call rows for the campaign",
+      "A 1-contact campaign whose contact hangs up remotely shows the same contact count in the headline and in the disposition breakdown",
+      "Repeated hang-up presses after a remote hangup do not create additional attempt or queue rows",
+      "The disposition breakdown's unit is stated in the UI or in code, and the headline and the breakdown cannot contradict each other",
+      "The fix lands with a test that fails against the current behaviour"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Needs reproduction, not fix now. The inconsistency is confirmed but the cause is not, and there are two candidate causes whose fixes are opposites: one is a duplicated write, the other is a write that never happens. Guessing here would change either a write path or an aggregate on the strength of a screenshot. The repro is three queries and about ten minutes. Also file the remote-hangup button symptom separately if the repro shows it still reproduces, since the existing #1292 guard suggests that half may already be fixed."
   }
 ]

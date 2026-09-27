@@ -1,5 +1,44 @@
 [
   {
+    "issueNumber": 2052,
+    "verdict": "verify-close",
+    "recommendedTitle": "Give the completion RPC one best-effort owner",
+    "summary": "Five call sites invoke try_complete_campaign_if_drained and only two guard it. campaign-queue-completion.server.ts:51-68 and ivr/status.action.server.ts:130-153 catch and log; the #2048 campaign-settle-recheck.server.ts catches and logs under a third event name; campaign.server.ts continueOrCompleteDispatch and auto-dial.server.ts:437-444 do not catch at all, so an RPC failure propagates and fails the dispatch job or dial drain. An RPC failure only means 'not complete yet', which must never fail unrelated work.",
+    "currentBehavior": "Completion failures are reported three different ways depending on surface, and on two surfaces they fail the surrounding job instead of being absorbed.",
+    "rootCause": "Each call site invented its own try/catch and log message. The #2048 wrapper was created for the same reason, so there are now two wrappers and three policies.",
+    "resolution": "One internal helper owns 'ask the gate, log, never throw', with a comment stating why. All five call sites use it and lose their own try/catch. Collapse campaign-settle-recheck.server.ts into the same owner rather than keeping two wrappers. Normalise the log event name and fields so a completion failure reads the same from every surface.",
+    "lookIn": [
+      "app/lib/campaign-queue-completion.server.ts:51-68",
+      "app/routes/api+/ivr/status.action.server.ts:130-153",
+      "app/lib/campaign-settle-recheck.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts (continueOrCompleteDispatch)",
+      "app/lib/auto-dial.server.ts:437-444",
+      "app/lib/db-rpc.server.ts:176-184"
+    ],
+    "existingTests": [
+      "test/webhook-side-effects.test.ts",
+      "test/campaign-settle-recheck.server.test.ts"
+    ],
+    "missingTests": [
+      "completion RPC failure does not propagate out of a dispatch job",
+      "completion RPC failure does not propagate out of a dial drain",
+      "completion RPC failure does not fail a Twilio webhook",
+      "completion RPC failure does not fail an open-sync sweep",
+      "one log event name is used from every surface"
+    ],
+    "acceptanceCriteria": [
+      "Exactly one code path owns the best-effort completion call",
+      "All five call sites use it with no local try/catch",
+      "A completion RPC failure never propagates into a dispatch job, dial drain, webhook or sweep",
+      "One log event name and field set from every surface",
+      "Failure path tested at each call site, not only at the owner"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Small cleanup, no live defect. Raised by the #2048 structural review and deliberately deferred there to keep that PR atomic. Lane is verify-close because the work is a de-duplication with no behavioural change to specify."
+  },
+  {
     "issueNumber": 1333,
     "verdict": "verify-close",
     "recommendedTitle": "test(chats): prove STOP and START text remains visible to operators",
@@ -88,28 +127,6 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Close after the eyeball."
-  },
-  {
-    "issueNumber": 1696,
-    "verdict": "verify-close",
-    "summary": "Recording metadata preload shipped to dev in PR #1806 (270680d8). A real Chrome check showed a one-second duration before Play, with the audio paused at time zero.",
-    "lookIn": [
-      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx"
-    ],
-    "existingTests": [
-      "test/ui/script-block-editor-ivr.test.tsx",
-      "PR #1806: real Chrome before/after component check"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "A selected recording shows its duration before Play.",
-      "Loading metadata does not start playback."
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.",
-    "currentBehavior": "The IVR recording preview uses preload=\"metadata\".",
-    "resolution": "Retest a selected recording on dev before playback. No further code is expected unless that check finds a gap."
   },
   {
     "issueNumber": 1782,
@@ -304,63 +321,6 @@
     "trackerRecommendation": "PR #1941 merge 58bea105 is on dev, not yet master."
   },
   {
-    "issueNumber": 1703,
-    "verdict": "verify-close",
-    "summary": "Fixed on dev in PR #1905 (db176dc8): each IVR response row removes with an inline trash icon beside the fields. Changelog records the change.",
-    "resolution": "Verify on the review environment that the Remove response button is a trash icon in line with the row. Close on master promotion.",
-    "lookIn": [
-      "app/components/campaign/settings/script/ScriptBlockEditor.IvrResponses.tsx"
-    ],
-    "existingTests": [
-      "test/ui/script-block-editor-ivr.test.tsx"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Response removal is an inline trash icon, not a full-width button"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "PR #1905 merge db176dc8 is on dev, not yet master."
-  },
-  {
-    "issueNumber": 1764,
-    "verdict": "verify-close",
-    "summary": "Fixed on dev in PR #1906 (14d29f1c): the rent path shows Service address as its own breadcrumb step (address, then number search, then review). Changelog records the change.",
-    "resolution": "Verify on the review environment that the address substep gets its own crumb when renting. Close on master promotion.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx"
-    ],
-    "existingTests": [
-      "test/ui/onboarding-first-number-flow.test.tsx"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Address substep has its own breadcrumb when renting"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "PR #1906 merge 14d29f1c is on dev, not yet master."
-  },
-  {
-    "issueNumber": 1701,
-    "verdict": "verify-close",
-    "summary": "In an IVR step on Play a recording, the Upload audio control now renders with the recording field (before the preview/empty-recording warning). On Speak text it stays visible with its switch hint.",
-    "resolution": "Verify on the review environment that the Upload audio button sits under the recording control in Play a recording mode and is still present in Speak text mode. Close on master promotion.",
-    "lookIn": [
-      "app/components/campaign/settings/script/ScriptBlockEditor.IvrStep.tsx"
-    ],
-    "existingTests": [
-      "test/ui/script-block-editor-audio.test.tsx",
-      "test/ui/script-block-editor-ivr.test.tsx"
-    ],
-    "acceptanceCriteria": [
-      "Upload audio is adjacent to the recording Select on recorded steps; still visible on spoken steps (keeps #1325)."
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Merged on dev in PR #1951 (fffeae9a); closes on master promotion."
-  },
-  {
     "issueNumber": 1715,
     "verdict": "verify-close",
     "summary": "Profile dropdown trimmed to username, Account, Invitations: N (with an open-mail icon), and Log Out; profile-info heading, first name, and Workspace settings link removed.",
@@ -398,23 +358,6 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Merged on dev in PR #1950 (2180c94d); closes on master promotion."
-  },
-  {
-    "issueNumber": 1822,
-    "verdict": "verify-close",
-    "summary": "issue-on-dev.yml now moves the CHS backlog Status to the project's lowercase on-dev option on every dev merge (no label). The stale 'On dev' default that silently skipped the move is fixed; the vestigial on-dev label is deleted.",
-    "resolution": "Live-verified: merging PR #1949 logged moved=1 and moved #1715 to on-dev with no label applied. Close on master promotion.",
-    "lookIn": [
-      ".github/workflows/issue-on-dev.yml",
-      ".agents/skills/project-on-dev-status/SKILL.md"
-    ],
-    "existingTests": [],
-    "acceptanceCriteria": [
-      "A dev-merge PR moves its referenced issues to the on-dev Status; no on-dev label exists or is applied."
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Merged on dev in PR #1952 (0beba212); closes on master promotion."
   },
   {
     "issueNumber": 1854,
@@ -1000,38 +943,6 @@
     "trackerRecommendation": "Verify on the review env; close when promoted to master (dev-only today)."
   },
   {
-    "issueNumber": 1853,
-    "verdict": "verify-close",
-    "recommendedTitle": "Dev: workspace invite insert fails (works on prod)",
-    "summary": "Root cause confirmed in comments: workspace_invite.user_id had two FKs, one to legacy auth.users (empty on dev), so every invite insert failed. PR #1887 (c80e59ec) drops both legacy constraints in migration 20260919120000_drop_legacy_auth_users_fks.sql, wired into both bootstrap scripts. Merged on dev only.",
-    "currentBehavior": "On dev the dropped constraints are gone; the public.user FK remains. Master still has the legacy auth.users FKs.",
-    "rootCause": "Legacy Supabase auth.users FK on workspace_invite.user_id (and workspace_api_key.created_by).",
-    "resolution": "Invite a user on the review environment and confirm the insert succeeds; then close when the fix is promoted to master. No further code.",
-    "lookIn": [
-      "client/migrations/20260919120000_drop_legacy_auth_users_fks.sql",
-      "app/lib/invite-user-by-email.server.ts",
-      "scripts/db/bootstrap-fresh-db.mjs",
-      "scripts/e2e/bootstrap-compose-db.mjs"
-    ],
-    "existingTests": [
-      "test/accept-invite.route.test.ts",
-      "test/bootstrap-migrations.server.test.ts"
-    ],
-    "missingTests": [
-      "schema assertion that no public FK targets auth.users",
-      "invite insert succeeds with no legacy FK"
-    ],
-    "acceptanceCriteria": [
-      "Inviting a user to a workspace succeeds on dev",
-      "Root schema difference identified and reconciled",
-      "No public FK to auth.users remains after migrations"
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Verify on review env. Merged on dev in PR #1887 (c80e59ec); close on master promotion."
-  },
-  {
     "issueNumber": 1877,
     "verdict": "verify-close",
     "recommendedTitle": "De-duplicate the IVR runtime (machine policy, block runtime, option type, Setup sections)",
@@ -1267,67 +1178,6 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Answer and close as working-as-designed (validation from PR #1063 is on master). Open a separate feature ticket only if merging multiple phone columns is wanted."
-  },
-  {
-    "issueNumber": 360,
-    "verdict": "verify-close",
-    "recommendedTitle": "Verify the signed-in redirect on /signin and /signup and the home CTA",
-    "summary": "The sign-in and sign-up loaders already redirect a signed-in visitor to /workspaces, and the landing page shows 'Go to Workspaces' instead of Sign Up. Both are on master.",
-    "currentBehavior": "signin.loader.server.ts and signup.loader.server.ts redirect to /workspaces when getSession returns a user. _index renders 'Go to Workspaces' for a signed-in user.",
-    "rootCause": "The original gap was closed by the loader redirects plus the signed-in home CTA (release 807cea82, #1838).",
-    "resolution": "Verify on the deployed master environment that a signed-in visit to /signin and /signup redirects to /workspaces and that the home CTAs read 'Go to Workspaces'. No new code expected.",
-    "lookIn": [
-      "app/routes/signin.loader.server.ts",
-      "app/routes/signup.loader.server.ts",
-      "app/routes/_index/index.tsx",
-      "app/routes/_index/index.loader.server.ts"
-    ],
-    "existingTests": [
-      "test/ui/index.route.test.tsx",
-      "test/signup.route.test.ts",
-      "e2e/specs/auth.spec.ts",
-      "e2e/specs/signup-flow.spec.ts"
-    ],
-    "missingTests": [
-      "Loader test that /signin and /signup redirect to /workspaces when a session exists"
-    ],
-    "acceptanceCriteria": [
-      "Signed-in /signin redirects to /workspaces",
-      "Signed-in /signup redirects to /workspaces",
-      "The home hero and CTA read 'Go to Workspaces' when signed in"
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Released to master (807cea82, #1838). Verify, then close; do not reimplement the redirects."
-  },
-  {
-    "issueNumber": 1824,
-    "verdict": "verify-close",
-    "recommendedTitle": "Verify the workspace picker runtime-error fix",
-    "summary": "PR #1825 kept the workspace actions inside the React Aria menu and rendered the pinned All workspaces footer as a plain button, removing the runtime error. The change is on master.",
-    "currentBehavior": "The workspace picker's All workspaces footer is a plain <button> with id all-workspaces outside the CommandList/menu.",
-    "rootCause": "A React Aria CommandItem (All workspaces) was rendered outside its required menu context, causing the runtime error.",
-    "resolution": "Retest on the review environment: open the workspace dropdown, choose a workspace, and choose All workspaces; confirm no error page. Close on master. Do not reimplement.",
-    "lookIn": [
-      "app/components/layout/Navbar.tsx"
-    ],
-    "existingTests": [
-      "test/ui/navbar-user-menu.test.tsx",
-      "test/ui/navbar-credits.test.tsx"
-    ],
-    "missingTests": [
-      "Workspace-picker regression test (the mocked test was deleted in PR #1825)"
-    ],
-    "acceptanceCriteria": [
-      "Opening the workspace dropdown does not throw",
-      "Choosing a workspace navigates to it",
-      "All workspaces navigates to /workspaces"
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "PR #1825's change is present on master (release trunk 807cea82, #1838); verify and close."
   },
   {
     "issueNumber": 1956,
@@ -1859,5 +1709,161 @@
     "size": "S-M",
     "risk": "low",
     "trackerRecommendation": "Implemented on dev (PR #1973 41d45f6d): shared/contact-import-headers.ts includes a drop-column option with tests (test/contact-import-headers.test.ts) + CHANGELOG entry. Verify the mapping UI and close."
+  },
+  {
+    "issueNumber": 2012,
+    "verdict": "verify-close",
+    "recommendedTitle": "auth pages: remove the top \"Sign Up\" link and rename \"Create an Account\" to \"Sign Up\"",
+    "summary": "The sign-in page shows a \"Sign Up\" link at the top as well as a \"Create an Account\" button, so the same destination is offered twice under two different labels. Grouped under the auth-pages epic (#2057).",
+    "currentBehavior": "Two distinct labels both lead to sign-up.",
+    "rootCause": "Copy was added over time without a single naming decision.",
+    "resolution": "Remove the top \"Sign Up\" link and change the button to read \"Sign Up\". Verify the result against the live routes before closing — this may already be fixed in which case it closes with a link to the current code.",
+    "lookIn": [
+      "app/routes/account.sign-in.*",
+      "app/components/shared/AuthCard.tsx"
+    ],
+    "existingTests": [],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "One label, one destination",
+      "No duplicate link to the same page from the same screen"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Smallest item in the cluster. Check the live route first — if it already reads this way, close it as already done rather than writing a change."
+  },
+  {
+    "issueNumber": 2001,
+    "verdict": "verify-close",
+    "recommendedTitle": "Phone Numbers promoted to its own top-level page at /phone-numbers and removed from Settings",
+    "summary": "Shipped. PR #2018 (0ee4766a) merged to dev and the automation comment says this closes when it reaches master. Verified in the working tree: the route module exists (app/routes/workspaces+/$id/phone-numbers.route.tsx and phone-numbers.loader.server.ts, both dated 2026-09-24), the sidebar links to it (app/components/workspace/WorkspaceNav.tsx:140, path 'phone-numbers'), the URL is in the verified route-tree baseline (scripts/baselines/route-tree.txt:153), and the purchase sub-route is split out (app/routes/workspaces+/$id/phone-numbers/purchase.route.tsx).",
+    "currentBehavior": "Phone Numbers is its own sidebar page; the settings page no longer carries a Phone Numbers section.",
+    "rootCause": "It was a section inside Settings rather than a top-level destination, which put a daily-use surface three clicks deep.",
+    "resolution": "No code. Verify on the review environment that /phone-numbers loads with numbers listed, that the Settings page has no Phone Numbers section, and that the e2e RBAC-04 assertion (e2e/specs/rbac.spec.ts:29-32, a caller is redirected away from /phone-numbers) still holds — that test is the only thing guarding the role gate on the new page. Then close when the fix is promoted to master.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/phone-numbers.route.tsx and phone-numbers.loader.server.ts",
+      "app/components/workspace/WorkspaceNav.tsx:140",
+      "scripts/baselines/route-tree.txt:153",
+      "e2e/specs/rbac.spec.ts:29-32 (the caller role gate on the new page)"
+    ],
+    "existingTests": [
+      "e2e/specs/rbac.spec.ts (RBAC-04 gates the caller role off /phone-numbers)",
+      "npm run tools:routes:verify (route tree baseline includes the new path)"
+    ],
+    "missingTests": [
+      "no test asserts the Settings page no longer renders a Phone Numbers section, so a re-add would pass silently",
+      "the sidebar link and the route path are asserted in the same place, so a rename cannot half-land"
+    ],
+    "acceptanceCriteria": [
+      "/phone-numbers loads and lists the workspace numbers",
+      "The Settings page has no Phone Numbers section",
+      "A caller role is still refused on /phone-numbers",
+      "No dead links point at the old settings anchor"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close. The work is merged to dev and the route tree baseline proves the path exists. The only open item is promotion to master."
+  },
+  {
+    "issueNumber": 2019,
+    "verdict": "verify-close",
+    "recommendedTitle": "Corrected project-9 Status flow documented and the enrichment lanes repaired",
+    "summary": "Shipped in PR #2026 (3d091ce5), which is an ancestor of the current dev HEAD, and every acceptance criterion in the issue body is satisfied in the working tree. .github/projects.yaml lists on-prod (2f691958) alongside the other six options. The board how-to in scripts/issue-board-lib.mjs:353-365 describes the corrected flow, including 'Never move a CLOSED issue by hand' and the not_planned/duplicate-is-the-one-manual-move rule. .agents/skills/project-on-dev-status/SKILL.md:114-140 carries the same rule and the option ids. The lane repair is done: verify-close.json holds #1883, #1884, #1846, #1980, #1981, #1982, #1830, #1844, #1845, #1886, #1936, and fix-now.json holds none of them. The validation error the issue quoted (#780 blockedBy unknown issue 1884) cannot occur now, because #1884 is present.",
+    "currentBehavior": "The Status flow is documented in the three places an agent will actually read, and the lanes match what has shipped.",
+    "rootCause": "The 2026-09-21 release session bulk-archived 260+ closed items, which exposed that the documented flow described a hand-move process the automation had replaced, and that PR #1995 had dropped two enrichment records.",
+    "resolution": "No code. Confirm the fix reaches master and close. If the board is regenerated and any lane claim here turns out to be stale, correct the enrichment files rather than reopening this issue — the repair itself is done.",
+    "lookIn": [
+      ".github/projects.yaml (on-prod option present)",
+      "scripts/issue-board-lib.mjs:353-365 (corrected Status-flow how-to)",
+      ".agents/skills/project-on-dev-status/SKILL.md:114-140 (Related section and option ids)",
+      "scripts/issue-board-enrichment/verify-close.json and fix-now.json (the lane moves)"
+    ],
+    "existingTests": [
+      "scripts/issue-board-lib.mjs validateEnrichmentFiles (fails on a duplicate issueNumber, an unknown blockedBy target, or a cycle — this is what caught the dropped #1883/#1884 records)"
+    ],
+    "missingTests": [
+      "no test asserts that an on-prod option exists in .github/projects.yaml, so removing it again would not fail any check",
+      "no test asserts that no lane record claims a verdict its filename contradicts (the issue notes lanes come from the verdict field, which is a drift trap)"
+    ],
+    "acceptanceCriteria": [
+      "npm run tools:issues:board exits 0 with no blockedBy, duplicateOf or cycle error",
+      "The corrected Status flow is documented in the board how-to, the skill and AGENTS.md where an agent will find it",
+      ".github/projects.yaml lists on-prod",
+      "Every record moved between lanes carries the verdict matching its lane file"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close. The work is committed on dev and the acceptance criteria are individually checkable in the working tree. Close on promotion to master."
+  },
+  {
+    "issueNumber": 1998,
+    "verdict": "verify-close",
+    "recommendedTitle": "Workspace audio library and caller/call audio split into separate key prefixes; migration tool shipped",
+    "summary": "Shipped in PR #1999 (27601c58), which is in the dev history. The split is real: app/lib/platform-media.server.ts:79-80 documents that caller voicemails live under voicemail/<ws>/ and Twilio recordings under call-recordings/<ws>/, outside the library prefix, and the migration tool exists at scripts/migrate-media-namespaces.ts with the npm script tools:media-namespace-migrate (dry-run by default, --apply to move). Tests were added alongside: test/media-namespace-migrate.server.test.ts, test/voicemail-media.server.test.ts, and test/call-recording-storage.server.test.ts was extended.",
+    "currentBehavior": "Library audio, caller voicemails and call recordings live in three different key prefixes, so the filename-prefix heuristics the issue listed are gone.",
+    "rootCause": "One bucket and one key prefix for three different kinds of media, which forced every consumer to guess from a filename and produced junk like voicemail-undefined.",
+    "resolution": "No code. The one remaining step is operational and is what makes this verifiable: run tools:media-namespace-migrate in dry-run on the review environment, check the counts, then --apply, then confirm the voicemails page and call-history playback still resolve their objects. Then repeat on prod. If the dry-run reports objects it cannot classify, that is a real gap — file it rather than forcing them across. Close when the review environment passes, since the code half is already merged.",
+    "lookIn": [
+      "app/lib/platform-media.server.ts:75-85 (the prefix split and the comment replacing the heuristics)",
+      "scripts/migrate-media-namespaces.ts and package.json tools:media-namespace-migrate (dry-run default, --apply)",
+      "app/lib/object-storage.server.ts (bucket + key layout for workspaceAudio)",
+      "app/routes/api+/email-vm.action.server.ts (the voicemail writer, now writing voicemail/<ws>/)"
+    ],
+    "existingTests": [
+      "test/media-namespace-migrate.server.test.ts",
+      "test/voicemail-media.server.test.ts",
+      "test/call-recording-storage.server.test.ts"
+    ],
+    "missingTests": [
+      "no test asserts that a voicemail object and a call recording are invisible to listWorkspaceAudiosApi, which is the whole point of the change",
+      "no test asserts the migrator is idempotent, so running it twice is unproven safe",
+      "no test covers an unclassifiable pre-split object, which is the case most likely to strand history"
+    ],
+    "acceptanceCriteria": [
+      "The review environment runs the migration dry-run, applies it, and the voicemails page and call-history playback still work",
+      "The audio library no longer lists voicemails or call recordings",
+      "No voicemail- or recording- filename heuristics remain in the code",
+      "The migration is idempotent and reports anything it cannot classify",
+      "The prod run happens after the review run and is recorded"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close, after the migration dry-run on the review environment. The code and the tests are merged; the only thing outstanding is running the tool, and that run is the verification rather than new work. Risk is medium only because the tool moves objects — which is why the dry-run default exists and why it should be run on review first."
+  },
+  {
+    "issueNumber": 2006,
+    "verdict": "verify-close",
+    "recommendedTitle": "Bulk Status moves to archive on the shared CHS backlog: incident fixed, prevention documented, no repo automation involved",
+    "summary": "Diagnosed and remediated by wra-sol in the issue comments, and the repo-side half is done. The mover was never this repository: nothing under .github/workflows/ writes project Status at all (a grep for 'archive' across the workflows returns nothing), and the board scripts never touch GitHub Projects. It was agent tooling doing a bulk sweep on the shared board, which overreached and put 48 OPEN issues into the terminal lane; all 48 were restored to Backlog and verified. The durable prevention is now written into the two places an agent will read: scripts/issue-board-lib.mjs:353-365 (the board how-to states the corrected flow, that closed items go to on-qa by automation, and that archive is only the one manual move for not_planned/duplicate) and .agents/skills/project-on-dev-status/SKILL.md:114-140 (never set a terminal lane, with the option ids). The bulk-sweep warning that was added to session memory is now in the repo instead of in one person's memory.",
+    "currentBehavior": "No repo automation can move a project item. The rule that prevents a repeat is documented in the board generator and the skill.",
+    "rootCause": "A terminal Status option named archive exists on a project shared by several CHS products, and a bulk 'archive the closed items' cleanup ran without checking item state. Open items in a terminal lane is a contradiction that nothing detected.",
+    "resolution": "No code. Verify on the shared board that no OPEN issue sits in a terminal lane (the check the fix claimed, re-run it), and that the corrected flow is still in the two documented places. Then close. If a repeat happens, the missing piece is an out-of-repo guard, not a repo change — a script that lists open items in a terminal lane would be worth its own issue if this recurs.",
+    "lookIn": [
+      ".github/workflows/ (no project Status writes — the negative result is the evidence)",
+      "scripts/issue-board-lib.mjs:353-365 (the corrected Status-flow section, including the never-hand-move-a-closed-item rule)",
+      ".agents/skills/project-on-dev-status/SKILL.md:114-140 (the same rule plus the option ids)",
+      ".github/projects.yaml (the terminal option is literally named archive)"
+    ],
+    "existingTests": [
+      "scripts/issue-board-lib.mjs validateEnrichmentFiles (structural validation of the enrichment, not of the project board)"
+    ],
+    "missingTests": [
+      "no check anywhere fails when an OPEN item is left in a terminal lane — the failure mode that produced this incident is still undetectable",
+      "no script lists project items in a terminal lane on demand, so the verification is manual"
+    ],
+    "acceptanceCriteria": [
+      "No open issue on the CHS backlog sits in archive or any other terminal lane",
+      "Nothing in this repository moves project Status to a terminal lane",
+      "The corrected Status flow is documented where an agent will read it, not only in session memory",
+      "The not_planned/duplicate exception is the only documented manual terminal move"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close. The incident was fixed and the prevention is in the repo, so there is no code work here. The one thing worth carrying forward is the gap named above: nothing detects an open item in a terminal lane, and that is what allowed a sweep to go unnoticed until a human looked."
   }
 ]
