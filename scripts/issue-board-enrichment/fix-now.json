@@ -3606,5 +3606,168 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
+  },
+  {
+    "issueNumber": 2172,
+    "verdict": "fix-now",
+    "recommendedTitle": "Campaign SMS pacing measures dispatch time, not provider-request time, so the rate limit collapses under load",
+    "summary": "runPacedSendBatches stamps lastStartAt immediately after CALLING handleMember, which is async and does real work (normalizePhoneNumber, recipientCallingWindowStatus, an awaited dequeueQueueEntry) before the provider RPC fires. So the enforced interval is between dispatches, while the quantity that must be bounded is between RPC starts. When the pre-RPC work exceeds the pacing interval the wait collapses to zero and the batch sends near-simultaneously. Under load — precisely when rate limiting matters — campaign SMS pacing silently stops pacing.",
+    "currentBehavior": "test/campaign-sms-dispatch-contract.test.ts 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' fails intermittently in the full test:node run (436/437 files pass, this is the only failure) and passes 4/4 in isolation. It also passes on a clean origin/dev worktree. retries is not configured in vitest.node.config.ts, so it is a hard failure, not a retried flake.",
+    "rootCause": "The pacer reads the wrong clock. gap(RPC n, RPC n+1) = minStartIntervalMs + w(n+1) - w(n), where w is the pre-RPC work. When w(n) is large the gap SHRINKS; the check for n+1 then sees elapsedMs > minStartIntervalMs, computes waitMs = 0, and never waits. This resolves an apparent contradiction: CPU contention makes timers fire late, which alone would ENLARGE gaps — the lastStartAt versus RPC-start mismatch dominates that effect. The test's own comment blames 'setTimeout jitter on a busy CI runner'; that diagnosis is wrong. The 10ms floor is catching a genuine collapse, and the test should be kept as-is.",
+    "resolution": "Stamp the pacing clock at the point the provider request is actually issued. Concretely: build a start pacer that serializes and awaits a minimum interval, and await it immediately before rpcCreateOutreachAttempt rather than pacing the dispatch loop. Open decision worth making deliberately: pace dispatch (simpler, but under-delivers by up to w(n)) or pace the provider call (correct, matches the code's stated intent of pacing starts rather than completions). Last touched by #2158 'enforce campaign send window before provider attempts', which is on this code path — check whether that PR moved when lastStartAt is stamped. Do NOT relax the 10ms floor to make the failure disappear; that would delete the only detector.",
+    "lookIn": [
+      "app/lib/campaign-sms-dispatch.server.ts:263 (minStartIntervalMs = 1000 / startRateMps)",
+      "app/lib/campaign-sms-dispatch.server.ts:353-361 (elapsedMs/waitMs against lastStartAt, then lastStartAt = Date.now() at dispatch)",
+      "app/lib/campaign-sms-dispatch.server.ts:449+ (handleMember — async work before the RPC)",
+      "test/campaign-sms-dispatch-contract.test.ts (the pacing contract test, and the comment that misdiagnoses it)"
+    ],
+    "existingTests": [
+      "campaign-sms-dispatch-contract.test.ts: 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' — catches the collapse, but only when the run is loaded enough to trigger it"
+    ],
+    "missingTests": [
+      "a test that makes handleMember's pre-RPC work slow (a mock resolving after ~40ms) and asserts the inter-RPC gap STILL holds at the configured interval — this must FAIL against current code",
+      "a test proving pacing holds under simulated event-loop contention"
+    ],
+    "acceptanceCriteria": [
+      "A test that delays pre-RPC work and asserts the inter-RPC gap still holds; it fails against current code",
+      "Campaign SMS rate limiting holds under simulated event-loop contention",
+      "Existing dispatch contract tests stay green, with the 10ms floor unchanged",
+      "The dispatch-loop pacing and the send-point pacing are not both active (no double-wait)"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now. Confirmed defect with an exact resolution path and a one-line location. Risk is production rate limiting silently degrading under load, which is hard to detect in development and most likely in production. Found while running ci:local for #2166 on PR #2173; proven independent of that diff (no import path from the recording/job-registry changes to SMS dispatch, passes 4/4 in isolation, passes on a clean origin/dev worktree)."
+  },
+  {
+    "issueNumber": 2170,
+    "verdict": "fix-now",
+    "recommendedTitle": "Stale subaccount credentials block the product's own number-release path — a customer cannot release their own number",
+    "summary": "Every subaccount credential in the dev environment is stale. 18 of 18 release attempts failed with 'authentication token is not valid for account AC…'. Only the master account works. The consequence is that a customer cannot release their own number through the product: removeWorkspacePhoneNumber authenticates with the dead subaccount credential and fails, while platform-operated calls succeed via master.api.v2010.accounts(subAccountSid).",
+    "currentBehavior": "removeWorkspacePhoneNumber fails for every workspace in dev. The same release performed with the master account succeeds.",
+    "rootCause": "Subaccount auth tokens were rotated or invalidated at Twilio without the workspace rows being updated, so the stored credential no longer matches Twilio's. This is a data/rotation defect, not a code defect — but the code has no detection and no fallback, so a customer-visible operation is silently unavailable.",
+    "resolution": "Two parts, deliberately split. (1) Detection, which is small and independent: probe the stored credential and surface the mismatch instead of failing at release time. (2) Fallback: for destructive operations the platform performs anyway, use master.api.v2010.accounts(subAccountSid) when the subaccount credential is rejected. Part (2) rewrites the same function #2085 touches, so sequence it AFTER #2085 to avoid doing that work twice — do not treat this as blocked, because part (1) ships on its own. Note the repair sweep's hasCredentials seam is the natural place for the detection probe, but a presence check cannot detect this: a stale token is structurally identical to a working one, since the row exists and the token string is populated. Only a live Twilio call reveals the rejection.",
+    "lookIn": [
+      "app/lib/database/workspace-twilio-subaccount.server.ts (createSubaccount/createKeys; the place credentials are minted and would be rotated)",
+      "app/lib/phone-numbers.server.ts (removeWorkspacePhoneNumber — authenticates with the workspace credential)",
+      "master.api.v2010.accounts(subAccountSid) — the working path for platform-operated calls"
+    ],
+    "existingTests": [
+      "none that exercise a stale or rejected subaccount credential"
+    ],
+    "missingTests": [
+      "a stale subaccount credential is detected and reported rather than surfacing as a release failure",
+      "a destructive number release still succeeds via the master-account fallback when the subaccount credential is rejected",
+      "a workspace with a HEALTHY credential does not take the fallback path"
+    ],
+    "acceptanceCriteria": [
+      "A customer can release their own number in dev without platform intervention",
+      "A stale credential produces a diagnosable signal, not a generic failure",
+      "A workspace with a valid credential never uses the fallback path",
+      "Detection ships independently of #2085"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now, split into detection and fallback. Detection is unblocked and small. Coordinate the fallback with #2085, which is OPEN and rewrites the same release function — sequencing matters for rework, but this is an ordering preference, not a prerequisite, so no blockedBy edge. A presence-based credential check must not be presented as the fix: it cannot detect this class of failure."
+  },
+  {
+    "issueNumber": 2166,
+    "verdict": "fix-now",
+    "recommendedTitle": "Call audio depends on a best-effort Twilio copy — recover the ones that failed, then remove the Twilio playback fallback",
+    "summary": "Call recordings were copied out of Twilio on a best-effort basis: a missing credential, a failed download or a failed upload was returned as a failure the caller logged and swallowed, so the job reported success, the idempotency key was consumed, and call.audio_url stayed NULL with no way back. Partly landed: #2169 made the copy throw, and PR #2173 shipped a daily repair sweep (merged to dev as ccecd868, with #2175 and #2177 as follow-ups). Remaining: remove the Twilio-URL playback fallback, fix the voicemail orphan path, and decide whether call.recording_url is kept at all.",
+    "currentBehavior": "After #2169 and PR #2173: a failed copy throws, so the job retries and eventually dead-letters, and a daily sweep re-drives recording_side_effects for calls with recording_sid set and audio_url NULL. Loud is not recovered — Twilio's retention window keeps running and the audio is gone once it closes. Playback still falls back to the raw Twilio URL when no stored copy exists.",
+    "rootCause": "The original design treated the copy as best-effort and swallowed the failure, which made an unrecoverable data loss look like success. A second, independent problem: recording_sid was written AFTER the copy, so a failed copy left no searchable row — the failure was unrepresentable in the database. #2169 fixed the ordering, which is what made the repair sweep's find query possible.",
+    "resolution": "Landing in order, and the order matters. (1) DONE — #2169: persistCallRecordingToStorage throws; recording_sid and recording_duration are written BEFORE the copy. (2) DONE — PR #2173 merged to dev as ccecd868: a daily self-rescheduling repair sweep, bounded at 100 rows, age-bounded 30 minutes to 60 days, keyed so at most one repair per call per day and ordered newest-first so permanently-unrepairable old rows cannot starve the queue. Follow-ups #2175 (cross-tenant scoping of the queue add paths) and #2177 (one shared workspace guard) are also merged. (3) NEXT, unblocked now that #2173 has merged: remove the Twilio-URL playback fallback in app/components/calls/CallLogTable.tsx:234. This is NOT a plain deletion — the cell currently falls through to the Voicemails page link, which is a different concept from a call recording, so step 3 needs a real replacement state for 'recording known, stored copy missing'. Removing the fallback before the sweep lands turns a recoverable copy into a dead link. (4) The voicemail object path in app/routes/api+/email-vm.action.server.ts uses a single batch timestamp in the object key and omits upsert, so a Twilio retry orphans an object; make the key deterministic and pass upsert: true. (5) Decide whether call.recording_url is retained at all.",
+    "lookIn": [
+      "app/lib/call-recording-storage.server.ts (persistCallRecordingToStorage — throws on every failure mode)",
+      "app/lib/worker/webhook-side-effects.server.ts (runRecordingSideEffects — writes recording identity before the copy)",
+      "app/lib/call-recording-repair.server.ts (repair sweep, PR #2173)",
+      "app/components/calls/CallLogTable.tsx:234 (Twilio-URL playback fallback — step 3)",
+      "app/lib/call-log.server.ts:49-52 (CallLogRow.recordingUrl is the raw Twilio URL, documented as 'a fallback that leaves the app')",
+      "app/routes/api+/email-vm.action.server.ts:185-197 (voicemail object key and upload — step 4)"
+    ],
+    "existingTests": [
+      "test/call-recording-storage.server.test.ts — inverted to assert the throwing behaviour",
+      "test/webhook-side-effects.test.ts — asserts identity is written before the copy",
+      "test/call-recording-repair.server.test.ts — 13 tests, including a schema-contract test proving the swept payload is accepted by the real job-params schema"
+    ],
+    "missingTests": [
+      "step 3: a call with a recording but no stored copy renders the intended replacement state, not a Voicemails link",
+      "step 4: a repeated voicemail delivery does not orphan an object in storage"
+    ],
+    "acceptanceCriteria": [
+      "Steps 1 and 2 landed (both done or in flight)",
+      "Step 3 lands only after the sweep, and provides a real replacement state",
+      "Step 4 makes the voicemail object key deterministic and sets upsert: true",
+      "Step 5 records an explicit decision on call.recording_url"
+    ],
+    "blockedBy": [],
+    "size": "M-L",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now, in strict sequence. Step 2 (the repair sweep) is merged; steps 3-5 remain, each with an exact resolution path. The ordering constraint was real and is now discharged: removing the playback fallback before the repair sweep shipped would have turned a recoverable recording into a dead link, and the sweep has landed. Status on-dev is correct — a fix merged to dev does not close the issue until the dev-to-master release. Two follow-up issues were filed and closed out during the sweep work: #2178 (call.date_created is declared text() but is timestamptz in the database, which is why the sweep's bounds need a cast) and #2174 (the integration-db tier that would close the sweep's remaining test gap)."
+  },
+  {
+    "issueNumber": 2168,
+    "verdict": "fix-now",
+    "recommendedTitle": "Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo",
+    "summary": "Stale dev workspaces and phone numbers were culled. Partly landed: #2171 shipped scripts/cull-report.mjs (read-only, no delete path) and the release run executed, taking dev from 26 numbers to 3. Remaining: backfill Twilio subaccount display names using the naming helper from #2167, and move the keep-list out of a shell argument into the repo so it is reviewable and repeatable.",
+    "currentBehavior": "scripts/cull-report.mjs and npm run tools:cull:report exist and are read-only. The release run is done and verified: 19 numbers released, 0 blocked, 0 failed, leaving exactly the keep-list survivors. 33 cull-candidate workspace rows with zero numbers attached remain deliberately untouched. The keep-list currently lives in a shell argument, not in the repository.",
+    "rootCause": "No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.",
+    "resolution": "Two remaining items. (1) Backfill subaccount display names from app/lib/twilio-resource-name.ts (merged in #2167, format 'Workspace Name · <first 8 of uuid>'). Note this needs credentials that work — see #2170, since every subaccount credential in dev is stale, so the backfill will need the master account. (2) Move the keep-list into the repository so the cull is reproducible and reviewable rather than a shell argument. Keep-list is absolute and is checked FIRST, before the phone-number-named rule: 2608141501 is on both lists and must survive. Do not widen the rule that was chosen: the tightened rule yielded 19 numbers where the loose rule yielded 4, and that choice was deliberate.",
+    "lookIn": [
+      "scripts/cull-report.mjs (read-only cull tool, merged #2171)",
+      "app/lib/twilio-resource-name.ts (naming helper, merged #2167)",
+      "app/lib/database/workspace-twilio-subaccount.server.ts (subaccount create path the backfill mirrors)"
+    ],
+    "existingTests": [
+      "cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings"
+    ],
+    "missingTests": [
+      "a check that the recorded keep-list survives culling unchanged",
+      "a check that keep-list membership outranks the phone-number-named rule"
+    ],
+    "acceptanceCriteria": [
+      "Subaccount display names are backfilled to the #2167 format",
+      "The keep-list lives in the repository, not a shell argument",
+      "2608141501 survives, since it is on both the keep-list and the phone-number-named rule",
+      "The cull report remains read-only with no delete path"
+    ],
+    "blockedBy": [
+      2170
+    ],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Fix now for the remaining two items. The destructive part is done and verified; what is left is the name backfill and recording the keep-list. The backfill depends on working credentials, which is #2170 — a real prerequisite, since it cannot run against dev's stale subaccount tokens. The keep-list move is independent and can proceed now."
+  },
+  {
+    "issueNumber": 2174,
+    "verdict": "fix-now",
+    "recommendedTitle": "Wire test/integration-db into a CI workflow",
+    "summary": "test/integration-db is a real-Postgres tier that runs nowhere. It exists to catch schema-vs-database mismatches, which is precisely the class of bug that let call.date_created be declared text() while the column is timestamptz (#2178), and it is the only tier in which the call-recording repair sweep's remaining test gap is honestly writable. Nothing is failing today only because nothing runs.",
+    "currentBehavior": "The suite is not referenced by any workflow in .github/workflows, so it cannot fail a PR. Every test that would need a real database is either absent or, worse, mocked into a tautology: the repair sweep's find-set can only be asserted as rendered SQL text, because the mocked adminDb returns whatever rows it is handed regardless of the WHERE clause.",
+    "rootCause": "The tier was built and never wired. It needs a Postgres service container, migrations applied on boot, and a separate job from the mocked unit suite — not a flag on the existing one, because the two have incompatible setup costs and different failure semantics.",
+    "resolution": "1. Add a Postgres service to a workflow job, using the same image version as production (PostgreSQL 18). 2. Apply client/migrations on boot so the schema is real, and seed AUTH_migrations.schema_migrations the way the review-env restore does. 3. Run the integration suite as its own job with a DATABASE_URL pointing at the service. 4. Add the specific tests the tier exists for, starting with the schema-vs-database type check that would have caught #2178, then the repair sweep's deferred claim: a second run over an already-repaired call enqueues nothing. 5. Keep it advisory-then-blocking in two steps if the suite is not yet green on day one — do not merge a permanently-red job.",
+    "lookIn": [
+      "test/integration-db/",
+      ".github/workflows/ci.yml",
+      "docs/railway-review-env.md (the restore path that seeds AUTH_migrations.schema_migrations)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "every Drizzle column type matches the database's pg_typeof for a sample of rows",
+      "the repair sweep's second-run-over-a-repaired-call enqueues nothing",
+      "the repair sweep's day-bucket key actually dedupes in the queue, not just in the enqueued payload"
+    ],
+    "acceptanceCriteria": [
+      "The suite runs in a workflow and can fail a PR",
+      "A deliberately wrong column type in schema.ts makes that job go red",
+      "The repair sweep's deferred claim is asserted against real rows, not against rendered SQL",
+      "The image version matches production so a mismatch cannot pass locally and fail in prod"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now. The resolution path is concrete and nothing is currently red, which is the argument for doing it rather than against: every day this tier does not run, a schema-vs-database mismatch is invisible until it misbehaves in production. Two known instances are already queued against it — #2178's text()/timestamptz mismatch, and the repair sweep's deferred end-to-end test. Not a spec change: the tier exists and is unwired."
   }
 ]
