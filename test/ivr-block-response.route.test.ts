@@ -271,6 +271,63 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.$blockId.response.tsx", 
     const text = await res.text();
     expect(text).not.toContain("page_9/bZ");
     expect(text).toContain("<Redirect>https://base.example/api/ivr/1/page_1/bX/</Redirect>");
+    expect(telephonyStubState.outreachUpdateCalls).toEqual([]);
+  });
+
+  test("replays unmatched input without recording it as an answer", async () => {
+    const script = {
+      pages: { page_1: { blocks: ["menu", "next"] } },
+      blocks: {
+        menu: {
+          id: "menu",
+          title: "Menu answer",
+          options: [
+            { value: "1", next: "page_1:next" },
+            { value: "2", next: "page_1:next" },
+          ],
+          noInput: { action: "replay", maxReplays: 1 },
+        },
+        next: { id: "next" },
+      },
+    };
+    const campaignData = { script: { steps: script } };
+    let persistedResult: Record<string, unknown> = {};
+    const client = makeDbClient({
+      call: { sid: "CA1", workspace: "w1", outreach_attempt_id: 9 },
+      campaignData,
+    });
+    mocks.createClient.mockReturnValue(client);
+    telephonyDbMocks.findOutreachAttemptById.mockImplementation(async () => ({
+      result: persistedResult,
+    }));
+    telephonyDbMocks.updateOutreachAttemptForWorkspace.mockImplementation(
+      async (_workspaceId, _id, patch) => {
+        if ("result" in patch) persistedResult = patch.result as Record<string, unknown>;
+        return { result: persistedResult };
+      },
+    );
+    const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route");
+    const respondWithUnknownKey = () =>
+      mod.action({
+        params: { campaignId: "1", pageId: "page_1", blockId: "menu" },
+        request: makeReq({ CallSid: "CA1", Digits: "9" }),
+      } as any);
+
+    const firstResponse = await respondWithUnknownKey();
+    expect(await firstResponse.text()).toContain(
+      "<Redirect>https://base.example/api/ivr/1/page_1/menu/</Redirect>",
+    );
+    expect(persistedResult).toEqual({
+      __no_input_replays: { page_1: { menu: 1 } },
+    });
+
+    const responseAfterReplayLimit = await respondWithUnknownKey();
+    expect(await responseAfterReplayLimit.text()).toContain(
+      "<Redirect>https://base.example/api/ivr/1/page_1/next/</Redirect>",
+    );
+    expect(persistedResult).toEqual({
+      __no_input_replays: { page_1: { menu: 1 } },
+    });
   });
 
   test("replay keeps every earlier and later caller answer across repeated timeouts", async () => {
