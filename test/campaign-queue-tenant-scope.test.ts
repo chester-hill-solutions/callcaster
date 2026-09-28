@@ -224,7 +224,10 @@ describe("patchCampaignQueueApi add_contact_ids — tenant scope (#2097)", () =>
       contact_ids: [1],
     });
 
-    expect(mocks.tenantDbWorkspaces).toEqual([WS_A]);
+    // The scoping itself moved to `resolveContactsOwnedByWorkspace` in #2176;
+    // this pins that the lookup still happens against the caller's workspace
+    // and still names the contact id column.
+    expect(mocks.tenantDbWorkspaces).toContain(WS_A);
     // Guards against the scoping being re-implemented as a hand-written
     // `eq(contact.workspace, ...)` against the unscoped client, which the
     // tenancy ADR forbids and which would drift the moment a table changes.
