@@ -125,8 +125,14 @@ export async function runRecordingRepairSweep(args?: {
   // would fail, with no matching operator.
   //
   // The real defect worth fixing is upstream, in the schema: `app/db/schema.ts`
-  // misdeclares this column. Until it agrees with the database, every date
-  // comparison against `call` needs this cast.
+  // misdeclares this column, and its siblings, as `text()`.
+  //
+  // The cast is kept anyway, deliberately: these bounds are raw `sql`, so the
+  // cast is not a type-level necessity here the way it is for the typed
+  // `lt`/`gt` helpers. It is here to state the comparison's type explicitly
+  // and to fail loudly if this column's real type ever changes — a `text`
+  // column compared against an ISO string still "works", but compares
+  // lexicographically, which is the silent wrong answer.
   const createdAt = () => sql`${callTable.date_created}::timestamptz`;
   const createdBefore = (iso: string) => sql`${createdAt()} < ${iso}::timestamptz`;
   const createdAfter = (iso: string) => sql`${createdAt()} > ${iso}::timestamptz`;
