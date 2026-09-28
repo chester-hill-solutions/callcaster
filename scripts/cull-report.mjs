@@ -4,6 +4,8 @@
  *
  * Usage:
  *   DATABASE_URL=... node scripts/cull-report.mjs [--days 60] [--json]
+ *     [--keep <id,id,id>]        absolute keep-list, wins over every cull rule
+ *     [--exclude "test,blah,e2e"] name fragments to cull regardless of age
  *
  * Read-only by design. There is no delete path in this file and there should
  * not be one: release is a separate, reviewed step. The first run of this
@@ -12,10 +14,17 @@
  *
  * ## The rule
  *
- * Keep a workspace if it is on the explicit keep-list OR has had a call, a
- * message, or a campaign in the last N days. Everything else is a cull
- * candidate. Keep a number if its owning workspace survives — never cull a
- * number out from under a workspace that is being kept.
+ * Keep a workspace if it is on the explicit keep-list, or if it has had a call,
+ * a message, or a campaign in the last N days AND its name does not read as a
+ * throwaway. A workspace named after a bare phone number (`260804124`,
+ * `202607291957`) is a number that was tested, not an organisation — that rule
+ * culls roughly two thirds of what a bare 60-day window protects.
+ *
+ * Keep a number if its owning workspace survives — never cull a number out from
+ * under a workspace that is being kept.
+ *
+ * The keep-list is absolute and is checked FIRST, so it outranks the
+ * phone-named rule. `2608141501` is both a phone number and a workspace we keep.
  *
  * ## What this reports that a naive query gets wrong
  *
@@ -43,6 +52,27 @@ const WINDOW_DAYS = Number(flag("days", "60"));
 const KEEP_LIST = (flag("keep", "") || "")
   .split(",")
   .map((s) => s.trim())
+  .filter(Boolean);
+
+/**
+ * A workspace named after a bare phone number is a leftover from testing a
+ * number, not an organisation. `260804124`, `202607291957` and friends account
+ * for a large share of the workspaces the activity window was protecting.
+ *
+ * The keep-list always wins over this: `2608141501` is both a phone number and
+ * a workspace we are keeping, so the order of these rules matters.
+ */
+const PHONE_NAMED = /^\+?[\d][\d\s().-]{5,}$/;
+
+/**
+ * Extra name fragments to cull regardless of age. Deliberately empty by
+ * default — an explicit list of words meaning "junk" is a judgement call, and a
+ * judgement call belongs in the invocation where it is visible and arguable,
+ * not baked into the tool.
+ */
+const JUNK_FRAGMENTS = (flag("exclude", "") || "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
 /**
@@ -88,7 +118,15 @@ const ageDays = (iso) =>
   iso ? (Date.now() - new Date(iso).getTime()) / 86_400_000 : null;
 
 function verdict(row) {
-  if (KEEP_LIST.includes(row.id)) return { verdict: "KEEP", why: "keep-list" };
+  // The keep-list is absolute: it outranks every cull rule below, including
+  // the phone-named rule that would otherwise catch `2608141501`.
+  if (KEEP_LIST.includes(row.id)) return { verdict: "KEEP", why: "keep-list", ageDays: ageDays(row.last_any) };
+
+  const junk = JUNK_FRAGMENTS.find((f) => (row.name ?? "").toLowerCase().includes(f));
+  if (junk) return { verdict: "CULL", why: `name matches "${junk}"`, ageDays: ageDays(row.last_any) };
+  if (PHONE_NAMED.test(row.name ?? ""))
+    return { verdict: "CULL", why: "named after a phone number", ageDays: ageDays(row.last_any) };
+
   const age = ageDays(row.last_any);
   if (age === null) return { verdict: "CULL", why: "no activity ever", ageDays: null };
   if (age <= WINDOW_DAYS)
@@ -171,12 +209,15 @@ if (asJson) {
   const pad = (s, n) => String(s ?? "—").slice(0, n).padEnd(n);
   const label = (r) => {
     if (r.why === "keep-list") return "KEEP list";
+    if (r.why === "named after a phone number") return "CULL phone";
+    if (r.why.startsWith("name matches")) return "CULL name";
     if (r.ageDays === null) return `${r.verdict} never`;
     return `${r.verdict} ${r.ageDays}d`;
   };
   console.log(
     `\nCull report — ${report.length} workspaces, ${sum(report, "numbers_total")} numbers ` +
-    `(window ${WINDOW_DAYS}d${KEEP_LIST.length ? `, keep-list ${KEEP_LIST.length}` : ""})\n`,
+    `(window ${WINDOW_DAYS}d${KEEP_LIST.length ? `, keep-list ${KEEP_LIST.length}` : ""}` +
+    `${JUNK_FRAGMENTS.length ? `, exclude "${JUNK_FRAGMENTS.join(",")}"` : ""})\n`,
   );
   console.log(`  KEEP ${keeps.length} (${sum(keeps, "numbers_total")} numbers)   CULL ${culls.length} (${sum(culls, "numbers_total")} numbers)\n`);
   console.log(pad("VERDICT", 12), pad("WORKSPACE", 34), pad("NUM", 4), pad("RENT", 5), pad("CID", 4), "LAST ACTIVITY");
@@ -202,6 +243,11 @@ if (asJson) {
           console.log(`     VERIFY   E911 status in Twilio — an emergency address blocks release and cannot be detached via API`);
       }
     }
+  }
+  console.log(`\nWhy each cull candidate was culled:`);
+  for (const r of culls) {
+    if (r.numbers_total > 0) continue; // already listed in the reference check
+    console.log(`  ${pad(r.name, 34)} ${r.why}`);
   }
   console.log(
     `\nRead-only. Nothing was changed. Release is a separate, reviewed step.\n`,
