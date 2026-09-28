@@ -2,6 +2,7 @@ import {
   CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,
   CAMPAIGN_DISPATCH_JOB_TYPE,
   CAMPAIGN_EXPORT_JOB_TYPE,
+  RECORDING_REPAIR_SWEEP_JOB_TYPE,
   RECORDING_SIDE_EFFECTS_JOB_TYPE,
   SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
   WEBHOOK_DELIVERY_JOB_TYPE,
@@ -20,6 +21,7 @@ import {
   elevenlabsBatchTranscribeParams,
   noParams,
   numberRentalBillingParams,
+  recordingRepairSweepParams,
   recordingSideEffectsParams,
   smsStatusSideEffectsParams,
   twilioOpenSyncParams,
@@ -27,6 +29,7 @@ import {
   webhookDeliveryParams,
   workspaceTwilioComplianceParams,
 } from "@/lib/worker/job-params.server";
+import { runRecordingRepairSweep } from "@/lib/call-recording-repair.server";
 import {
   billingReconcileHandler,
   campaignScheduleSyncHandler,
@@ -142,6 +145,12 @@ const registrations = [
     params: twilioWebhookAuditParams,
     schedule: true,
     handler: (job, params) => twilioWebhookAuditHandler(job, params),
+  }),
+  defineJob({
+    type: RECORDING_REPAIR_SWEEP_JOB_TYPE,
+    params: recordingRepairSweepParams,
+    schedule: true,
+    handler: () => runRecordingRepairSweep(),
   }),
   defineJob({
     type: CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,

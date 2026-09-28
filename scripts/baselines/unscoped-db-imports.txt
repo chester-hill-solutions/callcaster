@@ -10,6 +10,7 @@ app/lib/auto-dial.server.ts::@/server/db
 app/lib/call-coaching-ack.server.ts::@/server/admin-db
 app/lib/call-coaching-hydration.server.ts::@/server/admin-db
 app/lib/call-log.server.ts::@/server/db
+app/lib/call-recording-repair.server.ts::@/server/admin-db
 app/lib/call-recording-storage.server.ts::@/server/admin-db
 app/lib/call-screen.server.ts::@/server/admin-db
 app/lib/campaign-audience-db.server.ts::@/server/db
