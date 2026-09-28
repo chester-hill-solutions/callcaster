@@ -50,6 +50,7 @@
     "tools:components:move-settings": "node scripts/move-component-settings.mjs",
     "tools:prune:hygiene": "node scripts/prune-repo-hygiene.mjs",
     "tools:issues:board": "node scripts/generate-open-issues-board.mjs",
+    "tools:cull:report": "node scripts/cull-report.mjs",
     "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
     "start": "bun run ./server/bun.ts",
     "worker": "bun run ./worker/index.ts",
