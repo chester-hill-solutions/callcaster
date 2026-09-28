@@ -19,6 +19,7 @@ import {
   CAMPAIGN_DISPATCH_JOB_TYPE,
   CAMPAIGN_EXPORT_JOB_TYPE,
   ELEVENLABS_BATCH_TRANSCRIBE_JOB_TYPE,
+  RECORDING_REPAIR_SWEEP_JOB_TYPE,
   RECORDING_SIDE_EFFECTS_JOB_TYPE,
   SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
   TWILIO_WEBHOOK_AUDIT_JOB_TYPE,
@@ -197,6 +198,9 @@ export const recordingSideEffectsParams = voiceSideEffectsParamsSchema(
   "recording_side_effects",
 );
 
+/** The repair sweep takes no params; its budget is a module constant. */
+export const recordingRepairSweepParams = noParams;
+
 /**
  * Every registered job type's `{type, params}` pair. `handlers.server.ts`
  * builds its `defineJob` registrations from these SAME schema objects
@@ -216,6 +220,7 @@ export const jobParamsRegistry = [
   { type: CALL_STATUS_SIDE_EFFECTS_JOB_TYPE, params: callStatusSideEffectsParams },
   { type: SMS_STATUS_SIDE_EFFECTS_JOB_TYPE, params: smsStatusSideEffectsParams },
   { type: RECORDING_SIDE_EFFECTS_JOB_TYPE, params: recordingSideEffectsParams },
+  { type: RECORDING_REPAIR_SWEEP_JOB_TYPE, params: recordingRepairSweepParams },
   { type: CAMPAIGN_EXPORT_JOB_TYPE, params: campaignExportParams },
   { type: CAMPAIGN_DISPATCH_JOB_TYPE, params: campaignDispatchParams },
   { type: WEBHOOK_DELIVERY_JOB_TYPE, params: webhookDeliveryParams },

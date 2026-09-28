@@ -55,6 +55,7 @@ const EXPECTED_JOB_TYPES = [
   "call_status_side_effects",
   "sms_status_side_effects",
   "recording_side_effects",
+  "recording_repair_sweep",
   "campaign_export",
   "campaign_dispatch",
   "webhook_delivery",
@@ -70,8 +71,10 @@ const EXPECTED_PAGING_JOB_TYPES = [
   "workspace_twilio_compliance",
 ].sort();
 
-// The exact set ensure-scheduled-jobs.server.ts hand-maintained as
-// `SELF_SCHEDULING_JOB_TYPES`.
+// The exact set `SELF_SCHEDULING_JOB_TYPES` derives from `jobRegistry` in
+// handlers.server.ts. Deliberate snapshot: adding a job with `schedule: true`
+// must fail here until its name is recorded, so a new self-scheduling type is
+// an intentional diff rather than a silent schedule change.
 const EXPECTED_SELF_SCHEDULING_JOB_TYPES = [
   "low_credit_notify",
   "twilio_webhook_audit",
@@ -79,11 +82,12 @@ const EXPECTED_SELF_SCHEDULING_JOB_TYPES = [
   "billing_reconcile",
   "number_rental_billing",
   "campaign_schedule_sync",
+  "recording_repair_sweep",
 ].sort();
 
-// The exact seed params map ensure-scheduled-jobs.server.ts hand-maintained
-// (only twilio_open_sync had non-empty seed params; every other
-// self-scheduling type seeded with `{}`).
+// The exact seed params `SELF_SCHEDULING_SEED_PARAMS` derives from
+// `jobRegistry` (only twilio_open_sync has non-empty seed params; every other
+// self-scheduling type seeds with `{}`).
 const EXPECTED_SEED_PARAMS: Record<string, Record<string, unknown>> = {
   low_credit_notify: {},
   twilio_webhook_audit: {},
@@ -91,6 +95,7 @@ const EXPECTED_SEED_PARAMS: Record<string, Record<string, unknown>> = {
   billing_reconcile: {},
   number_rental_billing: {},
   campaign_schedule_sync: {},
+  recording_repair_sweep: {},
 };
 
 describe("job registry — derived-set equality guard (#1239 A1)", () => {

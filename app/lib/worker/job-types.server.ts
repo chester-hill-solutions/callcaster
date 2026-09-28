@@ -3,6 +3,13 @@ export const CALL_STATUS_SIDE_EFFECTS_JOB_TYPE = "call_status_side_effects";
 export const SMS_STATUS_SIDE_EFFECTS_JOB_TYPE = "sms_status_side_effects";
 export const RECORDING_SIDE_EFFECTS_JOB_TYPE = "recording_side_effects";
 
+/**
+ * Daily sweep that re-drives `recording_side_effects` for calls whose copy out
+ * of Twilio never landed (#2166). Separate from the side-effect job itself so
+ * the repair has its own schedule and its own bounded budget.
+ */
+export const RECORDING_REPAIR_SWEEP_JOB_TYPE = "recording_repair_sweep";
+
 export const WEBHOOK_SIDE_EFFECT_JOB_TYPES = [
   CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,
   SMS_STATUS_SIDE_EFFECTS_JOB_TYPE,
