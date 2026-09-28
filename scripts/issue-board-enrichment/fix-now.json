@@ -101,38 +101,6 @@
     "trackerRecommendation": "Fix now. Audit trail for the #2048 settlement gate: that gate knows a message settled but not when. The one-line write is NOT sufficient on its own — verified that the open-row sweep can never revisit an already-settled message, so without the backfill selection the fix would appear to work while leaving the Lombardi data unfixed."
   },
   {
-    "issueNumber": 2048,
-    "verdict": "fix-now",
-    "recommendedTitle": "Block SMS campaign completion while messages are unsettled at Twilio",
-    "summary": "try_complete_campaign_if_drained gates completion on campaign_queue_has_pending_work + campaign_has_unsettled_calls — calls only. Message campaigns complete the instant the last queue row is dequeued, even with thousands of message rows still queued/sending at Twilio. Dequeue == handed-to-Twilio, not delivered. Lombardi (2026-09-24): 23,504 sends, 6,904 with provider error codes; export needed status reconciliation. Twilio open-sync already reconciles OPEN_MESSAGE_STATUSES (accepted/scheduled/queued/sending) — completion must run it and only then complete.",
-    "currentBehavior": "SMS campaign flips to 'complete' when campaign_queue has no pending rows, regardless of unsettled message rows at the provider.",
-    "rootCause": "campaign_has_unsettled_calls (added #1728/#2028 for IVR) has no message counterpart; campaign_queue_has_pending_work considers a row done at dequeue time.",
-    "resolution": "Add campaign_has_unsettled_messages(campaign_id) gating completion on non-terminal message statuses (OPEN_MESSAGE_STATUSES). Run twilio-open-sync before re-checking so no-terminal-callback messages are resolved/failed, not silently counted done. Keep IVR path unchanged. Route the dequeue-completion helpers through the settled gate.",
-    "lookIn": [
-      "client/migrations/20260922120000_gate_campaign_completion_on_settled_calls.sql",
-      "app/lib/twilio-open-sync.server.ts",
-      "app/lib/sms-status.ts",
-      "app/lib/campaign-queue-completion.server.ts",
-      "app/lib/worker/handlers/campaign.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "integration: message row still queued => campaign not complete",
-      "integration: all settled (delivered/failed/undelivered) => complete",
-      "open-sync resolves a no-callback message to failed, then completion proceeds"
-    ],
-    "acceptanceCriteria": [
-      "SMS campaign with queued/sending messages is not complete",
-      "Settled campaign completes normally",
-      "No-callback messages resolved by open-sync, don't block forever",
-      "IVR completion unchanged"
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Fix now; direct corollary of #1728's call gate, evidenced by the Lombardi blast statuses."
-  },
-  {
     "issueNumber": 2047,
     "verdict": "fix-now",
     "recommendedTitle": "Warn when a message campaign has no end time on its send window",

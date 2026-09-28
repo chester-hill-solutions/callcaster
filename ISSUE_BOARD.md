@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@13e7c502` · 277 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@20909935` · 277 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 119
+## Fix now — 118
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -54,17 +54,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: `add_audience` with a foreign audience → 404, no rows enqueued (kill-check: drop the tenant lookup and confirm the test goes red).; `add_contact_ids` with a foreign contact → rejected, no rows enqueued.; A permitted-path positive control.
 - Done when: `add_audience` with another workspace's `audience_id` returns 404 and enqueues nothing.; `add_contact_ids` with a foreign `contact_id` returns 404 (or a 400 naming it) and enqueues nothing.; A mixed list is handled explicitly: either all-or-nothing or a named rejection — documented and tested.; The permitted path (ids from the caller's own workspace) still enqueues, with a positive-control test.; Every `api+` write endpoint that accepts a tenant-scoped id has been swept and the sweep is recorded in the issue.
 - Tracker: Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage.
-
-### [#2048](https://github.com/chester-hill-solutions/callcaster/issues/2048) Block SMS campaign completion while messages are unsettled at Twilio
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-27
-- try_complete_campaign_if_drained gates completion on campaign_queue_has_pending_work + campaign_has_unsettled_calls — calls only. Message campaigns complete the instant the last queue row is dequeued, even with thousands of message rows still queued/sending at Twilio. Dequeue == handed-to-Twilio, not delivered. Lombardi (2026-09-24): 23,504 sends, 6,904 with provider error codes; export needed status reconciliation. Twilio open-sync already reconciles OPEN_MESSAGE_STATUSES (accepted/scheduled/queued/sending) — completion must run it and only then complete.
-- Current behavior: SMS campaign flips to 'complete' when campaign_queue has no pending rows, regardless of unsettled message rows at the provider.
-- Root cause: campaign_has_unsettled_calls (added #1728/#2028 for IVR) has no message counterpart; campaign_queue_has_pending_work considers a row done at dequeue time.
-- Resolution: Add campaign_has_unsettled_messages(campaign_id) gating completion on non-terminal message statuses (OPEN_MESSAGE_STATUSES). Run twilio-open-sync before re-checking so no-terminal-callback messages are resolved/failed, not silently counted done. Keep IVR path unchanged. Route the dequeue-completion helpers through the settled gate.
-- Look in: `client/migrations/20260922120000_gate_campaign_completion_on_settled_calls.sql`, `app/lib/twilio-open-sync.server.ts`, `app/lib/sms-status.ts`, `app/lib/campaign-queue-completion.server.ts`, `app/lib/worker/handlers/campaign.server.ts`
-- Missing tests: integration: message row still queued => campaign not complete; integration: all settled (delivered/failed/undelivered) => complete; open-sync resolves a no-callback message to failed, then completion proceeds
-- Done when: SMS campaign with queued/sending messages is not complete; Settled campaign completes normally; No-callback messages resolved by open-sync, don't block forever; IVR completion unchanged
-- Tracker: Fix now; direct corollary of #1728's call gate, evidenced by the Lombardi blast statuses.
 
 ### [#2157](https://github.com/chester-hill-solutions/callcaster/issues/2157) The chats loader-to-state sync can permanently discard a fresh page-1 response
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -1285,9 +1274,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 71
+## Verify and close — 72
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2048](https://github.com/chester-hill-solutions/callcaster/issues/2048) Block SMS campaign completion while messages are unsettled at Twilio
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-27
+- DONE — the settled-message gate shipped on 2026-09-27 as PR #2050 (d032c0c9), a day before this record was written. Message campaigns no longer flip to complete on dequeue: try_complete_campaign_if_drained now refuses while any message is unsettled. Measured on the Eric Lombardi blast (2026-09-24) the old behaviour reported complete at 6:29pm EDT while Twilio still held 5,382 messages, releasing them between 11:59pm and 1:46am — a median lag of 7.3 hours.
+- Current behavior: Verified against the live dev database, not just the migration file: campaign_has_unsettled_messages, campaign_ids_with_unsettled_messages and try_complete_campaign_if_drained all exist in public, and the deployed body of try_complete_campaign_if_drained does call campaign_has_unsettled_messages. A completion re-check exists (app/lib/campaign-settle-recheck.server.ts) because the gate would otherwise strand every message campaign at running forever once the local queue empties.
+- Root cause: campaign_has_unsettled_calls had no message counterpart, and campaign_queue_has_pending_work treats a row as done at dequeue time — handed to Twilio, not delivered. The re-check module's own comment records that a TypeScript re-implementation of the settled rule shipped once and broke the recovery path in two ways no test caught, which is why both the filter and the gate now live only in SQL.
+- Resolution: No code work outstanding. The residual is the expired-campaign bypass at app/lib/worker/handlers/campaign.server.ts, which writes status=complete directly and never calls the gate — that is issue #2051, DECLINED by the maintainer on 2026-09-25 ('no 2051') and deliberately left with a code comment marking it a known gap. Do not reopen it here. What remains is a verification pass: confirm on a real campaign that a message sitting at Twilio keeps the campaign at running, and that the re-check promotes it once the provider settles. That pass belongs on a real database, which is the tier #2174 tracks.
+- Look in: `client/migrations/20260922120000_gate_campaign_completion_on_settled_calls.sql`, `app/lib/twilio-open-sync.server.ts`, `app/lib/sms-status.ts`, `app/lib/campaign-queue-completion.server.ts`, `app/lib/worker/handlers/campaign.server.ts`
+- Existing tests: test/campaign-completion-rpc-contract.test.ts — extracts the live migration bodies and pins the settled list and the ::text casts (9 tests, runs in ci:local); test/campaign-settle-recheck.server.test.ts — the re-check sweep and its best-effort contract (7 tests, runs in ci:local); test/integration-db/campaign-completion-gate.test.ts — 14 tests against a real database; this tier is not wired to any workflow (#2174), so these do not run in CI today
+- Missing tests: an end-to-end real-Postgres pass: a message unsettled at the provider keeps the campaign at running, and the re-check promotes it once settled (#2174)
+- Done when: SMS campaign with queued/sending messages is not complete; Settled campaign completes normally; No-callback messages resolved by open-sync, don't block forever; IVR completion unchanged
+- Tracker: Verify and close — this is NOT Fix now and the earlier verdict was wrong. The gate shipped as #2050 on 2026-09-27; this record was written on 2026-09-28 and described shipped work as pending, which put the highest-severity item on the board on a task that was already done. The issue stays OPEN by design: a merge to dev does not close an issue until the dev-to-master release, and the project Status is already on-dev. Do not spend implementation time here. The one real gap, the expired-campaign bypass, is #2051 and was declined.
 
 ### [#1782](https://github.com/chester-hill-solutions/callcaster/issues/1782) Verify send-window boundary timing for voice campaigns on dev (#1351/#1352)
 - Verdict: **Verify and close** · Labels: none · Assignee: none · Updated: 2026-09-27
@@ -2880,10 +2881,10 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
 
-### [#2176](https://github.com/chester-hill-solutions/callcaster/issues/2176) The campaign-queue contact-id workspace guard exists in four places with three status codes, and two falsely reject a repeated id
+### [#2178](https://github.com/chester-hill-solutions/callcaster/issues/2178) call.date_created is declared text() but is timestamptz, so every date predicate needs a hand-written cast
 - Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-28
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
-### [#2178](https://github.com/chester-hill-solutions/callcaster/issues/2178) call.date_created is declared text() but is timestamptz, so every date predicate needs a hand-written cast
-- Status: Backlog · Labels: none · Assignee: none · Updated: 2026-09-28
+### [#2176](https://github.com/chester-hill-solutions/callcaster/issues/2176) The campaign-queue contact-id workspace guard exists in four places with three status codes, and two falsely reject a repeated id
+- Status: on-dev · Labels: none · Assignee: none · Updated: 2026-09-28
 - _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
