@@ -1963,5 +1963,37 @@
     "risk": "medium",
     "trackerRecommendation": "Implemented on dev (PR #2028 061689af): campaign completion is gated on settled calls (campaign_has_unsettled_calls + try_complete_campaign_if_drained), the IVR terminal-status callback triggers completion and persists busy/canceled, and the dequeue reason wording is corrected. Integration + contract tests land with it. Verify on the review env (campaign completes after calls settle, incl. no-answer/busy), then close.",
     "blockedBy": []
+  },
+  {
+    "issueNumber": 2172,
+    "verdict": "verify-close",
+    "recommendedTitle": "Campaign SMS pacing measures dispatch time, not provider-request time, so the rate limit collapses under load",
+    "summary": "runPacedSendBatches stamps lastStartAt immediately after CALLING handleMember, which is async and does real work (normalizePhoneNumber, recipientCallingWindowStatus, an awaited dequeueQueueEntry) before the provider RPC fires. So the enforced interval is between dispatches, while the quantity that must be bounded is between RPC starts. When the pre-RPC work exceeds the pacing interval the wait collapses to zero and the batch sends near-simultaneously. Under load — precisely when rate limiting matters — campaign SMS pacing silently stops pacing.",
+    "currentBehavior": "test/campaign-sms-dispatch-contract.test.ts 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' fails intermittently in the full test:node run (436/437 files pass, this is the only failure) and passes 4/4 in isolation. It also passes on a clean origin/dev worktree. retries is not configured in vitest.node.config.ts, so it is a hard failure, not a retried flake.",
+    "rootCause": "The pacer reads the wrong clock. gap(RPC n, RPC n+1) = minStartIntervalMs + w(n+1) - w(n), where w is the pre-RPC work. When w(n) is large the gap SHRINKS; the check for n+1 then sees elapsedMs > minStartIntervalMs, computes waitMs = 0, and never waits. This resolves an apparent contradiction: CPU contention makes timers fire late, which alone would ENLARGE gaps — the lastStartAt versus RPC-start mismatch dominates that effect. The test's own comment blames 'setTimeout jitter on a busy CI runner'; that diagnosis is wrong. The 10ms floor is catching a genuine collapse, and the test should be kept as-is.",
+    "resolution": "Stamp the pacing clock at the point the provider request is actually issued. Concretely: build a start pacer that serializes and awaits a minimum interval, and await it immediately before rpcCreateOutreachAttempt rather than pacing the dispatch loop. Open decision worth making deliberately: pace dispatch (simpler, but under-delivers by up to w(n)) or pace the provider call (correct, matches the code's stated intent of pacing starts rather than completions). Last touched by #2158 'enforce campaign send window before provider attempts', which is on this code path — check whether that PR moved when lastStartAt is stamped. Do NOT relax the 10ms floor to make the failure disappear; that would delete the only detector.",
+    "lookIn": [
+      "app/lib/campaign-sms-dispatch.server.ts:263 (minStartIntervalMs = 1000 / startRateMps)",
+      "app/lib/campaign-sms-dispatch.server.ts:353-361 (elapsedMs/waitMs against lastStartAt, then lastStartAt = Date.now() at dispatch)",
+      "app/lib/campaign-sms-dispatch.server.ts:449+ (handleMember — async work before the RPC)",
+      "test/campaign-sms-dispatch-contract.test.ts (the pacing contract test, and the comment that misdiagnoses it)"
+    ],
+    "existingTests": [
+      "campaign-sms-dispatch-contract.test.ts: 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' — catches the collapse, but only when the run is loaded enough to trigger it"
+    ],
+    "missingTests": [
+      "a test that makes handleMember's pre-RPC work slow (a mock resolving after ~40ms) and asserts the inter-RPC gap STILL holds at the configured interval — this must FAIL against current code",
+      "a test proving pacing holds under simulated event-loop contention"
+    ],
+    "acceptanceCriteria": [
+      "A test that delays pre-RPC work and asserts the inter-RPC gap still holds; it fails against current code",
+      "Campaign SMS rate limiting holds under simulated event-loop contention",
+      "Existing dispatch contract tests stay green, with the 10ms floor unchanged",
+      "The dispatch-loop pacing and the send-point pacing are not both active (no double-wait)"
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Fixed and merged as PR #2182 (d9eecf80), deployed to dev and serving HTTP 200. The pacing gate moved from the dispatch loop to immediately before the provider request, so the interval is now measured between the requests Twilio actually receives. createStartPacer serialises turns so two rows finishing preparation in the same tick cannot pass the gate together. The predicted mechanism was confirmed by instrumentation: dispatches paced perfectly at 0/20/40ms while requests landed 15ms apart where 20ms was required. Note the pacer also stopped serialising row preparation (peak concurrent lookups 1 -> 20, peak concurrent provider sends unchanged at 1), which is a real change in DB concurrency, not a pure refactor. Verified: two new tests fail before the fix at 5ms and 15ms against a 20ms floor, three kill-checks executed (including one that breaks a pre-existing test, proving the turn-chaining is load-bearing), ci:local exit 0, node suite 440/440 files and 3528 tests including the previously flaky 60 MPS test. Left OPEN because a merge to dev is not a release and no CI tier exercises this against real Postgres (test/integration-db is excluded, #2174)."
   }
 ]
