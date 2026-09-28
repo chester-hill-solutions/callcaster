@@ -94,6 +94,13 @@ function makeJob(overrides: Partial<ClaimedJobRow> = {}): ClaimedJobRow {
   };
 }
 
+/** The args the coordinator passed to the fanout for one job name. */
+function fanoutArgsFor(job: string): Record<string, unknown> | undefined {
+  return mocks.runCronWorkspaceFanout.mock.calls
+    .map(([args]) => args as Record<string, unknown>)
+    .find((args) => args?.job === job);
+}
+
 describe("cron handler self-reschedule gating", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -182,6 +189,52 @@ describe("cron handler self-reschedule gating", () => {
     expect(mocks.runNumberRentalBilling).toHaveBeenCalledWith({
       workspaceId: "ws-1",
     });
+  });
+
+  /**
+   * #2116. The two halves of the split are declared in different files, so
+   * neither test can catch a mismatch on its own: the fanout test proves
+   * `includeDisabled` is honoured, and the rental test proves the handler
+   * suppresses the debit. This asserts the coordinator actually asks for the
+   * opt-in. Drop it and the ladder goes silently dead for suspended
+   * workspaces while both halves stay green.
+   */
+  test("number_rental_billing opts into disabled workspaces so the release ladder still runs", async () => {
+    await numberRentalBillingHandler(makeJob({ type: "number_rental_billing" }));
+
+    expect(mocks.runCronWorkspaceFanout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        job: "number_rental_billing",
+        includeDisabled: true,
+      }),
+    );
+  });
+
+  test("billing_reconcile does not opt in — a suspended workspace is not reconciled", async () => {
+    await billingReconcileHandler(makeJob({ type: "billing_reconcile" }));
+
+    expect(mocks.runCronWorkspaceFanout).toHaveBeenCalledWith(
+      expect.objectContaining({ job: "billing_reconcile" }),
+    );
+    expect(fanoutArgsFor("billing_reconcile")?.includeDisabled).toBeUndefined();
+  });
+
+  test("twilio_open_sync does not opt in — a suspended workspace is not synced", async () => {
+    await twilioOpenSyncHandler(makeJob({ type: "twilio_open_sync" }));
+
+    expect(fanoutArgsFor("twilio_open_sync")?.includeDisabled).toBeUndefined();
+  });
+
+  test("number_rental_billing is the only fanout job that opts in", async () => {
+    // Guards the "when to pass includeDisabled" rule in the fanout doc comment:
+    // a new job inherits the skip, and opting in must stay deliberate.
+    await billingReconcileHandler(makeJob({ type: "billing_reconcile" }));
+    await twilioOpenSyncHandler(makeJob({ type: "twilio_open_sync" }));
+    await numberRentalBillingHandler(makeJob({ type: "number_rental_billing" }));
+
+    expect(fanoutArgsFor("billing_reconcile")?.includeDisabled).toBeUndefined();
+    expect(fanoutArgsFor("twilio_open_sync")?.includeDisabled).toBeUndefined();
+    expect(fanoutArgsFor("number_rental_billing")?.includeDisabled).toBe(true);
   });
 
   // These chains are the only scheduler. Rescheduling used to happen after the

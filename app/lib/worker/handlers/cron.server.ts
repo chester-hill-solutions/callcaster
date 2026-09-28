@@ -54,17 +54,22 @@ function resolveWorkspaceId(job: ClaimedJobRow): string | undefined {
 /**
  * Optional workspace fanout: when workspaceId is absent, run across all
  * eligible workspaces; otherwise run once for that workspace.
+ *
+ * `includeDisabled` is forwarded verbatim so each money job declares its own
+ * suspension policy. See the policy note on `runCronWorkspaceFanout`.
  */
 async function withOptionalWorkspaceFanout<T>(args: {
   job: string;
   workspaceId: string | undefined;
   requireTwilioCredentials: boolean;
+  includeDisabled?: boolean;
   runOne: (workspaceId: string) => Promise<T>;
 }): Promise<T | unknown> {
   if (!args.workspaceId) {
     return runCronWorkspaceFanout({
       job: args.job,
       requireTwilioCredentials: args.requireTwilioCredentials,
+      includeDisabled: args.includeDisabled,
       run: args.runOne,
     });
   }
@@ -179,6 +184,13 @@ export async function numberRentalBillingHandler(
         job: "number_rental_billing",
         workspaceId,
         requireTwilioCredentials: false,
+        // Opt in to disabled workspaces on purpose. This handler holds two
+        // jobs: the monthly DEBIT, which a suspended workspace must not
+        // receive, and the warn -> suspend -> release ladder, which must keep
+        // running so a number nobody pays for is eventually released instead
+        // of being held open forever by the suspension itself.
+        // `runNumberRentalBilling` suppresses only the debit half.
+        includeDisabled: true,
         runOne: (id) => runNumberRentalBilling({ workspaceId: id }),
       }),
   );
