@@ -482,6 +482,10 @@ export async function patchCampaignQueueApi(
   }
 
   const campaignIdNum = Number(campaignId);
+  // ADR-0004: the only tenant-data accessor. The `add_` branches below resolve
+  // the caller's own contacts and audience through it rather than against a
+  // bare id from the request body (#2097).
+  const tdb = createTenantDb(workspaceId);
 
   try {
     switch (body.action) {
@@ -496,18 +500,66 @@ export async function patchCampaignQueueApi(
         return { ok: true as const, success: true };
       }
       case "add_contact_ids": {
-        await enqueueContactsForCampaign(
-          campaignIdNum,
-          body.contact_ids,
-          { requeue: false },
-        );
+        // #2097. Proving the CAMPAIGN is the caller's says nothing about the
+        // contact ids in the body. `enqueueContactsForCampaign` takes no
+        // workspace, and the BEFORE trigger derives each queue row's workspace
+        // from the campaign — so an unvalidated id stamps another tenant's
+        // contact into the caller's workspace, where fetchCampaignQueuePage
+        // then returns its name, phone, email and address verbatim.
+        //
+        // All-or-nothing: a partial enqueue would silently drop the ids the
+        // caller could not prove, and the response reports success either way,
+        // so the caller cannot tell which contacts were skipped. Reject the
+        // whole request instead.
+        //
+        // Deduped first because the schema does not exclude repeats, and the
+        // owned-row count is compared against the requested count: without
+        // this, a legitimate `[7, 7]` would find one row and 404.
+        const requested = [...new Set(body.contact_ids)];
+        const owned = await tdb.contact.findMany({
+          where: inArray(contactTable.id, requested),
+          columns: { id: true },
+        });
+        if (owned.length !== requested.length) {
+          // Uniform 404 with no ids named, matching the rest of the data plane:
+          // naming the foreign ids would confirm they exist, which is the
+          // workspace-id inference the 404 convention exists to prevent.
+          return { ok: false as const, error: "Contact not found", status: 404 };
+        }
+        await enqueueContactsForCampaign(campaignIdNum, requested, {
+          requeue: false,
+        });
         return { ok: true as const, success: true };
       }
       case "add_audience": {
+        // #2097. `contact_audience` carries no tenancy column, so the audience
+        // cannot be filtered by workspace at the join. Prove the audience is
+        // the caller's first, through the tenant client.
+        const audience = await tdb.audience.findFirst({
+          where: eq(audienceTable.id, body.audience_id),
+          columns: { id: true },
+        });
+        if (!audience) {
+          return { ok: false as const, error: "Audience not found", status: 404 };
+        }
+        // The audience being the caller's makes its links *probably* safe to
+        // read, but the guarantee that matters is "every enqueued contact is in
+        // the caller's workspace". Joining contact and filtering on its tenancy
+        // column makes that true by construction instead of by assumption, for
+        // the price of one predicate in the same query.
         const contacts = await db
           .select({ contact_id: contactAudienceTable.contact_id })
           .from(contactAudienceTable)
-          .where(eq(contactAudienceTable.audience_id, body.audience_id));
+          .innerJoin(
+            contactTable,
+            eq(contactAudienceTable.contact_id, contactTable.id),
+          )
+          .where(
+            and(
+              eq(contactAudienceTable.audience_id, audience.id),
+              eq(contactTable.workspace, workspaceId),
+            ),
+          );
         await enqueueContactsForCampaign(
           campaignIdNum,
           contacts.map((row) => row.contact_id),
