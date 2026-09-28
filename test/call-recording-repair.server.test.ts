@@ -12,7 +12,13 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/server/admin-db", () => ({ adminDb: { select: mocks.select } }));
-vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
+// Spread the real module so future logger exports keep flowing. A literal
+// factory freezes the export surface, and the next person who adds an export
+// gets a catch-all failure in an unrelated test.
+vi.mock("@/lib/logger.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/logger.server")>()),
+  logger: mocks.logger,
+}));
 vi.mock("@/lib/worker/job-params.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/worker/job-params.server")>()),
   enqueueRegisteredJob: (...args: unknown[]) => mocks.enqueueRegisteredJob(...args),
