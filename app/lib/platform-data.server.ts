@@ -67,6 +67,7 @@ import {
 } from "@/db/schema";
 import { db } from "@/server/db";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
+import { resolveContactsOwnedByWorkspace } from "@/lib/contacts/tenant-scope.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { downloadObject } from "@/lib/object-storage.server";
 
@@ -500,33 +501,16 @@ export async function patchCampaignQueueApi(
         return { ok: true as const, success: true };
       }
       case "add_contact_ids": {
-        // #2097. Proving the CAMPAIGN is the caller's says nothing about the
-        // contact ids in the body. `enqueueContactsForCampaign` takes no
-        // workspace, and the BEFORE trigger derives each queue row's workspace
-        // from the campaign — so an unvalidated id stamps another tenant's
-        // contact into the caller's workspace, where fetchCampaignQueuePage
-        // then returns its name, phone, email and address verbatim.
-        //
-        // All-or-nothing: a partial enqueue would silently drop the ids the
-        // caller could not prove, and the response reports success either way,
-        // so the caller cannot tell which contacts were skipped. Reject the
-        // whole request instead.
-        //
-        // Deduped first because the schema does not exclude repeats, and the
-        // owned-row count is compared against the requested count: without
-        // this, a legitimate `[7, 7]` would find one row and 404.
-        const requested = [...new Set(body.contact_ids)];
-        const owned = await tdb.contact.findMany({
-          where: inArray(contactTable.id, requested),
-          columns: { id: true },
-        });
-        if (owned.length !== requested.length) {
-          // Uniform 404 with no ids named, matching the rest of the data plane:
-          // naming the foreign ids would confirm they exist, which is the
-          // workspace-id inference the 404 convention exists to prevent.
+        // #2097 / #2176. The shared helper owns the scoping rule, the dedupe
+        // and the all-or-nothing decision — see contacts/tenant-scope.server.ts.
+        const resolved = await resolveContactsOwnedByWorkspace(
+          workspaceId,
+          body.contact_ids,
+        );
+        if (!resolved.ok) {
           return { ok: false as const, error: "Contact not found", status: 404 };
         }
-        await enqueueContactsForCampaign(campaignIdNum, requested, {
+        await enqueueContactsForCampaign(campaignIdNum, resolved.contactIds, {
           requeue: false,
         });
         return { ok: true as const, success: true };

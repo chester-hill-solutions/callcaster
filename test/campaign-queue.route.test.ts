@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => {
     deleteCampaignQueueByIds: vi.fn(),
     dbDeleteReturning: vi.fn(),
     dbSelectWhere: vi.fn(),
+    tenantContactFindMany: vi.fn(async () => [] as { id: number }[]),
     requireWorkspaceAccess: vi.fn(),
   };
 });
@@ -53,6 +54,18 @@ vi.mock("@/server/db", () => ({
   },
 }));
 
+// The contact-ownership check goes through the tenant client, not the unscoped
+// `db` (#2176). The `@/server/db` mock above still serves the DELETE path.
+vi.mock("@/server/tenant-db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/tenant-db")>()),
+  createTenantDb: () => ({
+    execute: vi.fn(async () => []),
+    contact: {
+      findMany: (...args: any[]) => mocks.tenantContactFindMany(...args),
+    },
+  }),
+}));
+
 describe("app/routes/api+/campaign_queue/route.tsx", () => {
   beforeEach(() => {
     mocks.parseRequestData.mockReset();
@@ -62,6 +75,8 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     mocks.dbDeleteReturning.mockReset();
     mocks.dbSelectWhere.mockReset();
     mocks.dbSelectWhere.mockResolvedValue([]);
+    mocks.tenantContactFindMany.mockReset();
+    mocks.tenantContactFindMany.mockResolvedValue([]);
   });
 
   test("redirects to /signin when user missing", async () => {
@@ -76,7 +91,7 @@ describe("app/routes/api+/campaign_queue/route.tsx", () => {
     const dbClient = {};
     queueDualAuthSession({ user: { id: "u1" } });
     mocks.parseRequestData.mockResolvedValueOnce({ ids: ["1", 2], campaign_id: "10" });
-    mocks.dbSelectWhere.mockResolvedValueOnce([{ id: 1 }, { id: 2 }]);
+    mocks.tenantContactFindMany.mockResolvedValueOnce([{ id: 1 }, { id: 2 }]);
 
     const mod = await import("../app/routes/api+/campaign_queue");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));

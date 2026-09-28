@@ -27,6 +27,23 @@ const dbMocks = vi.hoisted(() => ({
   selectChain: vi.fn(),
 }));
 
+// The contact-ownership check goes through the tenant client, not the
+// unscoped `db` (#2176). The `@/server/db` mock above still serves the
+// contact_audience read on the add_from_audience path.
+const tdbMocks = vi.hoisted(() => ({
+  findMany: vi.fn(async () => [] as { id: number }[]),
+}));
+
+vi.mock("@/server/tenant-db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/server/tenant-db")>()),
+  createTenantDb: () => ({
+    execute: vi.fn(async () => []),
+    contact: {
+      findMany: (...args: unknown[]) => tdbMocks.findMany(...args),
+    },
+  }),
+}));
+
 vi.mock("@/lib/auth.server", () => ({
   getSession: () => ({ headers: new Headers(),
   }),
@@ -110,6 +127,8 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
     mocks.countQueuedCampaignQueueRows.mockReset();
     mocks.requireWorkspaceLoaderContext.mockReset();
     dbMocks.selectChain.mockReset();
+    tdbMocks.findMany.mockReset();
+    tdbMocks.findMany.mockResolvedValue([]);
     mocks.verifyAuth.mockResolvedValue({
       user: { id: "u1" },
     });
@@ -169,7 +188,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
       contacts: [{ id: 21 }, { id: 22 }],
     });
     // Workspace ownership lookup: both ids belong to the workspace.
-    dbMocks.selectChain.mockResolvedValueOnce([{ id: 21 }, { id: 22 }]);
+    tdbMocks.findMany.mockResolvedValueOnce([{ id: 21 }, { id: 22 }]);
 
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
@@ -197,7 +216,7 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
       // 22 belongs to another tenant; the ownership query returns only 21.
       contacts: [{ id: 21 }, { id: 22 }],
     });
-    dbMocks.selectChain.mockResolvedValueOnce([{ id: 21 }]);
+    tdbMocks.findMany.mockResolvedValueOnce([{ id: 21 }]);
 
     const mod = await import(
       "../app/routes/workspaces+/$id/campaigns/$selected_id/queue.route"
@@ -207,7 +226,9 @@ describe("workspaces_.$id.campaigns.$selected_id.queue action", () => {
       params: { selected_id: "77" },
     } as any)));
 
-    expect(res.status).toBe(403);
+    // Uniform 404, not 403: a 403 confirms the ids exist somewhere, which is
+    // the workspace-id inference the data plane's 404 convention prevents (#2176).
+    expect(res.status).toBe(404);
     await expect(res.json()).resolves.toMatchObject({ success: false });
     expect(mocks.enqueueContactsForCampaign).not.toHaveBeenCalled();
   });
