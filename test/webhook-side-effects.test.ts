@@ -594,12 +594,23 @@ describe("webhook side-effect handlers", () => {
     );
   });
 
-  test("runRecordingSideEffects logs and continues when persist fails", async () => {
-    mocks.persistCallRecordingToStorage.mockResolvedValueOnce({
-      ok: false,
-      reason: "download_failed",
-      error: "Twilio recording fetch failed (404 Not Found)",
-    });
+  /**
+   * #2166 — INVERTED. This test previously asserted that a failed copy resolves
+   * `{ ok: true }` and logs a warning. That behaviour marked the job successful,
+   * consumed its idempotency key, and left `audio_url` NULL with no mechanism
+   * left to ever fetch the audio again — the recording was silently lost even
+   * though Twilio still held it.
+   *
+   * The job must now FAIL so the worker's retry/dead-letter machinery takes
+   * over, and the recording identity must already be persisted so the repair
+   * sweep can find and re-drive it.
+   */
+  test("runRecordingSideEffects FAILS when the copy fails, so the worker retries", async () => {
+    mocks.persistCallRecordingToStorage.mockRejectedValueOnce(
+      new Error(
+        "call_recording: download_failed — Twilio recording fetch failed (404 Not Found) (call CA1, recording RE1)",
+      ),
+    );
 
     const { runRecordingSideEffects } = await import(
       "@/lib/worker/webhook-side-effects.server"
@@ -615,20 +626,58 @@ describe("webhook side-effect handlers", () => {
           RecordingDuration: "12",
         }),
       }),
-    ).resolves.toEqual({ ok: true });
+    ).rejects.toThrow(/download_failed/);
 
-    expect(mocks.logger.warn).toHaveBeenCalledWith(
-      "call_recording.persist_skipped",
-      expect.objectContaining({ reason: "download_failed" }),
-    );
-    expect(mocks.updateCallBySid).toHaveBeenCalledWith("w1", "CA1", {
-      recording_sid: "RE1",
-      recording_duration: "12",
+    // No audio_url was written, so nothing claims we hold the recording.
+    for (const call of mocks.updateCallBySid.mock.calls) {
+      expect((call[2] as Record<string, string>).audio_url).toBeUndefined();
+    }
+  });
+
+  /**
+   * The repair sweep finds calls by `recording_sid` set and `audio_url` NULL.
+   * If the identity were only written after a successful copy, a failed copy
+   * would leave no trace to search on and the sweep could never repair it.
+   */
+  test("the recording identity is persisted BEFORE the copy is attempted", async () => {
+    mocks.persistCallRecordingToStorage.mockImplementationOnce(async () => {
+      // Assert from inside the copy attempt: the identity must already be on
+      // the row by the time we try to copy.
+      const payloads = mocks.updateCallBySid.mock.calls.map(
+        (call) => call[2] as Record<string, string>,
+      );
+      expect(payloads.some((p) => p.recording_sid === "RE1")).toBe(true);
+      return { ok: true, audioUrl: "w1/recording-CA1.mp3", skipped: false };
     });
-    const updatePayload = mocks.updateCallBySid.mock.calls.at(-1)?.[2] as Record<
-      string,
-      string
-    >;
-    expect(updatePayload.audio_url).toBeUndefined();
+
+    const { runRecordingSideEffects } = await import(
+      "@/lib/worker/webhook-side-effects.server"
+    );
+
+    await runRecordingSideEffects({
+      callSid: "CA1",
+      event: parseTwilioVoiceCallback({
+        CallSid: "CA1",
+        AccountSid: "ACmain",
+        RecordingSid: "RE1",
+        RecordingDuration: "12",
+      }),
+    });
+
+    // The FIRST write carries the identity only; the second adds audio_url.
+    expect(mocks.updateCallBySid.mock.calls[0]).toEqual([
+      "w1",
+      "CA1",
+      { recording_sid: "RE1", recording_duration: "12" },
+    ]);
+    expect(mocks.updateCallBySid.mock.calls[1]).toEqual([
+      "w1",
+      "CA1",
+      {
+        recording_sid: "RE1",
+        recording_duration: "12",
+        audio_url: "w1/recording-CA1.mp3",
+      },
+    ]);
   });
 });
