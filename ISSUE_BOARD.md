@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@5fed5b61` · 277 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@d9eecf80` · 277 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,12 +29,12 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 116
+## Fix now — 115
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
 ### [#1885](https://github.com/chester-hill-solutions/callcaster/issues/1885) Rewrite the two live auth.uid() RPCs, drop get_outreach_attempts, then drop schema auth
-- Verdict: **Fix now** · Size: M-L · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
+- Verdict: **Fix now** · Size: M-L · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-28
 - Not a Supabase dependency: the only auth survivors are our own shim. auth.uid() is defined by drizzle/0001_auth_uid_shim.sql; auth.jwt() has no shim, so get_outreach_attempts is dead. The only live RPCs using auth.uid() are select_and_update_campaign_contacts and update_user_workspace_last_access_time, both called inside withAppCurrentUser. Chunks 1-2 shipped on dev (PR #1966 16445ca1): get_outreach_attempts dropped, the two live auth.uid() RPCs rewritten to app.current_user_id. Chunk 3 (fail-closed guard + DROP SCHEMA auth) remains.
 - Current behavior: Public RPCs still reference auth.uid()/auth.jwt(); schema auth cannot be dropped. get_outreach_attempts is dead.
 - Root cause: Legacy Supabase-era definitions survive in the Drizzle baseline and the auth.uid() shim was never rewritten onto the v2 app.current_user_id identity.
@@ -709,18 +709,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A disagreeing annotation fails `check:effects`; The comparison rule is written down, with its escape hatch; The guard has fixture tests for both the fail and the pass case; A `React.useEffect(` call is not silently skipped
 - Tracker: Fix now, and land it in the same PR as the member-call bypass on the same script — two changes to one guard's matching logic are easier to review together than as two PRs touching the same file. Expect a baseline ratchet: tightening the gate changes what the inventory contains, so the rewrite needs to be part of the change.
 
-### [#2172](https://github.com/chester-hill-solutions/callcaster/issues/2172) Campaign SMS pacing measures dispatch time, not provider-request time, so the rate limit collapses under load
-- Verdict: **Fix now** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-28
-- runPacedSendBatches stamps lastStartAt immediately after CALLING handleMember, which is async and does real work (normalizePhoneNumber, recipientCallingWindowStatus, an awaited dequeueQueueEntry) before the provider RPC fires. So the enforced interval is between dispatches, while the quantity that must be bounded is between RPC starts. When the pre-RPC work exceeds the pacing interval the wait collapses to zero and the batch sends near-simultaneously. Under load — precisely when rate limiting matters — campaign SMS pacing silently stops pacing.
-- Current behavior: test/campaign-sms-dispatch-contract.test.ts 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' fails intermittently in the full test:node run (436/437 files pass, this is the only failure) and passes 4/4 in isolation. It also passes on a clean origin/dev worktree. retries is not configured in vitest.node.config.ts, so it is a hard failure, not a retried flake.
-- Root cause: The pacer reads the wrong clock. gap(RPC n, RPC n+1) = minStartIntervalMs + w(n+1) - w(n), where w is the pre-RPC work. When w(n) is large the gap SHRINKS; the check for n+1 then sees elapsedMs > minStartIntervalMs, computes waitMs = 0, and never waits. This resolves an apparent contradiction: CPU contention makes timers fire late, which alone would ENLARGE gaps — the lastStartAt versus RPC-start mismatch dominates that effect. The test's own comment blames 'setTimeout jitter on a busy CI runner'; that diagnosis is wrong. The 10ms floor is catching a genuine collapse, and the test should be kept as-is.
-- Resolution: Stamp the pacing clock at the point the provider request is actually issued. Concretely: build a start pacer that serializes and awaits a minimum interval, and await it immediately before rpcCreateOutreachAttempt rather than pacing the dispatch loop. Open decision worth making deliberately: pace dispatch (simpler, but under-delivers by up to w(n)) or pace the provider call (correct, matches the code's stated intent of pacing starts rather than completions). Last touched by #2158 'enforce campaign send window before provider attempts', which is on this code path — check whether that PR moved when lastStartAt is stamped. Do NOT relax the 10ms floor to make the failure disappear; that would delete the only detector.
-- Look in: `app/lib/campaign-sms-dispatch.server.ts:263 (minStartIntervalMs = 1000 / startRateMps)`, `app/lib/campaign-sms-dispatch.server.ts:353-361 (elapsedMs/waitMs against lastStartAt, then lastStartAt = Date.now() at dispatch)`, `app/lib/campaign-sms-dispatch.server.ts:449+ (handleMember — async work before the RPC)`, `test/campaign-sms-dispatch-contract.test.ts (the pacing contract test, and the comment that misdiagnoses it)`
-- Existing tests: campaign-sms-dispatch-contract.test.ts: 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' — catches the collapse, but only when the run is loaded enough to trigger it
-- Missing tests: a test that makes handleMember's pre-RPC work slow (a mock resolving after ~40ms) and asserts the inter-RPC gap STILL holds at the configured interval — this must FAIL against current code; a test proving pacing holds under simulated event-loop contention
-- Done when: A test that delays pre-RPC work and asserts the inter-RPC gap still holds; it fails against current code; Campaign SMS rate limiting holds under simulated event-loop contention; Existing dispatch contract tests stay green, with the 10ms floor unchanged; The dispatch-loop pacing and the send-point pacing are not both active (no double-wait)
-- Tracker: Fix now. Confirmed defect with an exact resolution path and a one-line location. Risk is production rate limiting silently degrading under load, which is hard to detect in development and most likely in production. Found while running ci:local for #2166 on PR #2173; proven independent of that diff (no import path from the recording/job-registry changes to SMS dispatch, passes 4/4 in isolation, passes on a clean origin/dev worktree).
-
 ### [#2047](https://github.com/chester-hill-solutions/callcaster/issues/2047) Warn when a message campaign has no end time on its send window
 - Verdict: **Fix now** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - A message campaign with sms_send_window = null dispatches unrestricted (smsSendPolicy allowedWithoutSchedule: true) — the readiness gate comments 'null = unrestricted (send anytime) — no issue' (campaign-readiness.ts:479), so there is zero warning before an overnight blast. Proven in production: all Eric Lombardi message campaigns had sms_send_window = null yet carried a voice schedule (13:00-01:00) that SMS dispatch ignores; sends ran 18:30-22:29 UTC and replies/STOPs continued overnight.
@@ -1251,9 +1239,44 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 74
+## Verify and close — 75
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2172](https://github.com/chester-hill-solutions/callcaster/issues/2172) Campaign SMS pacing measures dispatch time, not provider-request time, so the rate limit collapses under load
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-28
+- runPacedSendBatches stamps lastStartAt immediately after CALLING handleMember, which is async and does real work (normalizePhoneNumber, recipientCallingWindowStatus, an awaited dequeueQueueEntry) before the provider RPC fires. So the enforced interval is between dispatches, while the quantity that must be bounded is between RPC starts. When the pre-RPC work exceeds the pacing interval the wait collapses to zero and the batch sends near-simultaneously. Under load — precisely when rate limiting matters — campaign SMS pacing silently stops pacing.
+- Current behavior: test/campaign-sms-dispatch-contract.test.ts 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' fails intermittently in the full test:node run (436/437 files pass, this is the only failure) and passes 4/4 in isolation. It also passes on a clean origin/dev worktree. retries is not configured in vitest.node.config.ts, so it is a hard failure, not a retried flake.
+- Root cause: The pacer reads the wrong clock. gap(RPC n, RPC n+1) = minStartIntervalMs + w(n+1) - w(n), where w is the pre-RPC work. When w(n) is large the gap SHRINKS; the check for n+1 then sees elapsedMs > minStartIntervalMs, computes waitMs = 0, and never waits. This resolves an apparent contradiction: CPU contention makes timers fire late, which alone would ENLARGE gaps — the lastStartAt versus RPC-start mismatch dominates that effect. The test's own comment blames 'setTimeout jitter on a busy CI runner'; that diagnosis is wrong. The 10ms floor is catching a genuine collapse, and the test should be kept as-is.
+- Resolution: Stamp the pacing clock at the point the provider request is actually issued. Concretely: build a start pacer that serializes and awaits a minimum interval, and await it immediately before rpcCreateOutreachAttempt rather than pacing the dispatch loop. Open decision worth making deliberately: pace dispatch (simpler, but under-delivers by up to w(n)) or pace the provider call (correct, matches the code's stated intent of pacing starts rather than completions). Last touched by #2158 'enforce campaign send window before provider attempts', which is on this code path — check whether that PR moved when lastStartAt is stamped. Do NOT relax the 10ms floor to make the failure disappear; that would delete the only detector.
+- Look in: `app/lib/campaign-sms-dispatch.server.ts:263 (minStartIntervalMs = 1000 / startRateMps)`, `app/lib/campaign-sms-dispatch.server.ts:353-361 (elapsedMs/waitMs against lastStartAt, then lastStartAt = Date.now() at dispatch)`, `app/lib/campaign-sms-dispatch.server.ts:449+ (handleMember — async work before the RPC)`, `test/campaign-sms-dispatch-contract.test.ts (the pacing contract test, and the comment that misdiagnoses it)`
+- Existing tests: campaign-sms-dispatch-contract.test.ts: 'three contacts at 60 MPS: rpcCreateOutreachAttempt starts are paced' — catches the collapse, but only when the run is loaded enough to trigger it
+- Missing tests: a test that makes handleMember's pre-RPC work slow (a mock resolving after ~40ms) and asserts the inter-RPC gap STILL holds at the configured interval — this must FAIL against current code; a test proving pacing holds under simulated event-loop contention
+- Done when: A test that delays pre-RPC work and asserts the inter-RPC gap still holds; it fails against current code; Campaign SMS rate limiting holds under simulated event-loop contention; Existing dispatch contract tests stay green, with the 10ms floor unchanged; The dispatch-loop pacing and the send-point pacing are not both active (no double-wait)
+- Tracker: Fixed and merged as PR #2182 (d9eecf80), deployed to dev and serving HTTP 200. The pacing gate moved from the dispatch loop to immediately before the provider request, so the interval is now measured between the requests Twilio actually receives. createStartPacer serialises turns so two rows finishing preparation in the same tick cannot pass the gate together. The predicted mechanism was confirmed by instrumentation: dispatches paced perfectly at 0/20/40ms while requests landed 15ms apart where 20ms was required. Note the pacer also stopped serialising row preparation (peak concurrent lookups 1 -> 20, peak concurrent provider sends unchanged at 1), which is a real change in DB concurrency, not a pure refactor. Verified: two new tests fail before the fix at 5ms and 15ms against a 20ms floor, three kill-checks executed (including one that breaks a pre-existing test, proving the turn-chaining is load-bearing), ci:local exit 0, node suite 440/440 files and 3528 tests including the previously flaky 60 MPS test. Left OPEN because a merge to dev is not a release and no CI tier exercises this against real Postgres (test/integration-db is excluded, #2174).
+
+### [#1896](https://github.com/chester-hill-solutions/callcaster/issues/1896) Design-system linting: retire the hand-rolled SaveBar token test
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-28
+- Both linter PRs shipped on dev: ESLint 9 flat config in PR #1907 (c5ac39e2) and @shadcn/lint in PR #1908 (f561396f), neither in master. One acceptance item is unmet: the hand-rolled token test test/ui/components-shared-smoke.test.tsx:286 is still present.
+- Current behavior: eslint.config.mjs registers @shadcn/lint; the SaveBar token smoke test still asserts bg-background / not bg-white.
+- Root cause: The migration PRs covered the linter config but did not remove the now-redundant hand-rolled test.
+- Resolution: Delete the 'uses design tokens rather than hardcoded colors' test from test/ui/components-shared-smoke.test.tsx and confirm check:lint-ratchet and the ratchet baseline are unchanged. Keep the component-variant tests.
+- Look in: `test/ui/components-shared-smoke.test.tsx`, `eslint.config.mjs`, `scripts/check-lint-ratchet.mjs`, `scripts/baselines/lint-ratchet.json`
+- Existing tests: test/ui/components-shared-smoke.test.tsx (remove line 286)
+- Done when: ESLint 9 runs the same rule set with the ratchet baseline unchanged or lower (done on dev); @shadcn/lint rules enabled and ratcheted (done on dev); The hand-rolled token test is removed (outstanding)
+- Tracker: Implemented on dev (PR #2027 bca2bc24): the hand-rolled SaveBar token test is gone and the ui-suite testTimeout is 20s to absorb route-hydration load. ESLint 9 + @shadcn/lint already shipped via #1907/#1908. Verify eslint runs clean and the save bar renders on the review env, then close.
+
+### [#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728) IVR: don't mark a campaign complete while calls are still in flight
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-28
+- Confirmed defect. IVR dispatch dequeues each queue row right after Twilio calls.create (campaign-ivr-dispatch.server.ts:260-264) and completion fires whenever campaign_queue_has_pending_work is false, so the campaign flips to 'complete' while calls are still ringing. Product decision (2026-09-20): 'complete' means all calls settled, not all dials attempted.
+- Current behavior: Campaign status turns 'complete' seconds after launch; the recipient's phone rings / the call arrives afterwards. The dequeue reason string 'IVR call completed' is factually wrong.
+- Root cause: dequeued_at is written at dial time, not at call completion, while completion keys only off pending queue rows and never checks in-flight (non-terminal) calls.
+- Resolution: Gate completion on no pending queue rows AND no non-terminal calls: teach try_complete_campaign_if_drained / continueOrCompleteDispatch to check for in-flight campaign calls, or defer the IVR dequeue to the terminal status callback in api+/ivr/status.action.server.ts (larger; needs a timeout sweep for missing callbacks). Update the existing 'dequeues on success' test that encodes the current behaviour.
+- Look in: `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/ivr-initiate.server.ts`, `app/lib/campaign-queue-completion.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/routes/api+/ivr/status.action.server.ts`, `drizzle/0000_baseline.sql`
+- Existing tests: test/campaign-ivr-dispatch.test.ts; test/campaign-dispatch-worker.test.ts; test/ivr-status.route.test.ts; test/campaign-queue-throughput.integration.test.ts
+- Missing tests: Campaign is not marked complete while it has a non-terminal call; A terminal status callback completes the campaign only after all calls settle; Replace the 'dequeues on success' assertion with acknowledgment-on-completion semantics
+- Done when: Campaign status does not read 'complete' while any campaign call is still in flight; Completion happens after the last call reaches a terminal status; No stalled campaign when a status callback never arrives
+- Tracker: Implemented on dev (PR #2028 061689af): campaign completion is gated on settled calls (campaign_has_unsettled_calls + try_complete_campaign_if_drained), the IVR terminal-status callback triggers completion and persists busy/canceled, and the dequeue reason wording is corrected. Integration + contract tests land with it. Verify on the review env (campaign completes after calls settle, incl. no-answer/busy), then close.
 
 ### [#2048](https://github.com/chester-hill-solutions/callcaster/issues/2048) Block SMS campaign completion while messages are unsettled at Twilio
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-27
@@ -1295,18 +1318,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/campaign-sms-dispatch-window.test.ts
 - Missing tests: Deployed closing-boundary verification.
 - Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
-
-### [#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728) IVR: don't mark a campaign complete while calls are still in flight
-- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-26
-- Confirmed defect. IVR dispatch dequeues each queue row right after Twilio calls.create (campaign-ivr-dispatch.server.ts:260-264) and completion fires whenever campaign_queue_has_pending_work is false, so the campaign flips to 'complete' while calls are still ringing. Product decision (2026-09-20): 'complete' means all calls settled, not all dials attempted.
-- Current behavior: Campaign status turns 'complete' seconds after launch; the recipient's phone rings / the call arrives afterwards. The dequeue reason string 'IVR call completed' is factually wrong.
-- Root cause: dequeued_at is written at dial time, not at call completion, while completion keys only off pending queue rows and never checks in-flight (non-terminal) calls.
-- Resolution: Gate completion on no pending queue rows AND no non-terminal calls: teach try_complete_campaign_if_drained / continueOrCompleteDispatch to check for in-flight campaign calls, or defer the IVR dequeue to the terminal status callback in api+/ivr/status.action.server.ts (larger; needs a timeout sweep for missing callbacks). Update the existing 'dequeues on success' test that encodes the current behaviour.
-- Look in: `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/ivr-initiate.server.ts`, `app/lib/campaign-queue-completion.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/routes/api+/ivr/status.action.server.ts`, `drizzle/0000_baseline.sql`
-- Existing tests: test/campaign-ivr-dispatch.test.ts; test/campaign-dispatch-worker.test.ts; test/ivr-status.route.test.ts; test/campaign-queue-throughput.integration.test.ts
-- Missing tests: Campaign is not marked complete while it has a non-terminal call; A terminal status callback completes the campaign only after all calls settle; Replace the 'dequeues on success' assertion with acknowledgment-on-completion semantics
-- Done when: Campaign status does not read 'complete' while any campaign call is still in flight; Completion happens after the last call reaches a terminal status; No stalled campaign when a status callback never arrives
-- Tracker: Implemented on dev (PR #2028 061689af): campaign completion is gated on settled calls (campaign_has_unsettled_calls + try_complete_campaign_if_drained), the IVR terminal-status callback triggers completion and persists busy/canceled, and the dequeue reason wording is corrected. Integration + contract tests land with it. Verify on the review env (campaign completes after calls settle, incl. no-answer/busy), then close.
 
 ### [#2052](https://github.com/chester-hill-solutions/callcaster/issues/2052) Give the completion RPC one best-effort owner
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -1510,17 +1521,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `.githooks/pre-commit`, `scripts/setup-githooks.sh`, `package.json`, `.github/workflows/pr-issue-reference.yml`, `.github/workflows/issue-on-dev.yml`
 - Done when: A commit with a lint error is blocked by the pre-commit hook.; A PR into dev with no issue reference fails a check unless labelled no-issue.
 - Tracker: Verify and close after dev verification; promote #1921/#1926 to master first.
-
-### [#1896](https://github.com/chester-hill-solutions/callcaster/issues/1896) Design-system linting: retire the hand-rolled SaveBar token test
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
-- Both linter PRs shipped on dev: ESLint 9 flat config in PR #1907 (c5ac39e2) and @shadcn/lint in PR #1908 (f561396f), neither in master. One acceptance item is unmet: the hand-rolled token test test/ui/components-shared-smoke.test.tsx:286 is still present.
-- Current behavior: eslint.config.mjs registers @shadcn/lint; the SaveBar token smoke test still asserts bg-background / not bg-white.
-- Root cause: The migration PRs covered the linter config but did not remove the now-redundant hand-rolled test.
-- Resolution: Delete the 'uses design tokens rather than hardcoded colors' test from test/ui/components-shared-smoke.test.tsx and confirm check:lint-ratchet and the ratchet baseline are unchanged. Keep the component-variant tests.
-- Look in: `test/ui/components-shared-smoke.test.tsx`, `eslint.config.mjs`, `scripts/check-lint-ratchet.mjs`, `scripts/baselines/lint-ratchet.json`
-- Existing tests: test/ui/components-shared-smoke.test.tsx (remove line 286)
-- Done when: ESLint 9 runs the same rule set with the ratchet baseline unchanged or lower (done on dev); @shadcn/lint rules enabled and ratcheted (done on dev); The hand-rolled token test is removed (outstanding)
-- Tracker: Implemented on dev (PR #2027 bca2bc24): the hand-rolled SaveBar token test is gone and the ui-suite testTimeout is 20s to absorb route-hydration load. ESLint 9 + @shadcn/lint already shipped via #1907/#1908. Verify eslint runs clean and the save bar renders on the review env, then close.
 
 ### [#1894](https://github.com/chester-hill-solutions/callcaster/issues/1894) Verify: the test suite is pinned to UTC
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
