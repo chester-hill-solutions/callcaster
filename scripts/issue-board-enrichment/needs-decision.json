@@ -876,5 +876,38 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "The blocker named in the original filing is answered and the work is complete. Lane moves needs-decision -> fix-now for the board, then closes on merge. Two things deliberately left for separate issues: (1) `disabled` still does not block sign-in or API access, so it is a billing and audit lever, not the kill switch it is described as anywhere in the product; (2) the release-ladder behaviour is now implicit in a flag name, so anyone adding a 5th fanout job has to read the doc comment to know the default. Both are worth filing, neither blocks this."
+  },
+  {
+    "issueNumber": 2164,
+    "verdict": "needs-decision",
+    "recommendedTitle": "workspace.disabled does not block sign-in or API access, so the platform suspension lever does not suspend",
+    "summary": "Disabling a workspace stops money moving out (rental DEBITs, billing_reconcile, twilio_open_sync) but does not stop anyone using the product. `disabled` is read in only three places and no auth path reads it, so a suspended workspace's members still sign in and still use the API.",
+    "currentBehavior": "A disabled workspace can still be signed into and can still call the API with valid credentials. Number RELEASE deliberately keeps running, because freezing it would strand every unpaid number in a suspended workspace.",
+    "rootCause": "`disabled` was specified and implemented as a billing lever only. It was never given an auth meaning, so the name implies a kill switch it does not provide. Not a missing check \u2014 a missing decision.",
+    "resolution": "Decide the semantics before scoping, because the two plausible answers have very different blast radius. (a) `disabled` blocks sign-in and API access, becoming a true kill switch; the warn->suspend->release ladder still runs server-side, so numbers are still released. (b) `disabled` stays billing-only and a separate field carries access suspension. Recommendation: (a), because one field with one meaning is what operators assume, and the release ladder already runs in background jobs that do not need user access. Do NOT implement by adding a single auth-path check \u2014 that would leave `disabled` still reading as billing-only everywhere else.",
+    "lookIn": [
+      "app/lib/workspace-middleware.server.ts (workspaceContext \u2014 no disabled check)",
+      "app/lib/data-plane-middleware.server.ts (dataPlaneAuthContext \u2014 no disabled check)",
+      "app/lib/admin-middleware.server.ts (adminContext)",
+      "app/db/schema.ts (workspace.disabled)"
+    ],
+    "existingTests": [
+      "none covering disabled-workspace sign-in or API access"
+    ],
+    "missingTests": [
+      "a disabled workspace's member cannot sign in",
+      "a disabled workspace's API token is rejected",
+      "number release still runs for a disabled workspace"
+    ],
+    "acceptanceCriteria": [
+      "The disabled semantics are chosen and recorded, not assumed",
+      "If (a): sign-in and API access are blocked for a disabled workspace",
+      "The warn->suspend->release ladder still releases numbers for disabled workspaces",
+      "Existing disabled-workspace billing tests stay green"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Needs a decision, not an implementation. Blocked only on the product call. Related to #2116, whose original single-guard proposal was already rejected in favour of splitting the billing lever from number release."
   }
 ]

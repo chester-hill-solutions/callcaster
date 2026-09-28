@@ -1864,5 +1864,39 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Verify and close. The incident was fixed and the prevention is in the repo, so there is no code work here. The one thing worth carrying forward is the gap named above: nothing detects an open item in a terminal lane, and that is what allowed a sweep to go unnoticed until a human looked."
+  },
+  {
+    "issueNumber": 2048,
+    "verdict": "verify-close",
+    "recommendedTitle": "Block SMS campaign completion while messages are unsettled at Twilio",
+    "summary": "DONE — the settled-message gate shipped on 2026-09-27 as PR #2050 (d032c0c9), a day before this record was written. Message campaigns no longer flip to complete on dequeue: try_complete_campaign_if_drained now refuses while any message is unsettled. Measured on the Eric Lombardi blast (2026-09-24) the old behaviour reported complete at 6:29pm EDT while Twilio still held 5,382 messages, releasing them between 11:59pm and 1:46am — a median lag of 7.3 hours.",
+    "currentBehavior": "Verified against the live dev database, not just the migration file: campaign_has_unsettled_messages, campaign_ids_with_unsettled_messages and try_complete_campaign_if_drained all exist in public, and the deployed body of try_complete_campaign_if_drained does call campaign_has_unsettled_messages. A completion re-check exists (app/lib/campaign-settle-recheck.server.ts) because the gate would otherwise strand every message campaign at running forever once the local queue empties.",
+    "rootCause": "campaign_has_unsettled_calls had no message counterpart, and campaign_queue_has_pending_work treats a row as done at dequeue time — handed to Twilio, not delivered. The re-check module's own comment records that a TypeScript re-implementation of the settled rule shipped once and broke the recovery path in two ways no test caught, which is why both the filter and the gate now live only in SQL.",
+    "resolution": "No code work outstanding. The residual is the expired-campaign bypass at app/lib/worker/handlers/campaign.server.ts, which writes status=complete directly and never calls the gate — that is issue #2051, DECLINED by the maintainer on 2026-09-25 ('no 2051') and deliberately left with a code comment marking it a known gap. Do not reopen it here. What remains is a verification pass: confirm on a real campaign that a message sitting at Twilio keeps the campaign at running, and that the re-check promotes it once the provider settles. That pass belongs on a real database, which is the tier #2174 tracks.",
+    "lookIn": [
+      "client/migrations/20260922120000_gate_campaign_completion_on_settled_calls.sql",
+      "app/lib/twilio-open-sync.server.ts",
+      "app/lib/sms-status.ts",
+      "app/lib/campaign-queue-completion.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts"
+    ],
+    "existingTests": [
+      "test/campaign-completion-rpc-contract.test.ts — extracts the live migration bodies and pins the settled list and the ::text casts (9 tests, runs in ci:local)",
+      "test/campaign-settle-recheck.server.test.ts — the re-check sweep and its best-effort contract (7 tests, runs in ci:local)",
+      "test/integration-db/campaign-completion-gate.test.ts — 14 tests against a real database; this tier is not wired to any workflow (#2174), so these do not run in CI today"
+    ],
+    "missingTests": [
+      "an end-to-end real-Postgres pass: a message unsettled at the provider keeps the campaign at running, and the re-check promotes it once settled (#2174)"
+    ],
+    "acceptanceCriteria": [
+      "SMS campaign with queued/sending messages is not complete",
+      "Settled campaign completes normally",
+      "No-callback messages resolved by open-sync, don't block forever",
+      "IVR completion unchanged"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Verify and close — this is NOT Fix now and the earlier verdict was wrong. The gate shipped as #2050 on 2026-09-27; this record was written on 2026-09-28 and described shipped work as pending, which put the highest-severity item on the board on a task that was already done. The issue stays OPEN by design: a merge to dev does not close an issue until the dev-to-master release, and the project Status is already on-dev. Do not spend implementation time here. The one real gap, the expired-campaign bypass, is #2051 and was declined."
   }
 ]
