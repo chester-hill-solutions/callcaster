@@ -240,34 +240,6 @@
     "trackerRecommendation": "Fix now as slice B in one PR. Keep intent matching with #1880 and per-campaign language with the #268 epic."
   },
   {
-    "issueNumber": 1896,
-    "verdict": "fix-now",
-    "recommendedTitle": "Design-system linting: retire the hand-rolled SaveBar token test",
-    "summary": "Both linter PRs shipped on dev: ESLint 9 flat config in PR #1907 (c5ac39e2) and @shadcn/lint in PR #1908 (f561396f), neither in master. One acceptance item is unmet: the hand-rolled token test test/ui/components-shared-smoke.test.tsx:286 is still present.",
-    "currentBehavior": "eslint.config.mjs registers @shadcn/lint; the SaveBar token smoke test still asserts bg-background / not bg-white.",
-    "rootCause": "The migration PRs covered the linter config but did not remove the now-redundant hand-rolled test.",
-    "resolution": "Delete the 'uses design tokens rather than hardcoded colors' test from test/ui/components-shared-smoke.test.tsx and confirm check:lint-ratchet and the ratchet baseline are unchanged. Keep the component-variant tests.",
-    "lookIn": [
-      "test/ui/components-shared-smoke.test.tsx",
-      "eslint.config.mjs",
-      "scripts/check-lint-ratchet.mjs",
-      "scripts/baselines/lint-ratchet.json"
-    ],
-    "existingTests": [
-      "test/ui/components-shared-smoke.test.tsx (remove line 286)"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "ESLint 9 runs the same rule set with the ratchet baseline unchanged or lower (done on dev)",
-      "@shadcn/lint rules enabled and ratcheted (done on dev)",
-      "The hand-rolled token test is removed (outstanding)"
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Fix now (delete the obsolete test), then close. The linter migration reaches master on the next release."
-  },
-  {
     "issueNumber": 1878,
     "verdict": "fix-now",
     "recommendedTitle": "Surface and select the caller audio on the /call welcome dialog",
@@ -335,42 +307,6 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Branch origin/bug/1833-primary-button-cursor (1a99dc44) is ready but unmerged; open a PR. File the raw-button inventory migration as follow-up tickets."
-  },
-  {
-    "issueNumber": 1728,
-    "verdict": "fix-now",
-    "recommendedTitle": "IVR: don't mark a campaign complete while calls are still in flight",
-    "summary": "Confirmed defect. IVR dispatch dequeues each queue row right after Twilio calls.create (campaign-ivr-dispatch.server.ts:260-264) and completion fires whenever campaign_queue_has_pending_work is false, so the campaign flips to 'complete' while calls are still ringing. Product decision (2026-09-20): 'complete' means all calls settled, not all dials attempted.",
-    "currentBehavior": "Campaign status turns 'complete' seconds after launch; the recipient's phone rings / the call arrives afterwards. The dequeue reason string 'IVR call completed' is factually wrong.",
-    "rootCause": "dequeued_at is written at dial time, not at call completion, while completion keys only off pending queue rows and never checks in-flight (non-terminal) calls.",
-    "resolution": "Gate completion on no pending queue rows AND no non-terminal calls: teach try_complete_campaign_if_drained / continueOrCompleteDispatch to check for in-flight campaign calls, or defer the IVR dequeue to the terminal status callback in api+/ivr/status.action.server.ts (larger; needs a timeout sweep for missing callbacks). Update the existing 'dequeues on success' test that encodes the current behaviour.",
-    "lookIn": [
-      "app/lib/campaign-ivr-dispatch.server.ts",
-      "app/lib/ivr-initiate.server.ts",
-      "app/lib/campaign-queue-completion.server.ts",
-      "app/lib/worker/handlers/campaign.server.ts",
-      "app/routes/api+/ivr/status.action.server.ts",
-      "drizzle/0000_baseline.sql"
-    ],
-    "existingTests": [
-      "test/campaign-ivr-dispatch.test.ts",
-      "test/campaign-dispatch-worker.test.ts",
-      "test/ivr-status.route.test.ts",
-      "test/campaign-queue-throughput.integration.test.ts"
-    ],
-    "missingTests": [
-      "Campaign is not marked complete while it has a non-terminal call",
-      "A terminal status callback completes the campaign only after all calls settle",
-      "Replace the 'dequeues on success' assertion with acknowledgment-on-completion semantics"
-    ],
-    "acceptanceCriteria": [
-      "Campaign status does not read 'complete' while any campaign call is still in flight",
-      "Completion happens after the last call reaches a terminal status",
-      "No stalled campaign when a status callback never arrives"
-    ],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Product decided complete = all calls settled. Fix now via the completion gate."
   },
   {
     "issueNumber": 1873,

@@ -1898,5 +1898,70 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Verify and close — this is NOT Fix now and the earlier verdict was wrong. The gate shipped as #2050 on 2026-09-27; this record was written on 2026-09-28 and described shipped work as pending, which put the highest-severity item on the board on a task that was already done. The issue stays OPEN by design: a merge to dev does not close an issue until the dev-to-master release, and the project Status is already on-dev. Do not spend implementation time here. The one real gap, the expired-campaign bypass, is #2051 and was declined."
+  },
+  {
+    "issueNumber": 1896,
+    "verdict": "verify-close",
+    "recommendedTitle": "Design-system linting: retire the hand-rolled SaveBar token test",
+    "summary": "Both linter PRs shipped on dev: ESLint 9 flat config in PR #1907 (c5ac39e2) and @shadcn/lint in PR #1908 (f561396f), neither in master. One acceptance item is unmet: the hand-rolled token test test/ui/components-shared-smoke.test.tsx:286 is still present.",
+    "currentBehavior": "eslint.config.mjs registers @shadcn/lint; the SaveBar token smoke test still asserts bg-background / not bg-white.",
+    "rootCause": "The migration PRs covered the linter config but did not remove the now-redundant hand-rolled test.",
+    "resolution": "Delete the 'uses design tokens rather than hardcoded colors' test from test/ui/components-shared-smoke.test.tsx and confirm check:lint-ratchet and the ratchet baseline are unchanged. Keep the component-variant tests.",
+    "lookIn": [
+      "test/ui/components-shared-smoke.test.tsx",
+      "eslint.config.mjs",
+      "scripts/check-lint-ratchet.mjs",
+      "scripts/baselines/lint-ratchet.json"
+    ],
+    "existingTests": [
+      "test/ui/components-shared-smoke.test.tsx (remove line 286)"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "ESLint 9 runs the same rule set with the ratchet baseline unchanged or lower (done on dev)",
+      "@shadcn/lint rules enabled and ratcheted (done on dev)",
+      "The hand-rolled token test is removed (outstanding)"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Implemented on dev (PR #2027 bca2bc24): the hand-rolled SaveBar token test is gone and the ui-suite testTimeout is 20s to absorb route-hydration load. ESLint 9 + @shadcn/lint already shipped via #1907/#1908. Verify eslint runs clean and the save bar renders on the review env, then close."
+  },
+  {
+    "issueNumber": 1728,
+    "verdict": "verify-close",
+    "recommendedTitle": "IVR: don't mark a campaign complete while calls are still in flight",
+    "summary": "Confirmed defect. IVR dispatch dequeues each queue row right after Twilio calls.create (campaign-ivr-dispatch.server.ts:260-264) and completion fires whenever campaign_queue_has_pending_work is false, so the campaign flips to 'complete' while calls are still ringing. Product decision (2026-09-20): 'complete' means all calls settled, not all dials attempted.",
+    "currentBehavior": "Campaign status turns 'complete' seconds after launch; the recipient's phone rings / the call arrives afterwards. The dequeue reason string 'IVR call completed' is factually wrong.",
+    "rootCause": "dequeued_at is written at dial time, not at call completion, while completion keys only off pending queue rows and never checks in-flight (non-terminal) calls.",
+    "resolution": "Gate completion on no pending queue rows AND no non-terminal calls: teach try_complete_campaign_if_drained / continueOrCompleteDispatch to check for in-flight campaign calls, or defer the IVR dequeue to the terminal status callback in api+/ivr/status.action.server.ts (larger; needs a timeout sweep for missing callbacks). Update the existing 'dequeues on success' test that encodes the current behaviour.",
+    "lookIn": [
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/ivr-initiate.server.ts",
+      "app/lib/campaign-queue-completion.server.ts",
+      "app/lib/worker/handlers/campaign.server.ts",
+      "app/routes/api+/ivr/status.action.server.ts",
+      "drizzle/0000_baseline.sql"
+    ],
+    "existingTests": [
+      "test/campaign-ivr-dispatch.test.ts",
+      "test/campaign-dispatch-worker.test.ts",
+      "test/ivr-status.route.test.ts",
+      "test/campaign-queue-throughput.integration.test.ts"
+    ],
+    "missingTests": [
+      "Campaign is not marked complete while it has a non-terminal call",
+      "A terminal status callback completes the campaign only after all calls settle",
+      "Replace the 'dequeues on success' assertion with acknowledgment-on-completion semantics"
+    ],
+    "acceptanceCriteria": [
+      "Campaign status does not read 'complete' while any campaign call is still in flight",
+      "Completion happens after the last call reaches a terminal status",
+      "No stalled campaign when a status callback never arrives"
+    ],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Implemented on dev (PR #2028 061689af): campaign completion is gated on settled calls (campaign_has_unsettled_calls + try_complete_campaign_if_drained), the IVR terminal-status callback triggers completion and persists busy/canceled, and the dequeue reason wording is corrected. Integration + contract tests land with it. Verify on the review env (campaign completes after calls settle, incl. no-answer/busy), then close.",
+    "blockedBy": []
   }
 ]

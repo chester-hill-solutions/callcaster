@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@20909935` · 277 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@5fed5b61` · 277 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 118
+## Fix now — 116
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -613,18 +613,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: the open-row path writes date_sent; the settled-row backfill writes date_sent; a filled row is not re-selected; an existing date_sent is not overwritten; a message with no provider dateSent is abandoned after the age bound
 - Done when: Message row carries the provider-reported date_sent after the sweep runs; Messages that settle before any sweep observed them still receive a date_sent; A message with no provider dateSent is abandoned after the age bound, not re-selected forever; date_sent is never overwritten once written and never inferred from date_created; Backfill selection is bounded, self-limiting, and its cost is measured; Export can show send time separately from request time
 - Tracker: Fix now. Audit trail for the #2048 settlement gate: that gate knows a message settled but not when. The one-line write is NOT sufficient on its own — verified that the open-row sweep can never revisit an already-settled message, so without the backfill selection the fix would appear to work while leaving the Lombardi data unfixed.
-
-### [#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728) IVR: don't mark a campaign complete while calls are still in flight
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-26
-- Confirmed defect. IVR dispatch dequeues each queue row right after Twilio calls.create (campaign-ivr-dispatch.server.ts:260-264) and completion fires whenever campaign_queue_has_pending_work is false, so the campaign flips to 'complete' while calls are still ringing. Product decision (2026-09-20): 'complete' means all calls settled, not all dials attempted.
-- Current behavior: Campaign status turns 'complete' seconds after launch; the recipient's phone rings / the call arrives afterwards. The dequeue reason string 'IVR call completed' is factually wrong.
-- Root cause: dequeued_at is written at dial time, not at call completion, while completion keys only off pending queue rows and never checks in-flight (non-terminal) calls.
-- Resolution: Gate completion on no pending queue rows AND no non-terminal calls: teach try_complete_campaign_if_drained / continueOrCompleteDispatch to check for in-flight campaign calls, or defer the IVR dequeue to the terminal status callback in api+/ivr/status.action.server.ts (larger; needs a timeout sweep for missing callbacks). Update the existing 'dequeues on success' test that encodes the current behaviour.
-- Look in: `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/ivr-initiate.server.ts`, `app/lib/campaign-queue-completion.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/routes/api+/ivr/status.action.server.ts`, `drizzle/0000_baseline.sql`
-- Existing tests: test/campaign-ivr-dispatch.test.ts; test/campaign-dispatch-worker.test.ts; test/ivr-status.route.test.ts; test/campaign-queue-throughput.integration.test.ts
-- Missing tests: Campaign is not marked complete while it has a non-terminal call; A terminal status callback completes the campaign only after all calls settle; Replace the 'dequeues on success' assertion with acknowledgment-on-completion semantics
-- Done when: Campaign status does not read 'complete' while any campaign call is still in flight; Completion happens after the last call reaches a terminal status; No stalled campaign when a status callback never arrives
-- Tracker: Product decided complete = all calls settled. Fix now via the completion gate.
 
 ### [#2151](https://github.com/chester-hill-solutions/callcaster/issues/2151) assertWorkspaceCanSendSms performs one to two live Twilio API reads for every single outbound SMS
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -1249,17 +1237,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Body content in a side Sheet has the same horizontal inset as its header and footer; The two full-bleed sheets (chats mobile list, workspace nav) still render edge to edge; Padding is defined in one place, and hand-compensating padding at call sites is removed; A test fails if a new SheetContent call site reintroduces flush body content; The vendored shad-cc package is unchanged
 - Tracker: Fix now. Smallest item in this batch and the only one that fixes nine call sites with one line. Do it before #2036, which changes spacing on the same call screen, so the two do not fight.
 
-### [#1896](https://github.com/chester-hill-solutions/callcaster/issues/1896) Design-system linting: retire the hand-rolled SaveBar token test
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
-- Both linter PRs shipped on dev: ESLint 9 flat config in PR #1907 (c5ac39e2) and @shadcn/lint in PR #1908 (f561396f), neither in master. One acceptance item is unmet: the hand-rolled token test test/ui/components-shared-smoke.test.tsx:286 is still present.
-- Current behavior: eslint.config.mjs registers @shadcn/lint; the SaveBar token smoke test still asserts bg-background / not bg-white.
-- Root cause: The migration PRs covered the linter config but did not remove the now-redundant hand-rolled test.
-- Resolution: Delete the 'uses design tokens rather than hardcoded colors' test from test/ui/components-shared-smoke.test.tsx and confirm check:lint-ratchet and the ratchet baseline are unchanged. Keep the component-variant tests.
-- Look in: `test/ui/components-shared-smoke.test.tsx`, `eslint.config.mjs`, `scripts/check-lint-ratchet.mjs`, `scripts/baselines/lint-ratchet.json`
-- Existing tests: test/ui/components-shared-smoke.test.tsx (remove line 286)
-- Done when: ESLint 9 runs the same rule set with the ratchet baseline unchanged or lower (done on dev); @shadcn/lint rules enabled and ratcheted (done on dev); The hand-rolled token test is removed (outstanding)
-- Tracker: Fix now (delete the obsolete test), then close. The linter migration reaches master on the next release.
-
 ### [#2060](https://github.com/chester-hill-solutions/callcaster/issues/2060) bucketFromIdempotencyKey never tests WELCOME_CREDITS_PREFIX, so welcome credits bucket as "other" not "purchase"
 - Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
 - The prefix constant is declared and used to build the key, but is absent from the classifier's chain, so every welcome-credit grant falls through to "other". The 2026-09-25 sweep re-confirmed this: the classifier tests nine prefixes and `WELCOME_CREDITS_PREFIX` is not one of them, so the claim in the manual-credit-load issue that welcome credits already bucket as "purchase" is wrong.
@@ -1274,7 +1251,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 72
+## Verify and close — 74
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -1318,6 +1295,18 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/campaign-sms-dispatch-window.test.ts
 - Missing tests: Deployed closing-boundary verification.
 - Tracker: Keep open until default-branch promotion. Verify the remaining acceptance criteria before closure; do not repeat the shipped fix.
+
+### [#1728](https://github.com/chester-hill-solutions/callcaster/issues/1728) IVR: don't mark a campaign complete while calls are still in flight
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: business-logic · Assignee: none · Updated: 2026-09-26
+- Confirmed defect. IVR dispatch dequeues each queue row right after Twilio calls.create (campaign-ivr-dispatch.server.ts:260-264) and completion fires whenever campaign_queue_has_pending_work is false, so the campaign flips to 'complete' while calls are still ringing. Product decision (2026-09-20): 'complete' means all calls settled, not all dials attempted.
+- Current behavior: Campaign status turns 'complete' seconds after launch; the recipient's phone rings / the call arrives afterwards. The dequeue reason string 'IVR call completed' is factually wrong.
+- Root cause: dequeued_at is written at dial time, not at call completion, while completion keys only off pending queue rows and never checks in-flight (non-terminal) calls.
+- Resolution: Gate completion on no pending queue rows AND no non-terminal calls: teach try_complete_campaign_if_drained / continueOrCompleteDispatch to check for in-flight campaign calls, or defer the IVR dequeue to the terminal status callback in api+/ivr/status.action.server.ts (larger; needs a timeout sweep for missing callbacks). Update the existing 'dequeues on success' test that encodes the current behaviour.
+- Look in: `app/lib/campaign-ivr-dispatch.server.ts`, `app/lib/ivr-initiate.server.ts`, `app/lib/campaign-queue-completion.server.ts`, `app/lib/worker/handlers/campaign.server.ts`, `app/routes/api+/ivr/status.action.server.ts`, `drizzle/0000_baseline.sql`
+- Existing tests: test/campaign-ivr-dispatch.test.ts; test/campaign-dispatch-worker.test.ts; test/ivr-status.route.test.ts; test/campaign-queue-throughput.integration.test.ts
+- Missing tests: Campaign is not marked complete while it has a non-terminal call; A terminal status callback completes the campaign only after all calls settle; Replace the 'dequeues on success' assertion with acknowledgment-on-completion semantics
+- Done when: Campaign status does not read 'complete' while any campaign call is still in flight; Completion happens after the last call reaches a terminal status; No stalled campaign when a status callback never arrives
+- Tracker: Implemented on dev (PR #2028 061689af): campaign completion is gated on settled calls (campaign_has_unsettled_calls + try_complete_campaign_if_drained), the IVR terminal-status callback triggers completion and persists busy/canceled, and the dequeue reason wording is corrected. Integration + contract tests land with it. Verify on the review env (campaign completes after calls settle, incl. no-answer/busy), then close.
 
 ### [#2052](https://github.com/chester-hill-solutions/callcaster/issues/2052) Give the completion RPC one best-effort owner
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -1521,6 +1510,17 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Look in: `.githooks/pre-commit`, `scripts/setup-githooks.sh`, `package.json`, `.github/workflows/pr-issue-reference.yml`, `.github/workflows/issue-on-dev.yml`
 - Done when: A commit with a lint error is blocked by the pre-commit hook.; A PR into dev with no issue reference fails a check unless labelled no-issue.
 - Tracker: Verify and close after dev verification; promote #1921/#1926 to master first.
+
+### [#1896](https://github.com/chester-hill-solutions/callcaster/issues/1896) Design-system linting: retire the hand-rolled SaveBar token test
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
+- Both linter PRs shipped on dev: ESLint 9 flat config in PR #1907 (c5ac39e2) and @shadcn/lint in PR #1908 (f561396f), neither in master. One acceptance item is unmet: the hand-rolled token test test/ui/components-shared-smoke.test.tsx:286 is still present.
+- Current behavior: eslint.config.mjs registers @shadcn/lint; the SaveBar token smoke test still asserts bg-background / not bg-white.
+- Root cause: The migration PRs covered the linter config but did not remove the now-redundant hand-rolled test.
+- Resolution: Delete the 'uses design tokens rather than hardcoded colors' test from test/ui/components-shared-smoke.test.tsx and confirm check:lint-ratchet and the ratchet baseline are unchanged. Keep the component-variant tests.
+- Look in: `test/ui/components-shared-smoke.test.tsx`, `eslint.config.mjs`, `scripts/check-lint-ratchet.mjs`, `scripts/baselines/lint-ratchet.json`
+- Existing tests: test/ui/components-shared-smoke.test.tsx (remove line 286)
+- Done when: ESLint 9 runs the same rule set with the ratchet baseline unchanged or lower (done on dev); @shadcn/lint rules enabled and ratcheted (done on dev); The hand-rolled token test is removed (outstanding)
+- Tracker: Implemented on dev (PR #2027 bca2bc24): the hand-rolled SaveBar token test is gone and the ui-suite testTimeout is 20s to absorb route-hydration load. ESLint 9 + @shadcn/lint already shipped via #1907/#1908. Verify eslint runs clean and the save bar renders on the review env, then close.
 
 ### [#1894](https://github.com/chester-hill-solutions/callcaster/issues/1894) Verify: the test suite is pinned to UTC
 - Verdict: **Verify and close** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-25
