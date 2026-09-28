@@ -38,18 +38,14 @@ export const REPAIR_MIN_AGE_MINUTES = 30;
 export const REPAIR_MAX_AGE_DAYS = 60;
 
 export type RepairSweepResult = {
-  ok: true;
   scanned: number;
   /** Calls re-driven for a fresh copy attempt. */
   requeued: number;
   /**
-   * Skipped because a credential probe said the workspace cannot authenticate.
-   * Expect this to be 0 in production: see `hasCredentials` — no probe is wired
-   * yet, so the sweep assumes every workspace is usable and lets a doomed job
-   * fail loudly instead.
+   * Skipped because the row carries no account SID or no recording SID, so
+   * there is no way to address the recording at Twilio. Age is excluded in SQL
+   * and never reaches this counter.
    */
-  skippedNoCredentials: number;
-  /** Skipped because there is no account SID or the recording is too old. */
   skippedUnservable: number;
   /** Enqueue failures. Counted, never thrown — one bad row must not stop the sweep. */
   enqueueFailed: number;
@@ -60,8 +56,11 @@ export type RepairSweepResult = {
  * `recording_side_effects:<callSid>:<recordingUrl>` and that row is consumed,
  * so reusing it would dedupe the repair away — the sweep would enqueue nothing
  * and report success.
+ *
+ * Not exported: the invariant that matters is the key actually handed to the
+ * queue, which is asserted on the enqueued payload, not on this function.
  */
-export function repairIdempotencyKey(callSid: string, attempt: number): string {
+function repairIdempotencyKey(callSid: string, attempt: number): string {
   return `recording_repair:${callSid}:${attempt}`;
 }
 
@@ -89,22 +88,6 @@ export function repairTwilioParams(row: {
 export async function runRecordingRepairSweep(args?: {
   limit?: number;
   now?: Date;
-  /**
-   * Per-workspace credential probe, injected in tests. Defaults to "assume
-   * usable", so production always requeues.
-   *
-   * That default is deliberate, and it is a known gap rather than an oversight:
-   * a probe cannot detect #2170. Stale subaccount credentials are structurally
-   * identical to working ones — the row exists, the token string is populated,
-   * only a live Twilio call reveals the rejection. So a presence check would
-   * report dev's 18 dead workspaces as healthy and skip nothing, which is worse
-   * than an honest "assume usable": it would look like the guard works.
-   *
-   * Until #2170 lands a real probe, a doomed repair job fails loudly, retries,
-   * and dead-letters — recoverable and visible. The wiring point is here so the
-   * probe can drop in without reshaping the sweep.
-   */
-  hasCredentials?: (workspaceId: string) => Promise<boolean>;
 }): Promise<RepairSweepResult> {
   const limit = args?.limit ?? DEFAULT_REPAIR_LIMIT;
   const now = args?.now ?? new Date();
@@ -115,9 +98,24 @@ export async function runRecordingRepairSweep(args?: {
     now.getTime() - REPAIR_MAX_AGE_DAYS * 86_400_000,
   ).toISOString();
 
-  // `date_created` is `text()` in the Drizzle schema but `timestamptz` in the
-  // database, so the age bounds need an explicit cast. A lexicographic string
-  // comparison is not merely wrong here, it is not even accepted.
+  // `date_created` is declared `text()` in the Drizzle schema but is
+  // `timestamptz` in the database (verified against a real database:
+  // `pg_typeof(date_created)` -> `timestamp with time zone`). The cast
+  // bridges that mismatch — `lt(column, isoString)` does not typecheck against
+  // a `text()` column.
+  //
+  // It is NOT a guard against Postgres mis-comparing. An uncast ISO literal is
+  // type `unknown`, so Postgres coerces it to match the column and the
+  // comparison is already correct. Only a text COLUMN on the right-hand side
+  // would fail, with no matching operator.
+  //
+  // The real defect worth fixing is upstream, in the schema: `app/db/schema.ts`
+  // misdeclares this column. Until it agrees with the database, every date
+  // comparison against `call` needs this cast.
+  const createdAt = () => sql`${callTable.date_created}::timestamptz`;
+  const createdBefore = (iso: string) => sql`${createdAt()} < ${iso}::timestamptz`;
+  const createdAfter = (iso: string) => sql`${createdAt()} > ${iso}::timestamptz`;
+
   const candidates = await adminDb
     .select({
       sid: callTable.sid,
@@ -131,17 +129,14 @@ export async function runRecordingRepairSweep(args?: {
       and(
         isNotNull(callTable.recording_sid),
         isNull(callTable.audio_url),
-        sql`${callTable.date_created}::timestamptz < ${earliest}::timestamptz`,
-        sql`${callTable.date_created}::timestamptz > ${oldest}::timestamptz`,
+        createdBefore(earliest),
+        createdAfter(oldest),
       ),
     )
-    .orderBy(asc(sql`${callTable.date_created}::timestamptz`))
+    .orderBy(asc(createdAt()))
     .limit(limit);
 
-  const hasCredentials = args?.hasCredentials ?? (async () => true);
-
   let requeued = 0;
-  let skippedNoCredentials = 0;
   let skippedUnservable = 0;
   let enqueueFailed = 0;
 
@@ -149,15 +144,6 @@ export async function runRecordingRepairSweep(args?: {
     // Without an account SID there is no way to address the recording at Twilio.
     if (!row.recordingSid || !row.accountSid) {
       skippedUnservable++;
-      continue;
-    }
-
-    const usable = await hasCredentials(String(row.workspace));
-    if (!usable) {
-      // Retrying cannot help, so do not churn a job that fails identically
-      // every single run. Unreachable until a real probe is wired — see the
-      // `hasCredentials` doc for why a presence check would not help.
-      skippedNoCredentials++;
       continue;
     }
 
@@ -193,10 +179,8 @@ export async function runRecordingRepairSweep(args?: {
   }
 
   const summary: RepairSweepResult = {
-    ok: true,
     scanned: candidates.length,
     requeued,
-    skippedNoCredentials,
     skippedUnservable,
     enqueueFailed,
   };

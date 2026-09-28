@@ -25,7 +25,6 @@ vi.mock("@/lib/worker/job-params.server", async (importOriginal) => ({
 }));
 
 import {
-  repairIdempotencyKey,
   repairTwilioParams,
   runRecordingRepairSweep,
 } from "@/lib/call-recording-repair.server";
@@ -70,7 +69,7 @@ function stubCandidates(rows: unknown[]) {
  * level. Returns column names and embedded SQL text separately: a Column
  * carries `name`, a Param carries `queryChunks`.
  */
-function flatten(node: unknown): { columns: string[]; sql: string } {
+function flatten(node: unknown): { columns: string[]; words: string[] } {
   const columns: string[] = [];
   const words: string[] = [];
   const seen = new Set<unknown>();
@@ -90,7 +89,10 @@ function flatten(node: unknown): { columns: string[]; sql: string } {
     }
   };
   walk(node);
-  return { columns, sql: words.join(" ") };
+  // The raw chunks, in order. Kept unjoined because the assertions that matter
+  // are about ADJACENCY between chunks (a cast chunk followed by an operator),
+  // and joining would destroy the boundary being asserted.
+  return { columns, words };
 }
 
 const NOW = new Date("2026-09-28T12:00:00.000Z");
@@ -111,10 +113,8 @@ describe("runRecordingRepairSweep", () => {
     const result = await runRecordingRepairSweep({ now: NOW });
 
     expect(result).toEqual({
-      ok: true,
       scanned: 1,
       requeued: 1,
-      skippedNoCredentials: 0,
       skippedUnservable: 0,
       enqueueFailed: 0,
     });
@@ -175,22 +175,27 @@ describe("runRecordingRepairSweep", () => {
    * and that row is consumed, so reusing that PREFIX would dedupe every repair
    * away — the sweep would report success while enqueueing nothing.
    *
-   * Asserting the prefix rather than comparing to one hand-written key: a
+   * Asserted on the key actually handed to the queue, not on the helper that
+   * builds it. Asserting the helper let a mutant that bypassed it at the call
+   * site stay green; that check was not possible before. It also asserts the
+   * PREFIX rather than comparing to one hand-written key, because a
    * `not.toBe(<literal>)` check passes for any key that merely differs from
-   * that literal, including a wrongly-prefixed one. That check looked right and
-   * survived a mutation that broke the behaviour it claimed to guard.
+   * that literal — including a wrongly-prefixed one.
    */
-  test("the repair key does not reuse the original delivery's prefix", () => {
-    const key = repairIdempotencyKey("CA1", NOW.getTime());
-    expect(key.startsWith("recording_side_effects:")).toBe(false);
-    expect(key.startsWith("recording_repair:")).toBe(true);
-    expect(key).toContain("CA1");
-    // Same attempt, same key — the sweep is safe to run twice in one window.
-    expect(repairIdempotencyKey("CA1", NOW.getTime())).toBe(key);
-    // Different attempts differ, so a later sweep is not blocked by an earlier.
-    expect(repairIdempotencyKey("CA1", NOW.getTime() + 1)).not.toBe(key);
+  test("the enqueued key does not reuse the original delivery's prefix", async () => {
+    stubCandidates([candidate()]);
+    await runRecordingRepairSweep({ now: NOW });
+
+    const { dedupe } = mocks.enqueueRegisteredJob.mock.calls[0][0] as unknown as {
+      dedupe: { kind: string; key: string };
+    };
+    expect(dedupe.kind).toBe("idempotency");
+    expect(dedupe.key.startsWith("recording_side_effects:")).toBe(false);
+    expect(dedupe.key.startsWith("recording_repair:")).toBe(true);
+    expect(dedupe.key).toContain("CA1");
   });
 
+  /** Same attempt, same key — the sweep is safe to run twice in one window. */
   test("is idempotent within a window: a second run enqueues the same keys", async () => {
     stubCandidates([candidate()]);
     await runRecordingRepairSweep({ now: NOW });
@@ -202,6 +207,22 @@ describe("runRecordingRepairSweep", () => {
     expect(a).toBe(b);
   });
 
+  /**
+   * A later sweep must not be deduped away by an earlier one, or a recording
+   * that fails once would never be retried. The attempt salt is what
+   * distinguishes the two keys.
+   */
+  test("a later sweep enqueues a different key for the same call", async () => {
+    stubCandidates([candidate()]);
+    await runRecordingRepairSweep({ now: NOW });
+    await runRecordingRepairSweep({ now: new Date(NOW.getTime() + 1) });
+
+    const [a, b] = mocks.enqueueRegisteredJob.mock.calls.map(
+      (call) => (call[0] as { dedupe: { key: string } }).dedupe.key,
+    );
+    expect(b).not.toBe(a);
+  });
+
   /** No account SID means there is no way to address the recording at Twilio. */
   test("skips a call with no account SID rather than enqueueing a doomed job", async () => {
     stubCandidates([candidate({ accountSid: null })]);
@@ -209,22 +230,6 @@ describe("runRecordingRepairSweep", () => {
     const result = await runRecordingRepairSweep({ now: NOW });
 
     expect(result).toMatchObject({ scanned: 1, requeued: 0, skippedUnservable: 1 });
-    expect(mocks.enqueueRegisteredJob).not.toHaveBeenCalled();
-  });
-
-  /**
-   * #2170: every subaccount credential in dev is stale, so re-enqueueing there
-   * would churn a job that fails identically every run.
-   */
-  test("skips a workspace with unusable credentials instead of churning it", async () => {
-    stubCandidates([candidate()]);
-
-    const result = await runRecordingRepairSweep({
-      now: NOW,
-      hasCredentials: async () => false,
-    });
-
-    expect(result).toMatchObject({ requeued: 0, skippedNoCredentials: 1 });
     expect(mocks.enqueueRegisteredJob).not.toHaveBeenCalled();
   });
 
@@ -261,17 +266,34 @@ describe("runRecordingRepairSweep", () => {
   /**
    * The age bounds. The lower one keeps the sweep from racing a copy that is
    * still in flight; the upper one stops it enqueueing rows whose media Twilio
-   * can no longer serve. Both are `::timestamptz` casts because the column is
-   * `text()` in the schema and `timestamptz` in the database.
+   * can no longer serve.
+   *
+   * The cast is a TYPE-level necessity, not a database guard: the Drizzle
+   * schema declares `date_created` as `text()` while the column is `timestamptz`
+   * in the database, so `lt(column, isoString)` will not typecheck. An uncast
+   * ISO literal is type `unknown` and Postgres coerces it correctly, so this
+   * cast is not preventing a silent mis-compare.
+   *
+   * Asserts that the COLUMN is cast and then COMPARED — a `::timestamptz` chunk
+   * immediately followed by an operator. Asserting merely that the substring
+   * `::timestamptz` appears is satisfied by the literal-side casts alone:
+   * deleting the column cast entirely leaves all four substring occurrences
+   * intact and that check still passed. Group B supersedes this whole approach
+   * with a real-Postgres assertion on rendered SQL.
    */
-  test("bounds the sweep by age, as timestamptz", async () => {
+  test("bounds the sweep by age, comparing the column as timestamptz", async () => {
     stubCandidates([]);
     await runRecordingRepairSweep({ now: NOW });
 
-    const { columns, sql } = flatten(mocks.whereClause);
+    const { columns, words } = flatten(mocks.whereClause);
     expect(columns).toContain("date_created");
-    expect(sql).toContain("::timestamptz <");
-    expect(sql).toContain("::timestamptz >");
+
+    // Both bounds: a cast chunk immediately followed by a comparison operator.
+    const castThenCompared = words.filter((word, i) => {
+      const next = words[i + 1]?.trim();
+      return word === "::timestamptz" && (next === "<" || next === ">");
+    });
+    expect(castThenCompared.length).toBeGreaterThanOrEqual(2);
   });
 
   test("a sweep with nothing to repair is a no-op", async () => {
