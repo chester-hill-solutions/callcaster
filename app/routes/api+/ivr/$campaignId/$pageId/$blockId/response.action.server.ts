@@ -72,16 +72,28 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
   return null;
 };
 
-const findNextStep = (currentBlock: { id: string; options?: Array<{ value: string; next?: string }> }, userInput: string | null, script: Script, pageId: string): string => {
-  const hasUserInput = userInput != null && String(userInput).trim() !== "";
-  if (currentBlock.options && hasUserInput) {
-    const matchedOption = currentBlock.options.find((option) => {
-      const optionValue = String(option.value).trim();
-      const input = String(userInput).trim();
-      return optionValue === input || (input.length > 2 && optionValue === 'vx-any');
-    });
-    if (matchedOption && matchedOption.next) return matchedOption.next;
-  }
+type IvrResponseOption = { value: string; next?: string };
+
+const findMatchedOption = (
+  options: IvrResponseOption[] | undefined,
+  userInput: string | null,
+): IvrResponseOption | undefined => {
+  if (!options || userInput == null || userInput.trim() === "") return undefined;
+  const input = userInput.trim();
+  return options.find((option) => {
+    const optionValue = String(option.value).trim();
+    return optionValue === input || (input.length > 2 && optionValue === "vx-any");
+  });
+};
+
+const findNextStep = (
+  currentBlock: { id: string; options?: IvrResponseOption[] },
+  userInput: string | null,
+  script: Script,
+  pageId: string,
+): string => {
+  const matchedOption = findMatchedOption(currentBlock.options, userInput);
+  if (matchedOption?.next) return matchedOption.next;
 
   const nextLocation = findNextBlock(script, pageId, currentBlock.id);
   return nextLocation 
@@ -177,6 +189,10 @@ export const action = defineAction({
 
     // Replay counts live in the call result so the cap survives the round-trip.
     const hadInput = userInput != null && String(userInput).trim() !== "";
+    const matchedOption = findMatchedOption(currentBlock.options, userInput);
+    // A gathered key is an answer only when it matches a declared option.
+    // Treat an unknown key like no input so it cannot answer a later block.
+    const hasAcceptedInput = hadInput && (!currentBlock.options?.length || matchedOption != null);
     const persistResult = async (patch: Record<string, unknown>) => {
       if (call.outreach_attempt_id == null || !call.workspace) return;
       await updateOutreachAttemptForWorkspace(
@@ -203,7 +219,7 @@ export const action = defineAction({
       const perPage = nested?.[pageId] as Record<string, unknown> | undefined;
       noInputReplays = typeof perPage?.[blockId] === "number" ? (perPage[blockId] as number) : 0;
 
-      if (!hadInput) {
+      if (!hasAcceptedInput) {
         const target = resolveNoInputTarget(currentBlock.noInput, noInputReplays);
         if (target.kind === "hangup") {
           twiml.hangup();
@@ -239,7 +255,7 @@ export const action = defineAction({
     // Test calls have no outreach attempt by design: they walk the flow
     // but record nothing, so results, exports, and analytics never see them.
     // Guarding here keeps a test key press from speaking the generic error.
-    if (call.outreach_attempt_id) {
+    if (call.outreach_attempt_id && hasAcceptedInput) {
       const resultValue = await getOutreach(call.workspace, call.outreach_attempt_id);
       const result =
         resultValue && typeof resultValue === "object"

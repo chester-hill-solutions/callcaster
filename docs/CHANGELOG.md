@@ -10,6 +10,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- IVR timeouts and unsupported key presses no longer save false answers or let an unoffered key answer a later step ([#2147](https://github.com/chester-hill-solutions/callcaster/issues/2147)).
 - SMS contacts that reach a closed send window before Twilio starts remain queued and do not add an outreach attempt. The API also returns results for contacts that completed before the batch reached the window boundary (PR [#2158](https://github.com/chester-hill-solutions/callcaster/pull/2158), issue [#1791](https://github.com/chester-hill-solutions/callcaster/issues/1791)).
 
 ### Changed
