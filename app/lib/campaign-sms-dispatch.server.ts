@@ -255,12 +255,16 @@ export async function dispatchCampaignSmsBatch(args: {
   };
   const budget = createDispatchCreditBudget(credits.balance);
 
-  // Start-rate cap: keep dispatch-loop starts under `configuredDispatcherSmsMps`.
-  // We pace *starts*, not completions — Twilio's throttle is on new sends per
-  // second, not on in-flight requests. Legacy pipelines default to 2 MPS
-  // (500ms between starts); parallel-on portals use their configured target.
+  // Start-rate cap: keep provider requests under `configuredDispatcherSmsMps`.
+  // We pace *request starts*, not completions — Twilio's throttle is on new
+  // sends per second, not on in-flight requests. Legacy pipelines default to
+  // 2 MPS (500ms between starts); parallel-on portals use their configured
+  // target.
   const startRateMps = configuredDispatcherSmsMps(portalConfig);
   const minStartIntervalMs = 1000 / Math.max(startRateMps, 0.1);
+  // The cap is enforced against the pacer below, at the moment each request is
+  // issued. It spans the whole queue, so adjacent batches cannot restart it.
+  const startPacer = createStartPacer(minStartIntervalMs);
 
   // Same-number rows wait for the first row's send result. A reservation set
   // alone can dequeue a sibling while the first row is still preparing and
@@ -281,13 +285,14 @@ export async function dispatchCampaignSmsBatch(args: {
     claimedNumbers,
     budget,
     sendPolicy,
+    startPacer,
   };
 
   const deferredAt = await runPacedSendBatches({
     queueMembers,
     ctx,
     batchSize: BATCH_SIZE,
-    minStartIntervalMs,
+    startPacer,
     responses,
   });
   if (counts.failed > 0) {
@@ -323,22 +328,65 @@ export async function dispatchCampaignSmsBatch(args: {
 }
 
 /**
+ * Serialises provider-request starts at a fixed minimum interval.
+ *
+ * The interval must be measured between *requests*, not between the dispatch
+ * calls that begin a row's preparation. A dispatched row does async work before
+ * the provider is called — line-type lookup, duplicate check, opt-out
+ * dequeue — and that work differs per row, so a dispatch-stamped clock drifts
+ * from the request clock by exactly the per-row difference. Rows then bunch up:
+ * a slow row's request can overtake a faster row's that was dispatched after
+ * it, and under load the gap collapses to nothing, which is the one situation
+ * where the rate limit matters.
+ *
+ * Callers queue here immediately before issuing their request, so each row
+ * claims a slot in the order it actually reaches the provider.
+ */
+function createStartPacer(minStartIntervalMs: number): StartPacer {
+  let lastRequestAt: number | null = null;
+  // Chains the turns so two rows finishing their preparation in the same tick
+  // cannot both read the same `lastRequestAt` and pass the gate together.
+  let turn: Promise<void> = Promise.resolve();
+  return {
+    async waitForTurn() {
+      const mine = turn.then(async () => {
+        if (lastRequestAt !== null) {
+          const waitMs = Math.max(0, minStartIntervalMs - (Date.now() - lastRequestAt));
+          if (waitMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, waitMs));
+          }
+        }
+        // Stamped here, at the release of the turn: the request follows
+        // immediately with no intervening await.
+        lastRequestAt = Date.now();
+      });
+      // Keep the chain usable after a rejected turn so one failed row cannot
+      // wedge every later row's pacing.
+      turn = mine.then(
+        () => undefined,
+        () => undefined,
+      );
+      return mine;
+    },
+  };
+}
+
+/**
  * Start each batch's sends at the paced rate and collect the results in
  * queue order per batch.
+ *
+ * Pacing lives in the pacer rather than in this loop, so a batch dispatches
+ * without serialising on timers. Per-row preparation then overlaps, and the
+ * rate is applied where the provider is actually called.
  */
 async function runPacedSendBatches(args: {
   queueMembers: QueueMember[];
   ctx: HandleMemberCtx;
   batchSize: number;
-  minStartIntervalMs: number;
+  startPacer: StartPacer;
   responses: ContactDispatchResult[];
 }): Promise<Date | null> {
-  const { queueMembers, ctx, batchSize, minStartIntervalMs, responses } = args;
-  // Keep the pacing clock across queue batches. At low configured rates the
-  // claim size is intentionally one row (for example, one MPS with the
-  // one-second dispatch tick), so resetting the clock at each batch would
-  // start adjacent sends back-to-back.
-  let lastStartAt: number | null = null;
+  const { queueMembers, ctx, batchSize, startPacer, responses } = args;
   for (let i = 0; i < queueMembers.length; i += batchSize) {
     const batch = queueMembers.slice(i, i + batchSize);
     const startingPromises: Promise<HandleMemberResult>[] = [];
@@ -350,15 +398,7 @@ async function runPacedSendBatches(args: {
         continue;
       }
 
-      if (lastStartAt !== null) {
-        const elapsedMs = Date.now() - lastStartAt;
-        const waitMs = Math.max(0, minStartIntervalMs - elapsedMs);
-        if (waitMs > 0) {
-          await new Promise((resolve) => setTimeout(resolve, waitMs));
-        }
-      }
       startingPromises.push(handleMember(member, ctx));
-      lastStartAt = Date.now();
     }
     const batchResults = await Promise.all(startingPromises);
     const deferredAt = batchResults.find((result) => result.deferredSendWindow)?.deferredSendWindow;
@@ -409,6 +449,12 @@ type HandleMemberCtx = {
   claimedNumbers: Map<string, SmsPhoneClaim>;
   budget: DispatchCreditBudget;
   sendPolicy: ReturnType<typeof smsSendPolicy>;
+  startPacer: StartPacer;
+};
+
+/** Claims the next provider-request slot at the configured start rate. */
+type StartPacer = {
+  waitForTurn: () => Promise<void>;
 };
 
 type HandleMemberResult = {
@@ -599,6 +645,12 @@ async function handleClaimedMember(
     phoneClaim?.resolve({ kind: "unaffordable" });
     return memberResponse(skipForInsufficientCredits(member, counts));
   }
+
+  // Claim a provider-request slot. This is the rate limit, so it is applied
+  // here rather than at dispatch: the interval has to be measured between the
+  // requests the provider actually receives. It is also an await, so it can
+  // hold a row past the window boundary — hence the gate order below.
+  await ctx.startPacer.waitForTurn();
 
   // The initial gate protects an idle batch, but pacing and the per-contact
   // lookup gates can keep a row here long enough for the campaign window to

@@ -501,9 +501,13 @@ describe("SMS dispatch contract — start rate does not exceed configured MPS", 
 
     expect(startTimes.length).toBe(3);
     const gaps = [startTimes[1] - startTimes[0], startTimes[2] - startTimes[1]];
-    // ~16.7ms nominal; floor of 10ms absorbs setTimeout jitter on a busy CI
-    // runner while still catching a coordinator that fires the whole batch
-    // simultaneously (which would produce ~0ms gaps).
+    // ~16.7ms nominal. This floor was previously read as setTimeout jitter on
+    // a busy CI runner; it was not. The coordinator stamped its pacing clock at
+    // dispatch rather than at the provider request, so per-row preparation
+    // work shifted requests inside each other's slots and the gap collapsed
+    // for real under load (#2172). The 10ms floor is the regression detector
+    // for that and must not be relaxed — the deterministic version of the same
+    // claim lives in campaign-sms-dispatch-pacing.test.ts.
     for (const gap of gaps) {
       expect(gap).toBeGreaterThanOrEqual(10);
     }
