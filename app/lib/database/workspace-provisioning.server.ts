@@ -23,11 +23,11 @@ import { addUserToWorkspace } from "@/lib/workspace-membership.server";
 import { adminDb } from "@/server/admin-db";
 import { db } from "@/server/db";
 import { createStripeContact } from "./stripe.server";
+import { twilioAccountToPersistableJson } from "./workspace.server";
 import {
   createKeys,
   createSubaccount,
-  twilioAccountToPersistableJson,
-} from "./workspace.server";
+} from "./workspace-twilio-subaccount.server";
 
 /** Every new workspace starts with free credits so teams can try calling/texting before paying. */
 export const NEW_WORKSPACE_WELCOME_CREDITS = 100;
@@ -105,6 +105,7 @@ export async function createNewWorkspace({
     try {
       account = await createSubaccount({
         workspace_id: createdWorkspaceId,
+        workspace_name: workspaceName,
       });
       if (!account) {
         provisioningWarnings.push("Twilio subaccount was not created");
@@ -119,6 +120,7 @@ export async function createNewWorkspace({
       try {
         newKey = await createKeys({
           workspace_id: createdWorkspaceId,
+          workspace_name: workspaceName,
           sid: account.sid,
           token: account.authToken,
         });

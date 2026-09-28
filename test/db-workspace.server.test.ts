@@ -340,7 +340,9 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("createKeys: returns newKey; logs+throws on error", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const Twilio = (await import("twilio")).default as any;
-    const mod = await import("../app/lib/database/workspace.server");
+    const mod = await import(
+      "../app/lib/database/workspace-twilio-subaccount.server"
+    );
 
     const ok = await mod.createKeys({
       workspace_id: "w1",
@@ -359,7 +361,9 @@ describe("app/lib/database/workspace.server.ts", () => {
   test("createSubaccount returns account; logs on create rejection", async () => {
     const { logger } = await import("../app/lib/logger.server");
     const Twilio = (await import("twilio")).default as any;
-    const mod = await import("../app/lib/database/workspace.server");
+    const mod = await import(
+      "../app/lib/database/workspace-twilio-subaccount.server"
+    );
 
     const ok = await mod.createSubaccount({ workspace_id: "w1" });
     expect(ok).toMatchObject({ sid: "AC_sub", authToken: "tok" });

@@ -14,7 +14,6 @@ import {
 import { eqChsTextToUuid } from "@/lib/chs-uuid-text.server";
 import { PG_ERROR_CODES } from "@/lib/parse-utils.server";
 import { WorkspaceData, WorkspaceNumbers } from "../types";
-import type { NewKeyInstance } from "twilio/lib/rest/api/v2010/account/newKey";
 import { MemberRole } from "@/components/workspace/TeamMember";
 import { env } from "../env.server";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
@@ -117,43 +116,6 @@ export async function getUserWorkspaces({ userId }: { userId: string }) {
     logger.error("Error on function getUserWorkspaces: ", error);
     return { data: null, error: toDbError(error) };
   }
-}
-
-export async function createKeys({
-  workspace_id,
-  sid,
-  token,
-}: {
-  workspace_id: string;
-  sid: string;
-  token: string;
-}): Promise<NewKeyInstance> {
-  const TwilioSdk = await loadTwilioSdk();
-  const twilio = new TwilioSdk.Twilio(sid, token);
-  try {
-    const newKey = await twilio.newKeys.create({ friendlyName: workspace_id });
-    return newKey;
-  } catch (error) {
-    logger.error("Error creating keys", error);
-    throw error;
-  }
-}
-
-export async function createSubaccount({
-  workspace_id,
-}: {
-  workspace_id: string;
-}) {
-  const TwilioSdk = await loadTwilioSdk();
-  const twilio = new TwilioSdk.Twilio(env.TWILIO_SID(), env.TWILIO_AUTH_TOKEN());
-  const account = await twilio.api.v2010.accounts
-    .create({
-      friendlyName: workspace_id,
-    })
-    .catch((error) => {
-      logger.error("Error creating subaccount", error);
-    });
-  return account;
 }
 
 /** Twilio `AccountInstance` is not JSON-serializable (circular `_version`); tests may return plain objects without `toJSON`. */
