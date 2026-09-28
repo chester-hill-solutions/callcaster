@@ -337,7 +337,28 @@ export async function runRecordingSideEffects(args: {
     enrichment.recording_duration = recordingDuration;
   }
 
+  // Narrowed by the throw above; bound once so the closure below keeps it.
+  const workspaceId: string = callRow.workspace;
+
+  /**
+   * Writes a SNAPSHOT, not the live object. This is called twice — once before
+   * the copy so a failure is attributable, once after so `audio_url` lands —
+   * and `enrichment` keeps mutating between them. Passing the live reference
+   * would make both writes identical at read time.
+   */
+  async function writeEnrichment(): Promise<void> {
+    if (Object.keys(enrichment).length === 0) return;
+    await updateCallBySid(workspaceId, args.callSid, { ...enrichment });
+  }
+
   if (recordingSid && accountSid) {
+    // Persist the recording identity BEFORE attempting the copy, so a copy that
+    // fails still leaves a row the repair sweep can find and re-drive while
+    // Twilio still holds the source. Then attempt the copy, which throws on
+    // failure so this job FAILS and the worker retries (#2166) rather than
+    // reporting success while the audio is lost.
+    await writeEnrichment();
+
     const persistResult = await persistCallRecordingToStorage({
       workspaceId: callRow.workspace,
       callSid: args.callSid,
@@ -346,7 +367,7 @@ export async function runRecordingSideEffects(args: {
       existingAudioUrl: callRow.audio_url,
     });
 
-    if (persistResult.ok && !persistResult.skipped) {
+    if (!persistResult.skipped) {
       enrichment.audio_url = persistResult.audioUrl;
       // Batch transcription is default-off pending an undecided product policy
       // (see `batchTranscription` in @/lib/coaching-schemas). Suppress the
@@ -367,13 +388,6 @@ export async function runRecordingSideEffects(args: {
           });
         }
       }
-    } else if (!persistResult.ok) {
-      logger.warn("call_recording.persist_skipped", {
-        callSid: args.callSid,
-        workspaceId: callRow.workspace,
-        reason: persistResult.reason,
-        error: persistResult.error,
-      });
     }
   } else if (recordingSid && !accountSid) {
     logger.warn("call_recording.missing_account_sid", {
@@ -382,9 +396,7 @@ export async function runRecordingSideEffects(args: {
     });
   }
 
-  if (Object.keys(enrichment).length > 0) {
-    await updateCallBySid(callRow.workspace, args.callSid, enrichment);
-  }
+  await writeEnrichment();
 
   logger.debug("Recording side effects completed", {
     callSid: args.callSid,

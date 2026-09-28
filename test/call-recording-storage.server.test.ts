@@ -172,7 +172,12 @@ describe("call-recording-storage.server", () => {
     expect(mocks.uploadObject).not.toHaveBeenCalled();
   });
 
-  test("persistCallRecordingToStorage returns download_failed without throwing", async () => {
+  /**
+   * #2166 — INVERTED. This test previously asserted that a failed download
+   * resolves `{ ok: false }`. The caller logged the failure and reported
+   * success, so the audio was silently lost. It must now throw.
+   */
+  test("persistCallRecordingToStorage THROWS when the download fails", async () => {
     const { persistCallRecordingToStorage } = await import(
       "@/lib/call-recording-storage.server"
     );
@@ -181,27 +186,112 @@ describe("call-recording-storage.server", () => {
       new Response(null, { status: 404, statusText: "Not Found" }),
     );
 
+    await expect(
+      persistCallRecordingToStorage(
+        {
+          workspaceId: "w1",
+          callSid: "CA1",
+          accountSid: "ACmain",
+          recordingSid: "RE1",
+        },
+        {
+          fetch: mocks.fetch,
+          uploadObject: mocks.uploadObject,
+          loadCredentials: mocks.loadWorkspaceTwilioCredentials,
+          maxAttempts: 1,
+          baseDelayMs: 0,
+        },
+      ),
+    ).rejects.toThrow(/download_failed.*404/s);
+
+    expect(mocks.uploadObject).not.toHaveBeenCalled();
+  });
+
+  /** An upload failure must be as loud as a download failure. */
+  test("persistCallRecordingToStorage THROWS when the upload fails", async () => {
+    const { persistCallRecordingToStorage } = await import(
+      "@/lib/call-recording-storage.server"
+    );
+
+    mocks.uploadObject.mockRejectedValueOnce(new Error("bucket unreachable"));
+
+    await expect(
+      persistCallRecordingToStorage(
+        {
+          workspaceId: "w1",
+          callSid: "CA1",
+          accountSid: "ACmain",
+          recordingSid: "RE1",
+        },
+        {
+          fetch: mocks.fetch,
+          uploadObject: mocks.uploadObject,
+          loadCredentials: mocks.loadWorkspaceTwilioCredentials,
+          maxAttempts: 1,
+          baseDelayMs: 0,
+        },
+      ),
+    ).rejects.toThrow(/upload_failed.*bucket unreachable/s);
+  });
+
+  /**
+   * Missing credentials is permanent, not a transport blip. It still throws —
+   * so the failure is visible and dead-lettered rather than silent — but the
+   * message says so, because re-driving it will never succeed.
+   */
+  test("missing credentials throw, and the message marks them permanent", async () => {
+    const { persistCallRecordingToStorage } = await import(
+      "@/lib/call-recording-storage.server"
+    );
+
+    await expect(
+      persistCallRecordingToStorage(
+        {
+          workspaceId: "w1",
+          callSid: "CA1",
+          accountSid: "ACmain",
+          recordingSid: "RE1",
+        },
+        {
+          fetch: mocks.fetch,
+          uploadObject: mocks.uploadObject,
+          loadCredentials: async () => null,
+          maxAttempts: 1,
+          baseDelayMs: 0,
+        },
+      ),
+    ).rejects.toThrow(/permanent/);
+
+    expect(mocks.fetch).not.toHaveBeenCalled();
+  });
+
+  /** The already-stored short circuit stays: it is not a failure. */
+  test("an already-stored recording skips without touching Twilio", async () => {
+    const { persistCallRecordingToStorage } = await import(
+      "@/lib/call-recording-storage.server"
+    );
+
     const result = await persistCallRecordingToStorage(
       {
         workspaceId: "w1",
         callSid: "CA1",
         accountSid: "ACmain",
         recordingSid: "RE1",
+        existingAudioUrl: "call-recordings/w1/recording-CA1.mp3",
       },
       {
         fetch: mocks.fetch,
         uploadObject: mocks.uploadObject,
         loadCredentials: mocks.loadWorkspaceTwilioCredentials,
-        maxAttempts: 1,
-        baseDelayMs: 0,
       },
     );
 
     expect(result).toEqual({
-      ok: false,
-      reason: "download_failed",
-      error: expect.stringContaining("404"),
+      ok: true,
+      audioUrl: "call-recordings/w1/recording-CA1.mp3",
+      skipped: true,
+      reason: "already_persisted",
     });
-    expect(mocks.uploadObject).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
   });
 });
