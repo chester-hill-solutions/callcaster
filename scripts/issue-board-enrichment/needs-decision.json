@@ -73,7 +73,7 @@
       "app/lib/platform-workspace-numbers.server.ts"
     ],
     "existingTests": [
-      "n/a — operational"
+      "n/a \u2014 operational"
     ],
     "missingTests": [
       "before/after evidence, rollback steps"
@@ -94,7 +94,7 @@
     "issueNumber": 1345,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide and add a CHS-managed toll-free SMS verification path",
-    "summary": "Political campaigns have no business number, so toll-free SMS (which requires a BN) does not serve them. Offer a CHS-managed path — but only after a compliance/ownership decision.",
+    "summary": "Political campaigns have no business number, so toll-free SMS (which requires a BN) does not serve them. Offer a CHS-managed path \u2014 but only after a compliance/ownership decision.",
     "currentBehavior": "Goal step offers toll-free (requires customer BN) or local (no BN); readiness requires businessRegistrationNumber for toll-free; twilio-toll-free-provision uses workspace business identity.",
     "rootCause": "No managed-sponsorship model; CHS BN must not be stored as customer identity.",
     "resolution": "Decide if CHS can sponsor customer traffic; if yes, add a support-request flow with clear ownership/review status and local-number alternative.",
@@ -122,7 +122,7 @@
   {
     "issueNumber": 1355,
     "verdict": "needs-decision",
-    "summary": "The current topology is dev→dev and master→staging/production. The request only renames staging to qa; there is no qa branch.",
+    "summary": "The current topology is dev\u2192dev and master\u2192staging/production. The request only renames staging to qa; there is no qa branch.",
     "resolution": "Verify a safe in-place rename before changing IaC. Do not recreate the environment.",
     "lookIn": [
       ".railway/environments/staging.ts"
@@ -281,7 +281,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1700,
@@ -295,7 +295,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1705,
@@ -309,7 +309,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1709,
@@ -323,7 +323,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1710,
@@ -337,7 +337,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1717,
@@ -351,7 +351,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1722,
@@ -365,12 +365,12 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1723,
     "verdict": "needs-decision",
-    "summary": "Feature request (template-tag → contact picker) whose scope depends on the tag UX decisions in 1724/1725; product decision first.",
+    "summary": "Feature request (template-tag \u2192 contact picker) whose scope depends on the tag UX decisions in 1724/1725; product decision first.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -379,7 +379,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1724,
@@ -393,12 +393,12 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1725,
     "verdict": "needs-decision",
-    "summary": "Parser tolerance of missing braces is intentional legacy support (single-brace bodies) — product decides whether to keep it or lint strict double-brace tags.",
+    "summary": "Parser tolerance of missing braces is intentional legacy support (single-brace bodies) \u2014 product decides whether to keep it or lint strict double-brace tags.",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -407,12 +407,12 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1729,
     "verdict": "needs-decision",
-    "summary": "Auto-disposition mapping needs a spec (which outcome → which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).",
+    "summary": "Auto-disposition mapping needs a spec (which outcome \u2192 which disposition, when overridable). Relevant machinery already exists (#1458 hold-screen, debounced auto-save).",
     "lookIn": [],
     "existingTests": [],
     "missingTests": [],
@@ -421,7 +421,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1732,
@@ -435,7 +435,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1763,
@@ -449,7 +449,7 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Lane set by 2026-09-12 board triage — confirm before implementing."
+    "trackerRecommendation": "Lane set by 2026-09-12 board triage \u2014 confirm before implementing."
   },
   {
     "issueNumber": 1789,
@@ -480,9 +480,9 @@
     "issueNumber": 1815,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide TWO_FACTOR_ENABLED kill-switch state per environment",
-    "summary": "Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 — the #1569 kill-switch default.",
+    "summary": "Screenshot-only report from Sai. Env check resolves it: MFA is off BECAUSE TWO_FACTOR_ENABLED is unset on the review (dev) env AND on production app services (Railway list-variables; only DISABLE_2FA_ENFORCEMENT + NODE_ENV present on review, and neither 2FA var on production). isTwoFactorFeatureEnabled() (env.server.ts:270) is false unless TWO_FACTOR_ENABLED=true|1 \u2014 the #1569 kill-switch default.",
     "currentBehavior": "Better Auth twoFactor plugin is not registered; no code prompt at sign-in for enrolled users. Enrollment rows are kept (two-factor.server.ts:59) so setting the flag turns it all back on.",
-    "rootCause": "None — MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.",
+    "rootCause": "None \u2014 MFA is off by the intended kill-switch default because the optional env flag is unset everywhere.",
     "resolution": "Decide the intended state. To enable 2FA, set TWO_FACTOR_ENABLED=true|1 on dev + production and retest. Otherwise keep the kill switch and close with the explanation.",
     "lookIn": [
       "app/lib/env.server.ts",
@@ -655,7 +655,7 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "",
-    "recommendedTitle": "Robocall vs IVR vs Automated Phone Menu — terminology consistency",
+    "recommendedTitle": "Robocall vs IVR vs Automated Phone Menu \u2014 terminology consistency",
     "summary": "Consistency audit for customer-facing naming. #1854 (API type robocall) and #1741 (one automated phone menu) set the direction, but UI still mixes terms: 'Robocall' appears in CampaignLaunch.tsx, CampaignLaunchExtras.tsx, CampaignVoiceSettings.tsx, SelectType.tsx, while the product language moved to 'automated phone menu'. Decide the canonical customer term + sweep scope.",
     "currentBehavior": "Mixed labels (Robocall/IVR/automated phone menu) across campaign setup surfaces.",
     "resolution": "Decide the canonical term (suggestion: 'Automated phone menu' in UI; 'robocall' stays the API value), then a copy sweep replacing IVR/Robocall labels.",
@@ -673,8 +673,8 @@
     "issueNumber": 2036,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide the scope of flattening the call screen: the call screen only, or the shared workspace panel every page uses",
-    "summary": "The complaint is clear and both named surfaces are real, but the outer card is not owned by the call screen — it is the shared workspace panel, so 'remove the rounded edges and drop shadow' is a choice about blast radius, not a local edit. The top bar is local: app/components/call/CallScreen.Header.tsx:239 is a sticky header with rounded-xl, border, shadow-sm and a backdrop blur, and that is the campaign details/settings bar in the screenshot. The outer card is app/routes/workspaces+/$id.tsx:206, a single className string that gives every workspace page its panel: `min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ...`, and the same file already branches on isChatsScreen (:204-207) so a call-screen branch is available. The issue's broader point is also a design-system one: cards are fine as containers, but their default treatment should be overridable per site.",
-    "currentBehavior": "The live calling screen stacks three card treatments — the workspace panel, the sticky top bar, and inner section cards — and the invisible ones still cost padding.",
+    "summary": "The complaint is clear and both named surfaces are real, but the outer card is not owned by the call screen \u2014 it is the shared workspace panel, so 'remove the rounded edges and drop shadow' is a choice about blast radius, not a local edit. The top bar is local: app/components/call/CallScreen.Header.tsx:239 is a sticky header with rounded-xl, border, shadow-sm and a backdrop blur, and that is the campaign details/settings bar in the screenshot. The outer card is app/routes/workspaces+/$id.tsx:206, a single className string that gives every workspace page its panel: `min-w-0 flex-1 lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card/70 lg:p-6 lg:shadow-sm ...`, and the same file already branches on isChatsScreen (:204-207) so a call-screen branch is available. The issue's broader point is also a design-system one: cards are fine as containers, but their default treatment should be overridable per site.",
+    "currentBehavior": "The live calling screen stacks three card treatments \u2014 the workspace panel, the sticky top bar, and inner section cards \u2014 and the invisible ones still cost padding.",
     "rootCause": "The workspace panel treatment is a single shared className with no per-surface override, and the top bar re-states rounded/border/shadow locally. Two owners for the same visual concept, so the call screen cannot opt out.",
     "resolution": "Decide the scope, then it is a small edit either way. Option A (call screen only): add an isCallScreen branch next to the existing isChatsScreen branch at app/routes/workspaces+/$id.tsx:204-207 that drops rounded-2xl, border and shadow-sm and reduces p-6 for the call route, and flatten the sticky header at CallScreen.Header.tsx:239. Nothing else on the product changes; the risk is that the call screen now looks different from every page beside it. Option B (whole product): flatten the shared panel for all workspace routes, so the page is a flat canvas and cards mean something when they appear. Bigger visual diff, needs a pass over every workspace page to check what depended on the panel's padding, but it is the version that actually establishes 'a card is a deliberate container'. Option C (middle): keep the panel as-is and change the top bar only, which fixes the half the reporter named twice but leaves the outer card. Whichever is chosen, express it as a variant on the panel rather than a route-conditional className string, so the next surface can opt out without editing a ternary. Also decide the padding: the reporter asks to 'punch back' the padding the invisible cards were creating, which means auditing the space-* classes between the panel and the first inner card as part of the change, not just deleting rounded and shadow.",
     "lookIn": [
@@ -695,7 +695,7 @@
       "The chosen scope is written down, and the panel treatment is a named variant rather than a route-conditional className string",
       "The named surfaces (outer card, top bar) have no curved edges or drop shadow",
       "The padding the removed cards were creating is punched back, verified by measuring the gap at the top of the call screen",
-      "Inner section cards keep their treatment — they are the containers that should still read as cards",
+      "Inner section cards keep their treatment \u2014 they are the containers that should still read as cards",
       "No other workspace page changed unintentionally, or changed deliberately and listed"
     ],
     "blockedBy": [],
@@ -707,14 +707,14 @@
     "issueNumber": 2029,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide the release list and the retention policy for unused dev-environment Twilio numbers",
-    "summary": "An operations task, not a code change, and it is waiting on two things rather than on engineering. The screenshot shows 76 numbers in the dev account at $86.20/month, plus 4 number-setups at $0. The body names the three numbers Sai uses (2608141501, a 2026 Municipal Ward 19 NES campaign, a HESC Phone Bank) and asks @wra-sol to say which workspaces Arfin wants kept; everything else is proposed for release. Two decisions are open. First, the list: Arfin's workspaces are not in the issue, so the release set is undefined. Second, and more important, there is no stated rule for what makes a dev number safe to release, and no automated check — a number that is still referenced by a workspace_number row, a campaign sender, a messaging service, a caller ID, or a verification in progress will break on release, and in a dev environment that breakage is discovered by the next person who uses it. There is a number lifecycle in the app (app/lib/number-rental-billing.server.ts handles suspension and release and notifies the workspace), but nothing there enumerates what a number is still referenced by.",
+    "summary": "An operations task, not a code change, and it is waiting on two things rather than on engineering. The screenshot shows 76 numbers in the dev account at $86.20/month, plus 4 number-setups at $0. The body names the three numbers Sai uses (2608141501, a 2026 Municipal Ward 19 NES campaign, a HESC Phone Bank) and asks @wra-sol to say which workspaces Arfin wants kept; everything else is proposed for release. Two decisions are open. First, the list: Arfin's workspaces are not in the issue, so the release set is undefined. Second, and more important, there is no stated rule for what makes a dev number safe to release, and no automated check \u2014 a number that is still referenced by a workspace_number row, a campaign sender, a messaging service, a caller ID, or a verification in progress will break on release, and in a dev environment that breakage is discovered by the next person who uses it. There is a number lifecycle in the app (app/lib/number-rental-billing.server.ts handles suspension and release and notifies the workspace), but nothing there enumerates what a number is still referenced by.",
     "currentBehavior": "76 numbers are held in the dev Twilio account; an unspecified subset is unused, and nobody can say which.",
     "rootCause": "Dev numbers accumulate because renting is cheap and there is no reaper. The list of what is safe to release is held in people's heads and in Slack, not in the repo or the database.",
-    "resolution": "Answer two questions and it becomes a 30-minute console task. (1) The release list: get Arfin's workspaces, then release every number not on the combined keep-list. (2) The safety rule, and this is the part worth writing down: what counts as 'in use'. The concrete options are (a) query the app for references — any workspace_number row not in a released state, any campaign using it as sender or caller ID, any messaging service with it attached, any caller-ID verification pending — and refuse to release a number with a live reference; (b) a time-based rule, release anything not rented in the last N days, accepting that a dormant campaign sender breaks; (c) purely manual, the operator eyeballs the console, which is what happens today and is how 76 accumulated. (a) is the only one that cannot break a workspace, and it is cheap because the reference check is a handful of queries over tables that already exist. Also decide whether dev numbers get a periodic reaper on the same rule, or whether this stays a one-off clean-up. Note the numbers in the keep-list are per-workspace, so record the mapping (number -> workspace) before releasing, otherwise the next clean-up starts from zero knowledge again.",
+    "resolution": "Answer two questions and it becomes a 30-minute console task. (1) The release list: get Arfin's workspaces, then release every number not on the combined keep-list. (2) The safety rule, and this is the part worth writing down: what counts as 'in use'. The concrete options are (a) query the app for references \u2014 any workspace_number row not in a released state, any campaign using it as sender or caller ID, any messaging service with it attached, any caller-ID verification pending \u2014 and refuse to release a number with a live reference; (b) a time-based rule, release anything not rented in the last N days, accepting that a dormant campaign sender breaks; (c) purely manual, the operator eyeballs the console, which is what happens today and is how 76 accumulated. (a) is the only one that cannot break a workspace, and it is cheap because the reference check is a handful of queries over tables that already exist. Also decide whether dev numbers get a periodic reaper on the same rule, or whether this stays a one-off clean-up. Note the numbers in the keep-list are per-workspace, so record the mapping (number -> workspace) before releasing, otherwise the next clean-up starts from zero knowledge again.",
     "lookIn": [
       "app/lib/number-rental-billing.server.ts:170-200 (existing suspend/release lifecycle and its workspace notification)",
       "app/lib/platform-workspace-numbers.server.ts (the workspace_number accessor to build the reference check on)",
-      "app/db/workspace-scoped-tables.ts (workspace_number, campaign, workspace_audio — the tables a reference check must cover)",
+      "app/db/workspace-scoped-tables.ts (workspace_number, campaign, workspace_audio \u2014 the tables a reference check must cover)",
       "app/routes/admin+/workspaces/$workspaceId/twilio/ (the admin Twilio panels; no release action exists there today)"
     ],
     "existingTests": [],
@@ -739,16 +739,16 @@
     "issueNumber": 2043,
     "verdict": "needs-decision",
     "recommendedTitle": "Decide how far to expand the campaign-split feature: promote it, widen its trigger, or automate the copy variation it asks for by hand",
-    "summary": "This issue has no defect in it. The title is an instruction to a person ('sai expand on this') and the body is a screenshot of the campaign Launch page, so what 'expand' means has to come from the reporter. The screenshot is the split feature's own surface: a 11,636-contact draft on a Canadian local number, with 'Split into 24 campaigns' in the large-bulk-send warning. The feature itself is built and works — SplitCampaignPrompt (app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx) clones the campaign into evenly sized segments, distributes the queued contacts, warns on ca_local with a queue of 500 or more (app/lib/throughput-config.ts:102-108), and requires an acknowledgement that the operator will vary the copy. Three things a person could plausibly mean by 'expand', and they are different pieces of work. (1) Reach: the prompt renders in exactly one place, the Launch step of a message campaign (app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:219-224), and only when isBulkSmsSenderMisaligned is true, so a campaign on a toll-free number with 50,000 queued contacts never sees it. (2) Automation: the copy-variation checklist is a checkbox acknowledgement and the clones get identical copy, so the operator is told to do manually the thing that defeats the carriers' duplicate-content detection. (3) Correctness: the split distributes queued contacts, and it is worth confirming what happens to the campaign's audit trail and to a send that is already in flight when the split is taken.",
+    "summary": "This issue has no defect in it. The title is an instruction to a person ('sai expand on this') and the body is a screenshot of the campaign Launch page, so what 'expand' means has to come from the reporter. The screenshot is the split feature's own surface: a 11,636-contact draft on a Canadian local number, with 'Split into 24 campaigns' in the large-bulk-send warning. The feature itself is built and works \u2014 SplitCampaignPrompt (app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx) clones the campaign into evenly sized segments, distributes the queued contacts, warns on ca_local with a queue of 500 or more (app/lib/throughput-config.ts:102-108), and requires an acknowledgement that the operator will vary the copy. Three things a person could plausibly mean by 'expand', and they are different pieces of work. (1) Reach: the prompt renders in exactly one place, the Launch step of a message campaign (app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:219-224), and only when isBulkSmsSenderMisaligned is true, so a campaign on a toll-free number with 50,000 queued contacts never sees it. (2) Automation: the copy-variation checklist is a checkbox acknowledgement and the clones get identical copy, so the operator is told to do manually the thing that defeats the carriers' duplicate-content detection. (3) Correctness: the split distributes queued contacts, and it is worth confirming what happens to the campaign's audit trail and to a send that is already in flight when the split is taken.",
     "currentBehavior": "A working but single-purpose warning-path tool: one entry point, one trigger condition, manual copy variation.",
     "rootCause": "The feature was scoped as a safeguard inside the bulk-send warning rather than as a campaign operation, so its reach and its automation were never designed.",
-    "resolution": "Ask the reporter which of these they mean, because they are unrelated in size. (a) Reach: move the split out of the warning path into a first-class campaign action reachable from the campaign list, and widen the trigger beyond ca_local/500 to any volume that would hit a sender limit, not just a Canadian local number. (b) Automation: make the copy actually vary per segment — a per-segment message variant, or a merge field carrying the segment index — instead of asking the operator to vary it by hand and hoping. This is the one with real value, because identical copy across segments is exactly what the warning claims to be avoiding. (c) Correctness: confirm the behaviour when a send is already in flight at split time, and whether each clone's results roll up to the parent or stand alone. Recommend (b) as the highest-value reading of 'expand', with (a) as a cheap follow-up, and (c) answered by whoever wrote the split before either lands. Do not start work before the reporter picks one: the three have nothing in common, and the issue as filed does not say which is wanted.",
+    "resolution": "Ask the reporter which of these they mean, because they are unrelated in size. (a) Reach: move the split out of the warning path into a first-class campaign action reachable from the campaign list, and widen the trigger beyond ca_local/500 to any volume that would hit a sender limit, not just a Canadian local number. (b) Automation: make the copy actually vary per segment \u2014 a per-segment message variant, or a merge field carrying the segment index \u2014 instead of asking the operator to vary it by hand and hoping. This is the one with real value, because identical copy across segments is exactly what the warning claims to be avoiding. (c) Correctness: confirm the behaviour when a send is already in flight at split time, and whether each clone's results roll up to the parent or stand alone. Recommend (b) as the highest-value reading of 'expand', with (a) as a cheap follow-up, and (c) answered by whoever wrote the split before either lands. Do not start work before the reporter picks one: the three have nothing in common, and the issue as filed does not say which is wanted.",
     "lookIn": [
       "app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx (the whole feature: the alert, the sheet, the checklist, the split submit)",
       "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:211-226 (the only render site)",
       "app/lib/throughput-config.ts:102-108 (isBulkSmsSenderMisaligned: ca_local and >= 500)",
       "test/ui/split-campaign-override.test.tsx (existing coverage of the override path)",
-      "app/lib/campaign-split.server.ts or splitMessageCampaign (the server side named in the component's doc comment — locate it before scoping any change)"
+      "app/lib/campaign-split.server.ts or splitMessageCampaign (the server side named in the component's doc comment \u2014 locate it before scoping any change)"
     ],
     "existingTests": [
       "test/ui/split-campaign-override.test.tsx (the bulk-on-local override and its acknowledgement)"
@@ -778,9 +778,9 @@
     "summary": "Canonical for the daily backup work; #1773 was folded in here as a duplicate. The code half is fully mapped and none of it is built, so the engineering risk is low and the open questions are product and data-protection ones. Every integration point the issue names exists: the job type constant file (app/lib/worker/job-types.server.ts), the params and registry (app/lib/worker/job-params.server.ts, app/lib/worker/handlers.server.ts), the cron handler pattern (app/lib/worker/handlers/cron.server.ts) with withReschedule from handlers/shared.server.ts, the per-workspace error isolation fanout (app/lib/cron-workspace-fanout.server.ts), the CSV serializer (app/lib/rpc-csv.server.ts rowsToCsv, app/lib/csv.ts escapeCsvCell), and the object-storage bucket union (app/lib/object-storage.server.ts ObjectStorageBucket, which today has no 'backups' member). ONE FACTUAL DRIFT to correct in the issue: it says 27 tenant tables and AGENTS.md says 26; WORKSPACE_SCOPED_TABLES in app/db/workspace-scoped-tables.ts currently has 28. Enumerate the table list from the constant rather than from either number, so the snapshot cannot silently miss a table. The unresolved decisions are below.",
     "currentBehavior": "No scheduled backup exists. A workspace's data exists only in the live database.",
     "rootCause": "The backup system was never ported; the gocanvass blueprint it copies is described in the issue and nothing in CallCaster implements it.",
-    "resolution": "Answer the four questions, then implement. (1) What is in the snapshot: the issue proposes every tenant table, which includes contact PII (names, phones, emails, street addresses) and the full billing ledger. Options: everything (maximum recoverability, maximum exposure), or contacts and the ledger excluded (a schema-and-reference backup that cannot restore customer records), or a middle option that includes contact identifiers without free-text fields. This is the decision that has to be made by someone accountable for the data, not by the implementer. (2) Where it lands: a dedicated backups bucket with its own retention, or the existing S3_BUCKET under a backups/ prefix. A dedicated bucket is the better answer on isolation grounds and the issue already designs for it; the prefix is cheaper and needs no new env var. Pick one and say why, because the object-storage bucket union has to grow either way. (3) Retention and deletion: BACKUP_RETENTION_DAYS defaults to 30 and pruning deletes objects. Confirm the default and confirm the retention is long enough to be useful for the incident it is insurance against. (4) Who can restore: the issue explicitly puts restore tooling out of scope, which means the snapshots are written and never read. Decide whether that is acceptable as phase one, or whether a restore runbook is part of the deliverable — an unread backup is a liability, since it is a full copy of customer data with no access control beyond the bucket. Once those are answered the implementation is the issue's own step list: job type and registry entry, daily dedupe via an idempotency key of backups:<YYYY-MM-DD> (or a self-scheduling chain seeded by ensure-scheduled-jobs), per-workspace fanout so one failure does not error the job, one CSV per table from createTenantDb over the 28 tables, a manifest.json, and a prune pass over the date segments.",
+    "resolution": "Answer the four questions, then implement. (1) What is in the snapshot: the issue proposes every tenant table, which includes contact PII (names, phones, emails, street addresses) and the full billing ledger. Options: everything (maximum recoverability, maximum exposure), or contacts and the ledger excluded (a schema-and-reference backup that cannot restore customer records), or a middle option that includes contact identifiers without free-text fields. This is the decision that has to be made by someone accountable for the data, not by the implementer. (2) Where it lands: a dedicated backups bucket with its own retention, or the existing S3_BUCKET under a backups/ prefix. A dedicated bucket is the better answer on isolation grounds and the issue already designs for it; the prefix is cheaper and needs no new env var. Pick one and say why, because the object-storage bucket union has to grow either way. (3) Retention and deletion: BACKUP_RETENTION_DAYS defaults to 30 and pruning deletes objects. Confirm the default and confirm the retention is long enough to be useful for the incident it is insurance against. (4) Who can restore: the issue explicitly puts restore tooling out of scope, which means the snapshots are written and never read. Decide whether that is acceptable as phase one, or whether a restore runbook is part of the deliverable \u2014 an unread backup is a liability, since it is a full copy of customer data with no access control beyond the bucket. Once those are answered the implementation is the issue's own step list: job type and registry entry, daily dedupe via an idempotency key of backups:<YYYY-MM-DD> (or a self-scheduling chain seeded by ensure-scheduled-jobs), per-workspace fanout so one failure does not error the job, one CSV per table from createTenantDb over the 28 tables, a manifest.json, and a prune pass over the date segments.",
     "lookIn": [
-      "app/db/workspace-scoped-tables.ts:41-95 (WORKSPACE_SCOPED_TABLES — 28 tables today, the single source of truth for the snapshot list)",
+      "app/db/workspace-scoped-tables.ts:41-95 (WORKSPACE_SCOPED_TABLES \u2014 28 tables today, the single source of truth for the snapshot list)",
       "app/lib/object-storage.server.ts:8-13 (ObjectStorageBucket, no backups member) and :57-62 (BUCKET_ENV_VARS)",
       "app/lib/worker/job-types.server.ts, app/lib/worker/job-params.server.ts:206-222, app/lib/worker/handlers.server.ts:89-178 (job type, params, registry)",
       "app/lib/worker/handlers/cron.server.ts:176-230 (handler pattern) and app/lib/worker/handlers/shared.server.ts:19-42 (withReschedule)",
@@ -789,12 +789,12 @@
       "~/Documents/gocanvass/app/server/backup-schedule.server.ts and workspace-csv-backup.server.ts (the blueprint being ported)"
     ],
     "existingTests": [
-      "test/job-registry.test.ts (guards registry drift — a new job type must be registered here)",
+      "test/job-registry.test.ts (guards registry drift \u2014 a new job type must be registered here)",
       "test/worker-cron-handlers.server.test.ts (the pattern for handler tests)",
       "test/call-recording-storage.server.test.ts and test/object-storage-upsert.test.ts (the pattern for storage-adapter tests)"
     ],
     "missingTests": [
-      "no test asserts a snapshot contains every table in WORKSPACE_SCOPED_TABLES — a new tenant table would silently not be backed up",
+      "no test asserts a snapshot contains every table in WORKSPACE_SCOPED_TABLES \u2014 a new tenant table would silently not be backed up",
       "no test asserts the daily dedupe key prevents a second run on the same UTC day",
       "no test asserts that one workspace failing does not error the whole job",
       "no test asserts the manifest is written and lists the files it claims to",
@@ -817,40 +817,12 @@
     "trackerRecommendation": "Needs decision before implementation, then it is well-specified work. The engineering is a known pattern in this repo, but shipping a daily full copy of customer PII with a 30-day retention, no access story and no restore path is a decision with an owner, not an implementation detail. Ask the four questions in one go; do not start by writing the job handler, because the answers change which tables the handler walks and where it writes."
   },
   {
-    "issueNumber": 2116,
-    "verdict": "needs-decision",
-    "recommendedTitle": "runCronWorkspaceFanout never skips workspace.disabled, so a disabled workspace is still debited and still reconciled",
-    "summary": "`runCronWorkspaceFanout` is the entry point for `twilio_open_sync`, `billing_reconcile` and `number_rental_billing`. It does not check `workspace.disabled`. A workspace an admin has disabled — the platform's suspension lever for non-payment or abuse — still gets its daily number-rental debits posted against its credit balance, and still gets its Twilio usage pulled and reconciled.",
-    "currentBehavior": "`disabled` is the platform's kill switch for a workspace. Suspending a workspace for non-payment and then continuing to debit it is a product contradiction: the workspace is being punished twice, and the balance can go negative while suspended.",
-    "resolution": "1. In `runCronWorkspaceFanout`, `continue` (and count as `skipped`, with the same `logger.info` shape as the no-credentials branch) when `workspace.disabled` is true. One guard, applied to all three money jobs consistently. 2. **Confirm with the product owner first** that `disabled` is intended to mean \"stop all billing\", since the only existing precedent is the webhook audit. Record the decision in the issue — if the intent is \"stop outbound but keep billing\", then the guard belongs in the dispatch path, not here, and that is a different change. 3. Once decided, state the rule in a comment at the top of `runCronWorkspaceFanout` so the next job added to it inherits the behaviour deliberately.",
-    "lookIn": [
-      "app/lib/worker/handlers/cron.server.ts:64,121,167,190-225",
-      "app/lib/cron-workspace-fanout.server.ts",
-      "app/lib/database/workspace.server.ts (the `disabled` column and the sibling sweep that filters it)"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "A disabled workspace is skipped by all three jobs.",
-      "The skip is counted and logged with a reason."
-    ],
-    "acceptanceCriteria": [
-      "A disabled workspace receives no `number_rental_billing` debit, no `billing_reconcile` run and no `twilio_open_sync` run (kill-check: remove the guard and confirm the test goes red).",
-      "The fanout summary counts the workspace as `skipped` with a reason.",
-      "An enabled workspace is unaffected (positive control).",
-      "The decided meaning of `disabled` is written down in the issue and in a code comment."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
-  },
-  {
     "issueNumber": 2139,
     "verdict": "needs-decision",
     "recommendedTitle": "Member-level role management is server-permitted but UI-invisible, so the Member floor on updateUser/deleteUser is dead code",
-    "summary": "A workspace `member` who clicks the gear icon on a peer sees the manage sheet with their own name in the title and the text \"You do not have permission to edit this user\" — for an operation the server explicitly authorises and has unit tests for. The message actively tells the user the product forbids something it allows.",
+    "summary": "A workspace `member` who clicks the gear icon on a peer sees the manage sheet with their own name in the title and the text \"You do not have permission to edit this user\" \u2014 for an operation the server explicitly authorises and has unit tests for. The message actively tells the user the product forbids something it allows.",
     "currentBehavior": "One side of the permission model is implemented and the other is not, and the user-visible message is on the wrong side. A test that asserts the server permits it and a UI that asserts the user cannot do it are both green, which is why this survived.",
-    "resolution": "Decide the policy and make one side match. Given that `assertNoRoleEscalation`, `requireActorOutranksTarget` and `requireSoleOwnerProtection` already exist, the smaller fix is to **render the form**: 1. `TeamMember.tsx:139-141` → `userRole !== MemberRole.Caller && memberRole !== MemberRole.Admin` (keep the existing `memberRole === \"owner\"` exclusion from the sheet wrapper at `:78`). 2. Filter the `updateUser` role select by `assertNoRoleEscalation(userRole, role)` so a `member` is never offered `admin`. 3. If admin-only is the intent instead, raise the floor in `settings.action.server.ts:46` to `MemberRole.Admin` and add a member-floor test asserting 403. 4. **Either way, add the e2e assertion.** There should be a test that a `member` sees (or does not see) the manage control, matching whichever policy is chosen. Right now neither side is asserted in the UI and the server test asserts th",
+    "resolution": "Decide the policy and make one side match. Given that `assertNoRoleEscalation`, `requireActorOutranksTarget` and `requireSoleOwnerProtection` already exist, the smaller fix is to **render the form**: 1. `TeamMember.tsx:139-141` \u2192 `userRole !== MemberRole.Caller && memberRole !== MemberRole.Admin` (keep the existing `memberRole === \"owner\"` exclusion from the sheet wrapper at `:78`). 2. Filter the `updateUser` role select by `assertNoRoleEscalation(userRole, role)` so a `member` is never offered `admin`. 3. If admin-only is the intent instead, raise the floor in `settings.action.server.ts:46` to `MemberRole.Admin` and add a member-floor test asserting 403. 4. **Either way, add the e2e assertion.** There should be a test that a `member` sees (or does not see) the manage control, matching whichever policy is chosen. Right now neither side is asserted in the UI and the server test asserts th",
     "lookIn": [
       "app/components/workspace/TeamMember.tsx:78,139-141",
       "app/routes/workspaces+/$id/settings.action.server.ts:44-53",
@@ -874,5 +846,35 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
+  },
+  {
+    "issueNumber": 2116,
+    "verdict": "fix-now",
+    "recommendedTitle": "runCronWorkspaceFanout never skips workspace.disabled, so a disabled workspace is still debited and still reconciled",
+    "summary": "`runCronWorkspaceFanout` is the entry point for `twilio_open_sync`, `billing_reconcile` and `number_rental_billing`. It did not check `workspace.disabled`, so a workspace an admin had disabled still got its daily number-rental debits posted and still got its Twilio usage pulled and reconciled. RESOLVED as a two-lever split, decided by the product owner 2026-09-28 and implemented. `disabled` stops money moving OUT (rental debits, usage reconciliation, twilio_open_sync) but number RELEASE keeps running on its own schedule.",
+    "currentBehavior": "Two claims in the original filing were wrong and are corrected here. (1) 'the balance can go negative while suspended' is not true: number-rental-billing.server.ts:395-431 checks funds before every DEBIT and routes an unaffordable cycle to the unpaid ladder, so the ledger write is only reachable when balance >= the rental cost. The real harm was an unbudgeted charge against a suspended account, not a negative balance. (2) `disabled` is NOT a kill switch: it is read in exactly three places (the admin-console status filter, the activeWorkspaces stat, and the twilio webhook audit skip at cron.server.ts:275). No middleware, login, or API auth path reads it, so a disabled workspace's members can still sign in and place calls. Skipping the billing is the whole of what the flag buys today. The unstated third finding: the warn -> suspend -> RELEASE ladder lives inside the same number_rental_billing handler as the debit, so the naive one-guard fix would have frozen the ladder too and left every unpaid number in a suspended workspace rented and live forever. That is the trap this split avoids.",
+    "resolution": "DONE (2026-09-28). Implemented as a two-lever split rather than the single guard the original filing proposed. 1. `runCronWorkspaceFanout` gained `includeDisabled?: boolean`, defaulting to false: a disabled workspace is counted as `skipped` and logged as `<job>.fanout_skipped_disabled` before any Twilio credential read. This covers `twilio_open_sync` and `billing_reconcile`, and is the behaviour every future fanout job inherits. 2. `numberRentalBillingHandler` opts in with `includeDisabled: true`, because the release ladder must keep running. 3. `runNumberRentalBilling` reads `workspace.disabled` from the workspace row it already loads and passes `billingEnabled` into `billElapsedCycles`, which suppresses the DEBIT (and does not read the balance at all) while leaving the cycles unbilled so the caller derives them as unpaid and the ladder still escalates to release. 4. The rule is written into the `runCronWorkspaceFanout` doc comment, including when NOT to opt in. 5. The decision is recorded in a comment on this issue. NOT DONE, deliberately out of scope: making `disabled` actually block sign-in and API access. That is a different change and needs its own issue.",
+    "lookIn": [
+      "app/lib/worker/handlers/cron.server.ts:64,121,167,190-225",
+      "app/lib/cron-workspace-fanout.server.ts",
+      "app/lib/database/workspace.server.ts (the `disabled` column and the sibling sweep that filters it)"
+    ],
+    "existingTests": [
+      "test/cron-workspace-fanout.server.test.ts (new, 7 tests: skip + count, positive control, mixed sweep, includeDisabled opt-in, no credential read for a disabled workspace, undefined-disabled treated as enabled, skipped-not-failed)",
+      "test/number-rental-billing.server.test.ts (new describe block, 6 tests: no charge when disabled with a healthy balance, enabled control still charges, no balance read, release still happens, no unsuspend without a charge, fail-open when the workspace lookup throws)",
+      "test/worker-cron-handlers.server.test.ts (3 new tests asserting the coordinator passes includeDisabled: true for number_rental_billing and omits it for billing_reconcile and twilio_open_sync)"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "DONE: a disabled workspace receives no number_rental_billing debit and no billing_reconcile or twilio_open_sync run. Kill-check run: inverting the fanout guard turns 4 tests red, inverting billingEnabled turns 4 red, setting includeDisabled: false turns 2 red.",
+      "DONE: the fanout summary counts the workspace as `skipped` and logs `<job>.fanout_skipped_disabled` with the workspaceId.",
+      "DONE: an enabled workspace is unaffected (positive control asserted in all three test files).",
+      "DONE: the decided meaning of `disabled` is recorded on this issue and in the runCronWorkspaceFanout doc comment.",
+      "DONE: the release half keeps running, so no number is stranded by the suspension itself."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "The blocker named in the original filing is answered and the work is complete. Lane moves needs-decision -> fix-now for the board, then closes on merge. Two things deliberately left for separate issues: (1) `disabled` still does not block sign-in or API access, so it is a billing and audit lever, not the kill switch it is described as anywhere in the product; (2) the release-ladder behaviour is now implicit in a flag name, so anyone adding a 5th fanout job has to read the doc comment to know the default. Both are worth filing, neither blocks this."
   }
 ]

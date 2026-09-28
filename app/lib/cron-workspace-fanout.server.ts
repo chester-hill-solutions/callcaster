@@ -22,7 +22,7 @@ export type CronFanoutSummary = {
   ok: true;
   /** Workspaces whose per-workspace operation completed. */
   processed: number;
-  /** Workspaces skipped as ineligible (e.g. no Twilio credentials). */
+  /** Workspaces skipped as ineligible (e.g. disabled, no Twilio credentials). */
   skipped: number;
   /** Workspaces whose operation threw; never aborts the sweep. */
   failed: number;
@@ -35,15 +35,46 @@ export type CronFanoutSummary = {
  *
  * - `requireTwilioCredentials`: workspaces whose `twilio_data` has no usable
  *   subaccount credentials are counted as `skipped` (logged, not failed).
+ * - `includeDisabled`: by DEFAULT a workspace with `disabled = true` is
+ *   counted as `skipped` and does not run. See the policy note below.
  * - A throwing workspace is recorded in `failures` and the sweep continues.
  * - Throws only if the sweep itself cannot run (workspace enumeration fails);
  *   callers translate that into a 500.
+ *
+ * ## Why disabled workspaces are skipped by default (#2116)
+ *
+ * `workspace.disabled` is the platform's suspension lever. A job that moves
+ * money or reconciles a live Twilio account must not run for a workspace the
+ * platform has suspended: it keeps debiting a balance nobody will pay and
+ * keeps reconciling an account that should be frozen.
+ *
+ * The lever does NOT block workspace members from signing in — no middleware
+ * or auth path reads `disabled` — so "skip the billing" is the whole of what
+ * this flag buys today. Do not describe it as an access kill switch.
+ *
+ * ## When to pass `includeDisabled: true`
+ *
+ * Only when the job's purpose survives suspension. The one current case is
+ * `number_rental_billing`, whose non-payment ladder (warn -> suspend ->
+ * release) lives inside the same handler as the debit. Skipping a disabled
+ * workspace there would freeze the ladder too, and a workspace the platform
+ * stopped billing would keep its phone numbers rented and live forever. That
+ * job therefore opts in and suppresses only the debit, inside
+ * `runNumberRentalBilling`.
+ *
+ * A new job added here inherits the skip. Opting out is a deliberate act that
+ * must name which half of the job keeps running.
  */
 export async function runCronWorkspaceFanout(args: {
   /** Job name used as the log-event prefix, e.g. "billing_reconcile". */
   job: string;
   /** Skip (not fail) workspaces without Twilio subaccount credentials. */
   requireTwilioCredentials?: boolean;
+  /**
+   * Run for workspaces with `disabled = true`. Defaults to false.
+   * See the policy note above before setting it to true.
+   */
+  includeDisabled?: boolean;
   run: (workspaceId: string) => Promise<unknown>;
 }): Promise<CronFanoutSummary> {
   const workspaces = await listAllWorkspacesOrdered();
@@ -55,6 +86,15 @@ export async function runCronWorkspaceFanout(args: {
   for (const workspace of workspaces) {
     const workspaceId = workspace.id;
     try {
+      // Before the credential check: a disabled workspace is ineligible for
+      // the job regardless of whether it has usable credentials, and the
+      // credential read is a Twilio call we have no reason to make.
+      if (workspace.disabled && !args.includeDisabled) {
+        skipped++;
+        logger.info(`${args.job}.fanout_skipped_disabled`, { workspaceId });
+        continue;
+      }
+
       if (args.requireTwilioCredentials) {
         const twilioData = await loadWorkspaceTwilioData(workspaceId);
         const creds = readTwilioWorkspaceCredentials(twilioData);

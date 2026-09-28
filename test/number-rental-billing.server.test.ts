@@ -756,3 +756,176 @@ describe("runNumberRentalBilling", () => {
     });
   });
 });
+
+/**
+ * #2116 — `disabled` splits into two levers. A disabled workspace is not
+ * charged, but its numbers still run the warn -> suspend -> release ladder.
+ */
+describe("runNumberRentalBilling — disabled workspaces (#2116)", () => {
+  beforeEach(() => {
+    tdbMocks.workspace_number.findMany.mockReset();
+    tdbMocks.workspace_number.update.mockReset();
+    tdbMocks.workspace_number.update.mockResolvedValue([{ id: 1 }]);
+    tdbMocks.transaction_history.findFirst.mockReset();
+    tdbMocks.transaction_history.findFirst.mockResolvedValue(null);
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockReset();
+    transactionHistoryMocks.insertTransactionHistoryIdempotent.mockResolvedValue(undefined);
+    creditsMocks.getWorkspaceCreditsBalance.mockReset();
+    // The whole point: this workspace CAN afford the rental. Only `disabled`
+    // stops the charge. If the balance were the reason, the test would pass
+    // for the wrong reason and the guard could be deleted unnoticed.
+    creditsMocks.getWorkspaceCreditsBalance.mockResolvedValue(10_000);
+    workspaceMembersMocks.getWorkspaceById.mockReset();
+    workspaceMembersMocks.getWorkspaceById.mockResolvedValue({
+      id: "workspace-1",
+      name: "Civic Action",
+      disabled: true,
+    });
+    workspaceMembersMocks.listWorkspaceOwnerAdminEmails.mockReset();
+    workspaceMembersMocks.listWorkspaceOwnerAdminEmails.mockResolvedValue([
+      "owner@example.com",
+    ]);
+    lifecycleMocks.removeWorkspacePhoneNumber.mockReset();
+    lifecycleMocks.removeWorkspacePhoneNumber.mockResolvedValue({ error: null });
+    opsMocks.notifyOps.mockReset();
+    resendMocks.send.mockReset();
+    resendMocks.send.mockResolvedValue({ data: { id: "email_1" }, error: null });
+  });
+
+  test("charges nothing for a disabled workspace even when it can afford the rental", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01" }),
+    ]);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ processed: 1, charged: 0 });
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Kill-check for the test above. The suppression must key on `disabled`,
+   * not on an incidental read failure: the balance is healthy, so if the
+   * guard were removed the debit WOULD happen and this goes red.
+   */
+  test("an enabled workspace with the same healthy balance is charged", async () => {
+    workspaceMembersMocks.getWorkspaceById.mockResolvedValue({
+      id: "workspace-1",
+      name: "Civic Action",
+      disabled: false,
+    });
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01" }),
+    ]);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ charged: 1 });
+    expect(transactionHistoryMocks.insertTransactionHistoryIdempotent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ workspaceId: "workspace-1", type: "DEBIT" }),
+    );
+  });
+
+  test("does not read the credit balance for a disabled workspace", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01" }),
+    ]);
+
+    await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(creditsMocks.getWorkspaceCreditsBalance).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The reason the fanout opts this job into disabled workspaces. Without
+   * this, skipping the workspace would stop the ladder too and a number
+   * nobody pays for would stay rented and live forever.
+   */
+  test("still releases a disabled workspace's number once cycles go unpaid", async () => {
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-03-01", suspended_at: "2026-05-02T00:00:00.000Z" }),
+    ]);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-06-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ charged: 0, released: 1 });
+    expect(lifecycleMocks.removeWorkspacePhoneNumber).toHaveBeenCalledWith(
+      expect.objectContaining({ workspaceId: "workspace-1", numberId: BigInt(1) }),
+    );
+  });
+
+  test("does not unsuspend a number it never charged for", async () => {
+    // The unsuspend write is guarded on a charge having happened. A disabled
+    // workspace that pays nothing must not be told its number is restored.
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01", suspended_at: "2026-04-02T00:00:00.000Z" }),
+    ]);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ charged: 0, unsuspended: 0 });
+    expect(tdbMocks.workspace_number.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        set: expect.objectContaining({ suspended_at: null }),
+      }),
+    );
+  });
+
+  /**
+   * The `!billingEnabled` branch must sit AFTER the already-billed probe. If
+   * it came first, a cycle charged before the workspace was suspended would be
+   * counted as unpaid, manufacturing phantom unpaid cycles and accelerating
+   * the release ladder onto a number the workspace already paid for. Release
+   * is irreversible at Twilio, so this asserts the ladder does not move.
+   */
+  test("a cycle billed before suspension is not counted unpaid", async () => {
+    // Every cycle already has a ledger row: two elapsed cycles, both paid.
+    tdbMocks.transaction_history.findFirst.mockResolvedValue({ id: 7 });
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-03-01" }),
+    ]);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-06-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ charged: 0, unpaid: 0, suspended: 0, released: 0 });
+    expect(lifecycleMocks.removeWorkspacePhoneNumber).not.toHaveBeenCalled();
+  });
+
+  test("charges as normal when the workspace lookup fails", async () => {
+    // Fail-open on the lookup: a transient error must not silently stop
+    // charging every workspace in the sweep. The ladder still bounds an
+    // unaffordable number, so this cannot run away.
+    workspaceMembersMocks.getWorkspaceById.mockRejectedValueOnce(
+      new Error("workspace lookup unavailable"),
+    );
+    tdbMocks.workspace_number.findMany.mockResolvedValue([
+      makeNumber({ created_at: "2026-04-01" }),
+    ]);
+
+    const result = await runNumberRentalBilling({
+      workspaceId: "workspace-1",
+      today: new Date("2026-05-01T00:00:00.000Z"),
+    });
+
+    expect(result).toMatchObject({ charged: 1, technicalFailures: 0 });
+  });
+});
