@@ -30,6 +30,7 @@ import {
   workspaceTwilioComplianceParams,
 } from "@/lib/worker/job-params.server";
 import { runRecordingRepairSweep } from "@/lib/call-recording-repair.server";
+import { withReschedule } from "@/lib/worker/handlers/shared.server";
 import {
   billingReconcileHandler,
   campaignScheduleSyncHandler,
@@ -52,6 +53,12 @@ import {
   workspaceTwilioComplianceHandler,
 } from "./handlers/campaign.server";
 import { elevenlabsBatchTranscribeHandler } from "./handlers/elevenlabs-batch-transcribe.server";
+
+/**
+ * Daily, matching the other once-a-day crons (`billing_reconcile`,
+ * `number_rental_billing`, `low_credit_notify` in `handlers/cron.server.ts`).
+ */
+const RECORDING_REPAIR_SWEEP_RESCHEDULE_MS = 24 * 60 * 60 * 1000;
 
 export { enqueueWorkspaceComplianceJob };
 
@@ -150,7 +157,20 @@ const registrations = [
     type: RECORDING_REPAIR_SWEEP_JOB_TYPE,
     params: recordingRepairSweepParams,
     schedule: true,
-    handler: () => runRecordingRepairSweep(),
+    // Self-scheduling chains are their own scheduler — there is no pg_cron.
+    // Without `withReschedule` the chain dies after one run and the 10-minute
+    // watchdog re-seeds it, so the sweep would run every 10 minutes instead of
+    // daily. Every other cron here wraps its handler the same way.
+    handler: (job) =>
+      withReschedule(
+        {
+          type: RECORDING_REPAIR_SWEEP_JOB_TYPE,
+          delayMs: RECORDING_REPAIR_SWEEP_RESCHEDULE_MS,
+          params: recordingRepairSweepParams.parse({}),
+          completedJobId: job.id,
+        },
+        () => runRecordingRepairSweep(),
+      ),
   }),
   defineJob({
     type: CALL_STATUS_SIDE_EFFECTS_JOB_TYPE,

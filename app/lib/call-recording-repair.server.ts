@@ -1,4 +1,4 @@
-import { and, asc, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, isNotNull, isNull, sql } from "drizzle-orm";
 import { call as callTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { logger } from "@/lib/logger.server";
@@ -37,6 +37,13 @@ export const REPAIR_MIN_AGE_MINUTES = 30;
 /** Backdate beyond this and Twilio cannot still hold the media. */
 export const REPAIR_MAX_AGE_DAYS = 60;
 
+/**
+ * The idempotency-key salt granularity. Equal to the sweep's cadence, so
+ * "at most one repair attempt per call per day" is a property of the key
+ * rather than of when the worker happened to run.
+ */
+const DAY_BUCKET_MS = 24 * 60 * 60 * 1000;
+
 export type RepairSweepResult = {
   scanned: number;
   /** Calls re-driven for a fresh copy attempt. */
@@ -57,11 +64,19 @@ export type RepairSweepResult = {
  * so reusing it would dedupe the repair away — the sweep would enqueue nothing
  * and report success.
  *
+ * The suffix is the DAY BUCKET, not the sweep's own clock. That distinction is
+ * the whole point: keying on the exact run time gives every run a unique key,
+ * so a second sweep the same day re-enqueues every candidate instead of
+ * deduping. Keyed on the day, any number of sweeps within one day collapse to
+ * the same key and the queue dedupes them, while tomorrow's sweep still gets a
+ * fresh key and retries the recordings that are still unrepaired.
+ *
  * Not exported: the invariant that matters is the key actually handed to the
  * queue, which is asserted on the enqueued payload, not on this function.
  */
-function repairIdempotencyKey(callSid: string, attempt: number): string {
-  return `recording_repair:${callSid}:${attempt}`;
+function repairIdempotencyKey(callSid: string, runStartedAtMs: number): string {
+  const dayBucket = Math.floor(runStartedAtMs / DAY_BUCKET_MS);
+  return `recording_repair:${callSid}:${dayBucket}`;
 }
 
 /**
@@ -133,7 +148,18 @@ export async function runRecordingRepairSweep(args?: {
         createdAfter(oldest),
       ),
     )
-    .orderBy(asc(createdAt()))
+    // NEWEST first, deliberately. This set is not homogeneous: a call whose
+    // recording has already aged out of Twilio's retention can never be
+    // repaired, and such rows never leave the candidate set — they just stop
+    // being copyable. Ordering oldest-first with a hard limit therefore parks
+    // the permanently-broken rows at the head of the queue and starves every
+    // newer, genuinely repairable call behind them, indefinitely.
+    //
+    // Newest-first inverts that: recent recordings are both the most likely to
+    // still be in Twilio's window AND the most likely to succeed, so a stuck
+    // old row is starved harmlessly. It ages out past `REPAIR_MAX_AGE_DAYS`
+    // on its own instead of blocking the queue.
+    .orderBy(desc(createdAt()))
     .limit(limit);
 
   let requeued = 0;
@@ -142,6 +168,7 @@ export async function runRecordingRepairSweep(args?: {
 
   for (const row of candidates) {
     // Without an account SID there is no way to address the recording at Twilio.
+    // Retrying cannot help, so the row is dropped rather than re-enqueued.
     if (!row.recordingSid || !row.accountSid) {
       skippedUnservable++;
       continue;
@@ -184,6 +211,15 @@ export async function runRecordingRepairSweep(args?: {
     skippedUnservable,
     enqueueFailed,
   };
-  logger.info("recording_repair.sweep", summary);
+  logger.info("recording_repair.sweep", {
+    ...summary,
+    // The age window is a narrowing of the requested find-set, and `scanned`
+    // alone cannot show that. An operator seeing `scanned: 0` needs to
+    // distinguish "nothing to repair" from "everything fell outside the
+    // window", and the two look identical without these bounds.
+    windowStart: oldest,
+    windowEnd: earliest,
+    maxRows: limit,
+  });
   return summary;
 }

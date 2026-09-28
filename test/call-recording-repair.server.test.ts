@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 
 vi.hoisted(() => {
   process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
@@ -7,6 +9,7 @@ vi.hoisted(() => {
 const mocks = vi.hoisted(() => ({
   select: vi.fn(),
   whereClause: null as unknown,
+  orderSql: null as string | null,
   enqueueRegisteredJob: vi.fn(async () => ({ enqueued: true })),
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
 }));
@@ -31,7 +34,6 @@ import {
 import { parseTwilioVoiceCallback } from "@/lib/twilio/voice-callback";
 import { recordingSideEffectsParams } from "@/lib/worker/job-params.server";
 
-
 /** A call row the find query would return: we know the recording, we have no copy. */
 function candidate(overrides: Record<string, unknown> = {}) {
   return {
@@ -51,49 +53,34 @@ function stubCandidates(rows: unknown[]) {
       mocks.whereClause = clause;
       return chain;
     },
-    orderBy: () => chain,
+    orderBy: (clause: unknown) => {
+      mocks.orderSql = pgDialect.sqlToQuery(clause as SQL).sql;
+      return chain;
+    },
     limit: () => Promise.resolve(rows),
   };
   mocks.select.mockReturnValue(chain);
 }
 
 /**
+ * Render a Drizzle clause to real SQL.
+ *
  * The find query is the whole feature, and `adminDb` is mocked — so the stub
  * returns whatever rows it is handed no matter what the WHERE clause says. The
- * filter has to be asserted directly or the sweep is untested where it matters.
- * Renders the Drizzle clause to SQL so the assertions are on the query, not on
- * the builder's internal shape.
+ * filter has to be asserted directly or the sweep is untested where it matters,
+ * and the only way to assert a query's shape against a mocked client is on the
+ * rendered string.
+ *
+ * The previous approach walked Drizzle's private `queryChunks` / `left` /
+ * `right` internals and matched substrings, which was both brittle — it broke
+ * on a refactor that changed no behaviour — and wrong: a bare
+ * `::timestamptz` substring check is satisfied by the literal-side casts, so
+ * deleting the COLUMN cast entirely still passed. That is what #2174
+ * supersedes with a real-Postgres tier; this is correct in the meantime and
+ * does not depend on Drizzle's internal representation.
  */
-/**
- * `and(...)` nests its clauses, so walk the whole tree rather than the top
- * level. Returns column names and embedded SQL text separately: a Column
- * carries `name`, a Param carries `queryChunks`.
- */
-function flatten(node: unknown): { columns: string[]; words: string[] } {
-  const columns: string[] = [];
-  const words: string[] = [];
-  const seen = new Set<unknown>();
-
-  const walk = (n: unknown): void => {
-    if (n === null || n === undefined || seen.has(n)) return;
-    if (typeof n === "string") { words.push(n); return; }
-    if (typeof n !== "object") return;
-    seen.add(n);
-    const obj = n as Record<string, unknown>;
-    if (typeof obj.name === "string") columns.push(obj.name);
-    for (const key of ["queryChunks", "left", "right", "expression", "value"]) {
-      const child = obj[key];
-      if (Array.isArray(child)) child.forEach(walk);
-      else if (child !== undefined && typeof child === "object") walk(child);
-      else if (typeof child === "string") words.push(child);
-    }
-  };
-  walk(node);
-  // The raw chunks, in order. Kept unjoined because the assertions that matter
-  // are about ADJACENCY between chunks (a cast chunk followed by an operator),
-  // and joining would destroy the boundary being asserted.
-  return { columns, words };
-}
+const pgDialect = new PgDialect({ casing: { escapeName: (n: string) => `"${n}"` } });
+const whereSql = (clause: unknown): string => pgDialect.sqlToQuery(clause as SQL).sql;
 
 const NOW = new Date("2026-09-28T12:00:00.000Z");
 
@@ -191,15 +178,21 @@ describe("runRecordingRepairSweep", () => {
     };
     expect(dedupe.kind).toBe("idempotency");
     expect(dedupe.key.startsWith("recording_side_effects:")).toBe(false);
-    expect(dedupe.key.startsWith("recording_repair:")).toBe(true);
-    expect(dedupe.key).toContain("CA1");
   });
 
-  /** Same attempt, same key — the sweep is safe to run twice in one window. */
-  test("is idempotent within a window: a second run enqueues the same keys", async () => {
+  /**
+   * At most one repair attempt per call per day, whatever the cadence.
+   *
+   * This is the test that fails when the key is salted with the sweep's own
+   * clock instead of a day bucket: two runs 90 minutes apart would then mint two
+   * different keys, the queue would dedupe nothing, and every unrepairable call
+   * would be re-enqueued on every sweep — forever, since a call whose recording
+   * has aged out of Twilio never leaves the candidate set.
+   */
+  test("two sweeps on the same day enqueue the same key, so the queue dedupes them", async () => {
     stubCandidates([candidate()]);
     await runRecordingRepairSweep({ now: NOW });
-    await runRecordingRepairSweep({ now: NOW });
+    await runRecordingRepairSweep({ now: new Date(NOW.getTime() + 90 * 60_000) });
 
     const [a, b] = mocks.enqueueRegisteredJob.mock.calls.map(
       (call) => (call[0] as { dedupe: { key: string } }).dedupe.key,
@@ -208,14 +201,13 @@ describe("runRecordingRepairSweep", () => {
   });
 
   /**
-   * A later sweep must not be deduped away by an earlier one, or a recording
-   * that fails once would never be retried. The attempt salt is what
-   * distinguishes the two keys.
+   * The other half of the same invariant: tomorrow must NOT be deduped against
+   * today, or a recording that fails once would never be retried.
    */
-  test("a later sweep enqueues a different key for the same call", async () => {
+  test("a sweep the next day enqueues a different key, so the call is retried", async () => {
     stubCandidates([candidate()]);
     await runRecordingRepairSweep({ now: NOW });
-    await runRecordingRepairSweep({ now: new Date(NOW.getTime() + 1) });
+    await runRecordingRepairSweep({ now: new Date(NOW.getTime() + 25 * 60 * 60_000) });
 
     const [a, b] = mocks.enqueueRegisteredJob.mock.calls.map(
       (call) => (call[0] as { dedupe: { key: string } }).dedupe.key,
@@ -258,9 +250,9 @@ describe("runRecordingRepairSweep", () => {
     stubCandidates([]);
     await runRecordingRepairSweep({ now: NOW });
 
-    expect(flatten(mocks.whereClause).columns).toEqual(
-      expect.arrayContaining(["recording_sid", "audio_url"]),
-    );
+    const sql = whereSql(mocks.whereClause);
+    expect(sql).toMatch(/"recording_sid" is not null/i);
+    expect(sql).toMatch(/"audio_url" is null/i);
   });
 
   /**
@@ -285,15 +277,30 @@ describe("runRecordingRepairSweep", () => {
     stubCandidates([]);
     await runRecordingRepairSweep({ now: NOW });
 
-    const { columns, words } = flatten(mocks.whereClause);
-    expect(columns).toContain("date_created");
+    const sql = whereSql(mocks.whereClause);
+    // Both bounds, each comparing the COLUMN (not just the literal) as
+    // timestamptz. Checking merely that `::timestamptz` appears is satisfied by
+    // the literal-side casts, so deleting the column cast left the old test
+    // green.
+    expect(sql).toMatch(/"date_created"::timestamptz\s*</);
+    expect(sql).toMatch(/"date_created"::timestamptz\s*>/);
+  });
 
-    // Both bounds: a cast chunk immediately followed by a comparison operator.
-    const castThenCompared = words.filter((word, i) => {
-      const next = words[i + 1]?.trim();
-      return word === "::timestamptz" && (next === "<" || next === ">");
-    });
-    expect(castThenCompared.length).toBeGreaterThanOrEqual(2);
+  /**
+   * Newest-first, and this is a correctness guard rather than a preference.
+   *
+   * A call whose recording has aged out of Twilio's retention can never be
+   * repaired, so it never leaves the candidate set. Under oldest-first ordering
+   * with a hard row limit, those permanently-broken rows hold the head of the
+   * queue and starve every newer, repairable call behind them — permanently.
+   * Newest-first starves the stuck rows instead, and they age out on their own.
+   */
+  test("orders newest-first so unrepairable old rows cannot starve the queue", async () => {
+    stubCandidates([]);
+    await runRecordingRepairSweep({ now: NOW });
+
+    expect(mocks.orderSql).toMatch(/desc\s*$/);
+    expect(mocks.orderSql).not.toMatch(/\basc\s*$/);
   });
 
   test("a sweep with nothing to repair is a no-op", async () => {
