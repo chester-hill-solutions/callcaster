@@ -3496,5 +3496,146 @@
     "size": "L",
     "risk": "high",
     "trackerRecommendation": "The highest-leverage item found this session, and it outranks several Fix-now entries. The argument for doing it over a live defect: this is the class that already caused a production corruption, the fix is compiler-checked so the large diff is safe, and the guard is worth more than the fix. The argument against rushing it: 68 columns is a lot of surface, and it should not share a PR with anything else. Blocks #2208 on its four-column subset only — the other 64 can wait."
+  },
+  {
+    "issueNumber": 2215,
+    "verdict": "fix-now",
+    "recommendedTitle": "Eleven tenant-scoped tables have no workspace foreign key, so deleting a workspace orphans campaign queue, agent status and audit rows",
+    "summary": "16 of the 27 registered tenant-scoped tables have a workspace foreign key with ON UPDATE CASCADE ON DELETE CASCADE in the SQL baseline. Eleven never got one, so DELETE FROM workspace leaves rows in all eleven and nothing in the write path refuses them. The gap splits in two. Eight are uuid on both sides (campaign_queue, outreach_attempt, workspace_events, agent_status, agent_status_event, inbound_queue, inbound_queue_member, inbound_queue_entry) and need nothing but an ALTER TABLE. Three (workspace_member, workspace_audit_event, workspace_audio) carry text tenancy columns and cannot be constrained, because the database declares workspace.id as uuid (drizzle/0000_baseline.sql:5320) while the Drizzle model declares it text() (app/db/schema.ts:102).",
+    "currentBehavior": "Deleting a workspace leaves campaign queue rows, outreach attempts, agent status rows, inbound queue entries, audit events, and audio metadata behind. db:orphans:check runs in CI, so this is caught on a schedule against whatever the check can reach, but it is not a constraint on every write and does not cover a delete racing a check. For workspace_member the exposure is sharper: a membership row whose workspace no longer exists still names a role_id, and role resolution reads it. workspace_member is the authorization table.",
+    "rootCause": "Two causes, not one. The eight unblocked tables simply never received the constraint the baseline added to the other sixteen — an incomplete migration, not a design choice. The three blocked ones are a model-versus-database type drift: the Drizzle model was written as text() while the DDL is uuid, and a foreign key requires matching types. That drift is the same class as #2213 (timestamptz declared as text()), on a different type, and it is why the CHS membership tables added in client/migrations/20260713180000 cannot be constrained as written. Note the Drizzle schema declares zero .references() for ANY tenancy column, so the type layer knows about none of the 16 constraints that do exist either.",
+    "resolution": "Ship the eight unblocked constraints first and do not wait on the other three: a plain ALTER TABLE ... ADD CONSTRAINT per table, ON UPDATE CASCADE ON DELETE CASCADE, with no data fix, because existing rows already carry a valid workspace id. Then decide the direction for the three text tables: correct the Drizzle model for workspace.id to uuid, aligning the model to the database it is supposed to mirror, rather than adding a text surrogate key to make the constraint fit. Before narrowing that type, verify against real data — the text model has stood since the baseline, so confirm every production workspace id parses as a uuid first. Add a test asserting every table in WORKSPACE_SCOPED_TABLES has a workspace foreign key, and extend the information_schema comparison test proposed in #2213 to cover foreign keys while it is being written. Do not bundle the eight constraints with the #2213 column work; they are independent and the eight are unblocked.",
+    "lookIn": [
+      "drizzle/0000_baseline.sql:5320 (workspace.id is uuid in the database)",
+      "app/db/schema.ts:102 (workspace.id is text() in the model — the drift)",
+      "app/db/schema.ts:126,453,472 (the three text tenancy columns: workspace_member, workspace_audit_event, workspace_audio)",
+      "app/db/schema.ts:51,79 (schema-campaign: campaign_queue.workspace is uuid)",
+      "app/db/workspace-scoped-tables.ts:41-94 (the 27 registered tables)",
+      "client/migrations/20260713180000_chs_workspace_membership.sql:99-106 (workspace_member, role_id FK but no workspace_id FK)",
+      "client/migrations/20260713120000_workspace_audit_event.sql:4 (workspace_audit_event.workspace_id is text)",
+      "client/migrations/20260715120000_workspace_audio_metadata.sql:17 (workspace_audio.workspace_id is text)",
+      "client/migrations/20260731140000_create_workspace_events.sql:24 (workspace_events.workspace_id is uuid — unconstrained)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Every tenant-scoped table in WORKSPACE_SCOPED_TABLES has a workspace foreign key to workspace(id) (kill-check: drop one constraint and confirm the assertion goes red)",
+      "Deleting a workspace cascades to all eleven tables, asserted against a real database",
+      "The information_schema guard from #2213 also compares foreign keys, not only column types"
+    ],
+    "acceptanceCriteria": [
+      "Eight ALTER TABLE migrations add the workspace FK with ON DELETE CASCADE, one per PR or one small migration file",
+      "A test fails if any tenant-scoped table lacks the constraint",
+      "A model-versus-database type check exists for workspace.id",
+      "The three text tables are either constrained or explicitly documented as blocked with the reason"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now, and start with the eight unblocked tables. The three blocked ones depend on the #2213 type-drift work, so sequencing the unblocked eight first is strictly better than waiting on it. This is the only genuinely new defect in the set: the rest of this batch maps onto issues that already existed. Medium risk because a cascade added to a live table is destructive if any existing row carries a workspace id that does not resolve — so confirm referential integrity before adding the constraint, not after."
+  },
+  {
+    "issueNumber": 2216,
+    "verdict": "fix-now",
+    "recommendedTitle": "Email verification is half-wired: a verify-email route and a \"verify your email\" prompt both exist, but no verification email is ever sent",
+    "summary": "Three facts together. No token is ever issued: Better Auth is configured with emailAndPassword but no sendVerificationEmail and no requireEmailVerification (app/server/auth-instance.ts:22-31), and a repo-wide grep for sendVerificationEmail and emailVerification across app/ returns nothing. The route is therefore unreachable: POST /api/auth/verify-email calls auth.api.verifyEmail (app/lib/platform-auth.server.ts:339-380) with no token ever written to auth_verification. And the success message lies: registerUser returns \"Registration successful. Verify your email before signing in\" (app/lib/platform-auth.server.ts:189-198), a branch Better Auth never takes when verification is not required, because it returns a session token instead. A rate limit is wired to the dead route (app/routes/api+/auth/verify-email.action.server.ts:9).",
+    "currentBehavior": "Every account can be registered against an address the registrant does not control, and nothing ever asks the registrant to prove it. No user has ever been asked to verify anything, so the route and the prompt are the only evidence the product verifies addresses. Password reset then sends to the unverified address, so whoever claimed it first controls the account.",
+    "rootCause": "Email verification was designed, partially removed, and left half-wired. Removing it cleanly would have deleted the route, the branch, and the column handling together. What survives is a removed feature's shape without its mechanism — the most misleading of the three states, because a reader auditing the auth surface will conclude addresses are verified. There is no test asserting whether a registered user is verified, so no gate noticed.",
+    "resolution": "Decide, then implement one of two paths. Do not leave it split. OPTION A (correct product): add requireEmailVerification: true and a sendVerificationEmail callback in app/server/auth-instance.ts, correct sign-in to handle a pending-verification session, and add a resend path. This closes the account-takeover path and makes the existing route live, at the cost of signup friction. OPTION B (smaller, honest): delete the verify-email loader, action and route files, delete the unreachable branch in registerUser, and delete the emailVerified handling that assumes a verification step. Either way add a test that registers a user and asserts the actual observable outcome, so the third state cannot return. NOTE the two options are not equivalent in value: B makes the code honest, A makes the product correct. If the platform will hold customer contact data at scale — and the contact schema says it already does, with phone, email, address and a do_not_knock household flag — A is the right call. Raise that as a product decision rather than resolving it silently inside a bug fix.",
+    "lookIn": [
+      "app/server/auth-instance.ts:22-31 (emailAndPassword: no sendVerificationEmail, no requireEmailVerification)",
+      "app/lib/platform-auth.server.ts:339-380 (the unreachable verify-email handler)",
+      "app/lib/platform-auth.server.ts:189-198 (the unreachable success branch)",
+      "app/routes/api+/auth/verify-email.action.server.ts:9 (a rate limit on a dead route)",
+      "app/db/auth-schema.ts:16 (emailVerified column, default false, never written)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Registering a user asserts the real observable outcome: either a verification email is sent and the session is pending, or neither happens (kill-check: leave the \"Verify your email\" string in place and confirm the test goes red)",
+      "No route, branch, or message claims verification occurs unless a test proves it does"
+    ],
+    "acceptanceCriteria": [
+      "A test registers a user and asserts one of the two outcomes, so the half-wired state cannot return",
+      "No user-visible string references verification unless verification happens",
+      "The dead route and its rate limit are either live or removed",
+      "A test covers the chosen path end to end"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now, and treat the Option A/B choice as the decision it is rather than picking the cheaper one by default. Small change, but it sits on the account-takeover path of a product that provisions real Twilio subaccounts and spends real money, and it is the only auth defect in this batch whose risk is about who can hold an account rather than about leaking or brute-forcing one. #2075 (password reset links to a route that does not exist) is a separate dead end in the same flow — not a duplicate, and both are worth fixing in one pass since both are the forgotten-password path."
+  },
+  {
+    "issueNumber": 2219,
+    "verdict": "fix-now",
+    "recommendedTitle": "accept-invite actionType=updateUser creates an account for any email with no invite token and no rate limit",
+    "summary": "POST /accept-invite with actionType=updateUser calls auth.api.signUpEmail for any email, password and name taken straight from the form body, with no invite token read or validated and no rate limit. The action dispatches on a form field (app/routes/accept-invite.action.server.ts:225-234): redeemInvitationAction validates a token, resendInvitationAction resends, and signUpAndClaimAction validates nothing. This is an authentication bypass, not an abuse-rate gap — anyone can register any address and receive a live session plus that address's pending-invitation list.",
+    "currentBehavior": "With SIGNUP_OPEN=true an unauthenticated caller POSTs actionType=updateUser with an arbitrary email and password and gets a real user row, a real scrypt password hash, a real session cookie, and a list of every pending workspace invitation for that address (app/routes/accept-invite.action.server.ts:189-194). The invitationId/token pair at :163-187 is optional and only claims an invite AFTER the account already exists.",
+    "rootCause": "One dispatch branch of three omits the invariant the route name implies. The action's auth strategy is bare getSession (app/routes/accept-invite.action.server.ts:215), which reads but does not require a session and applies no limit. Neither existing gate helps: isSignupOpen() (app/lib/env.server.ts:288-292) is the only check and .env.example:66 ships SIGNUP_OPEN=true, and the limiter that protects the ordinary path is absent here entirely. The per-IP 10/60s limits on the JSON twin (app/routes/api+/auth/register.action.server.ts:10) and the Better Auth catch-all (app/routes/api+/auth/$.loader.server.ts:12-25) do not cover this form post, so the one route that skips invite validation is also the one route that skips the limiter. That coincidence is what makes it exploitable at volume. #1550 previously fixed the signup-closed half of this route and left the token half.",
+    "resolution": "1. Apply the same rate limit the JSON twin uses — add rateLimitedPostAuth(\"auth:register\") or the in-handler enforceAuthRateLimit(request, \"auth:register\") form (app/routes/signin.action.server.ts:14). One line, closes the abuse-at-volume vector immediately, and should land even if step 2 is deferred. 2. Require a valid, unredeemed invitation for the address being registered. redeemWorkspaceInvitation already exists and returns a structured { ok, error, status } (app/routes/accept-invite.action.server.ts:46-58) — reuse it rather than adding a second check, since the intended flow is that a user registers BECAUSE of an invite. 3. With step 2 in place the pending-invite list at :189-194 becomes unreachable in this branch; if it is not done, remove that disclosure regardless, because returning a workspace's pending invitations to an unauthenticated caller who supplied the address is a targeting aid. Land in that order — step 1 alone is strictly better than nothing.",
+    "lookIn": [
+      "app/routes/accept-invite.action.server.ts:225-234 (the dispatcher; updateUser bypasses the token check)",
+      "app/routes/accept-invite.action.server.ts:104-150 (signUpAndClaimAction — unauthenticated registration)",
+      "app/routes/accept-invite.action.server.ts:163-194 (optional invite claim, then the pending-invite disclosure)",
+      "app/routes/accept-invite.action.server.ts:215 (auth: bare getSession, no rate limit)",
+      "app/routes/accept-invite.action.server.ts:46-58 (redeemWorkspaceInvitation — the check to reuse)",
+      "app/routes/api+/auth/register.action.server.ts:10 (the limited JSON twin to match)",
+      "app/lib/workspace-invitations.server.ts (redeemWorkspaceInvitation implementation)",
+      "app/lib/env.server.ts:288-292 and .env.example:66 (SIGNUP_OPEN ships true in this repo)"
+    ],
+    "existingTests": [
+      "test/accept-invite.route.test.ts — covers the redeem path"
+    ],
+    "missingTests": [
+      "Registration via actionType=updateUser with no token creates no user (kill-check: remove the token requirement and confirm the test goes red)",
+      "Registration with a valid unredeemed token creates the user AND claims the invitation",
+      "The route returns 429 at the register threshold (kill-check: drop the limiter and confirm)",
+      "An unauthenticated caller cannot obtain a pending-invitation list for an arbitrary address"
+    ],
+    "acceptanceCriteria": [
+      "POST /accept-invite with actionType=updateUser and no invitation token does not create a user",
+      "The same request with a valid unredeemed token creates the user and claims the invitation",
+      "The route is rate limited at the same threshold as POST /api/auth/register",
+      "No unauthenticated caller can read a pending-invitation list for an arbitrary email"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Fix now, and treat it as the most serious auth finding in the current set — ahead of every rate-limit item, because it is a missing authorization check rather than an abuse-rate problem. It is the only issue in this batch where an unauthenticated caller obtains an authenticated session for an identity they chose. The one-line rate limit is the fastest mitigation and should not wait on the token work. High risk is the severity of the finding, not the size of the change. Sibling authorization bugs on this same route are already tracked: #2077 (resend has no ownership check) and #2076 (cancel authorized on workspaceId but executed on a bare invitation id) — the route has a pattern of authorizing on one key and acting on another, and this issue is the third instance of it."
+  },
+  {
+    "issueNumber": 2220,
+    "verdict": "fix-now",
+    "recommendedTitle": "The HTML signup and password-reset forms have no rate limit, while their JSON twins do",
+    "summary": "app/routes/signup.action.server.ts and app/routes/reset-password.action.server.ts declare no rate limit, while POST /api/auth/register and POST /api/auth/reset-password both use rateLimitedPostAuth(\"auth:register\") / the reset scope (app/routes/api+/auth/register.action.server.ts:10, app/routes/api+/auth/reset-password.action.server.ts:10). The limiter exists and is not missing: the sibling HTML actions signin, two-factor and remember all call enforceAuthRateLimit (app/routes/signin.action.server.ts:14, app/routes/two-factor.action.server.ts:14). Three of five HTML auth actions use the in-handler form; the two that reach the same two operations do not. This is a wiring gap, not a design gap.",
+    "currentBehavior": "signup.action.server.ts calls registerUser with nothing in front of it. reset-password.action.server.ts calls auth.api.resetPassword at :36 with no limit. The Better Auth catch-all is limited (app/routes/api+/auth/$.loader.server.ts:12-25) and both JSON twins are limited, so the unthrottled surface is specifically the two browser form posts.",
+    "rootCause": "The limiter was added surface by surface rather than by construction, and these two were missed. That is visible in the code's own intent: DISABLE_AUTH_RATE_LIMIT is honored in non-production only and REFUSES to apply on Railway production (app/lib/platform-auth-rate-limit.server.ts:41-54), so the platform deliberately enforces this in production. Two forms sit outside a control the codebase otherwise treats as non-negotiable. Related gap in the same family: no per-account lockout exists anywhere in app/ — a grep for lockout, failedAttempt and brute returns nothing, and the only lockout is Better Auth's TOTP plugin default (10 failures / 900s, app/db/auth-schema.ts:81-82), which covers 2FA only and 2FA is opt-in (app/lib/env.server.ts:270-273). So credential stuffing is per-IP bounded at 10/60s and per-account unbounded.",
+    "resolution": "1. Add enforceAuthRateLimit(request, \"auth:register\") to signup.action.server.ts, and the reset equivalent to reset-password.action.server.ts, matching signin and two-factor. Confirm the scope names exist in platform-auth-rate-limit.server.ts:18-33; add a scope if the reset one is missing. Two one-line changes. 2. Add a per-account failed-password counter with lockout on signin.action.server.ts. auth_two_factor.failed_verification_count / locked_until (app/db/auth-schema.ts:81-82) is a working in-repo precedent for the column pair, and Better Auth's TOTP plugin is a working precedent for the behaviour. 3. Add a test per surface asserting 429 past the threshold, so the next refactor cannot drop the limiter the way it was dropped here. The reset gap is genuinely lower severity than the signup gap and the issue says so: the reset form requires a valid token, so the exposure is an unthrottled token-verification endpoint, not a session-revocation vector — revokeSessionsOnPasswordReset only runs on a successful reset.",
+    "lookIn": [
+      "app/routes/signup.action.server.ts (no limiter; calls registerUser)",
+      "app/routes/reset-password.action.server.ts:36 (no limiter; calls auth.api.resetPassword)",
+      "app/routes/signin.action.server.ts:14 (enforceAuthRateLimit — the pattern to copy)",
+      "app/routes/two-factor.action.server.ts:14 (same)",
+      "app/lib/platform-auth-rate-limit.server.ts:18-33,41-54 (scopes; production refuses the kill switch)",
+      "app/routes/api+/auth/register.action.server.ts:10 (the limited JSON twin)",
+      "app/routes/api+/auth/reset-password.action.server.ts:10 (the limited JSON twin)",
+      "app/db/auth-schema.ts:81-82 (failed_verification_count / locked_until — the lockout precedent)",
+      "app/lib/env.server.ts:270-273 (TWO_FACTOR_ENABLED is opt-in)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Signup form returns 429 past the threshold (kill-check: remove the limiter call and confirm the test goes red)",
+      "Reset form returns 429 past the threshold",
+      "A correct password after N failed attempts is refused for the lockout window"
+    ],
+    "acceptanceCriteria": [
+      "The HTML signup form is rate limited at the same threshold as POST /api/auth/register",
+      "The HTML reset form is rate limited, and a scope for it exists in platform-auth-rate-limit.server.ts",
+      "A per-account failed-password lockout is enforced on signin.action.server.ts",
+      "A test asserts 429 on each surface, so the limiter cannot be dropped silently again"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now. Two one-line changes with an unbounded-cost exposure each: every account can provision a Twilio subaccount (app/lib/database/workspace-provisioning.server.ts:106-134) and spend welcome credits, and the per-IP bound on the JSON path is the only thing currently limiting that. Sequence alongside #2099 — rate_limit_bucket is never pruned and its key is the caller-supplied X-Forwarded-For, so wiring these limiters while the key is spoofable and unpruned leaves a weaker control than it appears. That is a real dependency on correctness, not on sequencing aesthetics. Distinct from #2135 (no limit on API-key write endpoints) and from #2219, which is an authentication bypass and the more serious of the two despite both being about missing limits."
   }
 ]
