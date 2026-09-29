@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@8f1952bf` · 279 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@48c850bb` · 279 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 116
+## Fix now — 115
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -44,16 +44,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: test/legacy-auth-sql-guard.test.ts - latest CREATE OR REPLACE per public function has no auth.uid()/auth.jwt(); test/integration-db/manual-dial-claim-actor.test.ts - claim RPC assigns the withAppCurrentUser actor; test/queue-rpc-contract.test.ts latest-definition resolver must pick the new migration
 - Done when: No public function or policy references auth.*; The two RPC flows still pass their tests; DROP SCHEMA auth succeeds on dev, then prod; A fresh bootstrap does not recreate auth.uid()
 - Tracker: Keep in Fix now, split into the three PR-sized chunks. Run the zero-auth.* dependency query on prod before the drop and keep the rewrite and the drop in separate releases.
-
-### [#2097](https://github.com/chester-hill-solutions/callcaster/issues/2097) PATCH /api/campaigns/:campaignId/queue never checks that the referenced audience or contacts belong to the caller's workspace
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-09-28
-- `patchCampaignQueueApi` proves the **campaign** is the caller's, then resolves `add_audience` / `add_contact_ids` against **any** id in the platform. The trigger stamps the attacker's workspace onto the resulting queue rows, so `GET /api/campaigns/:id/queue` then returns another tenant's contacts in full.
-- Current behavior: `PATCH /api/campaigns/57/queue` with `{"add_audience": {"audience_id": "<ws-B audience>"}}` → the campaign is the attacker's → the audience is workspace B's → every B contact id is inserted into campaign 57's queue with `workspace = <attacker's workspace>` → `GET /api/campaigns/57/queue` returns B's contact records.
-- Resolution: 1. Resolve the target ids through the caller's tenant client before enqueuing. For `add_audience`: `createTenantDb(workspaceId).audience.findFirst({ where: eq(audienceTable.id, body.audience_id) })` → 404 when it is not in the workspace. 2. For `add_contact_ids`: filter the id list to `tdb.contact` rows, or reject with a 400 naming the foreign ids. Do not enqueue a partial set silently. 3. Return the same uniform 404 the rest of the data plane uses for another tenant's resource, so the endpoint is not an existence oracle. 4. Sweep the other `api+` write endpoints for the same shape: a request that references a tenant-scoped id must resolve it through the tenant client. `check:route-membership` cannot catch this class — it checks the route, not the referenced ids — so say so in the issue and consider a helper the write paths must use.
-- Look in: `app/routes/api+/campaigns/$campaignId/queue.action.server.ts:60-62`, `the `patchCampaignQueueApi` implementation (the `add_audience` / `add_contact_ids` branches)`, `app/lib/campaign-queue-search.server.ts:553-564`, `app/server/tenant-db.ts`, `app/db/workspace-scoped-tables.ts`
-- Missing tests: `add_audience` with a foreign audience → 404, no rows enqueued (kill-check: drop the tenant lookup and confirm the test goes red).; `add_contact_ids` with a foreign contact → rejected, no rows enqueued.; A permitted-path positive control.
-- Done when: `add_audience` with another workspace's `audience_id` returns 404 and enqueues nothing.; `add_contact_ids` with a foreign `contact_id` returns 404 (or a 400 naming it) and enqueues nothing.; A mixed list is handled explicitly: either all-or-nothing or a named rejection — documented and tested.; The permitted path (ids from the caller's own workspace) still enqueues, with a positive-control test.; Every `api+` write endpoint that accepts a tenant-scoped id has been swept and the sweep is recorded in the issue.
-- Tracker: Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage.
 
 ### [#2157](https://github.com/chester-hill-solutions/callcaster/issues/2157) The chats loader-to-state sync can permanently discard a fresh page-1 response
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -1244,7 +1234,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 76
+## Verify and close — 77
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -1287,6 +1277,16 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Campaign is not marked complete while it has a non-terminal call; A terminal status callback completes the campaign only after all calls settle; Replace the 'dequeues on success' assertion with acknowledgment-on-completion semantics
 - Done when: Campaign status does not read 'complete' while any campaign call is still in flight; Completion happens after the last call reaches a terminal status; No stalled campaign when a status callback never arrives
 - Tracker: Implemented on dev (PR #2028 061689af): campaign completion is gated on settled calls (campaign_has_unsettled_calls + try_complete_campaign_if_drained), the IVR terminal-status callback triggers completion and persists busy/canceled, and the dequeue reason wording is corrected. Integration + contract tests land with it. Verify on the review env (campaign completes after calls settle, incl. no-answer/busy), then close.
+
+### [#2097](https://github.com/chester-hill-solutions/callcaster/issues/2097) PATCH /api/campaigns/:campaignId/queue never checks that the referenced audience or contacts belong to the caller's workspace
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-09-28
+- `patchCampaignQueueApi` proves the **campaign** is the caller's, then resolves `add_audience` / `add_contact_ids` against **any** id in the platform. The trigger stamps the attacker's workspace onto the resulting queue rows, so `GET /api/campaigns/:id/queue` then returns another tenant's contacts in full.
+- Current behavior: `PATCH /api/campaigns/57/queue` with `{"add_audience": {"audience_id": "<ws-B audience>"}}` → the campaign is the attacker's → the audience is workspace B's → every B contact id is inserted into campaign 57's queue with `workspace = <attacker's workspace>` → `GET /api/campaigns/57/queue` returns B's contact records.
+- Resolution: 1. Resolve the target ids through the caller's tenant client before enqueuing. For `add_audience`: `createTenantDb(workspaceId).audience.findFirst({ where: eq(audienceTable.id, body.audience_id) })` → 404 when it is not in the workspace. 2. For `add_contact_ids`: filter the id list to `tdb.contact` rows, or reject with a 400 naming the foreign ids. Do not enqueue a partial set silently. 3. Return the same uniform 404 the rest of the data plane uses for another tenant's resource, so the endpoint is not an existence oracle. 4. Sweep the other `api+` write endpoints for the same shape: a request that references a tenant-scoped id must resolve it through the tenant client. `check:route-membership` cannot catch this class — it checks the route, not the referenced ids — so say so in the issue and consider a helper the write paths must use.
+- Look in: `app/routes/api+/campaigns/$campaignId/queue.action.server.ts:60-62`, `the `patchCampaignQueueApi` implementation (the `add_audience` / `add_contact_ids` branches)`, `app/lib/campaign-queue-search.server.ts:553-564`, `app/server/tenant-db.ts`, `app/db/workspace-scoped-tables.ts`
+- Missing tests: `add_audience` with a foreign audience → 404, no rows enqueued (kill-check: drop the tenant lookup and confirm the test goes red).; `add_contact_ids` with a foreign contact → rejected, no rows enqueued.; A permitted-path positive control.
+- Done when: `add_audience` with another workspace's `audience_id` returns 404 and enqueues nothing.; `add_contact_ids` with a foreign `contact_id` returns 404 (or a 400 naming it) and enqueues nothing.; A mixed list is handled explicitly: either all-or-nothing or a named rejection — documented and tested.; The permitted path (ids from the caller's own workspace) still enqueues, with a positive-control test.; Every `api+` write endpoint that accepts a tenant-scoped id has been swept and the sweep is recorded in the issue.
+- Tracker: Fixed on dev by PR #2175 (07bd43d1), merged 2026-09-28, plus PR #2177 (13e7c502) which unified the guard. Verified on dev rather than assumed: app/lib/contacts/tenant-scope.server.ts:44 defines resolveContactsOwnedByWorkspace, app/lib/platform-data.server.ts imports it at line 70 and calls it at line 506 from the add_contact_ids branch of patchCampaignQueueApi, and test/campaign-queue-tenant-scope.test.ts plus test/contact-tenant-scope-unified.test.ts cover it. One deliberate behaviour change: the workspaces+ route now answers 404 where it answered 403, because a 403 or 400 naming foreign ids would confirm a workspace's contents exist. The record went stale because it predates the fix and the generator only prunes CLOSED issues; #2097 is still open, correctly, since a merge to dev is not a release. Left OPEN: what remains is a verification pass on the review environment, not code.
 
 ### [#2048](https://github.com/chester-hill-solutions/callcaster/issues/2048) Block SMS campaign completion while messages are unsettled at Twilio
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-27
