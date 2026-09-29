@@ -61,8 +61,12 @@ async function emitQueueRowDeletes(workspaceId: string, deletedRows: CampaignQue
 /**
  * Update campaign_queue rows and emit SSE postgres_change events.
  * Loads old rows once, mutates, then emits UPDATE events.
+ *
+ * Exported so `campaign-queue-updates.server.ts` writes keyed rows through
+ * this instead of copying it. One writer means a publish can never end up
+ * conditional for keyed updates and unconditional for everything else.
  */
-async function updateCampaignQueueAndEmit(args: {
+export async function updateCampaignQueueAndEmit(args: {
   conditions: SQL[];
   set: Record<string, unknown>;
   workspaceId?: string;
@@ -343,25 +347,6 @@ export async function getQueuedContactIdsForCampaign(args: {
   return rows.map((row) => row.contact_id);
 }
 
-/**
- * Revert a claimed campaign_queue row back to `queued`. Used to release a
- * contact claimed by `claim_next_queue_contact` when the subsequent dial
- * attempt fails before a Twilio call is actually placed (e.g. the Twilio API
- * call itself throws) — otherwise the contact is stuck "assigned" forever
- * and the predictive dialer can never retry it.
- */
-export async function requeueCampaignQueueById(queueId: number, workspaceId?: string) {
-  const conditions: SQL[] = [eq(campaignQueueTable.id, queueId)];
-  if (workspaceId) {
-    conditions.push(eq(campaignQueueTable.workspace, workspaceId));
-  }
-
-  return updateCampaignQueueAndEmit({
-    conditions,
-    set: buildQueuedQueueUpdate(),
-    workspaceId,
-  });
-}
 
 /**
  * Internal mechanism — plain Drizzle UPDATE, unconditional on the row's
@@ -387,39 +372,6 @@ async function dequeueCampaignQueueById(args: {
   });
 }
 
-export async function updateCampaignQueueByContactAndCampaign(args: {
-  contactId: number;
-  campaignId: number;
-  update: Record<string, unknown>;
-  workspaceId?: string;
-}) {
-  const conditions: SQL[] = [
-    eq(campaignQueueTable.contact_id, args.contactId),
-    eq(campaignQueueTable.campaign_id, args.campaignId),
-  ];
-  if (args.workspaceId) {
-    conditions.push(eq(campaignQueueTable.workspace, args.workspaceId));
-  }
-
-  return updateCampaignQueueAndEmit({
-    conditions,
-    set: args.update,
-    workspaceId: args.workspaceId,
-  });
-}
-
-export async function requeueAllCampaignQueueForCampaign(campaignId: number, workspaceId?: string) {
-  const conditions: SQL[] = [eq(campaignQueueTable.campaign_id, campaignId)];
-  if (workspaceId) {
-    conditions.push(eq(campaignQueueTable.workspace, workspaceId));
-  }
-
-  return updateCampaignQueueAndEmit({
-    conditions,
-    set: buildQueuedQueueUpdate(),
-    workspaceId,
-  });
-}
 
 export async function fetchCampaignQueueRowsByIds(queueIds: number[], workspaceId?: string) {
   if (queueIds.length === 0) {

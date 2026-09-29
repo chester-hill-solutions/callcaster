@@ -7,10 +7,10 @@ import {
   resolveCampaignWorkspaceId,
   resolveContactWorkspaceId,
 } from "@/lib/platform-telephony.server";
+import { requeueAllCampaignQueueForCampaign } from "@/lib/campaign-queue-updates.server";
 import {
   dequeueQueueEntry,
-  explainDequeueNoOp,
-  requeueAllCampaignQueueForCampaign,
+  explainDequeueNoOp
 } from "@/lib/campaign-queue-db.server";
 import { jsonError } from "@/lib/platform-api.server";
 import { logger } from "@/lib/logger.server";

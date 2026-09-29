@@ -28,9 +28,14 @@ const requeueCampaignQueueByIdMock = vi.hoisted(() => vi.fn());
 const dequeueQueueEntryMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   claimNextQueueContact: (...args: unknown[]) => claimNextQueueContactMock(...args),
+  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
+}));
+// Spreads the real module: only the keyed write is asserted here, and a frozen
+// factory breaks the day the module gains an export.
+vi.mock("@/lib/campaign-queue-updates.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-queue-updates.server")>()),
   requeueCampaignQueueById: (...args: unknown[]) =>
     requeueCampaignQueueByIdMock(...args),
-  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
 }));
 
 const twilioMocks = vi.hoisted(() => ({

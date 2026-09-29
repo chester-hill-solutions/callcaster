@@ -32,13 +32,19 @@ vi.mock("@/lib/logger.server", () => ({
 }));
 const dequeueQueueEntryMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/campaign-queue-db.server", () => ({
+  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
+}));
+// Spreads the real module, for the same reason: only the keyed write is
+// asserted on, and this file's graph is deep enough that a frozen factory hides
+// unrelated breakage behind a catch-all error.
+vi.mock("@/lib/campaign-queue-updates.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-queue-updates.server")>()),
   updateCampaignQueueByContactAndCampaign: async (...args: unknown[]) => {
     if (campaignQueueDbMocks.updateError) {
       throw campaignQueueDbMocks.updateError;
     }
     return campaignQueueDbMocks.updateCampaignQueueByContactAndCampaign(...args);
   },
-  dequeueQueueEntry: (...args: unknown[]) => dequeueQueueEntryMock(...args),
 }));
 
 const twilioValidation = vi.hoisted(() => ({

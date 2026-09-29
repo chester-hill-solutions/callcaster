@@ -29,10 +29,14 @@ vi.mock("@/lib/request-utils.server", () => ({
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   fetchCampaignQueueRowsByIds: (...args: unknown[]) => mocks.fetchCampaignQueueRowsByIds(...args),
-  requeueAllCampaignQueueForCampaign: (...args: unknown[]) =>
-    mocks.requeueAllCampaignQueueForCampaign(...args),
   dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
   explainDequeueNoOp: (...args: unknown[]) => mocks.explainDequeueNoOp(...args),
+}));
+// Spreads the real module: the requeue is the only keyed write asserted here.
+vi.mock("@/lib/campaign-queue-updates.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-queue-updates.server")>()),
+  requeueAllCampaignQueueForCampaign: (...args: unknown[]) =>
+    mocks.requeueAllCampaignQueueForCampaign(...args),
 }));
 vi.mock("@/lib/platform-telephony.server", () => ({
   resolveCampaignWorkspaceId: (...args: unknown[]) => mocks.resolveCampaignWorkspaceId(...args),

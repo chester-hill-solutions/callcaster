@@ -11,10 +11,10 @@ import {
   rpcResetStaleCampaignQueueClaims,
   rpcTryCompleteCampaignIfDrained,
 } from "@/lib/db-rpc.server";
+import { requeueCampaignQueueById } from "@/lib/campaign-queue-updates.server";
 import {
   claimNextQueueContact,
-  dequeueQueueEntry,
-  requeueCampaignQueueById,
+  dequeueQueueEntry
 } from "@/lib/campaign-queue-db.server";
 import { updateCallBySid } from "@/lib/telephony-db.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
