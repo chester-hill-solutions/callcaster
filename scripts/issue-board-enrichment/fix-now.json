@@ -3114,37 +3114,6 @@
     "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
   },
   {
-    "issueNumber": 2146,
-    "verdict": "fix-now",
-    "recommendedTitle": "The IVR option matcher reads only option.value, so a documented-format script's declared next routes never match",
-    "summary": "The documented script format stores options with `content` and `next` and no `value`. The option matcher reads only `option.value`, so **every** branch declared in a documented-format script is silently ignored: the runtime falls through to the linear chain and plays the next block regardless of what the caller pressed.",
-    "currentBehavior": "Two readers of the same option shape disagree: the router reads `next`, the matcher and the label resolver read `value`. A script can pass validation and then behave as if it had no branches.",
-    "resolution": "1. Normalise the option value in **one** shared helper used by both response routes and by `ivr-results.ts`: const optionValue = (o: { value?: unknown; content?: unknown }) => String(o.value ?? o.content ?? \"\").trim(); 2. Failing that, run `scripts.migrateFromCallcasterFlow(steps)` + `serializeToCallcasterFlow` inside `createScriptForCampaign` so the stored shape is canonical — but the shared helper is still needed for scripts that arrive by any other route. 3. Rejecting a script whose interactive options lack `value` at the API boundary would also be defensible, and would turn a silent behaviour change into a clear error. Decide which and record it. 4. Whatever is chosen, add a routing-validation check that exercises the **matcher**, not just the edges — `script_routing_invalid` currently cannot catch this because it only checks that `next` exists.",
-    "lookIn": [
-      "the IVR response route's option matcher (`findNextStep`) and `findNextBlock` at lines 86-89",
-      "app/lib/ivr-results.ts:114-118 (`resolveIvrAnswerLabel`)",
-      "app/lib/ivr-script-validation.ts (`resolveNext`, `script_routing_invalid`)",
-      "app/lib/create-with-script.server.ts",
-      "docs/script-json-format.md"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "A documented-format script routes on a key press (kill-check).",
-      "The export shows the option label.",
-      "A script with unmatchable options is normalised or rejected."
-    ],
-    "acceptanceCriteria": [
-      "A documented-format script with `content`/`next` options routes correctly on a key press (kill-check: remove the normalisation and confirm the test goes red).",
-      "The Results screen and the CSV export show the option label, not the raw digit.",
-      "A script whose options have no recognisable value is either normalised or rejected with a clear message — decided and tested.",
-      "The launch gate can detect a script whose options cannot be matched (a validation that exercises the matcher)."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
-  },
-  {
     "issueNumber": 2147,
     "verdict": "fix-now",
     "recommendedTitle": "A timed-out Gather writes a literal null answer, and the voice campaign export renders it as the string \"null\"",
