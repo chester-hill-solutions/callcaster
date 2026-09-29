@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@e3a10624` · 279 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@3098025e` · 280 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 114
+## Fix now — 115
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -322,6 +322,11 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: `GET /admin` loader payload has no `twilio_data` / `key` / `token` / `stripe_id` key at any nesting depth.; `GET /admin/workspaces/:id` loader payload likewise.; The sudo JSON API `all_workspaces` likewise.; A guard test that fails when a new admin route puts `getWorkspaceById` in a `routeData`.
 - Done when: No admin loader payload contains `twilio_data`, `key`, `token` or `stripe_id` for any workspace.; `check:workspace-projection` scans `app/routes/admin+` as well as `app/routes/workspaces+`, and fails on a `SELECT *` workspace read in either.; `WorkspaceWithCampaigns` is a hand-written projection, so adding a secret column to `workspace` does not silently widen the admin payload.; A test asserts the admin loader payload's key set, not just that the projection helper works.
 - Tracker: Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage.
+
+### [#2194](https://github.com/chester-hill-solutions/callcaster/issues/2194) Cull 111 empty legacy-named Twilio subaccounts (Console-only; 31 must be kept)
+- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
+- Surveyed 2026-09-29 with npm run tools:twilio:subaccounts (PR #2193). The single Twilio account <the shared account> is shared by dev, staging AND production — there is no dev-only silo — and holds 192 subaccounts, 183 named with a raw workspace UUID, 91 suspended, 48 holding phone numbers and 22 holding message history. 142 subaccounts look empty (no numbers, no messages) but 31 of those belong to live dev workspaces, one with 7,704 contacts and another with 5,826: empty means 'has not rented a number yet', not 'abandoned'. So 111 are safe to delete and 31 must be kept. The only reliable subaccount-to-workspace link is the friendly name, because app-created subaccounts are named with the workspace UUID; workspace.twilio_data stores NO subaccount SID and cannot be used as a guard.
+- Tracker: Cannot be automated: twilio v5 exposes only create/fetch/update on an account, with no remove, so subaccount deletion is a Console-only action. A cull script was written, had all three guards verified (refuses without --confirm, refuses the parent account, refuses an empty allowlist), then failed 111/111 on the missing method and was deleted rather than shipped half-working. Do it by hand: Console > Account > Subaccounts, select the 111, delete. Before deleting any candidate, cross-check it against BOTH databases — the production database is internal-only, so that check must run from inside Railway via 'railway ssh --service CallCaster --environment production', never from a laptop. The higher-value and NON-DESTRUCTIVE half of this job is renaming the 183 legacy subaccounts to the current 'Name · <8 hex>' scheme, which the API does support via update; that makes the console readable and makes every future cull safe by inspection. Consider doing the renames first.
 
 ### [#2086](https://github.com/chester-hill-solutions/callcaster/issues/2086) The IVR no-input replay branch overwrites outreach_attempt.result, destroying every answer already recorded on that call
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-09-27
