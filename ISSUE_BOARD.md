@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@24948429` · 280 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@a3ab6cf0` · 280 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 114
+## Fix now — 113
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -695,11 +695,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
 - Tracker: Fix now; caused night-time sends on the Eric Lombardi blast (2026-09-24).
 
-### [#2187](https://github.com/chester-hill-solutions/callcaster/issues/2187) One contact's preparation failure aborts the whole campaign SMS batch
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-29
-- handleMember forwards handleClaimedMember and re-throws, and runPacedSendBatches collects the batch with Promise.all, so one row's preparation failure rejects the whole dispatchCampaignSmsBatch and abandons every other row in it. Trigger: getOrLookupLineType throws — a transient connection reset, a statement timeout, or pool exhaustion under exactly the load #2185 addresses. Verified by making the first three lookups throw in a 25-row batch: the call rejects with 'lookup blew up' instead of returning dispatched or deferred_send_window. Not data loss — unstarted rows are never dequeued and a later tick retries them — but a whole batch of prepared work is discarded for one bad contact.
-- Tracker: Fix now as its own atomic PR. Give preparation the same per-row treatment the send path already has: catch inside handleMember, call recordQueueAttemptFailure, increment counts.failed, and return { success: false, error } for that row alone. Today rpcFailExhaustedCampaignQueueContacts runs only when counts.failed > 0 and a rejection never reaches it, so failed rows are not dead-lettered either, and the durable worker adapter gets an exception where it expects a structured outcome. Reuse the existing sendSingleCampaignSms .then(ok, err) shape rather than inventing a second failure convention. Do NOT bundle with #2185 — that is merged.
-
 ### [#2116](https://github.com/chester-hill-solutions/callcaster/issues/2116) runCronWorkspaceFanout never skips workspace.disabled, so a disabled workspace is still debited and still reconciled
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-28
 - `runCronWorkspaceFanout` is the entry point for `twilio_open_sync`, `billing_reconcile` and `number_rental_billing`. It did not check `workspace.disabled`, so a workspace an admin had disabled still got its daily number-rental debits posted and still got its Twilio usage pulled and reconciled. RESOLVED as a two-lever split, decided by the product owner 2026-09-28 and implemented. `disabled` stops money moving OUT (rental debits, usage reconciliation, twilio_open_sync) but number RELEASE keeps running on its own schedule.
@@ -1219,9 +1214,14 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 79
+## Verify and close — 80
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2187](https://github.com/chester-hill-solutions/callcaster/issues/2187) One contact's preparation failure aborts the whole campaign SMS batch
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-29
+- handleMember forwards handleClaimedMember and re-throws, and runPacedSendBatches collects the batch with Promise.all, so one row's preparation failure rejects the whole dispatchCampaignSmsBatch and abandons every other row in it. Trigger: getOrLookupLineType throws — a transient connection reset, a statement timeout, or pool exhaustion under exactly the load #2185 addresses. Verified by making the first three lookups throw in a 25-row batch: the call rejects with 'lookup blew up' instead of returning dispatched or deferred_send_window. Not data loss — unstarted rows are never dequeued and a later tick retries them — but a whole batch of prepared work is discarded for one bad contact.
+- Tracker: Fixed and merged as PR #2198 (a3ab6cf0e). The send path had a per-row failure boundary (sendSingleCampaignSms rejects, and its .then(_,onError) releases the credit, counts the failure, records the attempt and returns a per-contact result); preparation had none, so a throw in any of its four database round trips propagated into await Promise.all in runPacedSendBatches and rejected the whole batch. Blast radius: batch siblings' responses discarded even though they had already sent and been counted, every remaining batch abandoned, and rpcFailExhaustedCampaignQueueContacts skipped - so the failed row never dead-lettered, stayed eligible, failed again next run, and the campaign could not drain. That third one is the permanent-failure case. Fix is three parts: a row boundary in handleMember wrapping the whole body (the await on its last statement is load-bearing, because the phone-claim handler rethrows and returning its promise would put the rejection outside the try), the reservation released wherever a row fails after reserving (the release previously lived ONLY in the send's rejection handler, so a synchronous throw out of sendSingleCampaignSms - invisible to .then - kept the credits for the rest of the dispatch; failRow now takes the cost to release so a new throw site cannot forget it), and Promise.allSettled so no future row path can abort a campaign. Six tests, four kill-checks each failing exactly one: remove the row boundary -> the dead-letter test; allSettled back to all -> the recorder-down test; drop the post-prepare release -> the credit-release test; failRow stops recording -> the dead-letter test. Note removing the row boundary fails ONLY the dead-letter test, because the loop backstop alone already keeps the batch alive - the boundary earns its place by recording the attempt, which is what lets the campaign drain. The recorder-down test caught a double-count in the fix itself: failRow counted before awaiting the record, so a failed record made the loop count the same row again (failed:2 for one contact); counting after the await makes the two mutually exclusive, and it is also what makes the loop backstop reachable rather than dead code. The file-size guard forced an extraction rather than a baseline: the credit budget and start pacer are pure, dependency-free and imported by nothing else, so they moved to campaign-sms-dispatch-primitives.server.ts, taking the file 860 -> 784. NOT fixed, deliberately: when the record write itself fails the row stays queued and eligible, since nothing is recorded to dead-letter it on - retrying is honest but a persistently broken recorder keeps that row alive, and that deserves its own issue. ci:local exit 0, node 442/442 files 3560 tests, ui 151/151 924 tests.
 
 ### [#2156](https://github.com/chester-hill-solutions/callcaster/issues/2156) useQueue.updateQueue calls setNextRecipient and setCallDuration from inside a setQueue updater
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
