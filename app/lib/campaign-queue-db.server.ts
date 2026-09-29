@@ -12,7 +12,7 @@ import {
   campaign_queue as campaignQueueTable,
   contact as contactTable,
 } from "@/db/schema";
-import { db } from "@/server/db";
+import { db, type Database } from "@/server/db";
 import { loadContactsByQueueRows } from "@/lib/campaign-queue-contacts.server";
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { emitQueueEvent } from "@/lib/workspace-events.server";
@@ -31,6 +31,16 @@ export type ClaimedQueueContact = {
 };
 
 type CampaignQueueRow = typeof campaignQueueTable.$inferSelect;
+
+/** Collects publish work to run after a transaction commits. */
+export type DeferredEmit = (publish: () => Promise<void>) => void;
+
+/**
+ * The slice of a Drizzle client (or transaction) these queue writes need.
+ * `execute` is included so one transaction threads through both this module and
+ * the RPC helpers, which want an `RpcExecutor`.
+ */
+export type QueueWriteExecutor = Pick<Database, "select" | "update"> & RpcExecutor;
 
 async function emitQueueRowUpdates(
   workspaceId: string,
@@ -70,10 +80,13 @@ export async function updateCampaignQueueAndEmit(args: {
   conditions: SQL[];
   set: Record<string, unknown>;
   workspaceId?: string;
+  exec?: QueueWriteExecutor;
+  deferEmit?: DeferredEmit;
 }): Promise<CampaignQueueRow[]> {
+  const exec = args.exec ?? db;
   const where = and(...args.conditions);
-  const oldRows = await db.select().from(campaignQueueTable).where(where);
-  const updated = await db
+  const oldRows = await exec.select().from(campaignQueueTable).where(where);
+  const updated = await exec
     .update(campaignQueueTable)
     .set(args.set)
     .where(where)
@@ -81,7 +94,13 @@ export async function updateCampaignQueueAndEmit(args: {
 
   const resolvedWorkspaceId = args.workspaceId ?? updated[0]?.workspace;
   if (resolvedWorkspaceId) {
-    await emitQueueRowUpdates(resolvedWorkspaceId, oldRows, updated);
+    const publish = () =>
+      emitQueueRowUpdates(resolvedWorkspaceId, oldRows, updated);
+    if (args.deferEmit) {
+      args.deferEmit(publish);
+    } else {
+      await publish();
+    }
   }
   return updated;
 }
@@ -359,6 +378,8 @@ async function dequeueCampaignQueueById(args: {
   userId: string;
   reason: string;
   workspaceId?: string;
+  exec?: QueueWriteExecutor;
+  deferEmit?: DeferredEmit;
 }) {
   const conditions: SQL[] = [eq(campaignQueueTable.id, args.queueId)];
   if (args.workspaceId) {
@@ -369,6 +390,8 @@ async function dequeueCampaignQueueById(args: {
     conditions,
     set: buildDequeuedQueueUpdate(args.userId, args.reason),
     workspaceId: args.workspaceId,
+    exec: args.exec,
+    deferEmit: args.deferEmit,
   });
 }
 
@@ -529,6 +552,9 @@ type DequeueQueueEntryByIdArgs = {
   reason: string;
   workspaceId?: string;
   household?: undefined;
+  /** Run in the caller's transaction, and hold the publish until it commits. */
+  exec?: QueueWriteExecutor;
+  deferEmit?: DeferredEmit;
 };
 
 type DequeueQueueEntryByContactArgs = {
@@ -599,8 +625,14 @@ export async function dequeueQueueEntry(
       userId: args.userId,
       reason: args.reason,
       workspaceId: args.workspaceId,
+      exec: args.exec,
+      deferEmit: args.deferEmit,
     });
-    await completeCampaignsDrainedByDequeue(rows, args.workspaceId ?? rows[0]?.workspace);
+    await completeCampaignsDrainedByDequeue(
+      rows,
+      args.workspaceId ?? rows[0]?.workspace,
+      args.exec,
+    );
     return { dequeuedPrimary: rows.length > 0 };
   }
 

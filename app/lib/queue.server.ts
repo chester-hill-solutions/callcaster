@@ -1,6 +1,7 @@
 import {
   rpcHandleCampaignQueueEntry,
   rpcReserveCampaignQueueOrderRange,
+  type RpcExecutor,
 } from "@/lib/db-rpc.server";
 import { db } from "@/server/db";
 
@@ -30,15 +31,25 @@ function chunkArray<T>(items: T[], chunkSize: number): T[][] {
 export async function enqueueContactsForCampaign(
   campaignId: number,
   contactIds: number[],
-  options?: { startOrder?: number | string; requeue?: boolean },
+  options?: {
+    startOrder?: number | string;
+    requeue?: boolean;
+    /**
+     * Run the order reservation and the entry writes inside the caller's
+     * transaction, so a later phase can roll them all back together (#2154).
+     * Defaults to the module-level client.
+     */
+    exec?: RpcExecutor;
+  },
 ) {
   if (contactIds.length === 0) return;
 
   const requeue = options?.requeue ?? false;
+  const exec = options?.exec ?? db;
   let startOrder = parseFiniteNumber(options?.startOrder);
 
   if (startOrder === undefined) {
-    startOrder = await rpcReserveCampaignQueueOrderRange(db, {
+    startOrder = await rpcReserveCampaignQueueOrderRange(exec, {
       campaignId,
       count: contactIds.length,
     });
@@ -58,7 +69,7 @@ export async function enqueueContactsForCampaign(
         group.map(async ({ contactId, indexInBatch }) => {
           const queueOrder = resolvedStartOrder + i + indexInBatch;
           try {
-            await rpcHandleCampaignQueueEntry(db, {
+            await rpcHandleCampaignQueueEntry(exec, {
               contactId,
               campaignId,
               queueOrder,
