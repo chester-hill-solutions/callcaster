@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@5572837f` · 278 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@8f1952bf` · 279 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -720,6 +720,11 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
 - Tracker: Fix now; caused night-time sends on the Eric Lombardi blast (2026-09-24).
 
+### [#2187](https://github.com/chester-hill-solutions/callcaster/issues/2187) One contact's preparation failure aborts the whole campaign SMS batch
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-29
+- handleMember forwards handleClaimedMember and re-throws, and runPacedSendBatches collects the batch with Promise.all, so one row's preparation failure rejects the whole dispatchCampaignSmsBatch and abandons every other row in it. Trigger: getOrLookupLineType throws — a transient connection reset, a statement timeout, or pool exhaustion under exactly the load #2185 addresses. Verified by making the first three lookups throw in a 25-row batch: the call rejects with 'lookup blew up' instead of returning dispatched or deferred_send_window. Not data loss — unstarted rows are never dequeued and a later tick retries them — but a whole batch of prepared work is discarded for one bad contact.
+- Tracker: Fix now as its own atomic PR. Give preparation the same per-row treatment the send path already has: catch inside handleMember, call recordQueueAttemptFailure, increment counts.failed, and return { success: false, error } for that row alone. Today rpcFailExhaustedCampaignQueueContacts runs only when counts.failed > 0 and a rejection never reaches it, so failed rows are not dead-lettered either, and the durable worker adapter gets an exception where it expects a structured outcome. Reuse the existing sendSingleCampaignSms .then(ok, err) shape rather than inventing a second failure convention. Do NOT bundle with #2185 — that is merged.
+
 ### [#2116](https://github.com/chester-hill-solutions/callcaster/issues/2116) runCronWorkspaceFanout never skips workspace.disabled, so a disabled workspace is still debited and still reconciled
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-28
 - `runCronWorkspaceFanout` is the entry point for `twilio_open_sync`, `billing_reconcile` and `number_rental_billing`. It did not check `workspace.disabled`, so a workspace an admin had disabled still got its daily number-rental debits posted and still got its Twilio usage pulled and reconciled. RESOLVED as a two-lever split, decided by the product owner 2026-09-28 and implemented. `disabled` stops money moving OUT (rental debits, usage reconciliation, twilio_open_sync) but number RELEASE keeps running on its own schedule.
@@ -1034,11 +1039,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Subaccount display names are backfilled to the #2167 format; The keep-list lives in the repository, not a shell argument; 2608141501 survives, since it is on both the keep-list and the phone-number-named rule; The cull report remains read-only with no delete path
 - Tracker: Fix now for the remaining two items. The destructive part is done and verified; what is left is the name backfill and recording the keep-list. The backfill depends on working credentials, which is #2170 — a real prerequisite, since it cannot run against dev's stale subaccount tokens. The keep-list move is independent and can proceed now.
 
-### [#2185](https://github.com/chester-hill-solutions/callcaster/issues/2185) Bound campaign SMS prep concurrency: the #2172 pacer lets 25 rows hit a 10-connection pool at once
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-29
-- Found while verifying the #2172 fix (PR #2182). Moving the pacing gate to a serialising pacer claimed immediately before the provider request required removing the await from the dispatch loop, so rows in a batch now start their preparation together. Measured peak in-flight DB operations on a 25-row batch with 12ms prep: 1 before, 25 after. app/server/db.ts sets max: 10 on the query client. The postgres client queues the excess rather than failing, and MAX_CONCURRENCY=25 was already the intended batch cap, so nothing is broken — but each queued row holds its credit reservation while it waits, since ctx.budget.reserve runs before the pacer.
-- Tracker: Fix now as its own atomic PR, NOT bundled into a #2172 follow-up. Add a semaphore around the preparation phase in handleClaimedMember, bounded to what the pool can serve, and leave the pacer unbounded at the provider boundary. Do NOT re-serialise the dispatch loop — that reinstates the #2172 rate-limit defect. Also consider tying MAX_CONCURRENCY=25 to the pool size rather than leaving it a bare constant. No test currently covers this load shape, which is why the change went unnoticed.
-
 ### [#2040](https://github.com/chester-hill-solutions/callcaster/issues/2040) Add contact from the Messages page silently fails: the form posts workspace, the endpoint reads workspace_id
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: business-logic · Assignee: @sai-sy · Updated: 2026-09-27
 - Confirmed defect, three independent causes stacked in one click. (1) Field-name mismatch: app/components/contact/ContactForm.tsx:107 posts a hidden input named `workspace`, but app/routes/api+/contacts.action.server.ts:35 reads `String(data.workspace_id ?? "")` and returns 400 'Workspace ID is required' when it is empty. Every other caller uses the correct name (app/components/queue/ContactSearchDialog.tsx:65 `formData.set("workspace_id", workspaceId)`), so the endpoint contract is `workspace_id` and the shared form is the odd one out. (2) The response is thrown away: ChatAddContactDialog.tsx:67 submits with `navigate: false` and never reads the fetcher result, then calls `setDialog(false)` on line 68 immediately, so a 400 is indistinguishable from success and the sheet just closes. (3) Double submit: the form is a react-router <Form> (ContactForm.tsx:45-51, onSubmit=handleSaveContact, navigate=false) and React Router submits it itself; handleSaveContact then submits the same FormData again by hand, so a successful save POSTs twice.
@@ -1244,9 +1244,14 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 75
+## Verify and close — 76
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2185](https://github.com/chester-hill-solutions/callcaster/issues/2185) Bound campaign SMS prep concurrency: the #2172 pacer lets 25 rows hit a 10-connection pool at once
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-29
+- Found while verifying the #2172 fix (PR #2182). Moving the pacing gate to a serialising pacer claimed immediately before the provider request required removing the await from the dispatch loop, so rows in a batch now start their preparation together. Measured peak in-flight DB operations on a 25-row batch with 12ms prep: 1 before, 25 after. app/server/db.ts sets max: 10 on the query client. The postgres client queues the excess rather than failing, and MAX_CONCURRENCY=25 was already the intended batch cap, so nothing is broken — but each queued row holds its credit reservation while it waits, since ctx.budget.reserve runs before the pacer.
+- Tracker: Fixed and merged as PR #2188 (8f1952bfd). createSemaphore gates the preparation phase at ceil(QUERY_POOL_MAX / 2), leaving half the pool for interactive traffic. The permit is released BEFORE the pacing wait, so the pool is never gated on the rate limit — holding it across waitForTurn would be the #2172 defect in a different hat. Verified: measured peak in-flight prep dropped from 25 to the bound; 5 semaphore unit tests with 2 kill-checks (off-by-one on handoff -> 2 fail, one reporting inFlight -17; release removed -> 4 fail, 2 by timeout); 2 dispatch tests asserted from both sides so neither degenerate fix passes (gate removed -> 25 > 5; bound of 1 -> 1 > 1). An off-by-one in the first semaphore implementation was found and fixed during the work, and the test written for it initially passed against the bug because it never queued — it now uses more callers than permits. check:unscoped-db-imports correctly rejected importing @/server/db for the constant; fixed in code by moving QUERY_POOL_MAX to app/server/db-pool-size.ts, no baseline change. Left OPEN: merge to dev is not a release, and no CI tier runs against real Postgres (#2174).
 
 ### [#2172](https://github.com/chester-hill-solutions/callcaster/issues/2172) Campaign SMS pacing measures dispatch time, not provider-request time, so the rate limit collapses under load
 - Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-28
