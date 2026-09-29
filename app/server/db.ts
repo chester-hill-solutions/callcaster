@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../db/schema";
 import * as authSchema from "../db/auth-schema";
+import { QUERY_POOL_MAX } from "./db-pool-size";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 // `||`, not `??`: a set-but-empty DATABASE_DIRECT_URL (production, 2026-08-31,
@@ -59,7 +60,7 @@ const poolOpts = {
 } as const;
 
 /** Connection pool for queries (uses pgbouncer-friendly URL if separate). */
-const queryClient = postgres(DATABASE_URL as string, { ...poolOpts, max: 10 });
+const queryClient = postgres(DATABASE_URL as string, { ...poolOpts, max: QUERY_POOL_MAX });
 
 /** Direct connection for LISTEN/NOTIFY (no pgbouncer). */
 const directClient = postgres(

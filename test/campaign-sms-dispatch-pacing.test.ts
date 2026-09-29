@@ -85,6 +85,7 @@ vi.mock("@/lib/campaign-sms-send.server", async (importOriginal) => ({
 }));
 
 import { dispatchCampaignSmsBatch } from "@/lib/campaign-sms-dispatch.server";
+import { QUERY_POOL_MAX } from "@/server/db-pool-size";
 
 const WORKSPACE_ID = "3b6f0a52-6f5e-4b2d-9d55-000000000001";
 
@@ -291,5 +292,95 @@ describe("campaign SMS dispatch pacing — the clock the provider sees", () => {
     const [first, second] = [...sendTimes].sort((a, b) => a - b);
     expect(second).toBeDefined();
     expect((second ?? 0) - (first ?? 0)).toBeGreaterThanOrEqual(INTERVAL_MS);
+  });
+});
+
+/**
+ * #2185: a batch claims up to 25 rows and prepares them at once, and every
+ * preparation step is a database round trip. Without a bound, a 25-row batch
+ * queues a 10-connection pool to capacity — and one pool serves the web app,
+ * the admin client, every tenant client and the worker, so the whole process
+ * waits, `/readyz` included.
+ *
+ * The bound must not collapse to 1: serialising preparation is the old
+ * behaviour and it is slow. Asserted on both sides so neither degenerate fix
+ * passes.
+ */
+describe("campaign SMS dispatch — preparation concurrency stays inside the pool", () => {
+  const BATCH_ROWS = 25;
+
+  beforeEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+    mocks.configuredDispatcherSmsMps.mockReturnValue(20);
+    mocks.claimBatchSizeForRate.mockReturnValue(25);
+    mocks.requireOutboundCredits.mockResolvedValue({ ok: true, balance: 10_000 });
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue({
+      campaign: { id: 42, sms_send_mode: null, sms_send_window: null, caller_id: "+15550000000" },
+      body_text: "Hello {{firstname}}",
+      message_media: [],
+    });
+    mocks.getWorkspaceTwilioPortalConfig.mockResolvedValue({
+      parallelDispatchEnabled: true,
+      smsTargetMps: 20,
+    });
+    mocks.getCampaignQueueById.mockResolvedValue(
+      Array.from({ length: BATCH_ROWS }, (_, i) => queueRow(700 + i, 30 + i)),
+    );
+    mocks.dequeueQueueEntry.mockResolvedValue(undefined);
+    mocks.recordQueueAttemptFailure.mockResolvedValue(undefined);
+    mocks.createSignedObjectUrl.mockResolvedValue("signed");
+    mocks.rpcFailExhaustedCampaignQueueContacts.mockResolvedValue(0);
+    mocks.sendSingleCampaignSms.mockResolvedValue({ message: { sid: "SM" }, persisted: true });
+  });
+
+  /** Counts how many preparation round trips are open at once. */
+  function trackPrepConcurrency() {
+    let inFlight = 0;
+    let peak = 0;
+    const step = async <T>(value: T): Promise<T> => {
+      inFlight += 1;
+      peak = Math.max(peak, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      inFlight -= 1;
+      return value;
+    };
+    return {
+      step,
+      read: () => peak,
+      // Half the pool: the bound the module derives from QUERY_POOL_MAX.
+      bound: Math.ceil(QUERY_POOL_MAX / 2),
+    };
+  }
+
+  test("does not open more preparation round trips than the pool can serve", async () => {
+    const prep = trackPrepConcurrency();
+    mocks.getOrLookupLineType.mockImplementation(() => prep.step(null));
+    mocks.hasDuplicateCampaignSms.mockImplementation(() => prep.step(false));
+
+    await dispatchCampaignSmsBatch({
+      workspaceId: WORKSPACE_ID,
+      campaignId: "42",
+      userId: "3b6f0a52-6f5e-4b2d-9d55-000000000002",
+    });
+
+    expect(mocks.sendSingleCampaignSms).toHaveBeenCalledTimes(BATCH_ROWS);
+    expect(prep.read()).toBeLessThanOrEqual(prep.bound);
+  });
+
+  test("still prepares rows in parallel rather than one at a time", async () => {
+    // Guards against over-correcting. A bound of 1 would satisfy the test
+    // above while reinstating the serialised dispatch the pacing fix removed.
+    const prep = trackPrepConcurrency();
+    mocks.getOrLookupLineType.mockImplementation(() => prep.step(null));
+    mocks.hasDuplicateCampaignSms.mockImplementation(() => prep.step(false));
+
+    await dispatchCampaignSmsBatch({
+      workspaceId: WORKSPACE_ID,
+      campaignId: "42",
+      userId: "3b6f0a52-6f5e-4b2d-9d55-000000000002",
+    });
+
+    expect(prep.read()).toBeGreaterThan(1);
   });
 });
