@@ -32,6 +32,8 @@ import { OUTBOUND_CREDIT_FLOOR } from "../../shared/credit-floor";
 import { estimateMessageCredits } from "../../shared/pricing";
 import { rpcFailExhaustedCampaignQueueContacts } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
+import { QUERY_POOL_MAX } from "@/server/db-pool-size";
+import { createSemaphore, type Semaphore } from "@/lib/semaphore";
 import { selectEligibleCampaignQueueMembers } from "@/lib/campaign-dispatch-queue.server";
 import type { TwilioMessageIntent } from "@/lib/types";
 import {
@@ -265,6 +267,12 @@ export async function dispatchCampaignSmsBatch(args: {
   // The cap is enforced against the pacer below, at the moment each request is
   // issued. It spans the whole queue, so adjacent batches cannot restart it.
   const startPacer = createStartPacer(minStartIntervalMs);
+  // A batch claims up to MAX_CONCURRENCY rows and prepares them at the same
+  // time (#2185). Every preparation step is a database round trip, so without
+  // a bound a 25-row batch queues a ten-connection pool to capacity and the
+  // web app, the admin client and /readyz all wait behind it — one pool serves
+  // the whole process. Half the pool leaves the other consumers headroom.
+  const prepSemaphore = createSemaphore(Math.ceil(QUERY_POOL_MAX / 2));
 
   // Same-number rows wait for the first row's send result. A reservation set
   // alone can dequeue a sibling while the first row is still preparing and
@@ -286,6 +294,7 @@ export async function dispatchCampaignSmsBatch(args: {
     budget,
     sendPolicy,
     startPacer,
+    prepSemaphore,
   };
 
   const deferredAt = await runPacedSendBatches({
@@ -450,6 +459,7 @@ type HandleMemberCtx = {
   budget: DispatchCreditBudget;
   sendPolicy: ReturnType<typeof smsSendPolicy>;
   startPacer: StartPacer;
+  prepSemaphore: Semaphore;
 };
 
 /** Claims the next provider-request slot at the configured start rate. */
@@ -516,11 +526,13 @@ async function handleMember(
   }
 
   if (member.contact?.opt_out) {
-    await dequeueQueueEntry({
-      by: { id: member.id },
-      userId,
-      reason: OPTED_OUT_SMS_DEQUEUED_REASON,
-    });
+    await withPrepPermit(ctx, () =>
+      dequeueQueueEntry({
+        by: { id: member.id },
+        userId,
+        reason: OPTED_OUT_SMS_DEQUEUED_REASON,
+      }),
+    );
     counts.dequeued += 1;
     return memberResponse({
       [member.contact_id]: {
@@ -543,11 +555,13 @@ async function handleMember(
       if (firstResult.kind === "unaffordable") {
         return memberResponse(skipForInsufficientCredits(member, counts));
       }
-      await dequeueQueueEntry({
-        by: { id: member.id },
-        userId,
-        reason: DUPLICATE_SMS_DEQUEUED_REASON,
-      });
+      await withPrepPermit(ctx, () =>
+        dequeueQueueEntry({
+          by: { id: member.id },
+          userId,
+          reason: DUPLICATE_SMS_DEQUEUED_REASON,
+        }),
+      );
       counts.dequeued += 1;
       return memberResponse({
         [member.contact_id]: {
@@ -577,12 +591,36 @@ async function handleMember(
   );
 }
 
-async function handleClaimedMember(
+/** Runs `work` holding one preparation permit. */
+async function withPrepPermit<T>(ctx: HandleMemberCtx, work: () => Promise<T>): Promise<T> {
+  const release = await ctx.prepSemaphore.acquire();
+  try {
+    return await work();
+  } finally {
+    release();
+  }
+}
+
+/** A prepared row is ready to send, or it is already finished for some reason. */
+type PreparedRow =
+  | { kind: "finished"; result: HandleMemberResult }
+  | { kind: "ready"; processedBody: string; cost: number };
+
+/**
+ * Everything a row needs before it may send: the lookups, the duplicate check,
+ * the template, and the credit reservation. Every statement here is a
+ * database round trip, which is why it runs under a preparation permit.
+ *
+ * Split from the send so the permit is released before the pacing wait, which
+ * can be seconds at a low configured rate. Holding a permit across that wait
+ * would gate the pool on the rate limit rather than on database work.
+ */
+async function prepareClaimedMember(
   member: QueueMember,
   ctx: HandleMemberCtx,
   normalizedPhone: string,
   phoneClaim: SmsPhoneClaim | null,
-): Promise<HandleMemberResult> {
+): Promise<PreparedRow> {
   const { counts, workspaceId, campaignId, userId } = ctx;
   const lineType = member.contact
     ? await getOrLookupLineType({
@@ -599,13 +637,16 @@ async function handleClaimedMember(
       reason: LANDLINE_SMS_DEQUEUED_REASON,
     });
     counts.dequeued += 1;
-    return memberResponse({
-      [member.contact_id]: {
-        success: true,
-        skipped: true,
-        reason: LANDLINE_SMS_DEQUEUED_REASON,
-      },
-    });
+    return {
+      kind: "finished",
+      result: memberResponse({
+        [member.contact_id]: {
+          success: true,
+          skipped: true,
+          reason: LANDLINE_SMS_DEQUEUED_REASON,
+        },
+      }),
+    };
   }
 
   const duplicateExists = await hasDuplicateCampaignSms({
@@ -621,13 +662,16 @@ async function handleClaimedMember(
       reason: DUPLICATE_SMS_DEQUEUED_REASON,
     });
     counts.dequeued += 1;
-    return memberResponse({
-      [member.contact_id]: {
-        success: true,
-        skipped: true,
-        reason: DUPLICATE_SMS_DEQUEUED_REASON,
-      },
-    });
+    return {
+      kind: "finished",
+      result: memberResponse({
+        [member.contact_id]: {
+          success: true,
+          skipped: true,
+          reason: DUPLICATE_SMS_DEQUEUED_REASON,
+        },
+      }),
+    };
   }
 
   let processedBody = ctx.campaign.body_text;
@@ -635,16 +679,36 @@ async function handleClaimedMember(
     processedBody = processTemplateTags(ctx.campaign.body_text, member.contact);
   }
 
-  // Reserve synchronously (no await between the estimate and the send start)
-  // so sibling rows in this batch cannot spend the same credits.
+  // Reserve with no await between the estimate and the reservation, so sibling
+  // rows in this batch cannot spend the same credits.
   const cost = estimateMessageCredits({
     body: processedBody ?? "",
     hasMedia: ctx.media.length > 0,
   }).credits;
   if (!ctx.budget.reserve(cost)) {
     phoneClaim?.resolve({ kind: "unaffordable" });
-    return memberResponse(skipForInsufficientCredits(member, counts));
+    return {
+      kind: "finished",
+      result: memberResponse(skipForInsufficientCredits(member, counts)),
+    };
   }
+
+  return { kind: "ready", processedBody, cost };
+}
+
+async function handleClaimedMember(
+  member: QueueMember,
+  ctx: HandleMemberCtx,
+  normalizedPhone: string,
+  phoneClaim: SmsPhoneClaim | null,
+): Promise<HandleMemberResult> {
+  const { counts, workspaceId, campaignId, userId } = ctx;
+
+  const prepared = await withPrepPermit(ctx, () =>
+    prepareClaimedMember(member, ctx, normalizedPhone, phoneClaim),
+  );
+  if (prepared.kind === "finished") return prepared.result;
+  const { processedBody, cost } = prepared;
 
   // Claim a provider-request slot. This is the rate limit, so it is applied
   // here rather than at dispatch: the interval has to be measured between the
