@@ -3020,38 +3020,6 @@
     "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
   },
   {
-    "issueNumber": 2143,
-    "verdict": "fix-now",
-    "recommendedTitle": "syncWorkspaceA2pStatus seeds both statuses from the same stored value and reverts to the old value, so a stale approved A2P state survives a brand re-review",
-    "summary": "The A2P status sync seeds the brand and campaign status from the **aggregate** stored status rather than from the provider. A workspace whose A2P was `approved` and whose brand re-enters review keeps reading `approved`, and the sync writes that back while bumping `lastSyncedAt` — so the record looks freshly verified and the SMS send gate stays open.",
-    "currentBehavior": "A per-resource status is never seeded from an aggregate status. The aggregate is a *derived* value; deriving from it inverts the direction of truth and makes the state monotonic — it can only move toward `approved`, never away.",
-    "resolution": "Never seed a per-resource status from the aggregate. Track which resources were actually fetched and compute the aggregate from the **authoritative** per-resource values, defaulting an unfetched resource to the most conservative value that keeps the gate closed: const brandStatus = brandSid ? await fetchBrand() : \"pending\"; const campaignStatus = campaignSid ? await fetchCampaign() : \"pending\"; const mergedStatus = brandStatus === \"approved\" && campaignStatus === \"approved\" ? \"approved\" : (brandStatus === \"rejected\" || campaignStatus === \"rejected\") ? \"rejected\" : \"in_review\"; and delete the `?? onboarding.a2p10dlc.status` fallback. Add a test per transition direction — `approved → in_review` and `approved → rejected` are the two that fail today.",
-    "lookIn": [
-      "app/lib/twilio-a2p.server.ts (`syncWorkspaceA2pStatus`, `mapBrandStatus` at line 19, lines 71-80)",
-      "app/lib/messaging-onboarding/predicates.ts:380-390",
-      "app/routes/api+/twilio/trusthub/status.action.server.ts:62",
-      "app/lib/twilio-a2p-status-sync.server.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "`approved → in_review` (kill-check).",
-      "`approved → rejected`.",
-      "`in_review → approved` with both resources fetched (positive control).",
-      "An unfetched resource never yields `approved`."
-    ],
-    "acceptanceCriteria": [
-      "`approved → in_review` demotes the stored status (kill-check: restore the seed and confirm the test goes red).",
-      "`approved → rejected` demotes.",
-      "`in_review → approved` promotes when **both** resources are fetched as approved.",
-      "An unfetched resource never contributes `approved`.",
-      "The send gate closes on a re-review."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
-  },
-  {
     "issueNumber": 2144,
     "verdict": "fix-now",
     "recommendedTitle": "Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500",
