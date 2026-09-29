@@ -3588,5 +3588,14 @@
     "risk": "medium",
     "size": "S",
     "trackerRecommendation": "Fix now as its own atomic PR. Give preparation the same per-row treatment the send path already has: catch inside handleMember, call recordQueueAttemptFailure, increment counts.failed, and return { success: false, error } for that row alone. Today rpcFailExhaustedCampaignQueueContacts runs only when counts.failed > 0 and a rejection never reaches it, so failed rows are not dead-lettered either, and the durable worker adapter gets an exception where it expects a structured outcome. Reuse the existing sendSingleCampaignSms .then(ok, err) shape rather than inventing a second failure convention. Do NOT bundle with #2185 — that is merged."
+  },
+  {
+    "issueNumber": 2194,
+    "verdict": "fix-now",
+    "recommendedTitle": "Cull 111 empty legacy-named Twilio subaccounts (Console-only; 31 must be kept)",
+    "summary": "Surveyed 2026-09-29 with npm run tools:twilio:subaccounts (PR #2193). The single Twilio account <the shared account> is shared by dev, staging AND production — there is no dev-only silo — and holds 192 subaccounts, 183 named with a raw workspace UUID, 91 suspended, 48 holding phone numbers and 22 holding message history. 142 subaccounts look empty (no numbers, no messages) but 31 of those belong to live dev workspaces, one with 7,704 contacts and another with 5,826: empty means 'has not rented a number yet', not 'abandoned'. So 111 are safe to delete and 31 must be kept. The only reliable subaccount-to-workspace link is the friendly name, because app-created subaccounts are named with the workspace UUID; workspace.twilio_data stores NO subaccount SID and cannot be used as a guard.",
+    "risk": "high",
+    "size": "S",
+    "trackerRecommendation": "Cannot be automated: twilio v5 exposes only create/fetch/update on an account, with no remove, so subaccount deletion is a Console-only action. A cull script was written, had all three guards verified (refuses without --confirm, refuses the parent account, refuses an empty allowlist), then failed 111/111 on the missing method and was deleted rather than shipped half-working. Do it by hand: Console > Account > Subaccounts, select the 111, delete. Before deleting any candidate, cross-check it against BOTH databases — the production database is internal-only, so that check must run from inside Railway via 'railway ssh --service CallCaster --environment production', never from a laptop. The higher-value and NON-DESTRUCTIVE half of this job is renaming the 183 legacy subaccounts to the current 'Name · <8 hex>' scheme, which the API does support via update; that makes the console readable and makes every future cull safe by inspection. Consider doing the renames first."
   }
 ]
