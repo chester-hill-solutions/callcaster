@@ -3421,35 +3421,6 @@
     "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
   },
   {
-    "issueNumber": 2156,
-    "verdict": "fix-now",
-    "recommendedTitle": "useQueue.updateQueue calls setNextRecipient and setCallDuration from inside a setQueue updater",
-    "summary": "A `useState`/`useReducer` updater must be pure. React may invoke it more than once (deliberately under StrictMode, and it may replay or discard a result in concurrent rendering). `useQueue.updateQueue` nests `setNextRecipient(...)` and `setCallDuration(0)` inside `setQueue`'s updater — a state update during another state update.",
-    "currentBehavior": "Two defects: an impure updater, and a guard whose condition cannot be true. The dead guard means the intended behaviour is also not happening — the branch that was supposed to set the newly assigned contact never runs.",
-    "resolution": "1. Make the updater pure. Compute `nextUncontacted` / `nextRecipient` from the same `currentQueue` inside it and return a `{ queue, nextRecipient, resetDuration }` tuple via a single `useReducer`, **or** hoist the `setNextRecipient`/`setCallDuration` calls out of `setQueue` and read the current queue from a ref. 2. Fix or delete the dead guard. If the intent is \"advance to the newly assigned contact\", write the condition that actually expresses it; if the intent is gone, remove it so the next reader is not misled. 3. The predictive-FSM bridge in the same area re-dispatches its transition on every queue change for a related reason (it depends on `queue` identity) — fix both together, or the effect dependency churn remains.",
-    "lookIn": [
-      "app/hooks/call/useQueue.ts:88-89,157",
-      "the predictive FSM bridge in the same area",
-      "app/hooks/call/useCallScreen.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "StrictMode double-render yields an identical state (kill-check).",
-      "The next recipient advances to the newly assigned contact.",
-      "The call duration resets on a contact change."
-    ],
-    "acceptanceCriteria": [
-      "`updateQueue` contains no state update inside a state updater (kill-check: restore the nesting and confirm a StrictMode double-invoke test goes red).",
-      "A StrictMode double-render produces the same final state as a single render.",
-      "The newly assigned contact becomes the next recipient when that is the intent (the dead-guard fix).",
-      "A contact change resets the call duration."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
-  },
-  {
     "issueNumber": 2170,
     "verdict": "fix-now",
     "recommendedTitle": "Stale subaccount credentials block the product's own number-release path — a customer cannot release their own number",
