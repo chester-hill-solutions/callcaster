@@ -2066,5 +2066,34 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Fixed and merged as PR #2191 (e3a10624). Page numbers are not an identity; the filter is. The sync effect now discriminates on accumulatedFilterKeyRef, so a different filter resets the list and the same filter merges the response in. Two changes were needed, not one: mergeConversationPages already deduped by conversation phone and applied the fresh row over the existing one, AND the cursor had to become monotonic — the old effect also reset paginationState and requestedPageRef to the loader's page 1, so deleting the guard alone would have made the next load-more re-request a page already held. Verified: 4 tests in test/ui/use-chats-page-pagination.test.tsx; 2 reproduce the defect and failed on current code with a fresh unread count of 9 and 7 arriving as 1; 2 guard behaviour a naive fix breaks. 4 kill-checks each fail exactly one test — page-number guard reinstated, replace-not-merge, cursor rewind, always-merge-never-reset — so neither 'always replace' nor 'always merge' passes. ci:local exit 0, node 441/441, ui 150/150. The max-lines-per-function warning is pre-existing at 450 lines, now 462; splitting the hook is a refactor and does not belong here. NOT done: the useChatRealtime re-seed defect this issue suggests fixing alongside — no revalidator call or page reset that wipes loaded pages could be found in app/hooks/realtime/useChatRealtime.ts. Left OPEN: merge to dev is not a release, and no CI tier covers accumulated-pagination behaviour against a live revalidation."
+  },
+  {
+    "issueNumber": 2156,
+    "verdict": "verify-close",
+    "recommendedTitle": "useQueue.updateQueue calls setNextRecipient and setCallDuration from inside a setQueue updater",
+    "summary": "A `useState`/`useReducer` updater must be pure. React may invoke it more than once (deliberately under StrictMode, and it may replay or discard a result in concurrent rendering). `useQueue.updateQueue` nests `setNextRecipient(...)` and `setCallDuration(0)` inside `setQueue`'s updater — a state update during another state update.",
+    "currentBehavior": "Two defects: an impure updater, and a guard whose condition cannot be true. The dead guard means the intended behaviour is also not happening — the branch that was supposed to set the newly assigned contact never runs.",
+    "resolution": "1. Make the updater pure. Compute `nextUncontacted` / `nextRecipient` from the same `currentQueue` inside it and return a `{ queue, nextRecipient, resetDuration }` tuple via a single `useReducer`, **or** hoist the `setNextRecipient`/`setCallDuration` calls out of `setQueue` and read the current queue from a ref. 2. Fix or delete the dead guard. If the intent is \"advance to the newly assigned contact\", write the condition that actually expresses it; if the intent is gone, remove it so the next reader is not misled. 3. The predictive-FSM bridge in the same area re-dispatches its transition on every queue change for a related reason (it depends on `queue` identity) — fix both together, or the effect dependency churn remains.",
+    "lookIn": [
+      "app/hooks/call/useQueue.ts:88-89,157",
+      "the predictive FSM bridge in the same area",
+      "app/hooks/call/useCallScreen.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "StrictMode double-render yields an identical state (kill-check).",
+      "The next recipient advances to the newly assigned contact.",
+      "The call duration resets on a contact change."
+    ],
+    "acceptanceCriteria": [
+      "`updateQueue` contains no state update inside a state updater (kill-check: restore the nesting and confirm a StrictMode double-invoke test goes red).",
+      "A StrictMode double-render produces the same final state as a single render.",
+      "The newly assigned contact becomes the next recipient when that is the intent (the dead-guard fix).",
+      "A contact change resets the call duration."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Fixed and merged as PR #2196 (24948429e). updateQueue now plans the next queue in a pure function and applies the state updates outside, so setQueue takes a value and never a function and the impure shape cannot return unnoticed. The issue's useReducer option was NOT viable: useCampaignQueueFlow types setQueue as Dispatch<SetStateAction<QueueItem[]>> and usePredictiveCallSync plus useCallScreen both hold setNextRecipient, so the hoisting option was used and both setter shapes are unchanged. The dead guard if (!nextRecipientRef.current) was DELETED, not fixed - it could essentially never fire, and where it could the queue[0] fallback already gave the same value, so removal is behaviour-preserving and a kill-check confirms it. The stated intent, advance to the newly assigned contact, never happened; implementing it would change which contact a live call screen points at mid-session, so it stays a product decision and is flagged in the code. queueRef needs both a synchronous write after planning (else two updates in one tick lose the first row's addition) and an effect re-syncing on commit (else an external setQueue from useCallScreen or useCampaignQueueFlow is ignored); each has a test that fails when removed. Verified: 10 tests, 4 kill-checks - nested update restored fails 4 tests, no synchronous write fails composition, no effect fails external setQueue, no advance fails the recipient test. Two traps recorded: the recipient-advance test PASSED against a mutation that deleted the advance, because nextRecipient=null falls back to queue[0] and the difference is only observable when the next uncontacted row is not first; and the pre-existing hooks-queue.test.tsx used id 'user-1', which is not a UUID, so every updateQueue call in it took the removal branch and the assignment path had no coverage at all. The predictive-FSM re-dispatch churn in usePredictiveCallSync is deliberately not touched - separate effect-dependency concern. ci:local exit 0, node 441/441, ui 151/151 with 924 tests up from 914, no new lint warnings."
   }
 ]

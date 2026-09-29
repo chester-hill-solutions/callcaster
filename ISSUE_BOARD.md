@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@3098025e` · 280 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@24948429` · 280 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 115
+## Fix now — 114
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -44,16 +44,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: test/legacy-auth-sql-guard.test.ts - latest CREATE OR REPLACE per public function has no auth.uid()/auth.jwt(); test/integration-db/manual-dial-claim-actor.test.ts - claim RPC assigns the withAppCurrentUser actor; test/queue-rpc-contract.test.ts latest-definition resolver must pick the new migration
 - Done when: No public function or policy references auth.*; The two RPC flows still pass their tests; DROP SCHEMA auth succeeds on dev, then prod; A fresh bootstrap does not recreate auth.uid()
 - Tracker: Keep in Fix now, split into the three PR-sized chunks. Run the zero-auth.* dependency query on prod before the drop and keep the rewrite and the drop in separate releases.
-
-### [#2156](https://github.com/chester-hill-solutions/callcaster/issues/2156) useQueue.updateQueue calls setNextRecipient and setCallDuration from inside a setQueue updater
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- A `useState`/`useReducer` updater must be pure. React may invoke it more than once (deliberately under StrictMode, and it may replay or discard a result in concurrent rendering). `useQueue.updateQueue` nests `setNextRecipient(...)` and `setCallDuration(0)` inside `setQueue`'s updater — a state update during another state update.
-- Current behavior: Two defects: an impure updater, and a guard whose condition cannot be true. The dead guard means the intended behaviour is also not happening — the branch that was supposed to set the newly assigned contact never runs.
-- Resolution: 1. Make the updater pure. Compute `nextUncontacted` / `nextRecipient` from the same `currentQueue` inside it and return a `{ queue, nextRecipient, resetDuration }` tuple via a single `useReducer`, **or** hoist the `setNextRecipient`/`setCallDuration` calls out of `setQueue` and read the current queue from a ref. 2. Fix or delete the dead guard. If the intent is "advance to the newly assigned contact", write the condition that actually expresses it; if the intent is gone, remove it so the next reader is not misled. 3. The predictive-FSM bridge in the same area re-dispatches its transition on every queue change for a related reason (it depends on `queue` identity) — fix both together, or the effect dependency churn remains.
-- Look in: `app/hooks/call/useQueue.ts:88-89,157`, `the predictive FSM bridge in the same area`, `app/hooks/call/useCallScreen.ts`
-- Missing tests: StrictMode double-render yields an identical state (kill-check).; The next recipient advances to the newly assigned contact.; The call duration resets on a contact change.
-- Done when: `updateQueue` contains no state update inside a state updater (kill-check: restore the nesting and confirm a StrictMode double-invoke test goes red).; A StrictMode double-render produces the same final state as a single render.; The newly assigned contact becomes the next recipient when that is the intent (the dead-guard fix).; A contact change resets the call duration.
-- Tracker: Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage.
 
 ### [#2154](https://github.com/chester-hill-solutions/callcaster/issues/2154) splitMessageCampaign is non-atomic across clone, enqueue and dequeue, so a mid-run failure leaves a partially split campaign
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -1229,9 +1219,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 78
+## Verify and close — 79
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2156](https://github.com/chester-hill-solutions/callcaster/issues/2156) useQueue.updateQueue calls setNextRecipient and setCallDuration from inside a setQueue updater
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
+- A `useState`/`useReducer` updater must be pure. React may invoke it more than once (deliberately under StrictMode, and it may replay or discard a result in concurrent rendering). `useQueue.updateQueue` nests `setNextRecipient(...)` and `setCallDuration(0)` inside `setQueue`'s updater — a state update during another state update.
+- Current behavior: Two defects: an impure updater, and a guard whose condition cannot be true. The dead guard means the intended behaviour is also not happening — the branch that was supposed to set the newly assigned contact never runs.
+- Resolution: 1. Make the updater pure. Compute `nextUncontacted` / `nextRecipient` from the same `currentQueue` inside it and return a `{ queue, nextRecipient, resetDuration }` tuple via a single `useReducer`, **or** hoist the `setNextRecipient`/`setCallDuration` calls out of `setQueue` and read the current queue from a ref. 2. Fix or delete the dead guard. If the intent is "advance to the newly assigned contact", write the condition that actually expresses it; if the intent is gone, remove it so the next reader is not misled. 3. The predictive-FSM bridge in the same area re-dispatches its transition on every queue change for a related reason (it depends on `queue` identity) — fix both together, or the effect dependency churn remains.
+- Look in: `app/hooks/call/useQueue.ts:88-89,157`, `the predictive FSM bridge in the same area`, `app/hooks/call/useCallScreen.ts`
+- Missing tests: StrictMode double-render yields an identical state (kill-check).; The next recipient advances to the newly assigned contact.; The call duration resets on a contact change.
+- Done when: `updateQueue` contains no state update inside a state updater (kill-check: restore the nesting and confirm a StrictMode double-invoke test goes red).; A StrictMode double-render produces the same final state as a single render.; The newly assigned contact becomes the next recipient when that is the intent (the dead-guard fix).; A contact change resets the call duration.
+- Tracker: Fixed and merged as PR #2196 (24948429e). updateQueue now plans the next queue in a pure function and applies the state updates outside, so setQueue takes a value and never a function and the impure shape cannot return unnoticed. The issue's useReducer option was NOT viable: useCampaignQueueFlow types setQueue as Dispatch<SetStateAction<QueueItem[]>> and usePredictiveCallSync plus useCallScreen both hold setNextRecipient, so the hoisting option was used and both setter shapes are unchanged. The dead guard if (!nextRecipientRef.current) was DELETED, not fixed - it could essentially never fire, and where it could the queue[0] fallback already gave the same value, so removal is behaviour-preserving and a kill-check confirms it. The stated intent, advance to the newly assigned contact, never happened; implementing it would change which contact a live call screen points at mid-session, so it stays a product decision and is flagged in the code. queueRef needs both a synchronous write after planning (else two updates in one tick lose the first row's addition) and an effect re-syncing on commit (else an external setQueue from useCallScreen or useCampaignQueueFlow is ignored); each has a test that fails when removed. Verified: 10 tests, 4 kill-checks - nested update restored fails 4 tests, no synchronous write fails composition, no effect fails external setQueue, no advance fails the recipient test. Two traps recorded: the recipient-advance test PASSED against a mutation that deleted the advance, because nextRecipient=null falls back to queue[0] and the difference is only observable when the next uncontacted row is not first; and the pre-existing hooks-queue.test.tsx used id 'user-1', which is not a UUID, so every updateQueue call in it took the removal branch and the assignment path had no coverage at all. The predictive-FSM re-dispatch churn in usePredictiveCallSync is deliberately not touched - separate effect-dependency concern. ci:local exit 0, node 441/441, ui 151/151 with 924 tests up from 914, no new lint warnings.
 
 ### [#2157](https://github.com/chester-hill-solutions/callcaster/issues/2157) The chats loader-to-state sync can permanently discard a fresh page-1 response
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
