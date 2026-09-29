@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@d9eecf80` · 277 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@5572837f` · 278 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 115
+## Fix now — 116
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -1033,6 +1033,11 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: a check that the recorded keep-list survives culling unchanged; a check that keep-list membership outranks the phone-number-named rule
 - Done when: Subaccount display names are backfilled to the #2167 format; The keep-list lives in the repository, not a shell argument; 2608141501 survives, since it is on both the keep-list and the phone-number-named rule; The cull report remains read-only with no delete path
 - Tracker: Fix now for the remaining two items. The destructive part is done and verified; what is left is the name backfill and recording the keep-list. The backfill depends on working credentials, which is #2170 — a real prerequisite, since it cannot run against dev's stale subaccount tokens. The keep-list move is independent and can proceed now.
+
+### [#2185](https://github.com/chester-hill-solutions/callcaster/issues/2185) Bound campaign SMS prep concurrency: the #2172 pacer lets 25 rows hit a 10-connection pool at once
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-29
+- Found while verifying the #2172 fix (PR #2182). Moving the pacing gate to a serialising pacer claimed immediately before the provider request required removing the await from the dispatch loop, so rows in a batch now start their preparation together. Measured peak in-flight DB operations on a 25-row batch with 12ms prep: 1 before, 25 after. app/server/db.ts sets max: 10 on the query client. The postgres client queues the excess rather than failing, and MAX_CONCURRENCY=25 was already the intended batch cap, so nothing is broken — but each queued row holds its credit reservation while it waits, since ctx.budget.reserve runs before the pacer.
+- Tracker: Fix now as its own atomic PR, NOT bundled into a #2172 follow-up. Add a semaphore around the preparation phase in handleClaimedMember, bounded to what the pool can serve, and leave the pacer unbounded at the provider boundary. Do NOT re-serialise the dispatch loop — that reinstates the #2172 rate-limit defect. Also consider tying MAX_CONCURRENCY=25 to the pool size rather than leaving it a bare constant. No test currently covers this load shape, which is why the change went unnoticed.
 
 ### [#2040](https://github.com/chester-hill-solutions/callcaster/issues/2040) Add contact from the Messages page silently fails: the form posts workspace, the endpoint reads workspace_id
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: business-logic · Assignee: @sai-sy · Updated: 2026-09-27
