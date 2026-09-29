@@ -12,6 +12,8 @@
  * worse than showing a stale question label.
  */
 
+import { resolveIvrOptionLabel, type IvrOptionLike } from "@/lib/ivr-option-value";
+
 /** Campaign types whose scripts collect IVR keypress/speech responses. */
 const IVR_RESULT_CAMPAIGN_TYPES = new Set<string>([
   "robocall",
@@ -77,11 +79,8 @@ export type IvrQuestionResults = {
   options: IvrResponseOption[];
 };
 
-export type IvrOptionShape = {
-  value?: string | number | null;
-  label?: string | null;
-  content?: string | null;
-};
+/** The stored option shape. The same one `ivr-option-value` reads; aliased so the two cannot drift. */
+export type IvrOptionShape = IvrOptionLike;
 
 export type IvrScriptShape = {
   pages?: Record<string, { title?: string | null; blocks?: string[] | null }> | null;
@@ -151,11 +150,11 @@ export function resolveIvrAnswerLabel(
         ? block.title
         : blockId;
     if (key !== question) continue;
-    const option = block?.options?.find(
-      (candidate) => String(candidate?.value ?? "").trim() === value,
-    );
-    const label = option?.label ?? option?.content;
-    if (typeof label === "string" && label.trim().length > 0) return label.trim();
+    // Through the shared matcher, not a local `value`-only lookup: a
+    // documented-format option carries `content` and no `value`, and matching
+    // on `value` alone showed the raw DTMF digit for every such script (#2146).
+    const label = resolveIvrOptionLabel(block?.options, value);
+    if (label !== value) return label;
     break;
   }
   return value;

@@ -18,6 +18,7 @@ import {
   inboundNoInputReplayCount,
 } from "@/lib/inbound-no-input-replay.server";
 import { defineAction } from "@/lib/handler.server";
+import { findIvrMatchedOption, type IvrOptionLike } from "@/lib/ivr-option-value";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -25,7 +26,7 @@ interface Script {
     id: string;
     title?: string;
     noInput?: IvrNoInputConfig;
-    options?: Array<{ value: string; next?: string }>;
+    options?: IvrOptionLike[];
   }>;
 }
 
@@ -58,17 +59,13 @@ const findNextBlock = (
 };
 
 const findNextStep = (
-  currentBlock: { id: string; options?: Array<{ value: string; next?: string }> },
+  currentBlock: { id: string; options?: IvrOptionLike[] },
   userInput: string | null,
   script: Script,
   pageId: string,
 ): string => {
   if (currentBlock.options && userInput) {
-    const matchedOption = currentBlock.options.find((option) => {
-      const optionValue = String(option.value).trim();
-      const input = String(userInput).trim();
-      return optionValue === input || (input.length > 2 && optionValue === "vx-any");
-    });
+    const matchedOption = findIvrMatchedOption(currentBlock.options, String(userInput));
     if (matchedOption?.next) return matchedOption.next;
   }
 
