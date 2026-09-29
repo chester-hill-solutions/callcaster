@@ -171,5 +171,5 @@ export const API_SURFACE_ANNOTATIONS: Readonly<
   "app/routes/api+/acd-router/agent-status.route.tsx": { ownerArea: "telephony", exposure: "internalOnly", docsGuide: "docs/api-live-operations.md", bodyType: "twiml", specTarget: "publicOpenApi" },
   "app/routes/api+/acd-router/complete.route.tsx": { ownerArea: "telephony", exposure: "internalOnly", docsGuide: "docs/api-live-operations.md", bodyType: "twiml", specTarget: "publicOpenApi" },
   "app/routes/api+/workspaces+/$workspaceId/audiences/$audienceId/uploads.route.tsx": { ownerArea: "audiences", exposure: "sessionOnly", docsGuide: "docs/api-data-plane.md", workspaceScoped: true },
-  "app/routes/api+/workspaces+/$workspaceId/events.route.tsx": { ownerArea: "misc", exposure: "sessionOnly", docsGuide: "docs/api-live-operations.md", authClass: "session", workspaceScoped: true, notes: "SSE stream for workspace events (activity log)." },
+  "app/routes/api+/workspaces+/$workspaceId/events.route.tsx": { ownerArea: "misc", exposure: "sessionOnly", docsGuide: "docs/api-live-operations.md", workspaceScoped: true, notes: "SSE stream for workspace events (activity log). Requires the audit.read capability: the payload includes verbatim call transcripts, so it is the same class of surface as /audit-events. The auth class is derived from dataPlaneCapabilityAuth and is deliberately not declared here." },
 };

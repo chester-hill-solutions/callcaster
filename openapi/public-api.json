@@ -8841,18 +8841,22 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_events",
         "summary": "GET /api/workspaces/:workspaceId/events",
-        "description": "SSE stream for workspace events (activity log).",
+        "description": "SSE stream for workspace events (activity log). Requires the audit.read capability: the payload includes verbatim call transcripts, so it is the same class of surface as /audit-events. The auth class is derived from dataPlaneCapabilityAuth and is deliberately not declared here.",
         "tags": [
           "Misc",
-          "User API"
+          "Integrator API"
         ],
         "x-callcaster-supported": true,
         "x-callcaster-exposure": "sessionOnly",
-        "x-callcaster-auth-class": "session",
+        "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-live-operations.md",
+        "x-callcaster-capability": "audit.read",
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "apiKey": []
           }
         ],
         "parameters": [

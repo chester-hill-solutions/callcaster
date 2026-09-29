@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { dataPlaneCapabilityAuth } from "@/lib/capability-guard.server";
 import { defineLoader } from "@/lib/handler.server";
 import { logger } from "@/lib/logger.server";
 import type { DataPlaneAuthContextValue } from "@/lib/route-context.server";
@@ -52,9 +52,21 @@ function formatSseEvent(event: {
 }
 
 export const loader = defineLoader({
-  auth: ({ context, params }) => getDataPlaneRouteContext(context, params.workspaceId),
+  // `audit.read`, not a bare data-plane preamble. This stream carries every
+  // workspace event, including verbatim call transcripts, so it is the same
+  // class of privileged surface as `/audit-events` — which already requires
+  // this capability. `getDataPlaneRouteContext` only checks that the actor
+  // belongs to the workspace, so it admitted a key minted with *zero* scopes
+  // (#2133).
+  auth: dataPlaneCapabilityAuth("audit.read"),
   sideEffects: ["db-read"],
-  handler: (ctx) => streamWorkspaceEvents(ctx.request, ctx.params.workspaceId, ctx.auth),
+  handler: (ctx) =>
+    streamWorkspaceEvents(ctx.request, ctx.params.workspaceId, {
+      ...ctx.auth.auth,
+      // `dataPlaneCapabilityAuth` returns the flat context under `auth`, but the
+      // stream only reads `userId` from it, and it needs `workspaceId` too.
+      workspaceId: ctx.auth.workspaceId,
+    }),
 });
 
 async function streamWorkspaceEvents(
