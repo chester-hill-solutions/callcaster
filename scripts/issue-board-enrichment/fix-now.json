@@ -3489,15 +3489,6 @@
     "trackerRecommendation": "Fix now. The resolution path is concrete and nothing is currently red, which is the argument for doing it rather than against: every day this tier does not run, a schema-vs-database mismatch is invisible until it misbehaves in production. Two known instances are already queued against it — #2178's text()/timestamptz mismatch, and the repair sweep's deferred end-to-end test. Not a spec change: the tier exists and is unwired."
   },
   {
-    "issueNumber": 2187,
-    "verdict": "fix-now",
-    "recommendedTitle": "One contact's preparation failure aborts the whole campaign SMS batch",
-    "summary": "handleMember forwards handleClaimedMember and re-throws, and runPacedSendBatches collects the batch with Promise.all, so one row's preparation failure rejects the whole dispatchCampaignSmsBatch and abandons every other row in it. Trigger: getOrLookupLineType throws — a transient connection reset, a statement timeout, or pool exhaustion under exactly the load #2185 addresses. Verified by making the first three lookups throw in a 25-row batch: the call rejects with 'lookup blew up' instead of returning dispatched or deferred_send_window. Not data loss — unstarted rows are never dequeued and a later tick retries them — but a whole batch of prepared work is discarded for one bad contact.",
-    "risk": "medium",
-    "size": "S",
-    "trackerRecommendation": "Fix now as its own atomic PR. Give preparation the same per-row treatment the send path already has: catch inside handleMember, call recordQueueAttemptFailure, increment counts.failed, and return { success: false, error } for that row alone. Today rpcFailExhaustedCampaignQueueContacts runs only when counts.failed > 0 and a rejection never reaches it, so failed rows are not dead-lettered either, and the durable worker adapter gets an exception where it expects a structured outcome. Reuse the existing sendSingleCampaignSms .then(ok, err) shape rather than inventing a second failure convention. Do NOT bundle with #2185 — that is merged."
-  },
-  {
     "issueNumber": 2194,
     "verdict": "fix-now",
     "recommendedTitle": "Cull 111 empty legacy-named Twilio subaccounts (Console-only; 31 must be kept)",
