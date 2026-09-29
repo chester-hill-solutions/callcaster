@@ -197,3 +197,13 @@ Re-verified every claim above against source at `dev@d0c96b79`. Specifically re-
 Issue data comes from `ISSUE_BOARD.md` (283 issues) and `scripts/issue-board-enrichment/`. I read the board's issue titles and full entries. I did not run `gh issue view` against GitHub, so an issue may have moved since the board was generated. Confirm with `npm run tools:issues:board` before claiming a number.
 
 Not verified: I did not boot the app, did not run the test suites, did not query any database, and made no claim about actual usage. Documentation in `docs/` was not used as evidence for any finding.
+
+# Follow-up review of the proposed fixes
+
+`thermo-review-of-proposed-fixes.md` audits the *shape* of the remediation proposed in the six issues, not the findings. It found two blockers in the proposed fixes themselves, and all three issues were amended as a result:
+
+- **#2219** originally proposed adding a rate limit and then requiring an invite token. That is a guard, and it leaves the defect in place, because the defect is the raw `actionType` dispatch at `app/routes/accept-invite.action.server.ts:225-234`, where each branch hand-parses and hand-validates itself. The amended resolution uses a `z.discriminatedUnion` so an unvalidated path is unrepresentable rather than merely unchecked, parsed by `parseActionBody` — which the codebase already exports and **zero routes currently use**.
+- **#2220** originally named two call sites. It now also requires a `check-handlers` guard, because nothing enforces which limiter a route uses and the existing split is not along a clean axis. Two more one-line call sites would leave the trap in place for the next auth action someone adds by copying a neighbour.
+- **#2216** now states the cost of Option A as far as the code allows. The finding is that the cost is unmeasurable: there is no product analytics, so #2217's absence is now a live dependency of a security decision rather than a general improvement.
+
+Reading the review matters for the same reason reading the `Corrections` section of the report matters: it records where the analysis was wrong, including where it was wrong about its own fix. A reviewer who approves the findings without auditing the shape of the suggested remediation has approved half the work.
