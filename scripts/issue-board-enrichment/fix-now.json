@@ -3465,5 +3465,36 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Residue of #2174, whose premise was that the tier ran nowhere. It runs: the workflow YAML never names it because the invocation is inside a script, so the grep in #2174 was a true observation with a false conclusion. The real defect is the inverse of what #2174 asked for — not missing coverage, but a trustworthy signal arriving through an untrustworthy gate. Evidence is dated and re-checkable: 7 failures in 40 dev runs, and one observed unrelated failure on #2207."
+  },
+  {
+    "issueNumber": 2213,
+    "verdict": "fix-now",
+    "recommendedTitle": "Drizzle models 68 columns across 37 tables as text() where every real database has timestamp with time zone",
+    "summary": "A repo-wide ORM/database type drift. Measured against a real database bootstrapped from the full migration lineage: 68 columns in 37 tables are declared `text()` in `app/db/schema*.ts` and are `timestamp with time zone` in the database. The subset #2208 needs is four `campaign_queue` columns: `claimed_at`, `last_attempt_at`, `created_at`, `dequeued_at`. This is known debt, not an undiscovered bug — `app/lib/call-recording-repair.server.ts:117` documents it precisely, including the coercion subtlety, and works around it with a cast. The origin is #2174's production incident: `call.date_created` and `message.date_created` are both still in the 68, so the repair was done in application code and the schema that caused it was never corrected.",
+    "currentBehavior": "The model lies in both directions. Writes send an ISO string into a timestamptz column; reads return a string where the database says timestamp. TypeScript cannot catch a wrong comparison across the boundary because it believes the lie. The workarounds are per-site: 1 of 68 has a documented cast, and the other 67 are unprotected — correct only because an uncast ISO literal is type `unknown` and Postgres coerces it. That stops being correct the first time a comparison's right-hand side is a `text()` column rather than a literal, and the failure is `no matching operator` at runtime, in a query path, on a real workspace.",
+    "rootCause": "The original DDL created these columns as timestamptz and the Drizzle model was written as text(), and no migration ever reconciled the two. The repair for the one incident this caused was applied in application code rather than at the schema, so the model and the database have remained permanently disagreeing.",
+    "resolution": "**Fix the guard first, not the columns.** Add a real-Postgres test that walks `information_schema` and compares each column's `pg_typeof` against the Drizzle model; run it once to produce the authoritative list, which also proves the 68 rather than asserting it. Then correct the columns in slices by table, starting with `campaign_queue` because #2208 is blocked on it, deleting each site's workaround as its table lands. The fix is large but safe: nothing does string operations on these columns (`date_created` has 59 TS references and zero string ops; `campaign_queue.dequeued_at` has 32 and zero TS-side comparisons), so the change is compiler-checked and tsc enumerates the work. Do NOT bundle the 68 with any feature.",
+    "lookIn": [
+      "app/db/schema-campaign.ts:67 and app/db/schema.ts:358,396 (text() over timestamptz)",
+      "app/lib/call-recording-repair.server.ts:117 (the documented workaround, and the best explanation of the failure mode)",
+      "app/db/schema.ts (206 text() declarations; the drift is a minority of them)"
+    ],
+    "existingTests": [
+      "none — no test compares a Drizzle column type against the database's pg_typeof"
+    ],
+    "missingTests": [
+      "Every Drizzle column type matches the database's pg_typeof, per table (kill-check: declare one timestamp column as text() and confirm the comparison test goes red).",
+      "The guard runs in the tier whose verdict is trustworthy — see #2211, since that tier's only gate is currently the flakiest job."
+    ],
+    "acceptanceCriteria": [
+      "A test enumerates the drift authoritatively; the 68 figure is confirmed rather than asserted.",
+      "campaign_queue's four columns are correct types, unblocking #2208.",
+      "The cast and its comment in call-recording-repair.server.ts are deleted, replaced by the guard.",
+      "Not bundled with a feature PR."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "The highest-leverage item found this session, and it outranks several Fix-now entries. The argument for doing it over a live defect: this is the class that already caused a production corruption, the fix is compiler-checked so the large diff is safe, and the guard is worth more than the fix. The argument against rushing it: 68 columns is a lot of surface, and it should not share a PR with anything else. Blocks #2208 on its four-column subset only — the other 64 can wait."
   }
 ]
