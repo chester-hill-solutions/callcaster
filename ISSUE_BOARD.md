@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@fc9afe3b` · 281 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@92ed9aaa` · 282 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -526,18 +526,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Steps 1 and 2 landed (both done or in flight); Step 3 lands only after the sweep, and provides a real replacement state; Step 4 makes the voicemail object key deterministic and sets upsert: true; Step 5 records an explicit decision on call.recording_url
 - Tracker: Fix now, in strict sequence. Step 2 (the repair sweep) is merged; steps 3-5 remain, each with an exact resolution path. The ordering constraint was real and is now discharged: removing the playback fallback before the repair sweep shipped would have turned a recoverable recording into a dead link, and the sweep has landed. Status on-dev is correct — a fix merged to dev does not close the issue until the dev-to-master release. Two follow-up issues were filed and closed out during the sweep work: #2178 (call.date_created is declared text() but is timestamptz in the database, which is why the sweep's bounds need a cast) and #2174 (the integration-db tier that would close the sweep's remaining test gap).
 
-### [#2174](https://github.com/chester-hill-solutions/callcaster/issues/2174) test/integration-db never runs in CI — the real-Postgres tier built to catch schema-vs-database type mismatches is not wired to any workflow
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-28
-- Recommended title: **Wire test/integration-db into a CI workflow**
-- test/integration-db is a real-Postgres tier that runs nowhere. It exists to catch schema-vs-database mismatches, which is precisely the class of bug that let call.date_created be declared text() while the column is timestamptz (#2178), and it is the only tier in which the call-recording repair sweep's remaining test gap is honestly writable. Nothing is failing today only because nothing runs.
-- Current behavior: The suite is not referenced by any workflow in .github/workflows, so it cannot fail a PR. Every test that would need a real database is either absent or, worse, mocked into a tautology: the repair sweep's find-set can only be asserted as rendered SQL text, because the mocked adminDb returns whatever rows it is handed regardless of the WHERE clause.
-- Root cause: The tier was built and never wired. It needs a Postgres service container, migrations applied on boot, and a separate job from the mocked unit suite — not a flag on the existing one, because the two have incompatible setup costs and different failure semantics.
-- Resolution: 1. Add a Postgres service to a workflow job, using the same image version as production (PostgreSQL 18). 2. Apply client/migrations on boot so the schema is real, and seed AUTH_migrations.schema_migrations the way the review-env restore does. 3. Run the integration suite as its own job with a DATABASE_URL pointing at the service. 4. Add the specific tests the tier exists for, starting with the schema-vs-database type check that would have caught #2178, then the repair sweep's deferred claim: a second run over an already-repaired call enqueues nothing. 5. Keep it advisory-then-blocking in two steps if the suite is not yet green on day one — do not merge a permanently-red job.
-- Look in: `test/integration-db/`, `.github/workflows/ci.yml`, `docs/railway-review-env.md (the restore path that seeds AUTH_migrations.schema_migrations)`
-- Missing tests: every Drizzle column type matches the database's pg_typeof for a sample of rows; the repair sweep's second-run-over-a-repaired-call enqueues nothing; the repair sweep's day-bucket key actually dedupes in the queue, not just in the enqueued payload
-- Done when: The suite runs in a workflow and can fail a PR; A deliberately wrong column type in schema.ts makes that job go red; The repair sweep's deferred claim is asserted against real rows, not against rendered SQL; The image version matches production so a mismatch cannot pass locally and fail in prod
-- Tracker: Fix now. The resolution path is concrete and nothing is currently red, which is the argument for doing it rather than against: every day this tier does not run, a schema-vs-database mismatch is invisible until it misbehaves in production. Two known instances are already queued against it — #2178's text()/timestamptz mismatch, and the repair sweep's deferred end-to-end test. Not a spec change: the tier exists and is unwired.
-
 ### [#2170](https://github.com/chester-hill-solutions/callcaster/issues/2170) Stale subaccount credentials block the product's own number-release path — a customer cannot release their own number
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: devops/admin · Assignee: none · Updated: 2026-09-28
 - Every subaccount credential in the dev environment is stale. 18 of 18 release attempts failed with 'authentication token is not valid for account AC…'. Only the master account works. The consequence is that a customer cannot release their own number through the product: removeWorkspacePhoneNumber authenticates with the dead subaccount credential and fails, while platform-operated calls succeed via master.api.v2010.accounts(subAccountSid).
@@ -667,6 +655,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: campaign-readiness: null sms_send_window → unrestricted-send warning; campaign-readiness: null sms_send_window + voice schedule set → same warning; getScheduleValidation: active day with start but missing end flagged
 - Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
 - Tracker: Fix now; caused night-time sends on the Eric Lombardi blast (2026-09-24).
+
+### [#2211](https://github.com/chester-hill-solutions/callcaster/issues/2211) The real-Postgres integration tier's only CI gate is the pipeline's flakiest job, so a database regression and a compose flake look identical
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-29
+- test/integration-db/ does run in CI, but only as a step inside the e2e compose job, which is also the least reliable job in the pipeline. A genuine integration-database regression and an unrelated compose flake therefore arrive as the same red check, and the standing advice to rerun a red e2e before diffing — correct in general — discards the real failure. `ci:local` does not run the tier at all, so a green local gate says nothing about it.
+- Current behavior: scripts/e2e/run-compose-e2e.mjs:108 is the sole invocation, and only the e2e job runs that script. `dev` branch over the last 40 CI runs: 32 success, 7 failure, 1 cancelled (~18%). Observed 2026-09-29: PR #2207 was a campaign-queue refactor and its e2e failed on e2e/specs/voicemail-setup.spec.ts (117 passed / 2 failed) with no overlap with the diff; it passed on rerun of the same commit.
+- Root cause: The tier needs a real Postgres, and the quality job has none — no `services:` block, no DATABASE_URL. It is in e2e because e2e boots a compose Postgres and applies migrations. So the signal that no mocked test can produce is gated by the job with the most unrelated failures.
+- Resolution: Preferred: give the tier its **own job**, reusing the compose Postgres and migration-on-boot that e2e already does, so its red is never mixed with the browser suite. That is the cheapest fix for the actual defect, which is signal mixing, not missing coverage. Also: (1) add the tier to `ci:local` behind an env flag so a developer touching SQL or Drizzle types can run what CI runs, instead of reconstructing a database by hand; (2) print which tier is running at the top of the e2e log, so the next reader of a red job does not have to guess whether the database tests already passed; (3) record the ~18% e2e failure rate durably, so 'rerun it' is an informed default rather than folklore. NOT proposed: also adding the tier to quality — that runs it twice and does not fix the mixing.
+- Look in: `scripts/e2e/run-compose-e2e.mjs:107-108 (the only invocation of the tier)`, `.github/workflows/ci.yml (quality job has no services: block and no DATABASE_URL)`, `package.json scripts.ci:local (37 steps, no test:integration-db and no test:e2e)`
+- Existing tests: test/integration-db/dequeue-contact-assigned.test.ts — the real dequeue_contact function, dial path only; test/integration-db/split-campaign-atomic.test.ts — six real-Postgres tests added by #2209
+- Missing tests: A CI job exists whose only content is the integration tier, so a red database run is attributable without reading a browser suite's log (kill-check: break one integration test and confirm exactly one job goes red).
+- Done when: A failing integration test turns exactly one job red, and that job runs nothing else.; The tier is runnable locally by a documented command, matching what CI runs.; The e2e log names the tier it is running before any test output.; The measured e2e failure rate is recorded somewhere durable.
+- Tracker: Residue of #2174, whose premise was that the tier ran nowhere. It runs: the workflow YAML never names it because the invocation is inside a script, so the grep in #2174 was a true observation with a false conclusion. The real defect is the inverse of what #2174 asked for — not missing coverage, but a trustworthy signal arriving through an untrustworthy gate. Evidence is dated and re-checkable: 7 failures in 40 dev runs, and one observed unrelated failure on #2207.
 
 ### [#2116](https://github.com/chester-hill-solutions/callcaster/issues/2116) runCronWorkspaceFanout never skips workspace.disabled, so a disabled workspace is still debited and still reconciled
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-28
@@ -1187,9 +1187,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 84
+## Verify and close — 85
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2174](https://github.com/chester-hill-solutions/callcaster/issues/2174) test/integration-db never runs in CI — the real-Postgres tier built to catch schema-vs-database type mismatches is not wired to any workflow
+- Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-29
+- Recommended title: **Wire test/integration-db into a CI workflow**
+- The premise is false: the tier already runs in CI. Its summary proved `grep -rln 'integration-db' .github/workflows/` returns nothing, which is a true observation and the wrong place to look — the workflow YAML never names the tier because the invocation lives in a script. `scripts/e2e/run-compose-e2e.mjs:108` runs `npm run test:integration-db`, and the e2e job runs that script, so the tier executes on every CI run. Implementing the requested remedy would duplicate an existing run rather than add coverage.
+- Current behavior: The real-Postgres tier runs on every CI run inside the e2e compose job. Confirmed from a real log, not only from the source: PR #2207's e2e output contains `Test Files 6 passed (6)` / `Tests 60 passed (60)`, which is this tier exactly on dev before #2209 added its sixth file.
+- Resolution: No code change. The tier is already gated. The issue's residual observation is narrower than claimed and is filed as #2211: the tier's only gate is the pipeline's least reliable job, so a genuine database regression and an unrelated compose flake arrive as the same red check, and the standing 'rerun a red e2e first' reflex would discard the real failure. Separately, `ci:local` omits the tier, so a green local gate says nothing about it.
+- Look in: `scripts/e2e/run-compose-e2e.mjs:107-108 (the invocation #2174's grep could not see)`, `#2211 (the real residual: signal mixing, not missing coverage)`
+- Existing tests: test/integration-db/ — runs in CI today via the e2e compose job
+- Done when: Met: the tier runs in CI, so the schema-vs-database class of bug has a gate.; Not applicable: the wiring this issue asked for already exists.
+- Tracker: Closing rather than implementing, because implementing would add a duplicate CI run and give the appearance of a fix. Worth carrying forward as a general check: when an issue says something 'runs nowhere', find where the invocation actually lives before concluding it is absent. A call inside a script is invisible to a grep of the workflow file, and verifying that takes two minutes.
 
 ### [#2154](https://github.com/chester-hill-solutions/callcaster/issues/2154) splitMessageCampaign is non-atomic across clone, enqueue and dequeue, so a mid-run failure leaves a partially split campaign
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
