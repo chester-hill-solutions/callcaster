@@ -20,6 +20,7 @@ import {
 import { createTenantDb } from "@/server/tenant-db";
 
 import type { Json } from "@/lib/db-types";
+import { findIvrMatchedOption, type IvrOptionLike } from "@/lib/ivr-option-value";
 const getOutreach = async (workspaceId: string, outreachId: number) => {
   const row = await findOutreachAttemptById(workspaceId, outreachId);
   if (!row) throw new Error("Outreach attempt not found");
@@ -33,7 +34,7 @@ interface Script {
     {
       id: string;
       title?: string;
-      options?: Array<{ value: string; next?: string }>;
+      options?: IvrOptionLike[];
       noInput?: IvrNoInputConfig;
     }
   >;
@@ -72,27 +73,13 @@ const findNextBlock = (script: Script, currentPageId: string, currentBlockId: st
   return null;
 };
 
-type IvrResponseOption = { value: string; next?: string };
-
-const findMatchedOption = (
-  options: IvrResponseOption[] | undefined,
-  userInput: string | null,
-): IvrResponseOption | undefined => {
-  if (!options || userInput == null || userInput.trim() === "") return undefined;
-  const input = userInput.trim();
-  return options.find((option) => {
-    const optionValue = String(option.value).trim();
-    return optionValue === input || (input.length > 2 && optionValue === "vx-any");
-  });
-};
-
 const findNextStep = (
-  currentBlock: { id: string; options?: IvrResponseOption[] },
+  currentBlock: { id: string; options?: IvrOptionLike[] },
   userInput: string | null,
   script: Script,
   pageId: string,
 ): string => {
-  const matchedOption = findMatchedOption(currentBlock.options, userInput);
+  const matchedOption = findIvrMatchedOption(currentBlock.options, userInput);
   if (matchedOption?.next) return matchedOption.next;
 
   const nextLocation = findNextBlock(script, pageId, currentBlock.id);
@@ -189,7 +176,7 @@ export const action = defineAction({
 
     // Replay counts live in the call result so the cap survives the round-trip.
     const hadInput = userInput != null && String(userInput).trim() !== "";
-    const matchedOption = findMatchedOption(currentBlock.options, userInput);
+    const matchedOption = findIvrMatchedOption(currentBlock.options, userInput);
     // A gathered key is an answer only when it matches a declared option.
     // Treat an unknown key like no input so it cannot answer a later block.
     const hasAcceptedInput = hadInput && (!currentBlock.options?.length || matchedOption != null);
