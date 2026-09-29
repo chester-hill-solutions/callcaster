@@ -81,6 +81,14 @@ export function useChatsPage() {
     null,
   );
   const requestedPageRef = useRef(pagination.page);
+  /**
+   * The filter this accumulation belongs to. A page number cannot identify a
+   * response — after "load more" the fetcher holds a later page than the loader,
+   * permanently, and comparing the two discards every revalidation. The filter
+   * can: a different filter means a different list, and the same filter means
+   * the response should be folded in.
+   */
+  const accumulatedFilterKeyRef = useRef<string | null>(null);
   const registerChatActions = useCallback(
     (actions: typeof chatActionsRef.current) => {
       chatActionsRef.current = actions;
@@ -145,8 +153,8 @@ export function useChatsPage() {
   }, []);
 
   /**
-   * @effect CANDIDATE-REMOVE: mirror the loader's chats/pagination into local loadedChats/paginationState whenever the loader revalidates (e.g. filter/search/sort change, realtime-triggered revalidation), skipping the sync if the pagination fetcher already loaded a further-ahead page.
-   * @effect-deps chats, pagination (loader data to mirror), paginationFetcher.data, paginationFetcher.state (guards against clobbering an in-flight/completed "load more" page with stale loader data)
+   * @effect CANDIDATE-REMOVE: fold a fresh loader response into the accumulated chat list — merging it onto the pages already loaded, so a revalidation updates counts and ordering without discarding them.
+   * @effect-deps chats, pagination (loader data to fold in), paginationFetcher.data, paginationFetcher.state (skip while a "load more" is in flight), paginationFilterKey (the discriminator for a reset)
    * @effect-side-effects none (setState + ref write only)
    * @effect-why-not-loader chats/pagination are already loader data (via useLoaderData); this copies them into local state, the "sync state to a prop" pattern the effects guide flags. It's kept as an effect because loadedChats also accumulates fetcher-loaded pages over time (see the effect below) and must be reconciled against a fresh loader response without discarding those extra pages — a case not implemented today via a pure derivation.
    */
@@ -154,14 +162,38 @@ export function useChatsPage() {
     if (paginationFetcher.state !== "idle") {
       return;
     }
-    const fetchedPage = paginationFetcher.data?.pagination.page;
-    if (fetchedPage != null && fetchedPage > pagination.page) {
+
+    // A different filter means a different list, so the accumulated pages
+    // belong to a result the agent is no longer looking at. The fetcher key
+    // already carries the filter, so this is the one reset signal that stays
+    // correct when page numbers are in play.
+    if (accumulatedFilterKeyRef.current !== paginationFilterKey) {
+      accumulatedFilterKeyRef.current = paginationFilterKey;
+      setLoadedChats(chats);
+      setPaginationState(pagination);
+      requestedPageRef.current = pagination.page;
       return;
     }
-    setLoadedChats(chats);
-    setPaginationState(pagination);
-    requestedPageRef.current = pagination.page;
-  }, [chats, pagination, paginationFetcher.data, paginationFetcher.state]);
+
+    // Same filter, already paginating. This used to compare page numbers and
+    // drop the response whenever the fetcher held a later page, which after the
+    // first "load more" discarded every page-1 revalidation for the life of the
+    // page: a realtime event on a page-1 conversation never updated its unread
+    // count again. Page numbers are not an identity — merge instead.
+    setLoadedChats((currentChats) => mergeConversationPages(currentChats, chats));
+    // The cursor only moves forward. Rewinding it to the loader's page 1 would
+    // make the next "load more" re-request a page already held.
+    setPaginationState((current) =>
+      pagination.page > current.page ? pagination : current,
+    );
+    requestedPageRef.current = Math.max(requestedPageRef.current, pagination.page);
+  }, [
+    chats,
+    pagination,
+    paginationFetcher.data,
+    paginationFetcher.state,
+    paginationFilterKey,
+  ]);
 
   /**
    * @effect Merge a newly-loaded "load more" page of conversations (from the pagination fetcher) into the accumulated local chat list, and advance the pagination cursor.
