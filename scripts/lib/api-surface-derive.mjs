@@ -149,12 +149,17 @@ const BASE_HELPERS = [
     re: /\brequireDataPlaneRouteCapability\s*\(|\brequireDataPlaneCapability\s*\(/,
     allows: ["apiKeyOrSession", "session", "workspaceAdmin"],
   },
-  // Data-plane middleware resolves API-key actors but hands them userId:null,
-  // so a preamble that requires userId is session-or-stronger.
+  // Does NOT require a userId. `getDataPlaneRouteContext` only checks that the
+  // actor belongs to the workspace, so an API key with any scope set — including
+  // none at all — passes it. Listing `session` here asserted a guarantee the
+  // helper never enforced, which is what let a declared `authClass: "session"`
+  // pass unchallenged on the SSE stream (#2133). Routes that need a session
+  // actor must say so: `requireDataPlaneWorkspaceUser` requires `userId`, and
+  // a capability factory such as `dataPlaneCapabilityAuth` is authoritative.
   {
     id: "getDataPlaneRouteContext",
     re: /\bgetDataPlaneRouteContext\s*\(/,
-    allows: ["session", "workspaceAdmin"],
+    allows: ["apiKeyOrSession", "session", "workspaceAdmin"],
   },
   // The canonical workspace+user preamble shared by data-plane API routes.
   {

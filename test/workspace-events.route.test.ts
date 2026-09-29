@@ -18,6 +18,25 @@ vi.mock("@/lib/workspace-membership.server", () => ({
   getUserRole: (...args: unknown[]) => mocks.getUserRole(...args),
 }));
 
+// The loader gates on `audit.read` via `dataPlaneCapabilityAuth`. That pulls in
+// two modules this test did not previously load, and each needs its own mock or
+// it reaches `@/server/db`, which the mock above deliberately does not provide
+// (it exposes only `directPool`, because LISTEN is the only pool the route uses):
+//
+//   - `@/lib/database/workspace.server` — where the guard reads the membership
+//     from. A different module from `@/lib/workspace-membership.server` above,
+//     which is what the re-check inside the stream uses.
+//   - `@/server/admin-db` — reached transitively via the guard's auth
+//     resolution, and never touched by this route.
+vi.mock("@/lib/database/workspace.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/database/workspace.server")>()),
+  getUserRole: (...args: unknown[]) => mocks.getUserRole(...args),
+}));
+// `adminDb` must be a stub, not a spread: the real module is built on `db` from
+// `@/server/db`, which this test mocks down to `directPool` alone. Spreading it
+// evaluates the original and fails on the missing `db` export.
+vi.mock("@/server/admin-db", () => ({ adminDb: {} }));
+
 vi.mock("@/lib/workspace-events.server", () => ({
   WORKSPACE_EVENTS_NOTIFY_CHANNEL: "workspace_events",
   fetchWorkspaceEventsAfter: (...args: unknown[]) =>
@@ -48,7 +67,11 @@ describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
     mocks.fetchWorkspaceEventsAfter.mockResolvedValue([]);
     mocks.listen.mockRejectedValue(new Error("LISTEN unavailable"));
     mocks.getUserRole.mockReset();
-    mocks.getUserRole.mockResolvedValue({ role: "member" });
+    // `owner`, not `member`. The loader now gates on `audit.read`, which the
+    // role→capability matrix grants to owners alone (app/lib/capabilities.ts:43),
+    // so a `member` default is refused with 403 before the stream opens. The
+    // tests that care about a *non*-owner set the role themselves.
+    mocks.getUserRole.mockResolvedValue({ role: "owner" });
   });
 
   /** Drain an SSE body in the background, accumulating decoded text. */
@@ -80,6 +103,102 @@ describe("app/routes/api+/workspaces+/$workspaceId/events", () => {
       created_at: "2026-07-15T00:00:00.000Z",
     };
   }
+
+  // #2133: the stream is gated on `audit.read`. These are the auth cases the
+  // old `getDataPlaneRouteContext` preamble could not express — it admitted any
+  // key bound to the workspace, including one with no scopes at all.
+  describe("capability gate on the stream (#2133)", () => {
+    async function loadLoader() {
+      return import("../app/routes/api+/workspaces+/$workspaceId/events.loader.server");
+    }
+
+    function eventRequest() {
+      return new Request("http://localhost/api/workspaces/ws-1/events");
+    }
+
+    test("an API key with zero scopes is refused", async () => {
+      const mod = await loadLoader();
+      const response = await asRouteResponse(
+        mod.loader(
+          await withDataPlaneRouteArgs(
+            { request: eventRequest(), params: { workspaceId: "ws-1" } },
+            { userId: null, apiKey: { keyId: "key-1", scopes: [] } } as never,
+          ),
+        ),
+      );
+
+      // Before the gate this returned 200 and a live event stream carrying every
+      // workspace event, transcripts included.
+      expect(response.status).toBe(403);
+    });
+
+    test("an API key with only campaigns.read is refused", async () => {
+      const mod = await loadLoader();
+      const response = await asRouteResponse(
+        mod.loader(
+          await withDataPlaneRouteArgs(
+            { request: eventRequest(), params: { workspaceId: "ws-1" } },
+            { userId: null, apiKey: { keyId: "key-1", scopes: ["campaigns.read"] } } as never,
+          ),
+        ),
+      );
+
+      expect(response.status).toBe(403);
+    });
+
+    test("an API key with audit.read is allowed (positive control)", async () => {
+      const mod = await loadLoader();
+      const response = await mod.loader(
+        await withDataPlaneRouteArgs(
+          { request: eventRequest(), params: { workspaceId: "ws-1" } },
+          { userId: null, apiKey: { keyId: "key-1", scopes: ["audit.read"] } } as never,
+        ),
+      );
+
+      // The permission the gate asks for is the permission that opens it, so this
+      // fails if the gate is checking something else.
+      //
+      // Deliberately does not read the body: a 200 here is a live SSE stream that
+      // never ends, so `asRouteResponse` would block forever. The status and
+      // content type are enough — the streaming behaviour has its own tests.
+      expect(response.status).toBe(200);
+      expect(response.headers.get("Content-Type")).toContain("text/event-stream");
+    });
+
+    test("a member session is refused, since audit.read is owner-only", async () => {
+      // A control on the *role* axis as well as the scope axis. The matrix
+      // grants audit.read to owners alone, so a plain member cannot open a
+      // transcript-bearing stream even with a valid session.
+      mocks.getUserRole.mockResolvedValue({ role: "member" });
+      const mod = await loadLoader();
+      const response = await asRouteResponse(
+        mod.loader(
+          await withDataPlaneRouteArgs({
+            request: eventRequest(),
+            params: { workspaceId: "ws-1" },
+          }),
+        ),
+      );
+
+      expect(response.status).toBe(403);
+    });
+
+    test("an owner session is allowed (positive control)", async () => {
+      const mod = await loadLoader();
+      const response = await mod.loader(
+        await withDataPlaneRouteArgs({
+          request: eventRequest(),
+          params: { workspaceId: "ws-1" },
+        }),
+      );
+
+      // Not drained: a 200 here is an endless stream. See the other positive
+      // control above.
+      expect(response.status).toBe(200);
+
+      expect(response.status).toBe(200);
+    });
+  });
 
   test("stops streaming once the member's access is revoked mid-stream", async () => {
     vi.useFakeTimers();
