@@ -3394,36 +3394,6 @@
     "trackerRecommendation": "Fix now for the remaining two items. The destructive part is done and verified; what is left is the name backfill and recording the keep-list. The backfill depends on working credentials, which is #2170 — a real prerequisite, since it cannot run against dev's stale subaccount tokens. The keep-list move is independent and can proceed now."
   },
   {
-    "issueNumber": 2174,
-    "verdict": "fix-now",
-    "recommendedTitle": "Wire test/integration-db into a CI workflow",
-    "summary": "test/integration-db is a real-Postgres tier that runs nowhere. It exists to catch schema-vs-database mismatches, which is precisely the class of bug that let call.date_created be declared text() while the column is timestamptz (#2178), and it is the only tier in which the call-recording repair sweep's remaining test gap is honestly writable. Nothing is failing today only because nothing runs.",
-    "currentBehavior": "The suite is not referenced by any workflow in .github/workflows, so it cannot fail a PR. Every test that would need a real database is either absent or, worse, mocked into a tautology: the repair sweep's find-set can only be asserted as rendered SQL text, because the mocked adminDb returns whatever rows it is handed regardless of the WHERE clause.",
-    "rootCause": "The tier was built and never wired. It needs a Postgres service container, migrations applied on boot, and a separate job from the mocked unit suite — not a flag on the existing one, because the two have incompatible setup costs and different failure semantics.",
-    "resolution": "1. Add a Postgres service to a workflow job, using the same image version as production (PostgreSQL 18). 2. Apply client/migrations on boot so the schema is real, and seed AUTH_migrations.schema_migrations the way the review-env restore does. 3. Run the integration suite as its own job with a DATABASE_URL pointing at the service. 4. Add the specific tests the tier exists for, starting with the schema-vs-database type check that would have caught #2178, then the repair sweep's deferred claim: a second run over an already-repaired call enqueues nothing. 5. Keep it advisory-then-blocking in two steps if the suite is not yet green on day one — do not merge a permanently-red job.",
-    "lookIn": [
-      "test/integration-db/",
-      ".github/workflows/ci.yml",
-      "docs/railway-review-env.md (the restore path that seeds AUTH_migrations.schema_migrations)"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "every Drizzle column type matches the database's pg_typeof for a sample of rows",
-      "the repair sweep's second-run-over-a-repaired-call enqueues nothing",
-      "the repair sweep's day-bucket key actually dedupes in the queue, not just in the enqueued payload"
-    ],
-    "acceptanceCriteria": [
-      "The suite runs in a workflow and can fail a PR",
-      "A deliberately wrong column type in schema.ts makes that job go red",
-      "The repair sweep's deferred claim is asserted against real rows, not against rendered SQL",
-      "The image version matches production so a mismatch cannot pass locally and fail in prod"
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now. The resolution path is concrete and nothing is currently red, which is the argument for doing it rather than against: every day this tier does not run, a schema-vs-database mismatch is invisible until it misbehaves in production. Two known instances are already queued against it — #2178's text()/timestamptz mismatch, and the repair sweep's deferred end-to-end test. Not a spec change: the tier exists and is unwired."
-  },
-  {
     "issueNumber": 2194,
     "verdict": "fix-now",
     "recommendedTitle": "Cull 111 empty legacy-named Twilio subaccounts (Console-only; 31 must be kept)",
@@ -3464,5 +3434,36 @@
     "size": "L",
     "risk": "high",
     "trackerRecommendation": "Found while scoping #2154's atomicity fix. The atomicity defect is separate: that one is a mid-run *failure* leaving a partial split; this one is an in-flight *success* producing a double send, and fixing atomicity does not address it. Double SMS on an opt-in outreach list is a compliance and deliverability problem, not only a cost one. Note when grepping: `claimed_at` and the claim RPCs live in plpgsql migrations, so searching `app/lib` finds almost nothing and makes this look unimplemented."
+  },
+  {
+    "issueNumber": 2211,
+    "verdict": "fix-now",
+    "recommendedTitle": "The real-Postgres integration tier's only CI gate is the pipeline's flakiest job, so a database regression and a compose flake look identical",
+    "summary": "test/integration-db/ does run in CI, but only as a step inside the e2e compose job, which is also the least reliable job in the pipeline. A genuine integration-database regression and an unrelated compose flake therefore arrive as the same red check, and the standing advice to rerun a red e2e before diffing — correct in general — discards the real failure. `ci:local` does not run the tier at all, so a green local gate says nothing about it.",
+    "currentBehavior": "scripts/e2e/run-compose-e2e.mjs:108 is the sole invocation, and only the e2e job runs that script. `dev` branch over the last 40 CI runs: 32 success, 7 failure, 1 cancelled (~18%). Observed 2026-09-29: PR #2207 was a campaign-queue refactor and its e2e failed on e2e/specs/voicemail-setup.spec.ts (117 passed / 2 failed) with no overlap with the diff; it passed on rerun of the same commit.",
+    "rootCause": "The tier needs a real Postgres, and the quality job has none — no `services:` block, no DATABASE_URL. It is in e2e because e2e boots a compose Postgres and applies migrations. So the signal that no mocked test can produce is gated by the job with the most unrelated failures.",
+    "resolution": "Preferred: give the tier its **own job**, reusing the compose Postgres and migration-on-boot that e2e already does, so its red is never mixed with the browser suite. That is the cheapest fix for the actual defect, which is signal mixing, not missing coverage. Also: (1) add the tier to `ci:local` behind an env flag so a developer touching SQL or Drizzle types can run what CI runs, instead of reconstructing a database by hand; (2) print which tier is running at the top of the e2e log, so the next reader of a red job does not have to guess whether the database tests already passed; (3) record the ~18% e2e failure rate durably, so 'rerun it' is an informed default rather than folklore. NOT proposed: also adding the tier to quality — that runs it twice and does not fix the mixing.",
+    "lookIn": [
+      "scripts/e2e/run-compose-e2e.mjs:107-108 (the only invocation of the tier)",
+      ".github/workflows/ci.yml (quality job has no services: block and no DATABASE_URL)",
+      "package.json scripts.ci:local (37 steps, no test:integration-db and no test:e2e)"
+    ],
+    "existingTests": [
+      "test/integration-db/dequeue-contact-assigned.test.ts — the real dequeue_contact function, dial path only",
+      "test/integration-db/split-campaign-atomic.test.ts — six real-Postgres tests added by #2209"
+    ],
+    "missingTests": [
+      "A CI job exists whose only content is the integration tier, so a red database run is attributable without reading a browser suite's log (kill-check: break one integration test and confirm exactly one job goes red)."
+    ],
+    "acceptanceCriteria": [
+      "A failing integration test turns exactly one job red, and that job runs nothing else.",
+      "The tier is runnable locally by a documented command, matching what CI runs.",
+      "The e2e log names the tier it is running before any test output.",
+      "The measured e2e failure rate is recorded somewhere durable."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Residue of #2174, whose premise was that the tier ran nowhere. It runs: the workflow YAML never names it because the invocation is inside a script, so the grep in #2174 was a true observation with a false conclusion. The real defect is the inverse of what #2174 asked for — not missing coverage, but a trustworthy signal arriving through an untrustworthy gate. Evidence is dated and re-checkable: 7 failures in 40 dev runs, and one observed unrelated failure on #2207."
   }
 ]

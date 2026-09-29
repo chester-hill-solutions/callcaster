@@ -2227,5 +2227,29 @@
     "size": "S",
     "risk": "high",
     "trackerRecommendation": "Two kill-checks, each failing exactly one test, re-confirmed after rebasing onto the #2207 refactor. One trap worth carrying: the first version of the failure test used `vi.spyOn` on `dequeueQueueEntry` and came back GREEN without ever failing, because splitMessageCampaign holds a direct ESM binding and a namespace spy does not intercept it. The failure is induced by a database trigger instead. A green test that never exercised its subject is worse than no test."
+  },
+  {
+    "issueNumber": 2174,
+    "verdict": "verify-close",
+    "recommendedTitle": "Wire test/integration-db into a CI workflow",
+    "summary": "The premise is false: the tier already runs in CI. Its summary proved `grep -rln 'integration-db' .github/workflows/` returns nothing, which is a true observation and the wrong place to look — the workflow YAML never names the tier because the invocation lives in a script. `scripts/e2e/run-compose-e2e.mjs:108` runs `npm run test:integration-db`, and the e2e job runs that script, so the tier executes on every CI run. Implementing the requested remedy would duplicate an existing run rather than add coverage.",
+    "currentBehavior": "The real-Postgres tier runs on every CI run inside the e2e compose job. Confirmed from a real log, not only from the source: PR #2207's e2e output contains `Test Files 6 passed (6)` / `Tests 60 passed (60)`, which is this tier exactly on dev before #2209 added its sixth file.",
+    "resolution": "No code change. The tier is already gated. The issue's residual observation is narrower than claimed and is filed as #2211: the tier's only gate is the pipeline's least reliable job, so a genuine database regression and an unrelated compose flake arrive as the same red check, and the standing 'rerun a red e2e first' reflex would discard the real failure. Separately, `ci:local` omits the tier, so a green local gate says nothing about it.",
+    "lookIn": [
+      "scripts/e2e/run-compose-e2e.mjs:107-108 (the invocation #2174's grep could not see)",
+      "#2211 (the real residual: signal mixing, not missing coverage)"
+    ],
+    "existingTests": [
+      "test/integration-db/ — runs in CI today via the e2e compose job"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Met: the tier runs in CI, so the schema-vs-database class of bug has a gate.",
+      "Not applicable: the wiring this issue asked for already exists."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Closing rather than implementing, because implementing would add a duplicate CI run and give the appearance of a fix. Worth carrying forward as a general check: when an issue says something 'runs nowhere', find where the invocation actually lives before concluding it is absent. A call inside a script is invisible to a grep of the workflow file, and verifying that takes two minutes."
   }
 ]
