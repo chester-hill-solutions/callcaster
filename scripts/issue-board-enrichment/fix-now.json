@@ -3641,5 +3641,14 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Fix now. The resolution path is concrete and nothing is currently red, which is the argument for doing it rather than against: every day this tier does not run, a schema-vs-database mismatch is invisible until it misbehaves in production. Two known instances are already queued against it — #2178's text()/timestamptz mismatch, and the repair sweep's deferred end-to-end test. Not a spec change: the tier exists and is unwired."
+  },
+  {
+    "issueNumber": 2185,
+    "verdict": "fix-now",
+    "recommendedTitle": "Bound campaign SMS prep concurrency: the #2172 pacer lets 25 rows hit a 10-connection pool at once",
+    "summary": "Found while verifying the #2172 fix (PR #2182). Moving the pacing gate to a serialising pacer claimed immediately before the provider request required removing the await from the dispatch loop, so rows in a batch now start their preparation together. Measured peak in-flight DB operations on a 25-row batch with 12ms prep: 1 before, 25 after. app/server/db.ts sets max: 10 on the query client. The postgres client queues the excess rather than failing, and MAX_CONCURRENCY=25 was already the intended batch cap, so nothing is broken — but each queued row holds its credit reservation while it waits, since ctx.budget.reserve runs before the pacer.",
+    "risk": "low",
+    "size": "S",
+    "trackerRecommendation": "Fix now as its own atomic PR, NOT bundled into a #2172 follow-up. Add a semaphore around the preparation phase in handleClaimedMember, bounded to what the pool can serve, and leave the pacer unbounded at the provider boundary. Do NOT re-serialise the dispatch loop — that reinstates the #2172 rate-limit defect. Also consider tying MAX_CONCURRENCY=25 to the pool size rather than leaving it a bare constant. No test currently covers this load shape, which is why the change went unnoticed."
   }
 ]
