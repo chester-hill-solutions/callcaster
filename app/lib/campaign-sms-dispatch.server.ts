@@ -28,12 +28,18 @@ import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { requireOutboundCredits } from "@/lib/outbound-credit-gate.server";
-import { OUTBOUND_CREDIT_FLOOR } from "../../shared/credit-floor";
 import { estimateMessageCredits } from "../../shared/pricing";
 import { rpcFailExhaustedCampaignQueueContacts } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
 import { QUERY_POOL_MAX } from "@/server/db-pool-size";
 import { createSemaphore, type Semaphore } from "@/lib/semaphore";
+import {
+  createDispatchCreditBudget,
+  createStartPacer,
+  type DispatchCreditBudget,
+  type StartPacer,
+} from "@/lib/campaign-sms-dispatch-primitives.server";
+import { logger } from "@/lib/logger.server";
 import { selectEligibleCampaignQueueMembers } from "@/lib/campaign-dispatch-queue.server";
 import type { TwilioMessageIntent } from "@/lib/types";
 import {
@@ -100,37 +106,6 @@ export type CampaignSmsBatchOutcome =
 
 /** Skip reason for a row left queued because the balance cannot cover its estimated cost. */
 export const INSUFFICIENT_CREDITS_SKIPPED_REASON = "Insufficient credits for the estimated message cost";
-
-/**
- * Per-dispatch credit budget. The entry gate reads the balance once, but
- * debits land asynchronously after delivery, so every send in the batch
- * would otherwise pass on the same stale balance. Reservations are made
- * synchronously right before a send starts (no await in between), so
- * concurrent rows in one dispatch call cannot spend the same credits.
- * Cross-worker reservation is #1271.
- */
-export function createDispatchCreditBudget(balance: number) {
-  let remaining = balance - OUTBOUND_CREDIT_FLOOR;
-  let cheapestSeen = Number.POSITIVE_INFINITY;
-  return {
-    reserve(cost: number): boolean {
-      cheapestSeen = Math.min(cheapestSeen, cost);
-      if (cost > remaining) return false;
-      remaining -= cost;
-      return true;
-    },
-    /** A send that never reached Twilio will not be debited: give the credits back. */
-    release(cost: number): void {
-      remaining += cost;
-    },
-    /** True when a row was refused and the balance still cannot cover the cheapest one seen. */
-    get exhausted(): boolean {
-      return remaining < cheapestSeen;
-    },
-  };
-}
-
-export type DispatchCreditBudget = ReturnType<typeof createDispatchCreditBudget>;
 
 export async function dispatchCampaignSmsBatch(args: {
   workspaceId: string;
@@ -337,50 +312,6 @@ export async function dispatchCampaignSmsBatch(args: {
 }
 
 /**
- * Serialises provider-request starts at a fixed minimum interval.
- *
- * The interval must be measured between *requests*, not between the dispatch
- * calls that begin a row's preparation. A dispatched row does async work before
- * the provider is called — line-type lookup, duplicate check, opt-out
- * dequeue — and that work differs per row, so a dispatch-stamped clock drifts
- * from the request clock by exactly the per-row difference. Rows then bunch up:
- * a slow row's request can overtake a faster row's that was dispatched after
- * it, and under load the gap collapses to nothing, which is the one situation
- * where the rate limit matters.
- *
- * Callers queue here immediately before issuing their request, so each row
- * claims a slot in the order it actually reaches the provider.
- */
-function createStartPacer(minStartIntervalMs: number): StartPacer {
-  let lastRequestAt: number | null = null;
-  // Chains the turns so two rows finishing their preparation in the same tick
-  // cannot both read the same `lastRequestAt` and pass the gate together.
-  let turn: Promise<void> = Promise.resolve();
-  return {
-    async waitForTurn() {
-      const mine = turn.then(async () => {
-        if (lastRequestAt !== null) {
-          const waitMs = Math.max(0, minStartIntervalMs - (Date.now() - lastRequestAt));
-          if (waitMs > 0) {
-            await new Promise((resolve) => setTimeout(resolve, waitMs));
-          }
-        }
-        // Stamped here, at the release of the turn: the request follows
-        // immediately with no intervening await.
-        lastRequestAt = Date.now();
-      });
-      // Keep the chain usable after a rejected turn so one failed row cannot
-      // wedge every later row's pacing.
-      turn = mine.then(
-        () => undefined,
-        () => undefined,
-      );
-      return mine;
-    },
-  };
-}
-
-/**
  * Start each batch's sends at the paced rate and collect the results in
  * queue order per batch.
  *
@@ -398,7 +329,7 @@ async function runPacedSendBatches(args: {
   const { queueMembers, ctx, batchSize, startPacer, responses } = args;
   for (let i = 0; i < queueMembers.length; i += batchSize) {
     const batch = queueMembers.slice(i, i + batchSize);
-    const startingPromises: Promise<HandleMemberResult>[] = [];
+    const starting: { member: QueueMember; promise: Promise<HandleMemberResult> }[] = [];
     for (const member of batch) {
       // Once a row has been refused for credits, later rows cannot afford a
       // send either: account for them without lookups or pacing waits.
@@ -407,9 +338,39 @@ async function runPacedSendBatches(args: {
         continue;
       }
 
-      startingPromises.push(handleMember(member, ctx));
+      starting.push({ member, promise: handleMember(member, ctx) });
     }
-    const batchResults = await Promise.all(startingPromises);
+    // `allSettled`, not `all`: one row's rejection must not discard the
+    // responses of siblings that already sent, nor the batches after this one.
+    // `handleMember` has its own boundary, so the fallback below is a backstop
+    // rather than the normal path — but it is not unreachable. The one database
+    // write the row boundary cannot survive is the write that *records* a
+    // failure, and when that fails the rejection has to land somewhere.
+    const settled = await Promise.allSettled(starting.map((entry) => entry.promise));
+    const batchResults: HandleMemberResult[] = [];
+    settled.forEach((outcome, index) => {
+      if (outcome.status === "fulfilled") {
+        batchResults.push(outcome.value);
+        return;
+      }
+      const member = starting[index]?.member;
+      const error = outcome.reason;
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(
+        `Campaign SMS row escaped its own failure boundary: ${message}`,
+        error instanceof Error ? error : new Error(message),
+      );
+      // The only rejections that reach here are `failRow`'s own record write
+      // failing, which is why it counts the row instead of calling `failRow`
+      // again — the write that would record it is the thing that just failed.
+      // The row stays queued and eligible, which is the honest outcome.
+      ctx.counts.failed += 1;
+      if (member) {
+        batchResults.push(
+          memberResponse({ [member.contact_id]: { success: false, error: message } }),
+        );
+      }
+    });
     const deferredAt = batchResults.find((result) => result.deferredSendWindow)?.deferredSendWindow;
     responses.push(
       ...batchResults
@@ -462,11 +423,6 @@ type HandleMemberCtx = {
   prepSemaphore: Semaphore;
 };
 
-/** Claims the next provider-request slot at the configured start rate. */
-type StartPacer = {
-  waitForTurn: () => Promise<void>;
-};
-
 type HandleMemberResult = {
   response: ContactDispatchResult;
   deferredSendWindow?: Date;
@@ -494,6 +450,41 @@ function memberResponse(response: ContactDispatchResult): HandleMemberResult {
   return { response };
 }
 
+/**
+ * One row failed, and the rest of the batch carries on.
+ *
+ * Every failure path funnels through here so that a result is produced for that
+ * contact alone: the failure is counted, the attempt is recorded (so the row
+ * can be dead-lettered rather than retried forever), and the siblings are
+ * untouched.
+ *
+ * `releaseCost` is what keeps the credit budget correct. Preparation reserves
+ * synchronously and the send debits afterwards, so the reservation has to come
+ * back for any row that did not reach the provider. Passing it here means the
+ * release cannot be forgotten by a path that throws in a new place.
+ */
+async function failRow(
+  member: QueueMember,
+  ctx: HandleMemberCtx,
+  error: unknown,
+  releaseCost?: number,
+): Promise<HandleMemberResult> {
+  if (releaseCost !== undefined) ctx.budget.release(releaseCost);
+  const message = error instanceof Error ? error.message : String(error);
+  // Counted *after* the record on purpose. Recording is a database write on the
+  // same database that has just failed, so it can reject — and if this threw
+  // after incrementing, the row's rejection would escape to the batch loop,
+  // which counts it too. Counting last makes the two mutually exclusive: either
+  // this counts the row or the loop does, never both.
+  await recordQueueAttemptFailure({
+    queueId: member.id,
+    error: message,
+    workspaceId: ctx.workspaceId,
+  });
+  ctx.counts.failed += 1;
+  return memberResponse({ [member.contact_id]: { success: false, error: message } });
+}
+
 function deferredSendWindowResponse(policy: ReturnType<typeof smsSendPolicy>): HandleMemberResult {
   return {
     response: {},
@@ -502,7 +493,33 @@ function deferredSendWindowResponse(policy: ReturnType<typeof smsSendPolicy>): H
   };
 }
 
+/**
+ * The per-row boundary.
+ *
+ * Everything a row does before and during preparation is a database round trip,
+ * and any of them can throw: the opt-out and duplicate dequeues here, and the
+ * line-type lookup, duplicate check and reservation in `prepareClaimedMember`.
+ * Without this catch a single bad contact rejected the whole `Promise.all` in
+ * `runPacedSendBatches`, which discarded its batch siblings' responses — rows
+ * that had already sent — abandoned every later batch, and skipped the
+ * `rpcFailExhaustedCampaignQueueContacts` call that lets a campaign drain.
+ *
+ * The `await` on the last statement is load-bearing: the phone-claim handler
+ * below rethrows, and returning its promise would put the rejection outside
+ * this `try`.
+ */
 async function handleMember(
+  member: QueueMember,
+  ctx: HandleMemberCtx,
+): Promise<HandleMemberResult> {
+  try {
+    return await handleMemberInner(member, ctx);
+  } catch (error) {
+    return failRow(member, ctx, error);
+  }
+}
+
+async function handleMemberInner(
   member: QueueMember,
   ctx: HandleMemberCtx,
 ): Promise<HandleMemberResult> {
@@ -710,53 +727,58 @@ async function handleClaimedMember(
   if (prepared.kind === "finished") return prepared.result;
   const { processedBody, cost } = prepared;
 
-  // Claim a provider-request slot. This is the rate limit, so it is applied
-  // here rather than at dispatch: the interval has to be measured between the
-  // requests the provider actually receives. It is also an await, so it can
-  // hold a row past the window boundary — hence the gate order below.
-  await ctx.startPacer.waitForTurn();
+  // From here the row owns `cost`. Preparation reserved it, the provider debit
+  // happens after delivery, and the only code that used to give it back lived
+  // in the send's rejection handler — so a throw in this window (a synchronous
+  // throw out of `sendSingleCampaignSms`, for instance, which `.then` cannot
+  // see) kept the credits for the rest of the dispatch. The row boundary in
+  // `handleMember` turns the rethrow into a per-contact failure.
+  try {
+    // Claim a provider-request slot. This is the rate limit, so it is applied
+    // here rather than at dispatch: the interval has to be measured between the
+    // requests the provider actually receives. It is also an await, so it can
+    // hold a row past the window boundary — hence the gate order below.
+    await ctx.startPacer.waitForTurn();
 
-  // The initial gate protects an idle batch, but pacing and the per-contact
-  // lookup gates can keep a row here long enough for the campaign window to
-  // close. Check again immediately before starting the provider call so rows
-  // that have not started remain queued for the next window.
-  if (!isDispatchAllowedAt(ctx.sendPolicy)) {
-    ctx.budget.release(cost);
-    counts.deferred += 1;
-    return deferredSendWindowResponse(ctx.sendPolicy);
-  }
-
-  return sendSingleCampaignSms({
-    body: processedBody,
-    media: ctx.media,
-    to: normalizedPhone,
-    from: ctx.effectiveCallerId,
-    campaign_id: campaignId,
-    workspace: workspaceId,
-    contact_id: member.contact_id,
-    queue_id: member.id,
-    user_id: userId,
-    portalConfig: ctx.portalConfig,
-    messageIntent: ctx.messageIntent,
-    messagingServiceSidFromRequest: ctx.messagingServiceSidFromRequest,
-    sendPolicy: ctx.sendPolicy,
-    campaignSmsRow: ctx.campaign.campaign,
-  }).then(
-    (result) => {
-      if (result.kind === "deferred_send_window") {
-        ctx.budget.release(cost);
-        counts.deferred += 1;
-        return { response: {}, deferredSendWindow: result.nextOpenAt };
-      }
-      counts.sent += 1;
-      return memberResponse({ [member.contact_id]: { success: true, ...result } });
-    },
-    async (error) => {
+    // The initial gate protects an idle batch, but pacing and the per-contact
+    // lookup gates can keep a row here long enough for the campaign window to
+    // close. Check again immediately before starting the provider call so rows
+    // that have not started remain queued for the next window.
+    if (!isDispatchAllowedAt(ctx.sendPolicy)) {
       ctx.budget.release(cost);
-      const message = error instanceof Error ? error.message : String(error);
-      counts.failed += 1;
-      await recordQueueAttemptFailure({ queueId: member.id, error: message, workspaceId });
-      return memberResponse({ [member.contact_id]: { success: false, error: message } });
-    },
-  );
+      counts.deferred += 1;
+      return deferredSendWindowResponse(ctx.sendPolicy);
+    }
+
+    return await sendSingleCampaignSms({
+      body: processedBody,
+      media: ctx.media,
+      to: normalizedPhone,
+      from: ctx.effectiveCallerId,
+      campaign_id: campaignId,
+      workspace: workspaceId,
+      contact_id: member.contact_id,
+      queue_id: member.id,
+      user_id: userId,
+      portalConfig: ctx.portalConfig,
+      messageIntent: ctx.messageIntent,
+      messagingServiceSidFromRequest: ctx.messagingServiceSidFromRequest,
+      sendPolicy: ctx.sendPolicy,
+      campaignSmsRow: ctx.campaign.campaign,
+    }).then(
+      (result) => {
+        if (result.kind === "deferred_send_window") {
+          ctx.budget.release(cost);
+          counts.deferred += 1;
+          return { response: {}, deferredSendWindow: result.nextOpenAt };
+        }
+        counts.sent += 1;
+        return memberResponse({ [member.contact_id]: { success: true, ...result } });
+      },
+      (error: unknown) => failRow(member, ctx, error, cost),
+    );
+  } catch (error) {
+    ctx.budget.release(cost);
+    throw error;
+  }
 }
