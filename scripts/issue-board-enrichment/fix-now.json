@@ -3450,36 +3450,6 @@
     "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
   },
   {
-    "issueNumber": 2157,
-    "verdict": "fix-now",
-    "recommendedTitle": "The chats loader-to-state sync can permanently discard a fresh page-1 response",
-    "summary": "When the agent has scrolled the conversation list and triggered \"load more\" (page 4 is in `paginationFetcher.data`), a realtime message on a page-1 conversation causes a loader revalidation that produces a **new** `chats` array with fresh `message_count` / `conversation_last_update` for a page-1 row. The sync effect returns early because `fetchedPage (4) > pagination.page (1)`, so the fresh data is dropped.",
-    "currentBehavior": "Page numbers are not an identity. Comparing them is a proxy for \"have I already folded this response in?\" that fails as soon as the agent paginates — and then fails **permanently**, not transiently.",
-    "resolution": "1. Track which loader response has been folded in with a **monotonic token** — a ref holding the `pagination` object last applied, or a request sequence — rather than comparing page numbers. 2. **Merge rather than replace**: `setLoadedChats(prev => mergeConversationPages(prev, chats))`, so page-1 updates are applied on top of the accumulated pages instead of being all-or-nothing. 3. If two conversations in different pages are the same conversation, the merge must dedupe by conversation identity — that is the same identity question the pagination accumulator already answers for messages, so reuse it. 4. Fix this together with the `useChatRealtime` re-seed defect, which wipes loaded pages on the same surface. Both are the \"accumulated pagination vs revalidation\" class and should share one merge helper.",
-    "lookIn": [
-      "app/hooks/chats/useChatsPage.ts (the loader-to-state sync effect)",
-      "app/hooks/chats/useChatRealtime.ts",
-      "app/hooks/chats/useChatThread.ts",
-      "app/components/chats/"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Page-1 update applies after pagination (kill-check).",
-      "Loaded pages survive.",
-      "No duplicate conversation rows."
-    ],
-    "acceptanceCriteria": [
-      "With pages 1–4 loaded, a realtime event on a page-1 conversation updates that row's count and position (kill-check: restore the page-number comparison and confirm the test goes red).",
-      "The loaded pages are not lost.",
-      "A conversation appearing on two pages is not duplicated.",
-      "A fresh page-1 response is applied even after pagination (the permanent-staleness case)."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
-  },
-  {
     "issueNumber": 2170,
     "verdict": "fix-now",
     "recommendedTitle": "Stale subaccount credentials block the product's own number-release path — a customer cannot release their own number",

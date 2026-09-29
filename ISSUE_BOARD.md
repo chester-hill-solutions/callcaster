@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@48c850bb` · 279 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@e3a10624` · 279 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 ## How to use this board
 
@@ -29,7 +29,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 115
+## Fix now — 114
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -44,16 +44,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: test/legacy-auth-sql-guard.test.ts - latest CREATE OR REPLACE per public function has no auth.uid()/auth.jwt(); test/integration-db/manual-dial-claim-actor.test.ts - claim RPC assigns the withAppCurrentUser actor; test/queue-rpc-contract.test.ts latest-definition resolver must pick the new migration
 - Done when: No public function or policy references auth.*; The two RPC flows still pass their tests; DROP SCHEMA auth succeeds on dev, then prod; A fresh bootstrap does not recreate auth.uid()
 - Tracker: Keep in Fix now, split into the three PR-sized chunks. Run the zero-auth.* dependency query on prod before the drop and keep the rewrite and the drop in separate releases.
-
-### [#2157](https://github.com/chester-hill-solutions/callcaster/issues/2157) The chats loader-to-state sync can permanently discard a fresh page-1 response
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- When the agent has scrolled the conversation list and triggered "load more" (page 4 is in `paginationFetcher.data`), a realtime message on a page-1 conversation causes a loader revalidation that produces a **new** `chats` array with fresh `message_count` / `conversation_last_update` for a page-1 row. The sync effect returns early because `fetchedPage (4) > pagination.page (1)`, so the fresh data is dropped.
-- Current behavior: Page numbers are not an identity. Comparing them is a proxy for "have I already folded this response in?" that fails as soon as the agent paginates — and then fails **permanently**, not transiently.
-- Resolution: 1. Track which loader response has been folded in with a **monotonic token** — a ref holding the `pagination` object last applied, or a request sequence — rather than comparing page numbers. 2. **Merge rather than replace**: `setLoadedChats(prev => mergeConversationPages(prev, chats))`, so page-1 updates are applied on top of the accumulated pages instead of being all-or-nothing. 3. If two conversations in different pages are the same conversation, the merge must dedupe by conversation identity — that is the same identity question the pagination accumulator already answers for messages, so reuse it. 4. Fix this together with the `useChatRealtime` re-seed defect, which wipes loaded pages on the same surface. Both are the "accumulated pagination vs revalidation" class and should share one merge helper.
-- Look in: `app/hooks/chats/useChatsPage.ts (the loader-to-state sync effect)`, `app/hooks/chats/useChatRealtime.ts`, `app/hooks/chats/useChatThread.ts`, `app/components/chats/`
-- Missing tests: Page-1 update applies after pagination (kill-check).; Loaded pages survive.; No duplicate conversation rows.
-- Done when: With pages 1–4 loaded, a realtime event on a page-1 conversation updates that row's count and position (kill-check: restore the page-number comparison and confirm the test goes red).; The loaded pages are not lost.; A conversation appearing on two pages is not duplicated.; A fresh page-1 response is applied even after pagination (the permanent-staleness case).
-- Tracker: Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage.
 
 ### [#2156](https://github.com/chester-hill-solutions/callcaster/issues/2156) useQueue.updateQueue calls setNextRecipient and setCallDuration from inside a setQueue updater
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -1234,9 +1224,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 77
+## Verify and close — 78
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2157](https://github.com/chester-hill-solutions/callcaster/issues/2157) The chats loader-to-state sync can permanently discard a fresh page-1 response
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-29
+- When the agent has scrolled the conversation list and triggered "load more" (page 4 is in `paginationFetcher.data`), a realtime message on a page-1 conversation causes a loader revalidation that produces a **new** `chats` array with fresh `message_count` / `conversation_last_update` for a page-1 row. The sync effect returns early because `fetchedPage (4) > pagination.page (1)`, so the fresh data is dropped.
+- Current behavior: Page numbers are not an identity. Comparing them is a proxy for "have I already folded this response in?" that fails as soon as the agent paginates — and then fails **permanently**, not transiently.
+- Resolution: 1. Track which loader response has been folded in with a **monotonic token** — a ref holding the `pagination` object last applied, or a request sequence — rather than comparing page numbers. 2. **Merge rather than replace**: `setLoadedChats(prev => mergeConversationPages(prev, chats))`, so page-1 updates are applied on top of the accumulated pages instead of being all-or-nothing. 3. If two conversations in different pages are the same conversation, the merge must dedupe by conversation identity — that is the same identity question the pagination accumulator already answers for messages, so reuse it. 4. Fix this together with the `useChatRealtime` re-seed defect, which wipes loaded pages on the same surface. Both are the "accumulated pagination vs revalidation" class and should share one merge helper.
+- Look in: `app/hooks/chats/useChatsPage.ts (the loader-to-state sync effect)`, `app/hooks/chats/useChatRealtime.ts`, `app/hooks/chats/useChatThread.ts`, `app/components/chats/`
+- Missing tests: Page-1 update applies after pagination (kill-check).; Loaded pages survive.; No duplicate conversation rows.
+- Done when: With pages 1–4 loaded, a realtime event on a page-1 conversation updates that row's count and position (kill-check: restore the page-number comparison and confirm the test goes red).; The loaded pages are not lost.; A conversation appearing on two pages is not duplicated.; A fresh page-1 response is applied even after pagination (the permanent-staleness case).
+- Tracker: Fixed and merged as PR #2191 (e3a10624). Page numbers are not an identity; the filter is. The sync effect now discriminates on accumulatedFilterKeyRef, so a different filter resets the list and the same filter merges the response in. Two changes were needed, not one: mergeConversationPages already deduped by conversation phone and applied the fresh row over the existing one, AND the cursor had to become monotonic — the old effect also reset paginationState and requestedPageRef to the loader's page 1, so deleting the guard alone would have made the next load-more re-request a page already held. Verified: 4 tests in test/ui/use-chats-page-pagination.test.tsx; 2 reproduce the defect and failed on current code with a fresh unread count of 9 and 7 arriving as 1; 2 guard behaviour a naive fix breaks. 4 kill-checks each fail exactly one test — page-number guard reinstated, replace-not-merge, cursor rewind, always-merge-never-reset — so neither 'always replace' nor 'always merge' passes. ci:local exit 0, node 441/441, ui 150/150. The max-lines-per-function warning is pre-existing at 450 lines, now 462; splitting the hook is a refactor and does not belong here. NOT done: the useChatRealtime re-seed defect this issue suggests fixing alongside — no revalidator call or page reset that wipes loaded pages could be found in app/hooks/realtime/useChatRealtime.ts. Left OPEN: merge to dev is not a release, and no CI tier covers accumulated-pagination behaviour against a live revalidation.
 
 ### [#2185](https://github.com/chester-hill-solutions/callcaster/issues/2185) Bound campaign SMS prep concurrency: the #2172 pacer lets 25 rows hit a 10-connection pool at once
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-09-29
