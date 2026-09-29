@@ -13,9 +13,15 @@ import { logger } from "../logger.server";
 import { isUniqueViolation } from "@/lib/parse-utils.server";
 import { fetchCampaignQueueWithContacts } from "../campaign-queue-search.server";
 import { campaign as campaignTable } from "@/db/schema";
-import { createTenantDb, type TenantDb } from "@/server/tenant-db";
+import { createTenantDb, withAppCurrentUser, type TenantDb } from "@/server/tenant-db";
+// `withAppCurrentUser` hands its callback a transaction client; this is that
+// type, taken from the module that produces it rather than re-declared here.
+type TransactionClient = Parameters<Parameters<typeof withAppCurrentUser>[1]>[0];
 import { db, type Database } from "@/server/db";
-import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
+import {
+  dequeueQueueEntry,
+  type DeferredEmit,
+} from "@/lib/campaign-queue-db.server";
 import { enqueueContactsForCampaign } from "@/lib/queue.server";
 import {
   persistCampaignScript,
@@ -480,44 +486,80 @@ export async function splitMessageCampaign({
     ...clonableFields
   } = source;
 
-  const segments: SplitMessageCampaignResult["segments"] = [];
-  for (let index = 0; index < normalizedSegments; index++) {
-    const title = `${source.title} — Segment ${index + 1} of ${normalizedSegments}`;
-    // type-cast justified: clonableFields spread contains required props (type, etc.), but not visible to literal syntax
-    const { campaign: created } = await createCampaign({
-      campaignData: {
-        ...(clonableFields as unknown as Record<string, unknown>),
-        workspace: workspaceId,
-        title,
-        status: "draft",
-      } as unknown as CampaignData,
-      tdb,
-    });
+  // One transaction across all three phases (#2154). The irreversible part —
+  // contacts moving between campaigns — and the part that makes it visible (the
+  // dequeue) have to commit together, or a failure between them leaves contacts
+  // in two campaigns at once and the next dispatch dials them twice.
+  //
+  // `withAppCurrentUser` rather than `db.transaction` directly: the dequeue RPCs
+  // are SECURITY DEFINER and read the actor from `app.current_user_id`, so the
+  // setting has to be transaction-local or it leaks between requests on the
+  // pooled connection.
+  const deferredPublishes: Array<() => Promise<void>> = [];
+  const deferEmit: DeferredEmit = (publish) => {
+    deferredPublishes.push(publish);
+  };
 
-    const contactIds = buckets[index] ?? [];
-    if (contactIds.length > 0) {
-      await enqueueContactsForCampaign(Number(created.id), contactIds);
+  const splitInTransaction = async (tx: TransactionClient): Promise<
+    SplitMessageCampaignResult
+  > => {
+    const txTdb = createTenantDb(workspaceId, tx);
+    const segments: SplitMessageCampaignResult["segments"] = [];
+
+    for (let index = 0; index < normalizedSegments; index++) {
+      const title = `${source.title} — Segment ${index + 1} of ${normalizedSegments}`;
+      // type-cast justified: clonableFields spread contains required props (type, etc.), but not visible to literal syntax
+      const { campaign: created } = await createCampaign({
+        campaignData: {
+          ...(clonableFields as unknown as Record<string, unknown>),
+          workspace: workspaceId,
+          title,
+          status: "draft",
+        } as unknown as CampaignData,
+        tdb: txTdb,
+      });
+
+      const contactIds = buckets[index] ?? [];
+      if (contactIds.length > 0) {
+        await enqueueContactsForCampaign(Number(created.id), contactIds, {
+          exec: tx,
+        });
+      }
+
+      segments.push({
+        campaignId: Number(created.id),
+        title,
+        contactCount: contactIds.length,
+      });
     }
 
-    segments.push({
-      campaignId: Number(created.id),
-      title,
-      contactCount: contactIds.length,
-    });
+    // Remove the redistributed rows from the source so volume isn't double-sent.
+    let movedContactCount = 0;
+    for (const member of members) {
+      await dequeueQueueEntry({
+        by: { id: Number(member.id) },
+        userId,
+        reason: "Moved to parallel split segment",
+        workspaceId,
+        exec: tx,
+        deferEmit,
+      });
+      movedContactCount++;
+    }
+
+    return { segments, movedContactCount };
+  };
+
+  const result = await withAppCurrentUser(userId, splitInTransaction);
+
+  // Only now that the commit has succeeded. An emit issued before the commit
+  // tells a subscriber about rows that a rollback would erase, and never tells
+  // it the change was undone.
+  for (const publish of deferredPublishes) {
+    await publish();
   }
 
-  // Remove the redistributed rows from the source so volume isn't double-sent.
-  let movedContactCount = 0;
-  for (const member of members) {
-    await dequeueQueueEntry({
-      by: { id: Number(member.id) },
-      userId,
-      reason: "Moved to parallel split segment",
-    });
-    movedContactCount++;
-  }
-
-  return { segments, movedContactCount };
+  return result;
 }
 
 export async function updateOrCopyScript({

@@ -26,9 +26,16 @@ type DequeuedRow = { campaign_id: number | null; workspace?: string | null };
 export async function completeCampaignsDrainedByDequeue(
   rows: DequeuedRow[],
   workspaceId: string | null | undefined,
+  /**
+   * Run the completion checks inside a caller's transaction rather than on the
+   * module-level client. Without this, a caller that has wrapped its writes in
+   * a transaction would still see a campaign marked complete by a write that
+   * later rolls back (#2154).
+   */
+  execOverride?: RpcExecutor,
 ): Promise<void> {
   if (rows.length === 0) return;
-  const exec = workspaceId ? createTenantDb(workspaceId) : db;
+  const exec = execOverride ?? (workspaceId ? createTenantDb(workspaceId) : db);
   await tryCompleteDrainedCampaigns(
     rows.map((row) => row.campaign_id).filter((id): id is number => id != null),
     exec,
