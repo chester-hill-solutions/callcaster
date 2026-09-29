@@ -3264,39 +3264,6 @@
     "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
   },
   {
-    "issueNumber": 2154,
-    "verdict": "fix-now",
-    "recommendedTitle": "splitMessageCampaign is non-atomic across clone, enqueue and dequeue, so a mid-run failure leaves a partially split campaign",
-    "summary": "The campaign split clones the campaign, distributes the queued contacts and dequeues the source in three separate steps. A failure in the middle leaves a partially split campaign: some contacts cloned into a new campaign, some still on the original, and the dequeue not done — so contacts can be dialled twice or lost.",
-    "currentBehavior": "No transaction spans the three phases. The irreversible part (contacts moving between campaigns) is not atomic with the part that makes it visible (the dequeue), so a failure between them is a silent double-dial or loss.",
-    "resolution": "1. Wrap the whole split in one `db.transaction()`. All three phases are database writes against the same workspace, so a transaction is sufficient and there is no external call to justify splitting it. 2. Make the operation idempotent, keyed on a client-supplied split id, so a retry after an unknown outcome does not double-split. 3. Answer the in-flight question the existing record already asks: if a send is already running at split time, what happens? Either the dequeue refuses for contacts with an open send, or the split states that they stay on the source. Whichever is chosen, document it and test it. 4. State each clone's relationship to its parent in the results roll-up: either clones roll up to the parent or they stand alone. Decide and record.",
-    "lookIn": [
-      "splitMessageCampaign (locate it — named in the component's doc comment)",
-      "app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx:95,173,220-248,343",
-      "app/components/campaign/settings/detailed/CampaignLaunchExtras.tsx:211-226",
-      "app/lib/throughput-config.ts:102-108 (`isBulkSmsSenderMisaligned`)",
-      "test/ui/split-campaign-override.test.tsx"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Contacts are distributed across the clones with the requested segment count (kill-check).",
-      "The clones are reachable and correctly scoped to the workspace.",
-      "A mid-run failure is atomic.",
-      "A split with an in-flight send behaves per the documented decision."
-    ],
-    "acceptanceCriteria": [
-      "A failure in the dequeue phase leaves the campaign exactly as it was (kill-check: remove the transaction and confirm the test goes red).",
-      "A retry with the same split id does not split twice.",
-      "Contacts queued for an in-flight send are handled per the documented decision, and it is tested.",
-      "The results roll-up for clones is documented and tested.",
-      "The end-to-end split (clone, distribute, dequeue) is covered — today no test asserts that contacts are actually distributed across the clones."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
-  },
-  {
     "issueNumber": 2155,
     "verdict": "fix-now",
     "recommendedTitle": "Double-clicking Record leaks a microphone stream and corrupts the take",
@@ -3464,5 +3431,38 @@
     "risk": "high",
     "size": "S",
     "trackerRecommendation": "Cannot be automated: twilio v5 exposes only create/fetch/update on an account, with no remove, so subaccount deletion is a Console-only action. A cull script was written, had all three guards verified (refuses without --confirm, refuses the parent account, refuses an empty allowlist), then failed 111/111 on the missing method and was deleted rather than shipped half-working. Do it by hand: Console > Account > Subaccounts, select the 111, delete. Before deleting any candidate, cross-check it against BOTH databases — the production database is internal-only, so that check must run from inside Railway via 'railway ssh --service CallCaster --environment production', never from a laptop. The higher-value and NON-DESTRUCTIVE half of this job is renaming the 183 legacy subaccounts to the current 'Name · <8 hex>' scheme, which the API does support via update; that makes the console readable and makes every future cull safe by inspection. Consider doing the renames first."
+  },
+  {
+    "issueNumber": 2208,
+    "verdict": "fix-now",
+    "recommendedTitle": "Splitting a campaign double-sends any contact that is mid-SMS-send, because the SMS dispatch path never claims its rows",
+    "summary": "The SMS dispatch path selects eligible rows with a pure in-memory filter and dequeues only *after* the Twilio call, so a contact in flight is still `queued` and is indistinguishable from an untouched one. `splitMessageCampaign` copies such a contact into a split segment and dequeues it from the source; the in-flight send then completes against a row that is already dequeued, so the contact is queued in the segment **and** already sent. Guaranteed, not a race: it happens on every split that overlaps a send, and every step succeeds with nothing logged.",
+    "currentBehavior": "`selectEligibleCampaignQueueMembers` (app/lib/campaign-dispatch-queue.server.ts:12) is a pure function over an in-memory array; the module has zero matches for `claim`, `SKIP LOCKED` or `for update`. The dequeue at app/lib/campaign-sms-send.server.ts:243 is deliberately after the provider call, for documented crash-safety. `claimed_at` exists as a column but the only TypeScript writer is `rpcClaimQueueEntryForDial` — the manual-dial path. So there is no in-flight marker on the SMS path at all.",
+    "rootCause": "The SMS path has no claim step, so 'being sent' and 'never touched' are the same state. The dequeue cannot serve as that marker because its position after the provider call is load-bearing for crash-safety.",
+    "resolution": "1. Claim the row on the SMS send path *before* the provider call, setting `claimed_at` and the `claim_*` token columns the way the dial path does, and clear the claim when the row is dequeued. **Do not fix this by dequeuing earlier** — the comment at campaign-sms-send.server.ts:241 documents that the dequeue-after-send is deliberate, so a crash before the dequeue commits must leave the row resendable. The claim must be a separate marker that does not touch `queue_state`. 2. Have `splitMessageCampaign` skip claimed rows and report the held-back count, so a split never moves a contact that is in flight. 3. Extend `reset_stale_campaign_queue_claims` to cover SMS claims, or a crashed dispatcher leaves rows claimed forever. 4. This is a change to the send hot path and wants its own PR and review, separate from #2154's atomicity work.",
+    "lookIn": [
+      "app/lib/campaign-dispatch-queue.server.ts:12 (selectEligibleCampaignQueueMembers — a filter, not a reservation)",
+      "app/lib/campaign-sms-send.server.ts:241-249 (the dequeue, and the comment explaining why it is late)",
+      "app/lib/db-rpc.server.ts (rpcClaimQueueEntryForDial — the only claimed_at writer)",
+      "client/migrations (reset_stale_campaign_queue_claims — plpgsql, not TypeScript)"
+    ],
+    "existingTests": [
+      "test/integration-db/dequeue-contact-assigned.test.ts — the real dequeue_contact function, dial path only"
+    ],
+    "missingTests": [
+      "A row claimed for send is skipped by the split and counted in the held-back figure (kill-check: claim a row, run the split, assert the segment is one contact short and the count reports it).",
+      "The dequeue-after-send crash-safety is preserved: a claim does not change queue_state, so a row claimed but not dequeued is still `queued` and resendable (kill-check: drop the claim, or let the claim write queue_state, and confirm this goes red).",
+      "A stale claim is released by the reset, so a crashed dispatcher does not strand a contact."
+    ],
+    "acceptanceCriteria": [
+      "A split during a live send leaves the in-flight contact on the source and reports it; the contact is not sent twice.",
+      "Claiming a row does not alter queue_state, so crash-safety is unchanged (kill-check asserted against a mutation that lets the claim write queue_state).",
+      "A claim older than the staleness window is reclaimed and the contact is eventually sent.",
+      "The change lands as its own PR against the send hot path, not appended to #2154."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Found while scoping #2154's atomicity fix. The atomicity defect is separate: that one is a mid-run *failure* leaving a partial split; this one is an in-flight *success* producing a double send, and fixing atomicity does not address it. Double SMS on an opt-in outreach list is a compliance and deliverability problem, not only a cost one. Note when grepping: `claimed_at` and the claim RPCs live in plpgsql migrations, so searching `app/lib` finds almost nothing and makes this look unimplemented."
   }
 ]
