@@ -5,7 +5,7 @@
 > the state it depends on, and the side effects it performs. See
 > [effects-strictness.md](./effects-strictness.md).
 
-**115** documented / **117** total effects (2 grandfathered, ratcheting to 0).
+**116** documented / **118** total effects (2 grandfathered, ratcheting to 0).
 
 | File | Purpose | Depends on | Side effects | Why not a loader/fetcher |
 | --- | --- | --- | --- | --- |
@@ -84,6 +84,7 @@
 | `app/hooks/contact/useContactSearch.ts` | Debounced fetch of contact matches and latest conversation for the typed phone number. | phoneNumber, isValid (only searches once the number is valid), searchContact, searchConversation | fetch via debounce cleanup (fetchContactsByPhone + fetchLatestMessageForPhone) | This is disguised data fetching driven by local input state rather than |
 | `app/hooks/handset/useEndSessionOnUnmount.ts` | Call the latest endSession() exactly once, on unmount. | none — intentionally empty deps; endSessionRef is kept current outside the effect | none (in itself) — invokes the caller-supplied endSession, whose own side | Not data fetching — this is a mount-lifecycle cleanup hook (unmount handler). |
 | `app/hooks/queue/useQueue.ts` | Keep nextRecipientRef current so updateQueue can read the latest recipient without depending on it. | effectiveNextRecipient (re-syncs the ref whenever the computed recipient changes) | none — mutates a ref only; no DOM/subscription/fetch | Not data fetching — this is the standard "latest ref" pattern used to |
+| `app/hooks/queue/useQueue.ts` | Re-sync the queue ref whenever the committed queue changes, so an | queue (the committed value) | none — mutates a ref only | Not data fetching — the ref exists so the queue can |
 | `app/hooks/realtime/useChatRealtime.ts` | Reset local message state and the SID-dedupe set whenever the caller supplies a new initial message list (e.g. switching conversations). | initial (loader-provided message list; a new reference means the conversation/context changed) | none — synchronizes initialRef/messageIdsRef and calls setMessages | `initial` already comes from a loader; this effect only re-derives local realtime bookkeeping (the dedupe set) each time that loader data changes, which isn't itself a fetch. |
 | `app/hooks/realtime/useChatRealtime.ts` | Keep a ref to the active contact_number filter so the realtime message handler always reads the current value. | contact_number (filter prop, changes when the user switches contacts) | none — updates contactNumberRef only | Local ref bookkeeping to avoid a stale closure inside handleMessageChange; not data fetching. |
 | `app/hooks/realtime/useChatRealtime.ts` | Keep a ref to the active contact number so the realtime message handler always reads the currently-open conversation without a stale closure. | activeContactNumber (which conversation is open; changes as the user navigates between chats) | none — updates activeContactRef only | Local ref bookkeeping to avoid stale closures in handleMessageChange; not data fetching. |
