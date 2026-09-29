@@ -12,9 +12,9 @@ import {
   type TwilioVoiceCallback,
 } from "@/lib/twilio/voice-callback";
 import { buildProviderStatusQueueUpdate } from "@/lib/queue-status";
+import { updateCampaignQueueByContactAndCampaign } from "@/lib/campaign-queue-updates.server";
 import {
-  dequeueQueueEntry,
-  updateCampaignQueueByContactAndCampaign,
+  dequeueQueueEntry
 } from "@/lib/campaign-queue-db.server";
 import { createWorkspaceTwilioInstance } from "@/lib/database/workspace.server";
 import { data as routeData } from "react-router";
