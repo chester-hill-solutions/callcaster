@@ -9,6 +9,55 @@ import {
   isQueued,
 } from "@/lib/queue-status";
 
+/**
+ * What a queue update decided, applied by the caller outside any updater.
+ *
+ * `advanceTo` is `undefined` when the update does not touch the recipient and
+ * `null` when it deliberately clears it. The two are not the same, so this
+ * cannot collapse into a nullable field with a default.
+ */
+type QueueUpdatePlan = {
+  nextQueue: QueueItem[];
+  advanceTo: QueueItem | null | undefined;
+  resetDuration: boolean;
+  isRemoval: boolean;
+};
+
+/**
+ * The predictive-dial branch of a queue update, as a pure function.
+ *
+ * Predictive rows are not assigned to an agent the way manual ones are, so this
+ * differs from the standard branch: a row is admitted if it is queued *or*
+ * assigned to this agent, and a row that is neither is dropped.
+ */
+function planPredictiveRow(
+  currentQueue: QueueItem[],
+  newQueueItem: Tables<"campaign_queue"> & { contact: Contact },
+  assignedToMe: boolean,
+  isDuplicate: (item: QueueItem, queue: QueueItem[]) => boolean,
+): { nextQueue: QueueItem[]; advanceTo: QueueItem | null; resetDuration: boolean } {
+  if (!assignedToMe && !isQueued(newQueueItem)) {
+    return {
+      nextQueue: currentQueue.filter((item) => item.id !== newQueueItem.id),
+      advanceTo: null,
+      resetDuration: false,
+    };
+  }
+  if (isDuplicate(newQueueItem as QueueItem, currentQueue)) {
+    return { nextQueue: currentQueue, advanceTo: null, resetDuration: false };
+  }
+  const nextQueue = currentQueue.length
+    ? sortQueue([...currentQueue, newQueueItem as QueueItem])
+    : [newQueueItem as QueueItem];
+  return {
+    nextQueue,
+    // A newly assigned contact is the one the agent is about to call, so the
+    // recipient moves to it and the call timer restarts.
+    advanceTo: assignedToMe ? (newQueueItem as QueueItem) : null,
+    resetDuration: assignedToMe,
+  };
+}
+
 interface UseQueueProps {
   initialQueue: QueueItem[];
   initialPredictiveQueue: QueueItem[];
@@ -106,6 +155,103 @@ export const useQueue = ({
     return currentQueue.some(item => item.contact_id === newItem.contact_id);
   }, []);
 
+  /**
+   * The queue as of the last committed render, plus any writes made during
+   * this tick. `updateQueue` derives the next queue from this instead of from
+   * a `setQueue` updater, because the side effects that hang off a queue
+   * change cannot live inside an updater (see below). Reading a ref also means
+   * two `updateQueue` calls in the same tick compose, which a ref would not
+   * do if it were only synced in an effect — hence the synchronous write below.
+   */
+  const queueRef = useRef(queue);
+
+  /**
+   * @effect Re-sync the queue ref whenever the committed queue changes, so an
+   * external `setQueue` (useCallScreen and useCampaignQueueFlow both hold one)
+   * is picked up by the next `updateQueue`.
+   * @effect-deps queue (the committed value)
+   * @effect-side-effects none — mutates a ref only
+   * @effect-why-not-loader Not data fetching — the ref exists so the queue can
+   *   be read outside a state updater, which is what keeps that updater pure.
+   */
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
+  /**
+   * The next queue, and the recipient/duration changes that go with it.
+   *
+   * Pure: it reads no component state beyond the two refs passed in and calls
+   * no setters. Everything it decides is returned, so the caller can apply the
+   * state updates outside React's updater.
+   */
+  const planQueueUpdate = useCallback(
+    (
+      currentQueue: QueueItem[],
+      currentRecipient: QueueItem | null,
+      payload: { new: Tables<"campaign_queue"> & { contact: Contact } },
+    ): QueueUpdatePlan => {
+      const assignedUserId = getAssignedUserId(payload.new);
+      const isRemoval =
+        (!isPredictive &&
+          !isQueued(payload.new) &&
+          assignedUserId !== user?.id) ||
+        isDequeued(payload.new);
+
+      let nextQueue = isRemoval
+        ? [...currentQueue.filter((item) => item.id !== payload.new.id)]
+        : [...currentQueue];
+
+      let advanceTo: QueueItem | null = null;
+      let resetDuration = false;
+
+      if (payload.new.contact?.phone) {
+        const newQueueItem = payload.new;
+        const assigned = assignedUserId === user?.id;
+
+        if (isPredictive) {
+          const planned = planPredictiveRow(
+            nextQueue,
+            newQueueItem,
+            assigned,
+            isDuplicate,
+          );
+          nextQueue = planned.nextQueue;
+          advanceTo = planned.advanceTo;
+          resetDuration = planned.resetDuration;
+        } else if (assigned) {
+          // No explicit advance here, and deliberately so.
+          // `effectiveNextRecipient` falls back to `queue[0]`, so when the queue
+          // was empty the newly assigned contact becomes the recipient anyway;
+          // when it was not empty, the old `!nextRecipientRef.current` guard
+          // could not fire, because the ref was non-null either way. Setting it
+          // unconditionally would change which contact a live call screen points
+          // at — a product decision, not a purity fix. See #2156.
+          nextQueue = sortQueue([
+            ...nextQueue.filter(
+              (item) => item.contact_id !== payload.new.contact_id,
+            ),
+            newQueueItem,
+          ]);
+        }
+      }
+
+      if (
+        !isPredictive &&
+        isRemoval &&
+        currentRecipient?.contact_id === payload.new.contact_id
+      ) {
+        advanceTo =
+          nextQueue.find((item) => item.attempts === 0) ??
+          nextQueue[0] ??
+          null;
+      }
+
+      return { nextQueue, advanceTo, resetDuration, isRemoval };
+    },
+    [isPredictive, user?.id, isDuplicate],
+  );
+
   const updateQueue = useCallback(
     (payload: { new: Tables<"campaign_queue"> & { contact: Contact } }) => {
       // Validate payload
@@ -119,63 +265,31 @@ export const useQueue = ({
         return;
       }
 
-      const assignedUserId = getAssignedUserId(payload.new);
-      const isRemoval =
-        (!isPredictive &&
-          !isQueued(payload.new) &&
-          assignedUserId !== user?.id) ||
-        isDequeued(payload.new);
+      const plan = planQueueUpdate(
+        queueRef.current,
+        nextRecipientRef.current,
+        payload,
+      );
 
-      setQueue((currentQueue) => {
-        let updatedQueue = isRemoval
-          ? [...currentQueue.filter((item) => item.id !== payload.new.id)]
-          : [...currentQueue];
+      // Written synchronously so a second `updateQueue` in the same tick
+      // composes with this one, exactly as the updater form used to.
+      queueRef.current = plan.nextQueue;
+      setQueue(plan.nextQueue);
 
-        if (payload.new.contact?.phone) {
-          const newQueueItem = payload.new;
+      if (plan.advanceTo !== undefined) {
+        setNextRecipient(plan.advanceTo);
+      }
+      if (plan.resetDuration) {
+        setCallDuration(0);
+      }
 
-          if (isPredictive) {
-            if (assignedUserId === user?.id || isQueued(newQueueItem)) {
-              if (!isDuplicate(newQueueItem, updatedQueue)) {
-                updatedQueue = updatedQueue.length
-                  ? sortQueue([...updatedQueue, newQueueItem])
-                  : [newQueueItem];
-                if (assignedUserId === user?.id) {
-                  setNextRecipient(newQueueItem);
-                  setCallDuration(0);
-                }
-              }
-            } else {
-              updatedQueue = updatedQueue.filter((item) => item.id !== payload.new.id);
-            }
-          } else {
-            if (assignedUserId === user?.id) {
-              updatedQueue = updatedQueue.filter(
-                (item) => item.contact_id !== payload.new.contact_id,
-              );
-              updatedQueue = sortQueue([...updatedQueue, newQueueItem]);
-              if (!nextRecipientRef.current) setNextRecipient(newQueueItem);
-            }
-          }
-        }
-
-        if (!isPredictive && isRemoval && nextRecipientRef.current?.contact_id === payload.new.contact_id) {
-          const nextUncontacted = updatedQueue.find(
-            (item) => item.attempts === 0,
-          );
-          setNextRecipient(nextUncontacted || updatedQueue[0] || null);
-        }
-
-        return updatedQueue;
-      });
-
-      if (isRemoval) {
+      if (plan.isRemoval) {
         setPredictiveQueue((current) =>
           current.filter((item) => item.id !== payload.new.id),
         );
       }
     },
-    [isPredictive, user?.id, setCallDuration, isDuplicate],
+    [planQueueUpdate, setCallDuration],
   );
 
   return {
