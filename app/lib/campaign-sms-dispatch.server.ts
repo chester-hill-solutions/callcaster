@@ -15,6 +15,7 @@ import {
   messageCampaignRequiresCallerId,
 } from "@/lib/sms-send-resolve";
 import { dequeueQueueEntry, recordQueueAttemptFailure } from "@/lib/campaign-queue-db.server";
+import { claimQueueEntryForSms } from "@/lib/campaign-queue-claim.server";
 import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
 import { getCampaignQueueById } from "@/lib/database/campaign.server";
 import { getWorkspaceTwilioPortalConfig } from "@/lib/database/workspace.server";
@@ -374,7 +375,8 @@ async function runPacedSendBatches(args: {
     const deferredAt = batchResults.find((result) => result.deferredSendWindow)?.deferredSendWindow;
     responses.push(
       ...batchResults
-        .filter((result) => !result.deferredSendWindow)
+        // A claim loser did no work, so it must not surface as a result (#2208).
+        .filter((result) => !result.deferredSendWindow && !result.alreadyClaimed)
         .map((result) => result.response),
     );
     if (deferredAt) return deferredAt;
@@ -426,6 +428,8 @@ type HandleMemberCtx = {
 type HandleMemberResult = {
   response: ContactDispatchResult;
   deferredSendWindow?: Date;
+  /** Another dispatcher holds this row's claim (#2208) — no work was done. */
+  alreadyClaimed?: boolean;
 };
 
 type SmsPhoneClaimResult =
@@ -736,18 +740,29 @@ async function handleClaimedMember(
   try {
     // Claim a provider-request slot. This is the rate limit, so it is applied
     // here rather than at dispatch: the interval has to be measured between the
-    // requests the provider actually receives. It is also an await, so it can
-    // hold a row past the window boundary — hence the gate order below.
+    // requests the provider actually receives. It is an await, so it can hold a
+    // row past the window boundary — hence the gate order below.
     await ctx.startPacer.waitForTurn();
 
     // The initial gate protects an idle batch, but pacing and the per-contact
     // lookup gates can keep a row here long enough for the campaign window to
-    // close. Check again immediately before starting the provider call so rows
-    // that have not started remain queued for the next window.
+    // close. Re-check before the provider call so unstarted rows stay queued.
     if (!isDispatchAllowedAt(ctx.sendPolicy)) {
       ctx.budget.release(cost);
       counts.deferred += 1;
       return deferredSendWindowResponse(ctx.sendPolicy);
+    }
+
+    // #2208: claim the row — after the window gate so a deferred row never
+    // holds an unused claim, before the provider call. The dequeue runs after
+    // Twilio returns (crash-safety), so without this marker an in-flight row
+    // looks untouched and a split would copy it into a segment, sending twice.
+    const claim = await claimQueueEntryForSms({ queueId: member.id, workspaceId });
+    if (!claim) {
+      // Held by another dispatcher: its row stays queued for them, and the
+      // credit is released because this dispatcher did no work.
+      ctx.budget.release(cost);
+      return { response: {}, alreadyClaimed: true };
     }
 
     return await sendSingleCampaignSms({

@@ -74,44 +74,50 @@ describe("QueueEntry transition table", () => {
   });
 
   test("column sets match the transition table exactly", () => {
+    // `queued` and `dequeued` additionally clear `claimed_at` — the in-flight
+    // marker from #2208. Both transitions end the "a dispatcher has this row"
+    // window, so leaving the marker set would make a re-queued or dequeued row
+    // read as live to `claimIsLive`.
+    //
+    // `assigned` deliberately does NOT. The manual-dial claim path sets
+    // `claimed_at` and `assigned_to_user_id` in one UPDATE, so nulling the
+    // marker on a later assign would erase a live claim.
+    const claimClearing = [
+      "assigned_to_user_id",
+      "claimed_at",
+      "dequeued_at",
+      "dequeued_by",
+      "dequeued_reason",
+      "provider_status",
+      "queue_state",
+    ].sort();
+    const withoutClaim = [
+      "assigned_to_user_id",
+      "dequeued_at",
+      "dequeued_by",
+      "dequeued_reason",
+      "provider_status",
+      "queue_state",
+    ].sort();
+
     expect(QUEUE_ENTRY_TRANSITIONS.queued.columns.slice().sort()).toEqual(
-      [
-        "assigned_to_user_id",
-        "dequeued_at",
-        "dequeued_by",
-        "dequeued_reason",
-        "provider_status",
-        "queue_state",
-      ].sort(),
+      claimClearing,
     );
     expect(QUEUE_ENTRY_TRANSITIONS.assigned.columns.slice().sort()).toEqual(
-      [
-        "assigned_to_user_id",
-        "dequeued_at",
-        "dequeued_by",
-        "dequeued_reason",
-        "provider_status",
-        "queue_state",
-      ].sort(),
+      withoutClaim,
     );
     expect(QUEUE_ENTRY_TRANSITIONS.provider_status.columns.slice().sort()).toEqual(
       ["provider_status", "queue_state"].sort(),
     );
     expect(QUEUE_ENTRY_TRANSITIONS.dequeued.columns.slice().sort()).toEqual(
-      [
-        "assigned_to_user_id",
-        "dequeued_at",
-        "dequeued_by",
-        "dequeued_reason",
-        "provider_status",
-        "queue_state",
-      ].sort(),
+      claimClearing,
     );
   });
 
   test("buildQueuedQueueUpdate writes exactly the queued transition's columns", () => {
     expect(buildQueuedQueueUpdate()).toEqual({
       assigned_to_user_id: null,
+      claimed_at: null,
       dequeued_at: null,
       dequeued_by: null,
       dequeued_reason: null,

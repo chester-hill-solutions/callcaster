@@ -134,6 +134,15 @@ vi.mock("@/server/tenant-db", () => ({
   createTenantDb: () => createTenantDbMock(),
 }));
 
+vi.mock("@/lib/campaign-queue-claim.server", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/lib/campaign-queue-claim.server")
+  >()),
+  // #2208: the dispatch claims the row before the provider call. These
+  // suites cover gates, pacing and row failures, not claim contention,
+  // and the real claim would go to the database.
+  claimQueueEntryForSms: async () => true,
+}));
 vi.mock("@/lib/campaign-queue-db.server", () => ({
   recordQueueAttemptFailure: vi.fn(async () => undefined),
   dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),

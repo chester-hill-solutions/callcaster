@@ -12,6 +12,7 @@ import {
 import { logger } from "../logger.server";
 import { isUniqueViolation } from "@/lib/parse-utils.server";
 import { fetchCampaignQueueWithContacts } from "../campaign-queue-search.server";
+import { claimIsLive } from "../campaign-queue-claim";
 import { campaign as campaignTable } from "@/db/schema";
 import { createTenantDb, withAppCurrentUser, type TenantDb } from "@/server/tenant-db";
 // `withAppCurrentUser` hands its callback a transaction client; this is that
@@ -396,6 +397,14 @@ export type SplitMessageCampaignResult = {
     contactCount: number;
   }>;
   movedContactCount: number;
+  /**
+   * Contacts left on the source because a dispatcher holds a live in-flight
+   * claim on them (#2208). They stay queued and will be picked up by the
+   * campaign they already belong to, so nothing is lost — but the operator has
+   * to be told, because a split that silently leaves rows behind reads as a
+   * successful full move.
+   */
+  heldBackInFlightCount: number;
 };
 
 /**
@@ -466,11 +475,20 @@ export async function splitMessageCampaign({
     onlyQueued: true,
   });
 
+  // #2208: a member with a live in-flight claim is mid-send. Moving it now
+  // would leave it queued in the new segment while the in-flight send also
+  // completes — the contact gets two texts, and is billed for both. Hold those
+  // rows on the source and report how many, rather than dropping them.
+  const splittable = members.filter(
+    (member) => !claimIsLive(member.claimed_at as string | Date | null | undefined),
+  );
+  const heldBackInFlightCount = members.length - splittable.length;
+
   const buckets: number[][] = Array.from(
     { length: normalizedSegments },
     () => [],
   );
-  members.forEach((member, index) => {
+  splittable.forEach((member, index) => {
     const bucket = buckets[index % normalizedSegments];
     if (!bucket) {
       throw new Error(
@@ -533,9 +551,14 @@ export async function splitMessageCampaign({
       });
     }
 
-    // Remove the redistributed rows from the source so volume isn't double-sent.
+    // Remove the redistributed rows from the source so volume isn't
+    // double-sent. Only the rows actually moved: a held-back row must stay
+    // QUEUED on the source, because the in-flight send's own dequeue is the
+    // thing that will retire it. Dequeueing it here would leave a contact
+    // whose send then fails queued nowhere at all — a silent drop traded for
+    // the duplicate we are removing.
     let movedContactCount = 0;
-    for (const member of members) {
+    for (const member of splittable) {
       await dequeueQueueEntry({
         by: { id: Number(member.id) },
         userId,
@@ -547,7 +570,7 @@ export async function splitMessageCampaign({
       movedContactCount++;
     }
 
-    return { segments, movedContactCount };
+    return { segments, movedContactCount, heldBackInFlightCount };
   };
 
   const result = await withAppCurrentUser(userId, splitInTransaction);
