@@ -74,13 +74,16 @@ describe("QueueEntry transition table", () => {
   });
 
   test("column sets match the transition table exactly", () => {
-    // `queued` and `dequeued` additionally clear `claimed_at` — the in-flight
-    // marker from #2208. Both transitions end the "a dispatcher has this row"
-    // window, so leaving the marker set would make a re-queued or dequeued row
-    // read as live to `claimIsLive`.
+    // `queued` additionally clears `claimed_at`, the in-flight marker from
+    // #2208: a requeued row is back in the pool and held by nobody, so a
+    // marker left on it would make `claimIsLive` hold it out of every split
+    // for a whole lease.
     //
-    // `assigned` deliberately does NOT. The manual-dial claim path sets
-    // `claimed_at` and `assigned_to_user_id` in one UPDATE, so nulling the
+    // `dequeued` and `assigned` deliberately do NOT. Every reader of
+    // `claimed_at` already guards on `dequeued_at is null`, so a marker on a
+    // dequeued row is unreachable and clearing it there would mean rewriting
+    // two hot production functions for nothing; and the manual-dial claim path
+    // sets `claimed_at` together with `assigned_to_user_id`, so nulling the
     // marker on a later assign would erase a live claim.
     const claimClearing = [
       "assigned_to_user_id",
@@ -110,7 +113,7 @@ describe("QueueEntry transition table", () => {
       ["provider_status", "queue_state"].sort(),
     );
     expect(QUEUE_ENTRY_TRANSITIONS.dequeued.columns.slice().sort()).toEqual(
-      claimClearing,
+      withoutClaim,
     );
   });
 

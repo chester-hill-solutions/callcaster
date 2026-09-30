@@ -51,13 +51,17 @@ describe("claimIsLive (#2208)", () => {
   // whole guard becomes decorative. This case is the reason the signature is
   // `string | Date`, and it was added because the integration test caught the
   // guard silently doing nothing.
-  test("a Date-valued claim is live — the column really is timestamptz", () => {
-    expect(claimIsLive(new Date(now - 5_000), now)).toBe(true);
-  });
-
-  test("an expired Date-valued claim is not live", () => {
-    expect(
-      claimIsLive(new Date(now - SMS_CLAIM_LEASE_MS - 1_000), now),
-    ).toBe(false);
+  // The shape `claimed_at` ACTUALLY has: the schema declares `text()` while the
+  // column is `timestamptz` (#2213), and they disagree at the driver boundary,
+  // so the value arrives as a Postgres-formatted timestamp rather than
+  // ISO-8601. If `Date.parse` ever stops accepting that, this is the test that
+  // says so — instead of the guard silently reading every claim as expired,
+  // which is the failure mode an earlier revision of this file actually had.
+  test("a Postgres-formatted timestamp parses — the shape the driver returns", () => {
+    const postgresFormat = "2026-09-30 14:10:47.898535+00";
+    expect(Number.isNaN(Date.parse(postgresFormat))).toBe(false);
+    expect(claimIsLive(postgresFormat, Date.parse(postgresFormat) + 5_000)).toBe(
+      true,
+    );
   });
 });

@@ -480,7 +480,7 @@ export async function splitMessageCampaign({
   // completes — the contact gets two texts, and is billed for both. Hold those
   // rows on the source and report how many, rather than dropping them.
   const splittable = members.filter(
-    (member) => !claimIsLive(member.claimed_at as string | Date | null | undefined),
+    (member) => !claimIsLive(member.claimed_at),
   );
   const heldBackInFlightCount = members.length - splittable.length;
 

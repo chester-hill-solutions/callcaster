@@ -317,15 +317,26 @@ const QUEUE_ENTRY_FAILED_COLUMN_SET: readonly QueueEntryColumn[] = [
 ];
 
 /**
- * Dequeue and requeue clear the in-flight claim marker (#2208). Both are
- * transitions out of "a dispatcher has this row", so leaving the marker set
- * would make the row look live to `claimIsLive` after it is demonstrably not.
+ * Requeue clears the in-flight claim marker (#2208). A requeued row is back in
+ * the pool and held by nobody — the same argument the `assigned_to_user_id =
+ * NULL` in that branch already makes — so a marker left on it would be a lie,
+ * and `claimIsLive` would hold it out of every split for a whole lease.
  *
- * Deliberately NOT added to the `assigned` transition: the manual-dial claim
- * path (`select_and_update_campaign_contacts`) sets `claimed_at` and
- * `assigned_to_user_id` in one UPDATE, and nulling the marker on a later
- * assign would erase a live claim. Only the paths that end the in-flight
- * window clear it.
+ * `dequeued` deliberately does NOT clear it, and that is a decision, not an
+ * oversight. Every existing reader of `claimed_at`
+ * (`campaign_queue_has_pending_work`, `reset_stale_campaign_queue_claims`,
+ * and the split, which reads only `onlyQueued` rows) already guards on
+ * `dequeued_at is null`, so a marker on a dequeued row is unreachable — and
+ * the requeue transition above is the single place a row becomes visible again,
+ * so it is the single place that has to clear it. Adding it to `dequeued` would
+ * have meant rewriting two hot production functions (`dequeue_contact` with its
+ * household fan-out and #1260 race guard, and `dequeue_household`) to null a
+ * column nobody can read on those rows.
+ *
+ * `assigned` also does not clear it: the manual-dial claim path
+ * (`select_and_update_campaign_contacts`) sets `claimed_at` and
+ * `assigned_to_user_id` in one UPDATE, so nulling the marker on a later assign
+ * would erase a live claim.
  */
 const QUEUE_ENTRY_CLAIM_CLEARING_COLUMN_SET: readonly QueueEntryColumn[] = [
   "assigned_to_user_id",
@@ -359,7 +370,7 @@ export const QUEUE_ENTRY_TRANSITIONS: Record<
   dequeued: {
     queueState: QUEUE_STATUS_DEQUEUED,
     legalFrom: "any",
-    columns: QUEUE_ENTRY_CLAIM_CLEARING_COLUMN_SET,
+    columns: QUEUE_ENTRY_FULL_COLUMN_SET,
   },
   failed: {
     // plpgsql-only today: no build*QueueUpdate helper writes this transition.

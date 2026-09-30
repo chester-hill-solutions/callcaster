@@ -32,21 +32,25 @@ export const SMS_CLAIM_LEASE_MS = 10 * 60 * 1000;
 /**
  * A claim is live when it was taken less than one lease ago.
  *
- * `claimed_at` accepts `string | Date` because the Drizzle schema models it as
- * `text()` while the column is really `timestamptz` — the repo-wide drift
- * tracked in #2213. The driver hands back a `Date` for the real column, so a
- * string-only signature would silently see every claim as expired and the
- * guard would be decorative. `Date.parse(someDate)` is `NaN`, not a time.
+ * The value is always a string, never a `Date`. `claimed_at` is declared
+ * `text()` in the Drizzle schema while the column is really `timestamptz` (the
+ * repo-wide drift in #2213), and that mismatch means the driver hands back a
+ * Postgres-formatted timestamp — `"2026-09-30 14:10:47.898535+00"`, with a
+ * space separator and a bare `+00` offset — which `Date.parse` handles
+ * correctly. Verified by reading the value back through `db.select()`.
+ *
+ * An earlier revision of this function took `string | Date` and carried a
+ * `Date` branch, on the belief that the driver returned a `Date` for a
+ * timestamptz column. It does not. The branch was unreachable, and it forced
+ * an `as string | Date | null | undefined` cast at the one production call
+ * site, so removing it deletes a cast as well.
  */
 export function claimIsLive(
-  claimedAt: string | Date | null | undefined,
+  claimedAt: string | null | undefined,
   now: number = Date.now(),
 ): boolean {
   if (!claimedAt) return false;
-  const claimedMs =
-    claimedAt instanceof Date
-      ? claimedAt.getTime()
-      : Date.parse(claimedAt);
+  const claimedMs = Date.parse(claimedAt);
   if (Number.isNaN(claimedMs)) return false;
   return now - claimedMs < SMS_CLAIM_LEASE_MS;
 }

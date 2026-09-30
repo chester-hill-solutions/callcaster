@@ -1,127 +1,22 @@
--- #2208: clear the in-flight claim marker on every path that ends the
--- "a dispatcher has this row" window.
+-- #2208: clear the in-flight claim marker when a queue row re-enters the pool.
 --
 -- `campaign_queue.claimed_at` is now taken by the SMS dispatch immediately
 -- before the provider call, so a row is visibly in flight while it is still
 -- `queued`. `queue-status.ts` therefore lists `claimed_at` among the columns
--- the `dequeued` and `queued` transitions clear, and `check:queue-rpc-contract`
--- (which compares the plpgsql functions against that table) correctly refuses
--- to let those functions keep a stale claim.
+-- the `queued` transition clears, and `check:queue-rpc-contract` (which
+-- compares the plpgsql functions against that table) correctly refuses to let
+-- this function keep a stale claim.
 --
--- A stale claim is not cosmetic: `reset_stale_campaign_queue_claims` and
--- `campaign_queue_has_pending_work` both key on `claimed_at`, and
--- `splitMessageCampaign` holds back any row whose claim reads as live. A
--- dequeued row that kept a claim would be invisible to the split's
--- `onlyQueued` filter yet still look claimed to those readers.
---
--- Bodies are reproduced from the live definitions and the only change is the
--- added `claimed_at = null`.
-
--- dequeue_contact: primary row and household fan-out.
-CREATE OR REPLACE FUNCTION public.dequeue_contact(
-  passed_contact_id bigint,
-  group_on_household boolean,
-  p_workspace uuid,
-  dequeued_by_id uuid DEFAULT NULL::uuid,
-  dequeued_reason_text text DEFAULT NULL::text
-)
-RETURNS integer
-LANGUAGE plpgsql
-AS $function$
-declare
-  primary_rows integer;
-begin
-  update public.campaign_queue
-  set
-    queue_state = 'dequeued',
-    assigned_to_user_id = null,
-    provider_status = null,
-    claimed_at = null,
-    dequeued_by = dequeued_by_id,
-    dequeued_at = now(),
-    dequeued_reason = dequeued_reason_text
-  where contact_id = passed_contact_id
-    and workspace = p_workspace
-    and (
-      queue_state is null
-      or queue_state = 'queued'
-      -- #1260: the caller's own claim. Narrower than "any assigned row" on
-      -- purpose — see 20260815120000 for why this is the race guard, not a
-      -- hole. #1278 reports when it holds instead of hiding it.
-      or (
-        queue_state = 'assigned'
-        and dequeued_by_id is not null
-        and assigned_to_user_id = dequeued_by_id
-      )
-    );
-
-  get diagnostics primary_rows = row_count;
-
-  if group_on_household then
-    update public.campaign_queue cq
-    set
-      queue_state = 'dequeued',
-      assigned_to_user_id = null,
-      provider_status = null,
-      claimed_at = null,
-      dequeued_by = dequeued_by_id,
-      dequeued_at = now(),
-      dequeued_reason = dequeued_reason_text
-    from public.contact c1
-    join public.contact c2 on c1.household_id is not null and c1.household_id = c2.household_id
-    where
-      c1.id = passed_contact_id
-      and c1.workspace = p_workspace
-      and c2.workspace = p_workspace
-      and cq.contact_id = c2.id
-      and cq.workspace = p_workspace
-      and (
-        cq.queue_state is null
-        or cq.queue_state = 'queued'
-        -- Same widening, same guard: a household fan-out must never dequeue
-        -- a sibling row another agent is currently holding.
-        or (
-          cq.queue_state = 'assigned'
-          and dequeued_by_id is not null
-          and cq.assigned_to_user_id = dequeued_by_id
-        )
-      );
-  end if;
-
-  return primary_rows;
-end;
-$function$;
-
--- dequeue_household: the whole household's rows.
-CREATE OR REPLACE FUNCTION public.dequeue_household(
-  contact_id_variable integer,
-  dequeued_by_id uuid DEFAULT NULL::uuid,
-  dequeued_reason_text text DEFAULT NULL::text
-)
-RETURNS void
-LANGUAGE plpgsql
-AS $function$
-begin
-  update public.campaign_queue cq
-  set
-    queue_state = 'dequeued',
-    assigned_to_user_id = null,
-    provider_status = null,
-    claimed_at = null,
-    dequeued_by = dequeued_by_id,
-    dequeued_at = now(),
-    dequeued_reason = dequeued_reason_text
-  from public.contact c1
-  join public.contact c2
-    on c1.household_id is not null and c1.household_id = c2.household_id
-  where c1.id = contact_id_variable
-    and cq.contact_id = c2.id;
-end;
-$function$;
-
--- handle_campaign_queue_entry: the requeue/reactivate branch. A row going back
--- into the pool is held by nobody, exactly as `assigned_to_user_id = NULL`
--- below already argues for `claimed_at`.
+-- This is the ONLY place that needs it. `handle_campaign_queue_entry` is the
+-- single transition that sets `dequeued_at = NULL`, i.e. the single place an
+-- already-dequeued row becomes visible to a `claimed_at` reader again. Every
+-- other reader guards on `dequeued_at is null` (`campaign_queue_has_pending_work`
+-- and `reset_stale_campaign_queue_claims` both do), and the campaign split
+-- reads only `onlyQueued` rows — so a marker left on a dequeued row cannot be
+-- observed. Rewriting `dequeue_contact` and `dequeue_household` to null an
+-- unreadable column was rejected: it is a hot path, and `dequeue_contact`
+-- carries a documented race guard and a household fan-out that are worth more
+-- than the hygiene.
 --
 -- The `bigint` parameter types are load-bearing and must match the existing
 -- signature exactly: a migration that declares `p_queue_order integer` does not
@@ -129,6 +24,9 @@ $function$;
 -- "function is not unique". Reproduced while writing this file.
 DROP FUNCTION IF EXISTS public.handle_campaign_queue_entry(bigint, bigint, integer, boolean);
 
+-- handle_campaign_queue_entry: the requeue/reactivate branch. A row going back
+-- into the pool is held by nobody, exactly as `assigned_to_user_id = NULL`
+-- below already argues for `claimed_at`.
 CREATE OR REPLACE FUNCTION public.handle_campaign_queue_entry(
   p_contact_id bigint,
   p_campaign_id bigint,
