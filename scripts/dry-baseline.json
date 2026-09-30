@@ -1,5 +1,12 @@
 {
-  "clones": 178,
-  "duplicatedLines": 1902,
-  "percentage": 1.28
+  "coarse": {
+    "clones": 173,
+    "duplicatedLines": 1853,
+    "percentage": 1.21
+  },
+  "fine": {
+    "clones": 2309,
+    "duplicatedLines": 15957,
+    "percentage": 10.38
+  }
 }
