@@ -155,7 +155,8 @@ describeDb("splitMessageCampaign and in-flight SMS claims (#2208)", () => {
     const { campaignId, contactIds } = await seedCampaign(4, {
       claimFirstMsAgo: 2_000,
     });
-    const claimedContact = contactIds[0]!;
+    const claimedContact = contactIds[0];
+    expect(claimedContact).toBeDefined();
 
     const result = await split(campaignId);
 
@@ -180,8 +181,11 @@ describeDb("splitMessageCampaign and in-flight SMS claims (#2208)", () => {
       where contact_id = ${contactIds[0]} and workspace = ${WORKSPACE}
     `;
     expect(rows).toHaveLength(1);
-    expect(Number(rows[0]!.campaign_id)).toBe(campaignId);
-    expect(rows[0]!.dequeued_at).toBeNull();
+    const [row] = rows;
+    expect(row).toBeDefined();
+    if (!row) throw new Error("expected one campaign_queue row for the held-back contact");
+    expect(Number(row.campaign_id)).toBe(campaignId);
+    expect(row.dequeued_at).toBeNull();
   });
 
   // A dispatcher that dies mid-send leaves a claim behind. If an expired claim
