@@ -431,10 +431,13 @@ async function resolveDispatchBlockedCase(
     | { kind: "insufficient_credits" }
     | { kind: "caller_id_required" }
     | {
-        kind: "deferred_send_window";
-        nextOpenAt: Date;
+        kind: "deferred";
         progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
-      },
+      }
+    & (
+        | { because: "send_window"; nextOpenAt: Date }
+        | { because: "workspace_not_ready"; reasons: string[] }
+      ),
 ): Promise<
   | { ok: true; campaignId: number; blocked: "insufficient_credits" }
   | { ok: true; campaignId: number; blocked: "caller_id_required" }
@@ -442,6 +445,12 @@ async function resolveDispatchBlockedCase(
       ok: true;
       campaignId: number;
       deferred: "send_window";
+      progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
+    }
+  | {
+      ok: true;
+      campaignId: number;
+      deferred: "workspace_not_ready";
       progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
     }
 > {
@@ -457,7 +466,35 @@ async function resolveDispatchBlockedCase(
       // Config error — retrying cannot fix it; surface loudly and stop.
       logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
       return { ok: true, campaignId, blocked: "caller_id_required" };
-    case "deferred_send_window": {
+    case "deferred": {
+      if (outcome.because === "workspace_not_ready") {
+        // Workspace compliance, not a contact problem (#2081). Log the actual
+        // reasons loudly — this used to end as a whole audience dead-lettered
+        // with "Max queue attempts exceeded", which told the operator nothing
+        // about the A2P registration or sender pool that was the real cause.
+        logger.error("campaign_dispatch.workspace_not_ready", {
+          campaignId,
+          workspaceId,
+          reasons: outcome.reasons,
+        });
+        // Retry on the normal tick cadence rather than stopping the chain: a
+        // re-approved A2P registration or a re-synced sender pool clears this on
+        // its own, and the whole audience is still queued. Capped like the send
+        // window so a long-lived block cannot pin the chain to stale config.
+        await enqueueDispatchSuccessor({
+          workspaceId,
+          campaignId,
+          userId,
+          completedJobId: job.id,
+          delayMs: Math.min(DISPATCH_TICK_MS, SEND_WINDOW_MAX_DEFER_MS),
+        });
+        return {
+          ok: true,
+          campaignId,
+          deferred: "workspace_not_ready",
+          ...(outcome.progress ? { progress: outcome.progress } : {}),
+        };
+      }
       // Schedule the successor at the exact window boundary: the
       // batch's outcome carries the next open instant, so dispatch resumes
       // the moment sending is allowed. Cap the sleep (see

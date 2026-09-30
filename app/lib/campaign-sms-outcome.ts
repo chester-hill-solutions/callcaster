@@ -1,0 +1,92 @@
+/**
+ * What one campaign SMS batch did, as the two adapters see it.
+ *
+ * These types live apart from the dispatch loop so the pre-dispatch gates can
+ * build an outcome without importing the loop that calls them. Types only: no
+ * runtime, no imports, so this module cannot participate in a cycle.
+ */
+
+export type ContactDispatchResult = Record<
+  string | number,
+  {
+    success: boolean;
+    skipped?: boolean;
+    deferred?: boolean;
+    reason?: string;
+    error?: string;
+    [key: string]: unknown;
+  }
+>;
+
+export type CampaignSmsDispatchCounts = {
+  sent: number;
+  failed: number;
+  /** Dequeued without a send: opt-out, landline, duplicate. */
+  dequeued: number;
+  /** Left queued for a later tick (recipient quiet hours). */
+  deferred: number;
+  /** Left queued because the remaining balance could not cover the estimated cost. */
+  unaffordable: number;
+  /** Dead-lettered by the exhaustion sweep: failed rows at the attempt maximum. */
+  exhausted: number;
+};
+
+export type CampaignSmsBatchOutcome =
+  | { kind: "insufficient_credits" }
+  | { kind: "caller_id_required" }
+  | {
+      /**
+       * The batch stopped without finishing because a workspace- or
+       * campaign-level condition says now is not the time to send.
+       *
+       * This is the honest counterpart to a per-contact failure, and an adapter
+       * must not confuse the two: nothing was dequeued, no attempt was
+       * recorded, and no recipient is at fault. The audience is exactly as it
+       * was. Treating this as a failure is what burned whole audiences when a
+       * workspace's A2P registration was not approved yet (#2081).
+       *
+       * `because` names the condition, and only that condition's payload is
+       * present.
+       */
+      kind: "deferred";
+      /** Empty when a gate stopped the batch; otherwise the rows that finished first. */
+      responses: ContactDispatchResult[];
+      /** Aggregate work completed before the batch deferred. */
+      progress: { counts: CampaignSmsDispatchCounts; queuedRemaining: number };
+    } & (
+        | {
+            because: "send_window";
+            /**
+             * The exact next instant sending is allowed, so the durable adapter
+             * schedules its successor on the boundary rather than polling.
+             */
+            nextOpenAt: Date;
+          }
+        | {
+            /**
+             * The workspace is not cleared to send SMS: A2P 10DLC, sender pool
+             * sync, toll-free verification, or Messaging Service provisioning
+             * (#2081). Operator-facing, so the block is never reported as a
+             * dead-lettered queue.
+             */
+            because: "workspace_not_ready";
+            reasons: string[];
+          }
+      )
+  | {
+      kind: "dispatched";
+      responses: ContactDispatchResult[];
+      counts: CampaignSmsDispatchCounts;
+      /**
+       * Rows still queued after this batch: quiet-hours deferrals, failed
+       * sends that still have attempts left, unaffordable rows, and contacts
+       * beyond `maxContacts`.
+       */
+      queuedRemaining: number;
+      /**
+       * The balance ran out part-way through the batch and cannot cover
+       * another send: adapters treat this like the entry-level
+       * `insufficient_credits` outcome instead of scheduling a successor.
+       */
+      creditsExhausted: boolean;
+    };
