@@ -4,11 +4,11 @@
  * Apply Drizzle SQL migrations to a fresh Postgres (compose dev stack).
  * Usage: DATABASE_URL=postgresql://callcaster:callcaster@127.0.0.1:5433/callcaster node scripts/e2e/bootstrap-compose-db.mjs
  */
-import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertLocalTarget } from "../lib/local-target-guard.mjs";
+import { applySqlSteps } from "../lib/apply-sql-steps.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -137,16 +137,9 @@ if (unwired.length > 0) {
 
 console.log(`[e2e-bootstrap] target=${databaseUrl.replace(/:[^:@]+@/, ":***@")}`);
 
-for (const step of steps) {
-  const file = path.join(rootDir, step);
-  console.log(`[e2e-bootstrap] applying ${step}`);
-  const result = spawnSync("psql", [databaseUrl, "-v", "ON_ERROR_STOP=1", "-f", file], {
-    stdio: "inherit",
-  });
-  if (result.status !== 0) {
-    console.error(`[e2e-bootstrap] failed on ${step}`);
-    process.exit(result.status ?? 1);
-  }
-}
-
-console.log("[e2e-bootstrap] complete");
+await applySqlSteps({
+  databaseUrl,
+  steps,
+  rootDir,
+  label: "e2e-bootstrap",
+});

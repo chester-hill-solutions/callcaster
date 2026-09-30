@@ -21,6 +21,7 @@ import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDatabaseReady } from "../lib/apply-sql-steps.mjs";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const skipDocker = process.argv.includes("--skip-docker");
@@ -57,14 +58,13 @@ function has(command) {
 
 // ── Preflight ──────────────────────────────────────────────────────────
 // Checked up front so you learn about a missing tool now, not four minutes in.
-const missing = ["docker", "psql", "bun"].filter(
+const missing = ["docker", "bun"].filter(
   (tool) => !(tool === "docker" && skipDocker) && !has(tool),
 );
 if (missing.length > 0) {
   console.error(
     `[setup] Missing required tool(s): ${missing.join(", ")}\n` +
       "  docker — local Postgres and mail (skip with --skip-docker)\n" +
-      "  psql   — applies the database schema\n" +
       "  bun    — runs the production server and the job worker",
   );
   process.exit(1);
@@ -102,10 +102,7 @@ if (skipDocker) {
   process.stdout.write("[setup] waiting for Postgres");
   let ready = false;
   for (let i = 0; i < 40; i += 1) {
-    const probe = spawnSync("psql", [DATABASE_URL, "-tAc", "select 1"], {
-      stdio: "ignore",
-    });
-    if (probe.status === 0) {
+    if (await isDatabaseReady(DATABASE_URL)) {
       ready = true;
       break;
     }

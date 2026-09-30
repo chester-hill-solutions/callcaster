@@ -31,6 +31,7 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
+import { applySqlSteps } from "../lib/apply-sql-steps.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -280,19 +281,12 @@ async function main() {
     await sql.end({ timeout: 5 });
   }
 
-  for (const step of steps) {
-    const file = path.join(rootDir, step);
-    console.log(`[bootstrap-fresh-db] applying ${step}`);
-    const result = spawnSync(
-      "psql",
-      [databaseUrl, "-v", "ON_ERROR_STOP=1", "-q", "-f", file],
-      { stdio: "inherit" },
-    );
-    if (result.status !== 0) {
-      console.error(`[bootstrap-fresh-db] failed on ${step}`);
-      process.exit(result.status ?? 1);
-    }
-  }
+  await applySqlSteps({
+    databaseUrl,
+    steps,
+    rootDir,
+    label: "bootstrap-fresh-db",
+  });
 
   const ledgerSql = postgres(databaseUrl, { prepare: false, max: 1 });
   try {
