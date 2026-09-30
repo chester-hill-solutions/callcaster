@@ -1,5 +1,6 @@
-import { describe, expect, test, vi } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 
+import { resetRateLimitsForTests } from "@/lib/platform-rate-limit.server";
 import { asRouteResponse, routeArgs } from "./helpers/route-result";
 
 const mocks = vi.hoisted(() => ({
@@ -20,6 +21,11 @@ vi.mock("@/server/auth-instance", () => ({
 }));
 
 describe("app/routes/reset-password", () => {
+  beforeEach(async () => {
+    await resetRateLimitsForTests();
+    mocks.resetPassword.mockReset();
+  });
+
   test("loader returns token from query string", async () => {
     const mod = await import("../app/routes/reset-password");
     const response = await asRouteResponse(mod.loader(routeArgs(new Request("http://localhost/reset-password?token=abc123"))),
@@ -136,5 +142,41 @@ describe("app/routes/reset-password", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ success: true, error: null });
+  });
+
+  // #2220: the HTML reset form took a token with no limiter, while the JSON
+  // twin had one. `auth:reset-password` is 10/minute.
+  test("throttles reset attempts after the reset bucket is spent", async () => {
+    mocks.resetPassword.mockResolvedValue({});
+
+    const submit = async () => {
+      const form = new FormData();
+      form.set("password", "newPassword123");
+      form.set("confirm_password", "newPassword123");
+      const mod = await import("../app/routes/reset-password");
+      return asRouteResponse(
+        mod.action(
+          routeArgs(
+            new Request("http://localhost/reset-password?token=abc123", {
+              method: "POST",
+              body: form,
+            }),
+          ),
+        ),
+      );
+    };
+
+    for (let i = 0; i < 10; i++) {
+      expect((await submit()).status).toBe(200);
+    }
+
+    const limited = await submit();
+    expect(limited.status).toBe(429);
+    await expect(limited.json()).resolves.toEqual({
+      success: null,
+      error: { message: "Too many attempts. Wait a minute and try again." },
+    });
+    // The limiter must stop the reset call, not just report.
+    expect(mocks.resetPassword).toHaveBeenCalledTimes(10);
   });
 });
