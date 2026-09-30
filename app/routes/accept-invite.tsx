@@ -63,7 +63,7 @@ export default function AcceptInvite() {
   const { state } = useNavigation();
 
   useActionFeedback(state === "idle" ? actionData : undefined, {
-    getSuccess: (data) => data?.status === "updated" || data?.status === "resend_sent",
+    getSuccess: (data) => data?.status === "resend_sent",
     successMessage: "Invitation link sent",
     getError: (data) =>
       data?.status === "accept_failed"
