@@ -5,6 +5,7 @@ import { isSignupOpen } from "@/lib/env.server";
 import { registerBodySchema } from "@/lib/schemas/api/platform-auth";
 import { registerUser } from "@/lib/platform-auth.server";
 import { jsonError, jsonResponse } from "@/lib/platform-api.server";
+import { enforceAuthRateLimit } from "@/lib/platform-auth-rate-limit.server";
 import { data as routeData, redirect } from "react-router";
 import { defineAction } from "@/lib/handler.server";
 
@@ -15,9 +16,27 @@ type ActionData = {
 export const action = defineAction({
   sideEffects: ["db-write", "email"],
   handler: async ({ request }) => {
+    // This route creates accounts, so it shares the signup bucket with the
+    // JSON twin at api+/auth/register (#2220). Signup is open by default
+    // (SIGNUP_OPEN ships true), which makes this the cheapest provisioning
+    // path to abuse — an unthrottled form here is an account-creation oracle.
+    const contentType = request.headers.get("content-type") ?? "";
+    const isJson = contentType.includes("application/json");
+
+    const limited = await enforceAuthRateLimit(request, "auth:register");
+    if (limited) {
+      if (isJson) {
+        return jsonError("Too many sign-up attempts. Try again shortly.", 429);
+      }
+      const { headers } = await getSession(request);
+      return routeData<ActionData>(
+        { error: "Too many sign-up attempts. Wait a minute and try again." },
+        { headers, status: 429 },
+      );
+    }
+
     if (!isSignupOpen()) {
-      const contentType = request.headers.get("content-type") ?? "";
-      if (contentType.includes("application/json")) {
+      if (isJson) {
         return jsonError("Registration is closed.", 403);
       }
       const { headers } = await getSession(request);
@@ -27,9 +46,7 @@ export const action = defineAction({
       );
     }
 
-    const contentType = request.headers.get("content-type") ?? "";
-
-    if (contentType.includes("application/json")) {
+    if (isJson) {
       const parsed = await parseJsonBodyOrResponse(request, registerBodySchema);
       if (parsed instanceof Response) return parsed;
 
