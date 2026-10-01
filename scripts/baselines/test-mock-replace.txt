@@ -52,6 +52,8 @@ test/api-caller-id-status.route.test.ts::@/lib/twilio-webhook.server
 test/api-caller-id.route.test.ts::@/lib/platform-workspace-numbers.server
 test/api-workspaces-audiences.route.test.ts::@/lib/database/workspace.server
 test/api-workspaces-audiences.route.test.ts::@/lib/platform-data.server
+test/api-write-rate-limit.test.ts::@/lib/env.server
+test/api-write-rate-limit.test.ts::@/lib/logger.server
 test/audience-export.test.ts::@/lib/audience-upload-db.server
 test/audience-export.test.ts::@/lib/auth.server
 test/audience-export.test.ts::@/lib/capability-guard.server
@@ -92,7 +94,6 @@ test/auto-dial-room.route.test.ts::@/lib/auto-dial.server
 test/auto-dial-room.route.test.ts::@/lib/campaign-ivr.server
 test/auto-dial-room.route.test.ts::@/lib/campaign-queue-db.server
 test/auto-dial-room.route.test.ts::@/lib/object-storage.server
-test/auto-dial-room.route.test.ts::@/lib/telephony-db.server
 test/auto-dial-room.route.test.ts::@/lib/twilio-webhook.server
 test/auto-dial-room.route.test.ts::@/lib/user-audio.server
 test/auto-dial-room.route.test.ts::@/lib/workspace-members-db.server
@@ -473,7 +474,6 @@ test/initiate-ivr.route.test.ts::@/lib/db-rpc.server
 test/initiate-ivr.route.test.ts::@/lib/env.server
 test/initiate-ivr.route.test.ts::@/lib/logger.server
 test/initiate-ivr.route.test.ts::@/lib/request-utils.server
-test/integration-db/call-status-guard.test.ts::@/lib/workspace-events.server
 test/integration-db/dequeue-contact-assigned.test.ts::@/lib/workspace-events.server
 test/integration-db/ledger.test.ts::@/lib/workspace-events.server
 test/ivr-block-response.route.test.ts::@/lib/campaign-ivr.server
@@ -537,7 +537,6 @@ test/number-rental-billing.server.test.ts::@/lib/database/workspace.server
 test/number-rental-billing.server.test.ts::@/lib/ops-alert.server
 test/number-rental-billing.server.test.ts::@/lib/transaction-history.server
 test/number-rental-billing.server.test.ts::@/lib/workspace-credits.server
-test/number-rental-billing.server.test.ts::@/lib/workspace-members-db.server
 test/numbers-routing-preset-action.test.ts::@/lib/database/workspace.server
 test/numbers-routing-preset-action.test.ts::@/lib/platform-workspace-numbers.server
 test/numbers.route.test.ts::@/lib/auth.server

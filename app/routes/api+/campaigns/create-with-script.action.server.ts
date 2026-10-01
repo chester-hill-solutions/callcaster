@@ -9,6 +9,7 @@ import { verifyApiKeyOrSession } from "@/lib/api-auth.server";
 import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 import { requireDualAuthCapability } from "@/lib/capability-guard.server";
 import { defineAction } from "@/lib/handler.server";
+import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 import {
   createWithScriptBodySchema,
   type CreateWithScriptBody,
@@ -42,6 +43,11 @@ export const action = defineAction({
   },
   sideEffects: ["db-write"],
   handler: async ({ request, auth: authResult }) => {
+  // Bucket is the API key id, not the IP (#2135). Before the body is
+  // read, so an over-limit caller never gets to buffer it.
+  const rateLimited = await apiWriteRateLimitResponse(authResult, "api-create-with-script");
+  if (rateLimited) return rateLimited;
+
   const parsed = await parseJsonBodyOrResponse(request, createWithScriptBodySchema);
   if (parsed instanceof Response) {
     return parsed;
