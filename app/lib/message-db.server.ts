@@ -220,9 +220,23 @@ export async function findMessageBySid(sid: string): Promise<MessageRow | null> 
  */
 type GuardedMessageColumn = "status" | "date_sent";
 
-/** A message write, where the two guarded columns may carry a SQL fragment. */
-type MessageUpdate = Omit<Partial<MessageRow>, GuardedMessageColumn> &
-  Partial<Record<GuardedMessageColumn, MessageRow[GuardedMessageColumn] | SQL>>;
+/**
+ * A message write, where the two guarded columns may carry a SQL fragment.
+ *
+ * The guarded keys are spelled out per column rather than as
+ * `Record<GuardedMessageColumn, …>`. That union form resolved to
+ * `MessageRow["status" | "date_sent"]`, i.e. `string | Date | null`, so `status`
+ * silently accepted a `Date` — the mistake #2213 had already fixed on the model,
+ * and the tenant-db boundary would now have caught. Per-column keeps
+ * `status: string | SQL` and `date_sent: Date | SQL`.
+ *
+ * `ScopedUpdate` admits `SQL` on every column because that is Drizzle's own
+ * `PgUpdateSetSource`, so a guarded write needs no second type.
+ */
+type MessageUpdate = Omit<Partial<MessageRow>, GuardedMessageColumn> & {
+  status?: MessageRow["status"] | SQL;
+  date_sent?: MessageRow["date_sent"] | SQL;
+};
 
 /**
  * Status-transition guard, enforced atomically inside the UPDATE (same shape
