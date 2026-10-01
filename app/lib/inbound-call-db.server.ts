@@ -89,7 +89,7 @@ export async function upsertInboundCallRecord(args: {
   return insertCallForWorkspace(args.workspaceId, {
     ...args.values,
     sid: args.sid,
-    date_created: args.values.date_created ?? new Date().toISOString(),
+    date_created: args.values.date_created ?? new Date(),
     is_last: args.values.is_last ?? false,
   });
 }

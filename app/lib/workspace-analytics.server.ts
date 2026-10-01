@@ -20,7 +20,7 @@ type AnalyticsAttemptRow = {
     duration: string | null;
     call_duration: number | null;
     status: string | null;
-    end_time: string | null;
+    end_time: Date | null;
   }> | null;
 };
 

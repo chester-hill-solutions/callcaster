@@ -353,7 +353,7 @@ export async function insertCallForWorkspace(
   const tdb = options?.tdb ?? createTenantDb(workspaceId);
   const [row] = await tdb.call.insert({
     ...values,
-    date_created: values.date_created ?? new Date().toISOString(),
+    date_created: values.date_created ?? new Date(),
     is_last: values.is_last ?? false,
   } as Parameters<typeof tdb.call.insert>[0]);
   return row ?? null;
@@ -372,7 +372,7 @@ export async function upsertCallBySid(
     .insert(callTable)
     .values({
       ...values,
-      date_created: values.date_created ?? new Date().toISOString(),
+      date_created: values.date_created ?? new Date(),
       is_last: values.is_last ?? false,
     })
     .returning();

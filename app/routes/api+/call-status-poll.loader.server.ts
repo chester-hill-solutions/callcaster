@@ -83,12 +83,12 @@ export const loader = defineLoader({
       const statusChanged = currentDbStatus !== normalizedStatus;
 
       if (statusChanged) {
-        const now = new Date().toISOString();
+        const now = new Date();
         const updatedCall = await updateCallBySid(dbCall.workspace, callSid, {
           status: normalizedStatus,
           date_updated: now,
           ...(twilioCall.endTime
-            ? { end_time: new Date(twilioCall.endTime).toISOString() }
+            ? { end_time: new Date(twilioCall.endTime) }
             : {}),
           ...(twilioCall.duration != null
             ? { duration: String(twilioCall.duration) }

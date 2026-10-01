@@ -107,6 +107,22 @@ export function buildRepliedContactKeys(
   );
 }
 
+/**
+ * A `message.date_created` value as the ISO string `ConversationSummary` holds.
+ *
+ * `Tables<"message">` says `Date`, which is right for a Drizzle row and wrong
+ * in a browser: `useChatRealtime` receives the same field over JSON, where a
+ * Date arrives as a string. Both are accepted rather than assumed, because the
+ * contract that consumes this is a string and nothing may put a Date into it.
+ */
+export function toConversationTimestamp(
+  value: Date | string | null | undefined,
+): string | null {
+  if (value === null || value === undefined) return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 export function compareByRecentActivity(
   left: ConversationSummary,
   right: ConversationSummary,

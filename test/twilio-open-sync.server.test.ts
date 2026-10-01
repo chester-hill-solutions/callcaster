@@ -67,7 +67,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
   test("routes a locally-open, provider-terminal call through the canonical billing processor", async () => {
     mocks.callFindMany.mockResolvedValue([
-      { sid: "CA1", status: "in-progress", date_created: "2026-07-29T00:00:00Z" },
+      { sid: "CA1", status: "in-progress", date_created: new Date("2026-07-29T00:00:00Z") },
     ]);
     mocks.callsList.mockResolvedValue([
       {
@@ -90,7 +90,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
   test("falls back to a per-SID fetch when the call is outside the list window", async () => {
     mocks.callFindMany.mockResolvedValue([
-      { sid: "CA2", status: "queued", date_created: "2026-07-29T00:00:00Z" },
+      { sid: "CA2", status: "queued", date_created: new Date("2026-07-29T00:00:00Z") },
     ]);
     mocks.callsList.mockResolvedValue([]);
     mocks.callFetch.mockResolvedValue({
@@ -142,7 +142,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
   test("terminalizes an old Twilio-404 call as failed through the canonical processor", async () => {
     mocks.callFindMany.mockResolvedValue([
       // Far older than any window.
-      { sid: "CA404", status: "queued", date_created: "2026-07-01T00:00:00Z", is_last: false },
+      { sid: "CA404", status: "queued", date_created: new Date("2026-07-01T00:00:00Z"), is_last: false },
     ]);
     mocks.callsList.mockResolvedValue([]);
     mocks.callFetch.mockRejectedValue(
@@ -160,7 +160,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
   test("a young Twilio-404 call is skipped, not terminalized", async () => {
     mocks.callFindMany.mockResolvedValue([
-      { sid: "CAyoung", status: "queued", date_created: new Date().toISOString(), is_last: false },
+      { sid: "CAyoung", status: "queued", date_created: new Date(), is_last: false },
     ]);
     mocks.callsList.mockResolvedValue([]);
     mocks.callFetch.mockRejectedValue(
@@ -174,7 +174,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
   test("a transient fetch failure on an old row skips (retries next run) rather than terminalizing", async () => {
     mocks.callFindMany.mockResolvedValue([
-      { sid: "CAflaky", status: "queued", date_created: "2026-07-01T00:00:00Z", is_last: false },
+      { sid: "CAflaky", status: "queued", date_created: new Date("2026-07-01T00:00:00Z"), is_last: false },
     ]);
     mocks.callsList.mockResolvedValue([]);
     mocks.callFetch.mockRejectedValue(
@@ -188,7 +188,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
   test("a Twilio-404 message is never terminalized (billing side-effects risk)", async () => {
     mocks.messageFindMany.mockResolvedValueOnce([
-      { sid: "SM404", status: "queued", date_created: "2026-07-01T00:00:00Z", date_updated: null },
+      { sid: "SM404", status: "queued", date_created: new Date("2026-07-01T00:00:00Z"), date_updated: null },
     ]);
     mocks.messagesList.mockResolvedValue([]);
     mocks.messageFetch.mockRejectedValue(
@@ -203,7 +203,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
   test("terminal message discovery updates the row and enqueues the billing side-effects job", async () => {
     mocks.messageFindMany.mockResolvedValueOnce([
-      { sid: "SM1", status: "sending", date_created: "2026-07-29T00:00:00Z", date_updated: null },
+      { sid: "SM1", status: "sending", date_created: new Date("2026-07-29T00:00:00Z"), date_updated: null },
     ]);
     mocks.messagesList.mockResolvedValue([
       { sid: "SM1", status: "delivered", errorCode: null, dateUpdated: new Date() },
@@ -240,7 +240,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
     test("persists the provider send time it already fetched", async () => {
       mocks.messageFindMany.mockResolvedValueOnce([
-        { sid: "SM1", status: "sending", date_created: "2026-07-29T00:00:00Z", date_updated: null, date_sent: null },
+        { sid: "SM1", status: "sending", date_created: new Date("2026-07-29T00:00:00Z"), date_updated: null, date_sent: null },
       ]);
       mocks.messagesList.mockResolvedValue([
         {
@@ -257,7 +257,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
       expect(mocks.updateMessageBySid).toHaveBeenCalledWith(
         "ws-1",
         "SM1",
-        expect.objectContaining({ date_sent: "2026-07-29T00:04:30.000Z" }),
+        expect.objectContaining({ date_sent: new Date("2026-07-29T00:04:30.000Z") }),
       );
     });
 
@@ -270,7 +270,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
       // "nothing changed" early-exit must not skip them.
       mocks.messageFindMany.mockResolvedValueOnce([]); // open rows: none
       mocks.messageFindMany.mockResolvedValueOnce([
-        { sid: "SM_old", status: "delivered", date_created: "2026-05-01T00:00:00.000Z", date_updated: null, date_sent: null },
+        { sid: "SM_old", status: "delivered", date_created: new Date("2026-05-01T00:00:00.000Z"), date_updated: null, date_sent: null },
       ]); // backfill: the settled row with no send time
       mocks.messagesList.mockResolvedValue([]);
       mocks.messageFetch.mockResolvedValue({
@@ -286,7 +286,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
       expect(mocks.updateMessageBySid).toHaveBeenCalledWith(
         "ws-1",
         "SM_old",
-        expect.objectContaining({ date_sent: "2026-05-01T00:05:00.000Z" }),
+        expect.objectContaining({ date_sent: new Date("2026-05-01T00:05:00.000Z") }),
       );
       // Billing must NOT re-run. The row's status already matches the
       // provider, so its side effects already happened; a 23,504-row backfill
@@ -300,7 +300,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
       // every field this sweep owns, so re-writing it would emit a pointless
       // chat event.
       mocks.messageFindMany.mockResolvedValueOnce([
-        { sid: "SM_done", status: "delivered", date_created: "2026-05-01T00:00:00.000Z", date_updated: "2026-05-01T00:05:00.000Z", date_sent: "2026-05-01T00:05:00.000Z" },
+        { sid: "SM_done", status: "delivered", date_created: new Date("2026-05-01T00:00:00.000Z"), date_updated: new Date("2026-05-01T00:05:00.000Z"), date_sent: new Date("2026-05-01T00:05:00.000Z") },
       ]);
       mocks.messagesList.mockResolvedValue([]);
       mocks.messageFetch.mockResolvedValue({
@@ -320,7 +320,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
       // would be the exact defect this ticket exists to remove: it would make
       // a 7-hour discrepancy look like a 0-second one.
       mocks.messageFindMany.mockResolvedValueOnce([
-        { sid: "SM_none", status: "sending", date_created: "2026-07-29T00:00:00.000Z", date_updated: null, date_sent: null },
+        { sid: "SM_none", status: "sending", date_created: new Date("2026-07-29T00:00:00.000Z"), date_updated: null, date_sent: null },
       ]);
       mocks.messagesList.mockResolvedValue([
         { sid: "SM_none", status: "delivered", errorCode: null, dateSent: null },
@@ -380,7 +380,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
   test("a failed side-effects enqueue leaves the message open so the next sweep retries the debit", async () => {
     mocks.messageFindMany.mockResolvedValueOnce([
-      { sid: "SM_lost", status: "sent", date_created: "2026-05-01T00:00:00.000Z", date_updated: null },
+      { sid: "SM_lost", status: "sent", date_created: new Date("2026-05-01T00:00:00.000Z"), date_updated: null },
     ]);
     mocks.messagesList.mockResolvedValue([
       { sid: "SM_lost", status: "delivered", errorCode: null, dateUpdated: new Date("2026-05-01T00:05:00.000Z") },
@@ -395,7 +395,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
   test("queues the billing job before writing the terminal status", async () => {
     mocks.messageFindMany.mockResolvedValueOnce([
-      { sid: "SM_order", status: "sent", date_created: "2026-05-01T00:00:00.000Z", date_updated: null },
+      { sid: "SM_order", status: "sent", date_created: new Date("2026-05-01T00:00:00.000Z"), date_updated: null },
     ]);
     mocks.messagesList.mockResolvedValue([
       { sid: "SM_order", status: "delivered", errorCode: null, dateUpdated: new Date("2026-05-01T00:05:00.000Z") },
@@ -417,13 +417,13 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
       status: "queued",
       to: "+15555550100",
       from: "+15550000001",
-      date_created: new Date(Date.now() - 30 * 60_000).toISOString(),
+      date_created: new Date(Date.now() - 30 * 60_000),
       date_updated: null,
       ...over,
     });
 
     test("a young pending intent is left alone", async () => {
-      mocks.messageFindMany.mockResolvedValueOnce([intent({ date_created: new Date().toISOString() })]);
+      mocks.messageFindMany.mockResolvedValueOnce([intent({ date_created: new Date() })]);
       mocks.messagesList.mockResolvedValue([]);
       await triggerTwilioOpenSync({ workspaceId: "ws-1" });
       expect(mocks.updateMessageBySid).not.toHaveBeenCalled();
@@ -471,7 +471,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
   test("non-terminal message drift updates the row but does not enqueue billing", async () => {
     mocks.messageFindMany.mockResolvedValueOnce([
-      { sid: "SM2", status: "queued", date_created: "2026-07-29T00:00:00Z", date_updated: null },
+      { sid: "SM2", status: "queued", date_created: new Date("2026-07-29T00:00:00Z"), date_updated: null },
     ]);
     mocks.messagesList.mockResolvedValue([
       { sid: "SM2", status: "sending", errorCode: null, dateUpdated: new Date() },
@@ -485,7 +485,7 @@ describe("triggerTwilioOpenSync terminal recovery (TEL-04)", () => {
 
   test("unchanged statuses touch nothing", async () => {
     mocks.callFindMany.mockResolvedValue([
-      { sid: "CA3", status: "in-progress", date_created: "2026-07-29T00:00:00Z" },
+      { sid: "CA3", status: "in-progress", date_created: new Date("2026-07-29T00:00:00Z") },
     ]);
     mocks.callsList.mockResolvedValue([{ sid: "CA3", status: "in-progress" }]);
 

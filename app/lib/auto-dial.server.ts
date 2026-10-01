@@ -78,8 +78,8 @@ function buildCallRow(callData: Partial<Call>) {
     to: callData.to || null,
     from: callData.from || null,
     status: callData.status || null,
-    start_time: callData.start_time ? new Date(callData.start_time).toISOString() : null,
-    end_time: callData.end_time ? new Date(callData.end_time).toISOString() : null,
+    start_time: callData.start_time ?? null,
+    end_time: callData.end_time ?? null,
     duration: callData.duration ? String(callData.duration) : null,
     price: callData.price ? String(callData.price) : null,
     direction: callData.direction || null,
@@ -97,9 +97,7 @@ function buildCallRow(callData: Partial<Call>) {
     conference_id: callData.conference_id || null,
     phone_number_sid: callData.phone_number_sid || null,
     parent_call_sid: callData.parent_call_sid || null,
-    date_updated: callData.date_updated
-      ? new Date(callData.date_updated).toISOString()
-      : null,
+    date_updated: callData.date_updated ?? null,
   };
 }
 
@@ -134,7 +132,7 @@ export async function saveCallToDatabase(
     }
     await tdb.call.insert({
       ...row,
-      date_created: new Date().toISOString(),
+      date_created: new Date(),
       is_last: false,
     });
     return true;
@@ -388,23 +386,23 @@ export async function runAutoDialerTurn(
       });
 
       // `call.dateUpdated`/`startTime`/`endTime` are `Date` in the Twilio SDK's
-      // `CallInstance` type, while `Call.date_updated`/`start_time`/`end_time`
-      // are `text()` (string) columns — convert them here so `callData` is a
-      // real `Partial<Call>` the compiler checks, instead of force-casting a
-      // mismatched shape past it. The `? … : null` guards are defensive: Twilio's
-      // docs note these fields come back empty for a call that hasn't
-      // started/ended yet, despite the SDK typing them as always-present.
+      // `CallInstance` type, and `Call.date_updated`/`start_time`/`end_time` are
+      // `timestamptz` — so they are handed over as the Dates they already are,
+      // and `callData` stays a real `Partial<Call>` the compiler checks. The
+      // `? … : null` guards are defensive: Twilio's docs note these fields come
+      // back empty for a call that hasn't started/ended yet, despite the SDK
+      // typing them as always-present.
       const callData: Partial<Call> = {
         sid: call.sid,
-        date_updated: call.dateUpdated ? call.dateUpdated.toISOString() : null,
+        date_updated: call.dateUpdated ?? null,
         parent_call_sid: call.parentCallSid,
         account_sid: call.accountSid,
         to: toNumber,
         from: call.from,
         phone_number_sid: call.phoneNumberSid,
         status: call.status,
-        start_time: call.startTime ? call.startTime.toISOString() : null,
-        end_time: call.endTime ? call.endTime.toISOString() : null,
+        start_time: call.startTime ?? null,
+        end_time: call.endTime ?? null,
         duration: call.duration,
         price: call.price,
         direction: call.direction,

@@ -98,7 +98,7 @@ function makeMessage(overrides?: any) {
     status: "sent",
     direction: "outbound-api",
     campaign_id: 1,
-    date_updated: new Date().toISOString(),
+    date_updated: new Date(),
     ...overrides,
   };
 }

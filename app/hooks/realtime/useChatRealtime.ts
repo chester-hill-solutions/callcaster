@@ -4,6 +4,7 @@ import type { Database, Tables } from "@/lib/db-types";
 import {
   compareByRecentActivity,
   isInboundMessageDirection,
+  toConversationTimestamp,
 } from "@/lib/chat-conversation-sort";
 import {
   fetchConversationSummaries,
@@ -354,6 +355,11 @@ export const useConversationSummaryRealTime = ({
             const contactPhone =
               (newRow.direction === 'inbound' ? newRow.from : newRow.to) ?? "";
 
+            // The realtime payload crossed JSON, so this arrives as the
+            // string it was sent as. ConversationSummary holds strings.
+            const rowTimestamp =
+              toConversationTimestamp(newRow.date_created) ?? new Date().toISOString();
+
             // Check if we already have a conversation for this contact
             const existingConversationIndex = prevConversations.findIndex(conv =>
               phoneNumbersMatch(conv.contact_phone, contactPhone)
@@ -369,7 +375,7 @@ export const useConversationSummaryRealTime = ({
               updatedConversations[existingConversationIndex] = {
                 ...existingConversation,
                 unread_count: existingConversation.unread_count + 1,
-                conversation_last_update: newRow.date_created || new Date().toISOString(),
+                conversation_last_update: rowTimestamp,
                 message_count: existingConversation.message_count + 1
               };
               return updatedConversations;
@@ -381,8 +387,8 @@ export const useConversationSummaryRealTime = ({
                   (newRow.direction === 'inbound'
                     ? newRow.to
                     : newRow.from) ?? "",
-                conversation_start: newRow.date_created || new Date().toISOString(),
-                conversation_last_update: newRow.date_created || new Date().toISOString(),
+                conversation_start: rowTimestamp,
+                conversation_last_update: rowTimestamp,
                 message_count: 1,
                 unread_count: 1,
                 contact_firstname: '',  // We don't have this info yet

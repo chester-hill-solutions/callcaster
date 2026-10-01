@@ -96,7 +96,7 @@ function providerTime(m: ProviderMessage): number {
  */
 async function reconcilePendingIntent<T extends ProviderMessage>(args: {
   workspaceId: string;
-  local: { sid: string; to: string | null; from: string | null; client_ref: string | null; date_created: string | null };
+  local: { sid: string; to: string | null; from: string | null; client_ref: string | null; date_created: Date | null };
   twilioMessages: T[];
 }): Promise<
   | { kind: "skipped" }
@@ -104,7 +104,7 @@ async function reconcilePendingIntent<T extends ProviderMessage>(args: {
   | { kind: "resolved"; remote: T }
 > {
   const { workspaceId, local, twilioMessages } = args;
-  const createdAt = local.date_created ? new Date(local.date_created).getTime() : 0;
+  const createdAt = local.date_created ? local.date_created.getTime() : 0;
   if (Date.now() - createdAt < PENDING_INTENT_STALE_MS) {
     return { kind: "skipped" };
   }
@@ -120,7 +120,7 @@ async function reconcilePendingIntent<T extends ProviderMessage>(args: {
     await updateMessageBySid(workspaceId, local.sid, {
       status: "failed",
       error_message: "No provider record for this send (open-sync)",
-      date_updated: new Date().toISOString(),
+      date_updated: new Date(),
     });
     logger.warn("Twilio open sync: pending intent failed, nothing at provider", {
       workspaceId,
@@ -231,7 +231,7 @@ export async function triggerTwilioOpenSync({
             // failures (auth, 5xx, network) still skip and retry next run.
             const status = (error as { status?: number; code?: number }) ?? {};
             const isNotFound = status.status === 404 || status.code === 20404;
-            const rowAgeMs = Date.now() - new Date(local.date_created).getTime();
+            const rowAgeMs = Date.now() - local.date_created.getTime();
             if (isNotFound && rowAgeMs > maxAgeMinutes * 60_000) {
               await processCallStatusWebhook(
                 {
@@ -265,8 +265,8 @@ export async function triggerTwilioOpenSync({
             status: twilioStatus,
             duration:
               remote.duration != null ? String(remote.duration) : undefined,
-            end_time: remote.endTime?.toISOString() ?? undefined,
-            date_updated: remote.dateUpdated?.toISOString() ?? undefined,
+            end_time: remote.endTime ?? undefined,
+            date_updated: remote.dateUpdated ?? undefined,
           },
           { workspaceId, note: `Call ${local.sid} (open-sync recovery)` },
         );
@@ -305,10 +305,8 @@ export async function triggerTwilioOpenSync({
       where: and(
         isNull(message.date_sent),
         notInArray(message.status, [...OPEN_MESSAGE_STATUSES]),
-        // ISO strings, not Dates: the schema models every timestamp column on
-        // this table as text, so Drizzle's typed comparators reject a Date.
-        gt(message.date_created, new Date(Date.now() - DATE_SENT_BACKFILL_MAX_AGE_MS).toISOString()),
-        lt(message.date_created, new Date(Date.now() - DATE_SENT_BACKFILL_MIN_AGE_MS).toISOString()),
+        gt(message.date_created, new Date(Date.now() - DATE_SENT_BACKFILL_MAX_AGE_MS)),
+        lt(message.date_created, new Date(Date.now() - DATE_SENT_BACKFILL_MIN_AGE_MS)),
       ),
       orderBy: [asc(message.date_created)],
       limit: dateSentBackfillLimit,
@@ -367,7 +365,7 @@ export async function triggerTwilioOpenSync({
         // could never have written a date_sent for, because the old
         // early-exit fired first.
         const statusUnchanged = twilioStatus === local.status;
-        const remoteDateSent = remote.dateSent?.toISOString();
+        const remoteDateSent = remote.dateSent ?? undefined;
         if (statusUnchanged && (local.date_sent != null || !remoteDateSent)) {
           continue;
         }
@@ -409,8 +407,7 @@ export async function triggerTwilioOpenSync({
           // same-value write would otherwise be indistinguishable from a real
           // transition in the logs.
           ...(statusUnchanged ? {} : { status: twilioStatus }),
-          date_updated:
-            remote.dateUpdated?.toISOString() ?? local.date_updated,
+          date_updated: remote.dateUpdated ?? local.date_updated,
           ...(remoteDateSent ? { date_sent: remoteDateSent } : {}),
           ...(errorCode != null ? { error_code: errorCode } : {}),
         });

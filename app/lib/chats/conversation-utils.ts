@@ -3,6 +3,7 @@ import {
   getConversationParticipantPhones,
   isInboundMessageDirection,
   normalizeConversationPhone,
+  toConversationTimestamp,
   type ConversationSummary,
 } from "@/lib/chat-conversation-sort";
 import type { Tables } from "@/lib/db-types";
@@ -75,7 +76,8 @@ export function upsertConversationFromMessage({
     return currentChats;
   }
 
-  const nextTimestamp = message.date_created ?? new Date().toISOString();
+  const nextTimestamp =
+    toConversationTimestamp(message.date_created) ?? new Date().toISOString();
   const isInbound = isInboundMessageDirection(message.direction);
   const isActiveConversation =
     Boolean(activeContactNumber) &&
