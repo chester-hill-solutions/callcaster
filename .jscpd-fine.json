@@ -1,4 +1,29 @@
 {
+  "_comment": [
+    "The `fine` dimension of the DRY gate (scripts/check-dry.mjs).",
+    "",
+    "minTokens was 15 and it flagged 2,316 clones, only 39% of which were 8 lines",
+    "or longer. Over the two PRs after the gate landed it flagged 9 new clones; 2",
+    "were real and 7 were baselined. A gate you override every few PRs stops being",
+    "read, and I was the one overriding it.",
+    "",
+    "At 40 the flag volume is 6x lower and 78% of what remains is 8+ lines:",
+    "  15 tokens -> 2,316 clones, 910 of them 8+ lines",
+    "  25 tokens -> 1,191 clones, 624 of them 8+ lines",
+    "  40 tokens ->   380 clones, 298 of them 8+ lines",
+    "",
+    "What this does NOT do is separate convention from logic. Verified by planting",
+    "the exact idiom that got baselined in #2226 - `const tdb = args.tdb ??",
+    "createTenantDb(...)` beside a clock read - as a function body in two modules:",
+    "it is STILL flagged at 40 tokens. jscpd measures size, not meaning, so no",
+    "threshold makes it smart. This change buys a lower override rate, not a",
+    "signal that is right more often.",
+    "",
+    "A bet with a review date: if the next few PRs again come back mostly-baselined,",
+    "retire this dimension rather than lower the threshold a third time. A gate",
+    "nobody trusts catches nothing, and the coarse dimension still covers large",
+    "copy-paste at 50."
+  ],
   "path": ["app", "server", "worker", "shared"],
   "ignore": [
     "**/*.test.*",
@@ -9,7 +34,7 @@
     "**/node_modules/**",
     "**/*.d.ts"
   ],
-  "minTokens": 15,
+  "minTokens": 40,
   "reporters": ["json"],
   "output": "./node_modules/.cache/jscpd-fine",
   "gitignore": true,
