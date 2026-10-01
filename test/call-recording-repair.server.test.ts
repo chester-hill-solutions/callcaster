@@ -28,6 +28,8 @@ vi.mock("@/lib/worker/job-params.server", async (importOriginal) => ({
 }));
 
 import {
+  REPAIR_MAX_AGE_DAYS,
+  REPAIR_MIN_AGE_MINUTES,
   repairTwilioParams,
   runRecordingRepairSweep,
 } from "@/lib/call-recording-repair.server";
@@ -81,6 +83,10 @@ function stubCandidates(rows: unknown[]) {
  */
 const pgDialect = new PgDialect({ casing: { escapeName: (n: string) => `"${n}"` } });
 const whereSql = (clause: unknown): string => pgDialect.sqlToQuery(clause as SQL).sql;
+
+/** The values Drizzle binds into the WHERE clause, in order. */
+const whereParams = (clause: unknown): unknown[] =>
+  pgDialect.sqlToQuery(clause as SQL).params;
 
 const NOW = new Date("2026-09-28T12:00:00.000Z");
 
@@ -265,25 +271,30 @@ describe("runRecordingRepairSweep", () => {
    * in the database, so `lt(column, isoString)` will not typecheck. An uncast
    * ISO literal is type `unknown` and Postgres coerces it correctly, so this
    * cast is not preventing a silent mis-compare.
-   *
-   * Asserts that the COLUMN is cast and then COMPARED — a `::timestamptz` chunk
-   * immediately followed by an operator. Asserting merely that the substring
-   * `::timestamptz` appears is satisfied by the literal-side casts alone:
-   * deleting the column cast entirely leaves all four substring occurrences
-   * intact and that check still passed. Group B supersedes this whole approach
-   * with a real-Postgres assertion on rendered SQL.
+   * #2213 re-declared `call.date_created` as `timestamptz`, which removed the
+   * reason for the raw `sql` and its `::timestamptz` cast: the typed `lt`/`gt`
+   * helpers now accept a `Date`. The comparison is therefore asserted by the
+   * bound values Drizzle binds, not by a cast in the SQL text — and a test that
+   * asserted the cast would have gone green on the workaround it was written to
+   * police, which is how it survived until the workaround was no longer needed.
    */
-  test("bounds the sweep by age, comparing the column as timestamptz", async () => {
+  test("bounds the sweep by age, comparing date_created as timestamptz", async () => {
     stubCandidates([]);
     await runRecordingRepairSweep({ now: NOW });
 
     const sql = whereSql(mocks.whereClause);
-    // Both bounds, each comparing the COLUMN (not just the literal) as
-    // timestamptz. Checking merely that `::timestamptz` appears is satisfied by
-    // the literal-side casts, so deleting the column cast left the old test
-    // green.
-    expect(sql).toMatch(/"date_created"::timestamptz\s*</);
-    expect(sql).toMatch(/"date_created"::timestamptz\s*>/);
+    expect(sql).toMatch(/"date_created"\s*</);
+    expect(sql).toMatch(/"date_created"\s*>/);
+    // The column needs no cast now, and must not regain one: a `text()` column
+    // compared against a literal is the silent wrong answer this guards.
+    expect(sql).not.toMatch(/"date_created"::/);
+    const params = whereParams(mocks.whereClause).map(String);
+    expect(params).toContain(
+      new Date(NOW.getTime() - REPAIR_MIN_AGE_MINUTES * 60_000).toISOString(),
+    );
+    expect(params).toContain(
+      new Date(NOW.getTime() - REPAIR_MAX_AGE_DAYS * 86_400_000).toISOString(),
+    );
   });
 
   /**

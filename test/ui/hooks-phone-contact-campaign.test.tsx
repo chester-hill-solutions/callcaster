@@ -59,7 +59,7 @@ describe("phone, contact, campaign hooks", () => {
     contactSearchMocks.fetchContactsByPhone.mockResolvedValue([{ id: 1, phone: "+15551234567" }]);
     contactSearchMocks.fetchLatestMessageForPhone.mockResolvedValue({
       body: "hi",
-      date_created: new Date().toISOString(),
+      date_created: new Date(),
     });
 
     const { useContactSearch } = await import("@/hooks/contact/useContactSearch");

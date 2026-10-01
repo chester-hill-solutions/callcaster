@@ -159,7 +159,7 @@ async function handleInboundAction(
       to: data.To || null,
       from: data.From || null,
       status: "completed",
-      start_time: new Date().toISOString(),
+      start_time: new Date(),
       direction: data.Direction || null,
       api_version: data.ApiVersion || null,
       workspace: workspaceId,
@@ -184,7 +184,10 @@ async function handleInboundAction(
         to: call.to,
         status: call.status,
         direction: call.direction,
-        start_time: call.start_time,
+        // Integrator-facing webhook payload: `timestamp` is a string on the wire and
+        // this contract must not change shape, so the row's Date is rendered
+        // back to ISO here rather than sent as a Date.
+        start_time: call.start_time?.toISOString() ?? null,
       },
       sendWebhookNotification,
       logger,

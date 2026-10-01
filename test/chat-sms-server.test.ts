@@ -134,7 +134,9 @@ describe("app/lib/chat-sms.server.ts", () => {
           messagingServiceSid: "MG123",
         }),
         persistExtras: expect.objectContaining({
-          scheduled_at: sendAt,
+          // `message.scheduled_at` is timestamptz, so persistence takes the Date.
+          // An ISO string reaches postgres.js as a Date-mode bind and throws.
+          scheduled_at: new Date(sendAt),
         }),
       }),
     );

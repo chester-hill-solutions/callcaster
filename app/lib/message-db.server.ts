@@ -72,7 +72,12 @@ export async function fetchMessagePageForContact(
     where: and(
       isNotNull(messageTable.date_created),
       or(eq(messageTable.from, contactFilter), eq(messageTable.to, contactFilter)),
-      ...(before ? [lt(messageTable.date_created, before)] : []),
+      // `before` is a cursor the client sends back, so it is an ISO string. An
+      // unparseable cursor must not become a filter: `new Date("junk")` is an
+      // Invalid Date, which would throw here rather than return the first page.
+      ...(before && !Number.isNaN(new Date(before).getTime())
+        ? [lt(messageTable.date_created, new Date(before))]
+        : []),
     ),
     orderBy: [desc(messageTable.date_created)],
     limit: pageSize + 1,

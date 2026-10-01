@@ -98,8 +98,8 @@ async function runCallExport(args: {
       duration: args.duration,
       status: args.duration ? "completed" : "no-answer",
       answered_by: null,
-      start_time: "2026-01-01T00:00:00.000Z",
-      end_time: "2026-01-01T00:01:01.000Z",
+      start_time: new Date("2026-01-01T00:00:00.000Z"),
+      end_time: new Date("2026-01-01T00:01:01.000Z"),
       outreach_attempt_id: 10,
     },
   ]);

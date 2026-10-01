@@ -383,7 +383,7 @@ describe("api/inbound — inbound handset call", () => {
       to: "+15550001111",
       status: "completed",
       direction: "inbound",
-      start_time: new Date().toISOString(),
+      start_time: new Date(),
     });
     mocks.findActiveHandsetSessionClientIdentity.mockResolvedValue("agent-1");
     mocks.findActiveHandsetSession.mockResolvedValue({ user_id: "user-1" });

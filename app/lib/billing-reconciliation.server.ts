@@ -29,8 +29,13 @@ export async function loadBillingEntityAudit(args: {
   workspaceId: string;
   period: { startDate: string; endDate: string };
 }): Promise<BillingEntityAudit> {
-  const periodStart = `${args.period.startDate}T00:00:00.000Z`;
-  const periodEnd = `${args.period.endDate}T23:59:59.999Z`;
+  const periodStart = new Date(`${args.period.startDate}T00:00:00.000Z`);
+  const periodEnd = new Date(`${args.period.endDate}T23:59:59.999Z`);
+  // `transaction_history.created_at` is still declared `text()`, so its
+  // comparisons take an ISO string. It is one of the remaining #2213 columns
+  // and is deliberately not corrected in this slice.
+  const periodStartIso = periodStart.toISOString();
+  const periodEndIso = periodEnd.toISOString();
   const tdb = createTenantDb(args.workspaceId);
 
   const messageWhere = and(
@@ -56,14 +61,14 @@ export async function loadBillingEntityAudit(args: {
   );
   const smsDebitWhere = and(
     eq(transactionHistoryTable.type, "DEBIT"),
-    gte(transactionHistoryTable.created_at, periodStart),
-    lte(transactionHistoryTable.created_at, periodEnd),
+    gte(transactionHistoryTable.created_at, periodStartIso),
+    lte(transactionHistoryTable.created_at, periodEndIso),
     like(transactionHistoryTable.idempotency_key, "sms:%"),
   );
   const callDebitWhere = and(
     eq(transactionHistoryTable.type, "DEBIT"),
-    gte(transactionHistoryTable.created_at, periodStart),
-    lte(transactionHistoryTable.created_at, periodEnd),
+    gte(transactionHistoryTable.created_at, periodStartIso),
+    lte(transactionHistoryTable.created_at, periodEndIso),
     like(transactionHistoryTable.idempotency_key, "call:%"),
   );
 

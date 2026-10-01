@@ -56,19 +56,25 @@ export function buildCallUpsertFromTwilioParams(
   params: Record<string, string>,
 ): TablesInsert<"call"> {
   const underCaseData = twilioParamsToUnderCase(params);
+  // Twilio sends `Timestamp` as RFC 2822 ("Fri, 24 May 2019 17:44:46 +0000"),
+  // which `new Date` parses. An unparseable value is passed through as an
+  // Invalid Date rather than silently nulled: Postgres rejects it, exactly as
+  // it rejected the raw string before, so a malformed callback is still loud.
+  const timestamp = getString(underCaseData.timestamp);
+  const startTime = getString(underCaseData.start_time);
+  const endTime = getString(underCaseData.end_time);
   return {
     sid: getString(underCaseData.call_sid) ?? "",
-    date_created:
-      getString(underCaseData.timestamp) ?? new Date().toISOString(),
-    date_updated: new Date().toISOString(),
+    date_created: timestamp ? new Date(timestamp) : new Date(),
+    date_updated: new Date(),
     parent_call_sid: getString(underCaseData.parent_call_sid),
     account_sid: getString(underCaseData.account_sid),
     to: getString(underCaseData.to),
     from: getString(underCaseData.from),
     status: (getString(underCaseData.call_status) ??
       getString(underCaseData.status)) as Database["public"]["Enums"]["call_status"] | null,
-    start_time: getString(underCaseData.start_time),
-    end_time: getString(underCaseData.end_time),
+    start_time: startTime ? new Date(startTime) : undefined,
+    end_time: endTime ? new Date(endTime) : undefined,
     duration: String(
       Math.max(
         getNumber(underCaseData.duration) ?? 0,

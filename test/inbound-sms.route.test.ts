@@ -674,6 +674,29 @@ describe("app/routes/api+/inbound-sms", () => {
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
+  /**
+   * The message row's temporal columns are `timestamptz` (real `Date`), and
+   * postgres.js encodes a Date bind parameter by calling `.toISOString()` on it.
+   * An ISO *string* therefore fails at the driver, not at the type checker:
+   * `createTenantDb`'s `insert` takes `Record<string, unknown>`, so nothing
+   * checks the value. That is how this reached the e2e gate as a 400.
+   *
+   * The stub records the payload, so the contract can be asserted here rather
+   * than only in the real-Postgres tier — the tier that would otherwise be the
+   * only place it can be observed.
+   */
+  test("inserts Date values for the timestamptz columns, not ISO strings", async () => {
+    const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "inbound_sms" }] }] };
+    mocks.createClient.mockReturnValueOnce(makeDbClient({ number, smsWebhook: true }));
+    const mod = await import("../app/routes/api+/inbound-sms");
+    const res = await asRouteResponse(mod.action({ request: makeInboundSmsRequest() } as any));
+    expect(res.status).toBe(201);
+
+    const payload = tenantDbStubState.messageInsertCalls[0];
+    expect(payload?.date_created).toBeInstanceOf(Date);
+    expect(payload?.date_sent).toBeInstanceOf(Date);
+  });
+
   test("covers media_urls branch, contact lookup error logging, and no-webhook path", async () => {
     mocks.fetch.mockResolvedValueOnce({ ok: true, statusText: "OK", blob: async () => new Blob(["x"]) } as any);
     const number = { workspace: "w1", twilio_data: { sid: "sid", authToken: "tok" }, webhook: [{ events: [{ category: "other" }] }] };

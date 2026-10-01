@@ -1,4 +1,15 @@
 import { csvRow } from "@/lib/csv";
+
+/**
+ * A temporal value as it appears in a CSV cell.
+ *
+ * A `Date` stringifies to "Wed Oct 01 2026 12:00:00 GMT+0000 (Coordinated
+ * Universal Time)", so the export's columns would silently change format.
+ * These cells have always been ISO and must stay that way.
+ */
+function toExportIso(value: Date | null | undefined): string {
+  return value ? value.toISOString() : "";
+}
 import {
   countExportCampaignMessages,
   countExportOutreachAttempts,
@@ -246,7 +257,9 @@ export async function processMessageCampaignExport(
           matchedMessages.push({
             ...message,
             contact: matchingContact,
-            message_date: message.date_sent || message.date_created || new Date().toISOString()
+            // The CSV cell must stay ISO: interpolating a Date yields
+            // "Wed Oct 01 2026 …", which would change the export's output.
+            message_date: toExportIso(message.date_sent ?? message.date_created)
           });
         }
       }
@@ -500,8 +513,8 @@ export async function processCallCampaignExport(
           item.call.sid,
           durationSeconds.toString(),
           item.call.answered_by,
-          item.call.start_time || item.call.date_created || "",
-          item.call.end_time || item.call.date_updated || "",
+          toExportIso(item.call.start_time ?? item.call.date_created),
+          toExportIso(item.call.end_time ?? item.call.date_updated),
           item.contact.id,
           item.contact.firstname,
           item.contact.surname,

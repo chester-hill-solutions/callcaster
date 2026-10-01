@@ -107,7 +107,7 @@ export const sendMessage = async ({
         workspace,
         ...(contact_id && { contact_id }),
         ...(mediaData && mediaData.length > 0 && { outbound_media: [...mediaData] }),
-        ...(schedule && { scheduled_at: schedule.sendAt.toISOString() }),
+        ...(schedule && { scheduled_at: schedule.sendAt }),
       },
     });
   } catch (error) {

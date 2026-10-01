@@ -1,4 +1,4 @@
-import { and, desc, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, gt, isNotNull, isNull, lt } from "drizzle-orm";
 import { call as callTable } from "@/db/schema";
 import { adminDb } from "@/server/admin-db";
 import { logger } from "@/lib/logger.server";
@@ -106,36 +106,14 @@ export async function runRecordingRepairSweep(args?: {
 }): Promise<RepairSweepResult> {
   const limit = args?.limit ?? DEFAULT_REPAIR_LIMIT;
   const now = args?.now ?? new Date();
-  const earliest = new Date(
-    now.getTime() - REPAIR_MIN_AGE_MINUTES * 60_000,
-  ).toISOString();
-  const oldest = new Date(
-    now.getTime() - REPAIR_MAX_AGE_DAYS * 86_400_000,
-  ).toISOString();
+  const earliest = new Date(now.getTime() - REPAIR_MIN_AGE_MINUTES * 60_000);
+  const oldest = new Date(now.getTime() - REPAIR_MAX_AGE_DAYS * 86_400_000);
 
-  // `date_created` is declared `text()` in the Drizzle schema but is
-  // `timestamptz` in the database (verified against a real database:
-  // `pg_typeof(date_created)` -> `timestamp with time zone`). The cast
-  // bridges that mismatch — `lt(column, isoString)` does not typecheck against
-  // a `text()` column.
-  //
-  // It is NOT a guard against Postgres mis-comparing. An uncast ISO literal is
-  // type `unknown`, so Postgres coerces it to match the column and the
-  // comparison is already correct. Only a text COLUMN on the right-hand side
-  // would fail, with no matching operator.
-  //
-  // The real defect worth fixing is upstream, in the schema: `app/db/schema.ts`
-  // misdeclares this column, and its siblings, as `text()`.
-  //
-  // The cast is kept anyway, deliberately: these bounds are raw `sql`, so the
-  // cast is not a type-level necessity here the way it is for the typed
-  // `lt`/`gt` helpers. It is here to state the comparison's type explicitly
-  // and to fail loudly if this column's real type ever changes — a `text`
-  // column compared against an ISO string still "works", but compares
-  // lexicographically, which is the silent wrong answer.
-  const createdAt = () => sql`${callTable.date_created}::timestamptz`;
-  const createdBefore = (iso: string) => sql`${createdAt()} < ${iso}::timestamptz`;
-  const createdAfter = (iso: string) => sql`${createdAt()} > ${iso}::timestamptz`;
+  // These used to be raw `sql` with a `::timestamptz` cast, because
+  // `call.date_created` was declared `text()` and the typed comparators would
+  // not accept it. The column really is `timestamptz`, so the cast was
+  // restating a lie the schema told; it is now the typed comparators, and
+  // `scripts/baselines/schema-type-drift.txt` fails if the column drifts back.
 
   const candidates = await adminDb
     .select({
@@ -150,8 +128,8 @@ export async function runRecordingRepairSweep(args?: {
       and(
         isNotNull(callTable.recording_sid),
         isNull(callTable.audio_url),
-        createdBefore(earliest),
-        createdAfter(oldest),
+        lt(callTable.date_created, earliest),
+        gt(callTable.date_created, oldest),
       ),
     )
     // NEWEST first, deliberately. This set is not homogeneous: a call whose
@@ -165,7 +143,7 @@ export async function runRecordingRepairSweep(args?: {
     // still be in Twilio's window AND the most likely to succeed, so a stuck
     // old row is starved harmlessly. It ages out past `REPAIR_MAX_AGE_DAYS`
     // on its own instead of blocking the queue.
-    .orderBy(desc(createdAt()))
+    .orderBy(desc(callTable.date_created))
     .limit(limit);
 
   let requeued = 0;
@@ -223,8 +201,8 @@ export async function runRecordingRepairSweep(args?: {
     // alone cannot show that. An operator seeing `scanned: 0` needs to
     // distinguish "nothing to repair" from "everything fell outside the
     // window", and the two look identical without these bounds.
-    windowStart: oldest,
-    windowEnd: earliest,
+    windowStart: oldest.toISOString(),
+    windowEnd: earliest.toISOString(),
     maxRows: limit,
   });
   return summary;

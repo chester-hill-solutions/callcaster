@@ -129,15 +129,15 @@ export async function startAutoDialConference(
 
     const savedCall = await insertCallForWorkspace(workspaceId, {
       sid: call.sid,
-      date_updated: call.dateUpdated?.toISOString() ?? null,
+      date_updated: call.dateUpdated ?? null,
       parent_call_sid: call.parentCallSid ?? null,
       account_sid: call.accountSid ?? null,
       from: call.from ?? null,
       to: call.to ?? null,
       phone_number_sid: call.phoneNumberSid ?? null,
       status: call.status ?? null,
-      start_time: call.startTime?.toISOString() ?? null,
-      end_time: call.endTime?.toISOString() ?? null,
+      start_time: call.startTime ?? null,
+      end_time: call.endTime ?? null,
       duration: call.duration ?? null,
       price: call.price ?? null,
       direction: call.direction ?? null,
@@ -169,7 +169,7 @@ export async function startAutoDialConference(
 
       await updateCallBySid(workspaceId, pendingCallSid, {
         status: "failed",
-        date_updated: new Date().toISOString(),
+        date_updated: new Date(),
       });
 
       return { ok: false, status: 500, error: "Unable to persist call state" };
@@ -189,7 +189,7 @@ export async function startAutoDialConference(
   } catch (error) {
     await updateCallBySid(workspaceId, pendingCallSid, {
       status: "failed",
-      date_updated: new Date().toISOString(),
+      date_updated: new Date(),
     });
 
     logger.error("Error starting conference:", error);

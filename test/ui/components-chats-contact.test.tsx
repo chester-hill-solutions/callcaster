@@ -6,7 +6,7 @@ import { makeContact, DataSmokeRouter, SmokeRouter } from "./_helpers/component-
 vi.mock("@/hooks/chats/useChatThread", () => ({
   useChatThread: () => ({
     contact_number: "+1555",
-    messages: [{ sid: "1", body: "Hi", date_created: new Date().toISOString(), direction: "inbound" }],
+    messages: [{ sid: "1", body: "Hi", date_created: new Date(), direction: "inbound" }],
     messagesEndRef: createRef(),
     scrollContainerRef: createRef(),
     loadMoreSentinelRef: vi.fn(),
@@ -81,7 +81,7 @@ describe("app/components/sms-ui/ChatMessages.tsx", () => {
             status: "failed",
             direction: "outbound",
             body: "hello",
-            date_created: new Date().toISOString(),
+            date_created: new Date(),
             error_message: "Landline or unreachable carrier",
           },
           {
@@ -89,7 +89,7 @@ describe("app/components/sms-ui/ChatMessages.tsx", () => {
             status: "delivered",
             direction: "outbound",
             body: "world",
-            date_created: new Date().toISOString(),
+            date_created: new Date(),
           },
         ]}
         messagesEndRef={createRef()}
@@ -127,7 +127,7 @@ describe("app/components/sms-ui/ChatMessages.tsx", () => {
             status: "failed",
             direction: "inbound",
             body: "failed one",
-            date_created: new Date().toISOString(),
+            date_created: new Date(),
           },
         ]}
         messagesEndRef={createRef()}

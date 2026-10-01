@@ -6,10 +6,6 @@ audience.created_at: text -> timestamp with time zone
 audience.processed_at: text -> timestamp with time zone
 audience_upload.created_at: text -> timestamp with time zone
 audience_upload.processed_at: text -> timestamp with time zone
-call.date_created: text -> timestamp with time zone
-call.date_updated: text -> timestamp with time zone
-call.end_time: text -> timestamp with time zone
-call.start_time: text -> timestamp with time zone
 campaign.created_at: text -> timestamp with time zone
 campaign.end_date: text -> timestamp with time zone
 campaign.start_date: text -> timestamp with time zone
@@ -33,10 +29,6 @@ inbound_queue_entry.created_at: text -> timestamp with time zone
 inbound_queue_entry.offered_at: text -> timestamp with time zone
 inbound_queue_entry.updated_at: text -> timestamp with time zone
 inbound_queue_member.created_at: text -> timestamp with time zone
-message.date_created: text -> timestamp with time zone
-message.date_sent: text -> timestamp with time zone
-message.date_updated: text -> timestamp with time zone
-message.scheduled_at: text -> timestamp with time zone
 outreach_attempt.answered_at: text -> timestamp with time zone
 outreach_attempt.created_at: text -> timestamp with time zone
 outreach_attempt.ended_at: text -> timestamp with time zone

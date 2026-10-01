@@ -206,7 +206,7 @@ const handleParticipantLeave = async (
       throw new Error("Call not found for participant leave");
     }
     const dbCall = await updateCall(callSid, existingCall.workspace, {
-      end_time: new Date(timestamp).toISOString(),
+      end_time: new Date(timestamp),
       duration: String(event.durationSeconds ?? 0),
       status: event.callStatus.toLowerCase() as Tables<"call">["status"],
     });
@@ -248,9 +248,7 @@ const handleParticipantJoin = async (
         // the conference NAME. Reading the user id back out of it is
         // `resolveUserIdFromConferenceName`'s job, at the point of use.
         conference_id: requireValue(event.conferenceRef, "ConferenceSid"),
-        start_time: new Date(
-          requireValue(event.timestamp, "Timestamp"),
-        ).toISOString(),
+        start_time: new Date(requireValue(event.timestamp, "Timestamp")),
       });
     }
     if (dbCall.outreach_attempt_id) {

@@ -77,8 +77,8 @@ export async function inboundSmsRateVerdict(
     return { allowed: true };
   }
   const now = args.now ?? new Date();
-  const burstSinceIso = new Date(now.getTime() - INBOUND_SMS_BURST_WINDOW_MS).toISOString();
-  const hourSinceIso = new Date(now.getTime() - INBOUND_SMS_HOUR_WINDOW_MS).toISOString();
+  const burstSince = new Date(now.getTime() - INBOUND_SMS_BURST_WINDOW_MS);
+  const hourSince = new Date(now.getTime() - INBOUND_SMS_HOUR_WINDOW_MS);
   const variants = expandPhoneMatchVariants(trimmed);
 
   const baseWhere = and(
@@ -88,14 +88,14 @@ export async function inboundSmsRateVerdict(
   );
 
   const burst = await tdb.message.count({
-    where: and(baseWhere, gt(messageTable.date_created, burstSinceIso)),
+    where: and(baseWhere, gt(messageTable.date_created, burstSince)),
   });
   if (burst >= INBOUND_SMS_BURST_MAX) {
     return { allowed: false, window: "burst", count: burst, limit: INBOUND_SMS_BURST_MAX };
   }
 
   const hour = await tdb.message.count({
-    where: and(baseWhere, gt(messageTable.date_created, hourSinceIso)),
+    where: and(baseWhere, gt(messageTable.date_created, hourSince)),
   });
   if (hour >= INBOUND_SMS_HOUR_MAX) {
     return { allowed: false, window: "hour", count: hour, limit: INBOUND_SMS_HOUR_MAX };

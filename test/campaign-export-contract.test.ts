@@ -160,8 +160,8 @@ const messageRow = {
   to: "+15555550102",
   direction: "outbound-api",
   status: "delivered",
-  date_created: "2026-01-01T00:00:00.000Z",
-  date_sent: "2026-01-01T00:00:00.000Z",
+  date_created: new Date("2026-01-01T00:00:00.000Z"),
+  date_sent: new Date("2026-01-01T00:00:00.000Z"),
   workspace: "w1",
 };
 

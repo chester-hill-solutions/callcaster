@@ -92,8 +92,8 @@ export function parseCallDurationSeconds(
 }
 
 export function secondsBetween(
-  start: string | null | undefined,
-  end: string | null | undefined,
+  start: string | Date | null | undefined,
+  end: string | Date | null | undefined,
 ): number {
   if (!start || !end) return 0;
   const startMs = new Date(start).getTime();
@@ -115,7 +115,12 @@ export type AnalyticsAttemptInput = {
     duration: string | null;
     call_duration: number | null;
     status: string | null;
-    end_time: string | null;
+    /**
+     * `string | Date`, because `call.end_time` arrives as a `Date` from a
+     * Drizzle row and as a string from a payload that crossed JSON. Order it
+     * with `toMillis`, never with a bare comparator — see `endedAt` below.
+     */
+    end_time: string | Date | null;
   }> | null;
 };
 
@@ -151,14 +156,18 @@ export function aggregateAttemptMetrics(attempt: AnalyticsAttemptInput): {
   );
 
   const answeredAt = attempt.answered_at;
-  const endedAt =
-    attempt.ended_at ??
-    calls
-      .map((call) => call.end_time)
-      .filter((value): value is string => Boolean(value))
-      .sort()
-      .at(-1) ??
-    null;
+  // Latest end time across the attempt's calls. Sorted numerically, not with a
+  // bare comparator: `Array.sort()` stringifies, and a Date stringifies to
+  // "Wed Oct 01 2026 12:00:00 GMT+0000 (…)", whose lexicographic order is not
+  // chronological. An ISO string would survive that; a Date would not.
+  const latestCallEnd = calls.reduce<Date | string | null>((latest, call) => {
+    if (!call.end_time) return latest;
+    if (!latest) return call.end_time;
+    return new Date(call.end_time).getTime() > new Date(latest).getTime()
+      ? call.end_time
+      : latest;
+  }, null);
+  const endedAt = attempt.ended_at ?? latestCallEnd;
 
   const dialingSeconds = answeredAt
     ? secondsBetween(attempt.created_at, answeredAt)

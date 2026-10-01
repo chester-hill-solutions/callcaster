@@ -220,15 +220,15 @@ export const action = defineAction({
 
         const callSaved = await saveCallToDatabase(workspace_id, {
             sid: call.sid,
-            date_updated: call.dateUpdated?.toISOString() ?? new Date().toISOString(),
+            date_updated: call.dateUpdated ?? new Date(),
             parent_call_sid: call.parentCallSid ?? null,
             account_sid: call.accountSid ?? null,
             to: to_number,
             from: call.from ?? null,
             phone_number_sid: call.phoneNumberSid ?? null,
             status: call.status ?? null,
-            start_time: call.startTime?.toISOString() ?? null,
-            end_time: call.endTime?.toISOString() ?? null,
+            start_time: call.startTime ?? null,
+            end_time: call.endTime ?? null,
             duration: call.duration != null ? String(call.duration) : null,
             price: call.price ?? null,
             direction: call.direction ?? null,
