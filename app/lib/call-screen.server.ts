@@ -135,7 +135,7 @@ export async function getQueueByDialType(
     campaignId: parseInt(campaignId, 10),
     limit: 200,
   });
-  const queueItems = rows as unknown as QueueItem[];
+  const queueItems: QueueItem[] = rows;
 
   if (dialType === "predictive") {
     return queueItems.filter((item) => isQueued(item)).slice(0, 50);
