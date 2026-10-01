@@ -74,44 +74,53 @@ describe("QueueEntry transition table", () => {
   });
 
   test("column sets match the transition table exactly", () => {
+    // `queued` additionally clears `claimed_at`, the in-flight marker from
+    // #2208: a requeued row is back in the pool and held by nobody, so a
+    // marker left on it would make `claimIsLive` hold it out of every split
+    // for a whole lease.
+    //
+    // `dequeued` and `assigned` deliberately do NOT. Every reader of
+    // `claimed_at` already guards on `dequeued_at is null`, so a marker on a
+    // dequeued row is unreachable and clearing it there would mean rewriting
+    // two hot production functions for nothing; and the manual-dial claim path
+    // sets `claimed_at` together with `assigned_to_user_id`, so nulling the
+    // marker on a later assign would erase a live claim.
+    const claimClearing = [
+      "assigned_to_user_id",
+      "claimed_at",
+      "dequeued_at",
+      "dequeued_by",
+      "dequeued_reason",
+      "provider_status",
+      "queue_state",
+    ].sort();
+    const withoutClaim = [
+      "assigned_to_user_id",
+      "dequeued_at",
+      "dequeued_by",
+      "dequeued_reason",
+      "provider_status",
+      "queue_state",
+    ].sort();
+
     expect(QUEUE_ENTRY_TRANSITIONS.queued.columns.slice().sort()).toEqual(
-      [
-        "assigned_to_user_id",
-        "dequeued_at",
-        "dequeued_by",
-        "dequeued_reason",
-        "provider_status",
-        "queue_state",
-      ].sort(),
+      claimClearing,
     );
     expect(QUEUE_ENTRY_TRANSITIONS.assigned.columns.slice().sort()).toEqual(
-      [
-        "assigned_to_user_id",
-        "dequeued_at",
-        "dequeued_by",
-        "dequeued_reason",
-        "provider_status",
-        "queue_state",
-      ].sort(),
+      withoutClaim,
     );
     expect(QUEUE_ENTRY_TRANSITIONS.provider_status.columns.slice().sort()).toEqual(
       ["provider_status", "queue_state"].sort(),
     );
     expect(QUEUE_ENTRY_TRANSITIONS.dequeued.columns.slice().sort()).toEqual(
-      [
-        "assigned_to_user_id",
-        "dequeued_at",
-        "dequeued_by",
-        "dequeued_reason",
-        "provider_status",
-        "queue_state",
-      ].sort(),
+      withoutClaim,
     );
   });
 
   test("buildQueuedQueueUpdate writes exactly the queued transition's columns", () => {
     expect(buildQueuedQueueUpdate()).toEqual({
       assigned_to_user_id: null,
+      claimed_at: null,
       dequeued_at: null,
       dequeued_by: null,
       dequeued_reason: null,

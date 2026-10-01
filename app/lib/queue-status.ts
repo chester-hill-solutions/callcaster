@@ -273,7 +273,8 @@ export type QueueEntryColumn =
   | "provider_status"
   | "dequeued_at"
   | "dequeued_by"
-  | "dequeued_reason";
+  | "dequeued_reason"
+  | "claimed_at";
 
 /**
  * Named QueueEntry transitions. `provider_status` is not a distinct
@@ -323,6 +324,38 @@ const QUEUE_ENTRY_FAILED_COLUMN_SET: readonly QueueEntryColumn[] = [
   "queue_state",
 ];
 
+/**
+ * Requeue clears the in-flight claim marker (#2208). A requeued row is back in
+ * the pool and held by nobody — the same argument the `assigned_to_user_id =
+ * NULL` in that branch already makes — so a marker left on it would be a lie,
+ * and `claimIsLive` would hold it out of every split for a whole lease.
+ *
+ * `dequeued` deliberately does NOT clear it, and that is a decision, not an
+ * oversight. Every existing reader of `claimed_at`
+ * (`campaign_queue_has_pending_work`, `reset_stale_campaign_queue_claims`,
+ * and the split, which reads only `onlyQueued` rows) already guards on
+ * `dequeued_at is null`, so a marker on a dequeued row is unreachable — and
+ * the requeue transition above is the single place a row becomes visible again,
+ * so it is the single place that has to clear it. Adding it to `dequeued` would
+ * have meant rewriting two hot production functions (`dequeue_contact` with its
+ * household fan-out and #1260 race guard, and `dequeue_household`) to null a
+ * column nobody can read on those rows.
+ *
+ * `assigned` also does not clear it: the manual-dial claim path
+ * (`select_and_update_campaign_contacts`) sets `claimed_at` and
+ * `assigned_to_user_id` in one UPDATE, so nulling the marker on a later assign
+ * would erase a live claim.
+ */
+const QUEUE_ENTRY_CLAIM_CLEARING_COLUMN_SET: readonly QueueEntryColumn[] = [
+  "assigned_to_user_id",
+  "claimed_at",
+  "dequeued_at",
+  "dequeued_by",
+  "dequeued_reason",
+  "provider_status",
+  "queue_state",
+];
+
 export const QUEUE_ENTRY_TRANSITIONS: Record<
   QueueEntryTransitionName,
   QueueEntryTransitionDef
@@ -330,7 +363,7 @@ export const QUEUE_ENTRY_TRANSITIONS: Record<
   queued: {
     queueState: QUEUE_STATUS_QUEUED,
     legalFrom: "any",
-    columns: QUEUE_ENTRY_FULL_COLUMN_SET,
+    columns: QUEUE_ENTRY_CLAIM_CLEARING_COLUMN_SET,
   },
   assigned: {
     queueState: QUEUE_LIFECYCLE_ASSIGNED,
@@ -440,6 +473,13 @@ export function buildDequeuedQueueUpdate(
     dequeued_at: new Date(),
     dequeued_by: dequeuedBy,
     dequeued_reason: dequeuedReason,
+    // A dequeued row is never in flight, so the claim marker must go with it.
+    // Clearing it here rather than at each dequeue call site is deliberate:
+    // this builder is the single funnel for every dequeue path (SMS, manual
+    // dial, API, workspace), so a marker left behind anywhere is impossible.
+    // #2208 — a claim left set would make the next split hold the row back
+    // forever instead of moving it.
+    claimed_at: null,
   });
 }
 

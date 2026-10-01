@@ -147,7 +147,7 @@ describe("seeded drift is caught", () => {
         `create or replace function public.drifted_column() returns void language plpgsql as $$
          begin
            update campaign_queue set queue_state = 'dequeued', assigned_to_user_id = null,
-             provider_status = null, dequeued_at = now(), dequeued_by = null,
+             provider_status = null, claimed_at = null, dequeued_at = now(), dequeued_by = null,
              dequeued_reason = 'x', invented_column = 42 where id = 1;
          end; $$;`,
       ),
@@ -208,7 +208,7 @@ describe("seeded drift is caught", () => {
         `create or replace function public.full_dequeue() returns void language plpgsql as $$
          begin
            update campaign_queue set queue_state = 'dequeued', assigned_to_user_id = null,
-             provider_status = null, dequeued_at = now(), dequeued_by = v_user,
+             provider_status = null, claimed_at = null, dequeued_at = now(), dequeued_by = v_user,
              dequeued_reason = 'done' where id = 1;
          end; $$;`,
       ),
@@ -283,11 +283,14 @@ describe("the real migration lineage", () => {
   });
 
   test("resolves the LATEST definition, not a superseded one", () => {
-    // handle_campaign_queue_entry is defined three times across the lineage
-    // (baseline, 20260716120000, 20260814120000). Checking a superseded body
-    // would report drift repaired months ago.
+    // handle_campaign_queue_entry is defined several times across the lineage
+    // (baseline, 20260716120000, 20260814120000, and 20260930150000, which
+    // added `claimed_at = null` for #2208). Checking a superseded body would
+    // report drift that was repaired by a later migration.
     const enqueue = rpcs.find((r) => r.name === "handle_campaign_queue_entry");
-    expect(enqueue!.file).toBe("client/migrations/20260814120000_requeue_clears_assigned_user.sql");
+    expect(enqueue!.file).toBe(
+      "client/migrations/20260930150000_dequeue_paths_clear_inflight_claim.sql",
+    );
   });
 
   test("no queue RPC still references the dropped `status` column", () => {
