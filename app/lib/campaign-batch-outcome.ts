@@ -1,9 +1,18 @@
 /**
- * What one campaign SMS batch did, as the two adapters see it.
+ * What one campaign batch did, as the two adapters see it.
  *
- * These types live apart from the dispatch loop so the pre-dispatch gates can
- * build an outcome without importing the loop that calls them. Types only: no
- * runtime, no imports, so this module cannot participate in a cycle.
+ * These types live in their own module for a structural reason, not a tidiness
+ * one. `campaign-sms-dispatch.server.ts` calls `resolvePreDispatchGate`, and
+ * the gate has to return an outcome — so if the outcome type lived in the
+ * dispatch loop, the gate would import the module that imports it. Types only,
+ * no runtime and no imports, so nothing here can close that loop.
+ *
+ * The asymmetry is deliberate and worth leaving alone: the SMS outcome lives
+ * here because the gate builds one, while `campaign-ivr-dispatch.server.ts`
+ * declares its own next to the code that produces it. IVR's outcome differs —
+ * no per-contact `responses`, optional `progress` — and merging the two would
+ * mean hiding that behind type parameters. What genuinely is shared is
+ * `CampaignDeferralCause`, which all three files reference.
  */
 
 export type ContactDispatchResult = Record<

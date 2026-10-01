@@ -10,6 +10,14 @@ import {
  * mid-send" and "this row is held back from every future split". Both failure
  * directions are pinned: a live claim must read as live, and an expired one
  * must read as dead or the marker becomes a permanent block.
+ *
+ * Every case passes a `Date`, because that is what the column hands back:
+ * `claimed_at` is a real `timestamptz` and the model says so (#2213). This file
+ * used to hold six tests, four of which existed to cover a `string` arm in the
+ * signature — an unparseable-timestamp guard, a Postgres-formatted-timestamp
+ * parse, and two ISO-string claims. None of them described anything the driver
+ * can return any more, and the guard they propped up made the predicate look
+ * like it handled two timestamp formats when it handles one.
  */
 describe("claimIsLive (#2208)", () => {
   const now = Date.parse("2026-09-30T12:00:00.000Z");
@@ -17,51 +25,22 @@ describe("claimIsLive (#2208)", () => {
   test("no claim is not live", () => {
     expect(claimIsLive(null, now)).toBe(false);
     expect(claimIsLive(undefined, now)).toBe(false);
-    expect(claimIsLive("", now)).toBe(false);
   });
 
   test("a claim taken seconds ago is live", () => {
-    const claimedAt = new Date(now - 5_000).toISOString();
+    const claimedAt = new Date(now - 5_000);
     expect(claimIsLive(claimedAt, now)).toBe(true);
   });
 
   test("a claim older than the lease is not live", () => {
-    const claimedAt = new Date(now - SMS_CLAIM_LEASE_MS - 1_000).toISOString();
+    const claimedAt = new Date(now - SMS_CLAIM_LEASE_MS - 1_000);
     expect(claimIsLive(claimedAt, now)).toBe(false);
   });
 
   test("a claim exactly at the lease boundary is not live", () => {
     // Boundary pinned deliberately: at the boundary another dispatcher may
     // take the row, so the predicate must already say no.
-    const claimedAt = new Date(now - SMS_CLAIM_LEASE_MS).toISOString();
+    const claimedAt = new Date(now - SMS_CLAIM_LEASE_MS);
     expect(claimIsLive(claimedAt, now)).toBe(false);
-  });
-
-  // An unparseable timestamp must not read as "live forever". If it did, one
-  // corrupt row would be excluded from every future split with no way to clear
-  // it short of a manual UPDATE.
-  test("an unparseable claim is not live", () => {
-    expect(claimIsLive("not-a-timestamp", now)).toBe(false);
-    expect(claimIsLive("2026-13-45T99:99:99Z", now)).toBe(false);
-  });
-
-  // `claimed_at` is `text()` in the Drizzle schema but `timestamptz` in the
-  // database (#2213), so the driver hands back a Date. A string-only signature
-  // gets `Date.parse(Date)` === NaN, reads every claim as expired, and the
-  // whole guard becomes decorative. This case is the reason the signature is
-  // `string | Date`, and it was added because the integration test caught the
-  // guard silently doing nothing.
-  // The shape `claimed_at` ACTUALLY has: the schema declares `text()` while the
-  // column is `timestamptz` (#2213), and they disagree at the driver boundary,
-  // so the value arrives as a Postgres-formatted timestamp rather than
-  // ISO-8601. If `Date.parse` ever stops accepting that, this is the test that
-  // says so — instead of the guard silently reading every claim as expired,
-  // which is the failure mode an earlier revision of this file actually had.
-  test("a Postgres-formatted timestamp parses — the shape the driver returns", () => {
-    const postgresFormat = "2026-09-30 14:10:47.898535+00";
-    expect(Number.isNaN(Date.parse(postgresFormat))).toBe(false);
-    expect(claimIsLive(postgresFormat, Date.parse(postgresFormat) + 5_000)).toBe(
-      true,
-    );
   });
 });

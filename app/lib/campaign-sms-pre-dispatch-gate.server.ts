@@ -3,7 +3,11 @@ import {
   nextDispatchOpenAt,
   type DispatchPolicy,
 } from "@/lib/campaign-dispatch-policy";
-import type { CampaignSmsBatchOutcome, CampaignSmsDispatchCounts } from "@/lib/campaign-batch-outcome";
+import type {
+  CampaignDeferralCause,
+  CampaignSmsBatchOutcome,
+  CampaignSmsDispatchCounts,
+} from "@/lib/campaign-batch-outcome";
 import { messageCampaignRequiresCallerId } from "@/lib/sms-send-resolve";
 import {
   assertWorkspaceCanSendSms,
@@ -14,7 +18,7 @@ import type { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
 /** The campaign row the gates below read. */
 type CampaignRow = Awaited<ReturnType<typeof loadCampaignSmsDispatchData>>["campaign"];
 
-export type PreDispatchGateInput = {
+type PreDispatchGateInput = {
   workspaceId: string;
   campaign: CampaignRow;
   /** The request's own caller id, if it supplied one. */
@@ -61,9 +65,7 @@ function noWorkCounts(): CampaignSmsDispatchCounts {
  * cause and its payload differ, so only those are passed in.
  */
 function deferredBeforeAnyRow(
-  cause:
-    | { because: "send_window"; nextOpenAt: Date }
-    | { because: "workspace_not_ready"; reasons: string[] },
+  cause: CampaignDeferralCause,
   queuedRemaining: number,
 ): CampaignSmsBatchOutcome {
   return {
