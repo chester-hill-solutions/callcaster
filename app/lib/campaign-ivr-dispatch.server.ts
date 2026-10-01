@@ -45,7 +45,12 @@ import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { insertCallForWorkspace, hasDuplicateCampaignCall } from "@/lib/telephony-db.server";
 import { logger } from "@/lib/logger.server";
-import { selectEligibleCampaignQueueMembers } from "@/lib/campaign-dispatch-queue.server";
+import {
+  createPhoneClaim,
+  selectEligibleCampaignQueueMembers,
+  sweepExhaustedQueueContacts,
+  type PhoneClaim,
+} from "@/lib/campaign-dispatch-queue.server";
 import {
   isDispatchAllowedAt,
   ivrCallingPolicy,
@@ -197,11 +202,7 @@ export async function dispatchCampaignIvrBatch(args: {
     ),
   );
 
-  // Dead-letter rows that failed for the last time so one bad number cannot
-  // pin the chain to retries forever (#1513); see the SMS twin for the clamp.
-  if (counts.failed > 0) {
-    counts.exhausted = await rpcFailExhaustedCampaignQueueContacts(tdb, Number(campaignId));
-  }
+  counts.exhausted = await sweepExhaustedQueueContacts(tdb, campaignId, counts.failed);
 
   const queuedRemaining = remainingIvrQueue(queueSelection, counts);
   if (state.deferredAt) {
@@ -340,7 +341,7 @@ async function reserveIvrPhone(
     return { claimed: false };
   }
 
-  const claim = createIvrPhoneClaim();
+  const claim = createPhoneClaim<IvrPhoneClaimResult>();
   context.claimedNumbers.set(phone, claim);
   return { claimed: true, claim };
 }
@@ -479,18 +480,7 @@ type IvrPhoneClaimResult =
   | "duplicate"
   | "provider_attempted";
 
-type IvrPhoneClaim = {
-  result: Promise<IvrPhoneClaimResult>;
-  resolve: (result: IvrPhoneClaimResult) => void;
-};
-
-function createIvrPhoneClaim(): IvrPhoneClaim {
-  let resolve!: (result: IvrPhoneClaimResult) => void;
-  const result = new Promise<IvrPhoneClaimResult>((resolveResult) => {
-    resolve = resolveResult;
-  });
-  return { result, resolve };
-}
+type IvrPhoneClaim = PhoneClaim<IvrPhoneClaimResult>;
 
 class CampaignCallingWindowClosedError extends Error {
   constructor() {

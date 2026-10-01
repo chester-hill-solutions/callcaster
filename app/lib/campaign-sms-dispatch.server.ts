@@ -44,7 +44,12 @@ import {
   type StartPacer,
 } from "@/lib/campaign-sms-dispatch-primitives.server";
 import { logger } from "@/lib/logger.server";
-import { selectEligibleCampaignQueueMembers } from "@/lib/campaign-dispatch-queue.server";
+import {
+  createPhoneClaim,
+  selectEligibleCampaignQueueMembers,
+  sweepExhaustedQueueContacts,
+  type PhoneClaim,
+} from "@/lib/campaign-dispatch-queue.server";
 import type { TwilioMessageIntent } from "@/lib/types";
 import {
   sendSingleCampaignSms,
@@ -216,12 +221,11 @@ export async function dispatchCampaignSmsBatch(args: {
     startPacer,
     responses,
   });
-  if (counts.failed > 0) {
-    counts.exhausted = await rpcFailExhaustedCampaignQueueContacts(
-      createTenantDb(workspaceId),
-      Number(campaignId),
-    );
-  }
+  counts.exhausted = await sweepExhaustedQueueContacts(
+    createTenantDb(workspaceId),
+    campaignId,
+    counts.failed,
+  );
   const queuedRemaining = Math.max(
     0,
     queueSelection.unselectedEligibleCount +
@@ -371,18 +375,7 @@ type SmsPhoneClaimResult =
   | { kind: "unaffordable" }
   | { kind: "deferred_send_window"; nextOpenAt: Date };
 
-type SmsPhoneClaim = {
-  result: Promise<SmsPhoneClaimResult>;
-  resolve: (result: SmsPhoneClaimResult) => void;
-};
-
-function createSmsPhoneClaim(): SmsPhoneClaim {
-  let resolve!: (result: SmsPhoneClaimResult) => void;
-  const result = new Promise<SmsPhoneClaimResult>((resolveResult) => {
-    resolve = resolveResult;
-  });
-  return { result, resolve };
-}
+type SmsPhoneClaim = PhoneClaim<SmsPhoneClaimResult>;
 
 function memberResponse(response: ContactDispatchResult): HandleMemberResult {
   return { response };
@@ -526,7 +519,7 @@ async function handleMemberInner(
         },
       });
     }
-    phoneClaim = createSmsPhoneClaim();
+    phoneClaim = createPhoneClaim<SmsPhoneClaimResult>();
     claimedNumbers.set(normalizedPhone, phoneClaim);
   }
 
