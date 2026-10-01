@@ -13,6 +13,7 @@ export {
   voiceCreditsFromDurationSeconds,
   startedMinutesFromDurationSeconds,
   debitAmountFromCredits,
+  wholeCreditDebit,
   TERMINAL_BILLABLE_CALL_STATUSES,
   TERMINAL_BILLABLE_SMS_STATUSES,
   estimateMessageCredits,

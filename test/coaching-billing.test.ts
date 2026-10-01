@@ -122,13 +122,40 @@ describe("coaching-billing", () => {
     expect(new Set(keys).size).toBe(2);
   });
 
-  test("cue debit is negative", async () => {
+  /**
+   * The old assertion here was `expect(amount).toBeLessThan(0)`, which `-0.1`
+   * satisfies. That is why #2101 survived: the test checked the sign, and the
+   * defect was the fraction. Credits are `integer` end to end, so `-0.1` dies at
+   * the ledger RPC with `invalid input syntax for type integer` and every cue
+   * went unbilled with the error swallowed.
+   *
+   * Asserting the exact value makes the quantisation visible, so a future change
+   * to the rate has to be a deliberate edit here rather than a silent one.
+   */
+  test("cue debit is a whole negative credit", async () => {
     const { billCoachingCue } = await import("../services/media-stream/coaching-billing");
     await billCoachingCue({ workspaceId: "ws-1", callSid: "CA123", eventId: "evt-1" });
 
     const args = ledgerMocks.insertTransactionHistoryIdempotent.mock.calls[0]?.[1] as {
       amount: number;
     };
-    expect(args.amount).toBeLessThan(0);
+    expect(Number.isInteger(args.amount)).toBe(true);
+    expect(args.amount).toBe(-1);
+  });
+
+  test("a fractional rate reaching a debit helper is a build failure", async () => {
+    // The guard is scripts/check-credit-write-paths.mjs, which is in ci:local.
+    // This asserts the helper itself refuses to emit a fraction, so the invariant
+    // holds even if a future caller bypasses the lint rule.
+    const { wholeCreditDebit } = await import("../shared/pricing");
+    expect(wholeCreditDebit(0.1)).toBe(-1);
+    expect(wholeCreditDebit(0.4)).toBe(-1);
+    expect(wholeCreditDebit(0.6)).toBe(-1);
+    expect(Number.isInteger(wholeCreditDebit(0.1))).toBe(true);
+    // Never a zero debit: Math.round(0.1) is 0, and a zero row moves no credits
+    // while looking like a success.
+    expect(wholeCreditDebit(0.1)).not.toBe(0);
+    expect(wholeCreditDebit(2.4)).toBe(-2);
+    expect(wholeCreditDebit(-0.1)).toBe(-1);
   });
 });

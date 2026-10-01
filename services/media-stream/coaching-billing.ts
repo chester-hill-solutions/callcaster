@@ -18,7 +18,7 @@
  * this ever needs to run out-of-process from the app, the seam to cut is here
  * and in `db-writer.ts` — the rest of the engine is already effect-free.
  */
-import { debitAmountFromCredits } from "@/lib/pricing";
+import { wholeCreditDebit } from "@/lib/pricing";
 import { insertTransactionHistoryIdempotent } from "@/lib/transaction-history.server";
 import { db } from "@/server/db";
 import {
@@ -30,7 +30,13 @@ import {
   TRANSCRIPTION_RATE_CREDITS,
 } from "../../shared/billing-rates";
 
-/** Charge for one LLM-generated coaching cue, keyed by its persisted row id. */
+/**
+ * Charge for one LLM-generated coaching cue, keyed by its persisted row id.
+ *
+ * `wholeCreditDebit`, not `debitAmountFromCredits`: credits are `integer` end to
+ * end, so the raw 0.1 rate throws `invalid input syntax for type integer` at the
+ * ledger RPC and every cue went unbilled (#2101). The cue bills as 1 credit.
+ */
 export async function billCoachingCue(args: {
   workspaceId: string;
   callSid: string;
@@ -39,7 +45,7 @@ export async function billCoachingCue(args: {
   await insertTransactionHistoryIdempotent(db, {
     workspaceId: args.workspaceId,
     type: "DEBIT",
-    amount: debitAmountFromCredits(COACHING_CUE_CREDITS),
+    amount: wholeCreditDebit(COACHING_CUE_CREDITS),
     note: `Coaching cue ${args.callSid}`,
     idempotencyKey: coachingCueKey(args.callSid, args.eventId),
     callSid: args.callSid,
@@ -76,7 +82,12 @@ export async function billLiveTranscription(args: {
   await insertTransactionHistoryIdempotent(db, {
     workspaceId: args.workspaceId,
     type: "DEBIT",
-    amount: debitAmountFromCredits(credits),
+    // `wholeCreditDebit` rather than `debitAmountFromCredits`: `credits` is
+    // already whole here only because `liveTranscriptionCredits` applies
+    // `Math.ceil`. Putting the invariant at the write means removing that ceil
+    // cannot reintroduce #2101 -- the integer guarantee belongs next to the
+    // integer column, not one function upstream of it.
+    amount: wholeCreditDebit(credits),
     note: `Live transcription ${args.callSid}`,
     idempotencyKey: liveTranscriptionKey(args.callSid),
     callSid: args.callSid,
