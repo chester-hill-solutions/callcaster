@@ -25,6 +25,7 @@ import {
   isSmsIncapableRecipient,
 } from "@/lib/chat-sms-guards.server";
 import { defineAction } from "@/lib/handler.server";
+import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 
 export const action = defineAction({
   auth: async ({ request }) => {
@@ -41,6 +42,11 @@ export const action = defineAction({
   },
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth: authResult }) => {
+  // Bucket is the API key id, not the IP (#2135). Before the body is
+  // read, so an over-limit caller never gets to buffer it.
+  const rateLimited = await apiWriteRateLimitResponse(authResult, "api-chat-sms");
+  if (rateLimited) return rateLimited;
+
   const parsed = await parseJsonBodyOrResponse(request, chatSmsBodySchema);
   if (parsed instanceof Response) {
     return parsed;

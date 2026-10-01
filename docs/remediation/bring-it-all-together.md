@@ -55,8 +55,9 @@ These issues span multiple slices and must be fixed at the architecture/tooling 
 ### 9. Rate Limiting Is Not Production-Ready
 
 - **Where:** auth, integrator, API-key, SMS, webhook test.
-- **Problem:** In-memory `Map` per process; no limits on integrator or API-key routes; `X-Forwarded-For` trusted.
+- **Problem:** In-memory `Map` per process; `X-Forwarded-For` trusted on public routes.
 - **Remediation:** Redis-backed in production, in-memory fallback locally. Key by API key ID for integrator routes, IP for public routes, user ID for authenticated HTML. Provision Redis in Railway.
+- **Done (#2135):** per-key buckets on the three key-reachable write endpoints — `POST /api/sms`, `POST /api/chat_sms`, `POST /api/campaigns/create-with-script` — in `app/lib/api-write-rate-limit.server.ts`. The bucket is the API key's row id (user id for session callers), never `X-Forwarded-For`, and each route's ceiling and its reasoning are recorded next to it. Still outstanding: Redis (the production backend is the same in-process store), the webhook-test route, and the HTML routes.
 
 ### 10. Survey, Media, and Public Forms Lack Abuse Controls
 

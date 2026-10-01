@@ -7,6 +7,7 @@ import { requireWorkspaceAccess } from "@/lib/database/workspace.server";
 import type { TwilioMessageIntent } from "@/lib/types";
 import { parseOptionalString } from "@/lib/parse-utils.server";
 import { defineAction } from "@/lib/handler.server";
+import { apiWriteRateLimitResponse } from "@/lib/api-write-rate-limit.server";
 import { dispatchCampaignSmsBatch } from "@/lib/campaign-sms-dispatch.server";
 
 /**
@@ -27,6 +28,11 @@ export const action = defineAction({
   },
   sideEffects: ["db-write", "twilio"],
   handler: async ({ request, auth: authResult }) => {
+
+  // Bucket is the API key id, not the IP (#2135): a leaked key is the case an
+  // IP bucket does not stop. Before the body is read and before any dispatch.
+  const rateLimited = await apiWriteRateLimitResponse(authResult, "api-sms");
+  if (rateLimited) return rateLimited;
 
   try {
     const parsed = await parseJsonBodyOrResponse(
