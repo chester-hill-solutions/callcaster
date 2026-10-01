@@ -5,8 +5,8 @@
     "percentage": 1.21
   },
   "fine": {
-    "clones": 2316,
-    "duplicatedLines": 16037,
-    "percentage": 10.4
+    "clones": 380,
+    "duplicatedLines": 3451,
+    "percentage": 2.24
   }
 }
