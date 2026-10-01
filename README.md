@@ -5,8 +5,8 @@ CallCaster is a contact-center platform for calling and SMS campaigns: campaign 
 ## Quickstart
 
 Prerequisites: **Node 22.x** (the repo pins it and CI uses it; other majors
-produce test failures that don't reproduce in CI), **Bun >= 1.2.15**, **Docker**,
-and **psql**.
+produce test failures that don't reproduce in CI), **Bun >= 1.2.15**, and
+**Docker**.
 
 ```bash
 npm install
