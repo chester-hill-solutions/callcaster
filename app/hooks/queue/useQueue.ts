@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import type { Tables } from "@/lib/db-types";
 import { sortQueue, createHouseholdMap } from "@/lib/utils";
-import { Contact, QueueItem, User } from "@/lib/types";
+import { QueueItem, User } from "@/lib/types";
 import { logger } from "@/lib/logger.client";
 import {
   getAssignedUserId,
@@ -32,7 +32,7 @@ type QueueUpdatePlan = {
  */
 function planPredictiveRow(
   currentQueue: QueueItem[],
-  newQueueItem: Tables<"campaign_queue"> & { contact: Contact },
+  newQueueItem: QueueItem,
   assignedToMe: boolean,
   isDuplicate: (item: QueueItem, queue: QueueItem[]) => boolean,
 ): { nextQueue: QueueItem[]; advanceTo: QueueItem | null; resetDuration: boolean } {
@@ -43,17 +43,17 @@ function planPredictiveRow(
       resetDuration: false,
     };
   }
-  if (isDuplicate(newQueueItem as QueueItem, currentQueue)) {
+  if (isDuplicate(newQueueItem, currentQueue)) {
     return { nextQueue: currentQueue, advanceTo: null, resetDuration: false };
   }
   const nextQueue = currentQueue.length
-    ? sortQueue([...currentQueue, newQueueItem as QueueItem])
-    : [newQueueItem as QueueItem];
+    ? sortQueue([...currentQueue, newQueueItem])
+    : [newQueueItem];
   return {
     nextQueue,
     // A newly assigned contact is the one the agent is about to call, so the
     // recipient moves to it and the call timer restarts.
-    advanceTo: assignedToMe ? (newQueueItem as QueueItem) : null,
+    advanceTo: assignedToMe ? newQueueItem : null,
     resetDuration: assignedToMe,
   };
 }
@@ -189,7 +189,7 @@ export const useQueue = ({
     (
       currentQueue: QueueItem[],
       currentRecipient: QueueItem | null,
-      payload: { new: Tables<"campaign_queue"> & { contact: Contact } },
+      payload: { new: QueueItem },
     ): QueueUpdatePlan => {
       const assignedUserId = getAssignedUserId(payload.new);
       const isRemoval =
@@ -253,7 +253,7 @@ export const useQueue = ({
   );
 
   const updateQueue = useCallback(
-    (payload: { new: Tables<"campaign_queue"> & { contact: Contact } }) => {
+    (payload: { new: QueueItem }) => {
       // Validate payload
       if (!payload || !payload.new) {
         logger.error('Invalid queue update payload: payload or payload.new is missing');

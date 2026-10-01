@@ -2,18 +2,17 @@ import { CheckCircleIcon } from "lucide-react";
 import { callPanelShellClass } from "@/components/call/call-panel-classes";
 import { cn } from "@/lib/utils";
 import type { Tables } from "@/lib/db-types";
+import type { QueueItem } from "@/lib/types";
 
-type ContactRow = Tables<"contact">;
-type QueueItemRow = Tables<"campaign_queue"> & { contact: ContactRow };
 type Attempt = Tables<"outreach_attempt"> & {
   result?: { status?: string };
 };
 
 interface HouseholdProps {
-  house: QueueItemRow[];
-  switchQuestionContact: (args: { contact: QueueItemRow }) => void;
+  house: QueueItem[];
+  switchQuestionContact: (args: { contact: QueueItem }) => void;
   attemptList: Attempt[];
-  questionContact: QueueItemRow | null;
+  questionContact: QueueItem | null;
   isBusy: boolean;
 }
 
@@ -40,7 +39,7 @@ export const Household = ({
         Household Members
       </div>
       <div className="flex flex-wrap gap-2">
-        {house?.filter(Boolean).map((queueItem: QueueItemRow) => {
+        {house?.filter(Boolean).map((queueItem: QueueItem) => {
           const isActive = selectedId === queueItem.contact.id;
           return (
             <button

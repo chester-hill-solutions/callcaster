@@ -1,11 +1,10 @@
 import { useState, useCallback } from "react";
 import type { Tables } from "@/lib/db-types";
 import { logger } from "@/lib/logger.client";
+import type { QueueItem } from "@/lib/types";
 
 type Call = Tables<"call">
 type Attempt = Tables<"outreach_attempt">
-type Contact = Tables<"contact">
-type QueueItem = Tables<"campaign_queue"> & { contact: Contact }
 
 /**
  * Hook for managing call state and updates
