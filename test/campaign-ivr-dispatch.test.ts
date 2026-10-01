@@ -167,7 +167,8 @@ describe("dispatchCampaignIvrBatch", () => {
       userId: USER_ID,
     });
     expect(outcome).toMatchObject({
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       nextOpenAt: expect.any(Date),
     });
     expect(mocks.createWorkspaceTwilioInstance).not.toHaveBeenCalled();
@@ -198,7 +199,8 @@ describe("dispatchCampaignIvrBatch", () => {
       const outcome = await dispatch;
 
       expect(outcome).toMatchObject({
-        kind: "deferred_send_window",
+        kind: "deferred",
+        because: "send_window",
         nextOpenAt: new Date("2026-09-10T09:00:00.000Z"),
         progress: {
           counts: { called: 0, failed: 0, deferred: 1 },
@@ -242,7 +244,8 @@ describe("dispatchCampaignIvrBatch", () => {
       const outcome = await dispatch;
 
       expect(outcome).toMatchObject({
-        kind: "deferred_send_window",
+        kind: "deferred",
+        because: "send_window",
         progress: {
           counts: { called: 0, failed: 0, dequeued: 0, deferred: 2 },
           queuedRemaining: 2,

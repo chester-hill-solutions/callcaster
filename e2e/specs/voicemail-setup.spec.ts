@@ -86,7 +86,12 @@ ownerTest.describe("Voicemail setup @authenticated", () => {
 
     await page.getByRole("button", { name: /Save voicemail setup/i }).click();
 
-    await expect(page).toHaveURL(/\/voicemails\?configured=1$/);
+    // Assert where we LANDED, not the `?configured=1` that got us here.
+    // `useSearchParamFlash` fires the toast and then strips its params with a
+    // replace navigation, so the param is transient by design and asserting it
+    // races that deletion — which is why this spec was intermittently red.
+    // Leaving `/setup` is the stable proof the redirect happened.
+    await expect(page).toHaveURL(/\/voicemails$/);
     await expect(page.getByText(/Voicemail is set up/i)).toBeVisible();
 
     await expect.poll(readGreeting).toBe(`${name}.mp3`);
@@ -169,7 +174,9 @@ ownerTest.describe("Voicemail setup @authenticated", () => {
     };
 
     await submit();
-    await expect(page).toHaveURL(/\/voicemails\?configured=1$/);
+    // Transient-param assertion removed; see VM-02. `useSearchParamFlash`
+    // strips `configured` from the URL as soon as it has fired the toast.
+    await expect(page).toHaveURL(/\/voicemails$/);
 
     await submit();
     // The workspace layout may render a credit-depletion <Alert role=alert>;

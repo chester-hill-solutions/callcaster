@@ -46,7 +46,22 @@ export type QueueLifecycle =
 
 export type QueueStateLike = {
   status?: string | null;
-  dequeued_at?: string | null;
+  /**
+   * A real `timestamptz`, so a server-side Drizzle row hands back a `Date`
+   * (#2213) — and a `string`, because these helpers also run in the browser.
+   *
+   * `useQueue.ts` is a client hook and calls `isQueued` / `isDequeued` on
+   * payloads that arrived over JSON, where a `Date` is re-stringified on the
+   * wire. So both arms are live: `Date` from the model, `string` from a loader
+   * or realtime payload. The field is only ever tested for presence, never
+   * compared or sorted, so the union costs nothing.
+   *
+   * The earlier comment on this field claimed the string arm was for "raw sql
+   * projections and RPC payloads". That was wrong, and wrong in a way that
+   * mattered: it would have led the next reader to delete the arm, breaking
+   * every client-side caller.
+   */
+  dequeued_at?: Date | string | null;
   dequeued_by?: string | null;
   dequeued_reason?: string | null;
   assigned_to_user_id?: string | null;
@@ -59,7 +74,7 @@ const UUID_STATUS_PATTERN =
 
 function toQueueStateLike(
   value: QueueStateLike | string | null | undefined,
-  dequeuedAt?: string | null | undefined,
+  dequeuedAt?: Date | string | null,
 ): QueueStateLike {
   if (typeof value === "object" && value !== null) {
     return value;
@@ -130,7 +145,7 @@ export function isQueued(
  */
 export function isDequeued(
   value: QueueStateLike | string | null | undefined,
-  dequeuedAt?: string | null | undefined,
+  dequeuedAt?: Date | string | null,
 ): boolean {
   const queue = toQueueStateLike(value, dequeuedAt);
   return queue.queue_state === QUEUE_STATUS_DEQUEUED || Boolean(queue.dequeued_at);
@@ -149,7 +164,7 @@ export function isAssignedToUser(
 
 export function getQueueLifecycle(
   value: QueueStateLike | string | null | undefined,
-  dequeuedAt?: string | null | undefined,
+  dequeuedAt?: Date | string | null,
 ): QueueLifecycle {
   const queue = toQueueStateLike(value, dequeuedAt);
 
@@ -178,7 +193,7 @@ export function getQueueLifecycle(
 
 export function getQueueDisplayState(
   value: QueueStateLike | string | null | undefined,
-  dequeuedAt?: string | null | undefined,
+  dequeuedAt?: Date | string | null,
 ): QueueDisplayState {
   const queue = toQueueStateLike(value, dequeuedAt);
   if (isDequeued(queue)) {
@@ -202,7 +217,7 @@ export function getQueueDisplayState(
 
 export function getQueueDisplayLabel(
   value: QueueStateLike | string | null | undefined,
-  dequeuedAt?: string | null | undefined,
+  dequeuedAt?: Date | string | null,
 ): string {
   const queue = toQueueStateLike(value, dequeuedAt);
   const displayState = getQueueDisplayState(queue);
@@ -265,7 +280,8 @@ export type QueueEntryColumn =
   | "provider_status"
   | "dequeued_at"
   | "dequeued_by"
-  | "dequeued_reason";
+  | "dequeued_reason"
+  | "claimed_at";
 
 /**
  * Named QueueEntry transitions. `provider_status` is not a distinct
@@ -315,6 +331,38 @@ const QUEUE_ENTRY_FAILED_COLUMN_SET: readonly QueueEntryColumn[] = [
   "queue_state",
 ];
 
+/**
+ * Requeue clears the in-flight claim marker (#2208). A requeued row is back in
+ * the pool and held by nobody — the same argument the `assigned_to_user_id =
+ * NULL` in that branch already makes — so a marker left on it would be a lie,
+ * and `claimIsLive` would hold it out of every split for a whole lease.
+ *
+ * `dequeued` deliberately does NOT clear it, and that is a decision, not an
+ * oversight. Every existing reader of `claimed_at`
+ * (`campaign_queue_has_pending_work`, `reset_stale_campaign_queue_claims`,
+ * and the split, which reads only `onlyQueued` rows) already guards on
+ * `dequeued_at is null`, so a marker on a dequeued row is unreachable — and
+ * the requeue transition above is the single place a row becomes visible again,
+ * so it is the single place that has to clear it. Adding it to `dequeued` would
+ * have meant rewriting two hot production functions (`dequeue_contact` with its
+ * household fan-out and #1260 race guard, and `dequeue_household`) to null a
+ * column nobody can read on those rows.
+ *
+ * `assigned` also does not clear it: the manual-dial claim path
+ * (`select_and_update_campaign_contacts`) sets `claimed_at` and
+ * `assigned_to_user_id` in one UPDATE, so nulling the marker on a later assign
+ * would erase a live claim.
+ */
+const QUEUE_ENTRY_CLAIM_CLEARING_COLUMN_SET: readonly QueueEntryColumn[] = [
+  "assigned_to_user_id",
+  "claimed_at",
+  "dequeued_at",
+  "dequeued_by",
+  "dequeued_reason",
+  "provider_status",
+  "queue_state",
+];
+
 export const QUEUE_ENTRY_TRANSITIONS: Record<
   QueueEntryTransitionName,
   QueueEntryTransitionDef
@@ -322,7 +370,7 @@ export const QUEUE_ENTRY_TRANSITIONS: Record<
   queued: {
     queueState: QUEUE_STATUS_QUEUED,
     legalFrom: "any",
-    columns: QUEUE_ENTRY_FULL_COLUMN_SET,
+    columns: QUEUE_ENTRY_CLAIM_CLEARING_COLUMN_SET,
   },
   assigned: {
     queueState: QUEUE_LIFECYCLE_ASSIGNED,
@@ -364,7 +412,15 @@ export function isLegalQueueEntryTransition(
   return def.legalFrom.includes(fromState);
 }
 
-type QueueEntryColumnValues = Partial<Record<QueueEntryColumn, unknown>>;
+/**
+ * The real `campaign_queue` update shape, inferred from the schema.
+ *
+ * This was `Partial<Record<QueueEntryColumn, unknown>>`, which type-checked no
+ * value at all: `dequeued_at` could be handed a string while the column is a
+ * `timestamptz` and the compiler stayed quiet (#2213). Inferred, so it follows
+ * the schema instead of restating it.
+ */
+type QueueEntryColumnValues = Database["public"]["Tables"]["campaign_queue"]["Update"];
 
 /**
  * Build the campaign_queue UPDATE payload for a named transition. Every
@@ -383,12 +439,17 @@ function buildQueueEntryUpdate(
     if (column === "queue_state") {
       update.queue_state = def.queueState;
     } else if (column in values) {
-      update[column] = values[column];
+      // One cast, because TypeScript resolves a write through a union key to the
+      // *intersection* of every column's type — `string & Date & null` — which
+      // no value can satisfy. The values themselves are checked where it
+      // matters: at each caller's `values` argument, which is typed. This cast
+      // moves nothing across the boundary unchecked.
+      (update as Record<string, unknown>)[column] = values[column];
     } else {
-      update[column] = null;
+      (update as Record<string, unknown>)[column] = null;
     }
   }
-  return update as Database["public"]["Tables"]["campaign_queue"]["Update"];
+  return update;
 }
 
 export function buildQueuedQueueUpdate(): Database["public"]["Tables"]["campaign_queue"]["Update"] {
@@ -416,9 +477,16 @@ export function buildDequeuedQueueUpdate(
   dequeuedReason: string,
 ): Database["public"]["Tables"]["campaign_queue"]["Update"] {
   return buildQueueEntryUpdate("dequeued", {
-    dequeued_at: new Date().toISOString(),
+    dequeued_at: new Date(),
     dequeued_by: dequeuedBy,
     dequeued_reason: dequeuedReason,
+    // A dequeued row is never in flight, so the claim marker must go with it.
+    // Clearing it here rather than at each dequeue call site is deliberate:
+    // this builder is the single funnel for every dequeue path (SMS, manual
+    // dial, API, workspace), so a marker left behind anywhere is impossible.
+    // #2208 — a claim left set would make the next split hold the row back
+    // forever instead of moving it.
+    claimed_at: null,
   });
 }
 

@@ -1,20 +1,20 @@
 /**
  * Campaign SMS batch dispatch: the single authoritative send loop.
  *
- * Owns every send gate — credits, caller-id requirement, campaign send
- * window, recipient quiet hours, opt-out, line type, duplicates, template
- * tags, MMS media, portal/Messaging Service resolution — and returns
- * structured outcomes so callers stay thin adapters:
+ * Applies the credits gate, then hands the batch-level gates — caller id,
+ * workspace compliance, campaign send window — to
+ * `resolvePreDispatchGate`, and owns the per-recipient ones: quiet hours,
+ * opt-out, line type, duplicates, template tags, MMS media,
+ * portal/Messaging Service resolution. Returns structured outcomes so
+ * callers stay thin adapters:
  *
  * - `/api/sms` (HTTP adapter): auth/capability/parse, maps outcomes to
  *   the existing response contract.
  * - worker `campaign_dispatch` handler (durable adapter): claim/successor/
  *   completion orchestration around bounded batches.
  */
-import {
-  messageCampaignRequiresCallerId,
-} from "@/lib/sms-send-resolve";
 import { dequeueQueueEntry, recordQueueAttemptFailure } from "@/lib/campaign-queue-db.server";
+import { claimQueueEntryForSms } from "@/lib/campaign-queue-claim.server";
 import { loadCampaignSmsDispatchData } from "@/lib/sms-campaign-db.server";
 import { getCampaignQueueById } from "@/lib/database/campaign.server";
 import { getWorkspaceTwilioPortalConfig } from "@/lib/database/workspace.server";
@@ -23,7 +23,12 @@ import {
   claimBatchSizeForRate,
   configuredDispatcherSmsMps,
 } from "@/lib/throughput-config.server";
-import { isDispatchAllowedAt, nextDispatchOpenAt, smsSendPolicy } from "@/lib/campaign-dispatch-policy";
+import {
+  isDispatchAllowedAt,
+  nextDispatchOpenAt,
+  smsSendPolicy,
+} from "@/lib/campaign-dispatch-policy";
+import { resolvePreDispatchGate } from "@/lib/campaign-sms-pre-dispatch-gate.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
@@ -40,7 +45,12 @@ import {
   type StartPacer,
 } from "@/lib/campaign-sms-dispatch-primitives.server";
 import { logger } from "@/lib/logger.server";
-import { selectEligibleCampaignQueueMembers } from "@/lib/campaign-dispatch-queue.server";
+import {
+  createPhoneClaim,
+  selectEligibleCampaignQueueMembers,
+  sweepExhaustedQueueContacts,
+  type PhoneClaim,
+} from "@/lib/campaign-dispatch-queue.server";
 import type { TwilioMessageIntent } from "@/lib/types";
 import {
   sendSingleCampaignSms,
@@ -50,59 +60,17 @@ import {
   DUPLICATE_SMS_DEQUEUED_REASON,
 } from "@/lib/campaign-sms-send.server";
 
-export type ContactDispatchResult = Record<
-  string | number,
-  {
-    success: boolean;
-    skipped?: boolean;
-    deferred?: boolean;
-    reason?: string;
-    error?: string;
-    [key: string]: unknown;
-  }
->;
+import type {
+  CampaignSmsBatchOutcome,
+  CampaignSmsDispatchCounts,
+  ContactDispatchResult,
+} from "@/lib/campaign-batch-outcome";
 
-export type CampaignSmsDispatchCounts = {
-  sent: number;
-  failed: number;
-  /** Dequeued without a send: opt-out, landline, duplicate. */
-  dequeued: number;
-  /** Left queued for a later tick (recipient quiet hours). */
-  deferred: number;
-  /** Left queued because the remaining balance could not cover the estimated cost. */
-  unaffordable: number;
-  /** Dead-lettered by the exhaustion sweep: failed rows at the attempt maximum. */
-  exhausted: number;
-};
-
-export type CampaignSmsBatchOutcome =
-  | { kind: "insufficient_credits" }
-  | { kind: "caller_id_required" }
-  | {
-      kind: "deferred_send_window";
-      nextOpenAt: Date;
-      /** Results from contacts that completed before a later contact hit the window boundary. */
-      responses: ContactDispatchResult[];
-      /** Aggregate work completed before the batch deferred. */
-      progress: { counts: CampaignSmsDispatchCounts; queuedRemaining: number };
-    }
-  | {
-      kind: "dispatched";
-      responses: ContactDispatchResult[];
-      counts: CampaignSmsDispatchCounts;
-      /**
-       * Rows still queued after this batch: quiet-hours deferrals, failed
-       * sends that still have attempts left, unaffordable rows, and contacts
-       * beyond `maxContacts`.
-       */
-      queuedRemaining: number;
-      /**
-       * The balance ran out part-way through the batch and cannot cover
-       * another send: adapters treat this like the entry-level
-       * `insufficient_credits` outcome instead of scheduling a successor.
-       */
-      creditsExhausted: boolean;
-    };
+export type {
+  CampaignSmsBatchOutcome,
+  CampaignSmsDispatchCounts,
+  ContactDispatchResult,
+} from "@/lib/campaign-batch-outcome";
 
 /** Skip reason for a row left queued because the balance cannot cover its estimated cost. */
 export const INSUFFICIENT_CREDITS_SKIPPED_REASON = "Insufficient credits for the estimated message cost";
@@ -154,47 +122,22 @@ export async function dispatchCampaignSmsBatch(args: {
     getWorkspaceTwilioPortalConfig({ workspaceId }),
   ]);
 
-  const requiresCallerId = messageCampaignRequiresCallerId(
-    campaign.campaign?.sms_send_mode,
-  );
+  // Every gate that can stop the batch before a row is touched lives in
+  // `resolvePreDispatchGate` — caller id, workspace compliance, send window.
+  // Each is a workspace- or campaign-level condition resolved for the whole
+  // batch, so each returns an outcome here instead of failing a recipient.
   const effectiveCallerId =
     callerIdStr || String(campaign.campaign?.caller_id ?? "").trim();
-  const callerIdForGate = args.requireExplicitCallerId ? callerIdStr : effectiveCallerId;
-  if (requiresCallerId && !callerIdForGate) {
-    return { kind: "caller_id_required" };
-  }
-
-  // Campaign send-window / CASL quiet-hours gate. This is the authoritative
-  // campaign SMS path and is campaign-only — 1:1 chat sends use a different
-  // route (chat_sms) and are never gated here. When the current tick falls
-  // outside the campaign's send window we DEFER the whole batch: nothing is
-  // dispatched and nothing is dequeued, so contacts remain queued for a
-  // later in-window tick. A `null` window is unrestricted. The outcome
-  // carries the exact next open so the durable adapter can schedule its
-  // successor at the window boundary instead of a fixed poll interval.
   const sendPolicy = smsSendPolicy(campaign.campaign);
-  if (!isDispatchAllowedAt(sendPolicy)) {
-    return {
-      kind: "deferred_send_window",
-      // Defensive fallback: a parsed window with active intervals always has
-      // an open instant within the week, but never hot-loop if that invariant
-      // is somehow violated.
-      nextOpenAt:
-        nextDispatchOpenAt(sendPolicy) ?? new Date(Date.now() + 15 * 60 * 1000),
-      responses: [],
-      progress: {
-        counts: {
-          sent: 0,
-          failed: 0,
-          dequeued: 0,
-          deferred: 0,
-          unaffordable: 0,
-          exhausted: 0,
-        },
-        queuedRemaining: audience?.length ?? 0,
-      },
-    };
-  }
+  const gate = await resolvePreDispatchGate({
+    workspaceId,
+    campaign: campaign.campaign,
+    callerId: callerIdStr,
+    requireExplicitCallerId: Boolean(args.requireExplicitCallerId),
+    queuedRemaining: audience?.length ?? 0,
+    sendPolicy,
+  });
+  if (gate) return gate;
 
   const media = campaign.message_media?.length
     ? await Promise.all(
@@ -279,12 +222,11 @@ export async function dispatchCampaignSmsBatch(args: {
     startPacer,
     responses,
   });
-  if (counts.failed > 0) {
-    counts.exhausted = await rpcFailExhaustedCampaignQueueContacts(
-      createTenantDb(workspaceId),
-      Number(campaignId),
-    );
-  }
+  counts.exhausted = await sweepExhaustedQueueContacts(
+    createTenantDb(workspaceId),
+    campaignId,
+    counts.failed,
+  );
   const queuedRemaining = Math.max(
     0,
     queueSelection.unselectedEligibleCount +
@@ -295,7 +237,8 @@ export async function dispatchCampaignSmsBatch(args: {
   );
   if (deferredAt) {
     return {
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       nextOpenAt: deferredAt,
       responses,
       progress: { counts, queuedRemaining },
@@ -374,7 +317,8 @@ async function runPacedSendBatches(args: {
     const deferredAt = batchResults.find((result) => result.deferredSendWindow)?.deferredSendWindow;
     responses.push(
       ...batchResults
-        .filter((result) => !result.deferredSendWindow)
+        // A claim loser did no work, so it must not surface as a result (#2208).
+        .filter((result) => !result.deferredSendWindow && !result.alreadyClaimed)
         .map((result) => result.response),
     );
     if (deferredAt) return deferredAt;
@@ -426,6 +370,8 @@ type HandleMemberCtx = {
 type HandleMemberResult = {
   response: ContactDispatchResult;
   deferredSendWindow?: Date;
+  /** Another dispatcher holds this row's claim (#2208) — no work was done. */
+  alreadyClaimed?: boolean;
 };
 
 type SmsPhoneClaimResult =
@@ -433,18 +379,7 @@ type SmsPhoneClaimResult =
   | { kind: "unaffordable" }
   | { kind: "deferred_send_window"; nextOpenAt: Date };
 
-type SmsPhoneClaim = {
-  result: Promise<SmsPhoneClaimResult>;
-  resolve: (result: SmsPhoneClaimResult) => void;
-};
-
-function createSmsPhoneClaim(): SmsPhoneClaim {
-  let resolve!: (result: SmsPhoneClaimResult) => void;
-  const result = new Promise<SmsPhoneClaimResult>((resolveResult) => {
-    resolve = resolveResult;
-  });
-  return { result, resolve };
-}
+type SmsPhoneClaim = PhoneClaim<SmsPhoneClaimResult>;
 
 function memberResponse(response: ContactDispatchResult): HandleMemberResult {
   return { response };
@@ -588,7 +523,7 @@ async function handleMemberInner(
         },
       });
     }
-    phoneClaim = createSmsPhoneClaim();
+    phoneClaim = createPhoneClaim<SmsPhoneClaimResult>();
     claimedNumbers.set(normalizedPhone, phoneClaim);
   }
 
@@ -736,18 +671,29 @@ async function handleClaimedMember(
   try {
     // Claim a provider-request slot. This is the rate limit, so it is applied
     // here rather than at dispatch: the interval has to be measured between the
-    // requests the provider actually receives. It is also an await, so it can
-    // hold a row past the window boundary — hence the gate order below.
+    // requests the provider actually receives. It is an await, so it can hold a
+    // row past the window boundary — hence the gate order below.
     await ctx.startPacer.waitForTurn();
 
     // The initial gate protects an idle batch, but pacing and the per-contact
     // lookup gates can keep a row here long enough for the campaign window to
-    // close. Check again immediately before starting the provider call so rows
-    // that have not started remain queued for the next window.
+    // close. Re-check before the provider call so unstarted rows stay queued.
     if (!isDispatchAllowedAt(ctx.sendPolicy)) {
       ctx.budget.release(cost);
       counts.deferred += 1;
       return deferredSendWindowResponse(ctx.sendPolicy);
+    }
+
+    // #2208: claim the row — after the window gate so a deferred row never
+    // holds an unused claim, before the provider call. The dequeue runs after
+    // Twilio returns (crash-safety), so without this marker an in-flight row
+    // looks untouched and a split would copy it into a segment, sending twice.
+    const claim = await claimQueueEntryForSms({ queueId: member.id, workspaceId });
+    if (!claim) {
+      // Held by another dispatcher: its row stays queued for them, and the
+      // credit is released because this dispatcher did no work.
+      ctx.budget.release(cost);
+      return { response: {}, alreadyClaimed: true };
     }
 
     return await sendSingleCampaignSms({

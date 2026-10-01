@@ -12,10 +12,23 @@ import {
 
 describe("queue completion semantics", () => {
   test("treats dequeued_at and dequeued queue_state as completed", () => {
+    // The ISO string below is the *client* shape, not a stale test fixture.
+    // `claimed_at`-era code aside, `dequeued_at` is a real `timestamptz` (#2213),
+    // so a server-side Drizzle row hands back a `Date` — but these helpers also
+    // run in the browser via `useQueue.ts`, where JSON has re-stringified it.
+    // This case is why `QueueStateLike.dequeued_at` is `Date | string | null`.
+    // Do not "tidy" it to a `Date`; that breaks every client-side caller.
     expect(
       isDequeued({
         queue_state: "queued",
         dequeued_at: "2026-01-01T00:00:00Z",
+      }),
+    ).toBe(true);
+    // The server-side shape, for the other arm of the same union.
+    expect(
+      isDequeued({
+        queue_state: "queued",
+        dequeued_at: new Date("2026-01-01T00:00:00Z"),
       }),
     ).toBe(true);
     expect(
@@ -74,44 +87,53 @@ describe("QueueEntry transition table", () => {
   });
 
   test("column sets match the transition table exactly", () => {
+    // `queued` additionally clears `claimed_at`, the in-flight marker from
+    // #2208: a requeued row is back in the pool and held by nobody, so a
+    // marker left on it would make `claimIsLive` hold it out of every split
+    // for a whole lease.
+    //
+    // `dequeued` and `assigned` deliberately do NOT. Every reader of
+    // `claimed_at` already guards on `dequeued_at is null`, so a marker on a
+    // dequeued row is unreachable and clearing it there would mean rewriting
+    // two hot production functions for nothing; and the manual-dial claim path
+    // sets `claimed_at` together with `assigned_to_user_id`, so nulling the
+    // marker on a later assign would erase a live claim.
+    const claimClearing = [
+      "assigned_to_user_id",
+      "claimed_at",
+      "dequeued_at",
+      "dequeued_by",
+      "dequeued_reason",
+      "provider_status",
+      "queue_state",
+    ].sort();
+    const withoutClaim = [
+      "assigned_to_user_id",
+      "dequeued_at",
+      "dequeued_by",
+      "dequeued_reason",
+      "provider_status",
+      "queue_state",
+    ].sort();
+
     expect(QUEUE_ENTRY_TRANSITIONS.queued.columns.slice().sort()).toEqual(
-      [
-        "assigned_to_user_id",
-        "dequeued_at",
-        "dequeued_by",
-        "dequeued_reason",
-        "provider_status",
-        "queue_state",
-      ].sort(),
+      claimClearing,
     );
     expect(QUEUE_ENTRY_TRANSITIONS.assigned.columns.slice().sort()).toEqual(
-      [
-        "assigned_to_user_id",
-        "dequeued_at",
-        "dequeued_by",
-        "dequeued_reason",
-        "provider_status",
-        "queue_state",
-      ].sort(),
+      withoutClaim,
     );
     expect(QUEUE_ENTRY_TRANSITIONS.provider_status.columns.slice().sort()).toEqual(
       ["provider_status", "queue_state"].sort(),
     );
     expect(QUEUE_ENTRY_TRANSITIONS.dequeued.columns.slice().sort()).toEqual(
-      [
-        "assigned_to_user_id",
-        "dequeued_at",
-        "dequeued_by",
-        "dequeued_reason",
-        "provider_status",
-        "queue_state",
-      ].sort(),
+      withoutClaim,
     );
   });
 
   test("buildQueuedQueueUpdate writes exactly the queued transition's columns", () => {
     expect(buildQueuedQueueUpdate()).toEqual({
       assigned_to_user_id: null,
+      claimed_at: null,
       dequeued_at: null,
       dequeued_by: null,
       dequeued_reason: null,
@@ -148,8 +170,12 @@ describe("QueueEntry transition table", () => {
     expect(update.dequeued_reason).toBe("no answer");
     expect(update.provider_status).toBeNull();
     expect(update.queue_state).toBe("dequeued");
-    expect(typeof update.dequeued_at).toBe("string");
-    const dequeuedAtMs = new Date(update.dequeued_at as string).getTime();
+    // A real `Date`, not an ISO string. The column is `timestamptz` and the
+    // model now says so (#2213), so this asserts the instant directly instead
+    // of parsing a string back into one. Handing `dequeued_at` an ISO string is
+    // now a compile error, which is the point of the change.
+    expect(update.dequeued_at).toBeInstanceOf(Date);
+    const dequeuedAtMs = (update.dequeued_at as Date).getTime();
     expect(dequeuedAtMs).toBeGreaterThanOrEqual(before);
     expect(dequeuedAtMs).toBeLessThanOrEqual(after);
   });

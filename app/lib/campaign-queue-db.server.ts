@@ -22,6 +22,25 @@ import {
   completeCampaignsDrainedByDequeue,
   tryCompleteDrainedCampaigns,
 } from "@/lib/campaign-queue-completion.server";
+import type { CampaignQueueUpdate } from "@/lib/db-types";
+
+/**
+ * A `campaign_queue` update payload: each column's own value type, or a raw
+ * `SQL` fragment where the new value must be computed in the database.
+ *
+ * This was `Record<string, unknown>`, so no value in a queue write was ever
+ * checked — `dequeued_at` could take an ISO string while the column is a
+ * `timestamptz` and the compiler stayed quiet (#2213), and eight call sites
+ * were free to repeat that. The inferred insert type does not admit `SQL` for a
+ * plain integer, so the fragment case is declared here rather than cast at the
+ * one call site that needs it (`attempt_count + 1`).
+ *
+ * The sibling `buildQueueEntryUpdate` had the same hole and was closed in
+ * #2233; this is that closure one layer down.
+ */
+type QueueColumnWrite = {
+  [K in keyof CampaignQueueUpdate]?: CampaignQueueUpdate[K] | SQL;
+};
 
 export type ClaimedQueueContact = {
   contact_id: number;
@@ -78,7 +97,8 @@ async function emitQueueRowDeletes(workspaceId: string, deletedRows: CampaignQue
  */
 export async function updateCampaignQueueAndEmit(args: {
   conditions: SQL[];
-  set: Record<string, unknown>;
+  /** The real update shape, inferred from the schema — see {@link QueueColumnWrite}. */
+  set: QueueColumnWrite;
   workspaceId?: string;
   exec?: QueueWriteExecutor;
   deferEmit?: DeferredEmit;
@@ -609,7 +629,7 @@ export async function recordQueueAttemptFailure(args: {
     conditions: [eq(campaignQueueTable.id, args.queueId), isNull(campaignQueueTable.dequeued_at)],
     set: {
       attempt_count: sql`${campaignQueueTable.attempt_count} + 1`,
-      last_attempt_at: new Date().toISOString(),
+      last_attempt_at: new Date(),
       last_attempt_error: args.error.slice(0, 500),
     },
     workspaceId: args.workspaceId,
