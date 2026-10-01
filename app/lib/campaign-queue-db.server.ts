@@ -609,7 +609,7 @@ export async function recordQueueAttemptFailure(args: {
     conditions: [eq(campaignQueueTable.id, args.queueId), isNull(campaignQueueTable.dequeued_at)],
     set: {
       attempt_count: sql`${campaignQueueTable.attempt_count} + 1`,
-      last_attempt_at: new Date().toISOString(),
+      last_attempt_at: new Date(),
       last_attempt_error: args.error.slice(0, 500),
     },
     workspaceId: args.workspaceId,

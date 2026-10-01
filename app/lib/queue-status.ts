@@ -46,7 +46,15 @@ export type QueueLifecycle =
 
 export type QueueStateLike = {
   status?: string | null;
-  dequeued_at?: string | null;
+  /**
+   * A real `timestamptz` in the database, so a Drizzle row hands back a `Date`
+   * (#2213). The `string` arm is for the loose callers that still pass a raw
+   * value — RPC payloads and hand-built objects — not for the schema.
+   *
+   * Both arms are only ever tested for presence, never compared or sorted, so
+   * the union costs nothing here and keeps the module usable from both sides.
+   */
+  dequeued_at?: Date | string | null;
   dequeued_by?: string | null;
   dequeued_reason?: string | null;
   assigned_to_user_id?: string | null;
@@ -59,7 +67,7 @@ const UUID_STATUS_PATTERN =
 
 function toQueueStateLike(
   value: QueueStateLike | string | null | undefined,
-  dequeuedAt?: string | null | undefined,
+  dequeuedAt?: Date | string | null,
 ): QueueStateLike {
   if (typeof value === "object" && value !== null) {
     return value;
@@ -130,7 +138,7 @@ export function isQueued(
  */
 export function isDequeued(
   value: QueueStateLike | string | null | undefined,
-  dequeuedAt?: string | null | undefined,
+  dequeuedAt?: Date | string | null,
 ): boolean {
   const queue = toQueueStateLike(value, dequeuedAt);
   return queue.queue_state === QUEUE_STATUS_DEQUEUED || Boolean(queue.dequeued_at);
@@ -149,7 +157,7 @@ export function isAssignedToUser(
 
 export function getQueueLifecycle(
   value: QueueStateLike | string | null | undefined,
-  dequeuedAt?: string | null | undefined,
+  dequeuedAt?: Date | string | null,
 ): QueueLifecycle {
   const queue = toQueueStateLike(value, dequeuedAt);
 
@@ -178,7 +186,7 @@ export function getQueueLifecycle(
 
 export function getQueueDisplayState(
   value: QueueStateLike | string | null | undefined,
-  dequeuedAt?: string | null | undefined,
+  dequeuedAt?: Date | string | null,
 ): QueueDisplayState {
   const queue = toQueueStateLike(value, dequeuedAt);
   if (isDequeued(queue)) {
@@ -202,7 +210,7 @@ export function getQueueDisplayState(
 
 export function getQueueDisplayLabel(
   value: QueueStateLike | string | null | undefined,
-  dequeuedAt?: string | null | undefined,
+  dequeuedAt?: Date | string | null,
 ): string {
   const queue = toQueueStateLike(value, dequeuedAt);
   const displayState = getQueueDisplayState(queue);
@@ -364,7 +372,15 @@ export function isLegalQueueEntryTransition(
   return def.legalFrom.includes(fromState);
 }
 
-type QueueEntryColumnValues = Partial<Record<QueueEntryColumn, unknown>>;
+/**
+ * The real `campaign_queue` update shape, inferred from the schema.
+ *
+ * This was `Partial<Record<QueueEntryColumn, unknown>>`, which type-checked no
+ * value at all: `dequeued_at` could be handed a string while the column is a
+ * `timestamptz` and the compiler stayed quiet (#2213). Inferred, so it follows
+ * the schema instead of restating it.
+ */
+type QueueEntryColumnValues = Database["public"]["Tables"]["campaign_queue"]["Update"];
 
 /**
  * Build the campaign_queue UPDATE payload for a named transition. Every
@@ -383,12 +399,17 @@ function buildQueueEntryUpdate(
     if (column === "queue_state") {
       update.queue_state = def.queueState;
     } else if (column in values) {
-      update[column] = values[column];
+      // One cast, because TypeScript resolves a write through a union key to the
+      // *intersection* of every column's type — `string & Date & null` — which
+      // no value can satisfy. The values themselves are checked where it
+      // matters: at each caller's `values` argument, which is typed. This cast
+      // moves nothing across the boundary unchecked.
+      (update as Record<string, unknown>)[column] = values[column];
     } else {
-      update[column] = null;
+      (update as Record<string, unknown>)[column] = null;
     }
   }
-  return update as Database["public"]["Tables"]["campaign_queue"]["Update"];
+  return update;
 }
 
 export function buildQueuedQueueUpdate(): Database["public"]["Tables"]["campaign_queue"]["Update"] {
@@ -416,7 +437,7 @@ export function buildDequeuedQueueUpdate(
   dequeuedReason: string,
 ): Database["public"]["Tables"]["campaign_queue"]["Update"] {
   return buildQueueEntryUpdate("dequeued", {
-    dequeued_at: new Date().toISOString(),
+    dequeued_at: new Date(),
     dequeued_by: dequeuedBy,
     dequeued_reason: dequeuedReason,
   });
