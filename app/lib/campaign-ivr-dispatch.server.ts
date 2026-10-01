@@ -56,6 +56,7 @@ import {
   ivrCallingPolicy,
   nextDispatchOpenAt,
 } from "@/lib/campaign-dispatch-policy";
+import type { CampaignDeferralCause } from "@/lib/campaign-batch-outcome";
 
 export const IVR_CALL_DEQUEUED_REASON = "IVR dial dispatched";
 export const OPTED_OUT_IVR_DEQUEUED_REASON = "Contact opted out";
@@ -77,15 +78,14 @@ export type CampaignIvrBatchOutcome =
   | { kind: "insufficient_credits" }
   | { kind: "caller_id_required" }
   | {
-      // The shared `deferred` kind, with `because` fixed to the send window:
-      // this dispatcher has no workspace-compliance gate, so a window deferral
-      // is the only way it defers. The kind matches the SMS dispatcher because
-      // one worker helper handles both blocked outcomes.
+      // The shared `deferred` kind and cause, so one worker helper handles
+      // both dispatchers' blocked outcomes. `CampaignDeferralCause` also allows
+      // `workspace_not_ready`; this dispatcher has no compliance gate, so a
+      // window deferral is the only way it defers.
       kind: "deferred";
-      because: "send_window";
       nextOpenAt: Date;
       progress?: { counts: CampaignIvrDispatchCounts; queuedRemaining: number };
-    }
+    } & CampaignDeferralCause
   | {
       kind: "dispatched";
       counts: CampaignIvrDispatchCounts;

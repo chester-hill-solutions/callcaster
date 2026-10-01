@@ -63,13 +63,13 @@ import type {
   CampaignSmsBatchOutcome,
   CampaignSmsDispatchCounts,
   ContactDispatchResult,
-} from "@/lib/campaign-sms-outcome";
+} from "@/lib/campaign-batch-outcome";
 
 export type {
   CampaignSmsBatchOutcome,
   CampaignSmsDispatchCounts,
   ContactDispatchResult,
-} from "@/lib/campaign-sms-outcome";
+} from "@/lib/campaign-batch-outcome";
 
 /** Skip reason for a row left queued because the balance cannot cover its estimated cost. */
 export const INSUFFICIENT_CREDITS_SKIPPED_REASON = "Insufficient credits for the estimated message cost";
