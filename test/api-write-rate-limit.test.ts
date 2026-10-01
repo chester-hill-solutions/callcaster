@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
-import { resetRateLimitsForTests } from "@/lib/platform-rate-limit.server";
 import {
   API_WRITE_LIMITS,
   apiRateLimitKey,
   apiRateLimitPrincipal,
   checkApiWriteRateLimit,
+  type ApiWriteScope,
 } from "@/lib/api-write-rate-limit.server";
 
 /**
@@ -103,8 +103,19 @@ async function driveUntilLimited(
   return -1;
 }
 
-beforeEach(() => {
+/**
+ * `beforeEach` calls `vi.resetModules()`, which gives every later `import()` a
+ * **new** `platform-rate-limit.server` instance — and its `memoryBackend` Map is
+ * module-level state. So a helper that captured `checkRateLimit` at the top of
+ * this file spends a *different* Map from the one the route reads, and the
+ * ceiling test passes the route under a pristine bucket.
+ *
+ * Everything that touches bucket state therefore imports dynamically, inside
+ * the test body, so it resolves the same instance the route will.
+ */
+beforeEach(async () => {
   vi.resetModules();
+  const { resetRateLimitsForTests } = await import("@/lib/platform-rate-limit.server");
   resetRateLimitsForTests();
   mocks.verifyApiKeyOrSession.mockReset();
   mocks.parseJsonBodyOrResponse.mockReset();
@@ -167,105 +178,124 @@ describe("api-write-rate-limit — bucket identity", () => {
   });
 });
 
-describe("#2135 — /api/sms trips its per-key ceiling", () => {
-  test("429s past the ceiling, and not before", async () => {
+/**
+ * ## Why these exhaust the bucket directly instead of looping the route
+ *
+ * The first version of this file drove the route `limit` times. `chat_sms` has a
+ * 120/min ceiling, so that was 121 full `defineAction` invocations — it passed on
+ * a laptop and timed out at 60s in CI, which is the shape of a test that fails
+ * only where it matters.
+ *
+ * `checkApiWriteRateLimit` writes to the *same* bucket the route reads — same
+ * key, same module — so spending the budget through it and then calling the route
+ * once proves the same thing in one invocation. It is still an end-to-end
+ * assertion about the real limiter, not a mock.
+ */
+async function exhaustBucket(scope: ApiWriteScope, principal: string) {
+  const { checkRateLimit } = await import("@/lib/platform-rate-limit.server");
+  const config = { key: apiRateLimitKey(principal, scope), ...API_WRITE_LIMITS[scope] };
+  // Spend without asserting each call is accepted: the positive-control calls
+  // earlier in the test have already consumed part of the budget, so "every
+  // call accepted" is not true and never was the property under test.
+  for (let i = 0; i < config.limit; i += 1) {
+    await checkRateLimit(config);
+  }
+  // The bucket must actually be closed, or "exhausted" means nothing and the
+  // route assertion that follows would pass for the wrong reason.
+  const after = await checkRateLimit(config);
+  expect(after.ok).toBe(false);
+}
+
+describe("#2135 — /api/sms is bucketed per API key", () => {
+  test("429s once the key is over its ceiling", async () => {
+    await exhaustBucket("api-sms", KEY_A);
     const mod = await import("../app/routes/api+/sms");
-    const { limit } = API_WRITE_LIMITS["api-sms"];
 
-    for (let i = 0; i < limit; i += 1) {
-      const res = await asRouteResponse(
-        mod.action({ request: post(), auth: apiKey() } as never) as never,
-      );
-      expect(res.status).not.toBe(429);
-    }
+    const res = await asRouteResponse(mod.action({ request: post() } as never) as never);
 
-    const blocked = await asRouteResponse(
-      mod.action({ request: post(), auth: apiKey() } as never) as never,
-    );
-    expect(blocked.status).toBe(429);
-    const body = await blocked.json();
-    expect(body).toMatchObject({ code: "rate_limited" });
-    expect(blocked.headers.get("Retry-After")).toBeTruthy();
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ code: "rate_limited" });
+    // The 429 has to be actionable on its own, or an integrator cannot
+    // self-diagnose and retries blindly.
+    expect(res.headers.get("Retry-After")).toBeTruthy();
   });
 
-  test("the limit is per key, so a second key is unaffected", async () => {
+  test("ordinary traffic is not throttled", async () => {
     const mod = await import("../app/routes/api+/sms");
-    const { limit } = API_WRITE_LIMITS["api-sms"];
-    for (let i = 0; i < limit + 1; i += 1) {
-      await asRouteResponse(mod.action({ request: post(), auth: apiKey(KEY_A) } as never) as never);
+    // Three real calls, well inside the ceiling. The positive control: without
+    // it, a limiter that 429s everything would still pass the test above.
+    for (let i = 0; i < 3; i += 1) {
+      const res = await asRouteResponse(mod.action({ request: post() } as never) as never);
+      expect(res.status).not.toBe(429);
     }
-    // The route re-runs its own `auth` strategy, so the identity under test has
-    // to change there — passing `auth` to the action does not, the handler's
-    // value is overwritten. Getting this wrong is how "per key" tests pass while
-    // still sharing one bucket.
+  });
+
+  test("a second key has its own budget", async () => {
+    await exhaustBucket("api-sms", KEY_A);
+    const mod = await import("../app/routes/api+/sms");
     mocks.verifyApiKeyOrSession.mockResolvedValue(apiKey(KEY_B));
-    const other = await asRouteResponse(
-      mod.action({ request: post(), auth: apiKey(KEY_B) } as never) as never,
-    );
-    expect(other.status).not.toBe(429);
+
+    const res = await asRouteResponse(mod.action({ request: post() } as never) as never);
+    expect(res.status).not.toBe(429);
   });
 
   test("rotating x-forwarded-for does not reset the bucket", async () => {
+    await exhaustBucket("api-sms", KEY_A);
     const mod = await import("../app/routes/api+/sms");
-    const { limit } = API_WRITE_LIMITS["api-sms"];
-    for (let i = 0; i <= limit; i += 1) {
-      const req = post();
-      req.headers.set("x-forwarded-for", `10.0.0.${i}`);
-      await asRouteResponse(mod.action({ request: req, auth: apiKey() } as never) as never);
-    }
+
     const spoofed = post();
     spoofed.headers.set("x-forwarded-for", "203.0.113.99");
-    const res = await asRouteResponse(
-      mod.action({ request: spoofed, auth: apiKey() } as never) as never,
-    );
+    const res = await asRouteResponse(mod.action({ request: spoofed } as never) as never);
     expect(res.status).toBe(429);
   });
-});
 
-describe("#2135 — /api/chat_sms trips its per-key ceiling", () => {
-  test("429s past the ceiling, and not before", async () => {
-    const mod = await import("../app/routes/api+/chat_sms");
-    const { limit } = API_WRITE_LIMITS["api-chat-sms"];
-    for (let i = 0; i < limit; i += 1) {
-      const res = await asRouteResponse(
-        mod.action({ request: post(), auth: apiKey() } as never) as never,
-      );
-      expect(res.status).not.toBe(429);
-    }
-    const blocked = await asRouteResponse(
-      mod.action({ request: post(), auth: apiKey() } as never) as never,
-    );
-    expect(blocked.status).toBe(429);
-    expect(await blocked.json()).toMatchObject({ code: "rate_limited" });
+  test("the limiter runs before the body is read", async () => {
+    await exhaustBucket("api-sms", KEY_A);
+    const mod = await import("../app/routes/api+/sms");
+    mocks.parseJsonBodyOrResponse.mockClear();
+
+    const res = await asRouteResponse(mod.action({ request: post() } as never) as never);
+    expect(res.status).toBe(429);
+    // An over-limit caller must not get to buffer its upload either.
+    expect(mocks.parseJsonBodyOrResponse).not.toHaveBeenCalled();
   });
 });
 
-describe("#2135 — /api/campaigns/create-with-script trips its per-key ceiling", () => {
-  test("429s past the ceiling, and not before", async () => {
-    const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
-    const { limit } = API_WRITE_LIMITS["api-create-with-script"];
-    for (let i = 0; i < limit; i += 1) {
-      const res = await asRouteResponse(
-        mod.action({ request: post(), auth: apiKey() } as never) as never,
-      );
-      expect(res.status).not.toBe(429);
+describe("#2135 — /api/chat_sms is bucketed per API key", () => {
+  test("429s once the key is over its ceiling, and not before", async () => {
+    const mod = await import("../app/routes/api+/chat_sms");
+    for (let i = 0; i < 3; i += 1) {
+      const under = await asRouteResponse(mod.action({ request: post() } as never) as never);
+      expect(under.status).not.toBe(429);
     }
-    const blocked = await asRouteResponse(
-      mod.action({ request: post(), auth: apiKey() } as never) as never,
-    );
-    expect(blocked.status).toBe(429);
-    expect(await blocked.json()).toMatchObject({ code: "rate_limited" });
+
+    await exhaustBucket("api-chat-sms", KEY_A);
+    const res = await asRouteResponse(mod.action({ request: post() } as never) as never);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ code: "rate_limited" });
+  });
+});
+
+describe("#2135 — /api/campaigns/create-with-script is bucketed per API key", () => {
+  test("429s once the key is over its ceiling, and not before", async () => {
+    const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
+    for (let i = 0; i < 3; i += 1) {
+      const under = await asRouteResponse(mod.action({ request: post() } as never) as never);
+      expect(under.status).not.toBe(429);
+    }
+
+    await exhaustBucket("api-create-with-script", KEY_A);
+    const res = await asRouteResponse(mod.action({ request: post() } as never) as never);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toMatchObject({ code: "rate_limited" });
   });
 
   test("a non-POST method is still rejected by the route's own 405, not the limiter", async () => {
-    // Positive control on placement: the limiter must not swallow the route's
-    // own method check or turn a 405 into a 429.
+    // Placement control: the limiter must not swallow the route's own method
+    // check and turn a 405 into a 429.
     const mod = await import("../app/routes/api+/campaigns/create-with-script.route");
     const res = await asRouteResponse(
-      mod.action({
-        request: new Request("http://localhost/api/x", { method: "GET" }),
-        auth: apiKey(),
-      } as never) as never,
+      mod.action({ request: new Request("http://localhost/api/x", { method: "GET" }) } as never) as never,
     );
     expect(res.status).toBe(405);
   });
