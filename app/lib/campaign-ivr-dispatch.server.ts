@@ -72,7 +72,12 @@ export type CampaignIvrBatchOutcome =
   | { kind: "insufficient_credits" }
   | { kind: "caller_id_required" }
   | {
-      kind: "deferred_send_window";
+      // The shared `deferred` kind, with `because` fixed to the send window:
+      // this dispatcher has no workspace-compliance gate, so a window deferral
+      // is the only way it defers. The kind matches the SMS dispatcher because
+      // one worker helper handles both blocked outcomes.
+      kind: "deferred";
+      because: "send_window";
       nextOpenAt: Date;
       progress?: { counts: CampaignIvrDispatchCounts; queuedRemaining: number };
     }
@@ -118,7 +123,8 @@ export async function dispatchCampaignIvrBatch(args: {
   const initialDeferralAt = campaignWindowDeferralAt(callingPolicy);
   if (initialDeferralAt) {
     return {
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       nextOpenAt: initialDeferralAt,
     };
   }
@@ -200,7 +206,8 @@ export async function dispatchCampaignIvrBatch(args: {
   const queuedRemaining = remainingIvrQueue(queueSelection, counts);
   if (state.deferredAt) {
     return {
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       nextOpenAt: state.deferredAt,
       progress: { counts, queuedRemaining },
     };

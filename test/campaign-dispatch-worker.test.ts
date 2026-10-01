@@ -354,7 +354,8 @@ describe("campaignDispatchHandler", () => {
   test("send-window deferral schedules the successor at the exact next open (#1352)", async () => {
     const nextOpenAt = new Date(Date.now() + 5 * 60 * 1000);
     mocks.dispatchCampaignSmsBatch.mockResolvedValue({
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       nextOpenAt,
       progress: {
         counts: { sent: 1, failed: 0, dequeued: 0, deferred: 1, unaffordable: 0, exhausted: 0 },
@@ -381,7 +382,8 @@ describe("campaignDispatchHandler", () => {
     const maxDeferMs = 60 * 60 * 1000;
     const nextOpenAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
     mocks.dispatchCampaignSmsBatch.mockResolvedValue({
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       nextOpenAt,
     });
     await campaignDispatchHandler(makeJob());
@@ -591,7 +593,8 @@ describe("campaignDispatchHandler — machine-dialled voice (#1348)", () => {
   test("IVR schedule deferral schedules a delayed successor", async () => {
     const nextOpenAt = new Date(Date.now() + 5 * 60 * 1000);
     mocks.dispatchCampaignIvrBatch.mockResolvedValue({
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       nextOpenAt,
       progress: {
         counts: { called: 1, failed: 0, dequeued: 0, deferred: 1, exhausted: 0 },

@@ -97,7 +97,17 @@ export async function sendSingleCampaignSms(params: SendSingleSmsParams) {
     sendPolicy,
   } = params;
 
-  await assertWorkspaceCanSendSms({ workspaceId: workspace });
+  // The workspace readiness gate is NOT here (#2081). It used to be the first
+  // statement of this function, so it ran once per contact and threw a
+  // workspace-scoped error into the per-member rejection handler, which
+  // recorded a per-row attempt failure. Five ticks of a non-ready workspace
+  // then dead-lettered the entire audience. It is a workspace condition, so it
+  // is now checked once per dispatch in `dispatchCampaignSmsBatch`, before any
+  // row is selected, and the batch defers.
+  //
+  // 1:1 chat sends are a different surface (`chat_sms.server.ts`) and keep
+  // their own per-send gate: one message to one person, where a deferral
+  // would be worse than telling that one sender why.
 
   const twilio = await createWorkspaceTwilioInstance({ workspace_id: workspace });
 
