@@ -3,6 +3,8 @@ import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
 import type { RpcExecutor } from "@/lib/db-rpc.server";
+import { COACHING_CUE_CREDITS } from "../../shared/billing-rates";
+import { wholeCreditDebit } from "../../shared/pricing";
 import type { insertTransactionHistoryIdempotent as InsertFn } from "@/lib/transaction-history.server";
 
 /**
@@ -62,6 +64,7 @@ const STARTING_CREDITS = 1_000;
 const KEY_FIRST = "integration-db:ledger:first";
 const KEY_SECOND = "integration-db:ledger:second";
 const KEY_CONCURRENT = "integration-db:ledger:concurrent";
+const KEY_COACHING_CUE = "integration-db:ledger:coaching-cue";
 
 describeDb("apply_ledger_entry_and_sync_credits against real Postgres", () => {
   let client: postgres.Sql;
@@ -147,6 +150,48 @@ describeDb("apply_ledger_entry_and_sync_credits against real Postgres", () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
     );
     expect(await credits()).toBe(STARTING_CREDITS);
+  });
+
+  /**
+   * #2101 — a coaching cue bills through the real RPC at a whole-credit amount.
+   *
+   * This is the assertion the old unit test could not make. It mocked the
+   * ledger, so `amount: -0.1` sailed through and the suite stayed green while
+   * every real cue died at `invalid input syntax for type integer`. Only a real
+   * `p_amount integer` can reject a fraction, so only this tier can catch it.
+   *
+   * The debit is passed as `wholeCreditDebit(COACHING_CUE_CREDITS)` rather than a
+   * literal so the test tracks the rate card. If someone reintroduces the
+   * fractional write, this goes red on the Postgres error, not on an assertion.
+   */
+  test("a coaching cue bills a whole credit and lands in the ledger", async () => {
+    const before = await credits();
+    const amount = wholeCreditDebit(COACHING_CUE_CREDITS);
+
+    // The precondition, stated where the failure actually lives.
+    expect(Number.isInteger(amount)).toBe(true);
+
+    const result = await insertTransactionHistoryIdempotent(exec, {
+      workspaceId,
+      type: "DEBIT",
+      amount,
+      note: "integration-db coaching cue",
+      idempotencyKey: KEY_COACHING_CUE,
+      callSid: "CA_integration_db_coaching",
+    });
+
+    expect(result.inserted).toBe(true);
+    expect(await credits()).toBe(before + amount);
+
+    const rows = await ledgerRowsFor(KEY_COACHING_CUE);
+    expect(rows).toHaveLength(1);
+    expect(Number.isInteger(rows[0].amount as number)).toBe(true);
+    expect(rows[0]).toMatchObject({
+      workspace: workspaceId,
+      type: "DEBIT",
+      note: "integration-db coaching cue",
+      idempotency_key: KEY_COACHING_CUE,
+    });
   });
 
   test("a first call inserts the ledger row and moves credits by the amount", async () => {
