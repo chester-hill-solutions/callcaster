@@ -1,8 +1,5 @@
 import { memo } from "react";
-import type { Tables } from "@/lib/db-types";
-
-type Contact = Tables<"contact">;
-type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
+import type { Contact, QueueItem } from "@/lib/types";
 
 type QueueContactProps = {
   contact: Contact;

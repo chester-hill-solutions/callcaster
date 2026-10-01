@@ -5,11 +5,7 @@ import {
   callPanelHeaderPrimaryClass,
   callPanelShellClass,
 } from "@/components/call/call-panel-classes";
-import type { Tables } from "@/lib/db-types";
-import { CampaignDetails, Block } from "@/lib/types";
-
-type Contact = Tables<"contact">;
-type QueueItem = Tables<"campaign_queue"> & { contact: Contact };
+import { CampaignDetails, Block, QueueItem } from "@/lib/types";
 
 interface Script {
   steps?: {
