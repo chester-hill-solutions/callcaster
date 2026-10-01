@@ -199,6 +199,25 @@ describe("createTenantDb — registry completeness", () => {
   });
 
   /**
+   * `workspaceColumnName` exists only so `ColumnNameFor` can produce a type
+   * *literal* — Drizzle types a column's `name` as `string`, and reading it
+   * widened the omit key until `ScopedInsert`/`ScopedUpdate` accepted any object
+   * (#2242). A duplicate that drifts from its column would silently reopen that
+   * hole, so it is checked against the column it names.
+   */
+  test("every declared tenancy column name matches the column it names", () => {
+    for (const [tableName, entry] of Object.entries(WORKSPACE_SCOPED_TABLES)) {
+      const { workspaceColumn, workspaceColumnName } = entry as unknown as {
+        workspaceColumn: { name: string };
+        workspaceColumnName: string;
+      };
+      expect(`${tableName}: ${workspaceColumnName}`).toBe(
+        `${tableName}: ${workspaceColumn.name}`,
+      );
+    }
+  });
+
+  /**
    * Derived from schema.ts rather than from a number typed in by hand.
    *
    * The previous assertion was `toHaveLength(26)` compared against

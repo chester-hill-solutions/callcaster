@@ -41,15 +41,56 @@ export type TenantDb = {
 };
 
 type TableFor<K extends WorkspaceScopedTableName> = (typeof WORKSPACE_SCOPED_TABLES)[K]["table"];
+/**
+ * The tenancy column's name as a **literal**, taken from the registry's
+ * `workspaceColumnName` rather than from `workspaceColumn.name`.
+ *
+ * Drizzle types a column's `name` as `string`, so reading it here widened the
+ * key to `string` and `Omit<InferInsertModel<T>, string>` collapsed to `{}` —
+ * meaning `ScopedInsert` and `ScopedUpdate` accepted *any* object and no
+ * workspace-scoped write was type-checked at all. Three production writes
+ * carrying ISO strings into `timestamptz` columns shipped past `tsc` that way
+ * (#2242). `test/tenant-db.test.ts` asserts the literal matches
+ * `workspaceColumn.name` for every table, so it cannot drift.
+ */
 type ColumnNameFor<K extends WorkspaceScopedTableName> =
-  (typeof WORKSPACE_SCOPED_TABLES)[K]["workspaceColumn"]["name"];
-type ScopedInsert<K extends WorkspaceScopedTableName> = Omit<
-  InferInsertModel<TableFor<K>>,
-  ColumnNameFor<K>
->;
-type ScopedUpdate<K extends WorkspaceScopedTableName> = Partial<
-  Omit<InferSelectModel<TableFor<K>>, ColumnNameFor<K>>
->;
+  (typeof WORKSPACE_SCOPED_TABLES)[K]["workspaceColumnName"];
+/**
+ * The tenancy column is removed with a **mapped type**, not `Omit`.
+ *
+ * `Omit<InferInsertModel<TableFor<K>>, ColumnNameFor<K>>` looks equivalent and
+ * is not: both sides are double indexed accesses through the generic `K`, and
+ * TypeScript defers them. Asked directly, `ColumnNameFor<"contact">` reports
+ * `string`, so `Exclude<keyof T, string>` should leave nothing — but `Omit`
+ * returned a single leftover key instead of the 24 the table actually has. The
+ * write boundary was therefore still effectively open, and `tsc` reported real
+ * columns as "does not exist in type `ScopedInsert<...>`".
+ *
+ * Filtering key-by-key with `as` forces evaluation per key and resolves
+ * correctly. Measured with the compiler API, not assumed.
+ */
+type ScopedInsert<K extends WorkspaceScopedTableName> = {
+  [P in keyof InferInsertModel<TableFor<K>> as P extends ColumnNameFor<K>
+    ? never
+    : P]: InferInsertModel<TableFor<K>>[P];
+};
+/**
+ * The `set` for a tenant-scoped update.
+ *
+ * Every column keeps its model type; `SQL` is admitted alongside it because
+ * that is Drizzle's own `PgUpdateSetSource` (`SQL | column values`) and the
+ * guards in `message-db.server.ts` depend on it to enforce a status transition
+ * atomically inside the UPDATE. This is the driver's documented fragment
+ * escape, not a widening — `set: { body: 123 }` still fails.
+ *
+ * `insert` deliberately does **not** admit `SQL`: Drizzle has no fragment form
+ * for insert values.
+ */
+type ScopedUpdate<K extends WorkspaceScopedTableName> = Partial<{
+  [P in keyof InferSelectModel<TableFor<K>> as P extends ColumnNameFor<K> ? never : P]:
+    | InferSelectModel<TableFor<K>>[P]
+    | SQL;
+}>;
 
 type RelationalConfig = { where?: SQL | ((aliases: unknown) => SQL | undefined) } & Record<
   string,
@@ -72,6 +113,58 @@ function withoutTenancyColumn(
   delete rest[columnName];
   return rest;
 }
+
+/**
+ * Compile-time contract for the write boundary (#2242). **Never executed** —
+ * `npm run typecheck` is the assertion.
+ *
+ * It lives here rather than in `test/` because tsconfig excludes test files by
+ * glob, so a `@ts-expect-error` in a suite is never checked by anything. A
+ * guard that nothing runs is a comment.
+ *
+ * Each `@ts-expect-error` fails the **build** if the error it describes stops
+ * being an error, so the boundary cannot silently reopen. That is how this file
+ * is tested — there is no runtime half, deliberately: a runtime check would
+ * need a real database, and a mocked client is exactly what hid the original
+ * defect.
+ *
+ * What it is guarding: `insert` was declared `(values: ScopedInsert<K>)` and
+ * implemented as `(values: Record<string, unknown>)`, and `ColumnNameFor`
+ * resolved to `string`, so the boundary accepted any object. Three production
+ * writes carried ISO strings into `timestamptz` columns past `tsc`; postgres.js
+ * encodes a `Date` bind by calling `.toISOString()`, so the inbound-SMS webhook
+ * returned 400 on every inbound text. e2e caught it.
+ */
+function writeBoundaryContract(tdb: TenantDb): void {
+  // The exact #2241 defect: `message.date_created` is `timestamp` in
+  // `mode: "date"`, so the value has to be a `Date`.
+  // @ts-expect-error string is not assignable to Date
+  void tdb.message.insert({ sid: "SM1", date_created: "2026-01-01T00:00:00.000Z" });
+
+  // @ts-expect-error not a column of `contact`
+  void tdb.contact.insert({ firstname: "Ada", definitely_not_a_column: 1 });
+
+  // The tenancy column is auto-injected, so a caller cannot supply it. That is
+  // what keeps a row from being moved into another workspace.
+  // @ts-expect-error `workspace` is stripped from the insert type
+  void tdb.contact.insert({ firstname: "Ada", workspace: "somebody-elses-workspace" });
+
+  // @ts-expect-error `message.body` is text
+  void tdb.message.update({ set: { body: 123 } });
+
+  // The counterpart, and just as load-bearing: a SQL fragment in `set` is
+  // Drizzle's own documented form, and the status guards in
+  // `message-db.server.ts` depend on it to enforce a transition atomically
+  // inside the UPDATE. Removing this makes the guards silently broken.
+  void tdb.message.update({ set: { status: sql`lower(status)` } });
+
+  // `contact.created_at` is `NOT NULL DEFAULT now()` in every real database.
+  // The model declares that default, so omitting the column is correct. Before
+  // the default was declared the boundary demanded it here, and 11 call sites
+  // were pushed toward writing a value they had no reason to supply.
+  void tdb.contact.insert({ firstname: "Ada", surname: "Lovelace" });
+}
+void writeBoundaryContract;
 
 /**
  * Build a workspace-scoped Drizzle facade. Every read/write against a

@@ -16,7 +16,7 @@ import {
   pgTable, text, integer, bigint, numeric, boolean, timestamp, jsonb, uuid, serial, bigserial, smallint, pgEnum,
   uniqueIndex, unique,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import type { CoachingConfig } from "@/lib/coaching-schemas";
 // Type-only import; the cycle with db-types (which type-imports this module)
 // is erased at compile time and carries no runtime modules.
@@ -246,11 +246,11 @@ export const workspace_number = pgTable("workspace_number", {
 export const script = pgTable(
   "script",
   {
-    created_at: text().notNull(),
+    created_at: text().notNull().default(sql`now()`),
     created_by: uuid(),
     id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
     is_sample: boolean().notNull().default(false),
-    name: text().notNull(),
+    name: text().notNull().default(""),
     steps: jsonb(),
     type: text(),
     updated_at: text(),
@@ -266,7 +266,7 @@ export const contact = pgTable("contact", {
   address: text(),
   city: text(),
   country: text(),
-  created_at: text().notNull(),
+  created_at: text().notNull().default(sql`now()`),
   created_by: uuid(),
   date_updated: text(),
   email: text(),
@@ -298,9 +298,9 @@ export const contact_audience = pgTable("contact_audience", {
 });
 
 export const audience = pgTable("audience", {
-  created_at: text().notNull(),
+  created_at: text().notNull().default(sql`now()`),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
-  is_conditional: boolean().notNull(),
+  is_conditional: boolean().notNull().default(false),
   name: text(),
   workspace: uuid(),
   status: text(),
