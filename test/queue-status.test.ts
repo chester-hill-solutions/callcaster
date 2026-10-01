@@ -157,8 +157,12 @@ describe("QueueEntry transition table", () => {
     expect(update.dequeued_reason).toBe("no answer");
     expect(update.provider_status).toBeNull();
     expect(update.queue_state).toBe("dequeued");
-    expect(typeof update.dequeued_at).toBe("string");
-    const dequeuedAtMs = new Date(update.dequeued_at as string).getTime();
+    // A real `Date`, not an ISO string. The column is `timestamptz` and the
+    // model now says so (#2213), so this asserts the instant directly instead
+    // of parsing a string back into one. Handing `dequeued_at` an ISO string is
+    // now a compile error, which is the point of the change.
+    expect(update.dequeued_at).toBeInstanceOf(Date);
+    const dequeuedAtMs = (update.dequeued_at as Date).getTime();
     expect(dequeuedAtMs).toBeGreaterThanOrEqual(before);
     expect(dequeuedAtMs).toBeLessThanOrEqual(after);
   });

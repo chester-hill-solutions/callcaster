@@ -22,8 +22,12 @@ export async function claimQueueEntryForSms(args: {
   tdb?: TenantDb;
 }): Promise<boolean> {
   const tdb = args.tdb ?? createTenantDb(args.workspaceId);
-  const nowIso = new Date().toISOString();
-  const staleBefore = new Date(Date.now() - SMS_CLAIM_LEASE_MS).toISOString();
+  // A real `Date` on both sides. The column is `timestamptz` and the model now
+  // says so (#2213), so the lease is compared as a timestamp rather than as
+  // two strings — which is what made this safe to write in the first place,
+  // and is no longer something to work around.
+  const now = new Date();
+  const staleBefore = new Date(Date.now() - SMS_CLAIM_LEASE_MS);
 
   /**
    * Deliberately a single conditional UPDATE rather than a call to
@@ -36,7 +40,7 @@ export async function claimQueueEntryForSms(args: {
    * claim cannot reach another tenant's row even if the id were wrong.
    */
   const claimed = await tdb.campaign_queue.update({
-    set: { claimed_at: nowIso },
+    set: { claimed_at: now },
     where: and(
       eq(campaignQueueTable.id, args.queueId),
       isNull(campaignQueueTable.dequeued_at),

@@ -29,6 +29,13 @@ vi.mock("@/lib/campaign-queue-claim.server", async (importOriginal) => ({
   // and the real claim would go to the database.
   claimQueueEntryForSms: async () => true,
 }));
+// #2081: the workspace readiness gate moved to the batch level, so it now runs
+// in every dispatch. These suites cover pacing, window gating and row
+// failures with a ready workspace; the not-ready path has its own test.
+vi.mock("@/lib/twilio-readiness.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/twilio-readiness.server")>()),
+  assertWorkspaceCanSendSms: async () => undefined,
+}));
 vi.mock("@/lib/campaign-queue-db.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/campaign-queue-db.server")>()),
   dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
@@ -159,7 +166,7 @@ describe("campaign SMS dispatch send-window boundary", () => {
     const outcome = await dispatch;
 
     expect(mocks.sendSingleCampaignSms).toHaveBeenCalledTimes(1);
-    expect(outcome).toMatchObject({ kind: "deferred_send_window" });
+    expect(outcome).toMatchObject({ kind: "deferred", because: "send_window" });
     expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
   });
 
@@ -183,7 +190,8 @@ describe("campaign SMS dispatch send-window boundary", () => {
     const outcome = await dispatch;
 
     expect(outcome).toMatchObject({
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       progress: {
         counts: { sent: 0, failed: 0, dequeued: 0, deferred: 2 },
         queuedRemaining: 2,
@@ -210,7 +218,8 @@ describe("campaign SMS dispatch send-window boundary", () => {
     const outcome = await dispatch;
 
     expect(outcome).toMatchObject({
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       responses: [{ 30: { success: true, message: { sid: "SM30" }, persisted: true } }],
     });
     expect(mocks.sendSingleCampaignSms).toHaveBeenCalledTimes(1);
@@ -231,6 +240,9 @@ describe("campaign SMS dispatch send-window boundary", () => {
       body_text: "Hello {{firstname}}",
       message_media: [],
     });
+    // A PER-ROW deferral, not the batch outcome: `sendSingleCampaignSms` keeps
+    // its own `deferred_send_window` kind, which the dispatch loop turns into
+    // the batch-level `deferred` outcome below.
     mocks.sendSingleCampaignSms.mockResolvedValueOnce({
       kind: "deferred_send_window",
       nextOpenAt,
@@ -243,7 +255,8 @@ describe("campaign SMS dispatch send-window boundary", () => {
     });
 
     expect(outcome).toMatchObject({
-      kind: "deferred_send_window",
+      kind: "deferred",
+      because: "send_window",
       nextOpenAt,
       responses: [],
       progress: {

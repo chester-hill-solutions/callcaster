@@ -122,7 +122,27 @@ export const action = defineAction({
             headers: { "Content-Type": "application/json" },
           },
         );
-      case "deferred_send_window":
+      case "deferred":
+        // A deferred batch is 200 + `deferred`, never an error: nothing failed
+        // and nothing was sent, so a caller that treated this as an error would
+        // either retry blindly or report a per-contact failure for a condition
+        // that applies to the whole workspace or campaign. Each cause carries
+        // the detail the operator needs — the window boundary, or the real
+        // compliance reasons (#2081) rather than a dead-lettered queue.
+        if (outcome.because === "workspace_not_ready") {
+          return new Response(
+            JSON.stringify({
+              deferred: true,
+              reason: "Workspace is not cleared to send SMS",
+              reasons: outcome.reasons,
+              responses: outcome.responses,
+            }),
+            {
+              headers: { "Content-Type": "application/json" },
+              status: 200,
+            },
+          );
+        }
         return new Response(
           JSON.stringify({
             deferred: true,

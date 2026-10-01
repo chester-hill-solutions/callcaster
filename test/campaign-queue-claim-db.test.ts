@@ -64,10 +64,20 @@ describe("claimQueueEntryForSms (#2208)", () => {
   });
 
   test("stamps claimed_at on the row it wins", async () => {
+    const before = Date.now();
     updateReturning = [{ id: 7 }];
     await claim(7);
-    expect(setPayloads[0]).toHaveProperty("claimed_at");
-    expect(typeof setPayloads[0]?.claimed_at).toBe("string");
+    const after = Date.now();
+
+    // A real `Date`. The column is `timestamptz` and the model says so
+    // (#2213), so the lease is written as a timestamp rather than as an ISO
+    // string the database has to coerce. This test used to assert
+    // `typeof === "string"`, which pinned the pre-#2213 workaround in place.
+    const stamped = setPayloads[0]?.claimed_at;
+    expect(stamped).toBeInstanceOf(Date);
+    const stampedMs = (stamped as Date).getTime();
+    expect(stampedMs).toBeGreaterThanOrEqual(before);
+    expect(stampedMs).toBeLessThanOrEqual(after);
   });
 
   // A claim must not change the row's lifecycle state. If it did, the

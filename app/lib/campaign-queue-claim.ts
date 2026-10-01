@@ -32,25 +32,25 @@ export const SMS_CLAIM_LEASE_MS = 10 * 60 * 1000;
 /**
  * A claim is live when it was taken less than one lease ago.
  *
- * The value is always a string, never a `Date`. `claimed_at` is declared
- * `text()` in the Drizzle schema while the column is really `timestamptz` (the
- * repo-wide drift in #2213), and that mismatch means the driver hands back a
- * Postgres-formatted timestamp — `"2026-09-30 14:10:47.898535+00"`, with a
- * space separator and a bare `+00` offset — which `Date.parse` handles
- * correctly. Verified by reading the value back through `db.select()`.
+ * `claimed_at` is a real `timestamptz` and the Drizzle model says so (#2213),
+ * so a row read through the model hands back a `Date`. The `string` arm is for
+ * the callers that do not go through the model — a raw `sql` projection, or an
+ * RPC payload — and those arrive as a Postgres-formatted timestamp such as
+ * `"2026-09-30 14:10:47.898535+00"`, which `Date.parse` handles.
  *
- * An earlier revision of this function took `string | Date` and carried a
- * `Date` branch, on the belief that the driver returned a `Date` for a
- * timestamptz column. It does not. The branch was unreachable, and it forced
- * an `as string | Date | null | undefined` cast at the one production call
- * site, so removing it deletes a cast as well.
+ * An earlier revision of this function was string-only, with a long note
+ * explaining that a `Date` branch would be unreachable because the column was
+ * mis-declared as `text()`. That drift is fixed, so the `Date` branch is now
+ * the common path rather than dead code, and the string arm is the fallback
+ * instead of the only case.
  */
 export function claimIsLive(
-  claimedAt: string | null | undefined,
+  claimedAt: Date | string | null | undefined,
   now: number = Date.now(),
 ): boolean {
   if (!claimedAt) return false;
-  const claimedMs = Date.parse(claimedAt);
+  const claimedMs =
+    claimedAt instanceof Date ? claimedAt.getTime() : Date.parse(claimedAt);
   if (Number.isNaN(claimedMs)) return false;
   return now - claimedMs < SMS_CLAIM_LEASE_MS;
 }

@@ -52,6 +52,13 @@ vi.mock("@/lib/campaign-queue-claim.server", async (importOriginal) => ({
   // and the real claim would go to the database.
   claimQueueEntryForSms: async () => true,
 }));
+// #2081: the workspace readiness gate moved to the batch level, so it now runs
+// in every dispatch. These suites cover pacing, window gating and row
+// failures with a ready workspace; the not-ready path has its own test.
+vi.mock("@/lib/twilio-readiness.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/twilio-readiness.server")>()),
+  assertWorkspaceCanSendSms: async () => undefined,
+}));
 vi.mock("@/lib/campaign-queue-db.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/campaign-queue-db.server")>()),
   dequeueQueueEntry: (...args: unknown[]) => mocks.dequeueQueueEntry(...args),
@@ -145,7 +152,7 @@ function dispatch() {
 type DispatchResult = Awaited<ReturnType<typeof dispatch>>;
 
 /**
- * `dispatched` returns `counts` flat; `deferred_send_window` nests them under
+ * `dispatched` returns `counts` flat; `deferred` nests them under
  * `progress`. Read them the same way whatever came back.
  */
 function countsOf(result: DispatchResult) {
