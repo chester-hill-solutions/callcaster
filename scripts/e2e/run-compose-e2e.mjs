@@ -7,13 +7,14 @@
  *   npm run test:e2e:compose
  *
  * Optional:
- *   E2E_SKIP_BOOTSTRAP=1  — skip psql migrate (DB already bootstrapped)
+ *   E2E_SKIP_BOOTSTRAP=1  — skip the schema bootstrap (DB already migrated)
  *   E2E_SKIP_BUILD=1      — skip npm run build
  */
 import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertLocalTarget } from "../lib/local-target-guard.mjs";
+import { isDatabaseReady } from "../lib/apply-sql-steps.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "../..");
@@ -69,14 +70,11 @@ await (async function waitForPostgres() {
   // The official postgres image starts a temporary server for initdb, then
   // RESTARTS the real server — so an early host connection to the mapped port
   // gets "server closed the connection unexpectedly". Probe the SAME host path
-  // the bootstrap uses (psql → DATABASE_URL) and require two consecutive
-  // successes so a mid-restart drop can't be mistaken for readiness.
+  // the bootstrap uses (DATABASE_URL) and require two consecutive successes so
+  // a mid-restart drop can't be mistaken for readiness.
   let consecutive = 0;
   for (let i = 0; i < 90; i += 1) {
-    const probe = spawnSync("psql", [databaseUrl, "-tAc", "select 1"], {
-      stdio: "ignore",
-    });
-    if (probe.status === 0) {
+    if (await isDatabaseReady(databaseUrl)) {
       consecutive += 1;
       if (consecutive >= 2) return;
     } else {
