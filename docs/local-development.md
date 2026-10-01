@@ -40,7 +40,6 @@ Tail an app process by running it in its own terminal; the compose services are 
 
 - Node `22.x` (the repo pins it and CI uses it; other majors produce test failures that do not reproduce in CI) and Bun `>=1.2.15`
 - Docker Desktop or another Docker runtime
-- `psql` (Postgres client, used by the schema bootstrap script)
 - Localtunnel (only for live Twilio calling)
 - A Twilio account with:
   - an account SID and auth token
