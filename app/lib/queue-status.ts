@@ -47,12 +47,19 @@ export type QueueLifecycle =
 export type QueueStateLike = {
   status?: string | null;
   /**
-   * A real `timestamptz` in the database, so a Drizzle row hands back a `Date`
-   * (#2213). The `string` arm is for the loose callers that still pass a raw
-   * value — RPC payloads and hand-built objects — not for the schema.
+   * A real `timestamptz`, so a server-side Drizzle row hands back a `Date`
+   * (#2213) — and a `string`, because these helpers also run in the browser.
    *
-   * Both arms are only ever tested for presence, never compared or sorted, so
-   * the union costs nothing here and keeps the module usable from both sides.
+   * `useQueue.ts` is a client hook and calls `isQueued` / `isDequeued` on
+   * payloads that arrived over JSON, where a `Date` is re-stringified on the
+   * wire. So both arms are live: `Date` from the model, `string` from a loader
+   * or realtime payload. The field is only ever tested for presence, never
+   * compared or sorted, so the union costs nothing.
+   *
+   * The earlier comment on this field claimed the string arm was for "raw sql
+   * projections and RPC payloads". That was wrong, and wrong in a way that
+   * mattered: it would have led the next reader to delete the arm, breaking
+   * every client-side caller.
    */
   dequeued_at?: Date | string | null;
   dequeued_by?: string | null;

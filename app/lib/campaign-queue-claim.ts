@@ -33,24 +33,19 @@ export const SMS_CLAIM_LEASE_MS = 10 * 60 * 1000;
  * A claim is live when it was taken less than one lease ago.
  *
  * `claimed_at` is a real `timestamptz` and the Drizzle model says so (#2213),
- * so a row read through the model hands back a `Date`. The `string` arm is for
- * the callers that do not go through the model — a raw `sql` projection, or an
- * RPC payload — and those arrive as a Postgres-formatted timestamp such as
- * `"2026-09-30 14:10:47.898535+00"`, which `Date.parse` handles.
- *
- * An earlier revision of this function was string-only, with a long note
- * explaining that a `Date` branch would be unreachable because the column was
- * mis-declared as `text()`. That drift is fixed, so the `Date` branch is now
- * the common path rather than dead code, and the string arm is the fallback
- * instead of the only case.
+ * so every caller hands back a `Date`. This signature used to accept a string
+ * as well, on the claim that raw-`sql` projections and RPC payloads would
+ * arrive as Postgres-formatted text. **They do not** — narrowing it to `Date`
+ * produces no compile error anywhere in `app/`, `test/`, `e2e/`, `shared/`,
+ * `server/` or `worker/`, so the string arm, the `Date.parse` fallback and the
+ * `Number.isNaN` guard were all unreachable. They are gone, and with them a
+ * `Date | string` in the signature that made it look as though two timestamp
+ * formats were genuinely in play.
  */
 export function claimIsLive(
-  claimedAt: Date | string | null | undefined,
+  claimedAt: Date | null | undefined,
   now: number = Date.now(),
 ): boolean {
   if (!claimedAt) return false;
-  const claimedMs =
-    claimedAt instanceof Date ? claimedAt.getTime() : Date.parse(claimedAt);
-  if (Number.isNaN(claimedMs)) return false;
-  return now - claimedMs < SMS_CLAIM_LEASE_MS;
+  return now - claimedAt.getTime() < SMS_CLAIM_LEASE_MS;
 }

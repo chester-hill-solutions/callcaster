@@ -12,10 +12,23 @@ import {
 
 describe("queue completion semantics", () => {
   test("treats dequeued_at and dequeued queue_state as completed", () => {
+    // The ISO string below is the *client* shape, not a stale test fixture.
+    // `claimed_at`-era code aside, `dequeued_at` is a real `timestamptz` (#2213),
+    // so a server-side Drizzle row hands back a `Date` — but these helpers also
+    // run in the browser via `useQueue.ts`, where JSON has re-stringified it.
+    // This case is why `QueueStateLike.dequeued_at` is `Date | string | null`.
+    // Do not "tidy" it to a `Date`; that breaks every client-side caller.
     expect(
       isDequeued({
         queue_state: "queued",
         dequeued_at: "2026-01-01T00:00:00Z",
+      }),
+    ).toBe(true);
+    // The server-side shape, for the other arm of the same union.
+    expect(
+      isDequeued({
+        queue_state: "queued",
+        dequeued_at: new Date("2026-01-01T00:00:00Z"),
       }),
     ).toBe(true);
     expect(
