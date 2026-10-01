@@ -31,6 +31,36 @@ export type CampaignSmsDispatchCounts = {
   exhausted: number;
 };
 
+/**
+ * What held a batch back, and that cause's payload.
+ *
+ * This is the part every blocked outcome shares, and it is declared once here
+ * because the SMS outcome, the IVR outcome and the worker adapter's parameter
+ * all used to spell it out. The payloads around it genuinely differ — SMS
+ * reports per-contact `responses` and a guaranteed `progress`, IVR has neither
+ * — so each keeps its own; only the cause is common, and only the cause is
+ * shared.
+ */
+export type CampaignDeferralCause =
+  | {
+      because: "send_window";
+      /**
+       * The exact next instant sending is allowed, so the durable adapter
+       * schedules its successor on the boundary rather than polling.
+       */
+      nextOpenAt: Date;
+    }
+  | {
+      /**
+       * The workspace is not cleared to send SMS: A2P 10DLC, sender pool sync,
+       * toll-free verification, or Messaging Service provisioning (#2081).
+       * Operator-facing, so the block is never reported as a dead-lettered
+       * queue.
+       */
+      because: "workspace_not_ready";
+      reasons: string[];
+    };
+
 export type CampaignSmsBatchOutcome =
   | { kind: "insufficient_credits" }
   | { kind: "caller_id_required" }
@@ -53,26 +83,7 @@ export type CampaignSmsBatchOutcome =
       responses: ContactDispatchResult[];
       /** Aggregate work completed before the batch deferred. */
       progress: { counts: CampaignSmsDispatchCounts; queuedRemaining: number };
-    } & (
-        | {
-            because: "send_window";
-            /**
-             * The exact next instant sending is allowed, so the durable adapter
-             * schedules its successor on the boundary rather than polling.
-             */
-            nextOpenAt: Date;
-          }
-        | {
-            /**
-             * The workspace is not cleared to send SMS: A2P 10DLC, sender pool
-             * sync, toll-free verification, or Messaging Service provisioning
-             * (#2081). Operator-facing, so the block is never reported as a
-             * dead-lettered queue.
-             */
-            because: "workspace_not_ready";
-            reasons: string[];
-          }
-      )
+    } & CampaignDeferralCause
   | {
       kind: "dispatched";
       responses: ContactDispatchResult[];

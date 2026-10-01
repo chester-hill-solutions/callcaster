@@ -3,7 +3,7 @@ import {
   nextDispatchOpenAt,
   type DispatchPolicy,
 } from "@/lib/campaign-dispatch-policy";
-import type { CampaignSmsBatchOutcome, CampaignSmsDispatchCounts } from "@/lib/campaign-sms-outcome";
+import type { CampaignSmsBatchOutcome, CampaignSmsDispatchCounts } from "@/lib/campaign-batch-outcome";
 import { messageCampaignRequiresCallerId } from "@/lib/sms-send-resolve";
 import {
   assertWorkspaceCanSendSms,
@@ -52,6 +52,29 @@ function noWorkCounts(): CampaignSmsDispatchCounts {
 }
 
 /**
+ * A deferral raised before any row was selected, so nothing to report and
+ * nothing done: no responses, and the whole audience still queued.
+ *
+ * Both gates in this module return that shape, and everything that makes it a
+ * deferral rather than a dispatch — empty `responses`, zeroed counts, the
+ * audience intact — is identical whichever condition held the batch. Only the
+ * cause and its payload differ, so only those are passed in.
+ */
+function deferredBeforeAnyRow(
+  cause:
+    | { because: "send_window"; nextOpenAt: Date }
+    | { because: "workspace_not_ready"; reasons: string[] },
+  queuedRemaining: number,
+): CampaignSmsBatchOutcome {
+  return {
+    kind: "deferred",
+    ...cause,
+    responses: [],
+    progress: { counts: noWorkCounts(), queuedRemaining },
+  };
+}
+
+/**
  * The gates that decide whether this batch may send at all, asked once, before
  * a single row is selected.
  *
@@ -94,13 +117,10 @@ export async function resolvePreDispatchGate(
     await assertWorkspaceCanSendSms({ workspaceId });
   } catch (error) {
     if (error instanceof WorkspaceSmsNotReadyError) {
-      return {
-        kind: "deferred",
-        because: "workspace_not_ready",
-        reasons: error.reasons,
-        responses: [],
-        progress: { counts: noWorkCounts(), queuedRemaining: input.queuedRemaining },
-      };
+      return deferredBeforeAnyRow(
+        { because: "workspace_not_ready", reasons: error.reasons },
+        input.queuedRemaining,
+      );
     }
     throw error;
   }
@@ -114,16 +134,16 @@ export async function resolvePreDispatchGate(
   // exact next open so the durable adapter can schedule its successor at the
   // window boundary instead of a fixed poll interval.
   if (!isDispatchAllowedAt(sendPolicy)) {
-    return {
-      kind: "deferred",
-      because: "send_window",
-      // Defensive fallback: a parsed window with active intervals always has
-      // an open instant within the week, but never hot-loop if that invariant
-      // is somehow violated.
-      nextOpenAt: nextDispatchOpenAt(sendPolicy) ?? new Date(Date.now() + 15 * 60 * 1000),
-      responses: [],
-      progress: { counts: noWorkCounts(), queuedRemaining: input.queuedRemaining },
-    };
+    return deferredBeforeAnyRow(
+      {
+        because: "send_window",
+        // Defensive fallback: a parsed window with active intervals always has
+        // an open instant within the week, but never hot-loop if that
+        // invariant is somehow violated.
+        nextOpenAt: nextDispatchOpenAt(sendPolicy) ?? new Date(Date.now() + 15 * 60 * 1000),
+      },
+      input.queuedRemaining,
+    );
   }
 
   return null;

@@ -32,6 +32,7 @@ import { ivrCallingPolicy, nextDispatchOpenAt } from "@/lib/campaign-dispatch-po
 import { logger } from "@/lib/logger.server";
 import type { ClaimedJobRow } from "@/lib/worker/poll-jobs.server";
 import type { VoterListSource } from "@/lib/audience-upload-process.server";
+import type { CampaignDeferralCause } from "@/lib/campaign-batch-outcome";
 
 // Re-exported for backwards compatibility: moved to job-types.server.ts in
 // #1239 A3 so job-params.server.ts can reference it without importing this
@@ -420,6 +421,24 @@ export async function campaignDispatchHandler(
 }
 
 /**
+ * The blocked outcomes a dispatch can hand back, narrowed to what an adapter
+ * actually reads.
+ *
+ * Named rather than written out inline, because the SMS outcome, the IVR
+ * outcome and this signature all spell the same `deferred` shape, and three
+ * copies of a union is how the fourth dispatcher gets it subtly wrong. The
+ * counts are a union because SMS and IVR count different things; everything
+ * else is shared.
+ */
+type CampaignBlockedOutcome =
+  | { kind: "insufficient_credits" }
+  | { kind: "caller_id_required" }
+  | {
+      kind: "deferred";
+      progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
+    } & CampaignDeferralCause;
+
+/**
  * The non-dispatched tail of the machine dispatch chain: park on
  * insufficient credit, stop on a caller-id config error, or reschedule the
  * successor at the send-window boundary. Shared by the SMS and IVR branches.
@@ -427,17 +446,7 @@ export async function campaignDispatchHandler(
 async function resolveDispatchBlockedCase(
   job: ClaimedJobRow,
   args: DispatchChainContext,
-  outcome:
-    | { kind: "insufficient_credits" }
-    | { kind: "caller_id_required" }
-    | {
-        kind: "deferred";
-        progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
-      }
-    & (
-        | { because: "send_window"; nextOpenAt: Date }
-        | { because: "workspace_not_ready"; reasons: string[] }
-      ),
+  outcome: CampaignBlockedOutcome,
 ): Promise<
   | { ok: true; campaignId: number; blocked: "insufficient_credits" }
   | { ok: true; campaignId: number; blocked: "caller_id_required" }
