@@ -59,6 +59,7 @@ app/lib/queue.server.ts::@/server/db
 app/lib/script-persistence.server.ts::@/server/db
 app/lib/survey-db.server.ts::@/server/db
 app/lib/survey-respondent.server.ts::@/server/db
+app/lib/survey-responses.server.ts::@/server/db
 app/lib/survey-structure.server.ts::@/server/db
 app/lib/telephony-db.server.ts::@/server/admin-db
 app/lib/telephony-db.server.ts::@/server/db
