@@ -70,20 +70,34 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
 
-      # A service container rather than a compose file: no ports to pick, no
-      # health-wait loop to get wrong, and the runner tears it down either way.
+      # A service container rather than the repo's compose file: no port to pick
+      # and no health-wait loop to get wrong. `supercharge/postgres-service` is a
+      # wrapper around `services:` and resolves unreliably, so this is the plain
+      # form the runner provides.
       - name: Start Postgres
-        uses: supercharge/postgres-service@v1
-        with:
-          db: callcaster
-          user: callcaster
-          password: callcaster
-          port: 5436
-          options: >-
-            --health-cmd pg_isready
-            --health-interval 10s
-            --health-timeout 5s
-            --health-retries 5
+        run: |
+          docker run -d --name drift-postgres \
+            -e POSTGRES_DB=callcaster \
+            -e POSTGRES_USER=callcaster \
+            -e POSTGRES_PASSWORD=callcaster \
+            -p 5436:5432 \
+            --health-cmd pg_isready \
+            --health-interval 10s \
+            --health-timeout 5s \
+            --health-retries 10 \
+            postgres:18-alpine
+
+          for attempt in $(seq 1 30); do
+            if docker exec drift-postgres pg_isready -U callcaster -d callcaster; then
+              echo "postgres ready"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "postgres did not become ready" >&2
+          docker logs drift-postgres >&2
+          exit 1
 
       # The repo's own bootstrap, not `drizzle-kit push` and not an `psql -f`
       # loop (#2227 removed the psql dependency from the e2e path for exactly
