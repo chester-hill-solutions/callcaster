@@ -1222,7 +1222,7 @@
     "recommendedTitle": "The auth:register idempotency scope is global, so a replay on a shared Idempotency-Key returns another caller's live access and refresh tokens",
     "summary": "The unauthenticated register response is still stored and replayed under one global namespace, including live bearer session tokens.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The unauthenticated register response is still stored and replayed under one global namespace, including live bearer session tokens.",
-    "resolution": "Do not cache or replay live registration credentials to an unauthenticated caller. An email hash alone is insufficient: email is public and a different caller can send the same email/key with another password. Remove signup response idempotency or use an authenticated/secret-bound design; keep workspace creation caller-scoped.",
+    "resolution": "Remove withIdempotency from unauthenticated registration. Ignore Idempotency-Key on this operation, do not cache signup responses or cookies, and use normal account-creation validation for retries. Existing replay rows must be unreachable through this endpoint. Update OpenAPI and the public auth docs. Keep the authenticated workspace-create namespace fix in #2132.",
     "lookIn": [
       "app/routes/api+/auth/register.action.server.ts:16",
       "app/lib/platform-idempotency.server.ts:83",
@@ -1241,11 +1241,12 @@
       "Legitimate retried registration does not leak or create extra accounts."
     ],
     "acceptanceCriteria": [
-      "A second caller using the same key with a different email cannot receive the first caller's credentials.",
-      "A second unproven caller using the same key and same email cannot receive the first caller's credentials.",
-      "Registration retries follow the chosen safe contract without exposing stored session tokens or creating extra accounts.",
-      "Every replay namespace has a documented caller-binding rule.",
-      "Tests fail when signup credentials become replayable through only a public email and an Idempotency-Key."
+      "Two callers using the same key with different emails never share session tokens or cookies.",
+      "A repeated request with the same key and email does not receive a cached session; existing-account handling still applies.",
+      "A previously stored auth:register response is not served by registration.",
+      "Registration success, validation, rate limits and provider failure retain their existing behavior.",
+      "OpenAPI and human docs state that registration does not replay session responses.",
+      "List the remaining replay call sites; the global workspaces:create defect stays tracked by #2132."
     ],
     "blockedBy": [],
     "size": "M",

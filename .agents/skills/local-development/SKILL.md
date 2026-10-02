@@ -7,6 +7,13 @@ description: "Use when setting up, running, repairing, or tailing logs for the C
 
 The single source of truth is `docs/local-development.md`. Read the relevant section before running commands; this skill only says where to look and which entry points exist.
 
+## Node runtime
+
+Use a working Node 22 runtime for local checks. Run `node --version` before
+installing dependencies. If Homebrew Node fails with a missing shared library,
+use an installed NVM Node 22 version for this task instead of changing global
+libraries or using a different Node major.
+
 ## Entry points
 
 - First run or repair: `make init` (`npm run setup`, idempotent). Services already running elsewhere: `npm run setup -- --skip-docker`.
