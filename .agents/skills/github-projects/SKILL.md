@@ -49,6 +49,16 @@ CallCaster pull requests base on `dev`. The repository default branch is `master
 5. Treat project deletion, closing, field deletion, item deletion, archival, and item edits as mutations. Read the specific command help first.
 6. After a mutation, query the project or item again and verify the changed IDs, names, and values.
 
+## Board Refresh Without Project Read Access
+
+The issue-board GraphQL query reads Project fields and needs `read:project`.
+If that scope is absent, REST can still provide live issue state, labels and
+assignees. For a source audit, pass that issue snapshot to `generateIssueBoard`
+from `scripts/issue-board-generate.mjs` and validate the enrichment normally.
+Do not infer Project Status from labels or PRs. Preserve cached progress markers
+only with a visible notice that names their source revision and says they were
+not refreshed. This fallback does not verify or change Project Status.
+
 ## Common Commands
 
 - View: `gh project view NUMBER --owner OWNER`

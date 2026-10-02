@@ -2450,5 +2450,230 @@
       "test/call-recording-repair.server.test.ts"
     ],
     "trackerRecommendation": "Code reviewed at dev@5b673c81. The original call.date_created text declaration is absent. Do not create a second implementation for this issue."
+  },
+  {
+    "issueNumber": 2116,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify the disabled-workspace billing split and continued number release",
+    "summary": "Implemented in PR #2165 on dev. Disabled workspaces receive no rental debit or sync/reconcile fanout. Number release keeps running.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The disabled-workspace billing split is complete on dev. Fanout skips disabled workspaces by default; rental billing still runs the release ladder and suppresses debits.",
+    "resolution": "Verify the disabled workspace case on the review environment, then promote the existing change.",
+    "lookIn": [
+      "app/lib/cron-workspace-fanout.server.ts:92",
+      "app/lib/worker/handlers/cron.server.ts:193",
+      "app/lib/number-rental-billing.server.ts:435",
+      "test/cron-workspace-fanout.server.test.ts:1",
+      "app/lib/worker/handlers/cron.server.ts:64,121,167,190-225",
+      "app/lib/cron-workspace-fanout.server.ts",
+      "app/lib/database/workspace.server.ts (the `disabled` column and the sibling sweep that filters it)"
+    ],
+    "existingTests": [
+      "test/cron-workspace-fanout.server.test.ts (new, 7 tests: skip + count, positive control, mixed sweep, includeDisabled opt-in, no credential read for a disabled workspace, undefined-disabled treated as enabled, skipped-not-failed)",
+      "test/number-rental-billing.server.test.ts (new describe block, 6 tests: no charge when disabled with a healthy balance, enabled control still charges, no balance read, release still happens, no unsuspend without a charge, fail-open when the workspace lookup throws)",
+      "test/worker-cron-handlers.server.test.ts (3 new tests asserting the coordinator passes includeDisabled: true for number_rental_billing and omits it for billing_reconcile and twilio_open_sync)"
+    ],
+    "missingTests": [
+      "Runtime verification remains; source and tests implement the decided behavior."
+    ],
+    "acceptanceCriteria": [
+      "DONE: a disabled workspace receives no number_rental_billing debit and no billing_reconcile or twilio_open_sync run. Kill-check run: inverting the fanout guard turns 4 tests red, inverting billingEnabled turns 4 red, setting includeDisabled: false turns 2 red.",
+      "DONE: the fanout summary counts the workspace as `skipped` and logs `<job>.fanout_skipped_disabled` with the workspaceId.",
+      "DONE: an enabled workspace is unaffected (positive control asserted in all three test files).",
+      "DONE: the decided meaning of `disabled` is recorded on this issue and in the runCronWorkspaceFanout doc comment.",
+      "DONE: the release half keeps running, so no number is stranded by the suspension itself."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Move to Verify and close. Do not implement the original single fanout guard. Related PR evidence: #2165. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2049,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify provider send-time capture and bounded backfill on the review environment",
+    "summary": "PR #2055 implements provider date_sent capture and bounded backfill on dev. Move to runtime verification.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Provider send-time capture is implemented: open rows and bounded untimed non-open rows are processed; first-write-wins is enforced at the SQL update. Export visibility remains a separate follow-up.",
+    "rootCause": "The original omission is fixed in PR #2055: the sweep persists provider dateSent, selects bounded untimed non-open rows, and the database update preserves the first stored time.",
+    "resolution": "Verify real provider capture and record API/DB cost. Keep separate request/send-time export work with #1752.",
+    "lookIn": [
+      "app/lib/twilio-open-sync.server.ts:295",
+      "app/lib/twilio-open-sync.server.ts:411",
+      "app/lib/message-db.server.ts:275",
+      "test/twilio-open-sync.server.test.ts:228",
+      "scripts/e2e/bootstrap-compose-db.mjs:89",
+      "app/lib/twilio-open-sync.server.ts:44,49,233-319",
+      "app/lib/message-db.server.ts:202-249",
+      "app/lib/worker/job-params.server.ts:52-56",
+      "app/lib/worker/handlers/cron.server.ts:73-107",
+      "app/db/schema.ts:390-420",
+      "app/lib/campaign-export.server.ts"
+    ],
+    "existingTests": [
+      "test/twilio-open-sync.server.test.ts",
+      "test/message-db.server.test.ts",
+      "test/sms-status-webhook.test.ts"
+    ],
+    "missingTests": [
+      "No real capture-rate/cost measurement performed here; unit tests do not prove deployed historical data is filled."
+    ],
+    "acceptanceCriteria": [
+      "Message row carries the provider-reported date_sent after the sweep runs",
+      "Messages that settle before any sweep observed them still receive a date_sent",
+      "A message with no provider dateSent is abandoned after the age bound, not re-selected forever",
+      "date_sent is never overwritten once written and never inferred from date_created",
+      "Backfill selection is bounded, self-limiting, and its cost is measured",
+      "Record provider capture/backfill cost. Separate request/send-time export presentation stays tracked by #1752."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close after provider/runtime cost checks. Do not repeat the write/backfill implementation. Related PR evidence: #2055. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2040,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify the SMS contact creation fix in the review environment",
+    "summary": "The reported SMS contact creation defects are addressed in current source: workspace_id is posted, blank audience is skipped, and the sheet waits for a successful response.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. PR #2070 fixes the posted workspace field, empty-audience conversion, and premature sheet close.",
+    "rootCause": "The original form/endpoint tenancy mismatch, blank-audience conversion, and premature sheet close are fixed by PR #2070. Browser persistence and failure-retention checks remain.",
+    "resolution": "Verify both successful creation and error retention in the review environment.",
+    "lookIn": [
+      "app/components/contact/ContactForm.tsx:107",
+      "app/routes/api+/contacts.action.server.ts:51",
+      "app/components/sms-ui/ChatAddContactDialog.tsx:74",
+      "app/components/contact/ContactForm.tsx:45-51 (Form action/method/navigate) and :107 (hidden input name)",
+      "app/components/sms-ui/ChatAddContactDialog.tsx:62-69 (submit, navigate:false, unconditional setDialog(false))",
+      "app/routes/api+/contacts.action.server.ts:35-40 (reads data.workspace_id, 400 on empty)",
+      "app/lib/request-utils.server.ts:10-20 (parseRequestData does no field-name mapping)",
+      "app/components/queue/ContactSearchDialog.tsx:65 (the correct workspace_id caller, and the working pattern to copy)"
+    ],
+    "existingTests": [
+      "test/contacts-action.server.test.ts (JSON tenancy checks; no Messages form round trip)",
+      "test/ui/components-chats-contact.test.tsx (ContactForm rendering only)"
+    ],
+    "missingTests": [
+      "Source fix is present, but test/contacts-action.server.test.ts covers JSON tenancy and the UI smoke test only renders ContactForm. No full dialog success/failure test was found."
+    ],
+    "acceptanceCriteria": [
+      "Saving a contact from the Messages sheet creates exactly one contact row",
+      "The POST carries the tenancy field the endpoint reads, agreed in one place rather than two",
+      "A rejected save keeps the sheet open with the typed values and shows the reason",
+      "A successful save closes the sheet after the create response.",
+      "One click produces one request, verified by a test that counts requests"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close after browser persistence/error checks; the original root-cause description is stale. Related PR evidence: #2070. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2039,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify rented-number success tone and routing spacing",
+    "summary": "PR #2071 changed the rented-number notice to success and removed the extra routing top padding. Source matches the recorded implementation plan.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The success tone and spacing change are present in dev.",
+    "rootCause": "The original default-tone and duplicate-padding defects are fixed by PR #2071. Dark/light visual checks remain.",
+    "resolution": "Verify the reported success state and spacing visually; no further source fix is established.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:388",
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:485",
+      "app/routes/workspaces+/$id/onboarding/OnboardingFirstNumberStep.tsx:387-400 (the Alert), :270 (space-y-6), :485 (border-t pt-6)",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx (default variant = border-brand-tertiary bg-brand-wash; success/destructive/warning/info exist)",
+      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:161 (--brand-wash dark = hsl(340 28% 18%))",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx (sibling steps to sweep for the same missing variant)"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-first-number-flow.test.tsx",
+      "test/ui/onboarding-first-number-groups.test.tsx"
+    ],
+    "missingTests": [
+      "Existing first-number UI tests cover number flows but do not prove tone and spacing in a real rendered theme. No browser check was performed."
+    ],
+    "acceptanceCriteria": [
+      "The rented-number confirmation reads as a success, not an error, in both light and dark themes",
+      "The gap under the banner matches the rest of the step's rhythm",
+      "The Alert primitive's default variant is unchanged",
+      "The rented-number confirmation uses the success tone. The wider default-Alert contract is tracked separately in #2061.",
+      "A test fails if a success-state Alert renders with the default variant"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Move to Verify and close pending browser confirmation. Related PR evidence: #2071. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2086,
+    "verdict": "verify-close",
+    "recommendedTitle": "The IVR no-input replay branch overwrites outreach_attempt.result, destroying every answer already recorded on that call",
+    "summary": "The replay path now merges answers and nested counters. CSV and result display strip the replay metadata. PR #2161 covers the reported loss.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The replay path now merges answers and nested counters. CSV and result display strip the replay metadata. PR #2161 covers the reported loss.",
+    "resolution": "The source fix and regression tests landed in #2161. Verify IVR answers, Results and CSV in the review environment; close after promotion under the issue policy.",
+    "lookIn": [
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts:226",
+      "app/lib/ivr-results.ts:113",
+      "test/ivr-block-response.route.test.ts:347",
+      "test/campaign-export-voice-credits.test.ts:230",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts:188-195,219-226,237+",
+      "app/lib/inbound-no-input-replay.server.ts",
+      "app/lib/campaign-export.server.ts:493",
+      "app/lib/outreach-typed-fields.server.ts",
+      "app/lib/ivr-results.ts"
+    ],
+    "existingTests": [
+      "test/ivr-block-response.route.test.ts:347 preserves answers across repeated replays.",
+      "test/campaign-export-voice-credits.test.ts:230 removes replay metadata from CSV.",
+      "test/ivr-results.test.ts covers result presentation."
+    ],
+    "missingTests": [
+      "Source tests exist; deployed IVR/result/CSV verification remains."
+    ],
+    "acceptanceCriteria": [
+      "A call that answers two prompts, then hits a no-input replay, then answers again, retains **all three** answers in `outreach_attempt.result`.",
+      "A second replay does not lose the answers either.",
+      "The export CSV `full_result` cell contains no `__no_input_replays` key.",
+      "The Results screen shows every answer for that attempt."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Source fix exists. Verify the review environment and required promotion before closing. Related PR evidence: #2161. A PR reference alone does not prove deployed behavior.",
+    "rootCause": "PR #2161 fixed the read-modify-write omission by merging prior answers and counters, and removes replay metadata from Results and export views."
+  },
+  {
+    "issueNumber": 2060,
+    "verdict": "verify-close",
+    "recommendedTitle": "Verify welcome-credit classification through the display and reconciliation adapters",
+    "summary": "The claimed purchase-classification defect is not present in the public adapters. Welcome and manual grant prefix buckets intentionally return other; the display adapter converts other+CREDIT to purchase, and reconciliation classifies every CREDIT as purchase.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. shared/billing-keys.ts returns other for welcome/manual grant prefixes, as explicitly tested in test/billing-keys.test.ts:28. app/lib/transaction-history-display.ts:30 maps other+CREDIT to purchase. shared/billing-reconciliation.ts:126 also maps every CREDIT to purchase. The reconciliation prefix classifier is duplicated, but that does not cause the claimed welcome-credit defect.",
+    "rootCause": "The issue mistakes the prefix-only bucket for the final event source. The adapters already use transaction type to identify credit purchases/grants. The shared key helper documentation overstates classifier reuse because reconciliation still has an inline classifier.",
+    "resolution": "Verify welcome CREDIT classification through getBillingEventSource and categorizeLedgerRow, then close the incorrect defect report. Any distinction between paid purchases and grants needs its own product decision and task; no welcome-prefix change is needed for the claimed behavior.",
+    "lookIn": [
+      "app/lib/transaction-history-display.ts:30",
+      "shared/billing-reconciliation.ts:126",
+      "test/billing-keys.test.ts:28",
+      "shared/billing-keys.ts:71",
+      "shared/billing-keys.ts:116",
+      "shared/billing-reconciliation.ts:3",
+      "shared/billing-keys.ts:24,72,106-129",
+      "app/lib/getBillingEventSource",
+      "shared/billing-keys.ts (categorizeLedgerRow)"
+    ],
+    "existingTests": [
+      "test/billing-keys.test.ts:28 asserts welcome/manual grant prefix buckets are other.",
+      "test/transaction-history.server.test.ts",
+      "test/billing-reconciliation.test.ts"
+    ],
+    "missingTests": [
+      "A focused adapter-level welcome CREDIT test would pin the already-correct displayed/reconciliation behavior."
+    ],
+    "acceptanceCriteria": [
+      "A welcome CREDIT displays as Purchase and reconciles as purchase through the public adapters.",
+      "The intentional prefix-only grant bucket remains other unless product semantics change.",
+      "Any change to distinguish paid purchases and grants has its own decision and task."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Move to Verify and close. Public adapters already satisfy the claimed purchase classification; do not change intentional grant prefix buckets solely to satisfy the original incorrect premise."
   }
 ]

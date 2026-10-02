@@ -848,36 +848,6 @@
     "trackerRecommendation": "Filed from the 2026-09-25 full vertical-slice sweep. Evidence was read and quoted from the code at dev@648f5e58; the high-severity claims were re-verified against the source before filing. Every missing test above is a specific assertion with an explicit kill-check, not a request to add coverage."
   },
   {
-    "issueNumber": 2116,
-    "verdict": "fix-now",
-    "recommendedTitle": "runCronWorkspaceFanout never skips workspace.disabled, so a disabled workspace is still debited and still reconciled",
-    "summary": "`runCronWorkspaceFanout` is the entry point for `twilio_open_sync`, `billing_reconcile` and `number_rental_billing`. It did not check `workspace.disabled`, so a workspace an admin had disabled still got its daily number-rental debits posted and still got its Twilio usage pulled and reconciled. RESOLVED as a two-lever split, decided by the product owner 2026-09-28 and implemented. `disabled` stops money moving OUT (rental debits, usage reconciliation, twilio_open_sync) but number RELEASE keeps running on its own schedule.",
-    "currentBehavior": "Two claims in the original filing were wrong and are corrected here. (1) 'the balance can go negative while suspended' is not true: number-rental-billing.server.ts:395-431 checks funds before every DEBIT and routes an unaffordable cycle to the unpaid ladder, so the ledger write is only reachable when balance >= the rental cost. The real harm was an unbudgeted charge against a suspended account, not a negative balance. (2) `disabled` is NOT a kill switch: it is read in exactly three places (the admin-console status filter, the activeWorkspaces stat, and the twilio webhook audit skip at cron.server.ts:275). No middleware, login, or API auth path reads it, so a disabled workspace's members can still sign in and place calls. Skipping the billing is the whole of what the flag buys today. The unstated third finding: the warn -> suspend -> RELEASE ladder lives inside the same number_rental_billing handler as the debit, so the naive one-guard fix would have frozen the ladder too and left every unpaid number in a suspended workspace rented and live forever. That is the trap this split avoids.",
-    "resolution": "DONE (2026-09-28). Implemented as a two-lever split rather than the single guard the original filing proposed. 1. `runCronWorkspaceFanout` gained `includeDisabled?: boolean`, defaulting to false: a disabled workspace is counted as `skipped` and logged as `<job>.fanout_skipped_disabled` before any Twilio credential read. This covers `twilio_open_sync` and `billing_reconcile`, and is the behaviour every future fanout job inherits. 2. `numberRentalBillingHandler` opts in with `includeDisabled: true`, because the release ladder must keep running. 3. `runNumberRentalBilling` reads `workspace.disabled` from the workspace row it already loads and passes `billingEnabled` into `billElapsedCycles`, which suppresses the DEBIT (and does not read the balance at all) while leaving the cycles unbilled so the caller derives them as unpaid and the ladder still escalates to release. 4. The rule is written into the `runCronWorkspaceFanout` doc comment, including when NOT to opt in. 5. The decision is recorded in a comment on this issue. NOT DONE, deliberately out of scope: making `disabled` actually block sign-in and API access. That is a different change and needs its own issue.",
-    "lookIn": [
-      "app/lib/worker/handlers/cron.server.ts:64,121,167,190-225",
-      "app/lib/cron-workspace-fanout.server.ts",
-      "app/lib/database/workspace.server.ts (the `disabled` column and the sibling sweep that filters it)"
-    ],
-    "existingTests": [
-      "test/cron-workspace-fanout.server.test.ts (new, 7 tests: skip + count, positive control, mixed sweep, includeDisabled opt-in, no credential read for a disabled workspace, undefined-disabled treated as enabled, skipped-not-failed)",
-      "test/number-rental-billing.server.test.ts (new describe block, 6 tests: no charge when disabled with a healthy balance, enabled control still charges, no balance read, release still happens, no unsuspend without a charge, fail-open when the workspace lookup throws)",
-      "test/worker-cron-handlers.server.test.ts (3 new tests asserting the coordinator passes includeDisabled: true for number_rental_billing and omits it for billing_reconcile and twilio_open_sync)"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "DONE: a disabled workspace receives no number_rental_billing debit and no billing_reconcile or twilio_open_sync run. Kill-check run: inverting the fanout guard turns 4 tests red, inverting billingEnabled turns 4 red, setting includeDisabled: false turns 2 red.",
-      "DONE: the fanout summary counts the workspace as `skipped` and logs `<job>.fanout_skipped_disabled` with the workspaceId.",
-      "DONE: an enabled workspace is unaffected (positive control asserted in all three test files).",
-      "DONE: the decided meaning of `disabled` is recorded on this issue and in the runCronWorkspaceFanout doc comment.",
-      "DONE: the release half keeps running, so no number is stranded by the suspension itself."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "The blocker named in the original filing is answered and the work is complete. Lane moves needs-decision -> fix-now for the board, then closes on merge. Two things deliberately left for separate issues: (1) `disabled` still does not block sign-in or API access, so it is a billing and audit lever, not the kill switch it is described as anywhere in the product; (2) the release-ladder behaviour is now implicit in a flag name, so anyone adding a 5th fanout job has to read the doc comment to know the default. Both are worth filing, neither blocks this."
-  },
-  {
     "issueNumber": 2164,
     "verdict": "needs-decision",
     "recommendedTitle": "workspace.disabled does not block sign-in or API access, so the platform suspension lever does not suspend",
@@ -978,5 +948,123 @@
     "size": "L",
     "risk": "high",
     "trackerRecommendation": "Needs decision, and the five questions are the deliverable, not a preamble to them. The single most consequential answer is credit semantics: if a subscription grants credits that refresh, the existing ledger's meaning changes and the reconciliation logic that shares the debit gate has to be reworked rather than extended. Do not start implementation before that is settled. This issue is blocked by #1521 (whether refunds and disputes reverse credits), which is a narrower decision about the same ledger. Sequence it AFTER the open credit-ledger defects are fixed rather than before — a subscription layered onto a ledger that drops out-of-order rows or mis-bills MMS makes those bugs more expensive and harder to attribute, and it is worth saying plainly that the ledger is currently correct by design and only its callers and schema are not."
+  },
+  {
+    "issueNumber": 2046,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Attribute inbound SMS replies to a campaign",
+    "summary": "Inbound rows still omit campaign_id. A latest-outbound correlation is only a heuristic when several campaigns address the same person; the ticket lists three different models without choosing one.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Inbound rows still omit campaign_id. A latest-outbound correlation is only a heuristic when several campaigns address the same person; the ticket lists three different models without choosing one.",
+    "rootCause": "The inbound write path knows only the contact (matched by From number); the outbound path knows its queue/campaign at dispatch. No conversation/thread link is written on the inbound row.",
+    "resolution": "Choose and document attribution precedence, correlation window, sender matching and ambiguity behavior. Then implement one model with STOP behavior preserved.",
+    "lookIn": [
+      "app/routes/api+/inbound-sms.action.server.ts:178",
+      "app/lib/campaign-export-db.server.ts:73",
+      "app/routes/api+/inbound-sms.action.server.ts",
+      "app/lib/campaign-export.server.ts",
+      "app/lib/campaign-export-db.server.ts",
+      "app/db/schema.ts (message table)"
+    ],
+    "existingTests": [
+      "test/inbound-sms.route.test.ts"
+    ],
+    "missingTests": [
+      "No source test proves single-blast attribution or deterministic ambiguous attribution."
+    ],
+    "acceptanceCriteria": [
+      "Single-blast reply attributed to exactly that campaign",
+      "Export lists replies with deterministic reply_to_campaign_ids + documented precedence",
+      "STOP/opt-out dequeue unaffected",
+      "Attribution covered by a test"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Move to Needs decision. Choose reply attribution semantics before adding a historical heuristic as fact."
+  },
+  {
+    "issueNumber": 2061,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale",
+    "summary": "The maroon dark token and default brand Alert still exist. The issue explicitly requires an A/B/C decision and none is recorded; the onboarding instance fix does not decide the shared design contract.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The maroon dark token and default brand Alert still exist. The issue explicitly requires an A/B/C decision and none is recorded; the onboarding instance fix does not decide the shared design contract.",
+    "rootCause": "The default Alert pairs a pale pink border token with a dark maroon background token. The dark theme overrides brand-wash but retains brand-tertiary. Whether to change tokens, require explicit tones, or do both remains undecided.",
+    "resolution": "Choose token change, explicit tone contract, or both; inventory default Alert and other token consumers, then verify dark/light examples before changing shared tokens.",
+    "lookIn": [
+      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:100",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx:23",
+      "app/components/ui/alert.tsx:1",
+      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx",
+      "app/components/ui/alert.tsx"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "A source token can confirm the described colors, not whether a user reads them as an error. No browser contrast/tone acceptance check was performed."
+    ],
+    "acceptanceCriteria": [
+      "Record the token change, explicit tone, or combined decision.",
+      "Under that decision, a neutral Alert remains legible and does not appear to indicate failure in dark mode.",
+      "List every Alert without an explicit tone and mark it deliberately neutral or give it the required tone.",
+      "If shared tokens change, check their other consumers in light and dark themes.",
+      "Test the selected Alert tone contract and verify the rendered result."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Needs decision: record the A/B/C design choice before a shared visual change. Related PR evidence: #2071. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2194,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Cull 111 empty legacy-named Twilio subaccounts (Console-only; 31 must be kept)",
+    "summary": "The old survey identified 111 apparent candidates and 31 live dev owners. Dev, staging and production share the account; current ownership and deletion safety have not been established.",
+    "risk": "high",
+    "size": "S",
+    "trackerRecommendation": "Needs decision: a historical empty-resource count does not authorize shared-account deletion. Related PR evidence: #2193, #2195. A PR reference alone does not prove deployed behavior.",
+    "resolution": "Refresh the read-only inventory, reconcile each candidate with every environment and decide an explicit keep/delete list before Console cleanup.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The 111 deletion candidates come from a dated shared-account survey. The inventory only reads Twilio resources; it does not prove that all candidates lack live dev, staging and production owners.",
+    "missingTests": [
+      "Every candidate must have an evidenced absence of live ownership; no current deletion count can be inferred from the old survey."
+    ],
+    "lookIn": [
+      "scripts/twilio-subaccount-inventory.mjs:24",
+      "scripts/twilio-subaccount-inventory.mjs:29",
+      "scripts/twilio-subaccount-inventory.mjs:65"
+    ]
+  },
+  {
+    "issueNumber": 2216,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Email verification is half-wired: a verify-email route and a \"verify your email\" prompt both exist, but no verification email is ever sent",
+    "summary": "Email verification remains half-wired: auth has reset email callback but no verification callback/requirement; register fallback claims verification and a verify handler survives. The live issue explicitly leaves mandatory verification versus removal undecided.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Passwords are enabled and sessions issue without email verification; verification handler/message exist with no send callback. Registration can occupy an unverified email, while password reset goes to the mailbox owner.",
+    "rootCause": "Auth configuration enables password signup and reset delivery but has no email-verification delivery or enforcement configuration. Verification handlers and a verification message remain without a configured issuance flow. Source does not establish that the feature was deliberately removed.",
+    "resolution": "Choose mandatory verification with delivery/resend/pending-session UX, or deliberately remove misleading verification surface. EmailVerified is a Better Auth schema field and should not be deleted blindly. Cover actual registration behavior.",
+    "lookIn": [
+      "app/server/auth-instance.ts:21",
+      "app/lib/platform-auth.server.ts:195",
+      "app/lib/platform-auth.server.ts:347",
+      "app/routes/api+/auth/verify-email.action.server.ts:9",
+      "app/server/auth-instance.ts:22-31 (emailAndPassword: no sendVerificationEmail, no requireEmailVerification)",
+      "app/lib/platform-auth.server.ts:339-380 (the unreachable verify-email handler)",
+      "app/lib/platform-auth.server.ts:189-198 (the unreachable success branch)",
+      "app/routes/api+/auth/verify-email.action.server.ts:9 (a rate limit on a dead route)",
+      "app/db/auth-schema.ts:16 (emailVerified column, default false, never written)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "No test exercises real registration to assert verification issuance and session policy. Account-address occupancy is established; automatic account takeover by the first registrant is not, since reset goes to the actual mailbox owner."
+    ],
+    "acceptanceCriteria": [
+      "A test registers a user and asserts one of the two outcomes, so the half-wired state cannot return",
+      "No user-visible string references verification unless verification happens",
+      "The dead route and its rate limit are either live or removed",
+      "A test covers the chosen path end to end"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Needs decision. The issue explicitly requires Option A/B product policy and states funnel cost is unknown; do not select cheaper removal as a bug fix. Then implement/test the chosen policy. Related PR evidence: #2223, #2222. A PR reference alone does not prove deployed behavior."
   }
 ]
