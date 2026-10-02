@@ -17,6 +17,7 @@ import { requireJsonAuth } from "@/lib/api-auth.server";
 
 import { rpcCreateOutreachAttempt } from "@/lib/db-rpc.server";
 import { createTenantDb } from "@/server/tenant-db";
+import { callerIdRefusalMessage, resolveCallerIdUsability } from "@/lib/caller-id-usability.server";
 import { insertCallForWorkspace } from "@/lib/telephony-db.server";
 import { defineAction } from "@/lib/handler.server";
 
@@ -63,6 +64,13 @@ export const action = defineAction({
 
       const credits = await requireOutboundCredits(workspace_id);
       if (!credits.ok) return outboundCreditsResponse(credits);
+
+      // Same rule as every other send path: the workspace must own the number
+      // it is dialling from, and it must not be suspended for an unpaid rental.
+      const refusal = callerIdRefusalMessage(
+        await resolveCallerIdUsability(workspace_id, caller_id),
+      );
+      if (refusal) throw new Response(refusal, { status: 400 });
 
       const tdb = createTenantDb(workspace_id);
       outreachAttemptId = await rpcCreateOutreachAttempt(tdb, {

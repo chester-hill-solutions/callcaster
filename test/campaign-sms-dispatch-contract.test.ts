@@ -60,7 +60,10 @@ const mocks = vi.hoisted(() => ({
   rpcTryCompleteCampaignIfDrained: vi.fn(async () => true),
   rpcFailExhaustedCampaignQueueContacts: vi.fn(async () => 0),
   recordQueueAttemptFailure: vi.fn(async () => undefined),
-  createTenantDb: vi.fn(() => ({ tenant: true })),
+  createTenantDb: vi.fn(() => ({
+    tenant: true,
+    workspace_number: { findFirst: async () => ({ id: 1, suspended_at: null }) },
+  })),
   enqueueJob: vi.fn(async () => ({ enqueued: true, jobId: 99 })),
 
   isWithinSendWindow: vi.fn(() => true),

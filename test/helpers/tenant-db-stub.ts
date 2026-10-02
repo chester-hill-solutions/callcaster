@@ -54,7 +54,15 @@ function applyTenantDbMockImplementations() {
   tenantDbMocks.callInsert.mockImplementation(async (payload: unknown) => [payload]);
   tenantDbMocks.callDelete.mockImplementation(async () => undefined);
   tenantDbMocks.callUpdate.mockImplementation(async (opts: unknown) => [opts]);
-  tenantDbMocks.workspaceNumberFindFirst.mockImplementation(async () => null);
+  // Default: the workspace owns the number and it is not suspended, so send
+  // paths reach their subject instead of stopping at the ownership gate. Tests
+  // that are about ownership override this with a `null` (not owned) or a
+  // `suspended_at` row. Proven against a real database in
+  // test/integration-db/caller-id-usability.test.ts.
+  tenantDbMocks.workspaceNumberFindFirst.mockImplementation(async () => ({
+    id: 1,
+    suspended_at: null,
+  }));
 }
 
 applyTenantDbMockImplementations();

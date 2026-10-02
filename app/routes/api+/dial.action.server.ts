@@ -11,6 +11,7 @@ import {
   requireOutboundCredits,
 } from "@/lib/outbound-credit-gate.server";
 import { createTenantDb } from "@/server/tenant-db";
+import { callerIdRefusalMessage, resolveCallerIdUsability } from "@/lib/caller-id-usability.server";
 import { and, eq } from "drizzle-orm";
 import { workspace_number as workspaceNumberTable } from "@/db/schema";
 import { env } from "@/lib/env.server";
@@ -146,6 +147,16 @@ export const action = defineAction({
             { status: 409 },
         );
     }
+    // The caller must own the number they are dialling from, on every voice
+    // send. This lookup used to be gated behind the emergency-compliance branch
+    // below, so a workspace without that compliance could place a call from any
+    // number it liked -- the voice half of the SMS sender-spoofing path
+    // (`caller-id-usability.server.ts`).
+    const refusal = callerIdRefusalMessage(
+        await resolveCallerIdUsability(workspace_id, caller_id),
+    );
+    if (refusal) throw new Response(refusal, { status: 400 });
+
     const [callerIdRecord, onboarding] = await Promise.all([
         tdb.workspace_number.findFirst({
             where: eq(workspaceNumberTable.phone_number, caller_id),

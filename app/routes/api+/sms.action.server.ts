@@ -128,6 +128,24 @@ export const action = defineAction({
             headers: { "Content-Type": "application/json" },
           },
         );
+      case "caller_id_not_usable":
+        // The caller id was present and well-formed; it just cannot be used by
+        // this workspace. Distinct messages, because "supply one you already
+        // supplied" hides the real reason, and a suspended number needs a
+        // different remedy from someone else's number.
+        return new Response(
+          JSON.stringify({
+            error:
+              outcome.reason === "suspended"
+                ? "caller_id is suspended for an unpaid rental — add credits to restore it"
+                : "caller_id must be a phone number that belongs to this workspace",
+            callerId: outcome.callerId,
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
       case "deferred":
         // A deferred batch is 200 + `deferred`, never an error: nothing failed
         // and nothing was sent, so a caller that treated this as an error would

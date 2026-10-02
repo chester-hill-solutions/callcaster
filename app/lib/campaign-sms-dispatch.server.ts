@@ -29,6 +29,7 @@ import {
   smsSendPolicy,
 } from "@/lib/campaign-dispatch-policy";
 import { resolvePreDispatchGate } from "@/lib/campaign-sms-pre-dispatch-gate.server";
+import { resolveCallerIdUsability } from "@/lib/caller-id-usability.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
 import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
@@ -126,6 +127,27 @@ export async function dispatchCampaignSmsBatch(args: {
   // `resolvePreDispatchGate` — caller id, workspace compliance, send window.
   // Each is a workspace- or campaign-level condition resolved for the whole
   // batch, so each returns an outcome here instead of failing a recipient.
+  //
+  // Ownership of a request-supplied caller id is checked here rather than in the
+  // route: this function also has the durable worker as a caller, so a check in
+  // the route would leave that path unguarded. Without it any workspace member
+  // could send SMS appearing to come from another tenant's number, spending the
+  // victim's A2P registration without their consent (#2129 P0).
+  const callerIdUsability = await resolveCallerIdUsability(workspaceId, callerIdStr);
+  if (callerIdUsability.kind === "not_owned" || callerIdUsability.kind === "suspended") {
+    logger.warn("campaign_sms.caller_id_not_usable", {
+      workspaceId,
+      campaignId,
+      callerId: callerIdUsability.callerId,
+      reason: callerIdUsability.kind,
+    });
+    return {
+      kind: "caller_id_not_usable",
+      callerId: callerIdUsability.callerId,
+      reason: callerIdUsability.kind,
+    };
+  }
+
   const effectiveCallerId =
     callerIdStr || String(campaign.campaign?.caller_id ?? "").trim();
   const sendPolicy = smsSendPolicy(campaign.campaign);

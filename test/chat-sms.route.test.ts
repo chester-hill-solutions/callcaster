@@ -34,6 +34,11 @@ const tenantDbMocks = vi.hoisted(() => ({
   contact: {
     findFirst: vi.fn(async () => null),
   },
+  // Fixture: this workspace owns the sending number. Ownership itself is proved
+  // in test/integration-db/caller-id-usability.test.ts against a real database.
+  workspace_number: {
+    findFirst: vi.fn(async () => ({ id: 1, suspended_at: null })),
+  },
 }));
 
 

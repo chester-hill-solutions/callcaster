@@ -12,6 +12,14 @@ const mocks = vi.hoisted(() => ({
   env: { BASE_URL: () => "https://app.example" },
 }));
 
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    // Fixture: this workspace owns the sending number, so the send path reaches
+    // the behaviour under test instead of stopping at the ownership gate.
+    workspace_number: { findFirst: async () => ({ id: 1, suspended_at: null }) },
+  }),
+}));
+
 vi.mock("@/lib/database/workspace.server", () => ({
   createWorkspaceTwilioInstance: (...args: unknown[]) =>
     mocks.createWorkspaceTwilioInstance(...args),

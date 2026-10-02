@@ -433,6 +433,8 @@ export async function campaignDispatchHandler(
 type CampaignBlockedOutcome =
   | { kind: "insufficient_credits" }
   | { kind: "caller_id_required" }
+  /** A request- or config-supplied caller id this workspace cannot send from. */
+  | { kind: "caller_id_not_usable"; callerId: string; reason: "not_owned" | "suspended" }
   | {
       kind: "deferred";
       progress?: { counts: CampaignSmsDispatchCounts | CampaignIvrDispatchCounts; queuedRemaining: number };
@@ -450,6 +452,7 @@ async function resolveDispatchBlockedCase(
 ): Promise<
   | { ok: true; campaignId: number; blocked: "insufficient_credits" }
   | { ok: true; campaignId: number; blocked: "caller_id_required" }
+  | { ok: true; campaignId: number; blocked: "caller_id_not_usable" }
   | {
       ok: true;
       campaignId: number;
@@ -475,6 +478,18 @@ async function resolveDispatchBlockedCase(
       // Config error — retrying cannot fix it; surface loudly and stop.
       logger.error("campaign_dispatch.caller_id_required", { campaignId, workspaceId });
       return { ok: true, campaignId, blocked: "caller_id_required" };
+    case "caller_id_not_usable":
+      // A caller id this workspace cannot send from. Same shape as
+      // `caller_id_required` — a config error no retry can fix — but it is either
+      // a cross-tenant attempt or an unpaid-rental suspension, so the rejected
+      // number and the reason are logged for the operator.
+      logger.error("campaign_dispatch.caller_id_not_usable", {
+        campaignId,
+        workspaceId,
+        callerId: outcome.callerId,
+        reason: outcome.reason,
+      });
+      return { ok: true, campaignId, blocked: "caller_id_not_usable" };
     case "deferred": {
       if (outcome.because === "workspace_not_ready") {
         // Workspace compliance, not a contact problem (#2081). Log the actual

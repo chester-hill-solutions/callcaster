@@ -103,7 +103,10 @@ vi.mock("@/lib/db-rpc.server", () => ({
   rpcCreateOutreachAttempt: (...args: unknown[]) => mocks.rpcCreateOutreachAttempt(...args),
 }));
 vi.mock("@/server/tenant-db", () => ({
-  createTenantDb: vi.fn(() => ({})),
+  createTenantDb: vi.fn(() => ({
+    // Fixture: this workspace owns the sending number.
+    workspace_number: { findFirst: async () => ({ id: 1, suspended_at: null }) },
+  })),
 }));
 vi.mock("@/lib/object-storage.server", () => ({
   createSignedObjectUrl: (...args: unknown[]) => mocks.createSignedObjectUrl(...args),

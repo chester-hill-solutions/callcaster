@@ -26,6 +26,14 @@ const creditsState = vi.hoisted(() => ({
 // The recipient calling window is wall-clock dependent; pin it open so these
 // tests are not time-of-day sensitive (window logic is covered in
 // test/recipient-calling-window.test.ts).
+vi.mock("@/server/tenant-db", () => ({
+  createTenantDb: () => ({
+    // Fixture: this workspace owns the sending number, so the send path reaches
+    // the behaviour under test instead of stopping at the ownership gate.
+    workspace_number: { findFirst: async () => ({ id: 1, suspended_at: null }) },
+  }),
+}));
+
 vi.mock("@/lib/recipient-calling-window", () => ({
   recipientCallingWindowStatus: vi.fn(() => ({
     allowed: true,

@@ -75,6 +75,24 @@ export type CampaignSmsBatchOutcome =
   | { kind: "caller_id_required" }
   | {
       /**
+       * The request named a `from` number this workspace does not own.
+       *
+       * Distinct from `caller_id_required` on purpose: the caller id was present
+       * and well-formed, it just belongs to another tenant. Answering
+       * `caller_id_required` would tell the caller to supply one they have
+       * already supplied, and would hide that the supplied one was rejected for
+       * ownership. Nothing was dequeued and no recipient is at fault, so like a
+       * deferral this is a whole-batch stop — but it is a client error (400),
+       * not a workspace condition to wait out.
+       */
+      kind: "caller_id_not_usable";
+      /** The rejected value, so the route can echo it back to the caller. */
+      callerId: string;
+      /** Which rule refused it: not this workspace's number, or suspended. */
+      reason: "not_owned" | "suspended";
+    }
+  | {
+      /**
        * The batch stopped without finishing because a workspace- or
        * campaign-level condition says now is not the time to send.
        *
