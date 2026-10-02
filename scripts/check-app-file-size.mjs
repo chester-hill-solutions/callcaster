@@ -38,7 +38,11 @@ const BASELINE_ALLOWLIST = {
   // collapsed into authForResource, so the file genuinely shrank.
   "lib/platform-data.server.ts": 1005,
   "lib/database/workspace.server.ts": 826,
-  "lib/survey-db.server.ts": 928,
+  // Lowered from 928 on 2026-10-02: the response-read and CSV-export half moved
+  // to lib/survey-responses.server.ts (#2126), leaving the question/page
+  // resolution and response-write half behind. Re-exported from the original
+  // path, so no import site changed.
+  "lib/survey-db.server.ts": 725,
 };
 
 async function walk(dir) {
