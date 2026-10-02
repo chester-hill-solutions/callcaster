@@ -6,7 +6,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Security
 
-- Registration no longer replays another account's session credentials when callers use the same retry key ([#2098](https://github.com/chester-hill-solutions/callcaster/issues/2098)).
+- Registration no longer replays another account's session credentials when callers use the same retry key ([PR #2252](https://github.com/chester-hill-solutions/callcaster/pull/2252), [#2098](https://github.com/chester-hill-solutions/callcaster/issues/2098)).
 
 ### Added
 
