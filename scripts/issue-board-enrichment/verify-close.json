@@ -2100,9 +2100,9 @@
     "issueNumber": 2146,
     "verdict": "verify-close",
     "recommendedTitle": "The IVR option matcher reads only option.value, so a documented-format script's declared next routes never match",
-    "summary": "The documented script format stores options with `content` and `next` and no `value`. The option matcher reads only `option.value`, so **every** branch declared in a documented-format script is silently ignored: the runtime falls through to the linear chain and plays the next block regardless of what the caller pressed.",
-    "currentBehavior": "Two readers of the same option shape disagree: the router reads `next`, the matcher and the label resolver read `value`. A script can pass validation and then behave as if it had no branches.",
-    "resolution": "1. Normalise the option value in **one** shared helper used by both response routes and by `ivr-results.ts`: const optionValue = (o: { value?: unknown; content?: unknown }) => String(o.value ?? o.content ?? \"\").trim(); 2. Failing that, run `scripts.migrateFromCallcasterFlow(steps)` + `serializeToCallcasterFlow` inside `createScriptForCampaign` so the stored shape is canonical — but the shared helper is still needed for scripts that arrive by any other route. 3. Rejecting a script whose interactive options lack `value` at the API boundary would also be defensible, and would turn a silent behaviour change into a clear error. Decide which and record it. 4. Whatever is chosen, add a routing-validation check that exercises the **matcher**, not just the edges — `script_routing_invalid` currently cannot catch this because it only checks that `next` exists.",
+    "summary": "PR #2199 is merged to dev. Option matching, labels and Gather configuration use the shared ivr-option-value helper, with content as a fallback when value is blank.",
+    "currentBehavior": "The documented content/next option shape is supported on the read path. Launch-time handling of unmatchable options still needs the product decision recorded in this issue.",
+    "resolution": "Verify documented-format routing and exported labels on dev. Decide whether launch validation should reject unmatchable options or normalize them before storage. Do not repeat the shared-reader fix.",
     "lookIn": [
       "the IVR response route's option matcher (`findNextStep`) and `findNextBlock` at lines 86-89",
       "app/lib/ivr-results.ts:114-118 (`resolveIvrAnswerLabel`)",
@@ -2110,11 +2110,12 @@
       "app/lib/create-with-script.server.ts",
       "docs/script-json-format.md"
     ],
-    "existingTests": [],
+    "existingTests": [
+      "test/ivr-option-value.test.ts",
+      "test/ivr-gather.test.ts"
+    ],
     "missingTests": [
-      "A documented-format script routes on a key press (kill-check).",
-      "The export shows the option label.",
-      "A script with unmatchable options is normalised or rejected."
+      "Launch validation exercises the option matcher after the normalization or rejection decision."
     ],
     "acceptanceCriteria": [
       "A documented-format script with `content`/`next` options routes correctly on a key press (kill-check: remove the normalisation and confirm the test goes red).",
@@ -2251,5 +2252,203 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Closing rather than implementing, because implementing would add a duplicate CI run and give the appearance of a fix. Worth carrying forward as a general check: when an issue says something 'runs nowhere', find where the invocation actually lives before concluding it is absent. A call inside a script is invisible to a grep of the workflow file, and verifying that takes two minutes."
+  },
+  {
+    "issueNumber": 2147,
+    "verdict": "verify-close",
+    "recommendedTitle": "A timed-out Gather writes a literal null answer, and the voice campaign export renders it as the string \"null\"",
+    "summary": "PR #2163 is merged to dev. The response route saves only accepted input. Timeout and unsupported menu keys follow the no-input route.",
+    "currentBehavior": "PR #2163 is merged to dev. The response route saves only accepted input. Timeout and unsupported menu keys follow the no-input route.",
+    "resolution": "Verify a silent Gather and an unsupported key on dev. Check that the exported answer is blank. Keep the issue open until release.",
+    "lookIn": [
+      "app/lib/ivr-block-runtime.server.ts:120-131",
+      "the IVR response route (the `userInput === null` branch and the `result` write)",
+      "app/lib/ivr-results.ts:87-92",
+      "app/lib/campaign-export.server.ts:493"
+    ],
+    "existingTests": [
+      "test/ivr-block-response.route.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A caller who times out at a menu produces a CSV cell that is **empty**, not `null` (kill-check: keep recording the null and confirm the test goes red).",
+      "The Results screen is unchanged (empty, not `null`).",
+      "An unmatched key press re-prompts up to the replay cap and is not recorded as an answer (kill-check).",
+      "A terminal block is never answered by a digit the script did not offer."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Code reviewed at dev@5b673c81. PR #2163 merge 6c8a48fa is in origin/dev. Runtime and export verification remain."
+  },
+  {
+    "issueNumber": 1875,
+    "verdict": "verify-close",
+    "recommendedTitle": "IVR: store speech answers as { value, raw, inputType } (slice B)",
+    "summary": "PR #2160 is merged to dev. Outbound IVR answers include value, raw, inputType and optional confidence. Result readers still accept legacy strings.",
+    "currentBehavior": "PR #2160 is merged to dev. Outbound IVR answers include value, raw, inputType and optional confidence. Result readers still accept legacy strings.",
+    "rootCause": "The response parser collapses Digits/SpeechResult into one string and drops the optional Confidence value.",
+    "resolution": "Verify one speech answer, one keypad answer and one legacy answer in Results and CSV on dev. Keep the issue open until release.",
+    "lookIn": [
+      "app/lib/ivr-webhook-auth.server.ts",
+      "app/lib/ivr-results.ts",
+      "app/lib/outreach-typed-fields.server.ts",
+      "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.action.server.ts"
+    ],
+    "existingTests": [
+      "test/ivr-webhook-auth.server.test.ts",
+      "test/ivr-results.test.ts",
+      "test/outreach-typed-fields.server.test.ts",
+      "test/campaign-export-voice-credits.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A speech answer stores { value, raw, confidence, inputType }; confidence is null when Twilio omits or sends an invalid value",
+      "DTMF answers store inputType=dtmf and no confidence; route matching still receives the same userInput string",
+      "Legacy bare strings and new objects both aggregate and export as the answer value",
+      "Typed fields and CSV export resolve the value"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Slice B is present in dev@5b673c81 through PR #2160 merge 9dcab08b. The earlier claim that confidence is discarded is obsolete."
+  },
+  {
+    "issueNumber": 2054,
+    "verdict": "verify-close",
+    "recommendedTitle": "test:ui worker OOMs on test/ui/hooks-chats.test.tsx intermittently, on every branch including master",
+    "summary": "PR #2065 is merged to dev. The chats test mock returns one stable loader object. It no longer creates a new messages array on each render.",
+    "currentBehavior": "PR #2065 is merged to dev. The chats test mock returns one stable loader object. It no longer creates a new messages array on each render.",
+    "rootCause": "The old loader mock created a new array on each render. The hook effect set state on each new array and caused a render loop.",
+    "resolution": "Run the UI suite in CI and confirm the chats file completes. Do not add a heap cap as a substitute for the mock fix.",
+    "lookIn": [
+      "vitest.ui.config.ts (pool, maxWorkers, isolate)",
+      "test/ui/hooks-chats.test.tsx",
+      "test/setup.ui.ts"
+    ],
+    "existingTests": [
+      "test/ui/hooks-chats.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "test:ui completes 149/149 on a GitHub-hosted runner",
+      "hooks-chats no longer kills its worker under memory pressure",
+      "No rerun needed for a stable result on a clean dev checkout",
+      "Any new heap ceiling is documented in vitest.ui.config.ts beside the setting with its reason"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Code reviewed at dev@5b673c81. PR #2065 reports a measured render loop and a fix. The prior claim of runner memory pressure was incorrect."
+  },
+  {
+    "issueNumber": 2041,
+    "verdict": "verify-close",
+    "recommendedTitle": "Admins can only grant credits by direct database write; add an audited manual credit load on the admin workspace page",
+    "summary": "PR #2044 is merged to dev. The admin workspace Credits tab adds a positive whole-number credit load through the canonical ledger, with a required reason and a nonce for retry protection.",
+    "currentBehavior": "PR #2044 is merged to dev. The admin workspace Credits tab adds a positive whole-number credit load through the canonical ledger, with a required reason and a nonce for retry protection.",
+    "rootCause": "The billing ledger was designed around automated, provider-keyed writes. There is no human-initiated grant concept, no key namespace for one, and no UI for one — and the guard that would catch an unsafe write (check:credit-writes, scripts/check-credit-write-paths.mjs) treats any direct workspace.credits write as a violation, which is the correct default and the reason a supported path is needed rather than a bypass.",
+    "resolution": "Verify an admin credit load and a replay of the same form on dev. Check the balance, audit note and ledger row. Keep open until release.",
+    "lookIn": [
+      "app/routes/admin+/workspaces/$workspaceId/credits.action.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/credits.loader.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/credits.route.tsx",
+      "shared/billing-keys.ts"
+    ],
+    "existingTests": [
+      "test/admin-workspace-credits.route.test.ts",
+      "test/billing-keys.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "A sudo admin can grant credits to any workspace from the admin page, and the balance updates on refresh",
+      "The grant is written through insertTransactionHistoryAndSyncCredits-equivalent RPC path only; no direct workspace.credits write and check:credit-writes stays green",
+      "A retried submit with the same nonce credits exactly once",
+      "Invalid amounts are rejected with a clear message and nothing is written",
+      "The ledger row shows type CREDIT, a positive amount, and a note naming the admin and the reason",
+      "The grant's bucket is decided deliberately and documented, and the welcome-credits prefix classification is corrected in the same change",
+      "npm run ci:local is green, including the codegen and surface checks"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Code reviewed at dev@5b673c81. PR #2044 merge 1a2d2313 is in origin/dev. No deployed credit mutation was made during this review."
+  },
+  {
+    "issueNumber": 2013,
+    "verdict": "verify-close",
+    "recommendedTitle": "auth pages: one shared form container — same width, padding, centring",
+    "summary": "PR #2024 is merged to dev. Sign-in and sign-up use AuthCard and the same centered main layout. Both main wrappers use px-4 py-8, with the same responsive padding.",
+    "currentBehavior": "PR #2024 is merged to dev. Sign-in and sign-up use AuthCard and the same centered main layout. Both main wrappers use px-4 py-8, with the same responsive padding.",
+    "rootCause": "No shared container component; each page sets its own geometry.",
+    "resolution": "Compare sign-in and sign-up at narrow and wide viewport sizes on dev. Check width, centering and padding. Keep open for any remaining visual defect.",
+    "lookIn": [
+      "app/routes/signin.tsx",
+      "app/routes/signup.tsx",
+      "app/components/shared/AuthCard.tsx"
+    ],
+    "existingTests": [
+      "test/ui/signup.route.test.tsx"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "Identical form width on both pages",
+      "Identical padding on both pages",
+      "Centred vertically and horizontally on both pages",
+      "Geometry defined in one place, not per page",
+      "#2010 re-checked against this change"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Current source reviewed at dev@5b673c81. The PR description names older padding values; use current source for verification."
+  },
+  {
+    "issueNumber": 2005,
+    "verdict": "verify-close",
+    "recommendedTitle": "Quit This Workspace posts a self-leave that always 403s for the role it is shown to; remove the button and the self-leave path behind it",
+    "summary": "PR #2038 is merged to dev. The Quit This Workspace forms and deleteSelf adapter are removed. removeWorkspaceMember rejects a self-targeted request with 403.",
+    "currentBehavior": "PR #2038 is merged to dev. The Quit This Workspace forms and deleteSelf adapter are removed. removeWorkspaceMember rejects a self-targeted request with 403.",
+    "rootCause": "deleteSelf was never a domain operation — it is a thin adapter over member removal — and member removal is a management-of-others operation. Because it exists as a named intent, the UI could offer it to a role the underlying service forbids, and the same intent is reachable through the public member-delete endpoint, where a same-rank actor can currently target their own user_id.",
+    "resolution": "Verify the workspace settings page has no self-leave control. Verify the member API refuses self-removal and still permits authorized removal of another member.",
+    "lookIn": [
+      "app/components/workspace/TeamMember.tsx",
+      "app/routes/workspaces+/$id/settings.route.tsx",
+      "app/routes/workspaces+/$id/settings.action.server.ts",
+      "app/lib/platform-members.server.ts"
+    ],
+    "existingTests": [
+      "test/workspace-setting-utils.test.ts",
+      "test/workspace-settings-rbac.test.ts"
+    ],
+    "missingTests": [],
+    "acceptanceCriteria": [
+      "No Quit This Workspace form renders anywhere",
+      "The deleteSelf intent is gone from all three actions and handleDeleteSelf no longer exists",
+      "Member removal refuses a self-target with a clear 403 for every role",
+      "Removing a different member, owner transfer, invite cancellation and platform-admin removal are unchanged",
+      "The OpenAPI description and the generated spec state that self-removal is unsupported",
+      "The e2e RBAC-03 assertion that the button is visible is removed, and the invite-authorization follow-up is filed as its own issue"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Code reviewed at dev@5b673c81. PR #2038 is merged. Its PR body says tests were not run, so a merge alone does not complete verification."
+  },
+  {
+    "issueNumber": 2178,
+    "verdict": "verify-close",
+    "summary": "PR #2241 corrected all four call timestamps and the message timestamps in dev. The recording-repair workaround cast is removed.",
+    "resolution": "Run the real-Postgres temporal guard and the recording-repair tests on dev. Verify the deployed schema before release. Track other tables under #2213.",
+    "lookIn": [
+      "app/db/schema.ts",
+      "app/lib/call-recording-repair.server.ts",
+      "test/integration-db/schema-type-drift.test.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/schema-type-drift.test.ts",
+      "test/call-recording-repair.server.test.ts"
+    ],
+    "trackerRecommendation": "Code reviewed at dev@5b673c81. The original call.date_created text declaration is absent. Do not create a second implementation for this issue."
   }
 ]

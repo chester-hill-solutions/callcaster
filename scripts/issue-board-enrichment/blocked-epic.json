@@ -232,16 +232,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1356,
-    "verdict": "blocked-epic",
-    "summary": "The dev custom domain was attached in Railway; DNS and IaC ownership were still missing at the last verified report.",
-    "resolution": "Inspect current DNS and the Railway target. DNS changes need access to the domain zone, then codify the live mapping.",
-    "lookIn": [
-      ".railway/environments/dev.ts"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1357,
     "verdict": "blocked-epic",
     "summary": "The qa custom domain depends on the environment naming decision and DNS access. Staging continues to track master.",
@@ -614,9 +604,7 @@
       "Credentials are stored as secrets/vars, not in the repo",
       "IaC-vs-manual decision is recorded"
     ],
-    "blockedBy": [
-      1356
-    ],
+    "blockedBy": [],
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "blocked-epic: #1356 (dev DNS/IaC) first. Confirm the IaC-vs-manual decision when unblocked; this unblocks #1826."
