@@ -14,9 +14,9 @@ Cleanup removed 21 stale worktree records, four clean worktrees, 18 local branch
 | Main checkout after cleanup | `dev@5b673c81`, matching origin/dev |
 | Release checkout | Local master matches origin/master |
 | Release gap | master has three commits absent from dev; dev has 126 absent from master. Do not treat the count as 126 unreleased features |
-| Remaining local branches | 33 including dev, master, the saved branch and this maintenance branch |
-| Remaining remote branches | 15 including dev and master |
-| Open PRs | None in the final PR snapshot. PRs #2250 and #2251 merged during this review |
+| Local branches after cleanup | 33 including dev, master, the saved branch and this maintenance branch |
+| Remote branches after cleanup | 15 including dev and master |
+| Open PRs at cleanup | None in that snapshot. PRs #2250 and #2251 merged during the review. The later signup fix is PR #2252 |
 
 ## Preserved work
 
@@ -32,15 +32,17 @@ Cleanup removed 21 stale worktree records, four clean worktrees, 18 local branch
 
 | Lane | Issues |
 | --- | --- |
-| fix-now | 101 |
-| verify-close | 92 |
-| needs-repro | 10 |
-| needs-decision | 41 |
-| blocked-epic | 32 |
+| fix-now | 86 |
+| verify-close | 98 |
+| needs-repro | 11 |
+| needs-decision | 45 |
+| blocked-epic | 36 |
 | duplicate | 3 |
 | needs-triage | 4 |
 
-Six entries moved from Fix now to Verify and close: #1875, #2005, #2013, #2041, #2054 and #2147. #2178 now has a verification record. Closed enrichment records for #1356, #2081, #2101, #2120, #2126, #2135 and #2208 were pruned. The closed #1356 dependency was removed from #1827. No GitHub issue was closed or changed by this review.
+Six entries moved from Fix now to Verify and close: #1875, #2005, #2013, #2041, #2054 and #2147. #2178 now has a verification record. Closed enrichment records for #1356, #2081, #2101, #2120, #2126, #2135 and #2208 were pruned. The closed #1356 dependency was removed from #1827. No GitHub issue was closed. The later Fix now audit corrected 76 issue bodies and 26 titles on GitHub. The other 25 issue bodies needed no material change. Every update was read back and verified; labels and assignees were retained.
+
+All 101 entries in the starting Fix now lane were checked against current dev, related PRs and issue discussion. Of those entries, 86 remain in Fix now; six moved to Verify and close, four to Needs decision, four to Blocked / split first, and one to Needs reproduction. Each audited record now states the remaining work and test gaps. Original issue bodies remain in clearly marked superseded history sections where a body existed.
 
 The normal `npm run tools:issues:board` query failed because the token lacks `read:project`. The fallback used the same board generator with live issue data. Eight IN PROGRESS markers were retained from the prior committed board and explicitly marked as not refreshed. This is not a review of live project status.
 
@@ -64,9 +66,9 @@ The four issues without enrichment are #2239, #2176, #1832 and #1668. They remai
 
 - Git recovery bundle verified. Branch tips were checked before removal. Remote deletion results were read back from GitHub.
 - The issue generator validated the records, pruned closed issues and checked dependency edges. The board has one entry for each open issue.
-- The new read-only Python cleanup tool parsed and ran. It found the three remaining worktrees and the saved dev branch.
-- `git diff --check` is the final text check. Application tests, real-Postgres reproduction and deployed browser checks were not run. No application code changed.
-- No push, PR, deployment, live ledger write or environment change was made. Full `npm run ci:local` remains required before a later push or PR.
+- The new read-only Python cleanup tool parsed and ran after cleanup. It found the three worktrees present at that point and the saved dev branch. The later signup fix uses its own worktree.
+- Text checks and board validation passed. The audit uses source evidence; it does not claim live Postgres or deployed browser reproduction. This maintenance branch changes no application code.
+- Full `npm run ci:local` is required before publishing this maintenance branch; its result is recorded in the PR. The separate application fix for #2098 is PR #2252. No deployment, live ledger write or environment change was made.
 
 ## Recovery and repeat use
 
