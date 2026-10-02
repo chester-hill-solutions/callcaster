@@ -1,0 +1,11 @@
+campaign.caller_id: ''::text
+campaign_queue.attempt_count: 0
+campaign_queue.attempts: '0'::bigint
+outreach_attempt.workspace: gen_random_uuid()
+rate_limit_bucket.count: 1
+transaction_history.amount: '0'::numeric
+user.username: ''::text
+workspace.credits: '0'::numeric
+workspace.name: '''Test Workspace''::text'::text
+workspace.twilio_data: '{}'::jsonb
+workspace_invite.workspace: gen_random_uuid()

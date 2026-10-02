@@ -31,19 +31,83 @@ export const campaign = pgTable("campaign", {
   dial_ratio: numeric({ mode: "number" }).notNull().default(1),
   dial_type: text().default("call"),
   disposition_options: jsonb(),
-  end_date: text(),
+  end_date: text().default(sql`now() + '30 days'::interval`),
   group_household_queue: boolean().notNull().default(true),
   id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
   is_sample: boolean().notNull().default(false),
   live_questions: jsonb(),
   message_media: text().array(),
   next_queue_order: integer().notNull().default(1),
-  schedule: jsonb(),
+  schedule: jsonb().default({
+                               friday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               monday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               sunday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               tuesday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               saturday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               thursday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                               wednesday: {
+                                 active: true,
+                                 intervals: [
+                                   {
+                                     end: "01:00",
+                                     start: "13:00",
+                                   },
+                                 ],
+                               },
+                             }),
   script_id: integer(),
   sms_messaging_service_sid: text(),
   sms_send_mode: text(),
   sms_send_window: jsonb(),
-  start_date: text(),
+  start_date: text().default(sql`now()`),
   status: text(),
   title: text().notNull().default("unnamed campaign"),
   type: text(),
@@ -56,7 +120,7 @@ export const campaign = pgTable("campaign", {
 export const campaign_audience = pgTable("campaign_audience", {
   audience_id: bigint({ mode: "number" }).notNull(),
   campaign_id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity(),
-  created_at: text().notNull(),
+  created_at: text().notNull().default(sql`now()`),
 });
 
 export const campaign_queue = pgTable(
@@ -68,7 +132,7 @@ export const campaign_queue = pgTable(
     campaign_id: bigint({ mode: "number" }).notNull(),
     claimed_at: timestamp({ withTimezone: true, mode: "date" }),
     contact_id: bigint({ mode: "number" }).notNull(),
-    created_at: timestamp({ withTimezone: true, mode: "date" }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
     id: bigint({ mode: "number" }).notNull().generatedByDefaultAsIdentity().primaryKey(),
     last_attempt_at: timestamp({ withTimezone: true, mode: "date" }),
     last_attempt_error: text(),

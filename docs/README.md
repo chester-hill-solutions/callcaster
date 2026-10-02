@@ -79,6 +79,7 @@ ADRs live in [`adr/`](adr/) and document hard-to-reverse, surprising, trade-off-
 - `api-create-campaign-with-script.md` — `POST /api/campaigns/create-with-script` one-shot campaign setup
 - `api-send-sms.md` — `POST /api/chat_sms` and `POST /api/sms` messaging endpoints
 - `public-api-test-drift.md` — Public API test/coverage drift tracker
+- `schema-default-drift.md` — Schema guards: column types (#2213) and column defaults (#2243), and why not every default is modelled
 - `script-structure.md`
 - `script-json-format.md`
 - `csv-export-contract.md`

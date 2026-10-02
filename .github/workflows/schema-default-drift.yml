@@ -1,0 +1,103 @@
+name: Schema default drift
+
+# The model-vs-database default guard (#2243) needs a real database, and
+# `test:integration-db` is NOT in `ci:local` or the `quality` job — the
+# integration tier has no Postgres service in CI at all. So the guard that exists
+# to stop the model drifting from the database has never run on a push, which is
+# the same gap #2211 filed for the tier as a whole.
+#
+# This workflow is the actual gate. It boots Postgres, applies
+# `client/migrations` with the repo's own psql-free bootstrap
+# (`scripts/e2e/bootstrap-compose-db.mjs`, #2227), and runs the two drift guards
+# against it. Both fail loudly rather than skipping: `SCHEMA_DEFAULT_DRIFT_UPDATE`
+# is never set here, so the baseline is asserted, never rewritten.
+#
+# What each guard catches:
+#
+#   schema-type-drift     a column declared text() where the database has a
+#                         timestamp, or a baselined column that stopped lying
+#   schema-default-drift  a column the database defaults that the model does not
+#                         declare, or an exemption that is no longer needed
+#
+# A stale baseline line fails in both, on purpose: it would let the next
+# regression on that column match it and pass.
+#
+# Needs no secrets. The database is ephemeral and local to the runner.
+
+on:
+  pull_request:
+    paths:
+      - app/db/**
+      - test/helpers/schema-drift.ts
+      - test/integration-db/schema-type-drift.test.ts
+      - test/integration-db/schema-default-drift.test.ts
+      - scripts/baselines/schema-type-drift.txt
+      - scripts/baselines/schema-default-drift.txt
+      - client/migrations/**
+      - .github/workflows/schema-default-drift.yml
+  push:
+    branches:
+      - dev
+    paths:
+      - app/db/**
+      - test/helpers/schema-drift.ts
+      - test/integration-db/schema-type-drift.test.ts
+      - test/integration-db/schema-default-drift.test.ts
+      - scripts/baselines/schema-type-drift.txt
+      - scripts/baselines/schema-default-drift.txt
+      - client/migrations/**
+      - .github/workflows/schema-default-drift.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: schema-default-drift-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN || github.token }}
+
+      # A service container rather than a compose file: no ports to pick, no
+      # health-wait loop to get wrong, and the runner tears it down either way.
+      - name: Start Postgres
+        uses: supercharge/postgres-service@v1
+        with:
+          db: callcaster
+          user: callcaster
+          password: callcaster
+          port: 5436
+          options: >-
+            --health-cmd pg_isready
+            --health-interval 10s
+            --health-timeout 5s
+            --health-retries 5
+
+      # The repo's own bootstrap, not `drizzle-kit push` and not an `psql -f`
+      # loop (#2227 removed the psql dependency from the e2e path for exactly
+      # this reason). Applying client/migrations is what makes the guards
+      # meaningful: an unapplied migration would make them compare against a
+      # stale database.
+      - name: Bootstrap the database
+        env:
+          DATABASE_URL: postgres://callcaster:callcaster@127.0.0.1:5436/callcaster
+        run: node scripts/e2e/bootstrap-compose-db.mjs
+
+      # `quality` already runs the mocked suites; this is the tier it cannot
+      # reach. #2211 tracks the broader gap.
+      - name: Schema drift guards
+        env:
+          DATABASE_URL: postgres://callcaster:callcaster@127.0.0.1:5436/callcaster
+        run: npm run test:integration-db
