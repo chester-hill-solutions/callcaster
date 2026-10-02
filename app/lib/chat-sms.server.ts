@@ -7,6 +7,10 @@ import {
 import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { buildTwilioOutboundSmsCreateParams } from "@/lib/twilio-outbound-sms.server";
+import {
+  resolveCallerIdUsability,
+  CallerIdNotUsableError,
+} from "@/lib/caller-id-usability.server";
 import type { TwilioMessageIntent, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { assertWorkspaceCanSendSms } from "@/lib/twilio-readiness.server";
 import { sendWorkspaceWebhookNotification } from "@/lib/workspace-webhooks.server";
@@ -80,6 +84,29 @@ export const sendMessage = async ({
   }
 
   await assertWorkspaceCanSendSms({workspaceId: workspace });
+
+  // Ownership of the sending number, checked here rather than in each caller.
+  //
+  // All three `sendMessage` callers pass a `from` that reaches Twilio as the
+  // sender, and two of them take it straight from the request:
+  //
+  //   POST /api/chat_sms           caller_id
+  //   POST /workspaces/:id/chats   from_number  (via parseChatSenderSelection,
+  //                                                 which passes raw input through)
+  //   campaign test send           campaign.caller_id  — already workspace-derived
+  //
+  // At this convergence point no caller can be added later that skips the check.
+  // `from` is empty whenever a Messaging Service supplies the sender, so the
+  // no-op case is the normal one.
+  const callerIdUsability = await resolveCallerIdUsability(workspace, from);
+  if (callerIdUsability.kind === "not_owned" || callerIdUsability.kind === "suspended") {
+    logger.warn("chat_sms.caller_id_not_usable", {
+      workspaceId: workspace,
+      callerId: callerIdUsability.callerId,
+      reason: callerIdUsability.kind,
+    });
+    throw new CallerIdNotUsableError(callerIdUsability.callerId, callerIdUsability.kind);
+  }
 
   const twilio = await createWorkspaceTwilioInstance({
         workspace_id: workspace,
