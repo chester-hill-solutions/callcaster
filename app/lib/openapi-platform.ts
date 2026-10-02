@@ -15,16 +15,10 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
   "/api/auth/register": {
     post: {
       summary: "Register a new user account",
+      description:
+        "Registration does not support response replay. Idempotency-Key is ignored, and retries use normal account-creation validation. Use the token endpoint to sign in after a successful registration whose response was lost.",
       tags: ["Platform API", "Authentication"],
-      parameters: [
-        {
-          name: "Idempotency-Key",
-          in: "header",
-          required: false,
-          schema: { type: "string", maxLength: 256 },
-          description: "Optional idempotency key for safe retries.",
-        },
-      ],
+      parameters: [],
       requestBody: {
         required: true,
         content: {
