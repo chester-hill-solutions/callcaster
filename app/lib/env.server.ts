@@ -53,6 +53,7 @@ const requiredEnvVars = [...REQUIRED_ENV_KEYS] as (keyof EnvConfig)[];
 
 const optionalEnvVars: (keyof EnvConfig)[] = [
   'STRIPE_WEBHOOK_SECRET',
+  'VERIFICATION_PHONE_NUMBER',
   'TWILIO_VALIDATE_WEBHOOKS',
   'TWILIO_COMPLIANCE_NOTIFY_EMAIL',
   'TWILIO_TRUSTHUB_SECONDARY_POLICY_SID',

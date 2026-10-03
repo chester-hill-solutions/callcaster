@@ -127,15 +127,15 @@ describe("env.server", () => {
     vi.unstubAllGlobals();
   });
 
-  test("verification phone getter throws when missing", async () => {
+  test.each([undefined, ""])("verification phone getter permits missing configuration %s", async (value) => {
     vi.resetModules();
     seedRequiredEnv();
-    delete process.env.VERIFICATION_PHONE_NUMBER;
+    if (value === undefined) delete process.env.VERIFICATION_PHONE_NUMBER;
+    else process.env.VERIFICATION_PHONE_NUMBER = value;
 
     const mod = await import("../app/lib/env.server");
-    expect(() => mod.env.VERIFICATION_PHONE_NUMBER()).toThrow(
-      /Missing required environment variable: VERIFICATION_PHONE_NUMBER/,
-    );
+    expect(mod.env.VERIFICATION_PHONE_NUMBER()).toBeUndefined();
+    expect(() => mod.revalidateEnv()).not.toThrow();
   });
 
   test("getStripeKeyMode detects test, live, and unknown key prefixes", async () => {

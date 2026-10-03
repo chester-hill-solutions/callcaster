@@ -3655,7 +3655,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Include namespace effect calls in the effects guard",
     "summary": "The effect guard collects actual direct and namespace calls and reads annotations before the complete callee. Both hidden effects are now inventoried.",
-    "currentBehavior": "Source fix based on dev@24c4d810: TypeScript call syntax replaces the broad prefix exemption. Direct, namespace and multiline calls use the full-callee annotation offset; declarations and comment/string lookalikes are ignored. The datetime digit timer is documented. The audience-history fetch effect hidden after a full-stop comment is listed as CANDIDATE-REMOVE under separate runtime task #2288. Inventory now contains 120 actual calls: 118 documented and the same two grandfathered effects. No timer, fetch, dependency or baseline allowance changes. All 29 focused cases pass. Original source fails 14 of 18 CLI fixture cases with four controls; five scanner mutations and two actual annotation removals fail, and all source/inventory is restored. Full local and remote gates are required before merge.",
+    "currentBehavior": "Merged to dev in PR #2289 at 0a0acd17. The guard collects actual direct and namespace call expressions and reads annotations before the complete callee; declarations and comment/string lookalikes are ignored. Both hidden app effects are now inventoried: datetime timer documented, audience-history fetch CANDIDATE-REMOVE under #2288. Inventory lists 120 effects: 118 documented and the same two grandfathered effects. Runtime, dependencies and allowances are unchanged. All 29 focused cases pass; original scanner fails 14 of 18 with four controls, five mutations and two annotation removals fail. Full local CI passed 5,247 Vitest and 22 Bun tests; all remote and both Railway gates passed on cc58190e. Issue-on-dev moved one item. Verify merged/dev guard inventory and promote before closure.",
     "resolution": "Verify the real guard and generated inventory on the merged source; namespace calls must be enforced and documented, true declarations ignored and baseline allowances retained. Promote before closure. Audience-history behavior belongs to #2288; dependency-tag comparison remains #2067.",
     "lookIn": [
       "scripts/check-effects.mjs",
@@ -3687,5 +3687,41 @@
     "risk": "medium",
     "trackerRecommendation": "Source guard fix is in this change; verify inventory/enforcement and promote before closure.",
     "rootCause": "The definition-skip regex treated a preceding dot as proof of a declaration, including namespace calls and a dot in a preceding line comment. Annotation lookup at the hook name would also reject valid namespace annotations."
+  },
+  {
+    "issueNumber": 2105,
+    "verdict": "verify-close",
+    "recommendedTitle": "Return feature-unavailable response when call-in verification is not configured",
+    "summary": "The real optional verification-number getter now permits missing/empty values, making the existing route 503 response reachable.",
+    "currentBehavior": "Source fix based on dev@0a0acd17: only VERIFICATION_PHONE_NUMBER is added to optional handling. Missing/empty configuration returns undefined and the actual loader returns the existing 503 feature-unavailable response without a session write. Configured requests retain the number, caller, ten-minute expiry and session headers; invalid callers, denied auth and writer failures retain their responses. Boot required keys and production media-stream secret handling are unchanged. All 27 focused cases pass. Original runtime fails four with 23 controls; three isolated mutations fail and all source is restored. Full local and remote gates are required before merge.",
+    "resolution": "Verify absent/empty configuration on deployed dev returns 503 without a session write; verify configured valid session creation. Keep other required configuration and security contracts unchanged. Promote before closure.",
+    "lookIn": [
+      "app/lib/env.server.ts",
+      "app/lib/required-env-keys.ts",
+      "app/lib/required-env-keys.mjs",
+      "app/routes/api+/verify-call-in-session.loader.server.ts"
+    ],
+    "existingTests": [
+      "test/env.server.test.ts",
+      "test/verify-call-in-session.route.test.ts",
+      "test/verification-number-config.route.test.ts"
+    ],
+    "missingTests": [
+      "Deployed dev disabled/enabled verification before production promotion."
+    ],
+    "acceptanceCriteria": [
+      "Absent/empty verification number returns undefined from the real getter and does not prevent startup.",
+      "The real loader returns 503 with Call-in verification is not configured and writes no session.",
+      "Configured valid requests retain number, caller, ten-minute expiry and headers.",
+      "Invalid callers, unauthenticated requests and session write failures retain error responses.",
+      "Required boot keys and other production configuration/security contracts remain intact.",
+      "Meaningful original-source and mutation regressions fail; full local/remote gates pass before merge.",
+      "Verify deployed dev and promote before closure."
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "medium",
+    "trackerRecommendation": "Source fix is in this change; verify disabled/enabled deployed behavior before promotion and closure.",
+    "rootCause": "The optional type/boot configuration was inconsistent with the getter optional-key list. The getter threw before the intended route branch."
   }
 ]

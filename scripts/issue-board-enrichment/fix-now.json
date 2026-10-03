@@ -620,41 +620,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2105,
-    "verdict": "fix-now",
-    "recommendedTitle": "env.VERIFICATION_PHONE_NUMBER throws instead of returning undefined, so the route's 503 branch is unreachable and a missing var boots green",
-    "summary": "The verification number remains optional in its type/boot keys but absent from optionalEnvVars, so its getter throws before the intended 503.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. VERIFICATION_PHONE_NUMBER is optional in the type and boot required keys, but not in optionalEnvVars. The getter throws before the route 503 branch and before its DB try/catch.",
-    "resolution": "Add VERIFICATION_PHONE_NUMBER to optionalEnvVars so the existing unavailable-feature 503 branch is live; correct test/env.server.test.ts, which currently expects a missing-value exception.",
-    "lookIn": [
-      "app/lib/env.server.ts:38",
-      "app/lib/env.server.ts:54",
-      "app/routes/api+/verify-call-in-session.loader.server.ts:18",
-      "test/env.server.test.ts:130",
-      "app/lib/env.server.ts:54,265-273 (`optionalEnvVars`, `isTwoFactorFeatureEnabled` as the pattern)",
-      "app/lib/required-env-keys.ts`, `app/lib/required-env-keys.mjs",
-      "the call-in verification route (`app/routes/api+/verify-audio-pin.*` and its loader)",
-      "test/*env*"
-    ],
-    "existingTests": [
-      "test/env.server.test.ts:130 currently asserts that the missing verification-number getter throws.",
-      "The route's missing-configuration 503 path needs a test using the real getter."
-    ],
-    "missingTests": [
-      "Test real getter missing value through loader with no session insert; configured number should still create the expected verification session."
-    ],
-    "acceptanceCriteria": [
-      "With VERIFICATION_PHONE_NUMBER absent, its getter returns undefined.",
-      "The loader returns 503 with Call-in verification is not configured and writes no verification session.",
-      "With the number configured, a valid request retains the permitted verification flow.",
-      "The existing getter test no longer requires an exception for this optional variable."
-    ],
-    "blockedBy": [],
-    "size": "XS",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2106,
     "verdict": "fix-now",
     "recommendedTitle": "Sending a chat message wipes every older page the user scrolled back and loaded",

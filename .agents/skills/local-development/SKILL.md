@@ -28,6 +28,9 @@ The node suite installs a shared `api-auth.server` mock in
 `vi.unmock("@/lib/api-auth.server")` and mock only the session/provider boundary.
 Otherwise a test can receive the suite's default 401 and never reach its target.
 Keep shared server module mock factories additive with `importOriginal`.
+Use `setJsonAuthSession` for a shared default that a case must replace. A default
+queued with `queueJsonAuthSession` runs before a later queued denial; use queues
+only when the test needs multiple calls in that exact order.
 
 ## API and form response adapters
 
