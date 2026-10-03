@@ -1,3 +1,5 @@
+import { resolveIvrEntryPageId } from "@/lib/ivr-page-order";
+import type { IvrScript } from "@/lib/ivr-block-runtime.server";
 import {
   requireTwilioSignature,
   twilioWebhookBadRequest,
@@ -200,10 +202,10 @@ async function handleInboundAction(
       workspaceId,
       scriptId: number.inbound_script_id,
     });
-    const pages = steps?.pages as Record<string, { blocks: string[] }> | undefined;
-    if (pages) {
-      const pageIds = Object.keys(pages);
-      const firstPageId = pageIds[0];
+    const script = steps as IvrScript | null | undefined;
+    const pages = script?.pages;
+    if (pages && script) {
+      const firstPageId = resolveIvrEntryPageId(script);
       const firstPage = firstPageId ? pages[firstPageId] : undefined;
       const firstBlockId = firstPage?.blocks[0];
       if (firstPageId && firstBlockId) {

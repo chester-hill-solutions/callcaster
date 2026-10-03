@@ -1,3 +1,4 @@
+import type { IvrPageLayout } from "@/lib/ivr-page-order";
 import { createSignedObjectUrl } from "@/lib/object-storage.server";
 import { resolveIvrPromptObjectKey } from "@/lib/ivr-wav.server";
 import { resolveVoiceForBlock } from "@/lib/tts-voices";
@@ -20,7 +21,7 @@ import type { TwimlResponse } from "@/lib/twilio-twiml.server";
  * roster, signed audio URL) must be identical whichever route renders it.
  */
 
-export type IvrRenderScript = {
+export type IvrRenderScript = IvrPageLayout & {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<
     string,

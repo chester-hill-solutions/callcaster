@@ -1,3 +1,4 @@
+import { resolveIvrCallUrls } from "@/lib/twilio-ivr-runtime.server";
 import { data as routeData } from "react-router";
 import { dequeueQueueEntry } from "@/lib/campaign-queue-db.server";
 import { recipientCallingWindowStatus } from "@/lib/recipient-calling-window";
@@ -10,7 +11,6 @@ import {
   outboundCreditsResponse,
   requireOutboundCredits,
 } from "@/lib/outbound-credit-gate.server";
-import { env } from "@/lib/env.server";
 import { logger } from "@/lib/logger.server";
 import { withTwilioRetry } from "@/lib/twilio-client.server";
 import { requireJsonAuth } from "@/lib/api-auth.server";
@@ -81,15 +81,16 @@ export const action = defineAction({
         queueId: Number(queue_id),
       });
 
+      const ivrUrls = resolveIvrCallUrls(campaign_id);
       call = await withTwilioRetry(
         () =>
           twilio.calls.create({
             to: to_number,
             from: caller_id,
-            url: `${env.BASE_URL()}/api/ivr/${campaign_id}/page_1/`,
+            url: ivrUrls.flowUrl,
             machineDetection: "Enable",
             statusCallbackEvent: ["answered", "completed"],
-            statusCallback: `${env.BASE_URL()}/api/ivr/status`,
+            statusCallback: ivrUrls.statusCallback,
           }),
         { workspaceId: workspace_id, operation: "calls.create" },
       );

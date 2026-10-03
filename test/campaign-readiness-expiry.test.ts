@@ -159,3 +159,23 @@ describe("launch uses the same readiness clock", () => {
     expect(mocks.enqueueRegisteredJob).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe("saved IVR entry launch gate (#2087)", () => {
+  test.each(["robocall", "simple_ivr", "complex_ivr"] as const)("%s rejects a dangling raw start before status or job writes", async (type) => {
+    const steps = {
+      pages: { page_1: { id: "page_1", title: "Menu", blocks: ["a"] } },
+      blocks: { a: { id: "a", type: "recorded", options: [{ value: "1", next: "end" }] } },
+      startPageId: "deleted",
+    };
+    mocks.scriptFindFirst.mockResolvedValueOnce({ steps });
+    const result = await launchCampaign({
+      workspaceId: "workspace-1", campaignId: "42", userId: "user-1", mode: "now",
+      campaign: campaign({ type }), campaignDetails: voice, queueCount: 1, now: NOW,
+    });
+    expect(result).toMatchObject({ ok: false, issue: { code: "script_routing_invalid" } });
+    if (!result.ok) expect(result.error).toContain('Start page "deleted"');
+    expect(mocks.updateCampaignStatusInWorkspace).not.toHaveBeenCalled();
+    expect(mocks.enqueueRegisteredJob).not.toHaveBeenCalled();
+  });
+});

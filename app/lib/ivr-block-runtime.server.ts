@@ -1,3 +1,4 @@
+import { orderedIvrPageIds, type IvrPageLayout } from "@/lib/ivr-page-order";
 import type { TwimlResponse } from "@/lib/twilio-twiml.server";
 import { ivrGatherAttributes, type IvrOption } from "@/lib/ivr-gather.server";
 
@@ -9,7 +10,7 @@ import { ivrGatherAttributes, type IvrOption } from "@/lib/ivr-gather.server";
 
 export type { IvrOption };
 
-export type IvrScript = {
+export type IvrScript = IvrPageLayout & {
   pages: Record<string, { blocks: string[] }>;
 };
 
@@ -76,7 +77,7 @@ export function findNextBlock(
     return { pageId: currentPageId, blockId: nextBlockId };
   }
 
-  const pageIds = Object.keys(script.pages);
+  const pageIds = orderedIvrPageIds(script);
   const currentPageIndex = pageIds.indexOf(currentPageId);
   if (currentPageIndex < pageIds.length - 1) {
     const nextPageId = pageIds[currentPageIndex + 1];

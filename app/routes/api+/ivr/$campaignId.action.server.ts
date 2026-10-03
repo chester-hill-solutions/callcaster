@@ -4,9 +4,9 @@ import { defineAction } from "@/lib/handler.server";
 
 export const action = defineAction({
   auth: ({ request, params }) =>
-    requireTwilioSignatureForIvrPage(request, [params.campaignId, params.pageId]),
+    requireTwilioSignatureForIvrPage(request, [params.campaignId]),
   sideEffects: ["db-read", "db-write", "external"],
   handler: ({ params, auth }) => renderCampaignIvrPage({
-    campaignId: params.campaignId ?? "", pageId: params.pageId, ...auth,
+    campaignId: params.campaignId ?? "", ...auth,
   }),
 });

@@ -78,7 +78,7 @@ describe("sendCampaignTestCall", () => {
       expect.objectContaining({
         to: "+16135550199",
         from: "+15555550100",
-        url: expect.stringMatching(/\/api\/ivr\/99\/page_1\/$/),
+        url: expect.stringMatching(/\/api\/ivr\/99\/$/),
         statusCallback: expect.stringMatching(/\/api\/ivr\/status$/),
         machineDetection: "Enable",
       }),

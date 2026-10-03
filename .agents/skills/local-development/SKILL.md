@@ -74,6 +74,21 @@ Agent-offer changes also need real SDK setup failure and release-state coverage
 (`test/integration-db/acd-offer-cleanup.test.ts`). Mocking `calls.create` alone
 omits failures that occur before it.
 
+## IVR saved flow tests
+
+Check both manual and machine dispatch with the real URL resolver, then check
+emitted TwiML for entry and next-page order. Editor round-trip tests alone cannot
+prove caller flow. Campaign launch must check a declared raw entry before the
+editor migration can repair it. Keep legacy and explicit-page controls.
+
+## Generated API files
+
+For API surface changes, generate with `npm run tools:api:codegen` and
+`npm run tools:api:surface:report` before full CI. Review and stage the expected
+generated files. `ci:codegen:verify` compares unstaged output with the index;
+an intended un-staged API delta otherwise fails the final gate. Do not stage
+drift without its matching reviewed source change.
+
 ## Entry points
 
 - First run or repair: `make init` (`npm run setup`, idempotent). Services already running elsewhere: `npm run setup -- --skip-docker`.

@@ -17,7 +17,7 @@ export function resolveIvrCallUrls(campaignId: number | string): {
 } {
   const base = env.BASE_URL().replace(/\/$/, "");
   return {
-    flowUrl: `${base}/api/ivr/${campaignId}/page_1/`,
+    flowUrl: `${base}/api/ivr/${campaignId}/`,
     statusCallback: `${base}/api/ivr/status`,
     runtime: "remix",
   };

@@ -78,6 +78,7 @@ export const API_SURFACE_ANNOTATIONS: Readonly<
   "app/routes/api+/initiate-ivr.tsx": { ownerArea: "ivr", exposure: "sessionOnly", docsGuide: "docs/api-telephony-control.md", bodyType: "json", authClass: "session", workspaceScoped: true },
   "app/routes/api+/ivr.tsx": { ownerArea: "ivr", exposure: "sessionOnly", docsGuide: "docs/api-telephony-control.md", bodyType: "form", authClass: "session", workspaceScoped: true },
   "app/routes/api+/ivr/status.route.tsx": { ownerArea: "ivr", exposure: "providerOnly", docsGuide: "docs/api-webhooks.md", bodyType: "form" },
+  "app/routes/api+/ivr/$campaignId.route.tsx": { ownerArea: "ivr", exposure: "providerOnly", docsGuide: "docs/api-webhooks.md", bodyType: "form", notes: "Resolves the saved script entry and returns TwiML." },
   "app/routes/api+/ivr/$campaignId/$pageId.route.tsx": { ownerArea: "ivr", exposure: "providerOnly", docsGuide: "docs/api-webhooks.md", bodyType: "form", notes: "Returns TwiML." },
   "app/routes/api+/ivr/$campaignId/$pageId/$blockId.route.tsx": { ownerArea: "ivr", exposure: "providerOnly", docsGuide: "docs/api-webhooks.md", bodyType: "form" },
   "app/routes/api+/ivr/$campaignId/$pageId/$blockId/response.route.tsx": { ownerArea: "ivr", exposure: "providerOnly", docsGuide: "docs/api-webhooks.md", bodyType: "form" },
