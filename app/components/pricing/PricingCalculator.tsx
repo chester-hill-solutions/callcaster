@@ -109,7 +109,6 @@ function CalculatorField({
           const raw = Number(event.target.value);
           onChange(Number.isFinite(raw) ? raw : 0);
         }}
-        className="font-Zilla-Slab text-lg"
       />
     </FormField>
   );
