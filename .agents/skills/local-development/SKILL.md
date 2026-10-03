@@ -70,6 +70,10 @@ a builder mock can accept methods that the installed SDK does not provide.
 Use `test/inbound-queue-entry.route.test.ts` for callback and guard controls and
 `test/integration-db/inbound-queue-lookup.test.ts` for actual workspace selection.
 
+Agent-offer changes also need real SDK setup failure and release-state coverage
+(`test/integration-db/acd-offer-cleanup.test.ts`). Mocking `calls.create` alone
+omits failures that occur before it.
+
 ## Entry points
 
 - First run or repair: `make init` (`npm run setup`, idempotent). Services already running elsewhere: `npm run setup -- --skip-docker`.
