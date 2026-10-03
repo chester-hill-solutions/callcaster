@@ -15,7 +15,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
-- MMS uploads with the same filename now keep separate files, so later uploads cannot replace media in earlier messages or campaigns ([#2091](https://github.com/chester-hill-solutions/callcaster/issues/2091)).
+- MMS uploads with the same filename now keep separate files, so later uploads cannot replace media in earlier messages or campaigns ([PR #2261](https://github.com/chester-hill-solutions/callcaster/pull/2261), [#2091](https://github.com/chester-hill-solutions/callcaster/issues/2091)).
 
 - Calling or manually advancing a contact now leaves their queues in other campaigns intact; SMS opt-out and do-not-call still remove the contact from every campaign ([PR #2260](https://github.com/chester-hill-solutions/callcaster/pull/2260), [#2096](https://github.com/chester-hill-solutions/callcaster/issues/2096)).
 
