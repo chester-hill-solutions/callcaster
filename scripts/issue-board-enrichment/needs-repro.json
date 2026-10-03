@@ -220,5 +220,36 @@
     "size": "S",
     "risk": "low",
     "trackerRecommendation": "Move to Needs reproduction for the current runner failure. Update obsolete MinIO and Quay claims first."
+  },
+  {
+    "issueNumber": 2292,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Assess fragmented public survey responses",
+    "summary": "The historic impact of per-request respondent IDs has not been measured on deployed data.",
+    "currentBehavior": "The source defect is confirmed under #2125. No production survey-row query or repair has been performed in this audit.",
+    "rootCause": "Tokenless writes could fragment one visit across response rows, but anonymous records may not permit reliable attribution.",
+    "resolution": "Identify deployment interval and intended database. Run read-only aggregate counts with controls for legitimate separate attempts and anonymous/contact-backed respondents. Record attribution limits and a concrete repair or no-repair recommendation. If justified, create an atomic repair task with exact selection and rollback; perform no repair in this assessment.",
+    "lookIn": [
+      "app/lib/survey-db.server.ts",
+      "app/lib/survey-responses.server.ts",
+      "app/db/schema-survey.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/survey-respondent-identity.test.ts"
+    ],
+    "missingTests": [
+      "Read-only aggregate deployed-data assessment with reliable identity controls."
+    ],
+    "acceptanceCriteria": [
+      "Identify affected revision/deployment interval and database.",
+      "Measure aggregate fragmented-response/answer/no-row-completion patterns without exporting respondent rows.",
+      "Separate anonymous/contact-backed groups and legitimate multiple attempts.",
+      "Record attribution limits and repair/no-repair recommendation.",
+      "Do not update, delete, merge or backfill stored rows in this task."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Independent read-only historical assessment; it does not block the source fix."
   }
 ]

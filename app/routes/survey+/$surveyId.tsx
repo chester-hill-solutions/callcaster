@@ -1,4 +1,5 @@
 export { loader } from "./$surveyId.loader.server";
+import type { PublicSurveyLoaderData } from "./$surveyId.loader.server";
 
 import { useLoaderData, useFetcher } from "react-router";
 import { useState } from "react";
@@ -43,7 +44,14 @@ function safeString(value: unknown): string {
 }
 
 export default function SurveyPage() {
-  const { survey, resultId, contact, existingResponse, existingAnswers } = useLoaderData();
+  const data = useLoaderData<PublicSurveyLoaderData>();
+  return <SurveyRespondentPage key={`${data.survey.survey_id}:${data.resultId}`} data={data} />;
+}
+
+function SurveyRespondentPage({ data }: {
+  data: PublicSurveyLoaderData;
+}) {
+  const { survey, resultId, respondentToken, contact, existingResponse, existingAnswers } = data;
   const answerFetcher = useFetcher();
   const completeFetcher = useFetcher();
   
@@ -66,6 +74,7 @@ export default function SurveyPage() {
     );
     formData.append("contactId", contact?.id?.toString() || "");
     formData.append("resultId", resultId);
+    formData.append("respondent_token", respondentToken);
     formData.append("pageId", currentPage?.page_id ?? "");
 
     answerFetcher.submit(formData, {
@@ -122,6 +131,7 @@ export default function SurveyPage() {
     // Mark survey as completed using fetcher
     const formData = new FormData();
     formData.append("resultId", resultId);
+    formData.append("respondent_token", respondentToken);
     formData.append("surveyId", survey.survey_id);
     formData.append("completed", "true");
 

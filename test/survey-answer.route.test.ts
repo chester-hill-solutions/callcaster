@@ -26,24 +26,30 @@ const surveyDbMocks = vi.hoisted(() => ({
   })),
 }));
 
-vi.mock("@/lib/survey-db.server", () => ({
+vi.mock("@/lib/survey-db.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/survey-db.server")>()),
   saveSurveyAnswer: (...args: unknown[]) => surveyDbMocks.saveSurveyAnswer(...args),
   getActiveSurveyByPublicId: (...args: unknown[]) => surveyDbMocks.getActiveSurveyByPublicId(...args),
 }));
 
-vi.mock("@/lib/survey-respondent.server", () => ({
+vi.mock("@/lib/survey-respondent.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/survey-respondent.server")>()),
   loadSurveyRespondentContact: (...args: unknown[]) =>
     surveyDbMocks.loadSurveyRespondentContact(...args),
 }));
 
+let defaultToken: string;
+
 function makeReq(body: Record<string, string | Blob>) {
   const fd = new FormData();
+  fd.set("respondent_token", defaultToken);
   for (const [k, v] of Object.entries(body)) fd.set(k, v);
   return new Request("http://x", { method: "POST", body: fd });
 }
 
 describe("app/routes/api+/survey-answer/route.tsx", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    ({ token: defaultToken } = await createRespondentToken(1, "ws-1"));
     vi.resetModules();
     resetRateLimitsForTests();
     surveyDbMocks.saveSurveyAnswer.mockReset();
@@ -85,6 +91,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     fd1.set("questionId", "Q1");
     fd1.set("resultId", "R1");
     fd1.set("pageId", "p1");
+    fd1.set("respondent_token", defaultToken);
     const r1 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(404);
 
@@ -93,6 +100,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     fd2.set("questionId", "Q1");
     fd2.set("resultId", "R1");
     fd2.set("pageId", "p1");
+    fd2.set("respondent_token", defaultToken);
     fd2.set("contactId", "nope");
     const r2 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(r2.status).toBe(400);
@@ -149,28 +157,12 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     expect(res.status).toBe(400);
   });
 
-  test("generates a respondent token when none is provided", async () => {
+  test("rejects a missing signed identity even when a plain result ID is posted", async () => {
     const mod = await import("../app/routes/api+/survey-answer");
-    const res = await asRouteResponse(mod.action({
-      request: makeReq({
-        surveyId: "1",
-        questionId: "Q1",
-        answerValue: "yes",
-        pageId: "p1",
-      }),
-    } as any));
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.respondent_token).toBeDefined();
-    expect(json.respondent_token).toContain(".");
-    expect(surveyDbMocks.saveSurveyAnswer).toHaveBeenCalledWith(
-      expect.objectContaining({
-        surveyInternalId: 1,
-        questionPublicId: "Q1",
-        answerValue: "yes",
-        contactId: null,
-      }),
-    );
+    const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "1", questionId: "Q1", answerValue: "yes", pageId: "p1", resultId: "chosen-plain-id", respondent_token: "" }) } as any));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ error: "Respondent token is required" });
+    expect(surveyDbMocks.saveSurveyAnswer).not.toHaveBeenCalled();
   });
 
   test("uses and returns respondent token when provided", async () => {
@@ -197,6 +189,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
 
     function makeBody() {
       const fd = new FormData();
+      fd.set("respondent_token", defaultToken);
       fd.set("surveyId", "1");
       fd.set("questionId", "Q1");
       fd.set("pageId", "p1");
@@ -240,6 +233,7 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     fd1.set("questionId", "Q1");
     fd1.set("resultId", "R1");
     fd1.set("pageId", "p1");
+    fd1.set("respondent_token", defaultToken);
     const r1 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd1 }) } as any));
     expect(r1.status).toBe(404);
 
@@ -253,7 +247,30 @@ describe("app/routes/api+/survey-answer/route.tsx", () => {
     fd2.set("questionId", "Q1");
     fd2.set("resultId", "R1");
     fd2.set("pageId", "p1");
+    fd2.set("respondent_token", defaultToken);
     const r2 = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST", body: fd2 }) } as any));
     expect(r2.status).toBe(500);
   });
+  test("uses the form's signed ID and ignores a different plain result ID", async () => {
+    const { token, resultId } = await createRespondentToken(1, "ws-1");
+    const mod = await import("../app/routes/api+/survey-answer");
+    const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "public-survey", questionId: "Q1", pageId: "p1", answerValue: "Yes", resultId: "forged-id", respondent_token: token }) } as any));
+    expect(res.status).toBe(200);
+    expect(surveyDbMocks.saveSurveyAnswer).toHaveBeenCalledWith(expect.objectContaining({ resultId }));
+    expect(await res.json()).toMatchObject({ respondent_token: token });
+  });
+
+  test.each(["tampered", "expired", "other-survey", "other-workspace"])("refuses a %s identity without writing", async (kind) => {
+    const { token } = await createRespondentToken(kind === "other-survey" ? 2 : 1, kind === "other-workspace" ? "ws-other" : "ws-1");
+    const invalid = kind === "tampered" ? token.replace(/^./, "x") : token;
+    if (kind === "expired") vi.spyOn(Date, "now").mockReturnValue(Date.now() + 25 * 60 * 60 * 1000);
+    try {
+      const mod = await import("../app/routes/api+/survey-answer");
+      const res = await asRouteResponse(mod.action({ request: makeReq({ surveyId: "public-survey", questionId: "Q1", pageId: "p1", answerValue: "Yes", respondent_token: invalid, resultId: "forged-id" }) } as any));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toMatchObject({ error: "Invalid or expired respondent token" });
+      expect(surveyDbMocks.saveSurveyAnswer).not.toHaveBeenCalled();
+    } finally { vi.restoreAllMocks(); }
+  });
+
 });

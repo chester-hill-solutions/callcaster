@@ -1,20 +1,8 @@
 /**
- * Survey response reads and CSV export.
- *
- * Split out of `survey-db.server.ts` on 2026-10-02 (#2126). That file was pinned
- * at 928 lines by `scripts/check-app-file-size.mjs` — pinned rather than
- * exempted, so the next addition fails there rather than the cap being raised
- * again. This is the read-and-export half of the survey data layer: nothing here
- * writes a response or resolves a question, and nothing in the write half reads
- * responses back, so the seam is a real one rather than a line count.
- *
- * The body is the moved code **verbatim** — no refactor rode along with the move.
- * `buildSurveyResponsesCsv` reads the survey through `loadSurveyDetailByPublicId`,
- * which stays in `survey-db.server.ts`, so the dependency is one-directional and
- * there is no cycle.
- *
- * The public surface is unchanged: `survey-db.server.ts` re-exports all three
- * functions, so every existing import site keeps working.
+ * Survey response reads and CSV export. Public callers obtain result identities
+ * from a verified token; contact resume uses a workspace-scoped contact lookup.
+ * The write module re-exports these reads for existing callers. Its survey
+ * detail helper is called only when an export runs, after both modules load.
  */
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { formatDateUtc, safeFilenamePart, toCsvString } from "@/lib/csv";
@@ -298,4 +286,60 @@ export async function buildSurveyResponsesCsv(args: {
     .slice(0, 10)}.csv`;
 
   return { ok: true as const, filename, csv };
+}
+
+export async function loadExistingResponseWithAnswers(args: {
+  surveyInternalId: number;
+} & ({ resultId: string } | { contactId: number })) {
+  const [response] = await db
+    .select()
+    .from(surveyResponseTable)
+    .where(
+      and(
+        eq(surveyResponseTable.survey_id, args.surveyInternalId),
+        "resultId" in args
+          ? eq(surveyResponseTable.result_id, args.resultId)
+          : eq(surveyResponseTable.contact_id, args.contactId),
+      ),
+    )
+    .orderBy(desc(surveyResponseTable.created_at))
+    .limit(1);
+
+  if (!response) {
+    return { response: null, answers: {} as Record<string, string | string[]> };
+  }
+
+  const answers = await db
+    .select({
+      answer_value: responseAnswerTable.answer_value,
+      question_id: surveyQuestionTable.question_id,
+      question_type: surveyQuestionTable.question_type,
+    })
+    .from(responseAnswerTable)
+    .innerJoin(
+      surveyQuestionTable,
+      eq(responseAnswerTable.question_id, surveyQuestionTable.id),
+    )
+    .where(eq(responseAnswerTable.response_id, response.id));
+
+  const answersByQuestionId = answers.reduce<Record<string, string | string[]>>(
+    (acc, answer) => {
+      let value: string | string[] = answer.answer_value;
+      if (answer.question_type === "checkbox") {
+        try {
+          const parsed: unknown = JSON.parse(answer.answer_value);
+          if (Array.isArray(parsed) && parsed.every(option => typeof option === "string")) {
+            value = parsed;
+          }
+        } catch {
+          // Preserve legacy scalar answers rather than inventing a selection.
+        }
+      }
+      acc[answer.question_id] = value;
+      return acc;
+    },
+    {},
+  );
+
+  return { response, answers: answersByQuestionId };
 }

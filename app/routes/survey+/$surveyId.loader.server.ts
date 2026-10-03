@@ -4,12 +4,23 @@ import {
   loadSurveyDetailByPublicId,
 } from "@/lib/survey-db.server";
 import { loadSurveyRespondentContact } from "@/lib/survey-respondent.server";
+import { createRespondentToken } from "@/lib/survey-respondent-token.server";
+import { readRespondentCookie, serializeRespondentCookie } from "@/lib/survey-respondent-cookie.server";
 import {
   checkRateLimit,
   clientRateLimitKey,
   rateLimitResponse,
 } from "@/lib/platform-rate-limit.server";
 import { defineLoader } from "@/lib/handler.server";
+
+export type PublicSurveyLoaderData = {
+  survey: NonNullable<Awaited<ReturnType<typeof loadSurveyDetailByPublicId>>>;
+  resultId: string;
+  respondentToken: string;
+  contact: Awaited<ReturnType<typeof loadSurveyRespondentContact>>;
+  existingResponse: Awaited<ReturnType<typeof loadExistingResponseWithAnswers>>["response"];
+  existingAnswers: Record<string, string | string[]>;
+};
 
 /**
  * `?contact=` is a bare integer on links already in the wild, so it cannot be
@@ -51,26 +62,46 @@ export const loader = defineLoader({
       }
     }
 
-    const resultId = `result_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
+    const identityArgs = {
+      request, surveyId: survey.id, workspace: survey.workspace, contactId: contact?.id ?? null,
+    };
+    let identity = await readRespondentCookie(identityArgs);
     let existingResponse = null;
     let existingAnswers: Record<string, string | string[]> = {};
 
-    if (contact?.id) {
+    if (identity) {
       const existing = await loadExistingResponseWithAnswers({
-        surveyInternalId: survey.id,
-        contactId: contact.id,
+        surveyInternalId: survey.id, resultId: identity.resultId,
+      });
+      const responseContactId = existing.response?.contact_id;
+      const sameContact = responseContactId == null
+        ? identityArgs.contactId === null
+        : Number(responseContactId) === Number(identityArgs.contactId);
+      if (existing.response && !sameContact) {
+        identity = null;
+      } else {
+        existingResponse = existing.response;
+        existingAnswers = existing.answers;
+      }
+    }
+    if (!identity && contact?.id) {
+      const existing = await loadExistingResponseWithAnswers({
+        surveyInternalId: survey.id, contactId: contact.id,
       });
       existingResponse = existing.response;
       existingAnswers = existing.answers;
     }
-
-    return routeData({
+    identity ??= await createRespondentToken(survey.id, survey.workspace, {
+      resultId: existingResponse?.result_id,
+    });
+    const cookie = await serializeRespondentCookie({ ...identityArgs, token: identity.token });
+    return routeData<PublicSurveyLoaderData>({
       survey,
-      resultId: existingResponse?.result_id || resultId,
+      resultId: identity.resultId,
+      respondentToken: identity.token,
       contact,
       existingResponse,
       existingAnswers,
-    });
+    }, { headers: { "Set-Cookie": cookie, "Cache-Control": "private, no-store" } });
   },
 });

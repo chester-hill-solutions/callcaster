@@ -28,6 +28,7 @@ export {
   buildSurveyResponsesCsv,
   getSurveyResponsesForWorkspace,
   loadActiveSurveysForWorkspace,
+  loadExistingResponseWithAnswers,
 } from "./survey-responses.server";
 
 
@@ -260,48 +261,6 @@ export async function loadRecentSurveyResponses(surveyInternalId: number, limit 
   }));
 }
 
-export async function loadExistingResponseWithAnswers(args: {
-  surveyInternalId: number;
-  contactId: number;
-}) {
-  const [response] = await db
-    .select()
-    .from(surveyResponseTable)
-    .where(
-      and(
-        eq(surveyResponseTable.survey_id, args.surveyInternalId),
-        eq(surveyResponseTable.contact_id, args.contactId),
-      ),
-    )
-    .orderBy(desc(surveyResponseTable.created_at))
-    .limit(1);
-
-  if (!response) {
-    return { response: null, answers: {} as Record<string, string | string[]> };
-  }
-
-  const answers = await db
-    .select({
-      answer_value: responseAnswerTable.answer_value,
-      question_id: surveyQuestionTable.question_id,
-    })
-    .from(responseAnswerTable)
-    .innerJoin(
-      surveyQuestionTable,
-      eq(responseAnswerTable.question_id, surveyQuestionTable.id),
-    )
-    .where(eq(responseAnswerTable.response_id, response.id));
-
-  const answersByQuestionId = answers.reduce<Record<string, string | string[]>>(
-    (acc, answer) => {
-      acc[answer.question_id] = answer.answer_value;
-      return acc;
-    },
-    {},
-  );
-
-  return { response, answers: answersByQuestionId };
-}
 
 export async function createSurveyWithStructure(args: {
   workspaceId: string;
@@ -703,7 +662,7 @@ export async function completeSurveyResponse(args: {
 }) {
   const nowIso = new Date().toISOString();
   try {
-    await db
+    const [response] = await db
       .update(surveyResponseTable)
       .set({
         completed_at: args.completed ? nowIso : null,
@@ -714,7 +673,11 @@ export async function completeSurveyResponse(args: {
           eq(surveyResponseTable.survey_id, args.surveyInternalId),
           eq(surveyResponseTable.result_id, args.resultId),
         ),
-      );
+      )
+      .returning({ id: surveyResponseTable.id });
+    if (!response) {
+      return { ok: false as const, error: "Survey response not found", status: 404 };
+    }
   } catch (error) {
     logger.error("Error completing survey:", error);
     return { ok: false as const, error: "Failed to complete survey", status: 500 };
