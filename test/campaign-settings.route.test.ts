@@ -546,8 +546,8 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
       );
     });
 
-    test("places a test call for voice campaigns", async () => {
-      makeDbClientForSettingsRoute({ campaign: { id: 99, workspace: "w1", type: "robocall" } });
+    test.each(["robocall", "simple_ivr", "complex_ivr"])("places a %s test call through campaign settings", async (type) => {
+      makeDbClientForSettingsRoute({ campaign: { id: 99, workspace: "w1", type } });
       mocks.parseActionRequest.mockResolvedValue({ intent: "test_send", phone: "6135550199" });
       testSendMocks.sendCampaignTestCall.mockResolvedValue({
         ok: true,
@@ -572,6 +572,9 @@ describe("workspaces_.$id.campaigns.$selected_id.settings action", () => {
         to: "+16135550199",
       });
       expect(testSendMocks.sendCampaignTestSms).not.toHaveBeenCalled();
+      expect(testSendMocks.sendCampaignTestCall).toHaveBeenCalledWith(
+        expect.objectContaining({ workspaceId: "w1", campaignId: "99", userId: "user-1", to: "6135550199" }),
+      );
     });
 
     test("rejects live-call campaigns without sending", async () => {

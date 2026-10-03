@@ -29,6 +29,14 @@ Use object rows when a `test.each` case contains an array input, for example
 arguments; an empty row supplies no argument. Check the fixed positive cases
 before running mutations so a fixture error cannot pass as regression evidence.
 
+## SQL query regressions
+
+Use the real Postgres tier for query predicates; a mocked duplicate helper
+cannot check which rows the SQL counts. For a read-only query, a transaction-local
+temporary table can isolate the required columns without changing stored app
+rows. Restore injected clients in `finally`. Run the fixed cases before removing
+or reversing the predicate, and retain a real-row positive control.
+
 ## Network resource tests
 
 Use real Node readable streams when testing response limits and cleanup. The

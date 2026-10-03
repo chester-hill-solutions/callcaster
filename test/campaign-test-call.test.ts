@@ -68,7 +68,8 @@ describe("sendCampaignTestCall", () => {
     mocks.insertCallForWorkspace.mockResolvedValue({ sid: "CA123" });
   });
 
-  test("places the call through the campaign's IVR flow with no outreach attempt", async () => {
+  test.each(["robocall", "simple_ivr", "complex_ivr"])("places a %s test call with no outreach attempt", async (type) => {
+    mocks.findFirst.mockResolvedValue(campaign({ type }));
     const { sendCampaignTestCall } = await import("@/lib/campaign-test-call.server");
     const result = await sendCampaignTestCall(baseArgs);
 
@@ -93,7 +94,8 @@ describe("sendCampaignTestCall", () => {
     );
   });
 
-  test("records the matching workspace contact on the call row", async () => {
+  test.each(["robocall", "simple_ivr", "complex_ivr"])("records a matching contact on a %s test call without an attempt", async (type) => {
+    mocks.findFirst.mockResolvedValue(campaign({ type }));
     mocks.findContactsByPhone.mockResolvedValue([{ id: 7 }]);
     const { sendCampaignTestCall } = await import("@/lib/campaign-test-call.server");
     const result = await sendCampaignTestCall(baseArgs);

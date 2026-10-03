@@ -2815,5 +2815,38 @@
     "risk": "high",
     "trackerRecommendation": "The source fix is in PR #2257. This board update travels with that fix; after merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.",
     "currentBehavior": "PR #2257 implements #2095: Leave waits for the server stop, keeps the local device on failure and omits queue reset. The endpoint finds the current user's idle conferences and reports completion failures. All 57 focused UI and server cases passed; restoring the old Leave handler failed four regressions, and restoring the old endpoint failed twelve regressions with five controls passing."
+  },
+  {
+    "issueNumber": 2093,
+    "verdict": "verify-close",
+    "recommendedTitle": "A voice test call writes a call row with the campaign id, so the campaign's own duplicate gate later dequeues the real contact as \"Duplicate IVR call prevented\"",
+    "summary": "Voice campaign test calls no longer count as prior campaign dispatches. Deployed campaign verification remains.",
+    "currentBehavior": "This source fix adds IS NOT NULL on outreach_attempt_id to the real tenant-scoped duplicate query. All 45 focused cases passed, including three real Postgres query and dispatch cases. Removing the exclusion failed two cases while the real-call control passed; reversing it failed all three.",
+    "resolution": "Verify on deployed dev: test-call an audience number, then dispatch the campaign and confirm the first real call proceeds. A later real dispatch to that number must still be skipped as a duplicate. Promote the verified fix before closing.",
+    "lookIn": [
+      "app/lib/telephony-db.server.ts",
+      "app/lib/campaign-test-call.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "test/integration-db/campaign-call-duplicate.test.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/campaign-call-duplicate.test.ts (real Postgres counts and real dispatch gate; test and real history; workspace, campaign and phone controls)",
+      "test/campaign-test-call.test.ts (all three voice types, with and without a matching contact)",
+      "test/campaign-settings.route.test.ts (all three voice types use the shared test-call helper)",
+      "test/campaign-ivr-dispatch.test.ts (existing queue and dispatch controls)"
+    ],
+    "missingTests": [
+      "Deployed calling verification with a test recipient also in the audience, plus a real-call duplicate control."
+    ],
+    "acceptanceCriteria": [
+      "A test call to a number that is also in the campaign audience does **not** cause the campaign to dequeue that contact as a duplicate.",
+      "Two real dispatch calls to the same number in one campaign still dequeue the second (the positive control must stay green).",
+      "The dedupe query's test-call exclusion is asserted directly, not only through the dispatch result.",
+      "Every test-call path is covered; a test enumerates them."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix."
   }
 ]

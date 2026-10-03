@@ -1079,41 +1079,6 @@
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. An ended message campaign returns no readiness issues and no disabled reason. getDateIssue does not compare end_date to options.now."
   },
   {
-    "issueNumber": 2093,
-    "verdict": "fix-now",
-    "recommendedTitle": "A voice test call writes a call row with the campaign id, so the campaign's own duplicate gate later dequeues the real contact as \"Duplicate IVR call prevented\"",
-    "summary": "Campaign test calls keep campaign_id with no outreach attempt, and the duplicate count includes them. The issue proposes the wrong predicate polarity.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Campaign test calls keep campaign_id with no outreach attempt, and the duplicate count includes them. The issue proposes the wrong predicate polarity.",
-    "resolution": "Verify the marker on every test-call path. To count only real dispatch calls with the current marker, add isNotNull(callTable.outreach_attempt_id), NOT isNull. A dedicated test marker is another option. Retain real-call deduplication.",
-    "lookIn": [
-      "app/lib/campaign-test-call.server.ts:117",
-      "app/lib/telephony-db.server.ts:25",
-      "app/lib/campaign-ivr-dispatch.server.ts:281",
-      "app/lib/telephony-db.server.ts (`hasDuplicateCampaignCall`, `countCampaignCallsToPhone`)",
-      "app/lib/campaign-ivr-dispatch.server.ts:50,156-161,210-218",
-      "app/lib/campaign-test-call.server.ts",
-      "app/lib/campaign-queue-completion.server.ts (`completeCampaignsDrainedByDequeue`)"
-    ],
-    "existingTests": [
-      "test/campaign-test-call.test.ts",
-      "test/campaign-ivr-dispatch.test.ts"
-    ],
-    "missingTests": [
-      "A null-attempt campaign test call does not count as a duplicate; a real dispatch call does. Remove the IS NOT NULL predicate and confirm the test fails.",
-      "A test call to an audience number leaves its queue row available for the first real dispatch."
-    ],
-    "acceptanceCriteria": [
-      "A test call to a number that is also in the campaign audience does **not** cause the campaign to dequeue that contact as a duplicate.",
-      "Two real dispatch calls to the same number in one campaign still dequeue the second (the positive control must stay green).",
-      "The dedupe query's test-call exclusion is asserted directly, not only through the dispatch result.",
-      "Every test-call path is covered; a test enumerates them."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2094,
     "verdict": "fix-now",
     "recommendedTitle": "Agent hang-up on a predictive call 500s and never tears the conference down — Twilio retries forever and the dialer keeps dialling",

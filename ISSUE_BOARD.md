@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@40b56499 + PR #2257` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@09eb7740 + source fix for #2093` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-02.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 82
+## Fix now — 81
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -281,17 +281,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/platform-api.test.ts covers rate limiting using a supplied X-Forwarded-For header.; test/auth-catch-all-rate-limit.route.test.ts covers auth throttling; neither test proves the production proxy trust contract or database retention.
 - Missing tests: No retention boundary test; existing tests set client forwarded headers. Deployment proxy overwrite/append behavior needs verification before claiming externally spoofable keys.
 - Done when: After the daily job, `rate_limit_bucket` contains no row with `reset_at` older than the retention window.; The prune is covered by a test with rows on both sides of the boundary (kill-check: make the prune a no-op and confirm the test goes red).; The job's row count is logged.; The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria).
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2093](https://github.com/chester-hill-solutions/callcaster/issues/2093) A voice test call writes a call row with the campaign id, so the campaign's own duplicate gate later dequeues the real contact as "Duplicate IVR call prevented"
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Campaign test calls keep campaign_id with no outreach attempt, and the duplicate count includes them. The issue proposes the wrong predicate polarity.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Campaign test calls keep campaign_id with no outreach attempt, and the duplicate count includes them. The issue proposes the wrong predicate polarity.
-- Resolution: Verify the marker on every test-call path. To count only real dispatch calls with the current marker, add isNotNull(callTable.outreach_attempt_id), NOT isNull. A dedicated test marker is another option. Retain real-call deduplication.
-- Look in: `app/lib/campaign-test-call.server.ts:117`, `app/lib/telephony-db.server.ts:25`, `app/lib/campaign-ivr-dispatch.server.ts:281`, `app/lib/telephony-db.server.ts (`hasDuplicateCampaignCall`, `countCampaignCallsToPhone`)`, `app/lib/campaign-ivr-dispatch.server.ts:50,156-161,210-218`, `app/lib/campaign-test-call.server.ts`, `app/lib/campaign-queue-completion.server.ts (`completeCampaignsDrainedByDequeue`)`
-- Existing tests: test/campaign-test-call.test.ts; test/campaign-ivr-dispatch.test.ts
-- Missing tests: A null-attempt campaign test call does not count as a duplicate; a real dispatch call does. Remove the IS NOT NULL predicate and confirm the test fails.; A test call to an audience number leaves its queue row available for the first real dispatch.
-- Done when: A test call to a number that is also in the campaign audience does **not** cause the campaign to dequeue that contact as a duplicate.; Two real dispatch calls to the same number in one campaign still dequeue the second (the positive control must stay green).; The dedupe query's test-call exclusion is asserted directly, not only through the dispatch result.; Every test-call path is covered; a test enumerates them.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2079](https://github.com/chester-hill-solutions/callcaster/issues/2079) Transferring workspace ownership to yourself silently demotes you owner to admin and reports success
@@ -945,7 +934,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 102
+## Verify and close — 103
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -1003,6 +992,17 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Runtime verification remains; source and tests implement the decided behavior.
 - Done when: DONE: a disabled workspace receives no number_rental_billing debit and no billing_reconcile or twilio_open_sync run. Kill-check run: inverting the fanout guard turns 4 tests red, inverting billingEnabled turns 4 red, setting includeDisabled: false turns 2 red.; DONE: the fanout summary counts the workspace as `skipped` and logs `<job>.fanout_skipped_disabled` with the workspaceId.; DONE: an enabled workspace is unaffected (positive control asserted in all three test files).; DONE: the decided meaning of `disabled` is recorded on this issue and in the runCronWorkspaceFanout doc comment.; DONE: the release half keeps running, so no number is stranded by the suspension itself.
 - Tracker: Move to Verify and close. Do not implement the original single fanout guard. Related PR evidence: #2165. A PR reference alone does not prove deployed behavior.
+
+### [#2093](https://github.com/chester-hill-solutions/callcaster/issues/2093) A voice test call writes a call row with the campaign id, so the campaign's own duplicate gate later dequeues the real contact as "Duplicate IVR call prevented"
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
+- Voice campaign test calls no longer count as prior campaign dispatches. Deployed campaign verification remains.
+- Current behavior: This source fix adds IS NOT NULL on outreach_attempt_id to the real tenant-scoped duplicate query. All 45 focused cases passed, including three real Postgres query and dispatch cases. Removing the exclusion failed two cases while the real-call control passed; reversing it failed all three.
+- Resolution: Verify on deployed dev: test-call an audience number, then dispatch the campaign and confirm the first real call proceeds. A later real dispatch to that number must still be skipped as a duplicate. Promote the verified fix before closing.
+- Look in: `app/lib/telephony-db.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `test/integration-db/campaign-call-duplicate.test.ts`
+- Existing tests: test/integration-db/campaign-call-duplicate.test.ts (real Postgres counts and real dispatch gate; test and real history; workspace, campaign and phone controls); test/campaign-test-call.test.ts (all three voice types, with and without a matching contact); test/campaign-settings.route.test.ts (all three voice types use the shared test-call helper); test/campaign-ivr-dispatch.test.ts (existing queue and dispatch controls)
+- Missing tests: Deployed calling verification with a test recipient also in the audience, plus a real-call duplicate control.
+- Done when: A test call to a number that is also in the campaign audience does **not** cause the campaign to dequeue that contact as a duplicate.; Two real dispatch calls to the same number in one campaign still dequeue the second (the positive control must stay green).; The dedupe query's test-call exclusion is asserted directly, not only through the dispatch result.; Every test-call path is covered; a test enumerates them.
+- Tracker: The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
 
 ### [#2086](https://github.com/chester-hill-solutions/callcaster/issues/2086) The IVR no-input replay branch overwrites outreach_attempt.result, destroying every answer already recorded on that call
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-02
