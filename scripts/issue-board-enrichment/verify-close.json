@@ -3533,7 +3533,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Require conversation read capability for message acknowledgments",
     "summary": "Conversation POST now uses the same existing campaigns.read capability strategy as GET before either received-message read acknowledgment writer.",
-    "currentBehavior": "Source fix based on dev@29668acd: POST uses dataPlaneCapabilityAuthWithParam(\"campaigns.read\", \"contactNumber\"). Empty/unrelated API-key scopes and unknown session roles receive 403 before writes, missing actor receives 401, and non-members/workspace mismatches receive 404. Required-capability keys and caller/member/admin/owner sessions retain both acknowledgment modes. Actual writers only change received incoming message read state, not outbound provider delivery receipts. The generated API surface and both served specs derive matching GET/POST capability and API-key/session security. The annotation identifies public SDK exposure and the guide documents the operation. The scoped action sweep found no second missing gate among direct raw-context actions and the traced campaign-read resources with writes. Full checks and remote gates are required before merge.",
+    "currentBehavior": "Merged to dev in PR #2285 at a3051a42. Conversation acknowledgment POST enforces campaigns.read before either received-message writer, matching GET. Required-capability keys and permitted session roles retain both modes; scope, actor, membership and workspace rejections perform no writes. Generated and served contracts state the matching capability and API-key/session access. These writers only change received-message read state, not outbound provider delivery receipts. All 92 focused cases pass; original runtime fails 21 of 37 cases with 16 controls and four mutations fail. Full local CI passed 5,184 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on 0f9019b5. Issue-on-dev moved one item. Verify deployed behavior and promote before closure.",
     "resolution": "Verify empty/unrelated API-key scopes cause no read-state write on deployed dev, while campaigns.read keys and permitted session roles can acknowledge one received message or a conversation. Verify 401/403/404/405 errors and the documented served contract. Promote before closing.",
     "lookIn": [
       "app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.action.server.ts",
@@ -3566,5 +3566,50 @@
     "risk": "high",
     "trackerRecommendation": "Source fix is in this change; verify deployed behavior and promote before closure.",
     "rootCause": "The action read middleware context but did not require a session actor or a capability. GET already required campaigns.read. An editorial auth declaration concealed the missing POST gate and the sessionOnly exposure contradicted key access."
+  },
+  {
+    "issueNumber": 2100,
+    "verdict": "verify-close",
+    "recommendedTitle": "Align the API session-cookie contract with Better Auth",
+    "summary": "The API contract and SDK identify both session-cookie forms issued by the current auth configuration: HTTP and secure HTTPS deployment alternatives.",
+    "currentBehavior": "Source fix based on dev@a3051a42: shared session security definitions identify better-auth.session_token on HTTP and __Secure-better-auth.session_token on HTTPS. Public, complete and integrator specs retain API-key/session versus session-only policy while exposing the matching alternatives. All three generated SDK operations can select the exact issued name through the existing auth callback. API guides document browser cookie-jar behavior and preservation of the signed name/value for server clients. The installed real verifier reads the configured name, so a cookie renamed to another prefix is not accepted. No auth configuration or verifier changes. Real app-issued cookies and generated SDK requests are covered on both base-URL forms. Full local and remote gates are required before merge.",
+    "resolution": "Verify the deployed server cookie and served schemes match. Confirm a generated SDK request using its issued signed cookie authenticates, browser cookie-jar access remains valid, and API-key access is retained. Promote before closing.",
+    "lookIn": [
+      "app/lib/openapi-integrator.ts",
+      "app/lib/openapi-build.ts",
+      "app/lib/openapi-platform.ts",
+      "app/lib/api-generated/sdk.gen.ts",
+      "app/server/auth-instance.ts",
+      "app/lib/auth.server.ts",
+      "docs/api-auth-matrix.md",
+      "docs/api-overview.md",
+      "docs/api-telephony-control.md",
+      "test/session-cookie-contract.test.ts"
+    ],
+    "existingTests": [
+      "test/session-cookie-contract.test.ts (real app auth instance with isolated adapter, issued signed cookies, three generated SDK operations, HTTP/HTTPS, wrong-name/prefix/signature and API-key header controls)",
+      "test/openapi.test.ts (session-only and API-key/session security policy)",
+      "test/api-auth.test.ts",
+      "test/auth-instance.server.test.ts",
+      "test/api-surface.test.ts",
+      "test/openapi-complete.test.ts"
+    ],
+    "missingTests": [
+      "Deployed cookie/SDK verification and production promotion before closure."
+    ],
+    "acceptanceCriteria": [
+      "All three specs and the generated SDK identify the real HTTP and secure HTTPS deployment cookie alternatives.",
+      "All session operations include both mechanisms without widening session-only routes to API-key access.",
+      "The three SDK operations authenticate using the exact issued cookie name and signed value under both base-URL forms.",
+      "Renamed cookies, wrong secure prefixes and modified signatures are refused by the real verifier.",
+      "Browser-cookie and SDK API-key controls remain valid.",
+      "Original source and changed source/SDK names or omitted secure alternatives fail collected regressions.",
+      "Full codegen/local/remote gates pass; verify deployed behavior before promotion and closure."
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Source contract fix is in this change; verify deployed cookie/SDK behavior and promote before closure.",
+    "rootCause": "The OpenAPI source retained the retired Supabase cookie name. Generated outputs faithfully repeated it, and separate static security arrays omitted the HTTPS cookie mechanism."
   }
 ]

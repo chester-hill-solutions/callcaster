@@ -719,6 +719,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -782,6 +785,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -846,6 +852,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -911,6 +920,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -965,6 +977,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1029,6 +1044,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -1081,6 +1099,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -1145,6 +1166,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1210,6 +1234,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1493,6 +1520,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1556,6 +1586,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -1792,6 +1825,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2029,6 +2065,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2256,6 +2295,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -2320,6 +2362,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2441,6 +2486,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2506,6 +2554,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -2570,6 +2621,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2633,6 +2687,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2686,6 +2743,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2749,6 +2809,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2802,6 +2865,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2865,6 +2931,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2928,6 +2997,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2982,6 +3054,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -3051,6 +3126,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -3105,6 +3183,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3158,6 +3239,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3224,6 +3308,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -3293,6 +3380,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -3347,6 +3437,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3397,6 +3490,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -3516,6 +3612,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -3609,6 +3708,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3712,6 +3814,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3777,6 +3882,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3830,6 +3938,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3944,6 +4055,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4007,6 +4121,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4070,6 +4187,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -4124,6 +4244,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -4181,6 +4304,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -4235,6 +4361,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4451,6 +4580,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4516,6 +4648,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -4580,6 +4715,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4969,6 +5107,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5032,6 +5173,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5095,6 +5239,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5158,6 +5305,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -5209,6 +5359,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -5379,6 +5532,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5444,6 +5600,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6021,6 +6180,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6084,6 +6246,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6137,6 +6302,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6202,6 +6370,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6265,6 +6436,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6318,6 +6492,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6381,6 +6558,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -6445,6 +6625,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6510,6 +6693,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6575,6 +6761,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6640,6 +6829,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6703,6 +6895,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6754,6 +6949,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6863,6 +7061,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6928,6 +7129,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6996,6 +7200,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -7047,6 +7254,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -7363,6 +7573,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -7428,6 +7641,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -7491,6 +7707,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -7554,6 +7773,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -7608,6 +7830,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -7667,6 +7892,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -7721,6 +7949,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -7774,6 +8005,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -7839,6 +8073,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -8069,6 +8306,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -8132,6 +8372,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -8185,6 +8428,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -8299,6 +8545,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -8362,6 +8611,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -8413,6 +8665,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -8477,6 +8732,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -8540,6 +8798,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -8593,6 +8854,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8661,6 +8925,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -8714,6 +8981,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8781,6 +9051,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -8845,6 +9118,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -8908,6 +9184,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -8959,6 +9238,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9024,6 +9306,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -9094,6 +9379,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -9160,6 +9448,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -9230,6 +9521,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -9295,6 +9589,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -9358,6 +9655,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9425,6 +9725,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -9490,6 +9793,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -9553,6 +9859,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9617,6 +9926,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -9682,6 +9994,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9746,6 +10061,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9810,6 +10128,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9875,6 +10196,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -9943,6 +10267,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -10006,6 +10333,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -10060,6 +10390,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -10130,6 +10463,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -10196,6 +10532,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -10262,6 +10601,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -10332,6 +10674,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -10398,6 +10743,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -10467,6 +10815,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -10532,6 +10883,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -10599,6 +10953,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -10664,6 +11021,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -10727,6 +11087,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -10791,6 +11154,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -10842,6 +11208,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -10907,6 +11276,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -10970,6 +11342,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -11033,6 +11408,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -11084,6 +11462,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -11148,6 +11529,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -11211,6 +11595,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -11275,6 +11662,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -11338,6 +11728,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -11391,6 +11784,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -11454,6 +11850,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -11518,6 +11917,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -11584,6 +11986,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -11654,6 +12059,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -11719,6 +12127,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -11784,6 +12195,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -11848,6 +12262,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -11911,6 +12328,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -11974,6 +12394,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -12028,8 +12451,14 @@
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "sb-access-token",
-        "description": "Session cookie (browser). Use workspace API key for server/script access."
+        "name": "better-auth.session_token",
+        "description": "Signed Better Auth session cookie for an HTTP deployment. Preserve the name and value issued by the target server. HTTPS deployments use secureSessionCookie. Browsers send their cookie jar; server/script clients can use a workspace API key."
+      },
+      "secureSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Secure-better-auth.session_token",
+        "description": "Signed Better Auth session cookie for an HTTPS deployment. Preserve the secure prefix and the value issued by the target server; do not rename an HTTP cookie. Browsers send their cookie jar; server/script clients can use a workspace API key."
       },
       "apiKey": {
         "type": "apiKey",

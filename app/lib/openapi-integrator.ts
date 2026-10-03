@@ -12,15 +12,30 @@ const errorResponse = (description: string) => ({
   },
 });
 
-const publicSecurity = [{ sessionCookie: [] }, { apiKey: [] }] as const;
+export const sessionCookieSecurity = [
+  { sessionCookie: [] },
+  { secureSessionCookie: [] },
+] as const;
+
+export const apiKeyOrSessionSecurity = [
+  ...sessionCookieSecurity,
+  { apiKey: [] },
+] as const;
 
 const securitySchemes = {
   sessionCookie: {
     type: "apiKey" as const,
     in: "cookie" as const,
-    name: "sb-access-token",
+    name: "better-auth.session_token",
     description:
-      "Session cookie (browser). Use workspace API key for server/script access.",
+      "Signed Better Auth session cookie for an HTTP deployment. Preserve the name and value issued by the target server. HTTPS deployments use secureSessionCookie. Browsers send their cookie jar; server/script clients can use a workspace API key.",
+  },
+  secureSessionCookie: {
+    type: "apiKey" as const,
+    in: "cookie" as const,
+    name: "__Secure-better-auth.session_token",
+    description:
+      "Signed Better Auth session cookie for an HTTPS deployment. Preserve the secure prefix and the value issued by the target server; do not rename an HTTP cookie. Browsers send their cookie jar; server/script clients can use a workspace API key.",
   },
   apiKey: {
     type: "apiKey" as const,
@@ -294,7 +309,7 @@ export const integratorPathOverrides = {
         "Creates a call campaign in a single request: optionally creates a script, creates the campaign with a caller ID, and attaches audiences (with optional contact enqueue). Provide exactly one of `script` or `script_id`, not both. Requires the campaigns.write capability for API keys.",
       tags: [INTEGRATOR_API_TAG, "Campaigns"],
       "x-callcaster-capability": "campaigns.write",
-      security: [...publicSecurity],
+      security: [...apiKeyOrSessionSecurity],
       requestBody: {
         required: true,
         content: {
@@ -351,7 +366,7 @@ export const integratorPathOverrides = {
         "Sends one outbound SMS to a phone number. The destination phone selects the recipient. A supplied `contact_id` must identify its single matching workspace contact; otherwise the send is rejected. Template tags and attribution use that verified contact. Ambiguous matches and failed recipient verification block sends. A successful lookup with no contact permits a manual send without `contact_id`. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
       tags: [INTEGRATOR_API_TAG, "Messaging"],
       "x-callcaster-capability": "messages.send",
-      security: [...publicSecurity],
+      security: [...apiKeyOrSessionSecurity],
       requestBody: {
         required: true,
         content: {
@@ -385,7 +400,7 @@ export const integratorPathOverrides = {
         "Legacy batch dispatch: sends SMS to all queued contacts on a message campaign. Processes template tags per contact. Duplicate sends to the same number are skipped and the queue row is dequeued. API key auth requires `user_id` for outreach attribution; session auth uses the logged-in user. Requires the campaigns.dispatch capability for API keys.",
       tags: [INTEGRATOR_API_TAG, "Messaging"],
       "x-callcaster-capability": "campaigns.dispatch",
-      security: [...publicSecurity],
+      security: [...apiKeyOrSessionSecurity],
       requestBody: {
         required: true,
         content: {

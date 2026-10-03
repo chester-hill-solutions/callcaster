@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@29668acd + source fix for #2134` · 290 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@a3051a42 + source fix for #2100` · 290 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 67
+## Fix now — 66
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -602,16 +602,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A machine-voice campaign with no date pair, outside its calling window, reports `waiting` (kill-check: restore the combined guard and confirm the test goes red).; A campaign in range reports `running`.; A campaign with an expired range reports the expired state (see the related `campaign_ended` issue).; The `waiting` predicate is a single shared function used by both the sweep and the dispatch gate — asserted by a test that they agree across a table of cases.; The production count is recorded in the issue.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2100](https://github.com/chester-hill-solutions/callcaster/issues/2100) The published OpenAPI, three spec JSONs, three docs and the generated SDK all name a session cookie the app never issues: sb-access-token vs better-auth.session_token
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- The integrator scheme, generated SDK, committed OpenAPI and three docs still publish sb-access-token; auth config uses Better Auth defaults.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The integrator scheme, generated SDK, committed OpenAPI and three docs still publish sb-access-token; auth config uses Better Auth defaults.
-- Resolution: Align OpenAPI, generated outputs and docs with actual auth cookie names and secure-prefix behavior.
-- Look in: `app/lib/openapi-integrator.ts:21`, `app/lib/api-generated/sdk.gen.ts:30`, `openapi/integrator-api.json:336`, `app/server/auth-instance.ts:52`, `docs/api-auth-matrix.md:15`, `app/lib/openapi-build.ts:151-156`, `app/lib/auth.server.ts:23-34`, `app/server/auth-instance.ts`, `app/lib/api-generated/sdk.gen.ts`, `openapi/public-api.json`, `openapi/complete-api.json`, `openapi/integrator-api.json`, `docs/api-auth-matrix.md`, `docs/api-overview.md`, `docs/api-telephony-control.md`, `test/openapi*.test.ts`
-- Missing tests: No contract test comparing generated scheme to the real auth cookie; auth state and installed runtime cookie behavior were not exercised in this source-only audit.
-- Done when: The published scheme name equals the cookie name the app actually sets, in all three spec JSONs and the generated SDK.; The `__Secure-` prefix is documented, and the SDK/config supports both.; `ci:codegen:verify` passes with no drift.; A test asserts the published scheme name matches the real cookie name (kill-check: revert the name and confirm the test goes red).; `docs/api-auth-matrix.md`, `docs/api-overview.md` and `docs/api-telephony-control.md` no longer name the wrong cookie.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2118](https://github.com/chester-hill-solutions/callcaster/issues/2118) A malformed known feature flag disables valid sibling flags
 - Verdict: **Fix now** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
 - A wrong type in any known flag still causes whole-object schema parsing to fail and disables an independently valid flag. Unknown passthrough keys are not the same failure case.
@@ -786,14 +776,14 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 122
+## Verify and close — 123
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
 ### [#2134](https://github.com/chester-hill-solutions/callcaster/issues/2134) Require conversation read capability for message acknowledgments
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
 - Conversation POST now uses the same existing campaigns.read capability strategy as GET before either received-message read acknowledgment writer.
-- Current behavior: Source fix based on dev@29668acd: POST uses dataPlaneCapabilityAuthWithParam("campaigns.read", "contactNumber"). Empty/unrelated API-key scopes and unknown session roles receive 403 before writes, missing actor receives 401, and non-members/workspace mismatches receive 404. Required-capability keys and caller/member/admin/owner sessions retain both acknowledgment modes. Actual writers only change received incoming message read state, not outbound provider delivery receipts. The generated API surface and both served specs derive matching GET/POST capability and API-key/session security. The annotation identifies public SDK exposure and the guide documents the operation. The scoped action sweep found no second missing gate among direct raw-context actions and the traced campaign-read resources with writes. Full checks and remote gates are required before merge.
+- Current behavior: Merged to dev in PR #2285 at a3051a42. Conversation acknowledgment POST enforces campaigns.read before either received-message writer, matching GET. Required-capability keys and permitted session roles retain both modes; scope, actor, membership and workspace rejections perform no writes. Generated and served contracts state the matching capability and API-key/session access. These writers only change received-message read state, not outbound provider delivery receipts. All 92 focused cases pass; original runtime fails 21 of 37 cases with 16 controls and four mutations fail. Full local CI passed 5,184 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on 0f9019b5. Issue-on-dev moved one item. Verify deployed behavior and promote before closure.
 - Root cause: The action read middleware context but did not require a session actor or a capability. GET already required campaigns.read. An editorial auth declaration concealed the missing POST gate and the sessionOnly exposure contradicted key access.
 - Resolution: Verify empty/unrelated API-key scopes cause no read-state write on deployed dev, while campaigns.read keys and permitted session roles can acknowledge one received message or a conversation. Verify 401/403/404/405 errors and the documented served contract. Promote before closing.
 - Look in: `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.action.server.ts`, `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.loader.server.ts`, `app/lib/capability-guard.server.ts`, `app/lib/message-db.server.ts`, `app/lib/api-surface-annotations.ts`, `app/lib/api-surface-generated.ts`, `docs/api-data-plane.md`
@@ -801,6 +791,18 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed route verification and production promotion before closure.
 - Done when: Empty/unrelated API-key scopes receive 403 and perform no message write in either acknowledgment mode.; Required-capability keys and permitted session roles succeed; missing actor is 401 and non-member/workspace mismatch is 404 with no write.; GET and POST enforce campaigns.read and generated/served API contracts state API-key/session access.; Preserve decoded phone forwarding, specific-SID and empty-body acknowledgment, POST-only behavior and write failures.; Original runtime and changed gate fail the actual route regressions while positive controls remain.; Verify deployed behavior before production promotion and closure.
 - Tracker: Source fix is in this change; verify deployed behavior and promote before closure.
+
+### [#2100](https://github.com/chester-hill-solutions/callcaster/issues/2100) Align the API session-cookie contract with Better Auth
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The API contract and SDK identify both session-cookie forms issued by the current auth configuration: HTTP and secure HTTPS deployment alternatives.
+- Current behavior: Source fix based on dev@a3051a42: shared session security definitions identify better-auth.session_token on HTTP and __Secure-better-auth.session_token on HTTPS. Public, complete and integrator specs retain API-key/session versus session-only policy while exposing the matching alternatives. All three generated SDK operations can select the exact issued name through the existing auth callback. API guides document browser cookie-jar behavior and preservation of the signed name/value for server clients. The installed real verifier reads the configured name, so a cookie renamed to another prefix is not accepted. No auth configuration or verifier changes. Real app-issued cookies and generated SDK requests are covered on both base-URL forms. Full local and remote gates are required before merge.
+- Root cause: The OpenAPI source retained the retired Supabase cookie name. Generated outputs faithfully repeated it, and separate static security arrays omitted the HTTPS cookie mechanism.
+- Resolution: Verify the deployed server cookie and served schemes match. Confirm a generated SDK request using its issued signed cookie authenticates, browser cookie-jar access remains valid, and API-key access is retained. Promote before closing.
+- Look in: `app/lib/openapi-integrator.ts`, `app/lib/openapi-build.ts`, `app/lib/openapi-platform.ts`, `app/lib/api-generated/sdk.gen.ts`, `app/server/auth-instance.ts`, `app/lib/auth.server.ts`, `docs/api-auth-matrix.md`, `docs/api-overview.md`, `docs/api-telephony-control.md`, `test/session-cookie-contract.test.ts`
+- Existing tests: test/session-cookie-contract.test.ts (real app auth instance with isolated adapter, issued signed cookies, three generated SDK operations, HTTP/HTTPS, wrong-name/prefix/signature and API-key header controls); test/openapi.test.ts (session-only and API-key/session security policy); test/api-auth.test.ts; test/auth-instance.server.test.ts; test/api-surface.test.ts; test/openapi-complete.test.ts
+- Missing tests: Deployed cookie/SDK verification and production promotion before closure.
+- Done when: All three specs and the generated SDK identify the real HTTP and secure HTTPS deployment cookie alternatives.; All session operations include both mechanisms without widening session-only routes to API-key access.; The three SDK operations authenticate using the exact issued cookie name and signed value under both base-URL forms.; Renamed cookies, wrong secure prefixes and modified signatures are refused by the real verifier.; Browser-cookie and SDK API-key controls remain valid.; Original source and changed source/SDK names or omitted secure alternatives fail collected regressions.; Full codegen/local/remote gates pass; verify deployed behavior before promotion and closure.
+- Tracker: Source contract fix is in this change; verify deployed cookie/SDK behavior and promote before closure.
 
 ### [#2080](https://github.com/chester-hill-solutions/callcaster/issues/2080) Restrict webhook tests to permitted workspace members
 - Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03

@@ -12,13 +12,15 @@ Raw OpenAPI JSON:
 | Mode | OpenAPI tag | Typical caller | Headers / cookies |
 | --- | --- | --- | --- |
 | API key or session | Integrator API | Automation scripts, partners | `X-API-Key: cc_…` or `Authorization: Bearer cc_…`; or session cookie |
-| Session | User API | Signed-in browser / API client | Supabase session cookie (`sb-access-token` family) |
+| Session | User API | Signed-in browser / API client | Better Auth signed session cookie: `better-auth.session_token` on HTTP or `__Secure-better-auth.session_token` on HTTPS |
 | Workspace admin | Workspace Admin | Workspace owners/admins | Session + workspace membership/role checks |
 | Twilio signature | Provider Webhook | Twilio | `X-Twilio-Signature` + `application/x-www-form-urlencoded` body |
 | Stripe signature | Provider Webhook | Stripe | `Stripe-Signature` + raw JSON body |
 | Public form | Public Form | Anonymous visitors | None (surveys, contact form, auth callback) |
 | Internal trusted | Internal Trusted | App telephony workers | Service-role DB access; body/context trust |
 | Security gap | Security Gap | Anyone callable | Weak or missing auth — documented, not supported |
+
+The two session-cookie schemes are alternatives for the target deployment. Send the issued name and signed value without renaming either. Browser clients use their cookie jar; server SDK clients select the matching cookie mechanism. See [session client setup](./api-overview.md#session-browser).
 
 ## Workspace scoping
 
