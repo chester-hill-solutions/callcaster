@@ -557,40 +557,6 @@
     "trackerRecommendation": "Keep Fix now. #2225 added rate limiting to the HTML reset request but did not repair its reset destination or success feedback. Related PR evidence: #2225. A PR reference alone does not prove deployed behavior."
   },
   {
-    "issueNumber": 2076,
-    "verdict": "fix-now",
-    "recommendedTitle": "Invite cancel is authorized on workspaceId but executed on a bare invitation id — any member can cancel any workspace's pending invite",
-    "summary": "Workspace authorization still ends before invitation cancellation. Both API and settings helper send a bare invitation id to the package writer.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Workspace authorization still ends before invitation cancellation. Both API and settings helper send a bare invitation id to the package writer.",
-    "resolution": "Require workspace identity in cancel/resend writers and use it in the update predicate; map foreign ids to uniform 404.",
-    "lookIn": [
-      "app/lib/platform-members.server.ts:491",
-      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:175",
-      "vendor/chester-hill-solutions/auth-postgres/dist/invitation.js:75",
-      "app/lib/platform-members.server.ts:53-75,478-497",
-      "app/lib/workspace-invitations.server.ts:166-174",
-      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:198-214",
-      "app/routes/api+/workspaces+/$workspaceId/members.action.server.ts:165-177",
-      "app/routes/workspaces+/$id/settings.action.server.ts:44-53",
-      "app/components/workspace/TeamMember.tsx:102-125",
-      "app/db/schema.ts:180-193"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "No cross-workspace cancellation test. Cover both routes and a valid in-workspace pending invite; assert the foreign row remains unchanged."
-    ],
-    "acceptanceCriteria": [
-      "`cancelWorkspaceInvite(userA, wsA, inviteIdFromWsB)` returns `ok:false, status:404` and leaves the wsB invitation `pending`.",
-      "The `formName=cancelInvite` settings branch behaves identically.",
-      "The `workspaceId` parameter is no longer dead in either helper (a lint or type change makes an unused parameter an error so it cannot rot back).",
-      "`resendWorkspaceInvitation` gets the same scoping — see #the sibling resend-ownership issue."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2077,
     "verdict": "fix-now",
     "recommendedTitle": "/accept-invite resend has no ownership check — any signed-in user can rotate and re-send any invitation by id",

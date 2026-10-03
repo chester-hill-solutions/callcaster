@@ -9297,7 +9297,7 @@
             "sessionCookie": []
           }
         ],
-        "description": "Session-only trust-root route for removing another member. Self-removal is not supported. Pass `target: invite` to cancel a pending invite.",
+        "description": "Session-only trust-root route for removing another member. Self-removal is not supported. Pass `target: invite` to cancel a pending invite in this workspace. Foreign, missing and non-pending invites return the same 404 without a change.",
         "requestBody": {
           "required": true,
           "content": {

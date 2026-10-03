@@ -54,6 +54,11 @@ update path — so revoke and re-mint to change them.
 
 Auth: workspace member manager session. Privileged role changes require MFA (SEC-08).
 
+To cancel an invitation, send `DELETE` with `target: "invite"` and `invite_id`.
+Only a pending invitation in the URL's workspace can be canceled. Foreign,
+missing and finalized invitations all return 404 and remain unchanged. The
+workspace settings form uses the same cancellation rule.
+
 ## Customer webhooks
 
 | Method | Path | Purpose |

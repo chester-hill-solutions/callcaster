@@ -1,4 +1,5 @@
 import { data as routeData, redirect } from "react-router";
+import { AuthzError } from "@chester-hill-solutions/auth";
 import type { Database } from "@/lib/db-types";
 import { env } from "@/lib/env.server";
 import { isMemberRole } from "@/lib/member-role";
@@ -165,6 +166,7 @@ export async function handleDeleteWorkspace({
 export async function removeInvite({
   workspaceId,
   formData,
+  headers,
 }: {
   workspaceId: string;
   formData: FormData;
@@ -172,11 +174,17 @@ export async function removeInvite({
 }) {
   const invitationId = formData.get("userId") as string;
   try {
-    await cancelWorkspaceInvitationById(invitationId);
+    await cancelWorkspaceInvitationById(invitationId, workspaceId);
     return { data: { invitationId }, error: null };
   } catch (error) {
     logger.error("Error removing invite: ", error);
-    return { data: null, error };
+    return routeData(
+      {
+        data: null,
+        error: error instanceof AuthzError ? error.message : "Could not cancel the invitation.",
+      },
+      { headers, status: error instanceof AuthzError ? error.status : 500 },
+    );
   }
 }
 

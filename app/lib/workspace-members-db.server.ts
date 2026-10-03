@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { InviteError } from "@chester-hill-solutions/auth";
 import {
   campaign as campaignTable,
   user as userTable,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/workspace-membership.server";
 import {
   cancelWorkspaceInvitationById,
+  getWorkspaceInvitationById,
   listUserInvitesWithWorkspace,
   listWorkspaceInvitations,
 } from "@/lib/workspace-invitations.server";
@@ -478,7 +480,11 @@ export async function listUserWorkspaceMemberships(userId: string) {
 }
 
 export async function deleteWorkspaceInviteById(inviteId: string) {
-  await cancelWorkspaceInvitationById(inviteId);
+  const invitation = await getWorkspaceInvitationById(inviteId);
+  if (!invitation) {
+    throw new InviteError("Invitation not found.", "INVITE_NOT_FOUND", 404);
+  }
+  await cancelWorkspaceInvitationById(inviteId, invitation.workspace_id);
 }
 
 export async function updateAdminWorkspaceMemberRole(args: {
