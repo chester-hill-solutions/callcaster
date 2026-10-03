@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@b2d717c3 + source fix for #2125` · 292 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@be7f2312 + source fix for #2108` · 293 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 60
+## Fix now — 62
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -45,6 +45,16 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Installed SDK tests for EndUser creation/reuse, assignments, evaluation, submission, missing inputs, provider failure and repair retries.; Real persistence/readiness and deployed provider preparation verification.
 - Done when: Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.; Create/reuse and assign the required EndUser and customer profile before evaluation/submission.; Provider/input failure blocks brand creation with visible details.; Retry repairs and resubmits incomplete existing products without duplicates.; Private/public business controls and deployed provider checks pass before promotion and closure.
 - Tracker: Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation.
+
+### [#2107](https://github.com/chester-hill-solutions/callcaster/issues/2107) Require answers before public survey completion
+- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The public survey still has no required-answer checks in Next/Submit, and completion updates completed_at without checking required persisted answers. Native required controls sit outside a form.
+- Current behavior: Stable respondent identity source prerequisite #2125 merged to dev in PR #2293 at be7f2312; native dependency removed. Public completion still lacks required-answer enforcement. Implement per-page user feedback and persisted server checks in its own atomic fix, preserving optional questions.
+- Resolution: Add per-page respondent validation and independent server completion validation; do not patch survey-submit.ts, which manages survey authoring.
+- Look in: `app/routes/survey+/$surveyId.tsx:107`, `app/routes/survey+/$surveyId.tsx:198`, `app/lib/survey-db.server.ts:699`, `app/routes/survey+/$surveyId.tsx`, `app/routes/api+/survey-complete.action.server.ts`, `app/lib/survey-db.server.ts`
+- Missing tests: No public survey UI required-field test or database completion rejection test was found. survey-submit.ts belongs to survey editing, not this respondent path.
+- Done when: A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.; A required question left blank on the last page blocks submission.; A response with a missing required answer is rejected **server-side** even if the client is bypassed (kill-check: remove the client check and confirm the server test still passes; then remove the server check and confirm a test goes red).; Non-required questions remain skippable.; An existing completed response with a blank required answer is not retroactively invalidated without a decision on that.
+- Tracker: Ready for its own atomic required-answer fix from clean dev.
 
 ### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -221,6 +231,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Two same-recording callbacks yield one object; missing stored audio has a clear state and no raw Twilio link.
 - Done when: Failure propagation and the repair sweep remain covered by their existing regression tests.; Missing stored playback has a clear unavailable state and no raw Twilio recording link.; Repeated deliveries for one voicemail recording use one deterministic object key and the documented overwrite behavior.; An explicit recording_url retention decision is recorded.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2169, #2173, #2175, #2177. A PR reference alone does not prove deployed behavior.
+
+### [#2294](https://github.com/chester-hill-solutions/callcaster/issues/2294) Keep public survey answers scoped to their page
+- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Displayed and resumed public answers collapse repeated labels across pages.
+- Current behavior: The editor generates question labels independently per page. Local answers and write-in state use questionId alone; the resume helper reduces persisted values under the same public label without page identity. Database writes and the #2108 queue preserve page scope, but the displayed and resumed answer map does not.
+- Root cause: The form and resume reader treat a page-scoped label as a survey-wide identity.
+- Resolution: Use an unambiguous page/question identity in the loader resume map and local answer/write-in state; preserve checkbox hydration, signed respondent identity and write ordering. No stored-row repair or required-answer policy.
+- Look in: `app/lib/survey-responses.server.ts`, `app/routes/survey+/$surveyId.loader.server.ts`, `app/routes/survey+/$surveyId.tsx`, `app/hooks/surveys/useSurveyForm.ts`
+- Existing tests: test/ui/survey-respondent-identity.test.tsx; test/integration-db/survey-respondent-identity.test.ts
+- Missing tests: Actual-page different values across repeated labels and Previous/Next navigation.; Real-PG reload with repeated question labels on separate pages.
+- Done when: Each page retains its own displayed, resumed and write-in answer.; An unanswered question stays empty when another page has the same public label.; Single-page resume, checkbox hydration and signed identity remain valid.; A page-scope removal makes the new tests fail.
+- Tracker: Independent public read/state fix; no blocking dependency.
 
 ### [#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288) Move audience-upload history loading to route data
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -713,9 +735,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 128
+## Verify and close — 129
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2108](https://github.com/chester-hill-solutions/callcaster/issues/2108) Save all pending survey answers before completion
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Each respondent keeps pending answers by page and question. Next and Submit await save acknowledgements; Thank You awaits completion success.
+- Current behavior: Source fix based on dev@be7f2312. A domain hook retains page/question revisions and drains them serially through the existing form client. Failed writes remain retryable; successful writes do not delete newer edits. Next and Submit flush all pending writes, stop on HTTP, network or action failure, and wait for completion success before showing Thank You. Busy controls include explicit shared Checkbox disable. True respondent unmount cancels pending timers and requests; the shared debounce also cancels sidebar timers. Source prerequisite #2125 merged and the native blocked-by edge was removed. Focused original and fault proofs and full local/remote gates are required before merge.
+- Root cause: One timer discarded earlier question saves, and navigation/completion did not wait for successful action acknowledgements. The form owner remained mounted after optimistic completion; true unmount did not cancel timers.
+- Resolution: Verify deployed rapid edits, repeated labels across pages, immediate final submit, delayed and failed saves/completion, recoverable retry, respondent change and route unmount. Keep required-answer policy #2107, page-scoped display/resume #2294 and historical assessment #2292 separate. Promote before closure.
+- Look in: `app/hooks/surveys/useSurveySubmission.ts`, `app/routes/survey+/$surveyId.tsx`, `app/hooks/utils/useDebounce.ts`
+- Existing tests: test/ui/survey-save-order.test.tsx; test/ui/debounce-owner-unmount.test.tsx; test/ui/survey-respondent-identity.test.tsx; test/ui/hooks-utils.test.tsx
+- Missing tests: Deployed dev browser verification and promotion.
+- Done when: Submitting within 1s of typing the last answer persists that answer (kill-check: remove the flush and confirm the test goes red).; No timer survives unmount in any `useDebounce` consumer (a test that unmounts mid-debounce and asserts no submit fires).; The answer write is observably ordered before the completion write.; A blank answer to a required question is still caught (the related issue) — the two must compose.; Changing multiple questions within the debounce interval does not cancel another question's pending save.; Completion waits for successful answer persistence, not only for the answer request to start.; Answer or completion failure keeps a recoverable form and does not show a false success card.
+- Tracker: Atomic source fix in this change; keep open for deployed verification and promotion.
+
+### [#2125](https://github.com/chester-hill-solutions/callcaster/issues/2125) Keep one signed respondent identity through the public survey
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The public loader signs one respondent ID, keeps it in a scoped browser cookie and passes its token to every answer and completion. Completion requires an actual saved row.
+- Current behavior: Merged to dev in PR #2293 at be7f2312. Signed respondent identity is authoritative, tokenless writes fail, and the scoped HttpOnly cookie resumes the exact saved response. Trusted bigint survey/contact IDs are normalized. Checkbox arrays resume correctly, respondent change resets state, and completion must affect a saved row. All 68 focused cases pass; original runtime fails 21 with 47 controls; ten faults fail. Full local CI passed 5,299 Vitest and 22 Bun tests; all remote and both Railway gates passed on 3700fdb2. Issue-on-dev moved one item. Required-answer policy, save ordering and historical assessment remain separate. Verify deployed dev and promote before closure.
+- Root cause: The page omitted the signed token, and tokenless writes minted a fresh ID for each request. Completion reported success without checking the affected row.
+- Resolution: Verify deployed public three-answer persistence, anonymous/contact reload, scoped token rejection and missing-row API failure. Required-answer enforcement is separate #2107; flush/save/completion acknowledgement and the premature Thank You screen are separate #2108. Historical fragments require read-only assessment #2292. Promote before closure.
+- Look in: `app/routes/survey+/$surveyId.loader.server.ts`, `app/routes/survey+/$surveyId.tsx`, `app/lib/survey-public-action.server.ts`, `app/lib/survey-respondent-token.server.ts`, `app/lib/survey-respondent-cookie.server.ts`, `app/lib/survey-db.server.ts`, `app/lib/survey-responses.server.ts`
+- Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts; test/survey-public-loader.route.test.ts; test/survey-respondent-token-cookie.test.ts; test/ui/survey-respondent-identity.test.tsx; test/integration-db/survey-respondent-identity.test.ts; test/integration-db/survey-answer-question-scope.test.ts
+- Missing tests: Deployed dev survey/browser verification and promotion. Save-order/UI-success and required-field fixes remain in their own issues.
+- Done when: Three acknowledged answers and completion use one survey response with three answers.; Anonymous reload retains the signed identity and saved answers; a contact cookie keeps its exact response even when a newer attempt exists.; The real page passes the loader token with answer/completion requests and resets state when respondent identity changes.; Tampered, expired, wrong-survey/workspace or missing tokens cannot become chosen plain IDs.; Completion with no matching saved response returns a non-2xx API error with no success:true.; Preserve existing active-survey, honeypot, rate-limit, contact scope and trusted contact resume controls.; Verify deployed dev and promote before closure.
+- Tracker: Source fix is in this change. Keep #2107, #2108 and read-only historical assessment #2292 separate and visible.
 
 ### [#2106](https://github.com/chester-hill-solutions/callcaster/issues/2106) Keep loaded chat history when the current thread refreshes
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -728,18 +774,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed dev scroll/reply/filter/identity verification before promotion.
 - Done when: At least two older pages survive reply and filter/sort loader refreshes.; Matching SID records update, unmatched live rows remain and messages retain chronological order.; Saved rows replace matching optimistic replies when loader data arrives before SSE.; Known/older/unknown-time saved rows cannot remove a new repeated pending reply or hide send failure; valid second-precision saved rows can replace it.; SSE/loader overlap and already-loaded older SIDs do not append duplicates.; Different contact/workspace resets history and pagination; equivalent normalized contact keeps history.; Empty older pages stop pagination; latest-page availability changes do not reset exhaustion.; Current-context event filtering is retained.; Original source and isolated regressions fail meaningful tests; full local/remote gates pass before merge.; Verify deployed dev and promote before closure.
 - Tracker: Source fix is in this change. Thread history is separate from the sidebar accumulation already fixed under #2191; verify the deployed flow before promotion and closure.
-
-### [#2125](https://github.com/chester-hill-solutions/callcaster/issues/2125) Keep one signed respondent identity through the public survey
-- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- The public loader signs one respondent ID, keeps it in a scoped browser cookie and passes its token to every answer and completion. Completion requires an actual saved row.
-- Current behavior: Source fix based on dev@b2d717c3: signed identity is authoritative, plain posted IDs are ignored and tokenless writes fail. A survey/contact-scoped HttpOnly cookie retains the token until its signed expiry; private/no-store loader data resumes saved answers by verified ID. Legacy contact responses can be signed and resumed; bigint survey/contact boundaries are normalized. Checkbox selections resume as arrays while text remains text. A keyed page resets local state on respondent changes. Actual completion UPDATE must return a matching row or the API returns 404. All 54 node, 3 actual-page and 11 real-PG cases pass. Original tracked runtime fails 21 with 47 passing controls; ten isolated faults fail and all files are restored. Full local/remote gates must pass before merge.
-- Root cause: The page omitted the signed token, and tokenless writes minted a fresh ID for each request. Completion reported success without checking the affected row.
-- Resolution: Verify deployed public three-answer persistence, anonymous/contact reload, scoped token rejection and missing-row API failure. Required-answer enforcement is separate #2107; flush/save/completion acknowledgement and the premature Thank You screen are separate #2108. Historical fragments require read-only assessment #2292. Promote before closure.
-- Look in: `app/routes/survey+/$surveyId.loader.server.ts`, `app/routes/survey+/$surveyId.tsx`, `app/lib/survey-public-action.server.ts`, `app/lib/survey-respondent-token.server.ts`, `app/lib/survey-respondent-cookie.server.ts`, `app/lib/survey-db.server.ts`, `app/lib/survey-responses.server.ts`
-- Existing tests: test/survey-answer.route.test.ts; test/survey-complete.route.test.ts; test/survey-public-loader.route.test.ts; test/survey-respondent-token-cookie.test.ts; test/ui/survey-respondent-identity.test.tsx; test/integration-db/survey-respondent-identity.test.ts; test/integration-db/survey-answer-question-scope.test.ts
-- Missing tests: Deployed dev survey/browser verification and promotion. Save-order/UI-success and required-field fixes remain in their own issues.
-- Done when: Three acknowledged answers and completion use one survey response with three answers.; Anonymous reload retains the signed identity and saved answers; a contact cookie keeps its exact response even when a newer attempt exists.; The real page passes the loader token with answer/completion requests and resets state when respondent identity changes.; Tampered, expired, wrong-survey/workspace or missing tokens cannot become chosen plain IDs.; Completion with no matching saved response returns a non-2xx API error with no success:true.; Preserve existing active-survey, honeypot, rate-limit, contact scope and trusted contact resume controls.; Verify deployed dev and promote before closure.
-- Tracker: Source fix is in this change. Keep #2107, #2108 and read-only historical assessment #2292 separate and visible.
 
 ### [#2105](https://github.com/chester-hill-solutions/callcaster/issues/2105) Return feature-unavailable response when call-in verification is not configured
 - Verdict: **Verify and close** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -2651,31 +2685,9 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 38
+## Blocked / split first — 36
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
-
-### [#2108](https://github.com/chester-hill-solutions/callcaster/issues/2108) Save all pending survey answers before completion
-- Verdict: **Blocked / split first** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Answer/completion ordering is still unsafe, and useDebounce still has no cancellation/flush contract. The Thank You card does not unmount SurveyPage or its debounce hook; it only replaces that component output.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The hook owner stays mounted when Thank You renders. Completion still precedes pending answer persistence; route unmount has no timer cleanup. A shared debounce also cancels earlier question saves. Source prerequisite #2125 now has an independent fix in this change; the native blocked-by edge remains until that fix merges to dev.
-- Resolution: Flush and await all pending answers before completion, handle failures, and cancel on real owner unmount; cleanup alone is not a complete fix.
-- Look in: `app/hooks/utils/useDebounce.ts:30`, `app/routes/survey+/$surveyId.tsx:104`, `app/routes/survey+/$surveyId.tsx:128`, `app/hooks/utils/useDebounce.ts (or wherever it lives)`, `app/components/surveys/ (`handleAnswerChange`, `handleNext`, `handleSubmit`, `setIsCompleted`)`, `every other `useDebounce` consumer (grep)`
-- Blocked by: [#2125](https://github.com/chester-hill-solutions/callcaster/issues/2125)
-- Missing tests: Need immediate-submit final-answer ordering, multiple questions changed within 1 second, answer failure, true route unmount, and composition with required validation. A cleanup alone would lose the answer.
-- Done when: Submitting within 1s of typing the last answer persists that answer (kill-check: remove the flush and confirm the test goes red).; No timer survives unmount in any `useDebounce` consumer (a test that unmounts mid-debounce and asserts no submit fires).; The answer write is observably ordered before the completion write.; A blank answer to a required question is still caught (the related issue) — the two must compose.; Changing multiple questions within the debounce interval does not cancel another question's pending save.; Completion waits for successful answer persistence, not only for the answer request to start.; Answer or completion failure keeps a recoverable form and does not show a false success card.
-- Tracker: Begin after the stable respondent-identity source fix merges. Remove its fulfilled native dependency then; keep this issue open for its own atomic fix and deployed verification.
-
-### [#2107](https://github.com/chester-hill-solutions/callcaster/issues/2107) Require answers before public survey completion
-- Verdict: **Blocked / split first** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- The public survey still has no required-answer checks in Next/Submit, and completion updates completed_at without checking required persisted answers. Native required controls sit outside a form.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The public survey still has no required-answer checks in Next/Submit, and completion updates completed_at without checking required persisted answers. Native required controls sit outside a form. Source prerequisite #2125 now has an independent fix in this change; the native blocked-by edge remains until that fix merges to dev.
-- Resolution: Add per-page respondent validation and independent server completion validation; do not patch survey-submit.ts, which manages survey authoring.
-- Look in: `app/routes/survey+/$surveyId.tsx:107`, `app/routes/survey+/$surveyId.tsx:198`, `app/lib/survey-db.server.ts:699`, `app/routes/survey+/$surveyId.tsx`, `app/routes/api+/survey-complete.action.server.ts`, `app/lib/survey-db.server.ts`
-- Blocked by: [#2125](https://github.com/chester-hill-solutions/callcaster/issues/2125)
-- Missing tests: No public survey UI required-field test or database completion rejection test was found. survey-submit.ts belongs to survey editing, not this respondent path.
-- Done when: A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.; A required question left blank on the last page blocks submission.; A response with a missing required answer is rejected **server-side** even if the client is bypassed (kill-check: remove the client check and confirm the server test still passes; then remove the server check and confirm a test goes red).; Non-required questions remain skippable.; An existing completed response with a blank required answer is not retroactively invalidated without a decision on that.
-- Tracker: Begin after the stable respondent-identity source fix merges. Remove its fulfilled native dependency then; keep this issue open for its own atomic fix and deployed verification.
 
 ### [#2213](https://github.com/chester-hill-solutions/callcaster/issues/2213) Correct the remaining temporal column types listed in the schema drift baseline
 - Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02

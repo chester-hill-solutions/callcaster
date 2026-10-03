@@ -1,7 +1,7 @@
 export { loader } from "./$surveyId.loader.server";
 import type { PublicSurveyLoaderData } from "./$surveyId.loader.server";
 
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData } from "react-router";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { SurveyQuestionType } from "@/lib/types";
-import { useDebounce } from "@/hooks/utils/useDebounce";
+import { useSurveySubmission } from "@/hooks/surveys/useSurveySubmission";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type LoaderQuestionOption = {
   id: number;
@@ -35,14 +36,6 @@ type ExistingAnswerRow = {
   survey_question: { question_id: string };
 };
 
-function safeString(value: unknown): string {
-  if (Array.isArray(value)) return value.map(String).join(", ");
-  if (value !== null && typeof value === "object") {
-    return Object.values(value).map(String).join(", ");
-  }
-  return String(value);
-}
-
 export default function SurveyPage() {
   const data = useLoaderData<PublicSurveyLoaderData>();
   return <SurveyRespondentPage key={`${data.survey.survey_id}:${data.resultId}`} data={data} />;
@@ -52,36 +45,16 @@ function SurveyRespondentPage({ data }: {
   data: PublicSurveyLoaderData;
 }) {
   const { survey, resultId, respondentToken, contact, existingResponse, existingAnswers } = data;
-  const answerFetcher = useFetcher();
-  const completeFetcher = useFetcher();
+  const { queueAnswer, savePage, statusFor, error, isBusy, isCompleted } = useSurveySubmission({
+    surveyId: survey.survey_id, resultId, respondentToken, contactId: contact?.id ?? null,
+  });
   
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>(existingAnswers);
-  const [isCompleted, setIsCompleted] = useState(false);
 
   const currentPage = survey.survey_page?.[currentPageIndex];
   const totalPages = survey.survey_page?.length || 0;
   const progress = totalPages > 0 ? ((currentPageIndex + 1) / totalPages) * 100 : 0;
-
-  // Create a debounced save function for text fields.
-  const debouncedSave = useDebounce((questionId: string, value: string | string[]) => {
-    const formData = new FormData();
-    formData.append("surveyId", survey.survey_id);
-    formData.append("questionId", questionId);
-    formData.append(
-      "answerValue",
-      Array.isArray(value) ? JSON.stringify(value) : safeString(value),
-    );
-    formData.append("contactId", contact?.id?.toString() || "");
-    formData.append("resultId", resultId);
-    formData.append("respondent_token", respondentToken);
-    formData.append("pageId", currentPage?.page_id ?? "");
-
-    answerFetcher.submit(formData, {
-      method: "POST",
-      action: "/api/survey-answer",
-    });
-  }, 1000);
 
   // Early return if no current page
   if (!currentPage) {
@@ -95,7 +68,12 @@ function SurveyRespondentPage({ data }: {
     );
   }
 
+  const queuePageAnswer = (questionId: string, value: string | string[]) => {
+    queueAnswer({ questionId, value, pageId: currentPage.page_id });
+  };
+
   const handleAnswerChange = (questionId: string, value: string | string[]) => {
+    if (isBusy) return;
     setAnswers(prev => ({
       ...prev,
       [questionId]: value
@@ -106,19 +84,12 @@ function SurveyRespondentPage({ data }: {
       return;
     }
 
-    // Use debounced save for text fields, immediate save for others
-    const currentQuestion = currentPage.survey_question?.find((q: LoaderQuestion) => q.question_id === questionId);
-    const isTextField = currentQuestion?.question_type === "text" || currentQuestion?.question_type === "textarea";
-    
-    debouncedSave(questionId, value);
+    queuePageAnswer(questionId, value);
   };
 
-  const handleNext = () => {
-    if (currentPageIndex < totalPages - 1) {
-      setCurrentPageIndex(prev => prev + 1);
-    } else {
-      handleSubmit();
-    }
+  const handleNext = async () => {
+    const complete = currentPageIndex === totalPages - 1;
+    if (await savePage(complete) && !complete) setCurrentPageIndex(prev => prev + 1);
   };
 
   const handlePrevious = () => {
@@ -127,45 +98,14 @@ function SurveyRespondentPage({ data }: {
     }
   };
 
-  const handleSubmit = () => {
-    // Mark survey as completed using fetcher
-    const formData = new FormData();
-    formData.append("resultId", resultId);
-    formData.append("respondent_token", respondentToken);
-    formData.append("surveyId", survey.survey_id);
-    formData.append("completed", "true");
-
-    completeFetcher.submit(formData, {
-      method: "POST",
-      action: "/api/survey-complete",
-    });
-
-    setIsCompleted(true);
-  };
-
   const renderQuestion = (question: LoaderQuestion) => {
     const questionId = question.question_id;
     const currentAnswer = answers[questionId] as string | string[] | undefined;
     
-    // Derive status from fetcher state
-    const getQuestionStatus = () => {
-      const formData = answerFetcher.formData as FormData | null;
-      if (answerFetcher.state === "submitting" && formData?.get("questionId") === questionId) {
-        return 'saving';
-      }
-      const fetcherData = answerFetcher.data as { success?: boolean; error?: string } | null;
-      if (answerFetcher.state === "idle" && fetcherData?.success && formData?.get("questionId") === questionId) {
-        return 'saved';
-      }
-      if (answerFetcher.state === "idle" && fetcherData?.error && formData?.get("questionId") === questionId) {
-        return 'error';
-      }
-      return null;
-    };
+    const status = statusFor(currentPage.page_id, questionId);
 
     const renderStatusIndicator = () => {
-      const status = getQuestionStatus();
-      if (!status) return null;
+      if (!status || status === "pending") return null;
       
       return (
         <div className="flex items-center gap-2 mt-1">
@@ -269,7 +209,7 @@ function SurveyRespondentPage({ data }: {
                       const writeInText = e.target.value;
                       const answerValue = writeInText ? `${currentAnswer}: ${writeInText}` : currentAnswer;
                       
-                      debouncedSave(questionId, answerValue);
+                      queuePageAnswer(questionId, answerValue);
                     }}
                     className="w-full bg-background text-foreground"
                   />
@@ -292,6 +232,7 @@ function SurveyRespondentPage({ data }: {
                 return (
                   <div key={option.id} className="flex items-center space-x-2">
                     <Checkbox
+                      disabled={isBusy}
                       id={`${questionId}-${option.id}`}
                       checked={Array.isArray(currentAnswer) ? currentAnswer.includes(option.option_value) : false}
                       onCheckedChange={(checked) => {
@@ -332,7 +273,7 @@ function SurveyRespondentPage({ data }: {
                         return v;
                       });
                       
-                      debouncedSave(questionId, processedValues);
+                      queuePageAnswer(questionId, processedValues);
                     }}
                     className="w-full bg-background text-foreground"
                   />
@@ -391,6 +332,8 @@ function SurveyRespondentPage({ data }: {
           )}
         </CardHeader>
         <CardContent className="space-y-6">
+          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
+          <fieldset disabled={isBusy} className="space-y-6">
           {currentPage.survey_question?.map((question: LoaderQuestion) => (
             <div key={question.id} className="space-y-4">
               {renderQuestion(question)}
@@ -407,11 +350,12 @@ function SurveyRespondentPage({ data }: {
             </Button>
             <Button
               onClick={handleNext}
-              disabled={completeFetcher.state === "submitting"}
+              disabled={isBusy}
             >
               {currentPageIndex === totalPages - 1 ? "Submit" : "Next"}
             </Button>
           </div>
+          </fieldset>
         </CardContent>
       </Card>
     </div>

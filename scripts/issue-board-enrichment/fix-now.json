@@ -2062,5 +2062,69 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Adopted route-data policy gives an exact implementation path. This independent runtime task does not block #2104."
+  },
+  {
+    "issueNumber": 2107,
+    "verdict": "fix-now",
+    "recommendedTitle": "Require answers before public survey completion",
+    "summary": "The public survey still has no required-answer checks in Next/Submit, and completion updates completed_at without checking required persisted answers. Native required controls sit outside a form.",
+    "currentBehavior": "Stable respondent identity source prerequisite #2125 merged to dev in PR #2293 at be7f2312; native dependency removed. Public completion still lacks required-answer enforcement. Implement per-page user feedback and persisted server checks in its own atomic fix, preserving optional questions.",
+    "resolution": "Add per-page respondent validation and independent server completion validation; do not patch survey-submit.ts, which manages survey authoring.",
+    "lookIn": [
+      "app/routes/survey+/$surveyId.tsx:107",
+      "app/routes/survey+/$surveyId.tsx:198",
+      "app/lib/survey-db.server.ts:699",
+      "app/routes/survey+/$surveyId.tsx",
+      "app/routes/api+/survey-complete.action.server.ts",
+      "app/lib/survey-db.server.ts"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "No public survey UI required-field test or database completion rejection test was found. survey-submit.ts belongs to survey editing, not this respondent path."
+    ],
+    "acceptanceCriteria": [
+      "A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.",
+      "A required question left blank on the last page blocks submission.",
+      "A response with a missing required answer is rejected **server-side** even if the client is bypassed (kill-check: remove the client check and confirm the server test still passes; then remove the server check and confirm a test goes red).",
+      "Non-required questions remain skippable.",
+      "An existing completed response with a blank required answer is not retroactively invalidated without a decision on that."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Ready for its own atomic required-answer fix from clean dev."
+  },
+  {
+    "issueNumber": 2294,
+    "verdict": "fix-now",
+    "recommendedTitle": "Keep public survey answers scoped to their page",
+    "summary": "Displayed and resumed public answers collapse repeated labels across pages.",
+    "currentBehavior": "The editor generates question labels independently per page. Local answers and write-in state use questionId alone; the resume helper reduces persisted values under the same public label without page identity. Database writes and the #2108 queue preserve page scope, but the displayed and resumed answer map does not.",
+    "rootCause": "The form and resume reader treat a page-scoped label as a survey-wide identity.",
+    "resolution": "Use an unambiguous page/question identity in the loader resume map and local answer/write-in state; preserve checkbox hydration, signed respondent identity and write ordering. No stored-row repair or required-answer policy.",
+    "lookIn": [
+      "app/lib/survey-responses.server.ts",
+      "app/routes/survey+/$surveyId.loader.server.ts",
+      "app/routes/survey+/$surveyId.tsx",
+      "app/hooks/surveys/useSurveyForm.ts"
+    ],
+    "existingTests": [
+      "test/ui/survey-respondent-identity.test.tsx",
+      "test/integration-db/survey-respondent-identity.test.ts"
+    ],
+    "missingTests": [
+      "Actual-page different values across repeated labels and Previous/Next navigation.",
+      "Real-PG reload with repeated question labels on separate pages."
+    ],
+    "acceptanceCriteria": [
+      "Each page retains its own displayed, resumed and write-in answer.",
+      "An unanswered question stays empty when another page has the same public label.",
+      "Single-page resume, checkbox hydration and signed identity remain valid.",
+      "A page-scope removal makes the new tests fail."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Independent public read/state fix; no blocking dependency."
   }
 ]

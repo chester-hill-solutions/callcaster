@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Public surveys save all pending answers before advancing or completing, retain failed saves for retry, and show success only after completion is confirmed ([#2108](https://github.com/chester-hill-solutions/callcaster/issues/2108)).
+
 - Fixed: Public surveys keep one signed respondent identity through answer saves and reloads; completion reports an error when no saved response exists ([PR #2293](https://github.com/chester-hill-solutions/callcaster/pull/2293), [#2125](https://github.com/chester-hill-solutions/callcaster/issues/2125)).
 
 ### Security
