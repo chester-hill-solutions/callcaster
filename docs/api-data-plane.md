@@ -51,7 +51,12 @@ Legacy: `GET/PATCH/DELETE /api/audiences`, `POST /api/audience-upload`.
 | --- | --- | --- |
 | GET | `/api/workspaces/:workspaceId/conversations` | Thread list |
 | GET | `/api/workspaces/:workspaceId/conversations/:contactNumber` | Messages |
+| POST | `/api/workspaces/:workspaceId/conversations/:contactNumber` | Mark received messages as read |
 | POST | `/api/chat_sms` | Send message (integrator) |
+
+Conversation GET and acknowledgment POST both require `campaigns.read`. A workspace API key must have that scope. Session users must be workspace members whose role has that capability, including the caller role. A key with no scopes or only unrelated scopes receives 403 and causes no message write. A non-member or a workspace mismatch receives 404.
+
+The acknowledgment POST accepts JSON `{ "sid": "SM..." }` for one received message. Without `sid`, it marks received messages for the URL's contact number as read. The stored status changes from `received` to `delivered` for these incoming messages; this operation does not set outbound provider delivery receipts. It returns `{ "ok": true }` on success. Other methods receive 405 after authorization.
 
 ## See also
 

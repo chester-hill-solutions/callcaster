@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@e71435b3 + source fix for #2080` · 290 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@29668acd + source fix for #2134` · 290 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 68
+## Fix now — 67
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -250,16 +250,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/campaign-sms-send.server.test.ts; test/sms-status-settled.test.ts
 - Missing tests: Create → failed/undelivered/delivered must update Results and queue filters; cover duplicate/out-of-order callbacks.
 - Done when: A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).; `undelivered` and `delivered` likewise.; A message that never receives a callback still reaches a terminal disposition (positive control).; The call path is unchanged.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2134](https://github.com/chester-hill-solutions/callcaster/issues/2134) POST /api/workspaces/:workspaceId/conversations/:contactNumber performs a DB write with no user or capability check, while the public OpenAPI advertises API-key access
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- Conversation POST still accepts data-plane context without requiring a session user or API-key capability. GET uses campaigns.read, while POST directly changes message state.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Conversation POST still accepts data-plane context without requiring a session user or API-key capability. GET uses campaigns.read, while POST directly changes message state.
-- Resolution: Define and enforce the POST capability or session-only contract and regenerate its API output.
-- Look in: `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.action.server.ts:21`, `app/lib/data-plane-route.server.ts:8`, `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.loader.server.ts:10`, `app/lib/api-surface-annotations.ts:153`, `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.action.server.ts`, `app/lib/data-plane-route.server.ts:6-18`, `app/lib/api-surface-annotations.ts`, `app/lib/chat-sms.server.ts (`markMessageAsDeliveredBySid`, `markReceivedMessagesAsDeliveredForPhone`)`
-- Missing tests: Zero-scope key must produce no write; required-capability/session allowed case and annotation parity need tests.
-- Done when: A key with `[]` scopes receives 401/403 and no write happens (kill-check: remove the gate and confirm the test goes red).; A key with the required capability succeeds (positive control).; The annotation matches the implemented auth class and `ci:codegen:verify` is green.; The sweep result is recorded in the issue.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2102](https://github.com/chester-hill-solutions/callcaster/issues/2102) The public pricing page publishes the IVR rate for the "Calling — Agent-driven auto-dial" lane the code bills at 4 / 5 credits
@@ -796,14 +786,26 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 121
+## Verify and close — 122
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2134](https://github.com/chester-hill-solutions/callcaster/issues/2134) Require conversation read capability for message acknowledgments
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Conversation POST now uses the same existing campaigns.read capability strategy as GET before either received-message read acknowledgment writer.
+- Current behavior: Source fix based on dev@29668acd: POST uses dataPlaneCapabilityAuthWithParam("campaigns.read", "contactNumber"). Empty/unrelated API-key scopes and unknown session roles receive 403 before writes, missing actor receives 401, and non-members/workspace mismatches receive 404. Required-capability keys and caller/member/admin/owner sessions retain both acknowledgment modes. Actual writers only change received incoming message read state, not outbound provider delivery receipts. The generated API surface and both served specs derive matching GET/POST capability and API-key/session security. The annotation identifies public SDK exposure and the guide documents the operation. The scoped action sweep found no second missing gate among direct raw-context actions and the traced campaign-read resources with writes. Full checks and remote gates are required before merge.
+- Root cause: The action read middleware context but did not require a session actor or a capability. GET already required campaigns.read. An editorial auth declaration concealed the missing POST gate and the sessionOnly exposure contradicted key access.
+- Resolution: Verify empty/unrelated API-key scopes cause no read-state write on deployed dev, while campaigns.read keys and permitted session roles can acknowledge one received message or a conversation. Verify 401/403/404/405 errors and the documented served contract. Promote before closing.
+- Look in: `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.action.server.ts`, `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.loader.server.ts`, `app/lib/capability-guard.server.ts`, `app/lib/message-db.server.ts`, `app/lib/api-surface-annotations.ts`, `app/lib/api-surface-generated.ts`, `docs/api-data-plane.md`
+- Existing tests: test/conversation-ack.route.test.ts (actual actions, actor/scope controls, both writers, decoding, methods, generated surface and both served specs); test/capability-actor.test.ts; test/capability-gated-routes.test.ts; test/capability-linkage.test.ts
+- Missing tests: Deployed route verification and production promotion before closure.
+- Done when: Empty/unrelated API-key scopes receive 403 and perform no message write in either acknowledgment mode.; Required-capability keys and permitted session roles succeed; missing actor is 401 and non-member/workspace mismatch is 404 with no write.; GET and POST enforce campaigns.read and generated/served API contracts state API-key/session access.; Preserve decoded phone forwarding, specific-SID and empty-body acknowledgment, POST-only behavior and write failures.; Original runtime and changed gate fail the actual route regressions while positive controls remain.; Verify deployed behavior before production promotion and closure.
+- Tracker: Source fix is in this change; verify deployed behavior and promote before closure.
 
 ### [#2080](https://github.com/chester-hill-solutions/callcaster/issues/2080) Restrict webhook tests to permitted workspace members
 - Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
 - Both test URLs require workspace membership and the existing member-or-higher rule, then share one Postgres-backed per-user limit before DNS and outbound delivery.
-- Current behavior: Source fix on dev@e71435b3: the flat action requires a top-level workspace ID carried by WebhookEditor. Both route actions call the existing testWorkspaceWebhook service with authenticated user/workspace IDs. Its real membership policy permits member/admin/owner, refuses callers with 403 and non-members with 404. Ten tests per minute share one user budget across workspaces and both URLs; 429 carries Retry-After and rate-limit storage failure prevents delivery. Unsaved destinations/headers, provider response read-back and existing outbound safety controls remain. The membership guard scans external effects without tenancy tokens and counts only used service/provider imports. Forty-six actual action/guard cases and one UI case pass; original source fails 23 regressions with 23 controls and the original editor fails its submission test. Thirteen isolated mutations fail. Full gates are required before merge.
+- Current behavior: Merged to dev in PR #2284 at 29668acd. Both webhook-test URLs require member-or-higher workspace access and share ten tests per minute per authenticated user. Rejection and storage failure prevent DNS/HTTP work. The editor carries the top-level workspace ID, retains unsaved URL/header testing and preserves response read-back. The route guard checks external effects and only used service/provider imports. All 100 focused Node cases and one UI case pass; original runtime fails 23 regressions with 23 controls and the original editor fails. Thirteen mutations fail. Full local CI passed 5,147 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on 470d1825. Issue-on-dev moved one item. Verify deployed behavior and cross-process shared rate limiting before promotion and closure.
 - Root cause: The flat action trusted a session without workspace authorization. The nested test service relied on membership middleware but had no role gate. Neither test path was throttled. The membership guard skipped routes without tenancy text and could count unused service/provider imports as proof.
 - Resolution: Verify both deployed URLs: permitted users can test unsaved destinations/headers; callers and non-members have no outbound effect; both URLs and workspaces share the same user budget and return actionable 429 responses. Check storage-error rejection and public-URL/response controls before production promotion and closure.
 - Look in: `app/routes/api+/test-webhook.action.server.ts`, `app/routes/api+/workspaces+/$workspaceId/webhook.action.server.ts`, `app/lib/platform-members.server.ts:testWorkspaceWebhook`, `app/lib/webhook-test-delivery.server.ts`, `app/components/workspace/WebhookEditor.tsx`, `app/lib/platform-rate-limit.server.ts`, `scripts/check-route-membership.mjs`, `docs/api-workspace-admin.md`
