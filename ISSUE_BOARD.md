@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@e2d7b4c3 + source fix for #2091` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@7ce3dd88 + source fix for #2092` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-02.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 78
+## Fix now — 77
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -728,17 +728,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: The published scheme name equals the cookie name the app actually sets, in all three spec JSONs and the generated SDK.; The `__Secure-` prefix is documented, and the SDK/config supports both.; `ci:codegen:verify` passes with no drift.; A test asserts the published scheme name matches the real cookie name (kill-check: revert the name and confirm the test goes red).; `docs/api-auth-matrix.md`, `docs/api-overview.md` and `docs/api-telephony-control.md` no longer name the wrong cookie.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2092](https://github.com/chester-hill-solutions/callcaster/issues/2092) The campaign_ended readiness code is declared and mapped to a corrective action but never emitted, so an expired campaign reads "Ready to launch"
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
-- An ended message campaign returns no readiness issues and no disabled reason. getDateIssue does not compare end_date to options.now.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. An ended message campaign returns no readiness issues and no disabled reason. getDateIssue does not compare end_date to options.now.
-- Resolution: Pass now to date readiness and emit campaign_ended after the end boundary.
-- Look in: `app/lib/campaign-readiness.ts:219`, `app/lib/campaign-readiness.ts:472`, `app/lib/campaign-readiness.ts:25,68,77,225-231`, `app/lib/campaign-execution.server.ts:147`, `app/routes/workspaces+/$id/campaigns/$campaign_id/settings.loader.server.ts:133`, `app/hooks/campaign/settings/useCampaignSettingsController.ts:273`, `app/components/campaign/settings/CampaignLaunch.tsx:280-293`, `app/components/campaign/settings/CampaignLaunchActions.tsx:61-62`
-- Existing tests: test/campaign-readiness.test.ts; test/campaign-readiness-actions.test.ts
-- Missing tests: Pin time; test past, exact boundary and future dates for launch and scheduling.
-- Done when: A campaign whose end date has passed shows a blocking readiness issue, a disabled Start button, and a non-empty "Complete before launch" list.; The corrective action scrolls to the date pickers.; A campaign with a future end date is unaffected.; A guard test fails if a code is added to the union with no producer.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2118](https://github.com/chester-hill-solutions/callcaster/issues/2118) A malformed known feature flag disables valid sibling flags
 - Verdict: **Fix now** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
 - A wrong type in any known flag still causes whole-object schema parsing to fail and disables an independently valid flag. Unknown passthrough keys are not the same failure case.
@@ -901,21 +890,9 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 106
+## Verify and close — 107
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
-
-### [#2096](https://github.com/chester-hill-solutions/callcaster/issues/2096) Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them
-- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Ordinary contact dequeues require a campaign and leave other campaign queues intact. Explicit workspace-wide opt-out remains. Deployed migration and calling verification remain.
-- Current behavior: This source fix scopes primary and household SQL, RPC event snapshots, completion and no-op diagnostics to the selected campaign. A missing primary queue row cannot dequeue siblings or emit another operation’s sibling update. SMS opt-out and do-not-call use explicit allCampaigns targets. The assigned-agent guard and primary result remain. All 196 focused cases passed (161 node, 23 real Postgres, 12 UI); eight isolated mutations each failed the relevant regression. Both standards and issue-scope reviews passed after the missing-primary correction.
-- Root cause: The guarded dequeue RPC and its event snapshot had workspace/contact limits but no campaign. Ordinary live-call paths omitted campaign scope. Optional campaign fallback and unscoped no-op diagnostics could affect unrelated campaign queues.
-- Resolution: Verify the new six-argument dequeue_contact migration and matching application on deployed dev. Call one contact from campaign A while B stays queued; check household, predictive, manual advance, hangup and terminal callbacks, another agent’s claim, no-op messages, event scope and completion. Confirm SMS STOP and do-not-call still remove the contact from all campaign queues. Old callers fail after the old RPC signature is removed, so deploy the matching application and migration together. Promote verified behavior before closure.
-- Look in: `client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql`, `app/lib/campaign-queue-db.server.ts`, `app/lib/db-rpc.server.ts`, `app/lib/auto-dial.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/routes/api+/queues.action.server.ts`, `app/routes/api+/hangup.action.server.ts`, `app/routes/api+/auto-dial/status.action.server.ts`, `app/lib/callscreenActions.ts`
-- Existing tests: test/integration-db/dequeue-contact-assigned.test.ts (23 real Postgres cases: campaign/household/event/completion/no-op scope, missing-primary and concurrent events, own-assignee guard, global opt-out controls and exact RPC signature); test/queues.route.test.ts (validation, campaign/contact workspace pair and existing no-op/conflict responses); test/auto-dial.server.test.ts, test/auto-dial-status.test.ts, test/hangup.route.test.ts, test/webhook-side-effects.test.ts (campaign wiring and no-campaign controls); test/inbound-sms.route.test.ts and test/questions.route.test.ts (explicit all-campaign opt-out targets); test/ui/callscreenActions.test.ts (selected campaign in manual request)
-- Missing tests: Deployed migration and calling verification before production promotion.
-- Done when: One contact in two campaigns' queues: a hang-up in campaign A dequeues only A's row; B's row is still `queued` with `dequeued_at` null.; The same holds for the predictive post-dial and the terminal-status paths.; A dequeue with a campaign id that does not own the row is a no-op, not an error.; `check:queue-rpc-contract` passes with the new signature.; The manual "Save and Next" path is campaign-scoped too.
-- Tracker: The source fix travels with this board update. Verify the migration and browser/phone calling on deployed dev after merge, then promote and close. Do not start a duplicate fix.
 
 ### [#2091](https://github.com/chester-hill-solutions/callcaster/issues/2091) messageMedia uploads are keyed by the client-supplied filename with no uniquifier, so a same-name upload silently replaces an existing attachment
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -928,6 +905,30 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed chat upload and campaign-send verification before promotion.
 - Done when: Two uploads with the same filename in one workspace produce two distinct objects, and each message points at its own.; The route never reports `success: true` for an upload that replaced an existing object.; A live campaign re-signs the **correct** media for its own `message_media` value.; Historic `outbound_media` values keep resolving (no key rewrite breaks them).
 - Tracker: The source fix travels with this board update. Verify deployed uploads and campaign sends after merge, then promote and close. Do not start a duplicate fix.
+
+### [#2092](https://github.com/chester-hill-solutions/callcaster/issues/2092) The campaign_ended readiness code is declared and mapped to a corrective action but never emitted, so an expired campaign reads "Ready to launch"
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Expired campaigns now produce a readiness blocker before launch or joining. The correction selects the date pickers. Deployed launch and join verification remain.
+- Current behavior: The source fix uses the same strict end_date < now check in pure readiness and launch. Readiness defaults to the current clock; launch passes its explicit clock. End date equality remains valid, and invalid or reversed dates keep their earlier corrections. Launch rejects expiry before status or dispatch writes. The existing UI and results loader consume the blocker. All 144 focused cases passed (132 node, 12 UI), and seven isolated mutations failed the relevant regressions while controls passed. Producer fixtures invoke every real readiness producer, including script routing; an exhaustive record and a runtime union check detect untested codes.
+- Root cause: campaign_ended existed in the code union and action map but readiness had no producer. Launch checked expiry separately and did not pass args.now into readiness. The expiry action led to the queue instead of date pickers.
+- Resolution: Verify expired, equal-time and future campaigns on deployed dev: expired campaigns show Complete before launch, disable Start and Schedule, and disable joining. The setup guide must select the date pickers. Check message, live and automated voice campaigns, then promote verified behavior before closing.
+- Look in: `app/lib/campaign-readiness.ts`, `app/lib/campaign-execution.server.ts`, `app/lib/campaign-readiness-actions.ts`, `app/lib/campaign-setup-steps.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id/settings.loader.server.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id.loader.server.ts`, `app/components/campaign/settings/CampaignLaunch.tsx`
+- Existing tests: test/campaign-readiness-expiry.test.ts (expiry boundary, default/explicit clock, launch writes, every real producer and a new-union-code guard); test/campaign-settings.route.test.ts (activation and unavailable-script controls with a pinned clock); test/campaign-readiness.test.ts and test/campaign-readiness-actions.test.ts (existing readiness controls with a pinned clock); test/campaign-setup-steps.test.ts (expired guide correction and existing steps); test/campaign-selected-id.loader.test.ts (expired/equal running-campaign join behavior); test/ui/campaign-launch-review.test.tsx and test/ui/campaign-launch-actions.test.tsx (real expiry readiness into UI, disabled start/schedule controls)
+- Missing tests: Deployed expiry, date correction, launch and join verification before promotion.
+- Done when: A campaign whose end date has passed shows a blocking readiness issue, a disabled Start button, and a non-empty "Complete before launch" list.; The corrective action scrolls to the date pickers.; A campaign with a future end date is unaffected.; A guard test fails if a code is added to the union with no producer.
+- Tracker: The source fix travels with this board update. Verify deployed expiry, launch and joining after merge, then promote and close. Do not start a duplicate fix.
+
+### [#2096](https://github.com/chester-hill-solutions/callcaster/issues/2096) Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Ordinary contact dequeues require a campaign and leave other campaign queues intact. Explicit workspace-wide opt-out remains. Deployed migration and calling verification remain.
+- Current behavior: This source fix scopes primary and household SQL, RPC event snapshots, completion and no-op diagnostics to the selected campaign. A missing primary queue row cannot dequeue siblings or emit another operation’s sibling update. SMS opt-out and do-not-call use explicit allCampaigns targets. The assigned-agent guard and primary result remain. All 196 focused cases passed (161 node, 23 real Postgres, 12 UI); eight isolated mutations each failed the relevant regression. Both standards and issue-scope reviews passed after the missing-primary correction.
+- Root cause: The guarded dequeue RPC and its event snapshot had workspace/contact limits but no campaign. Ordinary live-call paths omitted campaign scope. Optional campaign fallback and unscoped no-op diagnostics could affect unrelated campaign queues.
+- Resolution: Verify the new six-argument dequeue_contact migration and matching application on deployed dev. Call one contact from campaign A while B stays queued; check household, predictive, manual advance, hangup and terminal callbacks, another agent’s claim, no-op messages, event scope and completion. Confirm SMS STOP and do-not-call still remove the contact from all campaign queues. Old callers fail after the old RPC signature is removed, so deploy the matching application and migration together. Promote verified behavior before closure.
+- Look in: `client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql`, `app/lib/campaign-queue-db.server.ts`, `app/lib/db-rpc.server.ts`, `app/lib/auto-dial.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/routes/api+/queues.action.server.ts`, `app/routes/api+/hangup.action.server.ts`, `app/routes/api+/auto-dial/status.action.server.ts`, `app/lib/callscreenActions.ts`
+- Existing tests: test/integration-db/dequeue-contact-assigned.test.ts (23 real Postgres cases: campaign/household/event/completion/no-op scope, missing-primary and concurrent events, own-assignee guard, global opt-out controls and exact RPC signature); test/queues.route.test.ts (validation, campaign/contact workspace pair and existing no-op/conflict responses); test/auto-dial.server.test.ts, test/auto-dial-status.test.ts, test/hangup.route.test.ts, test/webhook-side-effects.test.ts (campaign wiring and no-campaign controls); test/inbound-sms.route.test.ts and test/questions.route.test.ts (explicit all-campaign opt-out targets); test/ui/callscreenActions.test.ts (selected campaign in manual request)
+- Missing tests: Deployed migration and calling verification before production promotion.
+- Done when: One contact in two campaigns' queues: a hang-up in campaign A dequeues only A's row; B's row is still `queued` with `dequeued_at` null.; The same holds for the predictive post-dial and the terminal-status paths.; A dequeue with a campaign id that does not own the row is a no-op, not an error.; `check:queue-rpc-contract` passes with the new signature.; The manual "Save and Next" path is campaign-scoped too.
+- Tracker: The source fix travels with this board update. Verify the migration and browser/phone calling on deployed dev after merge, then promote and close. Do not start a duplicate fix.
 
 ### [#2094](https://github.com/chester-hill-solutions/callcaster/issues/2094) Agent hang-up on a predictive call 500s and never tears the conference down — Twilio retries forever and the dialer keeps dialling
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03

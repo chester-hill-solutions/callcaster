@@ -134,8 +134,8 @@ export const CAMPAIGN_READINESS_ACTIONS = {
     label: "Add message content",
   },
   campaign_ended: {
-    type: "route",
-    template: CAMPAIGN_READINESS_ROUTE_TEMPLATES.campaignQueue,
+    type: "scroll",
+    targetId: "campaign-setup-schedule",
     label: "Update campaign dates",
   },
   send_window_required: {

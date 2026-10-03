@@ -1011,41 +1011,6 @@
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The default opt-out set is only STOP and UNSUBSCRIBE. A configured END set removes STOP. Direct checks confirm CANCEL is not suppressed and configured END loses STOP."
   },
   {
-    "issueNumber": 2092,
-    "verdict": "fix-now",
-    "recommendedTitle": "The campaign_ended readiness code is declared and mapped to a corrective action but never emitted, so an expired campaign reads \"Ready to launch\"",
-    "summary": "An ended message campaign returns no readiness issues and no disabled reason. getDateIssue does not compare end_date to options.now.",
-    "resolution": "Pass now to date readiness and emit campaign_ended after the end boundary.",
-    "lookIn": [
-      "app/lib/campaign-readiness.ts:219",
-      "app/lib/campaign-readiness.ts:472",
-      "app/lib/campaign-readiness.ts:25,68,77,225-231",
-      "app/lib/campaign-execution.server.ts:147",
-      "app/routes/workspaces+/$id/campaigns/$campaign_id/settings.loader.server.ts:133",
-      "app/hooks/campaign/settings/useCampaignSettingsController.ts:273",
-      "app/components/campaign/settings/CampaignLaunch.tsx:280-293",
-      "app/components/campaign/settings/CampaignLaunchActions.tsx:61-62"
-    ],
-    "existingTests": [
-      "test/campaign-readiness.test.ts",
-      "test/campaign-readiness-actions.test.ts"
-    ],
-    "missingTests": [
-      "Pin time; test past, exact boundary and future dates for launch and scheduling."
-    ],
-    "acceptanceCriteria": [
-      "A campaign whose end date has passed shows a blocking readiness issue, a disabled Start button, and a non-empty \"Complete before launch\" list.",
-      "The corrective action scrolls to the date pickers.",
-      "A campaign with a future end date is unaffected.",
-      "A guard test fails if a code is added to the union with no producer."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. An ended message campaign returns no readiness issues and no disabled reason. getDateIssue does not compare end_date to options.now."
-  },
-  {
     "issueNumber": 2099,
     "verdict": "fix-now",
     "recommendedTitle": "Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address",
