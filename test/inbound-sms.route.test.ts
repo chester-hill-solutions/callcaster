@@ -465,7 +465,7 @@ describe("app/routes/api+/inbound-sms", () => {
         expect.objectContaining({ set: { opt_out: true } }),
       );
       expect(queueDbMocks.dequeueQueueEntry).toHaveBeenCalledWith({
-        by: { contactId: 9 },
+        by: { contactId: 9, allCampaigns: true },
         userId: null,
         reason: "Contact opted out via SMS",
         workspaceId: "w1",

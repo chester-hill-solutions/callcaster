@@ -112,6 +112,7 @@ function applyTelephonyMockImplementations() {
     return {
       disposition: cfg.outreachDisposition ?? "in-progress",
       contact_id: 1,
+      campaign_id: 1,
       ...(cfg.outreachAnsweredAt !== undefined
         ? { answered_at: cfg.outreachAnsweredAt }
         : {}),

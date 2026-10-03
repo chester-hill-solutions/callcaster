@@ -2888,5 +2888,46 @@
     "risk": "high",
     "trackerRecommendation": "The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.",
     "rootCause": "The handler required an outreach attempt and wrote a possibly empty CallStatus before stopping the conference. A terminal CallStatus also took the wrong branch. Null-contact broadcasts were ignored by the screen, and unscoped broadcasts could affect another conference."
+  },
+  {
+    "issueNumber": 2096,
+    "verdict": "verify-close",
+    "recommendedTitle": "Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them",
+    "summary": "Ordinary contact dequeues require a campaign and leave other campaign queues intact. Explicit workspace-wide opt-out remains. Deployed migration and calling verification remain.",
+    "currentBehavior": "This source fix scopes primary and household SQL, RPC event snapshots, completion and no-op diagnostics to the selected campaign. A missing primary queue row cannot dequeue siblings or emit another operation’s sibling update. SMS opt-out and do-not-call use explicit allCampaigns targets. The assigned-agent guard and primary result remain. All 196 focused cases passed (161 node, 23 real Postgres, 12 UI); eight isolated mutations each failed the relevant regression. Both standards and issue-scope reviews passed after the missing-primary correction.",
+    "resolution": "Verify the new six-argument dequeue_contact migration and matching application on deployed dev. Call one contact from campaign A while B stays queued; check household, predictive, manual advance, hangup and terminal callbacks, another agent’s claim, no-op messages, event scope and completion. Confirm SMS STOP and do-not-call still remove the contact from all campaign queues. Old callers fail after the old RPC signature is removed, so deploy the matching application and migration together. Promote verified behavior before closure.",
+    "lookIn": [
+      "client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql",
+      "app/lib/campaign-queue-db.server.ts",
+      "app/lib/db-rpc.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/routes/api+/queues.action.server.ts",
+      "app/routes/api+/hangup.action.server.ts",
+      "app/routes/api+/auto-dial/status.action.server.ts",
+      "app/lib/callscreenActions.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/dequeue-contact-assigned.test.ts (23 real Postgres cases: campaign/household/event/completion/no-op scope, missing-primary and concurrent events, own-assignee guard, global opt-out controls and exact RPC signature)",
+      "test/queues.route.test.ts (validation, campaign/contact workspace pair and existing no-op/conflict responses)",
+      "test/auto-dial.server.test.ts, test/auto-dial-status.test.ts, test/hangup.route.test.ts, test/webhook-side-effects.test.ts (campaign wiring and no-campaign controls)",
+      "test/inbound-sms.route.test.ts and test/questions.route.test.ts (explicit all-campaign opt-out targets)",
+      "test/ui/callscreenActions.test.ts (selected campaign in manual request)"
+    ],
+    "missingTests": [
+      "Deployed migration and calling verification before production promotion."
+    ],
+    "acceptanceCriteria": [
+      "One contact in two campaigns' queues: a hang-up in campaign A dequeues only A's row; B's row is still `queued` with `dequeued_at` null.",
+      "The same holds for the predictive post-dial and the terminal-status paths.",
+      "A dequeue with a campaign id that does not own the row is a no-op, not an error.",
+      "`check:queue-rpc-contract` passes with the new signature.",
+      "The manual \"Save and Next\" path is campaign-scoped too."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "The source fix travels with this board update. Verify the migration and browser/phone calling on deployed dev after merge, then promote and close. Do not start a duplicate fix.",
+    "rootCause": "The guarded dequeue RPC and its event snapshot had workspace/contact limits but no campaign. Ordinary live-call paths omitted campaign scope. Optional campaign fallback and unscoped no-op diagnostics could affect unrelated campaign queues."
   }
 ]

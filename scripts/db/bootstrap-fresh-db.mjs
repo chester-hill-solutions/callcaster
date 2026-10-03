@@ -124,6 +124,7 @@ const steps = [
   "client/migrations/20260925120000_gate_campaign_completion_on_settled_messages.sql",
   "client/migrations/20260925140000_index_message_date_sent_backfill.sql",
   "client/migrations/20260930150000_dequeue_paths_clear_inflight_claim.sql",
+  "client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql",
 ];
 
 /**

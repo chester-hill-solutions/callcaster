@@ -17,8 +17,18 @@ import { logger } from "@/lib/logger.server";
 import { data as routeData } from "react-router";
 import { defineAction } from "@/lib/handler.server";
 import type { ActionFunctionArgs } from "react-router";
+import { z } from "zod";
+import { parseJsonBodyOrResponse } from "@/lib/api-parse.server";
 
-type DequeueRequest = { contact_id: string | number; household: boolean };
+const positiveId = z.union([
+  z.number(),
+  z.string().regex(/^[1-9]\d*$/).transform(Number),
+]).pipe(z.number().int().positive().max(Number.MAX_SAFE_INTEGER));
+const dequeueRequest = z.object({
+  contact_id: positiveId,
+  campaign_id: positiveId,
+  household: z.boolean(),
+});
 type ResetRequest = { campaignId: string | number };
 
 export const action = defineAction({
@@ -27,8 +37,10 @@ export const action = defineAction({
   handler: async ({ request, auth }) => {
   try {
     if (request.method === "POST") {
-      const { contact_id, household }: DequeueRequest = await safeParseJson(request);
-      const workspaceId = await resolveContactWorkspaceId(contact_id);
+      const body = await parseJsonBodyOrResponse(request, dequeueRequest);
+      if (body instanceof Response) return body;
+      const { contact_id, campaign_id, household } = body;
+      const workspaceId = await resolveCampaignWorkspaceId(campaign_id);
 
       if (!workspaceId) {
         return jsonError("Contact queue entry not found", 404);
@@ -38,8 +50,12 @@ export const action = defineAction({
         workspaceId,
       });
 
+      if (await resolveContactWorkspaceId(contact_id) !== workspaceId) {
+        return jsonError("Contact queue entry not found", 404);
+      }
+
       const { dequeuedPrimary } = await dequeueQueueEntry({
-        by: { contactId: Number(contact_id) },
+        by: { contactId: contact_id, campaignId: campaign_id },
         workspaceId,
         household,
         userId: auth.user.id,
@@ -56,6 +72,7 @@ export const action = defineAction({
         // route already dequeued it.
         const reason = await explainDequeueNoOp({
           contactId: Number(contact_id),
+          campaignId: campaign_id,
           workspaceId,
           userId: auth.user.id,
         });

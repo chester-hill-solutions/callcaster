@@ -353,7 +353,7 @@ describe("auto-dial.server", () => {
       );
       expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          by: { contactId: 102 },
+          by: { contactId: 102, campaignId: 5 },
           household: true,
         }),
       );
@@ -427,7 +427,7 @@ describe("auto-dial.server", () => {
       expect(requeueCampaignQueueByIdMock).not.toHaveBeenCalled();
       expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          by: { contactId: 201 },
+          by: { contactId: 201, campaignId: 5 },
           household: false,
           reason: expect.stringContaining("Ambiguous dial failure"),
         }),

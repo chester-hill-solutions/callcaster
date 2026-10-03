@@ -115,7 +115,8 @@ export async function runCallStatusSideEffects(args: {
   if (
     outreachAttemptId != null &&
     CALL_STATUS_TO_DISPOSITION[callStatus.toLowerCase()] &&
-    callRow.contact_id != null
+    callRow.contact_id != null &&
+    callRow.campaign_id != null
   ) {
     const dequeueWorkspace = workspaceId ?? callRow.workspace;
     if (!dequeueWorkspace) {
@@ -144,7 +145,7 @@ export async function runCallStatusSideEffects(args: {
         : Promise.resolve(null),
     ]);
     await dequeueQueueEntry({
-      by: { contactId: callRow.contact_id },
+      by: { contactId: callRow.contact_id, campaignId: callRow.campaign_id },
       workspaceId: dequeueWorkspace,
       household: campaign?.group_household_queue ?? false,
       userId: queueRow?.assigned_to_user_id ?? null,

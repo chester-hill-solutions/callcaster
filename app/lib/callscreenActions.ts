@@ -208,6 +208,7 @@ export const handleQueue = ({
     submit(
       {
         contact_id: contact.contact.id,
+        campaign_id: campaign.id,
         household: groupByHousehold,
       },
       {

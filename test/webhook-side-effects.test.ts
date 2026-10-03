@@ -246,7 +246,7 @@ describe("webhook side-effect handlers", () => {
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledTimes(1);
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith(
       expect.objectContaining({
-        by: { contactId: 123 },
+        by: { contactId: 123, campaignId: 7 },
         workspaceId: "w1",
         household: false,
         userId: "user-1",
@@ -319,6 +319,20 @@ describe("webhook side-effect handlers", () => {
     expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
     expect(mocks.findOutreachAttemptWithCampaignType).not.toHaveBeenCalled();
     expect(mocks.updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
+  });
+
+  test("a terminal call without a campaign keeps billing but does not dequeue", async () => {
+    mocks.findCallBySid.mockResolvedValue({
+      sid: "CA1", workspace: "w1", status: "completed", contact_id: 123,
+      campaign_id: null, outreach_attempt_id: 10,
+    });
+    const { runCallStatusSideEffects } = await import("@/lib/worker/webhook-side-effects.server");
+    await runCallStatusSideEffects({
+      callSid: "CA1", event: parseTwilioVoiceCallback({ CallSid: "CA1", CallStatus: "completed" }),
+    });
+    expect(mocks.billTerminalCallStatus).toHaveBeenCalled();
+    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(mocks.tenantDb.campaign_queue.findFirst).not.toHaveBeenCalled();
   });
 
   test("non-terminal status does not dequeue the queue row", async () => {

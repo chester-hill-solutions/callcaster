@@ -1079,42 +1079,6 @@
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. An ended message campaign returns no readiness issues and no disabled reason. getDateIssue does not compare end_date to options.now."
   },
   {
-    "issueNumber": 2096,
-    "verdict": "fix-now",
-    "recommendedTitle": "Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them",
-    "summary": "The latest dequeue_contact function still filters contact/workspace without campaign. Ordinary call completion can dequeue the same contact from other campaigns.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The latest dequeue_contact function still filters contact/workspace without campaign. Ordinary call completion can dequeue the same contact from other campaigns.",
-    "resolution": "Make ordinary dequeue campaign-scoped across RPC and callers. Keep an explicit separate workspace-wide suppression operation for do-not-call intent.",
-    "lookIn": [
-      "client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql:58",
-      "client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql:58-69",
-      "client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql:27-32",
-      "app/routes/api+/queues.action.server.ts:41-47",
-      "app/lib/callscreenActions.ts:201-219",
-      "app/routes/api+/auto-dial/status.action.server.ts",
-      "the agent-hangup route under `app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/",
-      "scripts/check-queue-rpc-contract.mjs"
-    ],
-    "existingTests": [
-      "test/auto-dial-status.test.ts",
-      "test/auto-dial.server.test.ts"
-    ],
-    "missingTests": [
-      "Real Postgres: contact in two campaigns; call completion dequeues only its campaign, while deliberate opt-out can suppress both."
-    ],
-    "acceptanceCriteria": [
-      "One contact in two campaigns' queues: a hang-up in campaign A dequeues only A's row; B's row is still `queued` with `dequeued_at` null.",
-      "The same holds for the predictive post-dial and the terminal-status paths.",
-      "A dequeue with a campaign id that does not own the row is a no-op, not an error.",
-      "`check:queue-rpc-contract` passes with the new signature.",
-      "The manual \"Save and Next\" path is campaign-scoped too."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2099,
     "verdict": "fix-now",
     "recommendedTitle": "Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address",

@@ -280,7 +280,7 @@ describe("callscreenActions", () => {
 
     dequeue({ contact: { contact: { id: 1, phone: "+1555" } } } as any);
     expect(submit).toHaveBeenCalledWith(
-      expect.objectContaining({ contact_id: 1, household: true }),
+      expect.objectContaining({ contact_id: 1, campaign_id: 1, household: true }),
       expect.objectContaining({ action: "/api/queues" }),
     );
     expect(typeof setQueue.mock.calls[0][0]).toBe("function");

@@ -82,3 +82,29 @@ Setup: [stripe-webhook.md](./stripe-webhook.md)
 
 - [Internal routes without signatures](./api-internal-unsupported.md)
 - [Complete inventory](./api-surface-inventory.md)
+
+### Campaign queue scope
+
+Predictive dispatch, hangup and terminal callbacks dequeue only the call's
+campaign. Household grouping stays within that campaign. Calls without a
+campaign do not remove a contact from campaign queues. The guarded dequeue still
+skips a row assigned to another agent and reports whether the primary contact
+was changed.
+
+The internal session-authenticated `POST /api/queues` request requires
+`contact_id`, `campaign_id` and boolean `household`. IDs must be positive safe
+integers (numeric strings are accepted). The contact and campaign must belong
+to the authorized workspace. Missing or invalid IDs return 400; a missing queue
+entry or a workspace mismatch returns 404. Existing 409 claim conflicts and
+already-dequeued success responses stay unchanged.
+
+SMS opt-out and do-not-call dispositions remove the contact from all campaign
+queues in the workspace through an explicit `allCampaigns: true` target.
+They do not fan out to other household members.
+
+Migration `20261003000000_scope_dequeue_contact_by_campaign.sql` replaces the
+five-argument RPC with `(contact, campaign, household, workspace, user, reason)`
+and removes old overloads. Deploy the matching application and migration
+together. Old application callers fail after the old signature is removed;
+they cannot use an unscoped fallback. Both fresh database bootstrap paths
+include the new function.

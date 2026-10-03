@@ -292,7 +292,7 @@ describe("app/routes/api+/questions/route.tsx", () => {
       );
       // All-campaigns dequeue: campaignId must be omitted.
       expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
-        by: { contactId: 1 },
+        by: { contactId: 1, allCampaigns: true },
         userId: "u1",
         reason: "Do not call requested",
         workspaceId: "w1",

@@ -172,7 +172,7 @@ const handleCallStatus = async (
     }
 
     await dequeueQueueEntry({
-      by: { contactId: outreachStatus.contact_id },
+      by: { contactId: outreachStatus.contact_id, campaignId: outreachStatus.campaign_id },
       workspaceId: workspace,
       household: true,
       // A conference name is `${userId}~${uuid}`, and this argument is bound
