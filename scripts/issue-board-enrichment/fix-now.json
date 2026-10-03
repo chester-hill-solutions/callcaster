@@ -909,40 +909,6 @@
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. IVR entry and next-page runtime ignore saved startPageId and pageOrder. A direct check returns page_2 when pageOrder requests page_3."
   },
   {
-    "issueNumber": 2088,
-    "verdict": "fix-now",
-    "recommendedTitle": "The inbound IVR voicemail: terminal target hard-codes inboundAudio: null and speaks the number row id as the caller's dialled number",
-    "summary": "Inbound IVR voicemail still passes no greeting audio and speaks the number-row ID. The voicemail target payload is ignored while email uses the number row.",
-    "resolution": "Fix the greeting and dialled number first. Decide whether voicemail:{email} overrides the number recipient, then align runtime and docs.",
-    "lookIn": [
-      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts:113",
-      "app/routes/api+/email-vm.action.server.ts:119",
-      "app/lib/ivr-block-runtime.server.ts (the `voicemail:` branch) / the inbound IVR response route",
-      "app/routes/api+/email-vm.action.server.ts:102-120",
-      "docs/contact-center-platform-plan.md:134",
-      "app/lib/campaign-execution.server.ts:53-59,66-96",
-      "app/lib/platform-workspace-numbers.server.ts:373-374",
-      "app/lib/inbound-voicemail-twiml.server.ts"
-    ],
-    "existingTests": [
-      "test/inbound-ivr-block-response.route.test.ts"
-    ],
-    "missingTests": [
-      "Assert configured greeting and actual called number; cover the selected recipient contract."
-    ],
-    "acceptanceCriteria": [
-      "A caller routed to `voicemail:` hears the number's configured inbound greeting recording when one is set, and TTS only when it is not.",
-      "The spoken dialled number is the number the caller called, never the row id.",
-      "Either the `{email}` payload is honoured or it is removed from `docs/contact-center-platform-plan.md:134` — one of the two, with a test.",
-      "A number whose `inbound_script_id` has an invalid `voicemail:` target is rejected before it can be attached."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Inbound IVR voicemail still passes no greeting audio and speaks the number-row ID. The voicemail target payload is ignored while email uses the number row."
-  },
-  {
     "issueNumber": 2099,
     "verdict": "fix-now",
     "recommendedTitle": "Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address",
@@ -2594,5 +2560,67 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Keep Fix now with corrected five-table scope. Do not re-add six existing constraints or assume model-only uuid correction makes text foreign keys possible."
+  },
+  {
+    "issueNumber": 2268,
+    "verdict": "fix-now",
+    "recommendedTitle": "Deliver inbound IVR voicemail to the script recipient",
+    "summary": "The documented voicemail email target is dropped; delivery reads the number default instead.",
+    "currentBehavior": "Source audit dev@f6d02f91: the terminal branch discards the voicemail target payload. The recording callback uses number.inbound_action. The platform plan documents a voicemail email destination and builder picker; no ADR found changes that contract.",
+    "rootCause": "No trusted recipient metadata is carried from the selected IVR target into recording delivery.",
+    "resolution": "Bind the validated target email to trusted workspace-scoped call metadata before recording. Read that recipient after callback signature, call and workspace checks. Preserve legacy number/queue delivery and processed-recording retry protection. Verify storage field and migration/bootstrap coverage if needed; do not trust an arbitrary callback field or URL override.",
+    "lookIn": [
+      "app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts",
+      "app/lib/inbound-voicemail-twiml.server.ts",
+      "app/routes/api+/email-vm.action.server.ts",
+      "app/lib/telephony-db.server.ts",
+      "docs/contact-center-platform-plan.md"
+    ],
+    "existingTests": [
+      "test/email-vm.route.test.ts (existing number-recipient and recording controls)"
+    ],
+    "missingTests": [
+      "Script-selected email differs from number default, legacy and other-workspace controls, script edits, retry stability and duplicate protection."
+    ],
+    "acceptanceCriteria": [
+      "The script target recipient receives the voicemail.",
+      "Legacy recipients remain valid and untrusted callbacks cannot replace another call or workspace recipient.",
+      "Retries and later script edits retain the bound recipient without duplicate emails.",
+      "Runtime, docs, tests and deployed verification agree before promotion."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Independent Task split from #2088. Follow the documented email contract; playback does not complete delivery."
+  },
+  {
+    "issueNumber": 2269,
+    "verdict": "fix-now",
+    "recommendedTitle": "Validate inbound IVR scripts before number attachment",
+    "summary": "Platform and form attachment paths accept inbound_script_id without routing validation; later edits can invalidate an attached script.",
+    "currentBehavior": "Source audit dev@f6d02f91: patchWorkspaceNumber copies inbound_script_id, the phone-number form writes it directly, and shared script persistence stores changed steps. Campaign launch validation does not cover inbound number activation.",
+    "rootCause": "Inbound activation and attached-script editing have no shared ownership/routing validation boundary.",
+    "resolution": "Use one inbound validator at both attachment writes and saves of attached scripts. Reuse graph validation and extend it for documented queue, forward and voicemail email targets. Check script/queue workspace ownership, reject before writes and preserve the last valid configuration. Clearing an attachment remains valid.",
+    "lookIn": [
+      "app/lib/platform-workspace-numbers.server.ts",
+      "app/routes/workspaces+/$id/phone-numbers.action.server.ts",
+      "app/lib/script-persistence.server.ts",
+      "app/lib/campaign-execution.server.ts",
+      "app/lib/inbound-ivr-db.server.ts",
+      "docs/contact-center-platform-plan.md"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Both real attachment boundaries and attached-script saves: foreign/missing scripts, dangling references, malformed targets, valid targets and clearing controls."
+    ],
+    "acceptanceCriteria": [
+      "Foreign, missing, unsuitable and invalid scripts cannot be attached or saved over an attached valid version.",
+      "Valid targets and clearing remain usable.",
+      "API, editor and target docs agree; real write-boundary regressions and deployed checks pass."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Independent Task split from #2088. No blocking edge to playback or email delivery: the target grammar is documented."
   }
 ]

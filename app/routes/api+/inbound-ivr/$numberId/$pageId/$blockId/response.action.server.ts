@@ -81,11 +81,13 @@ const renderTerminalTarget = async (
     target: string;
     numberId: string;
     workspace: string;
+    inboundAudio: string | null;
+    phoneNumber: string;
     baseUrl: string;
     script: Script;
   },
 ) => {
-  const { twiml, target, numberId, workspace, baseUrl, script } = options;
+  const { twiml, target, numberId, workspace, inboundAudio, phoneNumber, baseUrl, script } = options;
   if (target === "hangup" || target === "end") {
     // Both are terminal (#1884): `end` is the documented terminal target; the
     // old code fell through and redirected to a bogus inbound block URL that
@@ -110,11 +112,11 @@ const renderTerminalTarget = async (
   if (target.startsWith("voicemail:")) {
     const voicemail = await resolveInboundVoicemailAudio({
       workspaceId: workspace,
-      inboundAudio: null,
+      inboundAudio,
     });
     appendInboundVoicemailTwiml({
       twiml,
-      phoneNumber: numberId,
+      phoneNumber,
       voicemailAudioUrl: voicemail?.signedUrl ?? null,
     });
     return;
@@ -251,6 +253,8 @@ export const action = defineAction({
       target: nextStep,
       numberId,
       workspace: number.workspaceId,
+      inboundAudio: number.inbound_audio ?? null,
+      phoneNumber: call.to,
       baseUrl,
       script: script as Script,
     });

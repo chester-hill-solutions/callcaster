@@ -1,5 +1,5 @@
 import { env } from "@/lib/env.server";
-import { createSignedObjectUrl, listObjects } from "@/lib/object-storage.server";
+import { createSignedObjectUrl, listObjects, objectExists } from "@/lib/object-storage.server";
 import type { TwimlResponse } from "@/lib/twilio-twiml.server";
 
 export async function resolveInboundVoicemailAudio(args: {
@@ -11,12 +11,11 @@ export async function resolveInboundVoicemailAudio(args: {
   }
 
   try {
-    const signedUrl = await createSignedObjectUrl(
-      "workspaceAudio",
-      `${args.workspaceId}/${args.inboundAudio}`,
-      3600,
-    );
-    return { signedUrl };
+    const key = `${args.workspaceId}/${args.inboundAudio}`;
+    if (await objectExists("workspaceAudio", key)) {
+      const signedUrl = await createSignedObjectUrl("workspaceAudio", key, 3600);
+      return { signedUrl };
+    }
   } catch {
     // fall through to search
   }
@@ -29,7 +28,7 @@ export async function resolveInboundVoicemailAudio(args: {
         entry.name === args.inboundAudio,
     );
 
-    if (!file) {
+    if (!file || !(await objectExists("workspaceAudio", `${args.workspaceId}/${file.name}`))) {
       return null;
     }
 

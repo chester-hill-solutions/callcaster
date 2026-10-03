@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { RouterContextProvider } from "react-router";
+import { asRouteResponse } from "./helpers/route-result";
 import {
   bumpInboundNoInputReplay,
   resetInboundNoInputReplays,
@@ -6,6 +8,9 @@ import {
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
+  createSignedObjectUrl: vi.fn(),
+  listObjects: vi.fn(),
+  objectExists: vi.fn(),
   requireTwilioSignatureForIvrResponse: vi.fn(),
   env: {
     BASE_URL: () => "https://base.example",
@@ -29,6 +34,13 @@ vi.mock("@/lib/inbound-ivr-db.server", () => ({
   loadInboundIvrBlockContext: (...a: unknown[]) => mocks.loadInboundIvrBlockContext(...a),
 }));
 
+vi.mock("@/lib/object-storage.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/object-storage.server")>()),
+  createSignedObjectUrl: (...args: unknown[]) => mocks.createSignedObjectUrl(...args),
+  listObjects: (...args: unknown[]) => mocks.listObjects(...args),
+  objectExists: (...args: unknown[]) => mocks.objectExists(...args),
+}));
+
 function makeReq(form: Record<string, string>) {
   const params = new URLSearchParams(form);
   return new Request("https://base.example/api/inbound-ivr/1/page_1/b1/", {
@@ -39,6 +51,9 @@ function makeReq(form: Record<string, string>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.createSignedObjectUrl.mockReset().mockImplementation(async (_bucket: string, key: string) => `https://audio.example/${key}`);
+  mocks.listObjects.mockReset().mockResolvedValue([]);
+  mocks.objectExists.mockReset().mockResolvedValue(true);
   resetInboundNoInputReplays();
   mocks.requireTwilioSignatureForIvrResponse.mockImplementation(
     async () => ({ callSid: "CA1", userInput: "1" }),
@@ -294,4 +309,67 @@ describe("inbound IVR block response", () => {
     } as any);
     expect(await res.text()).toContain("page_2/b2/");
   });
+  describe("voicemail playback settings (#2088)", () => {
+    async function voicemailResponse(inboundAudio: string | null) {
+      mocks.loadInboundIvrBlockContext.mockResolvedValue({
+        number: {
+          id: 42,
+          phoneNumber: "+15551234567",
+          workspaceId: "w1",
+          inbound_audio: inboundAudio,
+        },
+        script: {
+          pages: { page_1: { blocks: ["b1"] } },
+          blocks: { b1: { id: "b1", options: [{ value: "1", next: "voicemail:mail@example.org" }] } },
+        },
+      });
+      const { action } = await import(
+        "../app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.route"
+      );
+      const request = makeReq({ CallSid: "CA1", Digits: "1" });
+      return asRouteResponse(action({
+        params: { numberId: "42", pageId: "page_1", blockId: "b1" },
+        request,
+        context: new RouterContextProvider(),
+        url: new URL(request.url),
+      }));
+    }
+
+    function expectCapture(text: string) {
+      expect(text).toContain('<Pause length="1"');
+      expect(text).toContain("<Record");
+      expect(text).toContain('transcribe="true"');
+      expect(text).toContain('timeout="10"');
+      expect(text).toContain('playBeep="true"');
+      expect(text).toContain('recordingStatusCallback="https://base.example/api/email-vm"');
+    }
+
+    test("plays the number's selected greeting from its workspace before recording", async () => {
+      const text = await (await voicemailResponse("greeting.mp3")).text();
+      expect(text).toContain("<Play>https://audio.example/w1/greeting.mp3</Play>");
+      expect(text).not.toContain("Thank you for calling");
+      expectCapture(text);
+    });
+
+    test("speaks the actual called phone without a configured greeting", async () => {
+      const text = await (await voicemailResponse(null)).text();
+      expect(text).toContain("Thank you for calling +15551234567");
+      expect(text).not.toContain("Thank you for calling 42");
+      expect(text).not.toContain("<Play>");
+      expect(mocks.createSignedObjectUrl).not.toHaveBeenCalled();
+      expectCapture(text);
+    });
+
+    test("keeps phone-based speech and capture when the configured audio is unavailable", async () => {
+      mocks.objectExists.mockResolvedValueOnce(false);
+      mocks.listObjects.mockResolvedValueOnce([]);
+      const text = await (await voicemailResponse("missing.mp3")).text();
+      expect(text).toContain("Thank you for calling +15551234567");
+      expect(text).not.toContain("Thank you for calling 42");
+      expect(text).not.toContain("<Play>");
+      expect(mocks.createSignedObjectUrl).not.toHaveBeenCalled();
+      expectCapture(text);
+    });
+  });
+
 });
