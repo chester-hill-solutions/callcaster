@@ -1,3 +1,5 @@
+> Feedback update (2026-10-03): use [feedback-inventory.md](feedback-inventory.md) for current message surfaces and [design-system.md](design-system.md#feedback-surfaces) for the no-shift rule and canonical ui-kit ownership. The older component/visual inventory below is retained with its original review context; it is not current feedback acceptance evidence.
+
 # Design System Audit (Visual Asset Ledger)
 
 Canonical **inventory** of visual surfaces in CallCaster. Usage rules: [design-system.md](design-system.md). Component-audit method: [`.cursor/skills/component-audit/SKILL.md`](../.cursor/skills/component-audit/SKILL.md).
