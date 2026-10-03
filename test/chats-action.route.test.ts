@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
     linkContactToConversation: vi.fn(),
     getEffectivePortalConfig: vi.fn(),
     getOrLookupLineType: vi.fn(async () => null as string | null),
-    findMatchingContactIds: vi.fn(async () => [] as number[]),
+    findSmsRecipientContacts: vi.fn(),
     getWorkspaceCreditsBalance: vi.fn(async () => 100),
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
   };
@@ -50,8 +50,9 @@ vi.mock("@/lib/twilio-lookup.server", () => ({
   isSmsIncapableLineType: (lineType: string | null | undefined) =>
     lineType === "landline" || lineType === "fax",
 }));
-vi.mock("@/lib/inbound-sms-context.server", () => ({
-  findMatchingContactIds: (...args: unknown[]) => mocks.findMatchingContactIds(...args),
+vi.mock("@/lib/database/contact.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/database/contact.server")>()),
+  findSmsRecipientContacts: (...args: unknown[]) => mocks.findSmsRecipientContacts(...args),
 }));
 vi.mock("@/lib/workspace-credits.server", () => ({
   getWorkspaceCreditsBalance: (...args: unknown[]) => mocks.getWorkspaceCreditsBalance(...args),
@@ -87,8 +88,8 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     mocks.logger.error.mockReset();
     mocks.getOrLookupLineType.mockReset();
     mocks.getOrLookupLineType.mockResolvedValue(null);
-    mocks.findMatchingContactIds.mockReset();
-    mocks.findMatchingContactIds.mockResolvedValue([]);
+    mocks.findSmsRecipientContacts.mockReset();
+    mocks.findSmsRecipientContacts.mockResolvedValue([]);
     mocks.getWorkspaceCreditsBalance.mockReset();
     mocks.getWorkspaceCreditsBalance.mockResolvedValue(100);
     tenantDbMocks.contact.findFirst.mockReset();
@@ -253,7 +254,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
   });
 
   test("rejects sending to an opted-out contact with a 403 before calling sendMessage", async () => {
-    tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ id: 9, opt_out: true });
+    mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, opt_out: true , phone: "+15551234567" }]);
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );
@@ -276,7 +277,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
   });
 
   test("sends normally when contact_id is present but not opted out", async () => {
-    tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ id: 9, opt_out: false });
+    mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, opt_out: false , phone: "+15551234567" }]);
     mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" }, data: [] });
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
@@ -316,8 +317,8 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     expect(mocks.sendMessage).toHaveBeenCalled();
   });
 
-  test("fails open (still sends) when the opt-out lookup throws", async () => {
-    tenantDbMocks.contact.findFirst.mockRejectedValueOnce(new Error("db down"));
+  test("blocks sends when the opt-out lookup throws", async () => {
+    mocks.findSmsRecipientContacts.mockRejectedValueOnce(new Error("db down"));
     mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" }, data: [] });
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
@@ -332,16 +333,16 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
         params: { id: "w1", contact_number: "+15551234567" },
       })),
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error checking contact opt-out status:",
+      "Error verifying SMS recipient:",
       expect.any(Error),
     );
-    expect(mocks.sendMessage).toHaveBeenCalled();
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
   test("rejects sending to a landline contact with a 400 before calling sendMessage", async () => {
-    tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ id: 9, opt_out: false });
+    mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, opt_out: false , phone: "+15551234567" }]);
     mocks.getOrLookupLineType.mockResolvedValueOnce("landline");
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
@@ -374,7 +375,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
   test.each(["mobile", "voip", null])(
     "sends normally when the contact's line type is %s (only landline blocks)",
     async (lineType) => {
-      tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ id: 9, opt_out: false });
+      mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, opt_out: false , phone: "+15551234567" }]);
       mocks.getOrLookupLineType.mockResolvedValueOnce(lineType);
       mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" }, data: [] });
       const mod = await import(
@@ -414,8 +415,8 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
     expect(mocks.sendMessage).toHaveBeenCalled();
   });
 
-  test("fails open (still sends) when the landline lookup throws", async () => {
-    tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ id: 9, opt_out: false });
+  test("blocks sends when the landline lookup throws", async () => {
+    mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, opt_out: false , phone: "+15551234567" }]);
     mocks.getOrLookupLineType.mockRejectedValueOnce(new Error("lookup down"));
     mocks.sendMessage.mockResolvedValueOnce({ message: { sid: "SM1" }, data: [] });
     const mod = await import(
@@ -431,8 +432,8 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
         params: { id: "w1", contact_number: "+15551234567" },
       })),
     );
-    expect(res.status).toBe(200);
-    expect(mocks.sendMessage).toHaveBeenCalled();
+    expect(res.status).toBe(400);
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
   test("passes send_at through to sendMessage for scheduled sends", async () => {
@@ -584,8 +585,7 @@ describe("app/routes/workspaces+/$id/chats.action.server.ts", () => {
   test("blocks an opted-out contact resolved by phone when no contact_id is present", async () => {
     // M9 regression: the "new number" composer sends no contact_id, but the
     // recipient still resolves by an unambiguous phone match.
-    mocks.findMatchingContactIds.mockResolvedValueOnce([9]);
-    tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ id: 9, opt_out: true });
+        mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, opt_out: true , phone: "+15551234567" }]);
     const mod = await import(
       "../app/routes/workspaces+/$id/chats.action.server"
     );

@@ -10,7 +10,7 @@ CallCaster exposes two SMS endpoints for integrators. Both support **session coo
 
 ## Direct SMS — `POST /api/chat_sms`
 
-Send a single SMS to one phone number. Optional `contact_id` enables template tag substitution from the contact record.
+Send a single SMS to one phone number. The destination phone selects the recipient. A supplied `contact_id` must identify the single matching contact in the workspace. Template tags and message attribution use that verified contact. Ambiguous matches and failed recipient checks block the send. A successful lookup with no contact permits a manual send without `contact_id`.
 
 ### Request
 
@@ -22,7 +22,7 @@ Send a single SMS to one phone number. Optional `contact_id` enables template ta
 | `to_number` | string | Yes | Recipient phone (E.164 recommended). |
 | `caller_id` | string | Yes | Workspace outbound number. |
 | `body` | string | Yes | Message text (may be empty string). |
-| `contact_id` | string | No | Contact ID for `[tag]` substitution. |
+| `contact_id` | string | No | Must match the destination phone and its unique workspace contact. Enables template substitution. |
 | `media` | string | No | Media URL/path for MMS. |
 | `message_intent` | string | No | Twilio message intent. |
 | `messaging_service_sid` | string | No | Messaging Service SID override. |
@@ -48,9 +48,9 @@ curl -X POST "$BASE_URL/api/chat_sms" \
 | Status | Meaning |
 |--------|---------|
 | `201` | Message sent (`data`, `message` in body) |
-| `400` | Validation error |
+| `400` | Validation error, SMS-incapable recipient (`landline: true`), or recipient verification failure (`recipientVerificationError: true`) |
 | `401` | Missing/invalid auth |
-| `403` | `workspace_id` mismatch with API key |
+| `403` | `workspace_id` mismatch with API key or opted-out recipient (`optedOut: true`) |
 | `404` | Invalid phone number |
 | `500` | Twilio or server error |
 

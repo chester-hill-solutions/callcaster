@@ -3040,5 +3040,47 @@
     "trackerRecommendation": "Source fix is in this change. Verify deployed behavior after merge, then promote and close. #2263 and #2264 are independent decisions; do not treat them as completed by this parser fix.",
     "currentBehavior": "Source fix from dev@fd86e10a: one shared merge retains mandatory keywords for both parsed configuration and direct callers. Whole-message matching normalizes case and whitespace. Returned arrays cannot mutate the defaults. Actual inbound-route tests prove every keyword updates matching contacts and removes both contacts from all workspace campaign queues. All 175 focused cases passed (162 node, 13 UI). The corrected old-source check failed 72 regressions while 43 controls passed; five isolated mutations failed the relevant checks, including both real dispatch adapter gates.",
     "rootCause": "The default keyword list had only STOP and UNSUBSCRIBE, and non-empty workspace or direct-call lists replaced it."
+  },
+  {
+    "issueNumber": 2089,
+    "verdict": "verify-close",
+    "recommendedTitle": "Use the destination phone to verify the SMS recipient",
+    "summary": "The API, chat form and campaign test sender now use one verified recipient. Mismatched IDs, ambiguous contacts and failed verification block sends; deployed verification remains.",
+    "currentBehavior": "Source fix from dev@2d25f309: a workspace-scoped SQL query selects every normalized-equal phone, including formatted duplicates; the shared guard verifies unique destination identity. A supplied ID must match it. The same contact supplies opt-out, cached line type, template data and attribution. API and form line lookups propagate actual cache and provider failures. Campaign tests retain their existing opt-out-only policy. All 146 focused cases passed (137 node and nine real-Postgres tests), including 53 recipient regressions and controls; the old source failed 42 with 11 controls retained. Ten isolated mutations failed the relevant checks and were restored.",
+    "resolution": "Verify matching and mismatched IDs, ambiguous contacts, lookup failures, normalized phones, known opt-out and landline results, correct templates and attribution, and manual new-number behavior on deployed dev. Verify the campaign test sender. Promote verified behavior before closing. This change does not implement the unknown-sender consent ledger rollout under #2263 and #1268.",
+    "lookIn": [
+      "app/lib/database/contact.server.ts",
+      "app/lib/chat-sms-guards.server.ts",
+      "app/routes/api+/chat_sms.action.server.ts",
+      "app/routes/workspaces+/$id/chats.action.server.ts",
+      "app/lib/campaign-test-send.server.ts",
+      "app/lib/twilio-lookup.server.ts",
+      "app/lib/openapi-integrator.ts",
+      "docs/api-send-sms.md"
+    ],
+    "existingTests": [
+      "test/integration-db/sms-recipient-identity.test.ts (actual SQL, normalized formats and hidden duplicates, workspace and prefix exclusion, new-number and international controls)",
+      "test/sms-recipient-identity.test.ts (real resolver and line-type lookup through all three consumers, provider/cache failure, mismatch, ambiguity, phone equality, tags and attribution)",
+      "test/chat-sms-action.route.test.ts and test/chats-action.route.test.ts (opt-out, landline and verification error responses)",
+      "test/chats-action.server.test.ts (template and sender controls)",
+      "test/campaign-test-send.test.ts (test-send policy, sample data and media)",
+      "test/chat-sms.route.test.ts (actual chat sender and provider controls)",
+      "test/twilio-lookup.server.test.ts (existing caller fail-open policy retained)"
+    ],
+    "missingTests": [
+      "Deployed verification through API, chat form and campaign test sender before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Destination phone and unique workspace contact agree before sending; supplied IDs cannot bypass opt-out or landline protection.",
+      "Ambiguous and failed verification block sends with an error distinct from opt-out and landline.",
+      "Eligible normalized recipients use verified template data and attribution; legacy manual new-number and campaign test policies remain.",
+      "Public API contract and generated artifacts describe recipient verification.",
+      "Deployed verification and promotion are complete before closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Source fix is in this change. Verify deployed behavior after merge, then promote and close.",
+    "rootCause": "The guards trusted the supplied ID and allowed ambiguous matches or lookup failures. Later template and attribution code reused the unverified ID. The general search helper can omit formatted phones and hide ambiguity."
   }
 ]

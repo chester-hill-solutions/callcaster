@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   requireWorkspaceAccess: vi.fn(),
   getWorkspaceCreditsBalance: vi.fn(async () => 100),
   sendMessage: vi.fn(),
-  findMatchingContactIds: vi.fn(async () => [] as number[]),
+  findSmsRecipientContacts: vi.fn(),
   getOrLookupLineType: vi.fn(async () => null as string | null),
   logger: { error: vi.fn() },
 }));
@@ -39,8 +39,9 @@ vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
 vi.mock("@/lib/chat-sms.server", () => ({
   sendMessage: (...args: unknown[]) => mocks.sendMessage(...args),
 }));
-vi.mock("@/lib/inbound-sms-context.server", () => ({
-  findMatchingContactIds: (...args: unknown[]) => mocks.findMatchingContactIds(...args),
+vi.mock("@/lib/database/contact.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/database/contact.server")>()),
+  findSmsRecipientContacts: (...args: unknown[]) => mocks.findSmsRecipientContacts(...args),
 }));
 vi.mock("@/lib/twilio-lookup.server", () => ({
   getOrLookupLineType: (...args: unknown[]) => mocks.getOrLookupLineType(...args),
@@ -83,8 +84,8 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     mocks.getWorkspaceCreditsBalance.mockResolvedValue(100);
     mocks.sendMessage.mockReset();
     mocks.sendMessage.mockResolvedValue({ message: { sid: "SM1" }, data: [] });
-    mocks.findMatchingContactIds.mockReset();
-    mocks.findMatchingContactIds.mockResolvedValue([]);
+    mocks.findSmsRecipientContacts.mockReset();
+    mocks.findSmsRecipientContacts.mockResolvedValue([]);
     mocks.getOrLookupLineType.mockReset();
     mocks.getOrLookupLineType.mockResolvedValue(null);
     mocks.logger.error.mockReset();
@@ -93,7 +94,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
   });
 
   test("rejects with 403 when contact_id resolves to an opted-out contact", async () => {
-    tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ id: 9, opt_out: true });
+    mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, opt_out: true , phone: "+15551234567" }]);
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody({ contact_id: "9" }));
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
@@ -109,8 +110,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
   });
 
   test("falls back to a phone lookup and rejects when exactly one match is opted out", async () => {
-    mocks.findMatchingContactIds.mockResolvedValueOnce([9]);
-    tenantDbMocks.contact.findFirst.mockResolvedValueOnce({ id: 9, opt_out: true });
+        mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, opt_out: true , phone: "+15551234567" }]);
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody());
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
@@ -121,36 +121,37 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
-  test("sends normally when the phone lookup is ambiguous (skips the opt-out gate)", async () => {
-    mocks.findMatchingContactIds.mockResolvedValueOnce([9, 10]);
+  test("blocks an ambiguous recipient", async () => {
+    mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, phone: "+15551234567" }, { id: 10, phone: "+15551234567" }]);
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody());
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
     expect(tenantDbMocks.contact.findFirst).not.toHaveBeenCalled();
-    expect(mocks.sendMessage).toHaveBeenCalled();
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
-  test("fails open (still sends) when the opt-out lookup throws", async () => {
-    mocks.findMatchingContactIds.mockRejectedValueOnce(new Error("db down"));
+  test("blocks sends when the opt-out lookup throws", async () => {
+    mocks.findSmsRecipientContacts.mockRejectedValueOnce(new Error("db down"));
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody());
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error checking contact opt-out status:",
+      "Error verifying SMS recipient:",
       expect.any(Error),
     );
-    expect(mocks.sendMessage).toHaveBeenCalled();
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
   test("rejects with 400 when the resolved contact is a landline", async () => {
+    mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, phone: "+15551234567" }]);
     mocks.getOrLookupLineType.mockResolvedValueOnce("landline");
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody({ contact_id: "9" }));
 
@@ -172,6 +173,7 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
   test.each(["mobile", "voip", null])(
     "sends normally when the resolved contact's line type is %s (only landline blocks)",
     async (lineType) => {
+      mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, phone: "+15551234567" }]);
       mocks.getOrLookupLineType.mockResolvedValueOnce(lineType);
       mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody({ contact_id: "9" }));
 
@@ -184,20 +186,21 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     },
   );
 
-  test("skips the landline lookup entirely when the phone match is ambiguous", async () => {
-    mocks.findMatchingContactIds.mockResolvedValue([9, 10]);
+  test("blocks ambiguity before the line-type lookup", async () => {
+    mocks.findSmsRecipientContacts.mockResolvedValue([{ id: 9, phone: "+15551234567" }, { id: 10, phone: "+15551234567" }]);
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody());
 
     const mod = await import("../app/routes/api+/chat_sms.action.server");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
     expect(mocks.getOrLookupLineType).not.toHaveBeenCalled();
-    expect(mocks.sendMessage).toHaveBeenCalled();
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
-  test("fails open (still sends) when the landline lookup throws", async () => {
+  test("blocks sends when the landline lookup throws", async () => {
+    mocks.findSmsRecipientContacts.mockResolvedValueOnce([{ id: 9, phone: "+15551234567" }]);
     mocks.getOrLookupLineType.mockRejectedValueOnce(new Error("lookup down"));
     mocks.parseJsonBodyOrResponse.mockResolvedValueOnce(baseBody({ contact_id: "9" }));
 
@@ -205,12 +208,12 @@ describe("app/routes/api+/chat_sms.action.server.ts opt-out gate", () => {
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any),
     );
 
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
     expect(mocks.logger.error).toHaveBeenCalledWith(
-      "Error checking contact line type:",
+      "Error verifying SMS recipient:",
       expect.any(Error),
     );
-    expect(mocks.sendMessage).toHaveBeenCalled();
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
   });
 
   test("passes send_at through to sendMessage", async () => {

@@ -8,24 +8,18 @@ import { getEffectiveWorkspaceTwilioPortalConfigForWorkspace } from "@/lib/datab
 import { parseChatSenderSelection } from "@/lib/sms-campaign-send-mode";
 import { eq } from "drizzle-orm";
 import {
-  contact as contactTable,
   workspace_number as workspaceNumberTable,
 } from "@/db/schema";
-import { type TenantDb } from "@/server/tenant-db";
-import { findMatchingContactIds } from "@/lib/inbound-sms-context.server";
-import { hasTemplateSyntax, processTemplateTags } from "@/lib/message-templates";
+import { processTemplateTags } from "@/lib/message-templates";
 import { logger } from "@/lib/logger.server";
-import {
-  isOptedOutRecipient,
-  isSmsIncapableRecipient,
-} from "@/lib/chat-sms-guards.server";
+import { verifySmsRecipient } from "@/lib/chat-sms-guards.server";
 import {
   outboundCreditsBlockedResponse,
   requireOutboundCredits,
 } from "@/lib/outbound-credit-gate.server";
 import { estimateMessageCredits } from "@/lib/pricing";
 import { OUTBOUND_CREDIT_FLOOR } from "../../../../shared/credit-floor";
-import type { BaseUser, WorkspaceTwilioOpsConfig, Contact } from "@/lib/types";
+import type { BaseUser, WorkspaceTwilioOpsConfig } from "@/lib/types";
 import { defineAction } from "@/lib/handler.server";
 import { toUserMessage } from "@/lib/user-message";
 
@@ -37,45 +31,6 @@ function parseMediaList(raw: FormDataEntryValue | undefined): unknown[] {
   } catch {
     return [];
   }
-}
-
-/**
- * Fill template tags from the conversation's contact: the linked contact when
- * the composer sent one, otherwise the single contact that matches the phone
- * number. Text with no tags, or no matching contact, is sent as typed.
- */
-async function renderChatBody(args: {
-  body: string;
-  workspaceId: string;
-  contactId: string | undefined;
-  phone: string;
-  tdb: TenantDb;
-}): Promise<string> {
-  const { body, workspaceId, contactId, phone, tdb } = args;
-  if (!hasTemplateSyntax(body)) return body;
-  const contact = await resolveTemplateContact(
-    tdb,
-    workspaceId,
-    contactId,
-    phone,
-  );
-  return contact ? processTemplateTags(body, contact) : body;
-}
-
-async function resolveTemplateContact(
-  tdb: TenantDb,
-  workspaceId: string,
-  contactId: string | undefined,
-  phone: string,
-): Promise<Contact | null> {
-  let id = Number(contactId);
-  if (!Number.isFinite(id) || id <= 0) {
-    const matches = await findMatchingContactIds(workspaceId, phone);
-    if (matches.length !== 1) return null;
-    id = matches[0] as number;
-  }
-  const row = await tdb.contact.findFirst({ where: eq(contactTable.id, id) });
-  return (row as Contact | undefined) ?? null;
 }
 
 export const action = defineAction({
@@ -243,38 +198,16 @@ export const action = defineAction({
     }
   }
 
-  // Resolve the recipient by explicit contact_id, else by an unambiguous phone
-  // match (shared with api+/chat_sms). Previously these gates ran only when a
-  // contact_id was present, so the "new number" composer could text an
-  // opted-out contact or a landline that was not linked by id.
-  const contactId =
-    typeof data.contact_id === "string" && data.contact_id.length > 0
-      ? data.contact_id
-      : undefined;
-
-  if (await isOptedOutRecipient(workspaceId, contact_number, contactId)) {
-    return routeData(
-      { error: "This contact has opted out of messages.", optedOut: true },
-      { status: 403 },
-    );
-  }
-
-  if (await isSmsIncapableRecipient(workspaceId, contact_number, contactId)) {
-    return routeData(
-      { error: "This number is a landline and can't receive SMS.", landline: true },
-      { status: 400 },
-    );
+  const contactId = typeof data.contact_id === "string" ? data.contact_id : undefined;
+  const recipient = await verifySmsRecipient(workspaceId, contact_number, contactId);
+  if (!recipient.ok) {
+    return routeData(recipient.body, { status: recipient.status });
   }
 
   const sendAt = typeof data["send_at"] === "string" ? data["send_at"] : undefined;
 
-  const body = await renderChatBody({
-    body: String(data["body"] ?? ""),
-    workspaceId,
-    contactId,
-    phone: contact_number,
-    tdb,
-  });
+  const rawBody = String(data["body"] ?? "");
+  const body = recipient.contact ? processTemplateTags(rawBody, recipient.contact) : rawBody;
 
   try {
     const responseData = await sendMessage({
@@ -283,7 +216,7 @@ export const action = defineAction({
       from: fromNumber,
       media: data["media"] as string,
       workspace: workspaceId as string,
-      contact_id: data.contact_id as string,
+      contact_id: recipient.contact ? String(recipient.contact.id) : "",
       user: user as unknown as BaseUser,
       portalConfig,
       messagingServiceSid,

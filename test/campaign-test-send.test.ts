@@ -9,8 +9,7 @@ vi.hoisted(() => {
 const mocks = vi.hoisted(() => ({
   requireOutboundCredits: vi.fn(),
   loadCampaignSmsDispatchData: vi.fn(),
-  findContactsByPhone: vi.fn(),
-  isOptedOutRecipient: vi.fn(),
+  findSmsRecipientContacts: vi.fn(),
   createSignedObjectUrl: vi.fn(),
   sendMessage: vi.fn(),
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() },
@@ -27,11 +26,7 @@ vi.mock("@/lib/sms-campaign-db.server", async (importOriginal) => ({
 }));
 vi.mock("@/lib/database/contact.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/database/contact.server")>()),
-  findContactsByPhone: (...args: unknown[]) => mocks.findContactsByPhone(...args),
-}));
-vi.mock("@/lib/chat-sms-guards.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/chat-sms-guards.server")>()),
-  isOptedOutRecipient: (...args: unknown[]) => mocks.isOptedOutRecipient(...args),
+  findSmsRecipientContacts: (...args: unknown[]) => mocks.findSmsRecipientContacts(...args),
 }));
 vi.mock("@/lib/object-storage.server", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/object-storage.server")>()),
@@ -75,8 +70,7 @@ describe("sendCampaignTestSms", () => {
     vi.clearAllMocks();
     mocks.requireOutboundCredits.mockResolvedValue({ ok: true, balance: 100 });
     mocks.loadCampaignSmsDispatchData.mockResolvedValue(campaign());
-    mocks.findContactsByPhone.mockResolvedValue([]);
-    mocks.isOptedOutRecipient.mockResolvedValue(false);
+    mocks.findSmsRecipientContacts.mockResolvedValue([]);
     mocks.createSignedObjectUrl.mockImplementation(async (_b: string, key: string) => `https://cdn/${key}`);
     mocks.sendMessage.mockResolvedValue({ message: { sid: "SM123" }, data: null });
   });
@@ -108,7 +102,7 @@ describe("sendCampaignTestSms", () => {
   });
 
   test("renders against the matching workspace contact and attaches campaign media", async () => {
-    mocks.findContactsByPhone.mockResolvedValue([{ id: 7, firstname: "Ada", city: "" }]);
+    mocks.findSmsRecipientContacts.mockResolvedValue([{ id: 7, phone: "+16135550199", firstname: "Ada", city: "" }]);
     mocks.loadCampaignSmsDispatchData.mockResolvedValue(
       campaign({ message_media: ["a.png", "b.png"] }),
     );
@@ -116,7 +110,6 @@ describe("sendCampaignTestSms", () => {
     const result = await sendCampaignTestSms(baseArgs);
 
     expect(result).toMatchObject({ ok: true, body: "Hi Ada, from ", usedSampleContact: false });
-    expect(mocks.isOptedOutRecipient).toHaveBeenCalledWith("w1", "+16135550199", "7");
     expect(mocks.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         contact_id: "7",
@@ -134,7 +127,7 @@ describe("sendCampaignTestSms", () => {
   ] as const)("fails closed with %s", async (reason, argOverrides, setup) => {
     if ("credits" in setup) mocks.requireOutboundCredits.mockResolvedValue(setup.credits);
     if ("campaign" in setup) mocks.loadCampaignSmsDispatchData.mockResolvedValue(setup.campaign);
-    if ("optedOut" in setup) mocks.isOptedOutRecipient.mockResolvedValue(true);
+    if ("optedOut" in setup) mocks.findSmsRecipientContacts.mockResolvedValue([{ id: 7, phone: "+16135550199", opt_out: true }]);
     const { sendCampaignTestSms } = await import("@/lib/campaign-test-send.server");
 
     const result = await sendCampaignTestSms({ ...baseArgs, ...argOverrides });

@@ -125,7 +125,7 @@ export type ChatSmsRequest = {
      */
     body: string;
     /**
-     * Optional contact ID for template tag substitution.
+     * Optional contact ID. Must identify the unique workspace contact whose normalized phone equals to_number.
      */
     contact_id?: string;
     /**
@@ -269,7 +269,7 @@ export type SendChatSmsData = {
 
 export type SendChatSmsErrors = {
     /**
-     * Validation error
+     * Validation error, SMS-incapable recipient (landline: true), or unverified recipient (recipientVerificationError: true)
      */
     400: _Error;
     /**
@@ -277,7 +277,7 @@ export type SendChatSmsErrors = {
      */
     401: _Error;
     /**
-     * Forbidden (workspace mismatch)
+     * Forbidden (workspace mismatch or opted-out recipient: optedOut: true)
      */
     403: _Error;
     /**

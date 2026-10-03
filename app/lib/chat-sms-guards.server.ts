@@ -1,81 +1,100 @@
-/**
- * Shared compliance guards for outbound chat SMS, used by both the JSON API
- * route (api+/chat_sms) and the workspace chat UI route (workspaces+/$id/chats)
- * so the two entry points can never drift apart on opt-out / landline
- * enforcement — which is exactly what happened before this module existed.
- *
- * Both guards are FAIL-OPEN: a lookup error is logged and swallowed so a
- * transient DB/Twilio issue never blocks delivery. They resolve the recipient
- * by explicit contact_id when known, otherwise by a single unambiguous match
- * on the destination number.
- */
-import { eq } from "drizzle-orm";
-import { contact as contactTable } from "@/db/schema";
-import { createTenantDb } from "@/server/tenant-db";
-import { findMatchingContactIds } from "@/lib/inbound-sms-context.server";
-import { getOrLookupLineType, isSmsIncapableLineType } from "@/lib/twilio-lookup.server";
+import { findSmsRecipientContacts } from "@/lib/database/contact.server";
+import { getConversationPhoneKey } from "@/lib/chat-conversation-sort";
+import {
+  getOrLookupLineType,
+  isSmsIncapableLineType,
+} from "@/lib/twilio-lookup.server";
 import { logger } from "@/lib/logger.server";
+import type { Contact } from "@/lib/types";
 
-/**
- * Resolve the destination contact id: the explicit `contactId` when provided,
- * otherwise a single unambiguous match on the destination number. Returns null
- * when the number is unknown or ambiguous (0 or >1 matches).
- */
-async function resolveRecipientContactId(
-  workspaceId: string,
-  to: string,
-  contactId: string | undefined,
-): Promise<number | null> {
-  if (contactId) {
-    const numeric = Number(contactId);
-    return Number.isFinite(numeric) ? numeric : null;
-  }
+export type SmsRecipientResult =
+  | { ok: true; contact: Contact | null }
+  | {
+      ok: false;
+      reason: "recipient_unverified" | "opted_out" | "sms_incapable";
+      status: 400 | 403;
+      body: {
+        error: string;
+        recipientVerificationError?: true;
+        optedOut?: true;
+        landline?: true;
+      };
+    };
 
-  const matchingIds = await findMatchingContactIds(workspaceId, to);
-  const [singleMatchId] = matchingIds;
-  if (matchingIds.length === 1 && singleMatchId != null) {
-    return singleMatchId;
-  }
-  return null;
+function unverified(): SmsRecipientResult {
+  return {
+    ok: false,
+    reason: "recipient_unverified",
+    status: 400,
+    body: {
+      error:
+        "Unable to verify the message recipient. Check the phone number and contact.",
+      recipientVerificationError: true,
+    },
+  };
 }
 
-/** True when the resolved recipient has opted out of messages. */
-export async function isOptedOutRecipient(
+export async function verifySmsRecipient(
   workspaceId: string,
   to: string,
-  contactId: string | undefined,
-): Promise<boolean> {
+  contactId?: string,
+  options: { checkLineType?: boolean } = {},
+): Promise<SmsRecipientResult> {
   try {
-    const resolvedId = await resolveRecipientContactId(workspaceId, to, contactId);
-    if (resolvedId == null) return false;
-    const tdb = createTenantDb(workspaceId);
-    const contact = await tdb.contact.findFirst({
-      where: eq(contactTable.id, resolvedId),
-    });
-    return Boolean(contact?.opt_out);
+    const phoneKey = getConversationPhoneKey(to);
+    if (!phoneKey) return unverified();
+    const suppliedId = contactId ? Number(contactId) : 0;
+    if (
+      contactId &&
+      (!/^\d+$/.test(contactId) ||
+        !Number.isSafeInteger(suppliedId) ||
+        suppliedId <= 0)
+    ) {
+      return unverified();
+    }
+    const candidates = await findSmsRecipientContacts(workspaceId, to);
+    const matches = candidates.filter(
+      (contact) => getConversationPhoneKey(contact.phone) === phoneKey,
+    );
+    if (matches.length > 1) return unverified();
+    const contact = matches[0] ?? null;
+    if (contactId && contact?.id !== suppliedId) return unverified();
+    if (!contact) return { ok: true, contact: null };
+    if (contact.opt_out) {
+      return {
+        ok: false,
+        reason: "opted_out",
+        status: 403,
+        body: {
+          error: "This contact has opted out of messages.",
+          optedOut: true,
+        },
+      };
+    }
+    if (options.checkLineType !== false) {
+      const lineType =
+        contact.line_type ||
+        (await getOrLookupLineType({
+          workspaceId,
+          contactId: contact.id,
+          phone: to,
+          throwOnError: true,
+        }));
+      if (isSmsIncapableLineType(lineType)) {
+        return {
+          ok: false,
+          reason: "sms_incapable",
+          status: 400,
+          body: {
+            error: "This number is a landline and can't receive SMS.",
+            landline: true,
+          },
+        };
+      }
+    }
+    return { ok: true, contact };
   } catch (error) {
-    logger.error("Error checking contact opt-out status:", error);
-    return false;
-  }
-}
-
-/** True when the resolved recipient's line type cannot receive SMS (e.g. landline). */
-export async function isSmsIncapableRecipient(
-  workspaceId: string,
-  to: string,
-  contactId: string | undefined,
-): Promise<boolean> {
-  try {
-    const resolvedId = await resolveRecipientContactId(workspaceId, to, contactId);
-    if (resolvedId == null) return false;
-    const lineType = await getOrLookupLineType({
-      workspaceId,
-      contactId: resolvedId,
-      phone: to,
-    });
-    return isSmsIncapableLineType(lineType);
-  } catch (error) {
-    logger.error("Error checking contact line type:", error);
-    return false;
+    logger.error("Error verifying SMS recipient:", error);
+    return unverified();
   }
 }

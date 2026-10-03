@@ -6,6 +6,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Security
 
+- SMS sends now verify the destination contact before using its opt-out status, line type, template data or message attribution; mismatched IDs and failed or ambiguous checks block the send ([PR #2267](https://github.com/chester-hill-solutions/callcaster/pull/2267), [#2089](https://github.com/chester-hill-solutions/callcaster/issues/2089)).
+
 - Outbound webhook responses are limited to one MiB, and rejected or interrupted responses close their active connection ([PR #2255](https://github.com/chester-hill-solutions/callcaster/pull/2255), [#2103](https://github.com/chester-hill-solutions/callcaster/issues/2103)).
 - Registration no longer replays another account's session credentials when callers use the same retry key ([PR #2252](https://github.com/chester-hill-solutions/callcaster/pull/2252), [#2098](https://github.com/chester-hill-solutions/callcaster/issues/2098)).
 
