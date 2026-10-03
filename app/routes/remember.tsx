@@ -8,21 +8,22 @@ import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
 
 type ActionData = {
-  data: unknown;
+  data: { success: boolean } | null;
   error: string | { message: string } | null;
 } | undefined;
 
 export default function Remember() {
   const actionData = useActionData<ActionData>();
 
-  useActionFeedback(actionData as ActionData, {
+  useActionFeedback(actionData, {
     getError: (data) => data?.error,
-    getSuccess: () => false,
-    errorMessage: (data) => {
-      const error = (data as ActionData)?.error;
+    getSuccess: (data) => data?.data?.success === true,
+    successMessage: "If this email exists in our system, check your email for the reset link.",
+    errorMessage: () => {
+      const error = actionData?.error;
       if (typeof error === "string") return error;
       if (error && typeof error === "object" && "message" in error) {
-        return String((error as { message?: string }).message);
+        return error.message;
       }
       return "Unable to send reset email";
     },

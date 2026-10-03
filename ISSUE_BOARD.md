@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@8e1f89d3 + source fix for #2077` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@c261919e + source fix for #2075` · 289 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -261,17 +261,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: No retention boundary test; existing tests set client forwarded headers. Deployment proxy overwrite/append behavior needs verification before claiming externally spoofable keys.
 - Done when: After the daily job, `rate_limit_bucket` contains no row with `reset_at` older than the retention window.; The prune is covered by a test with rows on both sides of the boundary (kill-check: make the prune a no-op and confirm the test goes red).; The job's row count is logged.; The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria).
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075) Password reset email links to /api/auth/callback, which 302s to a route that does not exist — the forgot-password flow is dead end to end
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Password reset UI still targets the verification callback; it accepts token_hash/type, ignores the reset token, and redirects to an absent route.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Password reset UI still targets the verification callback; it accepts token_hash/type, ignores the reset token, and redirects to an absent route.
-- Resolution: Send reset links to /reset-password, correct the invalid callback fallback, and enable reset-request feedback.
-- Look in: `app/routes/remember.action.server.ts:24`, `app/routes/api+/auth/callback.loader.server.ts:11`, `app/routes/remember.tsx:20`, `test/remember.route.test.ts:35`, `app/routes/remember.action.server.ts:19-26`, `app/routes/api+/auth/callback.loader.server.ts:11-15,33`, `app/lib/platform-auth.server.ts:289-311 (the JSON path that is already correct)`, `app/routes/reset-password.loader.server.ts:7`, `app/routes/signin.tsx:86`, `app/routes/remember.tsx:18-29 (the missing success feedback)`, `scripts/baselines/route-tree.txt:121`
-- Existing tests: `test/remember.route.test.ts:55-61` asserts `redirectTo: "http://localhost/api/auth/callback"` — a tautological echo of the constant, which is why the break survived.; `test/api-auth-callback.route.test.ts:94-111` asserts the `auth-code-error` fallback, i.e. it pins the broken branch as correct.; `test/reset-password.route.test.ts` tests the form in isolation and never walks the emailed link.; `e2e/specs/auth.spec.ts` has no reset case.
-- Missing tests: Walk the issued reset link through the real callback and assert the final password form keeps the token. Existing isolated tests pin the wrong destination.
-- Done when: A user who submits `/remember` and clicks the emailed link lands on the password form with the token populated.; No redirect target in `app/routes/` points at a URL that is absent from `scripts/baselines/route-tree.txt`.; The success toast on `/remember` fires (#the form currently gives the user no feedback at all) — see Related.; A guard exists that walks every `redirect("/…")` literal in `app/routes/**` and fails when the target is not in the route tree.
-- Tracker: Keep Fix now. #2225 added rate limiting to the HTML reset request but did not repair its reset destination or success feedback. Related PR evidence: #2225. A PR reference alone does not prove deployed behavior.
 
 ### [#2149](https://github.com/chester-hill-solutions/callcaster/issues/2149) An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
@@ -698,6 +687,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: The welcome dialog surfaces the caller audio (name and a way to change it); What is surfaced matches what the dialer actually plays; The choice is session-only and does not write the campaign config
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
+### [#2278](https://github.com/chester-hill-solutions/callcaster/issues/2278) Validate literal redirect targets against the route tree
+- Verdict: **Fix now** · Size: S-M · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-03
+- The existing gate checks dot-relative redirects but cannot detect an absent absolute target.
+- Current behavior: Source audit dev@c261919e: check-relative-redirects freezes dot-relative calls only. The wide absolute-target gate requested by #2075 is now a separate Task.
+- Root cause: The existing guard has no route-tree matching for absolute redirect literals.
+- Resolution: Parse literal absolute redirects with the TypeScript AST, compare normalized pathnames to the generated route tree with explicit parameter and wildcard matching, test absent/real/multiline targets, resolve current violations and wire the gate into local and quality CI.
+- Look in: `scripts/check-relative-redirects.mjs`, `scripts/baselines/route-tree.txt`, `app/routes/`, `package.json`, `.github/workflows/ci.yml`
+- Existing tests: test/check-relative-redirects.test.ts
+- Missing tests: Absolute-target parser, registered/missing route, multiline, query/hash, parameterized and wildcard fixtures.
+- Done when: Literal absolute redirect pathnames match registered routes, including multiline calls.; Query/hash stripping, parameterized routes and wildcards have explicit behavior and fixtures.; Existing violations are corrected or tracked before enabling the gate.; Local and quality CI run the gate; the relative redirect check remains.
+- Tracker: Independent preventive Task split from #2075; no blocking edge.
+
 ### [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062) Flash telemetry infers Alert severity from its ARIA role
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
 - Telemetry still classifies every alert role as alert-banner without semantic severity. The invite example is overstated: /workspaces does not match a workspace ID, so it logs locally but does not send that banner to /client-flash, and alert capture has no stack.
@@ -826,9 +827,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 116
+## Verify and close — 117
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2077](https://github.com/chester-hill-solutions/callcaster/issues/2077) Authorize invitation resend before token rotation
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Session email authorizes resend before rotation; the actual write also filters workspace, email, ID and pending state. Deployed checks remain.
+- Current behavior: Merged to dev in PR #2277 at c261919e. Session email authorizes resend before rotation or delivery; the actual UPDATE filters mandatory workspace, authorized email, ID and pending state. Same 404 for foreign/missing/finalized invitations, unsigned 401, seven-day hash-only token and expired-pending resend remain. All 45 focused Node and six real Postgres cases passed, nine isolated mutations failed, full local CI passed 5,007 Vitest and 22 Bun tests. All remote gates passed on 7a1945e7; issue-on-dev moved one item. Deployed functional verification and promotion remain.
+- Root cause: The route checked only the presence of a session email. The package resend API rotated a globally named pending invitation by ID without workspace or email authorization.
+- Resolution: Verify foreign, missing and finalized refusal, normalized own-email resend, token expiry and existing throttling on deployed dev. Verify no email or token change on refusal, then promote before closure.
+- Look in: `app/routes/accept-invite.action.server.ts`, `app/lib/workspace-invitations.server.ts`, `app/lib/platform-auth-rate-limit.server.ts`, `app/lib/platform-rate-limit.server.ts`
+- Existing tests: test/workspace-invitation-resend.test.ts (real route, identity precheck, unsigned/race/server errors, email delivery and existing register throttling); test/integration-db/workspace-invitation-resend.test.ts (actual scoped UPDATE, unchanged tokens/expiry/status, independent hash check and seven-day expired-pending control); Existing accept-invite signup/redemption, invitations, cancellation and auth rate-limit controls
+- Missing tests: Deployed invite resend refusal, delivery, token and rate-limit verification before promotion.
+- Done when: Session email matches the pending invitation before rotation or email delivery.; Foreign, missing and finalized invitations share 404 and remain unchanged; unsigned callers remain 401.; The writer requires workspace and authorized email and filters both with ID and pending status.; Normalized own-email resend stores only the new hash and preserves the seven-day expiry contract.; Existing register rate limiting refuses excess resends before rotation or delivery.; Signup, redemption and cancellation remain separate; deployed verification and promotion precede closure.
+- Tracker: Source fix is in this change. Verify deployed refusal, permitted delivery and rate limiting, then promote and close.
+
+### [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075) Restore the password recovery email journey
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The reset email reaches the password form with its token; request feedback is generic and both verification failure paths reach sign-in. Deployed checks remain.
+- Current behavior: Source fix from dev@c261919e: /remember uses the configured BASE_URL with /reset-password. The actual issued link passes through the product auth loader and installed Better Auth handler to the real reset loader and action, changes the password and rejects token reuse. Known and unknown emails receive identical acceptance. Both verification callbacks return to registered /signin on failure. Rendered feedback covers initial, success and error states and accurate password completion. All 33 focused Node and four UI tests passed; original source failed ten Node and two UI cases with 23 Node and two UI controls retained. Nine isolated destination, host, callback, token and feedback mutations failed and were restored.
+- Root cause: The UI passed an email verification callback as the final password reset page. That callback required other parameters and redirected to an absent route; request success feedback was disabled.
+- Resolution: Verify the emailed journey, generic request feedback, expired and reused tokens, actual password sign-in and callback failures on deployed dev, then promote before closure. The repository-wide literal redirect guard is separate in #2278.
+- Look in: `app/routes/remember.action.server.ts`, `app/routes/remember.tsx`, `app/routes/reset-password.tsx`, `app/routes/reset-password.loader.server.ts`, `app/routes/reset-password.action.server.ts`, `app/routes/api+/auth/callback.loader.server.ts`, `app/routes/auth/confirm.loader.server.ts`
+- Existing tests: test/password-recovery-journey.test.ts (installed Better Auth, actual email sender, auth loader, reset loader/action, sign-in, expiry, replay, configured host and throttling); test/verification-callbacks.test.ts (both missing/rejected callbacks and success cookie/return controls); test/ui/password-recovery-feedback.test.tsx (real rendered forms and action feedback); Existing remember, reset, email sender, auth-instance and callback tests
+- Missing tests: Deployed password recovery and callback verification before promotion.
+- Done when: Actual issued link reaches the password form with the original token and the action changes the password.; Known and unknown emails receive the same generic acceptance feedback.; Verification failures reach a real sign-in route without carrying tokens; success keeps cookies and safe return paths.; Password completion feedback names the correct credential.; Existing expiry, replay rejection and request/reset limits remain.; Repository-wide redirect guard is tracked separately in #2278; deployed verification and promotion precede closure.
+- Tracker: Source fix is in this change. Verify deployed recovery and failure paths, then promote and close.
 
 ### [#2076](https://github.com/chester-hill-solutions/callcaster/issues/2076) Scope workspace invitation cancellation to its authorized workspace
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -841,18 +866,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed API, product and global admin cancellation verification before promotion.
 - Done when: The canonical mutation requires workspace ID and filters ID, workspace and pending status.; API and settings reject foreign, missing and non-pending invites with the same 404 and no row change.; Current member/admin/owner cancellation policy and caller/non-member refusal stay intact.; Every cancellation caller supplies the authorized or explicitly admin-selected workspace.; Resend and invitation acceptance stay separate.; Deployed verification and promotion are complete before closure.
 - Tracker: Source fix is in this change. Verify deployed cancellation and admin behavior, then promote and close. #2077 remains separate.
-
-### [#2077](https://github.com/chester-hill-solutions/callcaster/issues/2077) Authorize invitation resend before token rotation
-- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Session email authorizes resend before rotation; the actual write also filters workspace, email, ID and pending state. Deployed checks remain.
-- Current behavior: Source fix from dev@8e1f89d3: the accept-invite route loads the invitation and compares normalized session email before calling resend. Foreign, missing and finalized invitations have one 404 and no email delivery. The writer requires workspace and authorized email and includes both in the actual UPDATE with ID and pending status. Shared package normalization and opaque-token helpers remain in use; only the hash is stored and the seven-day expiry is preserved. All 45 focused Node and six real Postgres cases passed. Old source failed six Node and five database regressions with 39 Node and one allowed database control retained. Nine isolated mutations failed and were restored.
-- Root cause: The route checked only the presence of a session email. The package resend API rotated a globally named pending invitation by ID without workspace or email authorization.
-- Resolution: Verify foreign, missing and finalized refusal, normalized own-email resend, token expiry and existing throttling on deployed dev. Verify no email or token change on refusal, then promote before closure.
-- Look in: `app/routes/accept-invite.action.server.ts`, `app/lib/workspace-invitations.server.ts`, `app/lib/platform-auth-rate-limit.server.ts`, `app/lib/platform-rate-limit.server.ts`
-- Existing tests: test/workspace-invitation-resend.test.ts (real route, identity precheck, unsigned/race/server errors, email delivery and existing register throttling); test/integration-db/workspace-invitation-resend.test.ts (actual scoped UPDATE, unchanged tokens/expiry/status, independent hash check and seven-day expired-pending control); Existing accept-invite signup/redemption, invitations, cancellation and auth rate-limit controls
-- Missing tests: Deployed invite resend refusal, delivery, token and rate-limit verification before promotion.
-- Done when: Session email matches the pending invitation before rotation or email delivery.; Foreign, missing and finalized invitations share 404 and remain unchanged; unsigned callers remain 401.; The writer requires workspace and authorized email and filters both with ID and pending status.; Normalized own-email resend stores only the new hash and preserves the seven-day expiry contract.; Existing register rate limiting refuses excess resends before rotation or delivery.; Signup, redemption and cancellation remain separate; deployed verification and promotion precede closure.
-- Tracker: Source fix is in this change. Verify deployed refusal, permitted delivery and rate limiting, then promote and close.
 
 ### [#2079](https://github.com/chester-hill-solutions/callcaster/issues/2079) Reject workspace ownership transfer to the current owner
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03

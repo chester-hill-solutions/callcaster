@@ -99,7 +99,7 @@ Production delivery uses `safeOutboundFetch` (SEC-04a). Destination URLs must pa
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/auth/callback` | Supabase email OTP exchange (public redirect flow) |
+| GET | `/api/auth/callback` | Better Auth email verification (public redirect flow) |
 
 ## Public integrator APIs (different guide)
 
@@ -113,3 +113,7 @@ Workspace API keys authenticate the [public integrator endpoints](./api-overview
 
 - [Complete inventory](./api-surface-inventory.md)
 - [Stripe billing webhook setup](./stripe-webhook.md) (provider route, not session admin)
+
+### Password recovery UI
+
+`/remember` accepts a reset request with generic feedback for known and unknown email addresses. Reset links use the configured application base URL and the final page `/reset-password`; Better Auth checks the issued token before sending the user there. The form retains the token in its URL for the password change. Expired or reused tokens cannot change a password. Failed email verification at `/api/auth/callback` or `/auth/confirm` returns to `/signin`.
