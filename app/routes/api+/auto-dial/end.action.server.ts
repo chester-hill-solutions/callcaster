@@ -87,29 +87,24 @@ export const action = defineAction({
       const activeConferences = await twilio.conferences.list({ status: "in-progress" });
       const ownConferences = activeConferences
         .filter((conference) => isOwnConferenceName(conference.friendlyName, user.id));
-      const ownSids = new Set(ownConferences.map((conference) => conference.sid));
       const ownNames = ownConferences.map((conference) => conference.friendlyName);
       conferenceIds = [...new Set([
-        ...recordedIds.filter((id) => !ownSids.has(id)),
+        ...recordedIds.filter((id) => isOwnConferenceName(id, user.id)),
         ...ownNames,
       ])];
     }
     const stopped = await Promise.all(
       conferenceIds.map(async (conferenceId) => {
         try {
-          if (conferenceId.startsWith("CF")) {
-            await twilio.conferences(conferenceId).update({ status: "completed" });
-          } else {
-            const conferences = await twilio.conferences.list({
-              friendlyName: conferenceId,
-              status: "in-progress" as const,
-            });
-            await Promise.all(
-              conferences.map(({ sid }) =>
-                twilio.conferences(sid).update({ status: "completed" }),
-              ),
-            );
-          }
+          const conferences = await twilio.conferences.list({
+            friendlyName: conferenceId,
+            status: "in-progress" as const,
+          });
+          await Promise.all(
+            conferences.map(({ sid }) =>
+              twilio.conferences(sid).update({ status: "completed" }),
+            ),
+          );
         } catch (confError) {
           d.logger.error(`Error completing conference ${conferenceId}:`, confError);
           return false;
