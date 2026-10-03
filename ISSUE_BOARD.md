@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@89bd9fbb + source fix for #2076` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@8e1f89d3 + source fix for #2077` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 72
+## Fix now — 71
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -261,17 +261,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: No retention boundary test; existing tests set client forwarded headers. Deployment proxy overwrite/append behavior needs verification before claiming externally spoofable keys.
 - Done when: After the daily job, `rate_limit_bucket` contains no row with `reset_at` older than the retention window.; The prune is covered by a test with rows on both sides of the boundary (kill-check: make the prune a no-op and confirm the test goes red).; The job's row count is logged.; The credential rate limit is not bypassable by varying `X-Forwarded-For` (the related issue's acceptance criteria).
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2077](https://github.com/chester-hill-solutions/callcaster/issues/2077) /accept-invite resend has no ownership check — any signed-in user can rotate and re-send any invitation by id
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Resend is partly rate limited now, but any signed-in email still reaches a bare-id resend without being compared to the invite email.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Resend checks a session email exists but never checks invite ownership; it is now rate limited under auth:register.
-- Resolution: Retain existing rate limiting. Before rotation, authorize the normalized session email against the invitation and apply workspace scoping in the writer. Return 404 on a mismatch without rotating or sending.
-- Look in: `app/routes/accept-invite.action.server.ts:68`, `app/routes/accept-invite.action.server.ts:185`, `vendor/chester-hill-solutions/auth-postgres/dist/invitation.js:63`, `app/routes/accept-invite.action.server.ts:46-51,61-97`, `app/lib/workspace-invitations.server.ts:171-174`, `app/components/invite/welcome/ExistingUserInvites.tsx:39-50`, `node_modules/@chester-hill-solutions/auth-postgres/dist/invitation.js:45-70,86-153`
-- Existing tests: test/accept-invite.route.test.ts covers signup/link validation and registration throttling; current file has no foreign-invite resend regression.
-- Missing tests: Current accept-invite tests concentrate on registration and do not cover foreign-email resend versus allowed own-email resend.
-- Done when: `POST /accept-invite` with `actionType=resendInvitation` and an `invitationId` whose `email` is not the session user's returns 404 and leaves `token_hash` / `expires_at` untouched.; The resend branch is rate limited like the rest of the unauthenticated-auth surface.; `resendWorkspaceInvitation` is workspace-scoped like the cancel path.
-- Tracker: Keep Fix now. #2224/#2225 changed adjacent signup and rate-limit paths, but resend ownership and writer scoping remain absent. Related PR evidence: #2224, #2225. A PR reference alone does not prove deployed behavior.
 
 ### [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075) Password reset email links to /api/auth/callback, which 302s to a route that does not exist — the forgot-password flow is dead end to end
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -837,9 +826,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 115
+## Verify and close — 116
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2076](https://github.com/chester-hill-solutions/callcaster/issues/2076) Scope workspace invitation cancellation to its authorized workspace
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Cancellation requires the selected workspace in its actual mutation; deployed cancellation checks remain.
+- Current behavior: Merged to dev in PR #2276 at 8e1f89d3. Mandatory workspace ID filters the actual cancellation UPDATE with ID and pending status; API and settings preserve uniform 404 and permitted-role behavior. Global admin cancellation derives the invitation workspace for the same writer. All 73 focused Node and ten real Postgres cases passed; eight isolated mutations failed and were restored. Full local CI passed 4,998 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on 9886eae2. Deployed functional verification and promotion remain.
+- Root cause: API and form access checks used the requested workspace, but the global-table cancellation writer dropped that workspace and called a package API that filtered only ID and pending status.
+- Resolution: Verify cross-workspace refusal, uniform not-found responses and permitted cancellation through API and settings on deployed dev. Verify global admin behavior, then promote before closure. Resend authorization and token rotation remain separate in #2077.
+- Look in: `app/lib/workspace-invitations.server.ts`, `app/lib/platform-members.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/routes/api+/workspaces+/$workspaceId/members.action.server.ts`, `app/routes/workspaces+/$id/settings.action.server.ts`
+- Existing tests: test/workspace-invitation-cancel.test.ts (real adapters, mandatory workspace wiring, 404/500 mapping, member/admin/owner controls and global admin caller); test/integration-db/workspace-invitation-cancel.test.ts (actual UPDATE, unchanged foreign/finalized rows, real API/settings, role refusal and global admin control); Existing workspace settings, invitations, member authorization and OpenAPI controls
+- Missing tests: Deployed API, product and global admin cancellation verification before promotion.
+- Done when: The canonical mutation requires workspace ID and filters ID, workspace and pending status.; API and settings reject foreign, missing and non-pending invites with the same 404 and no row change.; Current member/admin/owner cancellation policy and caller/non-member refusal stay intact.; Every cancellation caller supplies the authorized or explicitly admin-selected workspace.; Resend and invitation acceptance stay separate.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed cancellation and admin behavior, then promote and close. #2077 remains separate.
+
+### [#2077](https://github.com/chester-hill-solutions/callcaster/issues/2077) Authorize invitation resend before token rotation
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Session email authorizes resend before rotation; the actual write also filters workspace, email, ID and pending state. Deployed checks remain.
+- Current behavior: Source fix from dev@8e1f89d3: the accept-invite route loads the invitation and compares normalized session email before calling resend. Foreign, missing and finalized invitations have one 404 and no email delivery. The writer requires workspace and authorized email and includes both in the actual UPDATE with ID and pending status. Shared package normalization and opaque-token helpers remain in use; only the hash is stored and the seven-day expiry is preserved. All 45 focused Node and six real Postgres cases passed. Old source failed six Node and five database regressions with 39 Node and one allowed database control retained. Nine isolated mutations failed and were restored.
+- Root cause: The route checked only the presence of a session email. The package resend API rotated a globally named pending invitation by ID without workspace or email authorization.
+- Resolution: Verify foreign, missing and finalized refusal, normalized own-email resend, token expiry and existing throttling on deployed dev. Verify no email or token change on refusal, then promote before closure.
+- Look in: `app/routes/accept-invite.action.server.ts`, `app/lib/workspace-invitations.server.ts`, `app/lib/platform-auth-rate-limit.server.ts`, `app/lib/platform-rate-limit.server.ts`
+- Existing tests: test/workspace-invitation-resend.test.ts (real route, identity precheck, unsigned/race/server errors, email delivery and existing register throttling); test/integration-db/workspace-invitation-resend.test.ts (actual scoped UPDATE, unchanged tokens/expiry/status, independent hash check and seven-day expired-pending control); Existing accept-invite signup/redemption, invitations, cancellation and auth rate-limit controls
+- Missing tests: Deployed invite resend refusal, delivery, token and rate-limit verification before promotion.
+- Done when: Session email matches the pending invitation before rotation or email delivery.; Foreign, missing and finalized invitations share 404 and remain unchanged; unsigned callers remain 401.; The writer requires workspace and authorized email and filters both with ID and pending status.; Normalized own-email resend stores only the new hash and preserves the seven-day expiry contract.; Existing register rate limiting refuses excess resends before rotation or delivery.; Signup, redemption and cancellation remain separate; deployed verification and promotion precede closure.
+- Tracker: Source fix is in this change. Verify deployed refusal, permitted delivery and rate limiting, then promote and close.
 
 ### [#2079](https://github.com/chester-hill-solutions/callcaster/issues/2079) Reject workspace ownership transfer to the current owner
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -852,18 +865,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed ownership-transfer verification before promotion.
 - Done when: The canonical service rejects equal owner IDs before MFA or a transaction.; API and product self transfers return a clear error and leave ownership unchanged.; Session identity, owner authorization and distinct-target MFA remain enforced.; A valid transfer promotes the distinct member and demotes the previous owner only in its workspace.; A failed transfer cannot return API success or record a success audit.; Deployed verification and promotion are complete before closure.
 - Tracker: Source fix is in this change. Verify deployed self, distinct-target and failed-transfer behavior, then promote and close.
-
-### [#2076](https://github.com/chester-hill-solutions/callcaster/issues/2076) Scope workspace invitation cancellation to its authorized workspace
-- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Cancellation requires the selected workspace in its actual mutation; deployed cancellation checks remain.
-- Current behavior: Source fix from dev@89bd9fbb: the canonical writer requires a workspace ID and filters the actual UPDATE by ID, workspace and pending status. Foreign, missing and finalized invitations receive one 404. API and settings pass the authorized workspace and preserve errors. The global admin helper derives the invitation workspace before calling the same writer. All 73 focused Node and ten real Postgres cases passed; old source failed eight Node and five database regressions while 65 Node and five database controls stayed green. Eight isolated mutations failed and were restored.
-- Root cause: API and form access checks used the requested workspace, but the global-table cancellation writer dropped that workspace and called a package API that filtered only ID and pending status.
-- Resolution: Verify cross-workspace refusal, uniform not-found responses and permitted cancellation through API and settings on deployed dev. Verify global admin behavior, then promote before closure. Resend authorization and token rotation remain separate in #2077.
-- Look in: `app/lib/workspace-invitations.server.ts`, `app/lib/platform-members.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/routes/api+/workspaces+/$workspaceId/members.action.server.ts`, `app/routes/workspaces+/$id/settings.action.server.ts`
-- Existing tests: test/workspace-invitation-cancel.test.ts (real adapters, mandatory workspace wiring, 404/500 mapping, member/admin/owner controls and global admin caller); test/integration-db/workspace-invitation-cancel.test.ts (actual UPDATE, unchanged foreign/finalized rows, real API/settings, role refusal and global admin control); Existing workspace settings, invitations, member authorization and OpenAPI controls
-- Missing tests: Deployed API, product and global admin cancellation verification before promotion.
-- Done when: The canonical mutation requires workspace ID and filters ID, workspace and pending status.; API and settings reject foreign, missing and non-pending invites with the same 404 and no row change.; Current member/admin/owner cancellation policy and caller/non-member refusal stay intact.; Every cancellation caller supplies the authorized or explicitly admin-selected workspace.; Resend and invitation acceptance stay separate.; Deployed verification and promotion are complete before closure.
-- Tracker: Source fix is in this change. Verify deployed cancellation and admin behavior, then promote and close. #2077 remains separate.
 
 ### [#2087](https://github.com/chester-hill-solutions/callcaster/issues/2087) Use saved IVR start page and page order in caller flow
 - Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03

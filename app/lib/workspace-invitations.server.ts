@@ -3,10 +3,15 @@ import {
   createInvitation,
   listPendingInvitations,
   redeemInvitation,
-  resendInvitation,
   type WorkspaceInvitationRow,
 } from "@chester-hill-solutions/auth-postgres";
-import { AuthzError, InviteError } from "@chester-hill-solutions/auth";
+import {
+  AuthzError,
+  generateOpaqueToken,
+  hashOpaqueToken,
+  InviteError,
+  normalizeEmail,
+} from "@chester-hill-solutions/auth";
 import {
   user as userTable,
   workspace as workspaceTable,
@@ -184,9 +189,41 @@ export async function cancelWorkspaceInvitationById(
   }
 }
 
-export async function resendWorkspaceInvitation(invitationId: string) {
+export async function resendWorkspaceInvitation(
+  invitationId: string,
+  workspaceId: string,
+  authorizedEmail: string,
+) {
   const db = await adminDbClient();
-  return resendInvitation(db, invitationId);
+  const rawToken = generateOpaqueToken();
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  // The package resend API cannot filter by workspace or authorized email.
+  const [invitation] = await db
+    .update(workspaceInvitationTable)
+    .set({
+      token_hash: hashOpaqueToken(rawToken),
+      expires_at: expiresAt,
+      updated_at: now,
+    })
+    .where(
+      and(
+        eq(workspaceInvitationTable.id, invitationId),
+        eq(workspaceInvitationTable.workspace_id, workspaceId),
+        eq(workspaceInvitationTable.email, normalizeEmail(authorizedEmail)),
+        eq(workspaceInvitationTable.status, "pending"),
+      ),
+    )
+    .returning({
+      id: workspaceInvitationTable.id,
+      workspaceId: workspaceInvitationTable.workspace_id,
+      email: workspaceInvitationTable.email,
+      roleId: workspaceInvitationTable.role_id,
+    });
+  if (!invitation) {
+    throw new InviteError("Invitation not found.", "INVITE_NOT_FOUND", 404);
+  }
+  return { invitation, rawToken };
 }
 
 export async function redeemWorkspaceInvitation(args: {

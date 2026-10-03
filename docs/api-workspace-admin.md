@@ -59,6 +59,12 @@ Only a pending invitation in the URL's workspace can be canceled. Foreign,
 missing and finalized invitations all return 404 and remain unchanged. The
 workspace settings form uses the same cancellation rule.
 
+Invitation resend on `/accept-invite` requires a session email that matches the
+pending invitation. Foreign, missing and finalized invitations return the same
+404 without token rotation or email delivery. A permitted resend rotates the
+token, stores only its hash and renews the existing seven-day expiry. The
+registration rate limit also applies to resend.
+
 ## Customer webhooks
 
 | Method | Path | Purpose |

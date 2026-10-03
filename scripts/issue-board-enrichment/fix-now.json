@@ -557,38 +557,6 @@
     "trackerRecommendation": "Keep Fix now. #2225 added rate limiting to the HTML reset request but did not repair its reset destination or success feedback. Related PR evidence: #2225. A PR reference alone does not prove deployed behavior."
   },
   {
-    "issueNumber": 2077,
-    "verdict": "fix-now",
-    "recommendedTitle": "/accept-invite resend has no ownership check — any signed-in user can rotate and re-send any invitation by id",
-    "summary": "Resend is partly rate limited now, but any signed-in email still reaches a bare-id resend without being compared to the invite email.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Resend checks a session email exists but never checks invite ownership; it is now rate limited under auth:register.",
-    "resolution": "Retain existing rate limiting. Before rotation, authorize the normalized session email against the invitation and apply workspace scoping in the writer. Return 404 on a mismatch without rotating or sending.",
-    "lookIn": [
-      "app/routes/accept-invite.action.server.ts:68",
-      "app/routes/accept-invite.action.server.ts:185",
-      "vendor/chester-hill-solutions/auth-postgres/dist/invitation.js:63",
-      "app/routes/accept-invite.action.server.ts:46-51,61-97",
-      "app/lib/workspace-invitations.server.ts:171-174",
-      "app/components/invite/welcome/ExistingUserInvites.tsx:39-50",
-      "node_modules/@chester-hill-solutions/auth-postgres/dist/invitation.js:45-70,86-153"
-    ],
-    "existingTests": [
-      "test/accept-invite.route.test.ts covers signup/link validation and registration throttling; current file has no foreign-invite resend regression."
-    ],
-    "missingTests": [
-      "Current accept-invite tests concentrate on registration and do not cover foreign-email resend versus allowed own-email resend."
-    ],
-    "acceptanceCriteria": [
-      "`POST /accept-invite` with `actionType=resendInvitation` and an `invitationId` whose `email` is not the session user's returns 404 and leaves `token_hash` / `expires_at` untouched.",
-      "The resend branch is rate limited like the rest of the unauthenticated-auth surface.",
-      "`resendWorkspaceInvitation` is workspace-scoped like the cancel path."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Keep Fix now. #2224/#2225 changed adjacent signup and rate-limit paths, but resend ownership and writer scoping remain absent. Related PR evidence: #2224, #2225. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2078,
     "verdict": "fix-now",
     "recommendedTitle": "Admin routes serialize the full workspace row — Twilio auth tokens, twilio_data and stripe_id reach the browser for every workspace",

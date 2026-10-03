@@ -3259,7 +3259,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Scope workspace invitation cancellation to its authorized workspace",
     "summary": "Cancellation requires the selected workspace in its actual mutation; deployed cancellation checks remain.",
-    "currentBehavior": "Source fix from dev@89bd9fbb: the canonical writer requires a workspace ID and filters the actual UPDATE by ID, workspace and pending status. Foreign, missing and finalized invitations receive one 404. API and settings pass the authorized workspace and preserve errors. The global admin helper derives the invitation workspace before calling the same writer. All 73 focused Node and ten real Postgres cases passed; old source failed eight Node and five database regressions while 65 Node and five database controls stayed green. Eight isolated mutations failed and were restored.",
+    "currentBehavior": "Merged to dev in PR #2276 at 8e1f89d3. Mandatory workspace ID filters the actual cancellation UPDATE with ID and pending status; API and settings preserve uniform 404 and permitted-role behavior. Global admin cancellation derives the invitation workspace for the same writer. All 73 focused Node and ten real Postgres cases passed; eight isolated mutations failed and were restored. Full local CI passed 4,998 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on 9886eae2. Deployed functional verification and promotion remain.",
     "resolution": "Verify cross-workspace refusal, uniform not-found responses and permitted cancellation through API and settings on deployed dev. Verify global admin behavior, then promote before closure. Resend authorization and token rotation remain separate in #2077.",
     "lookIn": [
       "app/lib/workspace-invitations.server.ts",
@@ -3290,5 +3290,40 @@
     "risk": "high",
     "trackerRecommendation": "Source fix is in this change. Verify deployed cancellation and admin behavior, then promote and close. #2077 remains separate.",
     "rootCause": "API and form access checks used the requested workspace, but the global-table cancellation writer dropped that workspace and called a package API that filtered only ID and pending status."
+  },
+  {
+    "issueNumber": 2077,
+    "verdict": "verify-close",
+    "recommendedTitle": "Authorize invitation resend before token rotation",
+    "summary": "Session email authorizes resend before rotation; the actual write also filters workspace, email, ID and pending state. Deployed checks remain.",
+    "currentBehavior": "Source fix from dev@8e1f89d3: the accept-invite route loads the invitation and compares normalized session email before calling resend. Foreign, missing and finalized invitations have one 404 and no email delivery. The writer requires workspace and authorized email and includes both in the actual UPDATE with ID and pending status. Shared package normalization and opaque-token helpers remain in use; only the hash is stored and the seven-day expiry is preserved. All 45 focused Node and six real Postgres cases passed. Old source failed six Node and five database regressions with 39 Node and one allowed database control retained. Nine isolated mutations failed and were restored.",
+    "resolution": "Verify foreign, missing and finalized refusal, normalized own-email resend, token expiry and existing throttling on deployed dev. Verify no email or token change on refusal, then promote before closure.",
+    "lookIn": [
+      "app/routes/accept-invite.action.server.ts",
+      "app/lib/workspace-invitations.server.ts",
+      "app/lib/platform-auth-rate-limit.server.ts",
+      "app/lib/platform-rate-limit.server.ts"
+    ],
+    "existingTests": [
+      "test/workspace-invitation-resend.test.ts (real route, identity precheck, unsigned/race/server errors, email delivery and existing register throttling)",
+      "test/integration-db/workspace-invitation-resend.test.ts (actual scoped UPDATE, unchanged tokens/expiry/status, independent hash check and seven-day expired-pending control)",
+      "Existing accept-invite signup/redemption, invitations, cancellation and auth rate-limit controls"
+    ],
+    "missingTests": [
+      "Deployed invite resend refusal, delivery, token and rate-limit verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Session email matches the pending invitation before rotation or email delivery.",
+      "Foreign, missing and finalized invitations share 404 and remain unchanged; unsigned callers remain 401.",
+      "The writer requires workspace and authorized email and filters both with ID and pending status.",
+      "Normalized own-email resend stores only the new hash and preserves the seven-day expiry contract.",
+      "Existing register rate limiting refuses excess resends before rotation or delivery.",
+      "Signup, redemption and cancellation remain separate; deployed verification and promotion precede closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Source fix is in this change. Verify deployed refusal, permitted delivery and rate limiting, then promote and close.",
+    "rootCause": "The route checked only the presence of a session email. The package resend API rotated a globally named pending invitation by ID without workspace or email authorization."
   }
 ]

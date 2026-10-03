@@ -1,4 +1,5 @@
 import { getSession } from "@/lib/auth.server";
+import { AuthzError, emailsMatch, InviteError, normalizeEmail } from "@chester-hill-solutions/auth";
 import { isSignupOpen } from "@/lib/env.server";
 import { mergeBetterAuthSetCookieHeaders } from "@/lib/better-auth-headers.server";
 import { auth } from "@/server/auth-instance";
@@ -11,6 +12,7 @@ import { rateLimitedPostAuth } from "@/lib/platform-auth-rate-limit.server";
 import {
   redeemWorkspaceInvitation,
   resendWorkspaceInvitation,
+  getWorkspaceInvitationById,
 } from "@/lib/workspace-invitations.server";
 import type {
   AcceptInviteAction,
@@ -65,7 +67,7 @@ async function redeemInvitationAction(ctx: ActionContext<"redeemInvitation">) {
 async function resendInvitationAction(ctx: ActionContext<"resendInvitation">) {
   const { body, session, requestHeaders } = ctx;
   const { invitationId } = body;
-  const sessionEmail = session.user?.email?.toLowerCase().trim();
+  const sessionEmail = normalizeEmail(session.user?.email ?? "");
   if (!sessionEmail) {
     return routeData<ActionData>(
       { status: "error", error: "Sign in to resend this invitation." },
@@ -73,8 +75,18 @@ async function resendInvitationAction(ctx: ActionContext<"resendInvitation">) {
     );
   }
   try {
+    const existing = await getWorkspaceInvitationById(invitationId);
+    if (
+      !existing ||
+      existing.status !== "pending" ||
+      !emailsMatch(existing.email, sessionEmail)
+    ) {
+      throw new InviteError("Invitation not found.", "INVITE_NOT_FOUND", 404);
+    }
     const { invitation, rawToken } = await resendWorkspaceInvitation(
       invitationId,
+      existing.workspace_id,
+      sessionEmail,
     );
     await sendWorkspaceInviteEmail({
       workspaceId: invitation.workspaceId,
@@ -85,6 +97,12 @@ async function resendInvitationAction(ctx: ActionContext<"resendInvitation">) {
     });
     return routeData<ActionData>({ status: "resend_sent" }, { headers: requestHeaders });
   } catch (error) {
+    if (error instanceof AuthzError && error.status === 404) {
+      return routeData<ActionData>(
+        { status: "error", error: "Invitation not found." },
+        { headers: requestHeaders, status: 404 },
+      );
+    }
     logger.error("resend_invitation.failed", {
       error: error instanceof Error ? error.message : String(error),
     });
