@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@be7f2312 + source fix for #2108` · 293 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@a3d9fc40 + source confirmation for #2295` · 294 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -735,21 +735,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 129
+## Verify and close — 130
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
 ### [#2108](https://github.com/chester-hill-solutions/callcaster/issues/2108) Save all pending survey answers before completion
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
 - Each respondent keeps pending answers by page and question. Next and Submit await save acknowledgements; Thank You awaits completion success.
-- Current behavior: Source fix based on dev@be7f2312. A domain hook retains page/question revisions and drains them serially through the existing form client. Failed writes remain retryable; successful writes do not delete newer edits. Next and Submit flush all pending writes, stop on HTTP, network or action failure, and wait for completion success before showing Thank You. Busy controls include explicit shared Checkbox disable. True respondent unmount cancels pending timers and requests; the shared debounce also cancels sidebar timers. Source prerequisite #2125 merged and the native blocked-by edge was removed. Focused original and fault proofs and full local/remote gates are required before merge.
+- Current behavior: Merged to dev in PR #2296 at a3d9fc40. Page/question revisions drain serially through the existing form client. Next and Submit await successful answer acknowledgements; Thank You awaits completion success. Failures retain retryable form values; a completed write does not remove a newer edit. Busy controls include explicit shared Checkbox disable. Respondent unmount cancels timers and requests; shared Sidebar debounce also cleans up. All 32 focused cases pass; original fails 16 with 16 controls; nine faults fail and source is restored. Full local CI passed 5,318 Vitest and 22 Bun; all remote and both Railway gates passed on 29115361. Source prerequisite #2125 is fulfilled. Verify deployed dev and promote before closure.
 - Root cause: One timer discarded earlier question saves, and navigation/completion did not wait for successful action acknowledgements. The form owner remained mounted after optimistic completion; true unmount did not cancel timers.
 - Resolution: Verify deployed rapid edits, repeated labels across pages, immediate final submit, delayed and failed saves/completion, recoverable retry, respondent change and route unmount. Keep required-answer policy #2107, page-scoped display/resume #2294 and historical assessment #2292 separate. Promote before closure.
 - Look in: `app/hooks/surveys/useSurveySubmission.ts`, `app/routes/survey+/$surveyId.tsx`, `app/hooks/utils/useDebounce.ts`
 - Existing tests: test/ui/survey-save-order.test.tsx; test/ui/debounce-owner-unmount.test.tsx; test/ui/survey-respondent-identity.test.tsx; test/ui/hooks-utils.test.tsx
 - Missing tests: Deployed dev browser verification and promotion.
 - Done when: Submitting within 1s of typing the last answer persists that answer (kill-check: remove the flush and confirm the test goes red).; No timer survives unmount in any `useDebounce` consumer (a test that unmounts mid-debounce and asserts no submit fires).; The answer write is observably ordered before the completion write.; A blank answer to a required question is still caught (the related issue) — the two must compose.; Changing multiple questions within the debounce interval does not cancel another question's pending save.; Completion waits for successful answer persistence, not only for the answer request to start.; Answer or completion failure keeps a recoverable form and does not show a false success card.
-- Tracker: Atomic source fix in this change; keep open for deployed verification and promotion.
+- Tracker: Merged source fix; verify deployed dev and promote before closure. Required validation, displayed/resumed page identity and historical assessment stay separate.
+
+### [#2295](https://github.com/chester-hill-solutions/callcaster/issues/2295) Confirm bulk-send warning overrides explicitly
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The bulk-volume override has an explicit confirmation with recipient count, delivery risk and a Send anyway choice.
+- Current behavior: Source change based on clean dev@a3d9fc40. The existing campaign-level local-number override is reused with Are you sure?, the actual queued contact count and delivery risk. Confirmation permits launch and does not dispatch immediately. Cancel, Escape and reopen require a fresh acknowledgement; pending confirmation locks the shared Checkbox and confirmation, with retry after failure. FormField uses matching visible label/control IDs. Existing admin/workspace guard, readiness rules, active notice, removal and splitting remain. Seven actual UI cases and 42 surrounding readiness/settings cases pass; original UI fails 5 with 2 controls; six faults fail and source is restored. Independent review is clear; full local/remote gates are required before merge.
+- Root cause: The existing override wording did not use the requested explicit confirmation, and cancelled acknowledgement could persist on reopening. The custom Checkbox was not explicitly locked during the request.
+- Resolution: Verify deployed bulk-volume warning count, explicit acknowledgement, Cancel/Escape/fresh reopen, pending double click, failure retry and active override removal. Keep other readiness and consent/opt-out enforcement. Promote before closure.
+- Look in: `app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx`, `app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts`, `app/lib/campaign-readiness.ts`
+- Existing tests: test/ui/split-campaign-override.test.tsx; test/campaign-readiness.test.ts; test/campaign-settings.route.test.ts
+- Missing tests: Deployed dev browser verification and promotion.
+- Done when: Show Are you sure?, real queued count, delivery risk, Cancel and Send anyway.; Require risk acknowledgement; Cancel/Escape sends nothing and reopening resets it.; Pending confirmation locks custom Checkbox and prevents a second request.; Failed confirmation is retryable without successful override state.; Keep existing workspace/admin authorization, readiness and recipient consent/opt-out boundaries.
+- Tracker: User-authorized source change in this atomic PR; keep open for deployed verification and promotion.
 
 ### [#2125](https://github.com/chester-hill-solutions/callcaster/issues/2125) Keep one signed respondent identity through the public survey
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
