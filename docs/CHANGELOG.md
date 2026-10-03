@@ -14,7 +14,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
-- Workspace creation retries now return only the signed-in user's own workspace, even when another user uses the same retry key ([#2132](https://github.com/chester-hill-solutions/callcaster/issues/2132)).
+- Workspace creation retries now return only the signed-in user's own workspace, even when another user uses the same retry key ([PR #2254](https://github.com/chester-hill-solutions/callcaster/pull/2254), [#2132](https://github.com/chester-hill-solutions/callcaster/issues/2132)).
 
 - Workspace analytics no longer risk picking the wrong "call ended at" time when an attempt's call rows mix `Date` and ISO-string end times; the latest is now chosen numerically instead of by sorting the values as text ([#2213](https://github.com/chester-hill-solutions/callcaster/issues/2213)).
 - IVR timeouts and unsupported key presses no longer save false answers or let an unoffered key answer a later step ([#2147](https://github.com/chester-hill-solutions/callcaster/issues/2147)).
