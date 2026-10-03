@@ -943,39 +943,6 @@
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Inbound IVR voicemail still passes no greeting audio and speaks the number-row ID. The voicemail target payload is ignored while email uses the number row."
   },
   {
-    "issueNumber": 2089,
-    "verdict": "fix-now",
-    "recommendedTitle": "The 1:1 opt-out and landline guards trust a caller-supplied contact_id that is never matched to the destination number",
-    "summary": "An explicit contact_id is trusted without matching its phone to the destination. Missing or ambiguous lookup also fails open.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. An explicit contact_id is trusted without matching its phone to the destination. Missing or ambiguous lookup also fails open.",
-    "resolution": "Match the resolved contact phone to the destination. Block ambiguous recipient suppression checks instead of treating them as permission.",
-    "lookIn": [
-      "app/lib/chat-sms-guards.server.ts:29",
-      "app/lib/chat-sms-guards.server.ts:3-6,24-40,42-59,62-67+",
-      "app/routes/api+/chat_sms.action.server.ts` / `app/routes/workspaces+/$id/messages.action.server.ts:255,262",
-      "app/components/chats/ChatInput.tsx:434-441",
-      "app/hooks/chats/useChatsPage.ts:341",
-      "app/routes/api+/inbound-sms.action.server.ts:208-211"
-    ],
-    "existingTests": [
-      "test/chat-sms-action.route.test.ts",
-      "test/chat-sms.route.test.ts"
-    ],
-    "missingTests": [
-      "Use an opted-out recipient with a different same-workspace contact ID and prove the send is blocked."
-    ],
-    "acceptanceCriteria": [
-      "`POST /api/chat_sms` with `to_number` of an opted-out contact and a different `contact_id` is blocked (kill-check: remove the number match and confirm the test goes red).",
-      "The landline guard behaves the same way.",
-      "The permitted path (matching `contact_id` and number) still sends.",
-      "An ambiguous number match is blocked rather than allowed."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2099,
     "verdict": "fix-now",
     "recommendedTitle": "Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address",

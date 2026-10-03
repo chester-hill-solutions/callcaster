@@ -167,7 +167,7 @@ const schemas = {
       body: { type: "string" as const, description: "SMS message body." },
       contact_id: {
         type: "string" as const,
-        description: "Optional contact ID for template tag substitution.",
+        description: "Optional contact ID. Must identify the unique workspace contact whose normalized phone equals to_number.",
       },
       media: {
         type: "string" as const,
@@ -348,7 +348,7 @@ export const integratorPathOverrides = {
       operationId: "sendChatSms",
       summary: "Send a single SMS",
       description:
-        "Sends one outbound SMS to a phone number. When `contact_id` is provided, template tags in `body` are substituted from the contact record. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
+        "Sends one outbound SMS to a phone number. The destination phone selects the recipient. A supplied `contact_id` must identify its single matching workspace contact; otherwise the send is rejected. Template tags and attribution use that verified contact. Ambiguous matches and failed recipient verification block sends. A successful lookup with no contact permits a manual send without `contact_id`. Session auth requires `workspace_id` in the body. Requires the messages.send capability for API keys.",
       tags: [INTEGRATOR_API_TAG, "Messaging"],
       "x-callcaster-capability": "messages.send",
       security: [...publicSecurity],
@@ -369,9 +369,9 @@ export const integratorPathOverrides = {
             },
           },
         },
-        "400": errorResponse("Validation error"),
+        "400": errorResponse("Validation error, SMS-incapable recipient (landline: true), or unverified recipient (recipientVerificationError: true)"),
         "401": errorResponse("Unauthorized"),
-        "403": errorResponse("Forbidden (workspace mismatch)"),
+        "403": errorResponse("Forbidden (workspace mismatch or opted-out recipient: optedOut: true)"),
         "404": errorResponse("Invalid phone number"),
         "500": errorResponse("Send failure"),
       },

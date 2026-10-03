@@ -1,6 +1,5 @@
-import { isOptedOutRecipient } from "@/lib/chat-sms-guards.server";
+import { verifySmsRecipient } from "@/lib/chat-sms-guards.server";
 import { sendMessage } from "@/lib/chat-sms.server";
-import { findContactsByPhone } from "@/lib/database/contact.server";
 import { logger } from "@/lib/logger.server";
 import {
   processTemplateTags,
@@ -19,6 +18,7 @@ export type CampaignTestSendFailure =
   | "insufficient_credits"
   | "empty_message"
   | "caller_id_required"
+  | "recipient_unverified"
   | "opted_out"
   | "send_failed";
 
@@ -38,6 +38,7 @@ const FAILURE_MESSAGES: Record<CampaignTestSendFailure, string> = {
   insufficient_credits: "Not enough credits to send a test message.",
   empty_message: "Add message text or media before sending a test.",
   caller_id_required: "Choose a sending number for this campaign first.",
+  recipient_unverified: "Unable to verify the message recipient. Check the phone number and contact.",
   opted_out: "That number has opted out of messages from this workspace.",
   send_failed: "Test message could not be sent",
 };
@@ -87,11 +88,17 @@ export async function sendCampaignTestSms(args: {
     return failure("caller_id_required");
   }
 
-  const [contact] = await findContactsByPhone(workspaceId, to);
-  const contactId = contact?.id == null ? undefined : String(contact.id);
-  if (await isOptedOutRecipient(workspaceId, to, contactId)) {
-    return failure("opted_out");
+  const recipient = await verifySmsRecipient(workspaceId, to, undefined, {
+    checkLineType: false,
+  });
+  if (!recipient.ok) {
+    return failure(
+      recipient.reason === "opted_out" ? "opted_out" : "recipient_unverified",
+      recipient.body.error,
+    );
   }
+  const { contact } = recipient;
+  const contactId = contact ? String(contact.id) : undefined;
 
   const body = hasBody
     ? processTemplateTags(campaign.body_text, contact ?? SAMPLE_TEMPLATE_CONTACT)

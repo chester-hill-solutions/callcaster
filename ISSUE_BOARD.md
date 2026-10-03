@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@fd86e10a + source fix for #2090` · 285 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@2d25f309 + source fix for #2089` · 285 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 76
+## Fix now — 75
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -324,17 +324,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/public-pricing.test.ts
 - Missing tests: Contract test must compare a five-minute published lane with voiceCreditsFromDurationSeconds for the same kind.
 - Done when: The Calling lane publishes the staffed rate (4 / 5) and the IVRs lane publishes the IVR rate (2 / 3).; A test computes `voiceCreditsFromDurationSeconds(300, kind)` for each published lane and asserts it equals the published figure for a 5-minute call.; The pricing calculator's field label matches the lane it prices.; `docs/` and any marketing copy quoting the auto-dial rate is checked and corrected.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2089](https://github.com/chester-hill-solutions/callcaster/issues/2089) The 1:1 opt-out and landline guards trust a caller-supplied contact_id that is never matched to the destination number
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- An explicit contact_id is trusted without matching its phone to the destination. Missing or ambiguous lookup also fails open.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. An explicit contact_id is trusted without matching its phone to the destination. Missing or ambiguous lookup also fails open.
-- Resolution: Match the resolved contact phone to the destination. Block ambiguous recipient suppression checks instead of treating them as permission.
-- Look in: `app/lib/chat-sms-guards.server.ts:29`, `app/lib/chat-sms-guards.server.ts:3-6,24-40,42-59,62-67+`, `app/routes/api+/chat_sms.action.server.ts` / `app/routes/workspaces+/$id/messages.action.server.ts:255,262`, `app/components/chats/ChatInput.tsx:434-441`, `app/hooks/chats/useChatsPage.ts:341`, `app/routes/api+/inbound-sms.action.server.ts:208-211`
-- Existing tests: test/chat-sms-action.route.test.ts; test/chat-sms.route.test.ts
-- Missing tests: Use an opted-out recipient with a different same-workspace contact ID and prove the send is blocked.
-- Done when: `POST /api/chat_sms` with `to_number` of an opted-out contact and a different `contact_id` is blocked (kill-check: remove the number match and confirm the test goes red).; The landline guard behaves the same way.; The permitted path (matching `contact_id` and number) still sends.; An ambiguous number match is blocked rather than allowed.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2080](https://github.com/chester-hill-solutions/callcaster/issues/2080) /api/test-webhook is an authenticated open egress relay — any signed-in user can POST to any public host with chosen headers and read the response
@@ -879,21 +868,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 108
+## Verify and close — 109
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
-### [#2092](https://github.com/chester-hill-solutions/callcaster/issues/2092) The campaign_ended readiness code is declared and mapped to a corrective action but never emitted, so an expired campaign reads "Ready to launch"
-- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- Expired campaigns now produce a readiness blocker before launch or joining. The correction selects the date pickers. Deployed launch and join verification remain.
-- Current behavior: The source fix uses the same strict end_date < now check in pure readiness and launch. Readiness defaults to the current clock; launch passes its explicit clock. End date equality remains valid, and invalid or reversed dates keep their earlier corrections. Launch rejects expiry before status or dispatch writes. The existing UI and results loader consume the blocker. All 144 focused cases passed (132 node, 12 UI), and seven isolated mutations failed the relevant regressions while controls passed. Producer fixtures invoke every real readiness producer, including script routing; an exhaustive record and a runtime union check detect untested codes.
-- Root cause: campaign_ended existed in the code union and action map but readiness had no producer. Launch checked expiry separately and did not pass args.now into readiness. The expiry action led to the queue instead of date pickers.
-- Resolution: Verify expired, equal-time and future campaigns on deployed dev: expired campaigns show Complete before launch, disable Start and Schedule, and disable joining. The setup guide must select the date pickers. Check message, live and automated voice campaigns, then promote verified behavior before closing.
-- Look in: `app/lib/campaign-readiness.ts`, `app/lib/campaign-execution.server.ts`, `app/lib/campaign-readiness-actions.ts`, `app/lib/campaign-setup-steps.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id/settings.loader.server.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id.loader.server.ts`, `app/components/campaign/settings/CampaignLaunch.tsx`
-- Existing tests: test/campaign-readiness-expiry.test.ts (expiry boundary, default/explicit clock, launch writes, every real producer and a new-union-code guard); test/campaign-settings.route.test.ts (activation and unavailable-script controls with a pinned clock); test/campaign-readiness.test.ts and test/campaign-readiness-actions.test.ts (existing readiness controls with a pinned clock); test/campaign-setup-steps.test.ts (expired guide correction and existing steps); test/campaign-selected-id.loader.test.ts (expired/equal running-campaign join behavior); test/ui/campaign-launch-review.test.tsx and test/ui/campaign-launch-actions.test.tsx (real expiry readiness into UI, disabled start/schedule controls)
-- Missing tests: Deployed expiry, date correction, launch and join verification before promotion.
-- Done when: A campaign whose end date has passed shows a blocking readiness issue, a disabled Start button, and a non-empty "Complete before launch" list.; The corrective action scrolls to the date pickers.; A campaign with a future end date is unaffected.; A guard test fails if a code is added to the union with no producer.
-- Tracker: The source fix travels with this board update. Verify deployed expiry, launch and joining after merge, then promote and close. Do not start a duplicate fix.
+### [#2089](https://github.com/chester-hill-solutions/callcaster/issues/2089) Use the destination phone to verify the SMS recipient
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The API, chat form and campaign test sender now use one verified recipient. Mismatched IDs, ambiguous contacts and failed verification block sends; deployed verification remains.
+- Current behavior: Source fix from dev@2d25f309: a workspace-scoped SQL query selects every normalized-equal phone, including formatted duplicates; the shared guard verifies unique destination identity. A supplied ID must match it. The same contact supplies opt-out, cached line type, template data and attribution. API and form line lookups propagate actual cache and provider failures. Campaign tests retain their existing opt-out-only policy. All 146 focused cases passed (137 node and nine real-Postgres tests), including 53 recipient regressions and controls; the old source failed 42 with 11 controls retained. Ten isolated mutations failed the relevant checks and were restored.
+- Root cause: The guards trusted the supplied ID and allowed ambiguous matches or lookup failures. Later template and attribution code reused the unverified ID. The general search helper can omit formatted phones and hide ambiguity.
+- Resolution: Verify matching and mismatched IDs, ambiguous contacts, lookup failures, normalized phones, known opt-out and landline results, correct templates and attribution, and manual new-number behavior on deployed dev. Verify the campaign test sender. Promote verified behavior before closing. This change does not implement the unknown-sender consent ledger rollout under #2263 and #1268.
+- Look in: `app/lib/database/contact.server.ts`, `app/lib/chat-sms-guards.server.ts`, `app/routes/api+/chat_sms.action.server.ts`, `app/routes/workspaces+/$id/chats.action.server.ts`, `app/lib/campaign-test-send.server.ts`, `app/lib/twilio-lookup.server.ts`, `app/lib/openapi-integrator.ts`, `docs/api-send-sms.md`
+- Existing tests: test/integration-db/sms-recipient-identity.test.ts (actual SQL, normalized formats and hidden duplicates, workspace and prefix exclusion, new-number and international controls); test/sms-recipient-identity.test.ts (real resolver and line-type lookup through all three consumers, provider/cache failure, mismatch, ambiguity, phone equality, tags and attribution); test/chat-sms-action.route.test.ts and test/chats-action.route.test.ts (opt-out, landline and verification error responses); test/chats-action.server.test.ts (template and sender controls); test/campaign-test-send.test.ts (test-send policy, sample data and media); test/chat-sms.route.test.ts (actual chat sender and provider controls); test/twilio-lookup.server.test.ts (existing caller fail-open policy retained)
+- Missing tests: Deployed verification through API, chat form and campaign test sender before promotion.
+- Done when: Destination phone and unique workspace contact agree before sending; supplied IDs cannot bypass opt-out or landline protection.; Ambiguous and failed verification block sends with an error distinct from opt-out and landline.; Eligible normalized recipients use verified template data and attribution; legacy manual new-number and campaign test policies remain.; Public API contract and generated artifacts describe recipient verification.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed behavior after merge, then promote and close.
 
 ### [#2090](https://github.com/chester-hill-solutions/callcaster/issues/2090) Retain all required SMS opt-out keywords when workspace settings add custom keywords
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -906,6 +895,18 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed SMS keyword and workspace queue verification before promotion.
 - Done when: All eight standard keywords plus OPT OUT remain mandatory for parser and direct matcher.; Custom keywords add to the required set, with case and whitespace normalization and whole-message matching.; Matching contacts are opted out and removed from all receiving-workspace campaign queues; eligible dispatch and ordinary reply controls remain.; Deployed verification and promotion are complete before closure.
 - Tracker: Source fix is in this change. Verify deployed behavior after merge, then promote and close. #2263 and #2264 are independent decisions; do not treat them as completed by this parser fix.
+
+### [#2092](https://github.com/chester-hill-solutions/callcaster/issues/2092) The campaign_ended readiness code is declared and mapped to a corrective action but never emitted, so an expired campaign reads "Ready to launch"
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Expired campaigns now produce a readiness blocker before launch or joining. The correction selects the date pickers. Deployed launch and join verification remain.
+- Current behavior: The source fix uses the same strict end_date < now check in pure readiness and launch. Readiness defaults to the current clock; launch passes its explicit clock. End date equality remains valid, and invalid or reversed dates keep their earlier corrections. Launch rejects expiry before status or dispatch writes. The existing UI and results loader consume the blocker. All 144 focused cases passed (132 node, 12 UI), and seven isolated mutations failed the relevant regressions while controls passed. Producer fixtures invoke every real readiness producer, including script routing; an exhaustive record and a runtime union check detect untested codes.
+- Root cause: campaign_ended existed in the code union and action map but readiness had no producer. Launch checked expiry separately and did not pass args.now into readiness. The expiry action led to the queue instead of date pickers.
+- Resolution: Verify expired, equal-time and future campaigns on deployed dev: expired campaigns show Complete before launch, disable Start and Schedule, and disable joining. The setup guide must select the date pickers. Check message, live and automated voice campaigns, then promote verified behavior before closing.
+- Look in: `app/lib/campaign-readiness.ts`, `app/lib/campaign-execution.server.ts`, `app/lib/campaign-readiness-actions.ts`, `app/lib/campaign-setup-steps.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id/settings.loader.server.ts`, `app/routes/workspaces+/$id/campaigns/$selected_id.loader.server.ts`, `app/components/campaign/settings/CampaignLaunch.tsx`
+- Existing tests: test/campaign-readiness-expiry.test.ts (expiry boundary, default/explicit clock, launch writes, every real producer and a new-union-code guard); test/campaign-settings.route.test.ts (activation and unavailable-script controls with a pinned clock); test/campaign-readiness.test.ts and test/campaign-readiness-actions.test.ts (existing readiness controls with a pinned clock); test/campaign-setup-steps.test.ts (expired guide correction and existing steps); test/campaign-selected-id.loader.test.ts (expired/equal running-campaign join behavior); test/ui/campaign-launch-review.test.tsx and test/ui/campaign-launch-actions.test.tsx (real expiry readiness into UI, disabled start/schedule controls)
+- Missing tests: Deployed expiry, date correction, launch and join verification before promotion.
+- Done when: A campaign whose end date has passed shows a blocking readiness issue, a disabled Start button, and a non-empty "Complete before launch" list.; The corrective action scrolls to the date pickers.; A campaign with a future end date is unaffected.; A guard test fails if a code is added to the union with no producer.
+- Tracker: The source fix travels with this board update. Verify deployed expiry, launch and joining after merge, then promote and close. Do not start a duplicate fix.
 
 ### [#2091](https://github.com/chester-hill-solutions/callcaster/issues/2091) messageMedia uploads are keyed by the client-supplied filename with no uniquifier, so a same-name upload silently replaces an existing attachment
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
