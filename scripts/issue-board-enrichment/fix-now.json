@@ -517,46 +517,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2078,
-    "verdict": "fix-now",
-    "recommendedTitle": "Admin routes serialize the full workspace row — Twilio auth tokens, twilio_data and stripe_id reach the browser for every workspace",
-    "summary": "Raw workspace rows still reach dashboard, detail and sudo API payloads. The safe derived workspaceRows do not remove the original secret-bearing workspaces array.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Raw workspace rows still reach dashboard, detail and sudo API payloads. The safe derived workspaceRows do not remove the original secret-bearing workspaces array.",
-    "resolution": "Use safe projections throughout dashboard, detail, sudo user workspace listings and nested workspace/provider account data. Detail loader also returns the full Twilio account object, so removing workspace secrets alone may leave provider authToken serialized. Extend admin route guards and narrow workspace types.",
-    "lookIn": [
-      "app/lib/workspace-members-db.server.ts:355",
-      "app/lib/platform-admin.server.ts:101",
-      "app/routes/admin+/workspaces/$workspaceId.loader.server.ts:114",
-      "app/routes/api+/admin+/users+/$userId/workspaces.action.server.ts:59",
-      "scripts/check-workspace-projection.mjs:17",
-      "app/lib/workspace-members-db.server.ts:354-356",
-      "app/lib/platform-admin.server.ts:88-102,225",
-      "app/routes/admin+/route.loader.server.ts:11-16",
-      "app/routes/admin+/workspaces/$workspaceId.loader.server.ts:73,112-121",
-      "app/routes/admin+/workspaces/$workspaceId.route.tsx:72-75",
-      "app/routes/admin+/admin.types.ts:4",
-      "app/lib/workspace-client-projection.server.ts:9-18",
-      "app/lib/admin-workspaces.server.ts:85-116"
-    ],
-    "existingTests": [
-      "test/workspace-loader-secrets.test.ts covers the workspace projection helper and a product workspace loader; it does not prove admin dashboard, detail or sudo API payload safety."
-    ],
-    "missingTests": [
-      "No test covers the complete dashboard/detail/sudo response secret key set. Existing helper projection coverage does not cover these raw returns."
-    ],
-    "acceptanceCriteria": [
-      "Dashboard, workspace detail and sudo workspace-list responses contain no workspace credentials or stripe_id at any nesting depth.",
-      "Workspace detail also projects the provider account object so authToken cannot reach the browser.",
-      "WorkspaceWithCampaigns uses a safe explicit projection.",
-      "The guard checks admin response paths while allowing server-only credential reads that never enter responses.",
-      "Tests assert complete serialized response key sets for all three surfaces."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2080,
     "verdict": "fix-now",
     "recommendedTitle": "/api/test-webhook is an authenticated open egress relay — any signed-in user can POST to any public host with chosen headers and read the response",

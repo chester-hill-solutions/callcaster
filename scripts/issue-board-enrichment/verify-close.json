@@ -3331,7 +3331,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Restore the password recovery email journey",
     "summary": "The reset email reaches the password form with its token; request feedback is generic and both verification failure paths reach sign-in. Deployed checks remain.",
-    "currentBehavior": "Source fix from dev@c261919e: /remember uses the configured BASE_URL with /reset-password. The actual issued link passes through the product auth loader and installed Better Auth handler to the real reset loader and action, changes the password and rejects token reuse. Known and unknown emails receive identical acceptance. Both verification callbacks return to registered /signin on failure. Rendered feedback covers initial, success and error states and accurate password completion. All 33 focused Node and four UI tests passed; original source failed ten Node and two UI cases with 23 Node and two UI controls retained. Nine isolated destination, host, callback, token and feedback mutations failed and were restored.",
+    "currentBehavior": "Merged to dev in PR #2279 at 9aa2025e. /remember uses configured BASE_URL with /reset-password, actual issued email links retain tokens through the password form and change the password; generic request feedback, expiry/replay rejection and limits remain. Both verification failures return to registered sign-in and password completion feedback is accurate. All 33 focused Node and four rendered UI cases passed, nine mutations failed, full local CI passed 5,022 Vitest and 22 Bun tests. All remote gates passed on 2303257c; issue-on-dev moved one item. Wider redirect guard remains separate in #2278. Deployed functional verification and promotion remain.",
     "resolution": "Verify the emailed journey, generic request feedback, expired and reused tokens, actual password sign-in and callback failures on deployed dev, then promote before closure. The repository-wide literal redirect guard is separate in #2278.",
     "lookIn": [
       "app/routes/remember.action.server.ts",
@@ -3364,5 +3364,43 @@
     "risk": "medium",
     "trackerRecommendation": "Source fix is in this change. Verify deployed recovery and failure paths, then promote and close.",
     "rootCause": "The UI passed an email verification callback as the final password reset page. That callback required other parameters and redirected to an absent route; request success feedback was disabled."
+  },
+  {
+    "issueNumber": 2078,
+    "verdict": "verify-close",
+    "recommendedTitle": "Project admin workspace responses without credentials",
+    "summary": "Admin workspace and provider data use positive field sets at the response boundary; nested invitation hashes are excluded. Deployed checks remain.",
+    "currentBehavior": "Source fix from dev@9aa2025e: dashboard UI/API, detail, campaign subpage and user-workspace UI/API use the canonical seven-field client workspace projection. Nested memberships and invitations use the same shape; invitation display rows exclude token_hash. Detail and standalone Twilio portal share a five-field provider account projection. The SDK client supplies the selected account SID, so detail no longer reads credentials from its response workspace. Admin client types are narrowed; the credits loader uses the existing safe SQL reader. All 50 focused Node cases and typechecking passed. Original affected source failed 14 payload/guard cases with 12 controls retained. Thirteen isolated workspace, nested invitation, provider account-selection and guard mutations failed and were restored.",
+    "resolution": "Verify all admin UI/JSON payloads and nested rows exclude credentials and hashes on deployed dev, while display/health data and server-only Twilio operations remain usable. Promote before closure.",
+    "lookIn": [
+      "app/lib/platform-admin.server.ts",
+      "app/lib/workspace-client-projection.server.ts",
+      "app/lib/twilio-client-projection.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId.loader.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server.ts",
+      "app/routes/admin+/admin.types.ts",
+      "scripts/check-workspace-projection.mjs"
+    ],
+    "existingTests": [
+      "test/admin-response-projection.test.ts (six real service/route surfaces, complete root/workspace/provider/invitation key sets, nested secret absence, API auth, missing workspace, provider failure, selected workspace account SID and server-only portal control)",
+      "test/check-workspace-projection.test.ts (raw reader/type refusal, positive/secret Pick controls and permitted server-only credentials)",
+      "Existing product SQL projection, admin rows/actions/credits/portal and membership summary controls"
+    ],
+    "missingTests": [
+      "Deployed admin payload, display/health and Twilio-operation verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Dashboard UI/API, detail, campaign and user-workspace UI/API payloads exclude workspace credentials, provider authToken and invitation token_hash at every depth.",
+      "Workspaces and provider accounts use explicit positive field sets with useful display and operational data preserved.",
+      "Client types use the safe workspace contract and server-only credential reads remain permitted.",
+      "Admin entry import/type guard rejects raw readers and full/unsafe workspace types, accepts positive Pick and server-only helper controls; payload tests prove dataflow separately.",
+      "Missing workspace, provider failure and real API authorization remain controlled.",
+      "Deployed verification and promotion precede closure."
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "high",
+    "trackerRecommendation": "Source fix is in this change. Verify deployed nested payloads and admin operations, then promote and close.",
+    "rootCause": "Safe derived workspaceRows were returned beside raw global workspace rows. Admin services also passed raw membership/invitation joins and detail rows through to route adapters, and a smaller provider interface did not remove runtime account fields."
   }
 ]

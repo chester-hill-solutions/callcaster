@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@c261919e + source fix for #2075` · 289 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@9aa2025e + source fix for #2078` · 289 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 71
+## Fix now — 70
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -152,17 +152,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Look in: `app/lib/twilio-toll-free.server.ts:49`, `app/lib/twilio-toll-free.server.ts:74`, `app/lib/twilio-toll-free.server.ts:25-42,44-50,52-67,68+`, `app/lib/twilio-readiness.server.ts:66-88`, `app/lib/messaging-onboarding/predicates.ts:380-471`, `app/lib/twilio-a2p-status-sync.server.ts (the same fail-open pattern is worth checking here too)`
 - Missing tests: Reject sends for provider errors, absent verification, unknown status and a sender beyond the record limit.
 - Done when: A toll-free number with **no** TFV record blocks bulk SMS with a message naming the missing verification.; A Twilio error while listing verifications **blocks** the send (fail closed) and surfaces the Twilio error.; A matching verification beyond the previous 200-record limit is included in the send decision.; An approved verification still passes; a rejected one still blocks — both are positive controls.; The fail-closed intent is documented at the decision function so the polarity cannot be flipped silently.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2078](https://github.com/chester-hill-solutions/callcaster/issues/2078) Admin routes serialize the full workspace row — Twilio auth tokens, twilio_data and stripe_id reach the browser for every workspace
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Raw workspace rows still reach dashboard, detail and sudo API payloads. The safe derived workspaceRows do not remove the original secret-bearing workspaces array.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Raw workspace rows still reach dashboard, detail and sudo API payloads. The safe derived workspaceRows do not remove the original secret-bearing workspaces array.
-- Resolution: Use safe projections throughout dashboard, detail, sudo user workspace listings and nested workspace/provider account data. Detail loader also returns the full Twilio account object, so removing workspace secrets alone may leave provider authToken serialized. Extend admin route guards and narrow workspace types.
-- Look in: `app/lib/workspace-members-db.server.ts:355`, `app/lib/platform-admin.server.ts:101`, `app/routes/admin+/workspaces/$workspaceId.loader.server.ts:114`, `app/routes/api+/admin+/users+/$userId/workspaces.action.server.ts:59`, `scripts/check-workspace-projection.mjs:17`, `app/lib/workspace-members-db.server.ts:354-356`, `app/lib/platform-admin.server.ts:88-102,225`, `app/routes/admin+/route.loader.server.ts:11-16`, `app/routes/admin+/workspaces/$workspaceId.loader.server.ts:73,112-121`, `app/routes/admin+/workspaces/$workspaceId.route.tsx:72-75`, `app/routes/admin+/admin.types.ts:4`, `app/lib/workspace-client-projection.server.ts:9-18`, `app/lib/admin-workspaces.server.ts:85-116`
-- Existing tests: test/workspace-loader-secrets.test.ts covers the workspace projection helper and a product workspace loader; it does not prove admin dashboard, detail or sudo API payload safety.
-- Missing tests: No test covers the complete dashboard/detail/sudo response secret key set. Existing helper projection coverage does not cover these raw returns.
-- Done when: Dashboard, workspace detail and sudo workspace-list responses contain no workspace credentials or stripe_id at any nesting depth.; Workspace detail also projects the provider account object so authToken cannot reach the browser.; WorkspaceWithCampaigns uses a safe explicit projection.; The guard checks admin response paths while allowing server-only credential reads that never enter responses.; Tests assert complete serialized response key sets for all three surfaces.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2113](https://github.com/chester-hill-solutions/callcaster/issues/2113) hasMaterialBillingVariance ignores categories.numbers.variance, so number-rental ledger drift never alerts and is not even stored in the snapshot
@@ -827,9 +816,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 117
+## Verify and close — 118
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075) Restore the password recovery email journey
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The reset email reaches the password form with its token; request feedback is generic and both verification failure paths reach sign-in. Deployed checks remain.
+- Current behavior: Merged to dev in PR #2279 at 9aa2025e. /remember uses configured BASE_URL with /reset-password, actual issued email links retain tokens through the password form and change the password; generic request feedback, expiry/replay rejection and limits remain. Both verification failures return to registered sign-in and password completion feedback is accurate. All 33 focused Node and four rendered UI cases passed, nine mutations failed, full local CI passed 5,022 Vitest and 22 Bun tests. All remote gates passed on 2303257c; issue-on-dev moved one item. Wider redirect guard remains separate in #2278. Deployed functional verification and promotion remain.
+- Root cause: The UI passed an email verification callback as the final password reset page. That callback required other parameters and redirected to an absent route; request success feedback was disabled.
+- Resolution: Verify the emailed journey, generic request feedback, expired and reused tokens, actual password sign-in and callback failures on deployed dev, then promote before closure. The repository-wide literal redirect guard is separate in #2278.
+- Look in: `app/routes/remember.action.server.ts`, `app/routes/remember.tsx`, `app/routes/reset-password.tsx`, `app/routes/reset-password.loader.server.ts`, `app/routes/reset-password.action.server.ts`, `app/routes/api+/auth/callback.loader.server.ts`, `app/routes/auth/confirm.loader.server.ts`
+- Existing tests: test/password-recovery-journey.test.ts (installed Better Auth, actual email sender, auth loader, reset loader/action, sign-in, expiry, replay, configured host and throttling); test/verification-callbacks.test.ts (both missing/rejected callbacks and success cookie/return controls); test/ui/password-recovery-feedback.test.tsx (real rendered forms and action feedback); Existing remember, reset, email sender, auth-instance and callback tests
+- Missing tests: Deployed password recovery and callback verification before promotion.
+- Done when: Actual issued link reaches the password form with the original token and the action changes the password.; Known and unknown emails receive the same generic acceptance feedback.; Verification failures reach a real sign-in route without carrying tokens; success keeps cookies and safe return paths.; Password completion feedback names the correct credential.; Existing expiry, replay rejection and request/reset limits remain.; Repository-wide redirect guard is tracked separately in #2278; deployed verification and promotion precede closure.
+- Tracker: Source fix is in this change. Verify deployed recovery and failure paths, then promote and close.
+
+### [#2078](https://github.com/chester-hill-solutions/callcaster/issues/2078) Project admin workspace responses without credentials
+- Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Admin workspace and provider data use positive field sets at the response boundary; nested invitation hashes are excluded. Deployed checks remain.
+- Current behavior: Source fix from dev@9aa2025e: dashboard UI/API, detail, campaign subpage and user-workspace UI/API use the canonical seven-field client workspace projection. Nested memberships and invitations use the same shape; invitation display rows exclude token_hash. Detail and standalone Twilio portal share a five-field provider account projection. The SDK client supplies the selected account SID, so detail no longer reads credentials from its response workspace. Admin client types are narrowed; the credits loader uses the existing safe SQL reader. All 50 focused Node cases and typechecking passed. Original affected source failed 14 payload/guard cases with 12 controls retained. Thirteen isolated workspace, nested invitation, provider account-selection and guard mutations failed and were restored.
+- Root cause: Safe derived workspaceRows were returned beside raw global workspace rows. Admin services also passed raw membership/invitation joins and detail rows through to route adapters, and a smaller provider interface did not remove runtime account fields.
+- Resolution: Verify all admin UI/JSON payloads and nested rows exclude credentials and hashes on deployed dev, while display/health data and server-only Twilio operations remain usable. Promote before closure.
+- Look in: `app/lib/platform-admin.server.ts`, `app/lib/workspace-client-projection.server.ts`, `app/lib/twilio-client-projection.server.ts`, `app/routes/admin+/workspaces/$workspaceId.loader.server.ts`, `app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server.ts`, `app/routes/admin+/admin.types.ts`, `scripts/check-workspace-projection.mjs`
+- Existing tests: test/admin-response-projection.test.ts (six real service/route surfaces, complete root/workspace/provider/invitation key sets, nested secret absence, API auth, missing workspace, provider failure, selected workspace account SID and server-only portal control); test/check-workspace-projection.test.ts (raw reader/type refusal, positive/secret Pick controls and permitted server-only credentials); Existing product SQL projection, admin rows/actions/credits/portal and membership summary controls
+- Missing tests: Deployed admin payload, display/health and Twilio-operation verification before promotion.
+- Done when: Dashboard UI/API, detail, campaign and user-workspace UI/API payloads exclude workspace credentials, provider authToken and invitation token_hash at every depth.; Workspaces and provider accounts use explicit positive field sets with useful display and operational data preserved.; Client types use the safe workspace contract and server-only credential reads remain permitted.; Admin entry import/type guard rejects raw readers and full/unsafe workspace types, accepts positive Pick and server-only helper controls; payload tests prove dataflow separately.; Missing workspace, provider failure and real API authorization remain controlled.; Deployed verification and promotion precede closure.
+- Tracker: Source fix is in this change. Verify deployed nested payloads and admin operations, then promote and close.
 
 ### [#2077](https://github.com/chester-hill-solutions/callcaster/issues/2077) Authorize invitation resend before token rotation
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -842,18 +855,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed invite resend refusal, delivery, token and rate-limit verification before promotion.
 - Done when: Session email matches the pending invitation before rotation or email delivery.; Foreign, missing and finalized invitations share 404 and remain unchanged; unsigned callers remain 401.; The writer requires workspace and authorized email and filters both with ID and pending status.; Normalized own-email resend stores only the new hash and preserves the seven-day expiry contract.; Existing register rate limiting refuses excess resends before rotation or delivery.; Signup, redemption and cancellation remain separate; deployed verification and promotion precede closure.
 - Tracker: Source fix is in this change. Verify deployed refusal, permitted delivery and rate limiting, then promote and close.
-
-### [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075) Restore the password recovery email journey
-- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- The reset email reaches the password form with its token; request feedback is generic and both verification failure paths reach sign-in. Deployed checks remain.
-- Current behavior: Source fix from dev@c261919e: /remember uses the configured BASE_URL with /reset-password. The actual issued link passes through the product auth loader and installed Better Auth handler to the real reset loader and action, changes the password and rejects token reuse. Known and unknown emails receive identical acceptance. Both verification callbacks return to registered /signin on failure. Rendered feedback covers initial, success and error states and accurate password completion. All 33 focused Node and four UI tests passed; original source failed ten Node and two UI cases with 23 Node and two UI controls retained. Nine isolated destination, host, callback, token and feedback mutations failed and were restored.
-- Root cause: The UI passed an email verification callback as the final password reset page. That callback required other parameters and redirected to an absent route; request success feedback was disabled.
-- Resolution: Verify the emailed journey, generic request feedback, expired and reused tokens, actual password sign-in and callback failures on deployed dev, then promote before closure. The repository-wide literal redirect guard is separate in #2278.
-- Look in: `app/routes/remember.action.server.ts`, `app/routes/remember.tsx`, `app/routes/reset-password.tsx`, `app/routes/reset-password.loader.server.ts`, `app/routes/reset-password.action.server.ts`, `app/routes/api+/auth/callback.loader.server.ts`, `app/routes/auth/confirm.loader.server.ts`
-- Existing tests: test/password-recovery-journey.test.ts (installed Better Auth, actual email sender, auth loader, reset loader/action, sign-in, expiry, replay, configured host and throttling); test/verification-callbacks.test.ts (both missing/rejected callbacks and success cookie/return controls); test/ui/password-recovery-feedback.test.tsx (real rendered forms and action feedback); Existing remember, reset, email sender, auth-instance and callback tests
-- Missing tests: Deployed password recovery and callback verification before promotion.
-- Done when: Actual issued link reaches the password form with the original token and the action changes the password.; Known and unknown emails receive the same generic acceptance feedback.; Verification failures reach a real sign-in route without carrying tokens; success keeps cookies and safe return paths.; Password completion feedback names the correct credential.; Existing expiry, replay rejection and request/reset limits remain.; Repository-wide redirect guard is tracked separately in #2278; deployed verification and promotion precede closure.
-- Tracker: Source fix is in this change. Verify deployed recovery and failure paths, then promote and close.
 
 ### [#2076](https://github.com/chester-hill-solutions/callcaster/issues/2076) Scope workspace invitation cancellation to its authorized workspace
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03

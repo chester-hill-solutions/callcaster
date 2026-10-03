@@ -15,15 +15,10 @@ import { getWorkspaceById } from "@/lib/workspace-members-db.server";
 import type { Database } from "@/lib/db-types";
 import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import type { WorkspaceTwilioPortalSnapshot } from "@/lib/types";
+import { projectTwilioAccountForClient, type TwilioAccountClientData } from "@/lib/twilio-client-projection.server";
 
 export interface TwilioPageData {
-  twilioAccountInfo: {
-    sid: string;
-    friendlyName: string;
-    status: string;
-    type: string;
-    dateCreated: string;
-  } | null;
+  twilioAccountInfo: TwilioAccountClientData | null;
   twilioNumbers: Array<{
     sid: string;
     phoneNumber: string;
@@ -90,13 +85,7 @@ export async function loadTwilioData(
         twilio.usage.records.list({ limit: 200 }),
       ]);
 
-      twilioAccountInfo = {
-        sid: account.sid,
-        friendlyName: account.friendlyName,
-        status: account.status,
-        type: account.type,
-        dateCreated: account.dateCreated.toISOString(),
-      };
+      twilioAccountInfo = projectTwilioAccountForClient(account);
 
       twilioNumbers = numbers.map((number) => ({
         sid: number.sid,

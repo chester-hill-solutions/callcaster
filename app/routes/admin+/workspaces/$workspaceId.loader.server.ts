@@ -5,9 +5,9 @@ import {
 import { data as routeData, redirect } from "react-router";
 import { getAdminWorkspaceDetail } from "@/lib/platform-admin.server";
 import { logger } from "@/lib/logger.server";
-import { readTwilioWorkspaceCredentials } from "@/lib/twilio-workspace-credentials";
 import { adminRouteAuth } from "@/lib/admin-route.server";
 import { defineLoader } from "@/lib/handler.server";
+import { projectTwilioAccountForClient, type TwilioAccountClientData } from "@/lib/twilio-client-projection.server";
 
 interface TwilioPhoneNumber {
   sid: string;
@@ -26,13 +26,7 @@ interface TwilioPhoneNumber {
   status?: string;
 }
 
-interface TwilioAccount {
-  sid: string;
-  friendlyName: string;
-  status: string;
-  type: string;
-  dateCreated: Date;
-}
+
 
 interface TwilioUsageRecord {
   category: string;
@@ -62,7 +56,7 @@ export const loader = defineLoader({
 
   const { workspace, workspaceUsers, phoneNumbers } = detail;
 
-  let twilioAccountInfo: TwilioAccount | null = null;
+  let twilioAccountInfo: TwilioAccountClientData | null = null;
   let twilioNumbers: TwilioPhoneNumber[] = [];
   let twilioUsage: TwilioUsageRecord[] = [];
 
@@ -70,13 +64,12 @@ export const loader = defineLoader({
     const twilio = await createWorkspaceTwilioInstance({       workspace_id: workspaceId,
     });
 
-    const adminTwilioCreds = readTwilioWorkspaceCredentials(workspace.twilio_data);
-    if (adminTwilioCreds?.sid) {
-      const account = await twilio.api.v2010.accounts(adminTwilioCreds.sid).fetch();
+    if (twilio.accountSid) {
+      const account = await twilio.api.v2010.accounts(twilio.accountSid).fetch();
       const numbers = await twilio.incomingPhoneNumbers.list({ limit: 20 });
       const usageRecords = await twilio.usage.records.list();
 
-      twilioAccountInfo = account;
+      twilioAccountInfo = projectTwilioAccountForClient(account);
       twilioNumbers = numbers.map((number) => ({
         sid: number.sid,
         phoneNumber: number.phoneNumber,

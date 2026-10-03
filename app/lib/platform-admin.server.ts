@@ -3,6 +3,7 @@ import {
   repointWorkspaceTwilioWebhooks,
 } from "@/lib/twilio-webhook-audit.server";
 import { deriveWorkspaceAdminRows } from "@/lib/admin-workspaces.server";
+import { projectWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { listRecentDeadLetteredJobs } from "@/lib/admin-jobs.server";
 import type { Database } from "@/lib/db-types";
 import {
@@ -98,7 +99,10 @@ export async function getAdminDashboard() {
   });
 
   return {
-    workspaces: workspacesWithCampaigns,
+    workspaces: workspacesWithCampaigns.map((workspace) => ({
+      ...projectWorkspaceForClient(workspace),
+      campaign: workspace.campaign,
+    })),
     users,
     workspaceUsers,
     workspaceNumbers,
@@ -227,17 +231,28 @@ export async function getAdminUserWorkspaces(
     listPendingInvitesForUsername(userResult.user.username),
   ]);
 
-  const userWorkspaces = membershipRows;
+  const userWorkspaces = membershipRows.map((row) => ({
+    ...row,
+    workspace: row.workspace ? projectWorkspaceForClient(row.workspace) : null,
+  }));
   const pendingInvites = pendingInviteRows.map((row) => ({
-    ...row.invite,
+    id: row.invite.id,
+    workspace_id: row.invite.workspace_id,
+    email: row.invite.email,
+    role_id: row.invite.role_id,
     role: row.invite.role_id,
-    workspace: row.workspace,
+    status: row.invite.status,
+    created_at: row.invite.created_at,
+    updated_at: row.invite.updated_at,
+    expires_at: row.invite.expires_at,
+    invited_by_user_id: row.invite.invited_by_user_id,
+    workspace: projectWorkspaceForClient(row.workspace),
   }));
 
   return {
     ok: true as const,
     targetUser: userResult.user,
-    allWorkspaces,
+    allWorkspaces: allWorkspaces.map(projectWorkspaceForClient),
     userWorkspaces,
     pendingInvites,
   };
@@ -335,7 +350,10 @@ export async function getAdminWorkspaceDetail(
 
   return {
     ok: true as const,
-    workspace,
+    workspace: {
+      ...projectWorkspaceForClient(workspace),
+      campaign: workspace.campaign,
+    },
     workspaceUsers,
     phoneNumbers,
   };
