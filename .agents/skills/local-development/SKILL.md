@@ -65,6 +65,19 @@ For route UI tests, mock the one-off server loader/action re-export boundary
 when router data is supplied by the fixture. Importing the real server graph can
 fail database startup before UI cases collect; retain the actual browser hooks.
 
+## Custom-control busy proofs
+
+For the [shared Checkbox](../../../app/components/ui/checkbox.tsx), pass its
+`disabled` prop when writes are pending. A disabled native fieldset does not
+supply the React Aria control's `isDisabled` state. Drive the control's own label
+or indicator press surface with `userEvent`; a separate native label can bypass
+the press path being tested. Assert the input's explicit `disabled` attribute:
+`toBeDisabled()` alone can pass because an ancestor fieldset is disabled.
+Hold the write acknowledgement, attempt the second click and check that the
+value and request count stay correct. Then remove the control's busy guard and
+confirm that the behavior test fails. If the fault still passes, strengthen the
+proof before claiming coverage. Use the measured test report counts.
+
 ## Realtime snapshot reconciliation
 
 An INSERT matcher cannot safely match every row in a loader snapshot. Check new

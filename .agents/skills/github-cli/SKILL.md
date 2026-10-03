@@ -39,6 +39,25 @@ The manual's command surface is: `agent-task`, `alias`, `api`, `attestation`, `a
 4. When `gh pr create` / `gh pr merge` hit `graphql_rate_limit`, fall back to REST: `POST /repos/{owner}/{repo}/pulls` (create; ensure the head branch has commits ahead of base first — "No commits between base and head" is the failure when it does not), `PUT /repos/{owner}/{repo}/pulls/{n}/merge` with `-f merge_method=squash`, and `DELETE /repos/{owner}/{repo}/git/refs/heads/{branch}`.
 5. Verify REST fallbacks the same as any mutation: query the remote state and report it.
 
+## REST Version And Commit Evidence
+
+Choose a verified API version for each endpoint contract. Do not copy a version
+header to every request without checking its breaking changes and response fields.
+GitHub's [version guide](https://docs.github.com/en/rest/about-the-rest-api/api-versions)
+and [breaking changes](https://docs.github.com/en/rest/about-the-rest-api/breaking-changes)
+are the source of truth. Version `2026-03-10` removes `merge_commit_sha` from pull
+request payloads. For cleanup that reads that field, explicitly use the supported
+`2022-11-28` contract for the pull read, or migrate the merge-evidence read to a
+verified contract. Do not depend on the unversioned default staying the same.
+A missing field does not prove that a PR is unmerged. Before cleanup, verify the
+merged state, base, tested head, merge SHA and source equivalence; stop if required
+evidence is absent. Keep issue-dependency version headers scoped to those calls.
+
+After a push, the remote ref can show the new commit before the pull endpoint's
+head updates. Compare both with the tested commit. Re-read with bounded retries;
+if the pull head stays stale, stop the mutation. Do not merge or delete refs using
+a stale pull snapshot, or create another PR to force its head to update.
+
 ## Authentication And Scopes
 
 Use `gh auth refresh -s <scope>` only when the operation requires an additional scope. Project mutations commonly require `project`; do not expose tokens in commands, logs, or issue bodies.
