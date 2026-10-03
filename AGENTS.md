@@ -110,7 +110,6 @@ Always talk to me like I have ADHD.
 
 - **Good for:** `list-projects`, `list-services`, `get-status`, `list-deployments`, `get-logs` — quick read-only checks without linking cwd.
 - **`accept-deploy`** — commits **all** staged environment changes and deploys; destructive; only when the user explicitly wants deploy.
-- **`railway-agent`** — multi-step ops but unreliable here: truncates service IDs, **`commitStagedChangesTool` often fails**, may **`discardStagedChangesTool`** and revert work, dual-volume PATCH merges instead of replacing. Prefer CLI when agent reports “staged” or “send another message”.
 - MCP **hides secret values** in config; use CLI `railway variables` / `railway run` when you need to run migrations against the DB.
 
 ### Postgres on Railway (this repo)
