@@ -3729,7 +3729,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Keep loaded chat history when the current thread refreshes",
     "summary": "Same-conversation loader refreshes reconcile rows by SID and retain loaded history. Workspace/contact changes reset the keyed thread.",
-    "currentBehavior": "Source fix based on dev@c14e4a19: loader refreshes update matching SIDs, add unseen rows and retain older/unmatched live rows in time order. Only previously unseen saved rows with a suitable creation time can replace matching pending replies when loader data beats SSE. Known/older/unknown-time rows keep a new repeated reply and its failure marker; second-precision saved timestamps are handled. Realtime INSERT checks the actual retained list, including older pages. Conversation identity includes workspace and normalized contact. The existing route contact key now includes workspace; pagination refs/state belong to that keyed lifetime, not latest-page refreshes. Empty older pages update exhaustion. All 32 focused cases pass. Original runtime fails ten of fourteen new cases with four controls; eleven isolated history/reset/update/duplicate/pending/pagination mutations fail and all source is restored. Full local and remote gates are required before merge.",
+    "currentBehavior": "Merged to dev in PR #2291 at b2d717c3. Same-conversation loader rows reconcile by SID and retain older/live history. Saved-row identity/time limits protect pending replies from known, older and unknown-time repeated-body rows. Different workspace/contact resets keyed history and pagination. Empty older pages set exhaustion. All 32 focused cases pass; original runtime fails ten with four controls; eleven faults fail and source is restored. Full local CI passed 5,269 Vitest and 22 Bun tests; remote and both Railway gates passed on 23676f9f. Issue-on-dev moved one item. Verify deployed dev and promote before closure.",
     "resolution": "Verify loading older pages, replying and filter/sort revalidation on deployed dev retain history, update matching records and do not duplicate saved/live replies. Different workspace/contact must reset history/pagination. Promote before closure.",
     "lookIn": [
       "app/hooks/realtime/useChatRealtime.ts",
@@ -3764,5 +3764,48 @@
     "risk": "high",
     "trackerRecommendation": "Source fix is in this change. Thread history is separate from the sidebar accumulation already fixed under #2191; verify the deployed flow before promotion and closure.",
     "rootCause": "Loader array reference changes were treated as a new conversation and replaced accumulated history. SID bookkeeping also excluded manually prepended rows; latest-page pagination state did not represent the retained thread."
+  },
+  {
+    "issueNumber": 2125,
+    "verdict": "verify-close",
+    "recommendedTitle": "Keep one signed respondent identity through the public survey",
+    "summary": "The public loader signs one respondent ID, keeps it in a scoped browser cookie and passes its token to every answer and completion. Completion requires an actual saved row.",
+    "currentBehavior": "Source fix based on dev@b2d717c3: signed identity is authoritative, plain posted IDs are ignored and tokenless writes fail. A survey/contact-scoped HttpOnly cookie retains the token until its signed expiry; private/no-store loader data resumes saved answers by verified ID. Legacy contact responses can be signed and resumed; bigint survey/contact boundaries are normalized. Checkbox selections resume as arrays while text remains text. A keyed page resets local state on respondent changes. Actual completion UPDATE must return a matching row or the API returns 404. All 54 node, 3 actual-page and 11 real-PG cases pass. Original tracked runtime fails 21 with 47 passing controls; ten isolated faults fail and all files are restored. Full local/remote gates must pass before merge.",
+    "resolution": "Verify deployed public three-answer persistence, anonymous/contact reload, scoped token rejection and missing-row API failure. Required-answer enforcement is separate #2107; flush/save/completion acknowledgement and the premature Thank You screen are separate #2108. Historical fragments require read-only assessment #2292. Promote before closure.",
+    "lookIn": [
+      "app/routes/survey+/$surveyId.loader.server.ts",
+      "app/routes/survey+/$surveyId.tsx",
+      "app/lib/survey-public-action.server.ts",
+      "app/lib/survey-respondent-token.server.ts",
+      "app/lib/survey-respondent-cookie.server.ts",
+      "app/lib/survey-db.server.ts",
+      "app/lib/survey-responses.server.ts"
+    ],
+    "existingTests": [
+      "test/survey-answer.route.test.ts",
+      "test/survey-complete.route.test.ts",
+      "test/survey-public-loader.route.test.ts",
+      "test/survey-respondent-token-cookie.test.ts",
+      "test/ui/survey-respondent-identity.test.tsx",
+      "test/integration-db/survey-respondent-identity.test.ts",
+      "test/integration-db/survey-answer-question-scope.test.ts"
+    ],
+    "missingTests": [
+      "Deployed dev survey/browser verification and promotion. Save-order/UI-success and required-field fixes remain in their own issues."
+    ],
+    "acceptanceCriteria": [
+      "Three acknowledged answers and completion use one survey response with three answers.",
+      "Anonymous reload retains the signed identity and saved answers; a contact cookie keeps its exact response even when a newer attempt exists.",
+      "The real page passes the loader token with answer/completion requests and resets state when respondent identity changes.",
+      "Tampered, expired, wrong-survey/workspace or missing tokens cannot become chosen plain IDs.",
+      "Completion with no matching saved response returns a non-2xx API error with no success:true.",
+      "Preserve existing active-survey, honeypot, rate-limit, contact scope and trusted contact resume controls.",
+      "Verify deployed dev and promote before closure."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Source fix is in this change. Keep #2107, #2108 and read-only historical assessment #2292 separate and visible.",
+    "rootCause": "The page omitted the signed token, and tokenless writes minted a fresh ID for each request. Completion reported success without checking the affected row."
   }
 ]

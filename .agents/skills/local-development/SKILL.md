@@ -98,6 +98,11 @@ Compile the new migration on a disposable Postgres database before trusting
 source-only checks. Test an upgrade from the old definition and both fresh
 bootstrap paths, including the surviving overload signature.
 
+Legacy bigint rows can reach a `serial()` Drizzle column as strings, while a
+related `bigint({ mode: "number" })` column maps to numbers. Normalize trusted
+identity values before signing or comparing them. Verify contact resume with a
+second later response so a type mismatch cannot silently switch the saved ID.
+
 ## Network resource tests
 
 Use real Node readable streams when testing response limits and cleanup. The
@@ -131,6 +136,10 @@ prove caller flow. Campaign launch must check a declared raw entry before the
 editor migration can repair it. Keep legacy and explicit-page controls.
 
 ## Scripted source edits
+
+Use checked subprocesses or `set -e` when a shell step contains a required check
+followed by another command. A later successful command can hide the failed
+check in the shell exit status. Inspect each required result before reporting it.
 
 Before inserting a constant beside an export, find its first runtime use. An
 exported table can aggregate an earlier private table, so shared constants must

@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Public surveys keep one signed respondent identity through answer saves and reloads; completion reports an error when no saved response exists ([PR #2293](https://github.com/chester-hill-solutions/callcaster/pull/2293), [#2125](https://github.com/chester-hill-solutions/callcaster/issues/2125)).
+
 ### Security
 
 - Conversation read acknowledgments now require the same workspace capability as conversation reads. Keys without `campaigns.read` cannot change read state ([PR #2285](https://github.com/chester-hill-solutions/callcaster/pull/2285), [#2134](https://github.com/chester-hill-solutions/callcaster/issues/2134)).

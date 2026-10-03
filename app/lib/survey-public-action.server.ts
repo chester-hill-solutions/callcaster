@@ -7,10 +7,7 @@ import {
 } from "@/lib/platform-rate-limit.server";
 import { getActiveSurveyByPublicId } from "@/lib/survey-db.server";
 import { loadSurveyRespondentContact } from "@/lib/survey-respondent.server";
-import {
-  createRespondentToken,
-  verifyRespondentToken,
-} from "@/lib/survey-respondent-token.server";
+import { verifyRespondentToken } from "@/lib/survey-respondent-token.server";
 
 const SURVEY_RATE_LIMIT = { limit: 10, windowMs: 60_000 };
 
@@ -22,10 +19,8 @@ function getRespondentToken(
   formData: FormData,
 ): string | null {
   const url = new URL(request.url);
-  return (
-    url.searchParams.get("respondent_token") ||
-    (formData.get("respondent_token") as string | null)
-  );
+  const token = url.searchParams.get("respondent_token") || formData.get("respondent_token");
+  return typeof token === "string" && token.length > 0 ? token : null;
 }
 
 async function resolveRespondentToken(
@@ -39,7 +34,7 @@ async function resolveRespondentToken(
   const token = getRespondentToken(request, formData);
   if (token) {
     const payload = await verifyRespondentToken(token, survey.id);
-    if (!payload) {
+    if (!payload || payload.workspace !== survey.workspace) {
       return {
         ok: false,
         response: routeData(
@@ -50,8 +45,10 @@ async function resolveRespondentToken(
     }
     return { ok: true, resultId: payload.result_id, token };
   }
-  const created = await createRespondentToken(survey.id, survey.workspace);
-  return { ok: true, resultId: created.resultId, token: created.token };
+  return {
+    ok: false,
+    response: routeData({ error: "Respondent token is required" }, { status: 400 }),
+  };
 }
 
 export type PublicSurveySubmission = {
