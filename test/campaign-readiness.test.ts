@@ -1,10 +1,16 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   getCampaignContentReadinessIssues,
   getCampaignReadiness,
   resolveReadinessQueueCount,
 } from "../app/lib/campaign-readiness";
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-03-01T00:00:00Z"));
+});
+afterEach(() => vi.useRealTimers());
 
 const validSchedule = {
   monday: {

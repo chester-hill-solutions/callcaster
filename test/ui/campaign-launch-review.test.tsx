@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 
+import { getCampaignReadiness } from "@/lib/campaign-readiness";
 import { CampaignLaunch } from "@/components/campaign/settings/CampaignLaunch";
 
 vi.mock("@/components/campaign/settings/detailed/CampaignLaunchExtras", () => ({
@@ -100,6 +101,19 @@ describe("campaign launch review", () => {
     expect(
       screen.getByRole("button", { name: "Start text campaign" }),
     ).toBeDisabled();
+  });
+
+  test("expired readiness replaces the ready banner and disables Start", () => {
+    const readiness = getCampaignReadiness({
+      type: "message", caller_id: "+15555550100", start_date: "2026-10-01T00:00:00Z",
+      end_date: "2026-10-02T23:59:59Z", schedule: null, sms_send_window: null,
+    } as never, { body_text: "Hello", message_media: [] } as never, {
+      queueCount: 25, now: new Date("2026-10-03T00:00:00Z"),
+    });
+    renderLaunchReview(readiness.startIssues);
+    expect(screen.getByText("Complete before launch")).toBeInTheDocument();
+    expect(screen.queryByText("Ready to launch.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start text campaign" })).toBeDisabled();
   });
 
   test("shows the campaign cost inline, not behind a disclosure (#1859)", () => {

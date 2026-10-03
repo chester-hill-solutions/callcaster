@@ -1,13 +1,18 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 vi.hoisted(() => {
   process.env.DATABASE_URL =
     process.env.DATABASE_URL ?? "postgres://test:test@localhost:5432/test";
 });
 
+import { asRouteResponse } from "./helpers/route-result";
+import { createRouteContextProvider, mockWorkspaceContext } from "./helpers/route-context-mock";
+
 const mocks = vi.hoisted(() => ({
   findCampaignInWorkspace: vi.fn(),
   fetchQueueCounts: vi.fn(),
+  fetchCampaignDetails: vi.fn(),
+  fetchBasicResults: vi.fn(),
   getUserRole: vi.fn(),
 }));
 
@@ -23,6 +28,8 @@ vi.mock("@/lib/database/campaign.server", async (importOriginal) => {
   return {
     ...actual,
     fetchQueueCounts: (...args: unknown[]) => mocks.fetchQueueCounts(...args),
+    fetchCampaignDetails: mocks.fetchCampaignDetails,
+    fetchBasicResults: mocks.fetchBasicResults,
   };
 });
 vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
@@ -35,11 +42,9 @@ vi.mock("@/lib/database/workspace.server", async (importOriginal) => {
 
 async function runLoader(selectedId: string) {
   const mod = await import("../app/routes/workspaces+/$id/campaigns/$selected_id.route");
-  return mod.loader({
-    request: new Request(`http://localhost/workspaces/ws-1/campaigns/${selectedId}`),
-    params: { id: "ws-1", selected_id: selectedId },
-    context: new Map(),
-  } as never);
+  const request = new Request(`http://localhost/workspaces/ws-1/campaigns/${selectedId}`);
+  const context = await createRouteContextProvider({ workspace: mockWorkspaceContext() });
+  return mod.loader({ request, url: new URL(request.url), params: { id: "ws-1", selected_id: selectedId }, context });
 }
 
 // #1682: "/campaigns/blah" reached the database with a non-integer id and
@@ -62,5 +67,31 @@ describe("app/routes/workspaces+/$id/campaigns/$selected_id.route.tsx loader", (
     expect((thrown as Response).status).toBe(404);
     expect(mocks.findCampaignInWorkspace).not.toHaveBeenCalled();
     expect(mocks.fetchQueueCounts).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("results loader campaign expiry", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime("2026-10-03T12:00:00Z");
+    mocks.fetchQueueCounts.mockResolvedValue({ fullCount: 3, queuedCount: 3 });
+    mocks.fetchCampaignDetails.mockResolvedValue({ script_id: 7 });
+    mocks.fetchBasicResults.mockResolvedValue([]);
+    mocks.getUserRole.mockResolvedValue({ role: "owner" });
+  });
+  afterEach(() => vi.useRealTimers());
+  test.each([{ end: "2026-10-03T11:59:59.999Z", expired: true }, { end: "2026-10-03T12:00:00Z", expired: false }])("end $end controls joining a running campaign", async ({ end, expired }) => {
+    mocks.findCampaignInWorkspace.mockResolvedValue({
+      id: 42, type: "live_call", status: "running", caller_id: "+15555550100",
+      start_date: "2026-10-01T00:00:00Z", end_date: end,
+      schedule: { monday: { active: true, intervals: [{ start: "09:00", end: "17:00" }] } },
+    });
+    const response = await asRouteResponse(runLoader("42"));
+    if (expired) expect(await response.json()).toMatchObject({
+      joinDisabled: expect.stringContaining("end date has passed"),
+      readiness: { issues: [{ code: "campaign_ended", message: expect.any(String) }] },
+    });
+    else expect(await response.json()).toMatchObject({ joinDisabled: null });
   });
 });

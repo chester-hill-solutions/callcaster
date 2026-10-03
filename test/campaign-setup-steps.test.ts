@@ -1,4 +1,4 @@
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import {
   DEFAULT_WEEKDAY_CALLING_SCHEDULE,
@@ -9,6 +9,12 @@ import {
   shouldShowCampaignSetupGuide,
   wallClockToUtcHm,
 } from "../app/lib/campaign-setup-steps";
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-03-01T00:00:00Z"));
+});
+afterEach(() => vi.useRealTimers());
 
 const validSchedule = DEFAULT_WEEKDAY_CALLING_SCHEDULE;
 
@@ -126,6 +132,21 @@ describe("app/lib/campaign-setup-steps.ts", () => {
     expect(result.allComplete).toBe(true);
     expect(result.currentStepId).toBe(null);
     expect(result.steps.every((step) => step.status === "complete")).toBe(true);
+  });
+
+  test("an expired campaign guide selects the date pickers", () => {
+    vi.setSystemTime(new Date("2026-03-12T00:00:00Z"));
+    const result = getCampaignSetupSteps({
+      campaignData: { type: "live_call", caller_id: "+15555550100", start_date: "2026-03-10T10:00:00Z", end_date: "2026-03-11T10:00:00Z", schedule: validSchedule, status: "draft" } as never,
+      campaignDetails: { script_id: 7 } as never,
+      phoneNumbers: [{ phone_number: "+15555550100" } as never],
+      queueCount: 3, audienceCount: 1, scriptsCount: 2, workspaceId: "ws-1",
+    });
+    expect(result.allComplete).toBe(false);
+    expect(result.currentStepId).toBe("schedule");
+    expect(result.steps.find(step => step.status === "current")?.action).toEqual({
+      type: "scroll", targetId: "campaign-setup-schedule", label: "Update campaign dates",
+    });
   });
 
   test("message campaigns in messaging_service mode include messaging step instead of phone", () => {

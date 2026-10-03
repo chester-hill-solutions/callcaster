@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { asRouteResponse } from "./helpers/route-result";
 import { withWorkspaceRouteArgs } from "./helpers/route-context-mock";
@@ -7,6 +7,12 @@ vi.hoisted(() => {
   process.env.DATABASE_URL =
     process.env.DATABASE_URL ?? "postgres://local:test@127.0.0.1:5432/test";
 });
+
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-03-01T00:00:00Z"));
+});
+afterEach(() => vi.useRealTimers());
 
 const mocks = vi.hoisted(() => {
   return {

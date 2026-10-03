@@ -59,7 +59,8 @@ vi.mock("@/lib/db-rpc.server", () => ({
 vi.mock("@/server/tenant-db", () => ({
   createTenantDb: mocks.createTenantDb,
 }));
-vi.mock("@/lib/campaign-readiness", () => ({
+vi.mock("@/lib/campaign-readiness", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/campaign-readiness")>()),
   getCampaignReadiness: mocks.getCampaignReadiness,
 }));
 vi.mock("@/lib/logger.server", () => ({

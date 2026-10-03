@@ -2964,5 +2964,44 @@
     "trackerRecommendation": "The source fix travels with this board update. Verify deployed uploads and campaign sends after merge, then promote and close. Do not start a duplicate fix.",
     "currentBehavior": "This source fix uses one server-generated UUID plus safe filename for upload, campaign message_media and signing. It passes upsert:false and treats the real ObjectExistsError as failure before signing or campaign attachment. Historic keys retain their stored values. All 42 focused cases passed, including five route cases through the real upload/signing adapter and both campaign dispatch adapters. Removing the unique key failed two regressions with three controls; removing no-overwrite or restoring conflict continuation each failed three regressions with two controls.",
     "rootCause": "The messageMedia caller stored only workspace plus client filename and did not request no-overwrite. Its legacy statusCode conflict branch could continue to report success rather than handling the S3 adapter’s actual ObjectExistsError."
+  },
+  {
+    "issueNumber": 2092,
+    "verdict": "verify-close",
+    "recommendedTitle": "The campaign_ended readiness code is declared and mapped to a corrective action but never emitted, so an expired campaign reads \"Ready to launch\"",
+    "summary": "Expired campaigns now produce a readiness blocker before launch or joining. The correction selects the date pickers. Deployed launch and join verification remain.",
+    "resolution": "Verify expired, equal-time and future campaigns on deployed dev: expired campaigns show Complete before launch, disable Start and Schedule, and disable joining. The setup guide must select the date pickers. Check message, live and automated voice campaigns, then promote verified behavior before closing.",
+    "lookIn": [
+      "app/lib/campaign-readiness.ts",
+      "app/lib/campaign-execution.server.ts",
+      "app/lib/campaign-readiness-actions.ts",
+      "app/lib/campaign-setup-steps.ts",
+      "app/routes/workspaces+/$id/campaigns/$selected_id/settings.loader.server.ts",
+      "app/routes/workspaces+/$id/campaigns/$selected_id.loader.server.ts",
+      "app/components/campaign/settings/CampaignLaunch.tsx"
+    ],
+    "existingTests": [
+      "test/campaign-readiness-expiry.test.ts (expiry boundary, default/explicit clock, launch writes, every real producer and a new-union-code guard)",
+      "test/campaign-settings.route.test.ts (activation and unavailable-script controls with a pinned clock)",
+      "test/campaign-readiness.test.ts and test/campaign-readiness-actions.test.ts (existing readiness controls with a pinned clock)",
+      "test/campaign-setup-steps.test.ts (expired guide correction and existing steps)",
+      "test/campaign-selected-id.loader.test.ts (expired/equal running-campaign join behavior)",
+      "test/ui/campaign-launch-review.test.tsx and test/ui/campaign-launch-actions.test.tsx (real expiry readiness into UI, disabled start/schedule controls)"
+    ],
+    "missingTests": [
+      "Deployed expiry, date correction, launch and join verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "A campaign whose end date has passed shows a blocking readiness issue, a disabled Start button, and a non-empty \"Complete before launch\" list.",
+      "The corrective action scrolls to the date pickers.",
+      "A campaign with a future end date is unaffected.",
+      "A guard test fails if a code is added to the union with no producer."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "The source fix travels with this board update. Verify deployed expiry, launch and joining after merge, then promote and close. Do not start a duplicate fix.",
+    "currentBehavior": "The source fix uses the same strict end_date < now check in pure readiness and launch. Readiness defaults to the current clock; launch passes its explicit clock. End date equality remains valid, and invalid or reversed dates keep their earlier corrections. Launch rejects expiry before status or dispatch writes. The existing UI and results loader consume the blocker. All 144 focused cases passed (132 node, 12 UI), and seven isolated mutations failed the relevant regressions while controls passed. Producer fixtures invoke every real readiness producer, including script routing; an exhaustive record and a runtime union check detect untested codes.",
+    "rootCause": "campaign_ended existed in the code union and action map but readiness had no producer. Launch checked expiry separately and did not pass args.now into readiness. The expiry action led to the queue instead of date pickers."
   }
 ]

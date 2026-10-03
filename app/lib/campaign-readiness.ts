@@ -216,7 +216,17 @@ export function getScheduleValidation(schedule: Campaign["schedule"]) {
   };
 }
 
-function getDateIssue(campaignData: Campaign): CampaignReadinessIssue | null {
+export function isCampaignExpired(
+  endDateStr: string | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  if (!endDateStr) return false;
+  const endDate = new Date(endDateStr);
+  if (Number.isNaN(endDate.getTime())) return false;
+  return endDate < now;
+}
+
+function getDateIssue(campaignData: Campaign, now: Date): CampaignReadinessIssue | null {
   if (!campaignData.start_date || !campaignData.end_date) {
     return null;
   }
@@ -230,6 +240,13 @@ function getDateIssue(campaignData: Campaign): CampaignReadinessIssue | null {
 
   if (startDate > endDate) {
     return issue("start_after_end", "Start date must be before the end date");
+  }
+
+  if (isCampaignExpired(campaignData.end_date, now)) {
+    return issue(
+      "campaign_ended",
+      "This campaign's end date has passed. Update the dates or create a new campaign.",
+    );
   }
 
   return null;
@@ -469,7 +486,7 @@ export function getCampaignReadiness(
     commonIssues.push(issue("dates_required", "Start and end dates are required"));
   }
 
-  const dateIssue = getDateIssue(campaignData);
+  const dateIssue = getDateIssue(campaignData, options.now ?? new Date());
   if (dateIssue) {
     commonIssues.push(dateIssue);
   }
