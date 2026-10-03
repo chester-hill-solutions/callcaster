@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@09eb7740 + source fix for #2093` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@cc10a756 + source fix for #2094` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-02.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 81
+## Fix now — 80
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -346,17 +346,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/public-pricing.test.ts
 - Missing tests: Contract test must compare a five-minute published lane with voiceCreditsFromDurationSeconds for the same kind.
 - Done when: The Calling lane publishes the staffed rate (4 / 5) and the IVRs lane publishes the IVR rate (2 / 3).; A test computes `voiceCreditsFromDurationSeconds(300, kind)` for each published lane and asserts it equals the published figure for a 5-minute call.; The pricing calculator's field label matches the lane it prices.; `docs/` and any marketing copy quoting the auto-dial rate is checked and corrected.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2094](https://github.com/chester-hill-solutions/callcaster/issues/2094) Agent hang-up on a predictive call 500s and never tears the conference down — Twilio retries forever and the dialer keeps dialling
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- participant-leave throws for calls without outreach_attempt_id before conference teardown. Agent legs have no outreach attempt.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. participant-leave throws for calls without outreach_attempt_id before conference teardown. Agent legs have no outreach attempt.
-- Resolution: Handle agent-leg departure without an outreach attempt and complete the intended predictive conference with bounded, retry-safe cleanup.
-- Look in: `app/routes/api+/auto-dial/status.action.server.ts:213`, `app/routes/api+/auto-dial/status.action.server.ts:200-235,341,388`, `app/lib/auto-dial.server.ts:210-219`, `app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/$roomId.action.server.ts:198`, `test/auto-dial-status.test.ts:33-41,136-143,589,612`
-- Existing tests: test/auto-dial-status.test.ts
-- Missing tests: Use an agent leg with no attempt; assert conference teardown and successful callback handling.
-- Done when: An agent hang-up returns 200 and completes the conference.; A callee hang-up still records the attempt outcome (the existing behaviour must stay green).; The predictive dialer stops when the last conference ends.; The other agents' dashboards receive the end-of-call broadcast for an agent-leg hang-up.; Twilio receives no retry (no 500) for the agent leg.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2089](https://github.com/chester-hill-solutions/callcaster/issues/2089) The 1:1 opt-out and landline guards trust a caller-supplied contact_id that is never matched to the destination number
@@ -934,9 +923,32 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 103
+## Verify and close — 104
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2094](https://github.com/chester-hill-solutions/callcaster/issues/2094) Agent hang-up on a predictive call 500s and never tears the conference down — Twilio retries forever and the dialer keeps dialling
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Agent participant hangups stop the conference without an outreach attempt and notify only the matching screen. Deployed calling verification remains.
+- Current behavior: This source fix handles participant hangups before ordinary call statuses, stops the carrier conference before metadata writes, and keeps the ordinary terminal billing claim available. The conference-stop broadcast has an explicit ended marker. Ordinary status events carry the stored conference name but do not clear the conference; the room and sync hooks ignore other or older conferences. All 73 focused cases passed. Restoring the old endpoint failed seven regressions with the signature control passing; removing the end event failed four cases. Removing the screen hangup or room scope each failed the real hook pipeline test. Removing ordinary event scope failed the callback sequence test; removing the ended-marker gate failed the ordinary-completion UI control.
+- Root cause: The handler required an outreach attempt and wrote a possibly empty CallStatus before stopping the conference. A terminal CallStatus also took the wrong branch. Null-contact broadcasts were ignored by the screen, and unscoped broadcasts could affect another conference.
+- Resolution: Verify on deployed dev with browser and phone agent devices: agent and callee hangups stop the conference and next dialer turn; the matching screen clears, other conferences remain active, and ordinary status callbacks still bill and record outcomes. Test provider stop failure/retry and already-ended conferences. Promote the verified fix before closing.
+- Look in: `app/routes/api+/auto-dial/status.action.server.ts`, `app/hooks/call/useCallRoom.ts`, `app/hooks/call/usePredictiveCallSync.ts`, `app/lib/workspace-events.shared.ts`, `test/auto-dial-agent-leave.route.test.ts`, `test/ui/predictive-conference-ended.test.tsx`
+- Existing tests: test/auto-dial-agent-leave.route.test.ts (eight cases: provider and legacy fields, metadata and provider errors, ended/SID-only conference, later billing claim and signature rejection); test/ui/predictive-conference-ended.test.tsx (real room and sync hooks; explicit end vs ordinary completion; matching, other and old conference events); test/auto-dial-status.test.ts (ordinary status and callee controls); test/auto-dial.server.test.ts (ended conference stops the next turn); test/ui/use-call-room.test.tsx; test/ui/use-predictive-call-sync.test.ts; test/ui/hooks-call-screen.test.tsx
+- Missing tests: Deployed browser and phone calling verification, callback retries and billing verification.
+- Done when: An agent hang-up returns 200 and completes the conference.; A callee hang-up still records the attempt outcome (the existing behaviour must stay green).; The predictive dialer stops when the last conference ends.; The other agents' dashboards receive the end-of-call broadcast for an agent-leg hang-up.; Twilio receives no retry (no 500) for the agent leg.
+- Tracker: The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
+
+### [#2093](https://github.com/chester-hill-solutions/callcaster/issues/2093) A voice test call writes a call row with the campaign id, so the campaign's own duplicate gate later dequeues the real contact as "Duplicate IVR call prevented"
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Voice campaign test calls no longer count as prior campaign dispatches. Deployed campaign verification remains.
+- Current behavior: This source fix adds IS NOT NULL on outreach_attempt_id to the real tenant-scoped duplicate query. All 45 focused cases passed, including three real Postgres query and dispatch cases. Removing the exclusion failed two cases while the real-call control passed; reversing it failed all three.
+- Resolution: Verify on deployed dev: test-call an audience number, then dispatch the campaign and confirm the first real call proceeds. A later real dispatch to that number must still be skipped as a duplicate. Promote the verified fix before closing.
+- Look in: `app/lib/telephony-db.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `test/integration-db/campaign-call-duplicate.test.ts`
+- Existing tests: test/integration-db/campaign-call-duplicate.test.ts (real Postgres counts and real dispatch gate; test and real history; workspace, campaign and phone controls); test/campaign-test-call.test.ts (all three voice types, with and without a matching contact); test/campaign-settings.route.test.ts (all three voice types use the shared test-call helper); test/campaign-ivr-dispatch.test.ts (existing queue and dispatch controls)
+- Missing tests: Deployed calling verification with a test recipient also in the audience, plus a real-call duplicate control.
+- Done when: A test call to a number that is also in the campaign audience does **not** cause the campaign to dequeue that contact as a duplicate.; Two real dispatch calls to the same number in one campaign still dequeue the second (the positive control must stay green).; The dedupe query's test-call exclusion is asserted directly, not only through the dispatch result.; Every test-call path is covered; a test enumerates them.
+- Tracker: The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
 
 ### [#2095](https://github.com/chester-hill-solutions/callcaster/issues/2095) "Leave Campaign" does not leave the campaign in predictive mode — the conference and the dialer keep running and real calls keep being placed
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -992,17 +1004,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Runtime verification remains; source and tests implement the decided behavior.
 - Done when: DONE: a disabled workspace receives no number_rental_billing debit and no billing_reconcile or twilio_open_sync run. Kill-check run: inverting the fanout guard turns 4 tests red, inverting billingEnabled turns 4 red, setting includeDisabled: false turns 2 red.; DONE: the fanout summary counts the workspace as `skipped` and logs `<job>.fanout_skipped_disabled` with the workspaceId.; DONE: an enabled workspace is unaffected (positive control asserted in all three test files).; DONE: the decided meaning of `disabled` is recorded on this issue and in the runCronWorkspaceFanout doc comment.; DONE: the release half keeps running, so no number is stranded by the suspension itself.
 - Tracker: Move to Verify and close. Do not implement the original single fanout guard. Related PR evidence: #2165. A PR reference alone does not prove deployed behavior.
-
-### [#2093](https://github.com/chester-hill-solutions/callcaster/issues/2093) A voice test call writes a call row with the campaign id, so the campaign's own duplicate gate later dequeues the real contact as "Duplicate IVR call prevented"
-- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Voice campaign test calls no longer count as prior campaign dispatches. Deployed campaign verification remains.
-- Current behavior: This source fix adds IS NOT NULL on outreach_attempt_id to the real tenant-scoped duplicate query. All 45 focused cases passed, including three real Postgres query and dispatch cases. Removing the exclusion failed two cases while the real-call control passed; reversing it failed all three.
-- Resolution: Verify on deployed dev: test-call an audience number, then dispatch the campaign and confirm the first real call proceeds. A later real dispatch to that number must still be skipped as a duplicate. Promote the verified fix before closing.
-- Look in: `app/lib/telephony-db.server.ts`, `app/lib/campaign-test-call.server.ts`, `app/lib/campaign-ivr-dispatch.server.ts`, `test/integration-db/campaign-call-duplicate.test.ts`
-- Existing tests: test/integration-db/campaign-call-duplicate.test.ts (real Postgres counts and real dispatch gate; test and real history; workspace, campaign and phone controls); test/campaign-test-call.test.ts (all three voice types, with and without a matching contact); test/campaign-settings.route.test.ts (all three voice types use the shared test-call helper); test/campaign-ivr-dispatch.test.ts (existing queue and dispatch controls)
-- Missing tests: Deployed calling verification with a test recipient also in the audience, plus a real-call duplicate control.
-- Done when: A test call to a number that is also in the campaign audience does **not** cause the campaign to dequeue that contact as a duplicate.; Two real dispatch calls to the same number in one campaign still dequeue the second (the positive control must stay green).; The dedupe query's test-call exclusion is asserted directly, not only through the dispatch result.; Every test-call path is covered; a test enumerates them.
-- Tracker: The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
 
 ### [#2086](https://github.com/chester-hill-solutions/callcaster/issues/2086) The IVR no-input replay branch overwrites outreach_attempt.result, destroying every answer already recorded on that call
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: @wra-sol · Updated: 2026-10-02

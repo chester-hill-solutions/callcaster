@@ -15,6 +15,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Agent hangups in predictive campaigns now stop the conference, notify the matching call screen and preserve the later billing callback ([PR #2259](https://github.com/chester-hill-solutions/callcaster/pull/2259), [#2094](https://github.com/chester-hill-solutions/callcaster/issues/2094)).
 - Voice campaign test calls no longer cause an audience contact to be skipped as a duplicate; real campaign calls retain duplicate protection ([#2093](https://github.com/chester-hill-solutions/callcaster/issues/2093)).
 - Leaving a predictive campaign now waits for the conference and dialer to stop, keeps the call screen available on failure, and preserves the campaign queue ([PR #2257](https://github.com/chester-hill-solutions/callcaster/pull/2257), [#2095](https://github.com/chester-hill-solutions/callcaster/issues/2095)).
 - Workspace creation retries now return only the signed-in user's own workspace, even when another user uses the same retry key ([PR #2254](https://github.com/chester-hill-solutions/callcaster/pull/2254), [#2132](https://github.com/chester-hill-solutions/callcaster/issues/2132)).

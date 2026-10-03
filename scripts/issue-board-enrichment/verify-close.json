@@ -2848,5 +2848,45 @@
     "size": "S",
     "risk": "high",
     "trackerRecommendation": "The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix."
+  },
+  {
+    "issueNumber": 2094,
+    "verdict": "verify-close",
+    "recommendedTitle": "Agent hang-up on a predictive call 500s and never tears the conference down — Twilio retries forever and the dialer keeps dialling",
+    "summary": "Agent participant hangups stop the conference without an outreach attempt and notify only the matching screen. Deployed calling verification remains.",
+    "currentBehavior": "This source fix handles participant hangups before ordinary call statuses, stops the carrier conference before metadata writes, and keeps the ordinary terminal billing claim available. The conference-stop broadcast has an explicit ended marker. Ordinary status events carry the stored conference name but do not clear the conference; the room and sync hooks ignore other or older conferences. All 73 focused cases passed. Restoring the old endpoint failed seven regressions with the signature control passing; removing the end event failed four cases. Removing the screen hangup or room scope each failed the real hook pipeline test. Removing ordinary event scope failed the callback sequence test; removing the ended-marker gate failed the ordinary-completion UI control.",
+    "resolution": "Verify on deployed dev with browser and phone agent devices: agent and callee hangups stop the conference and next dialer turn; the matching screen clears, other conferences remain active, and ordinary status callbacks still bill and record outcomes. Test provider stop failure/retry and already-ended conferences. Promote the verified fix before closing.",
+    "lookIn": [
+      "app/routes/api+/auto-dial/status.action.server.ts",
+      "app/hooks/call/useCallRoom.ts",
+      "app/hooks/call/usePredictiveCallSync.ts",
+      "app/lib/workspace-events.shared.ts",
+      "test/auto-dial-agent-leave.route.test.ts",
+      "test/ui/predictive-conference-ended.test.tsx"
+    ],
+    "existingTests": [
+      "test/auto-dial-agent-leave.route.test.ts (eight cases: provider and legacy fields, metadata and provider errors, ended/SID-only conference, later billing claim and signature rejection)",
+      "test/ui/predictive-conference-ended.test.tsx (real room and sync hooks; explicit end vs ordinary completion; matching, other and old conference events)",
+      "test/auto-dial-status.test.ts (ordinary status and callee controls)",
+      "test/auto-dial.server.test.ts (ended conference stops the next turn)",
+      "test/ui/use-call-room.test.tsx",
+      "test/ui/use-predictive-call-sync.test.ts",
+      "test/ui/hooks-call-screen.test.tsx"
+    ],
+    "missingTests": [
+      "Deployed browser and phone calling verification, callback retries and billing verification."
+    ],
+    "acceptanceCriteria": [
+      "An agent hang-up returns 200 and completes the conference.",
+      "A callee hang-up still records the attempt outcome (the existing behaviour must stay green).",
+      "The predictive dialer stops when the last conference ends.",
+      "The other agents' dashboards receive the end-of-call broadcast for an agent-leg hang-up.",
+      "Twilio receives no retry (no 500) for the agent leg."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.",
+    "rootCause": "The handler required an outreach attempt and wrote a possibly empty CallStatus before stopping the conference. A terminal CallStatus also took the wrong branch. Null-contact broadcasts were ignored by the screen, and unscoped broadcasts could affect another conference."
   }
 ]

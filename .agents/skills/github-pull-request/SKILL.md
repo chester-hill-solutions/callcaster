@@ -29,6 +29,16 @@ or editing a PR. High-risk paths or more than 500 added lines require a
 outside the board/enrichment-only exemption still need that declaration.
 Record the completed review and its scope; do not add a marker without review.
 
+## Development links for dev PRs
+
+Closing keywords in a PR into `dev` may leave `closingIssuesReferences` empty
+because `dev` is not the default branch. Read that field after PR creation.
+If it is empty, resolve the issue and PR node IDs, then use GraphQL
+`addCloseIssueReferences(input: { issueId: ISSUE_ID, pullRequestIds: [PR_ID] })`.
+The input is one issue and a list of PRs; the payload returns `issue`, not
+`pullRequest`. Verify `closingIssuesReferences` afterward. Keep the issue open
+until the fix reaches the default branch and its required verification is done.
+
 ## Context-only issue references
 
 The `issue-on-dev` workflow also matches singular `issue #N` in body prose,

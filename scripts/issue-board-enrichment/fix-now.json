@@ -1079,38 +1079,6 @@
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. An ended message campaign returns no readiness issues and no disabled reason. getDateIssue does not compare end_date to options.now."
   },
   {
-    "issueNumber": 2094,
-    "verdict": "fix-now",
-    "recommendedTitle": "Agent hang-up on a predictive call 500s and never tears the conference down — Twilio retries forever and the dialer keeps dialling",
-    "summary": "participant-leave throws for calls without outreach_attempt_id before conference teardown. Agent legs have no outreach attempt.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. participant-leave throws for calls without outreach_attempt_id before conference teardown. Agent legs have no outreach attempt.",
-    "resolution": "Handle agent-leg departure without an outreach attempt and complete the intended predictive conference with bounded, retry-safe cleanup.",
-    "lookIn": [
-      "app/routes/api+/auto-dial/status.action.server.ts:213",
-      "app/routes/api+/auto-dial/status.action.server.ts:200-235,341,388",
-      "app/lib/auto-dial.server.ts:210-219",
-      "app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/$roomId.action.server.ts:198",
-      "test/auto-dial-status.test.ts:33-41,136-143,589,612"
-    ],
-    "existingTests": [
-      "test/auto-dial-status.test.ts"
-    ],
-    "missingTests": [
-      "Use an agent leg with no attempt; assert conference teardown and successful callback handling."
-    ],
-    "acceptanceCriteria": [
-      "An agent hang-up returns 200 and completes the conference.",
-      "A callee hang-up still records the attempt outcome (the existing behaviour must stay green).",
-      "The predictive dialer stops when the last conference ends.",
-      "The other agents' dashboards receive the end-of-call broadcast for an agent-leg hang-up.",
-      "Twilio receives no retry (no 500) for the agent leg."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2096,
     "verdict": "fix-now",
     "recommendedTitle": "Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them",

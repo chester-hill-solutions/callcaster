@@ -196,33 +196,19 @@ const handleCallStatus = async (
 
 const handleParticipantLeave = async (
   event: ParticipantLeaveEvent,
+  dbCall: Tables<"call">,
   twilio: TwilioClient,
 ) => {
   try {
     const callSid = requireValue(event.callSid, "CallSid");
-    const timestamp = requireValue(event.timestamp, "Timestamp");
-    const existingCall = await findCallBySid(callSid);
-    if (!existingCall?.workspace) {
-      throw new Error("Call not found for participant leave");
+    const workspaceId = requireValue(dbCall.workspace, "workspace");
+    let conferenceName = event.conferenceName ?? dbCall.conference_id;
+    if (!conferenceName && event.conferenceSid) {
+      const conference = await twilio.conferences(event.conferenceSid).fetch();
+      conferenceName = conference.friendlyName;
     }
-    const dbCall = await updateCall(callSid, existingCall.workspace, {
-      end_time: new Date(timestamp),
-      duration: String(event.durationSeconds ?? 0),
-      status: event.callStatus.toLowerCase() as Tables<"call">["status"],
-    });
-    if (!dbCall.outreach_attempt_id) {
-      throw new Error("Missing outreach_attempt_id for participant leave");
-    }
-    const outreachStatus = await findOutreachAttemptById(
-      existingCall.workspace,
-      dbCall.outreach_attempt_id,
-    );
-    if (!outreachStatus) {
-      throw new Error("Outreach attempt not found for participant leave");
-    }
-
     const conferences = await twilio.conferences.list({
-      friendlyName: event.conferenceRef ?? "",
+      friendlyName: requireValue(conferenceName, "conference name"),
       status: "in-progress",
     });
     await Promise.all(
@@ -230,6 +216,27 @@ const handleParticipantLeave = async (
         twilio.conferences(sid).update({ status: "completed" }),
       ),
     );
+
+    await emitPredictiveBroadcast(workspaceId, {
+      contact_id: dbCall.contact_id,
+      status: "completed",
+      conference_id: requireValue(conferenceName, "conference name"),
+      conference_ended: true,
+    });
+
+    // Terminal call.status owns the ordinary callback's billing/replay claim.
+    // A participant event must not take that claim before billing runs.
+    try {
+      const update: Partial<Tables<"call">> = {};
+      if (event.timestamp) {
+        const endedAt = new Date(event.timestamp);
+        if (Number.isFinite(endedAt.getTime())) update.end_time = endedAt;
+      }
+      if (event.durationSeconds !== null) update.duration = String(event.durationSeconds);
+      if (Object.keys(update).length) await updateCall(callSid, workspaceId, update);
+    } catch (error) {
+      logger.error("Participant conference stopped but call metadata update failed", error);
+    }
   } catch (error) {
     logger.error("Error in handleParticipantLeave:", error);
     throw error;
@@ -325,9 +332,10 @@ export const action = defineAction({
 
     const twilio = await createWorkspaceTwilioInstance({ workspace_id: requireValue(dbCall.workspace, "workspace"),
     });
-    // `""` when Twilio sent no CallStatus, on every union member — conference
-    // participant callbacks carry one too, and this switch runs before the
-    // event kind is ever consulted.
+    if (isParticipantHangup(event)) {
+      await handleParticipantLeave(event, dbCall, twilio);
+      return routeData({ success: true });
+    }
     const callStatusValue = event.callStatus;
 
     // Predictive contact calls send their status callbacks HERE, not to
@@ -340,6 +348,7 @@ export const action = defineAction({
       await emitPredictiveBroadcast(requireValue(dbCall.workspace, "workspace"), {
         contact_id: dbCall.contact_id,
         status: callStatusValue.toLowerCase(),
+        ...(dbCall.conference_id ? { conference_id: dbCall.conference_id } : {}),
       });
     }
     switch (callStatusValue) {
@@ -375,9 +384,7 @@ export const action = defineAction({
         );
         break;
       default:
-        if (isParticipantHangup(event)) {
-          await handleParticipantLeave(event, twilio);
-        } else if (isParticipantJoin(event)) {
+        if (isParticipantJoin(event)) {
           await handleParticipantJoin(event, dbCall);
         }
     }
