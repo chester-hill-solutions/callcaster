@@ -44,7 +44,7 @@ Always talk to me like I have ADHD.
 - **Auth layout adapter:** This repository currently uses [`app/lib/auth-layout.server.ts`](app/lib/auth-layout.server.ts) (`createAuthLayoutLoader`, `createRequireSessionUserId`) for the auth layout boundary.
 - **`@react-router/fs-routes`:** Deferred — `remix-flat-routes` + route tooling baselines remain; evaluate fs-routes only after RR8 is stable in production.
 - Tooling: `npm run tools:routes:folderize`, `tools:routes:verify`, `tools:routes:imports` (see [scripts/](scripts/)).
-- **Pre-PR CI bar:** `npm run ci:local` mirrors the quality + bundle-guard jobs (typecheck, lint, tests, route-tree verify, API surface/codegen drift, structural guards).
+- **Pre-PR CI bar:** `npm run ci:local` is the repository's comprehensive local gate. It runs typecheck, lint, both test suites, route and API checks, structural guards, the production build, the client-bundle check, and codegen verification.
 - **Structural guards:** 15 `check:*` commands wired in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — 14 in the `quality` job (`check:route-server-leaks`, `check:twilio-webhooks`, `check:request-body-consumption`, `check:middleware`, `check:credit-writes`, `check:route-authz`, `check:workspace-projection`, `check:effects`, `check:type-safety`, `check:dry`, `check:handlers`, `check:test-mocks`, `check:bun-lock`, `check:lint-ratchet`) plus `check:client-bundle` in `bundle-guard`. That job list also runs `tools:routes:verify`, `tools:api:surface:check`, `db:ledger:check`, `db:bootstrap:check`, `tools:check-file-size` and `ci:codegen:verify`.
 
 ## Public APIs (doc-first / Hey API)
