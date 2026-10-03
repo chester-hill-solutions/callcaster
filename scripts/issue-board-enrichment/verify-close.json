@@ -3813,7 +3813,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Save all pending survey answers before completion",
     "summary": "Each respondent keeps pending answers by page and question. Next and Submit await save acknowledgements; Thank You awaits completion success.",
-    "currentBehavior": "Source fix based on dev@be7f2312. A domain hook retains page/question revisions and drains them serially through the existing form client. Failed writes remain retryable; successful writes do not delete newer edits. Next and Submit flush all pending writes, stop on HTTP, network or action failure, and wait for completion success before showing Thank You. Busy controls include explicit shared Checkbox disable. True respondent unmount cancels pending timers and requests; the shared debounce also cancels sidebar timers. Source prerequisite #2125 merged and the native blocked-by edge was removed. Focused original and fault proofs and full local/remote gates are required before merge.",
+    "currentBehavior": "Merged to dev in PR #2296 at a3d9fc40. Page/question revisions drain serially through the existing form client. Next and Submit await successful answer acknowledgements; Thank You awaits completion success. Failures retain retryable form values; a completed write does not remove a newer edit. Busy controls include explicit shared Checkbox disable. Respondent unmount cancels timers and requests; shared Sidebar debounce also cleans up. All 32 focused cases pass; original fails 16 with 16 controls; nine faults fail and source is restored. Full local CI passed 5,318 Vitest and 22 Bun; all remote and both Railway gates passed on 29115361. Source prerequisite #2125 is fulfilled. Verify deployed dev and promote before closure.",
     "resolution": "Verify deployed rapid edits, repeated labels across pages, immediate final submit, delayed and failed saves/completion, recoverable retry, respondent change and route unmount. Keep required-answer policy #2107, page-scoped display/resume #2294 and historical assessment #2292 separate. Promote before closure.",
     "lookIn": [
       "app/hooks/surveys/useSurveySubmission.ts",
@@ -3841,7 +3841,40 @@
     "blockedBy": [],
     "size": "S",
     "risk": "high",
-    "trackerRecommendation": "Atomic source fix in this change; keep open for deployed verification and promotion.",
+    "trackerRecommendation": "Merged source fix; verify deployed dev and promote before closure. Required validation, displayed/resumed page identity and historical assessment stay separate.",
     "rootCause": "One timer discarded earlier question saves, and navigation/completion did not wait for successful action acknowledgements. The form owner remained mounted after optimistic completion; true unmount did not cancel timers."
+  },
+  {
+    "issueNumber": 2295,
+    "verdict": "verify-close",
+    "recommendedTitle": "Confirm bulk-send warning overrides explicitly",
+    "summary": "The bulk-volume override has an explicit confirmation with recipient count, delivery risk and a Send anyway choice.",
+    "currentBehavior": "Source change based on clean dev@a3d9fc40. The existing campaign-level local-number override is reused with Are you sure?, the actual queued contact count and delivery risk. Confirmation permits launch and does not dispatch immediately. Cancel, Escape and reopen require a fresh acknowledgement; pending confirmation locks the shared Checkbox and confirmation, with retry after failure. FormField uses matching visible label/control IDs. Existing admin/workspace guard, readiness rules, active notice, removal and splitting remain. Seven actual UI cases and 42 surrounding readiness/settings cases pass; original UI fails 5 with 2 controls; six faults fail and source is restored. Independent review is clear; full local/remote gates are required before merge.",
+    "rootCause": "The existing override wording did not use the requested explicit confirmation, and cancelled acknowledgement could persist on reopening. The custom Checkbox was not explicitly locked during the request.",
+    "resolution": "Verify deployed bulk-volume warning count, explicit acknowledgement, Cancel/Escape/fresh reopen, pending double click, failure retry and active override removal. Keep other readiness and consent/opt-out enforcement. Promote before closure.",
+    "lookIn": [
+      "app/components/campaign/settings/detailed/CampaignDetailed.SplitCampaign.tsx",
+      "app/routes/workspaces+/$id/campaigns/$selected_id/settings.action.server.ts",
+      "app/lib/campaign-readiness.ts"
+    ],
+    "existingTests": [
+      "test/ui/split-campaign-override.test.tsx",
+      "test/campaign-readiness.test.ts",
+      "test/campaign-settings.route.test.ts"
+    ],
+    "missingTests": [
+      "Deployed dev browser verification and promotion."
+    ],
+    "acceptanceCriteria": [
+      "Show Are you sure?, real queued count, delivery risk, Cancel and Send anyway.",
+      "Require risk acknowledgement; Cancel/Escape sends nothing and reopening resets it.",
+      "Pending confirmation locks custom Checkbox and prevents a second request.",
+      "Failed confirmation is retryable without successful override state.",
+      "Keep existing workspace/admin authorization, readiness and recipient consent/opt-out boundaries."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "User-authorized source change in this atomic PR; keep open for deployed verification and promotion."
   }
 ]
