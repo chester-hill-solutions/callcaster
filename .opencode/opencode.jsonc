@@ -5,5 +5,8 @@
       "type": "local",
       "command": ["railway", "mcp"]
     }
-  }
+  },
+  "plugins": [
+    ".opencode/plugins/graphify.js"
+  ]
 }
