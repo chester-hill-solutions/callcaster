@@ -587,37 +587,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2083,
-    "verdict": "fix-now",
-    "recommendedTitle": "The toll-free send gate fails open when the number has no TFV record and when the Twilio list call errors",
-    "summary": "A verification-list error becomes an empty result. Missing or unknown toll-free verification then permits bulk SMS. The list also has a 200-record limit.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. A verification-list error becomes an empty result. Missing or unknown toll-free verification then permits bulk SMS. The list also has a 200-record limit.",
-    "resolution": "Propagate or classify verification-list errors as blocking. Missing and unknown verification must block bulk SMS. Replace the bounded 200-record enumeration with complete relevant enumeration; the issue does not prove a one-page SDK bug.",
-    "lookIn": [
-      "app/lib/twilio-toll-free.server.ts:49",
-      "app/lib/twilio-toll-free.server.ts:74",
-      "app/lib/twilio-toll-free.server.ts:25-42,44-50,52-67,68+",
-      "app/lib/twilio-readiness.server.ts:66-88",
-      "app/lib/messaging-onboarding/predicates.ts:380-471",
-      "app/lib/twilio-a2p-status-sync.server.ts (the same fail-open pattern is worth checking here too)"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Reject sends for provider errors, absent verification, unknown status and a sender beyond the record limit."
-    ],
-    "acceptanceCriteria": [
-      "A toll-free number with **no** TFV record blocks bulk SMS with a message naming the missing verification.",
-      "A Twilio error while listing verifications **blocks** the send (fail closed) and surfaces the Twilio error.",
-      "A matching verification beyond the previous 200-record limit is included in the send decision.",
-      "An approved verification still passes; a rejected one still blocks — both are positive controls.",
-      "The fail-closed intent is documented at the decision function so the polarity cannot be flipped silently."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2084,
     "verdict": "fix-now",
     "recommendedTitle": "Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor",

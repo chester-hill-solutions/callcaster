@@ -1,4 +1,6 @@
 import type { Database, Tables } from "@/lib/db-types";
+import type { WorkspaceTwilioSyncSnapshot } from "@/lib/workspace-twilio-sync";
+export type { WorkspaceTwilioSyncSnapshot, WorkspaceTwilioSyncStatus } from "@/lib/workspace-twilio-sync";
 import type { AccountInstance } from "twilio/lib/rest/api/v2010/account";
 import type { CallCoachingHydration } from "@/hooks/call/useCallCoaching";
 import type { WorkspaceOnboardingGoal } from "@/lib/workspace-onboarding-goals";
@@ -193,12 +195,6 @@ export type TwilioMessageIntent = (typeof TWILIO_MESSAGE_INTENT_VALUES)[number];
 export type TwilioSendMode = (typeof TWILIO_SEND_MODE_VALUES)[number];
 export type TwilioOnboardingStatus = (typeof TWILIO_ONBOARDING_STATUS_VALUES)[number];
 export type TwilioSmsSenderClass = (typeof TWILIO_SMS_SENDER_CLASS_VALUES)[number];
-export type WorkspaceTwilioSyncStatus =
-  | "never_synced"
-  | "syncing"
-  | "healthy"
-  | "error";
-
 export interface WorkspaceTwilioOpsAuditEntry {
   changedAt: string;
   actorUserId: string | null;
@@ -255,23 +251,6 @@ export interface WorkspaceTwilioPortalMetrics {
   voiceConcurrentCallLimit: number;
   parallelDispatchEnabled: boolean;
   smsSenderClass: TwilioSmsSenderClass;
-}
-
-export interface WorkspaceTwilioSyncSnapshot {
-  accountStatus: string | null;
-  accountFriendlyName: string | null;
-  phoneNumberCount: number;
-  /** Capability flags observed on workspace numbers (sms, mms, voice). */
-  numberTypes: string[];
-  /** Twilio sender taxonomy inferred from phone inventory (toll_free, local, …). */
-  senderTypes: string[];
-  recentUsageCount: number;
-  usageTotalPrice: number | null;
-  lastSyncedAt: string | null;
-  lastSyncStatus: WorkspaceTwilioSyncStatus;
-  lastSyncError: string | null;
-  /** True when toll-free verification blocks bulk SMS for synced inventory. */
-  tollFreeVerificationBlocked?: boolean;
 }
 
 export interface WorkspaceTwilioPortalSnapshot {

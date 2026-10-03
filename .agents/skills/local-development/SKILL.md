@@ -102,6 +102,18 @@ emitted TwiML for entry and next-page order. Editor round-trip tests alone canno
 prove caller flow. Campaign launch must check a declared raw entry before the
 editor migration can repair it. Keep legacy and explicit-page controls.
 
+## Scripted source edits
+
+Before inserting a constant beside an export, find its first runtime use. An
+exported table can aggregate an earlier private table, so shared constants must
+precede that first construction. Anchor replacements to whole lines or complete
+declarations, and require a unique match before writing. Run the affected module
+tests after the edit.
+Baseline experiments after staging must include staged and unstaged runtime
+changes against the pinned commit (`git diff HEAD`), not only the worktree diff.
+Restore each tracked runtime file from that commit and check the actual collected
+failure/control counts. Keep restoration in `finally`.
+
 ## Generated API files
 
 For API surface changes, generate with `npm run tools:api:codegen` and

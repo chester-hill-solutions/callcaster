@@ -3370,7 +3370,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Project admin workspace responses without credentials",
     "summary": "Admin workspace and provider data use positive field sets at the response boundary; nested invitation hashes are excluded. Deployed checks remain.",
-    "currentBehavior": "Source fix from dev@9aa2025e: dashboard UI/API, detail, campaign subpage and user-workspace UI/API use the canonical seven-field client workspace projection. Nested memberships and invitations use the same shape; invitation display rows exclude token_hash. Detail and standalone Twilio portal share a five-field provider account projection. The SDK client supplies the selected account SID, so detail no longer reads credentials from its response workspace. Admin client types are narrowed; the credits loader uses the existing safe SQL reader. All 50 focused Node cases and typechecking passed. Original affected source failed 14 payload/guard cases with 12 controls retained. Thirteen isolated workspace, nested invitation, provider account-selection and guard mutations failed and were restored.",
+    "currentBehavior": "Merged to dev in PR #2280 at 6e46180b. Six admin UI/API surfaces use the canonical positive workspace contract, nested invitation hashes are excluded and both account loaders use one five-field projection with selected-account tests. Safe client types and the static import/type gate preserve server-only credential reads and health derivation. All 50 focused Node cases passed, 13 mutations failed, full local CI passed 5,048 Vitest and 22 Bun tests. All remote gates passed on 9ee5270b; issue-on-dev moved one item. Deployed functional verification and promotion remain.",
     "resolution": "Verify all admin UI/JSON payloads and nested rows exclude credentials and hashes on deployed dev, while display/health data and server-only Twilio operations remain usable. Promote before closure.",
     "lookIn": [
       "app/lib/platform-admin.server.ts",
@@ -3402,5 +3402,45 @@
     "risk": "high",
     "trackerRecommendation": "Source fix is in this change. Verify deployed nested payloads and admin operations, then promote and close.",
     "rootCause": "Safe derived workspaceRows were returned beside raw global workspace rows. Admin services also passed raw membership/invitation joins and detail rows through to route adapters, and a smaller provider interface did not remove runtime account fields."
+  },
+  {
+    "issueNumber": 2083,
+    "verdict": "verify-close",
+    "recommendedTitle": "Block bulk SMS when toll-free verification evidence is missing",
+    "summary": "Complete SDK enumeration and explicit approval now establish successful verification evidence. Missing, failed and older snapshots block bulk SMS until refreshed.",
+    "currentBehavior": "Source fix from dev@6e46180b: full phone inventory and verification lists use SDK pagination without a total cap. Missing records, unknown/non-approved statuses and provider errors block sends. Successful complete sync writes tollFreeVerificationCheckedAt; missing, malformed, failed and legacy healthy/false evidence remains blocked. The real shared predicate and send gate retain provider error feedback. Approved and no-toll-free inventory controls pass; a successful refresh replaces a failure. All 101 focused Node cases and typechecking passed. Original source failed 27 new regressions with 12 controls retained. Fourteen isolated status, provider error, pagination, evidence and feedback mutations failed and were restored.",
+    "resolution": "After deploying, refresh older snapshots through admin Sync Twilio or Sync Now. Verify approved, missing, provider-error, later-page inventory/verification and recovery cases through the real bulk SMS gate. Promote before closure.",
+    "lookIn": [
+      "app/lib/twilio-toll-free.server.ts",
+      "app/lib/database/workspace-twilio-sync.server.ts",
+      "app/lib/twilio-readiness.server.ts",
+      "app/lib/messaging-onboarding/predicates.ts",
+      "app/lib/workspace-twilio-sync.ts",
+      "app/lib/types.ts",
+      "scripts/check-app-file-size.mjs",
+      "docs/twilio-toll-free-verification-plan.md"
+    ],
+    "existingTests": [
+      "test/toll-free-verification-evidence.test.ts (installed SDK transport, exact status controls, provider errors and later verification pages)",
+      "test/workspace-twilio-sync.server.test.ts (real writer, normalization, stored readiness gate, later inventory page, unknown/legacy/malformed/failed evidence, approval/no-TF controls and refresh recovery)",
+      "Existing portal, recommendations, shared onboarding/readiness, RCS and campaign send-gate controls"
+    ],
+    "missingTests": [
+      "Deployed dev refresh and actual bulk SMS checks before promotion and closure."
+    ],
+    "acceptanceCriteria": [
+      "Missing, unknown, misleading non-approved, pending and rejected verification blocks bulk SMS.",
+      "Provider and inventory errors remain visible and block the actual gate.",
+      "Phone inventory and matching verification beyond the former 200-result cap affect the decision.",
+      "A successful complete sync is required before old or missing evidence can permit sends.",
+      "Approved senders and successful no-toll-free inventory remain allowed; successful refresh recovers from failure.",
+      "The shared gate fails closed and adds no provider call per recipient.",
+      "Refresh deployed snapshots and verify behavior before promotion and closure."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Source fix is in this change. Refresh legacy snapshots after deployment, verify actual SMS decisions and recovery, then promote and close.",
+    "rootCause": "The verification helper swallowed errors, truncated enumeration and permitted unknown status. The outer sync error handler also cleared the block. Existing healthy/false snapshots could therefore be false approval evidence."
   }
 ]
