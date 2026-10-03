@@ -1042,7 +1042,7 @@
     "verdict": "blocked-epic",
     "recommendedTitle": "Consistent feedback without page movement",
     "summary": "Shared component ownership and a no-layout-movement rule for all dynamic feedback. Implement through the separate child tasks.",
-    "currentBehavior": "Rule/inventory PR #2302 and reset-password PR #2310 are merged into dev. Canonical Notice #120, semantic Alert #121 and modal-safe Toaster #126 are reviewed local shared work, not merged/adopted. Notice source uses shared button styles; actual CallCaster shad-cc consumer proof passes four narrow/desktop light/dark cases with no page/scroll movement. Field-error #125 is pending. Native consumer children #2311/#2312 cover field placement/modal accessibility; #2305 and #2307 have real prerequisites, and #2306/#2308 remain separate defects.",
+    "currentBehavior": "Rule/inventory PR #2302 and reset-password PR #2310 are merged into dev. Canonical Notice #120, semantic Alert #121 and modal-safe Toaster #126 are reviewed local shared work, not merged/adopted. Notice source uses shared button styles; actual CallCaster shad-cc consumer proof passes four narrow/desktop light/dark cases with no page/scroll movement. Field-error #125 is reviewed local shared source at a4a07e5: 218 workbench tests, five CLI tests and four actual CallCaster shad-cc browser cases pass. Original flow adds 120px at narrow width. Shared source remains unmerged and not adopted. Native consumer children #2311/#2312 cover field placement/modal accessibility; #2305 and #2307 have real prerequisites, and #2306/#2308 remain separate defects.",
     "rootCause": "Message tone, placement and lifecycle were selected independently at each call site.",
     "resolution": "Ship shared mechanics first, then migrate consumer groups in atomic PRs. Preserve page layout, field association, unresolved conditions, required remedies, confirmation safety and root-only transient feedback. Do not implement this Epic as one large PR.",
     "lookIn": [
@@ -1131,14 +1131,14 @@
     ],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Source-confirmed prerequisite #2311. Native dependency and issue-body audit update are prepared but not yet published because GitHub reads time out. Repair the premature client advance within this name-save failure/retry concern; preserve the server onboarding state machine."
+    "trackerRecommendation": "Blocked by #2311 (native edge and audited issue body verified on 2026-10-03). Repair the premature client advance within this name-save failure/retry concern; preserve the server onboarding state machine."
   },
   {
     "issueNumber": 2311,
     "verdict": "blocked-epic",
     "recommendedTitle": "Keep validation errors from moving form controls",
     "summary": "Adopt the canonical field-error presentation while preserving correct accessible field association.",
-    "currentBehavior": "FormField inserts a conditional normal-flow error paragraph; AddAudioSheet also inserts one unassociated local validation row. Shared field primitive work is open in chester-hill-solutions/chester-hill-solutions#125. Consumer implementation/browser acceptance is pending.",
+    "currentBehavior": "FormField inserts a conditional normal-flow error paragraph; AddAudioSheet also inserts one unassociated local validation row. Shared #125 now has reviewed local source at a4a07e5: owning IDs/ARIA, SSR description, retained drafts, keyboard remedies and modal access. Full workbench/CLI checks and four actual CallCaster shad-cc browser cases pass; original flow fails geometry. Shared merge and consumer implementation/browser acceptance remain pending.",
     "rootCause": "Conditional error rows add layout height; some validation is not associated with the invalid control.",
     "resolution": "Implement the canonical shared contract in https://github.com/chester-hill-solutions/chester-hill-solutions/issues/125 first. Adopt its reviewed source through the existing vendor and thin FormField adapter; preserve labels, help, stable IDs, values, compound controls, hard validation and remedies. Do not make a second placement engine.",
     "lookIn": [
@@ -1147,10 +1147,11 @@
       "docs/design-system.md"
     ],
     "existingTests": [
-      "Existing FormField accessibility tests; canonical source audit at shared main@412bb1d."
+      "Existing FormField accessibility tests; canonical source audit at shared main@412bb1d.",
+      "Reviewed shared local source: 218 workbench tests, five CLI tests, nine focused cases with original/five faults failing and restored source passing. Four narrow/desktop light/dark actual shad-cc cases preserve 18 page/17 dialog landmarks."
     ],
     "missingTests": [
-      "Shared implementation and adoption; actual browser input/textarea/compound-control multiple/long-error appearance/update/clear geometry and keyboard remedies."
+      "Fresh full shared CI and merge, then actual consumer FormField/AddAudioSheet adoption with input/textarea/compound-control multiple/long-error appearance/update/clear geometry and keyboard remedies."
     ],
     "acceptanceCriteria": [
       "Canonical library owns generic placement and accessibility.",
