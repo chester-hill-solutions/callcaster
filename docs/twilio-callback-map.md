@@ -10,7 +10,7 @@
 | `chat-sms.server.ts` | `${SUPABASE_URL}/functions/v1/sms-status` | Edge sms-status | Yes | Edge | Canonical |
 | `sms.action.server.ts` | `${SUPABASE_URL}/functions/v1/sms-status` | Edge sms-status | Yes | Edge | Canonical |
 | `sms-handler/index.ts` | `${functionsBaseUrl}sms-status` | Edge sms-status | Yes | Edge | Canonical |
-| `ivr-initiate.server.ts` | `${BASE_URL}/api/ivr/:id/page_1/` | Remix IVR page | Yes | App | Active (Remix path) |
+| `ivr-initiate.server.ts` | `${BASE_URL}/api/ivr/:id/` | App IVR saved entry | Yes | App | Active (Remix path) |
 | `ivr-initiate.server.ts` | `${BASE_URL}/api/ivr/status` | Remix IVR status | Yes | App | Active (Remix path) |
 | `ivr.action.server.ts` | `${BASE_URL}/api/ivr/status` | Remix IVR status | Yes | App | Active (Remix path) |
 | `ivr-handler/index.ts` | `${baseUrl}/ivr-flow` | Edge ivr-flow | Yes | Edge | Active (Edge path) |

@@ -151,6 +151,8 @@ describe("app/routes/api+/ivr/tsx.route", () => {
   });
 
   test("success creates outreach, places call, inserts call, dequeues, returns JSON", async () => {
+    const create = vi.fn().mockResolvedValue({ sid: "CA1" });
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({ calls: { create } });
     const mod = await import("../app/routes/api+/ivr");
     const res = await asRouteResponse(mod.action({
       request: makeRequest({
@@ -165,6 +167,10 @@ describe("app/routes/api+/ivr/tsx.route", () => {
     } as any));
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, callSid: "CA1" });
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({
+      url: "https://base.example/api/ivr/1/",
+      statusCallback: "https://base.example/api/ivr/status",
+    }));
     expect(mocks.rpcCreateOutreachAttempt).toHaveBeenCalledWith(
       expect.anything(),
       {

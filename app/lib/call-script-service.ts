@@ -34,6 +34,13 @@ export function documentToScript(script: Script, document: ScriptDocument): Scri
 }
 
 export function validateScriptSteps(steps: unknown) {
+  // Migration repairs old editor data; launch must reject an explicitly broken entry first.
+  if (steps && typeof steps === "object" && "startPageId" in steps && steps.startPageId !== undefined) {
+    if (typeof steps.startPageId !== "string" || !("pages" in steps) || !steps.pages ||
+      typeof steps.pages !== "object" || !Object.hasOwn(steps.pages, steps.startPageId)) {
+      return { ok: false as const, errors: [`Start page "${String(steps.startPageId)}" does not exist`] };
+    }
+  }
   const document = scripts.migrateFromCallcasterFlow(steps ?? { pages: {}, blocks: {} });
   const structural = scripts.validateDocument(document);
   if (!structural.ok) {

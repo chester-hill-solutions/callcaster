@@ -868,47 +868,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2087,
-    "verdict": "fix-now",
-    "recommendedTitle": "The IVR runtime ignores the persisted startPageId and pageOrder — the start page and the linear next-page hop are decided by jsonb key order",
-    "summary": "IVR entry and next-page runtime ignore saved startPageId and pageOrder. A direct check returns page_2 when pageOrder requests page_3.",
-    "resolution": "Use one ordered-page/start-page resolver on all inbound and outbound entry and transition paths.",
-    "lookIn": [
-      "app/lib/ivr-block-runtime.server.ts:79",
-      "app/lib/twilio-ivr-runtime.server.ts:20",
-      "app/routes/api+/inbound.action.server.ts:204",
-      "app/lib/twilio-ivr-runtime.server.ts:20,77",
-      "app/lib/ivr-block-runtime.server.ts (`findNextBlock`)",
-      "app/lib/ivr-script-validation.ts",
-      "app/routes/api+/ivr/$pageId.action.server.ts",
-      "app/routes/api+/inbound.action.server.ts:201-212",
-      "app/lib/campaign-execution.server.ts:53-59,66-96",
-      "app/lib/platform-workspace-numbers.server.ts:373-374",
-      "app/lib/create-with-script.server.ts:129",
-      "app/db/schema.ts:254"
-    ],
-    "existingTests": [
-      "test/ivr-block-runtime.test.ts",
-      "test/ivr-page.route.test.ts",
-      "test/inbound-ivr-block-response.route.test.ts"
-    ],
-    "missingTests": [
-      "Save a non-page_1 start and reordered pages; assert the heard sequence on both paths."
-    ],
-    "acceptanceCriteria": [
-      "A script whose `startPageId` is not `page_1` and not the shortest id enters the call on `startPageId`.",
-      "Reordering pages changes the order a caller hears when a step falls off the end of a page.",
-      "An inbound IVR number whose script sets a non-first start page enters on that page.",
-      "A script with a `startPageId` that points at a missing page is rejected by the launch gate with a clear message.",
-      "The existing UI test for \"Set as start\" is joined by a server-side test that proves the setting changes dispatch behaviour (today no such test exists — that is why this survived)."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. IVR entry and next-page runtime ignore saved startPageId and pageOrder. A direct check returns page_2 when pageOrder requests page_3."
-  },
-  {
     "issueNumber": 2099,
     "verdict": "fix-now",
     "recommendedTitle": "Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address",

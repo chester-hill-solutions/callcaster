@@ -5493,6 +5493,56 @@
         }
       }
     },
+    "/api/ivr/{campaignId}": {
+      "post": {
+        "operationId": "postIvr_campaignId",
+        "summary": "POST /api/ivr/:campaignId",
+        "description": "Resolves the saved script entry and returns TwiML.\n\n**Not supported for external use.** Webhook, internal, or security-gap route.",
+        "tags": [
+          "Provider Webhook",
+          "ivr"
+        ],
+        "x-callcaster-supported": false,
+        "x-callcaster-exposure": "providerOnly",
+        "x-callcaster-auth-class": "twilioSignature",
+        "x-callcaster-docs-guide": "docs/api-webhooks.md",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "description": "Form fields (JSON or multipart where noted in human docs)."
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "TwiML XML response",
+            "content": {
+              "text/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ivr/{campaignId}/{pageId}": {
       "post": {
         "operationId": "postIvr_campaignId_pageId",

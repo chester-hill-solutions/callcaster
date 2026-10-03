@@ -9,6 +9,8 @@ import {
   resolveInboundVoicemailAudio,
 } from "@/lib/inbound-voicemail-twiml.server";
 import {
+  findNextBlock,
+  type IvrScript,
   resolveNoInputTarget,
   type IvrNoInputConfig,
   type NoInputTarget,
@@ -21,7 +23,7 @@ import { defineAction } from "@/lib/handler.server";
 import { findIvrMatchedOption, type IvrOptionLike } from "@/lib/ivr-option-value";
 import { appendInboundQueueTwiml } from "@/lib/inbound-queue-twiml.server";
 
-interface Script {
+interface Script extends IvrScript {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<string, {
     id: string;
@@ -30,34 +32,6 @@ interface Script {
     options?: IvrOptionLike[];
   }>;
 }
-
-const findNextBlock = (
-  script: Script,
-  currentPageId: string,
-  currentBlockId: string,
-): { pageId: string; blockId: string } | null => {
-  const currentPage = script.pages[currentPageId];
-  if (!currentPage) return null;
-  const currentBlockIndex = currentPage.blocks.indexOf(currentBlockId);
-
-  if (currentBlockIndex < currentPage.blocks.length - 1) {
-    const nextBlockId = currentPage.blocks[currentBlockIndex + 1];
-    if (!nextBlockId) return null;
-    return { pageId: currentPageId, blockId: nextBlockId };
-  }
-
-  const pageIds = Object.keys(script.pages);
-  const currentPageIndex = pageIds.indexOf(currentPageId);
-  if (currentPageIndex < pageIds.length - 1) {
-    const nextPageId = pageIds[currentPageIndex + 1];
-    const nextPage = nextPageId ? script.pages[nextPageId] : undefined;
-    const nextBlockId = nextPage?.blocks[0];
-    if (!nextPageId || !nextBlockId) return null;
-    return { pageId: nextPageId, blockId: nextBlockId };
-  }
-
-  return null;
-};
 
 const findNextStep = (
   currentBlock: { id: string; options?: IvrOptionLike[] },

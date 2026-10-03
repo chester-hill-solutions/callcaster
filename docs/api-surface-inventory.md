@@ -84,6 +84,7 @@ Interactive specs:
 | `/api/inbound-verification` | POST | Provider Webhook | internalOnly | no | `routes/api+/inbound-verification.tsx` | `docs/api-internal-unsupported.md` | Call-in verification TwiML, authenticated by a main-account Twilio signature. Returns TwiML. |
 | `/api/initiate-ivr` | POST | User API | sessionOnly | yes | `routes/api+/initiate-ivr.tsx` | `docs/api-telephony-control.md` |  |
 | `/api/ivr` | POST | User API | sessionOnly | yes | `routes/api+/ivr.tsx` | `docs/api-telephony-control.md` |  |
+| `/api/ivr/:campaignId` | POST | Provider Webhook | providerOnly | no | `routes/api+/ivr/$campaignId.route.tsx` | `docs/api-webhooks.md` | Resolves the saved script entry and returns TwiML. |
 | `/api/ivr/:campaignId/:pageId` | POST | Provider Webhook | providerOnly | no | `routes/api+/ivr/$campaignId/$pageId.route.tsx` | `docs/api-webhooks.md` | Returns TwiML. |
 | `/api/ivr/:campaignId/:pageId/:blockId` | POST | Provider Webhook | providerOnly | no | `routes/api+/ivr/$campaignId/$pageId/$blockId.route.tsx` | `docs/api-webhooks.md` |  |
 | `/api/ivr/:campaignId/:pageId/:blockId/response` | POST | Provider Webhook | providerOnly | no | `routes/api+/ivr/$campaignId/$pageId/$blockId/response.route.tsx` | `docs/api-webhooks.md` |  |
@@ -161,5 +162,5 @@ Interactive specs:
 | `/api/workspaces/:workspaceId/voicemails` | GET | User API | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/voicemails.route.tsx` | `docs/api-analytics-export.md` |  |
 | `/api/workspaces/:workspaceId/webhook` | POST, PUT, GET | Workspace Admin | sessionOnly | yes | `routes/api+/workspaces+/$workspaceId/webhook.route.tsx` | `docs/api-workspace-admin.md` | POST tests webhook delivery. |
 
-Total entries: **148**
+Total entries: **149**
 

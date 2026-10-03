@@ -138,9 +138,8 @@ describe("app/routes/api+/ivr/route.$campaignId.$pageId.tsx", () => {
   });
 
   test("falls back to the script's first page when the requested page id is missing", async () => {
-    // Dispatch always dials `/api/ivr/{campaignId}/page_1/`, but editor-created
-    // scripts use generated page ids (e.g. page_mtugk9ys_1). The first hop must
-    // resolve to the real first page instead of erroring (#1730-era #1348).
+    // Old callbacks can still address page_1 for scripts with generated IDs.
+    // Keep their fallback when the script has no saved entry metadata.
     const mod = await import("../app/routes/api+/ivr/$campaignId/$pageId.route");
     const fd = new FormData();
     fd.set("CallSid", "CA1");

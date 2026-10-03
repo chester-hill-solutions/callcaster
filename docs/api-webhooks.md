@@ -26,6 +26,7 @@ Complete spec: [`/api/docs/openapi/all`](/api/docs/openapi/all) (tag: **Provider
 | Method | Path | Purpose |
 | --- | --- | --- |
 | POST | `/api/ivr/status` | IVR call status |
+| POST | `/api/ivr/:campaignId` | IVR saved script entry TwiML |
 | POST | `/api/ivr/:campaignId/:pageId` | IVR page TwiML |
 | POST | `/api/ivr/:campaignId/:pageId/:blockId` | IVR block TwiML |
 | POST | `/api/ivr/:campaignId/:pageId/:blockId/response` | IVR gather response |

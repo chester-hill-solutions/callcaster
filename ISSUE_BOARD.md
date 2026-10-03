@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@dbb9f691 + source fix for #2130` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@dff1ac66 + source fix for #2087` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 75
+## Fix now — 74
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -174,17 +174,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/billing-reconciliation.test.ts; test/billing-reconciliation-alert.test.ts
 - Missing tests: Need month-unit positive control, purchase exclusion/period semantics, threshold alert and snapshot round-trip.
 - Done when: A numbers variance above the threshold raises an alert (kill-check: drop the numbers term and confirm the test goes red).; `numbersVariance` is present in the snapshot and survives a normalise round-trip.; The `numbers` comparison is unit-consistent: a workspace with one number for one month shows zero variance (positive control, and the test that proves the units are right).; A one-time purchase debit does not create a permanent variance.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2087](https://github.com/chester-hill-solutions/callcaster/issues/2087) The IVR runtime ignores the persisted startPageId and pageOrder — the start page and the linear next-page hop are decided by jsonb key order
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- IVR entry and next-page runtime ignore saved startPageId and pageOrder. A direct check returns page_2 when pageOrder requests page_3.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. IVR entry and next-page runtime ignore saved startPageId and pageOrder. A direct check returns page_2 when pageOrder requests page_3.
-- Resolution: Use one ordered-page/start-page resolver on all inbound and outbound entry and transition paths.
-- Look in: `app/lib/ivr-block-runtime.server.ts:79`, `app/lib/twilio-ivr-runtime.server.ts:20`, `app/routes/api+/inbound.action.server.ts:204`, `app/lib/twilio-ivr-runtime.server.ts:20,77`, `app/lib/ivr-block-runtime.server.ts (`findNextBlock`)`, `app/lib/ivr-script-validation.ts`, `app/routes/api+/ivr/$pageId.action.server.ts`, `app/routes/api+/inbound.action.server.ts:201-212`, `app/lib/campaign-execution.server.ts:53-59,66-96`, `app/lib/platform-workspace-numbers.server.ts:373-374`, `app/lib/create-with-script.server.ts:129`, `app/db/schema.ts:254`
-- Existing tests: test/ivr-block-runtime.test.ts; test/ivr-page.route.test.ts; test/inbound-ivr-block-response.route.test.ts
-- Missing tests: Save a non-page_1 start and reordered pages; assert the heard sequence on both paths.
-- Done when: A script whose `startPageId` is not `page_1` and not the shortest id enters the call on `startPageId`.; Reordering pages changes the order a caller hears when a step falls off the end of a page.; An inbound IVR number whose script sets a non-first start page enters on that page.; A script with a `startPageId` that points at a missing page is rejected by the launch gate with a clear message.; The existing UI test for "Set as start" is joined by a server-side test that proves the setting changes dispatch behaviour (today no such test exists — that is why this survived).
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2085](https://github.com/chester-hill-solutions/callcaster/issues/2085) Releasing a number can report failure after Twilio already released it and the row was deleted, and the stale sender-pool entry then blocks all outbound SMS
@@ -869,9 +858,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 112
+## Verify and close — 113
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2130](https://github.com/chester-hill-solutions/callcaster/issues/2130) Validate ACD credentials before claiming and release failed offers
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Validated credentials are reused and agent-call setup failures release the exact offer; deployed configuration, release and retry checks remain.
+- Current behavior: Merged to dev in PR #2273 at dff1ac66. Validated credentials are reused, call URL setup runs before a claim, and SDK setup/create failures release the exact offer with actionable context. All 33 focused Node and three real Postgres cases passed; six isolated mutations failed and were restored. Full local CI passed 4,952 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on 9960d86e. Deployed functional verification and promotion remain.
+- Root cause: Initial missing credentials were already rejected during signature validation, but the second credential read after claim could leave an undialled offer. SDK loading/construction and URL configuration also happened outside or before the call-start cleanup boundary.
+- Resolution: Verify missing configuration, failed agent-call setup, release state and bounded retries on deployed dev, then promote before closure. No new readiness subsystem or historical migration changes are required.
+- Look in: `app/lib/acd/acd-router.server.ts`, `app/lib/db-rpc.server.ts`, `client/migrations/20260731130000_create_acd_inbound_queue_functions.sql`
+- Existing tests: test/acd-offer-start.test.ts (credential reuse, initial rejection, configuration before claim, SDK/create failure, exact release, log context and retry/active controls); test/integration-db/acd-offer-cleanup.test.ts (real SDK setup error and actual release RPC: availability, accepted-entry and missing-entry controls); test/acd-router.test.ts, test/acd-router-route.test.ts and test/acd-router-subroutes.test.ts (existing ACD, signature and stale-sweep controls)
+- Missing tests: Deployed configuration, failed setup, release and retry behavior before promotion.
+- Done when: Missing credentials or required call URL configuration cannot create a new offer.; Validated credentials are reused; failed SDK setup or create releases the exact offered entry.; Actual release makes its agent available while accepted calls and other-workspace offers remain intact.; Logs identify the affected context without credentials; existing signatures, limits, active-entry and stale-sweep controls pass.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed ACD behavior after merge, then promote and close.
+
+### [#2087](https://github.com/chester-hill-solutions/callcaster/issues/2087) Use saved IVR start page and page order in caller flow
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Caller entry and next-page flow use saved start and order; deployed outbound/manual/inbound flow checks remain.
+- Current behavior: Source fix from dev@dff1ac66: manual and machine dispatch use a signed campaign entry route with stored call/campaign checks and existing machine-answer handling. Inbound entry resolves the declared start. Prompt and both response flows share ordered next-page logic; unknown/repeated order IDs are reconciled and omitted pages appended. Launch checks the raw declared entry before migration can heal it. All 125 focused cases passed; old source failed 16 regressions with 109 controls retained. Seven isolated mutations failed and were restored.
+- Root cause: Outbound dispatch hard-coded page_1, inbound entry used object key order, and three next-block helpers ignored saved order. Launch validation migrated first and silently repaired dangling saved entries.
+- Resolution: Verify saved entry and order in manual, machine and inbound calls, machine-answer controls and clear launch rejection on deployed dev; promote before closure. Inbound attachment/save validation remains separate in #2269.
+- Look in: `app/lib/ivr-page-order.ts`, `app/lib/ivr-block-runtime.server.ts`, `app/lib/campaign-ivr-page.server.ts`, `app/lib/call-script-service.ts`, `app/lib/twilio-ivr-runtime.server.ts`, `app/routes/api+/ivr/$campaignId.action.server.ts`, `app/routes/api+/inbound.action.server.ts`
+- Existing tests: test/page-order.test.ts and test/page-flow.route.test.ts (entry, ordering, real TwiML, legacy/explicit-page, auth and machine controls); test/ivr.route.test.ts and test/campaign-ivr-dispatch.test.ts (manual/machine dispatch with real URL resolver); test/campaign-readiness-expiry.test.ts (raw entry rejects before status/job writes for all three machine voice types); Existing page, block response, inbound response, script service and shared runtime controls
+- Missing tests: Deployed caller-flow and launch-error verification before promotion.
+- Done when: Both outbound dispatch paths and inbound entry use the declared start.; Prompt and response fall-through use saved page order; explicit navigation and legacy behavior remain intact.; Unknown/repeated order IDs are reconciled and omitted pages remain reachable.; A dangling raw start is rejected before campaign launch; entry cannot silently choose another page.; Signature and stored campaign checks, machine-answer policy, deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify caller flow on deployed dev, then promote and close; #2269 owns attachment/save validation.
 
 ### [#2271](https://github.com/chester-hill-solutions/callcaster/issues/2271) Build valid inbound queue TwiML and ACD callbacks
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -884,18 +897,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed direct and scripted queue entry, ACD wait, agent connection and completion before promotion.
 - Done when: Both routes emit valid named Enqueue with ACD wait and completion callbacks.; Callback values round-trip unchanged; invalid, missing or foreign queues cannot emit Enqueue.; Signature, call mismatch, voicemail and navigation controls remain valid.; Deployed verification and promotion are complete before closure.
 - Tracker: Source fix is in this change. Verify deployed queue behavior after merge, then promote and close.
-
-### [#2130](https://github.com/chester-hill-solutions/callcaster/issues/2130) Validate ACD credentials before claiming and release failed offers
-- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- Validated credentials are reused and agent-call setup failures release the exact offer; deployed configuration, release and retry checks remain.
-- Current behavior: Source fix from dev@dbb9f691: the wait handler reuses the credentials that passed workspace signature validation. Required call URL setup runs before a new claim. SDK import, construction and create are inside failure cleanup, which releases the entry as timed_out and logs workspace, queue and entry context. All 33 focused Node and three real-Postgres cases passed. Old source failed five Node regressions with 27 controls; the real SDK/database baseline failed two cases with one control. Six isolated mutations failed and were restored.
-- Root cause: Initial missing credentials were already rejected during signature validation, but the second credential read after claim could leave an undialled offer. SDK loading/construction and URL configuration also happened outside or before the call-start cleanup boundary.
-- Resolution: Verify missing configuration, failed agent-call setup, release state and bounded retries on deployed dev, then promote before closure. No new readiness subsystem or historical migration changes are required.
-- Look in: `app/lib/acd/acd-router.server.ts`, `app/lib/db-rpc.server.ts`, `client/migrations/20260731130000_create_acd_inbound_queue_functions.sql`
-- Existing tests: test/acd-offer-start.test.ts (credential reuse, initial rejection, configuration before claim, SDK/create failure, exact release, log context and retry/active controls); test/integration-db/acd-offer-cleanup.test.ts (real SDK setup error and actual release RPC: availability, accepted-entry and missing-entry controls); test/acd-router.test.ts, test/acd-router-route.test.ts and test/acd-router-subroutes.test.ts (existing ACD, signature and stale-sweep controls)
-- Missing tests: Deployed configuration, failed setup, release and retry behavior before promotion.
-- Done when: Missing credentials or required call URL configuration cannot create a new offer.; Validated credentials are reused; failed SDK setup or create releases the exact offered entry.; Actual release makes its agent available while accepted calls and other-workspace offers remain intact.; Logs identify the affected context without credentials; existing signatures, limits, active-entry and stale-sweep controls pass.; Deployed verification and promotion are complete before closure.
-- Tracker: Source fix is in this change. Verify deployed ACD behavior after merge, then promote and close.
 
 ### [#2088](https://github.com/chester-hill-solutions/callcaster/issues/2088) Use the number settings for inbound IVR voicemail playback
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03

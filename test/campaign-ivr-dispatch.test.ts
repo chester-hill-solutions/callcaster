@@ -66,6 +66,10 @@ vi.mock("@/lib/outbound-credit-gate.server", () => ({
 vi.mock("@/lib/recipient-calling-window", () => ({
   recipientCallingWindowStatus: mocks.recipientCallingWindowStatus,
 }));
+vi.mock("@/lib/env.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/env.server")>();
+  return { ...actual, env: { ...actual.env, BASE_URL: () => "https://base.test" } };
+});
 vi.mock("@/lib/twilio-ivr-runtime.server", () => ({
   resolveIvrCallUrls: mocks.resolveIvrCallUrls,
 }));
@@ -132,6 +136,15 @@ describe("dispatchCampaignIvrBatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     defaultMocks();
+  });
+
+  test("dispatch reaches the saved-entry webhook through the real URL resolver", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/twilio-ivr-runtime.server")>("@/lib/twilio-ivr-runtime.server");
+    mocks.resolveIvrCallUrls.mockImplementationOnce(actual.resolveIvrCallUrls);
+    await dispatchCampaignIvrBatch({ workspaceId: WORKSPACE_ID, campaignId: "42", userId: USER_ID });
+    expect(mocks.twilioCallCreate).toHaveBeenCalledWith(expect.objectContaining({
+      url: "https://base.test/api/ivr/42/", statusCallback: "https://base.test/api/ivr/status",
+    }));
   });
 
   test("insufficient credits short-circuits before any reads", async () => {

@@ -1,9 +1,10 @@
+import type { IvrPageLayout } from "@/lib/ivr-page-order";
 import { eq } from "drizzle-orm";
 import { script as scriptTable, workspace_number as workspaceNumberTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 
-export type InboundIvrScriptSteps = {
+export type InboundIvrScriptSteps = IvrPageLayout & {
   pages: Record<string, { blocks: string[] }>;
   blocks: Record<string, unknown>;
 };
