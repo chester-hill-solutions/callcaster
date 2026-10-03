@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@163884a4` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@6aec5b03` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-02.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 85
+## Fix now — 83
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -219,17 +219,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: `provisionWorkspaceA2P` (or its replacement) creates both a brand registration **and** a campaign, and the returned state carries a non-null `campaignSid`.; A Twilio failure to create the campaign is surfaced as an error to the operator; it is never reported as success.; The onboarding success message is only returned when both resources exist.; A unit test asserts the campaign-create call happens (with the nested `services(sid).usAppToPerson` path).; No `messagingApi?.x?.create` optional-chain guard remains on a resource that must exist.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2132](https://github.com/chester-hill-solutions/callcaster/issues/2132) The workspaces:create idempotency scope is global, so one user's workspace id is replayed to another user
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Workspace creation still uses a global replay scope even though the authenticated creator id is available.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Workspace creation still uses a global replay scope even though the authenticated creator id is available.
-- Resolution: Scope workspace creation replay by the authenticated user ID: workspaces:create:${auth.user.id}. Keep same-user retry replay and in-flight conflict behavior. Legacy global records must be unreachable. Registration replay was removed in PR #2252; billing checkout is already workspace-scoped after authorization. Update the API docs and prove cross-user isolation with the real replay store. An owner-column migration is not required for this route fix.
-- Look in: `app/routes/api+/workspaces.action.server.ts:39`, `app/lib/platform-idempotency.server.ts:83`, `test/platform-api.test.ts:108`, `app/lib/platform-idempotency.server.ts:54-59,79-85,240+`, `the workspaces-create action under `app/routes/api+/`, `app/lib/openapi-platform.ts:19-27`
-- Existing tests: test/platform-api.test.ts covers replay, concurrency and failed-handler reservation release; it does not test workspace creation by two different authenticated users sharing a key.
-- Missing tests: Need two users sharing a key with separate created workspaces and a same-user replay positive case.
-- Done when: Two users sending the same `Idempotency-Key` to workspace-create each get their own workspace, and neither sees the other's id (kill-check: revert to the bare namespace and confirm the test goes red).; The same user retrying with the same key still replays their own result (the intended behaviour must stay green).; Every `withIdempotency(` namespace is listed with its scoping rule.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150) An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
 - Webhook recovery resolves only SID, and the following message update still omits NumSegments. Billing defaults a null segment count to one. The sweep also does not fill num_segments.
@@ -282,17 +271,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: No test covers older thread pages plus loader revalidation. Existing use-chats-page-pagination tests cover the sidebar, not useChatThread.
 - Done when: Scrolling back through N pages, sending a message, and scrolling up again still shows all N pages (kill-check: revert to `setMessages(initial)` and confirm the test goes red).; Switching to a **different** conversation does reset the thread.; A filter/sort change while a thread is open does not wipe the loaded pages.; A message that arrived via SSE while older pages were loaded is not duplicated by the reconciliation.
 - Tracker: Fix now. PR #2191 fixes conversation-list accumulation, not this thread-history replacement. Related PR evidence: #2191. A PR reference alone does not prove deployed behavior.
-
-### [#2103](https://github.com/chester-hill-solutions/callcaster/issues/2103) safeOutboundFetch buffers webhook responses without a byte limit
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- safeOutboundFetch still accumulates every response chunk then concatenates it without a byte cap. DNS pinning and redirect rejection do not bound memory.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. safeOutboundFetch still accumulates every response chunk then concatenates it without a byte cap. DNS pinning and redirect rejection do not bound memory.
-- Resolution: Count response bytes and destroy on overflow. Verify abort/error cleanup and queue isolation as separate work if scope grows.
-- Look in: `app/lib/safe-outbound-url.server.ts:268`, `app/lib/safe-outbound-url.server.ts:262`, `app/lib/workspace-webhooks.server.ts:64`, `test/safe-outbound-url.test.ts:175`, `app/lib/safe-outbound-url.server.ts (all `rejectPromise` paths, the accumulation loop)`, `app/lib/worker/handlers/cron.server.ts (the inline webhook call)`, `app/lib/worker/handlers/campaign.server.ts:545-567 (`webhook_delivery` handler)`, `app/lib/workspace-webhooks.server.ts`
-- Existing tests: test/safe-outbound-url.test.ts covers public/private destinations, DNS pinning and redirect rejection; it has no oversized-response boundary test.
-- Missing tests: Need above-cap, exact-cap, early termination and abort/error regressions. No OOM or peak-memory measurements were run.
-- Done when: A response above the configured cap rejects with a clear error and terminates its connection.; Buffered chunks never accumulate beyond the cap.; A response exactly at the cap succeeds.; Abort, stream-error and redirect paths release request/response resources.; Tests prove bounded buffering and cleanup. Webhook scheduling changes are separate work.
-- Tracker: Keep Fix now for the shared unbounded-response defect. Cap/socket cleanup is one atomic concern; any webhook scheduling redesign is separate work. Source proves no byte limit, not a measured production OOM.
 
 ### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -978,19 +956,41 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 99
+## Verify and close — 101
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
+### [#2103](https://github.com/chester-hill-solutions/callcaster/issues/2103) safeOutboundFetch buffers webhook responses without a byte limit
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Outbound responses are bounded to one MiB on dev; deployed verification remains.
+- Current behavior: PR #2255 merged to dev as 6aec5b03. The helper rejects before retaining an overflow chunk, clears retained chunks on failure and closes the active request and response. All 17 focused stream and DNS-pinning cases passed. Removing the byte cap failed both size regressions while six cleanup/control cases passed.
+- Resolution: Verify exact-limit and oversized response behavior on the deployed dev environment with a controlled webhook target. Confirm cleanup on abort/error and preserve the existing ten-second caller timeouts. Promote the tested fix before closing. Webhook scheduling remains separate work.
+- Look in: `app/lib/safe-outbound-url.server.ts:268`, `app/lib/safe-outbound-url.server.ts:262`, `app/lib/workspace-webhooks.server.ts:64`, `test/safe-outbound-url.test.ts:175`, `app/lib/safe-outbound-url.server.ts (all `rejectPromise` paths, the accumulation loop)`, `app/lib/worker/handlers/cron.server.ts (the inline webhook call)`, `app/lib/worker/handlers/campaign.server.ts:545-567 (`webhook_delivery` handler)`, `app/lib/workspace-webhooks.server.ts`
+- Existing tests: test/safe-outbound-response-limit.test.ts (eight real-stream boundary and cleanup cases); test/safe-outbound-url.test.ts (nine DNS validation, pinning and redirect cases)
+- Missing tests: Confirm rejection and cleanup on the deployed dev environment using a controlled webhook target.
+- Done when: A response above the configured cap rejects with a clear error and terminates its connection.; Buffered chunks never accumulate beyond the cap.; A response exactly at the cap succeeds.; Abort, stream-error and redirect paths release request/response resources.; Tests prove bounded buffering and cleanup. Webhook scheduling changes are separate work.
+- Tracker: The source fix is on dev in PR #2255. Verify on deployed dev; close after production promotion. Do not start a duplicate fix.
+
+### [#2132](https://github.com/chester-hill-solutions/callcaster/issues/2132) The workspaces:create idempotency scope is global, so one user's workspace id is replayed to another user
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Workspace creation replay is scoped to the verified user on dev; deployed verification remains.
+- Current behavior: PR #2254 merged to dev as 41b2785e. Workspace creation now uses workspaces:create:${auth.user.id}. Legacy global records are unreachable through the route. Seven route tests pass, and restoring the global scope fails all three cross-user isolation regressions.
+- Resolution: Verify cross-user isolation, same-user retries, in-flight conflicts, authentication and input validation on the deployed dev environment. Promote the tested fix to production before closing.
+- Look in: `app/routes/api+/workspaces.action.server.ts`, `app/lib/platform-idempotency.server.ts`, `app/lib/openapi-platform.ts`, `test/api-workspace-create-idempotency.route.test.ts`
+- Existing tests: test/api-workspace-create-idempotency.route.test.ts (seven route cases with real replay storage and route auth); test/platform-api.test.ts (replay helper and public API contract)
+- Missing tests: Confirm workspace creation and retry behavior on the deployed dev environment.
+- Done when: Two users sending the same `Idempotency-Key` to workspace-create each get their own workspace, and neither sees the other's id (kill-check: revert to the bare namespace and confirm the test goes red).; The same user retrying with the same key still replays their own result (the intended behaviour must stay green).; Every `withIdempotency(` namespace is listed with its scoping rule.
+- Tracker: The source fix is on dev in PR #2254. Verify it on the deployed dev environment; close after production promotion. Do not start a duplicate fix.
+
 ### [#2098](https://github.com/chester-hill-solutions/callcaster/issues/2098) The auth:register idempotency scope is global, so a replay on a shared Idempotency-Key returns another caller's live access and refresh tokens
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- The unauthenticated register response is still stored and replayed under one global namespace, including live bearer session tokens.
+- Signup responses are not cached or replayed on dev; deployed verification remains.
 - Current behavior: PR #2252 merged to dev as 163884a4. Registration no longer uses the replay store. Seven route tests pass; restoring the old route fails all four replay regression cases.
-- Resolution: Remove withIdempotency from unauthenticated registration. Ignore Idempotency-Key on this operation, do not cache signup responses or cookies, and use normal account-creation validation for retries. Existing replay rows must be unreachable through this endpoint. Update OpenAPI and the public auth docs. Keep the authenticated workspace-create namespace fix in #2132.
+- Resolution: Verify registration success, validation, rate limits and absence of response replay on deployed dev. The remaining replay namespaces are user-scoped workspace creation and authorized workspace-scoped billing checkout. Promote the tested fix before closing.
 - Look in: `app/routes/api+/auth/register.action.server.ts:16`, `app/lib/platform-idempotency.server.ts:83`, `app/lib/platform-auth.server.ts:99`, `app/lib/auth.server.ts:80`, `app/routes/api+/auth/register.action.server.ts:6,10,16`, `app/lib/platform-idempotency.server.ts:54-59,240+`, `app/lib/openapi-platform.ts:19-27`, `app/lib/auth.server.ts (`resolveBearerSessionUser`)`, `every other `withIdempotency(` call site (grep)`
 - Existing tests: test/api-auth-register.route.test.ts (seven route cases, real replay store and rate limiter); test/platform-api.test.ts (public auth API contract)
 - Missing tests: Confirm the registration behavior on the deployed dev environment before promotion.
-- Done when: Two callers using the same key with different emails never share session tokens or cookies.; A repeated request with the same key and email does not receive a cached session; existing-account handling still applies.; A previously stored auth:register response is not served by registration.; Registration success, validation, rate limits and provider failure retain their existing behavior.; OpenAPI and human docs state that registration does not replay session responses.; List the remaining replay call sites; the global workspaces:create defect stays tracked by #2132.
+- Done when: Two callers using the same key with different emails never share session tokens or cookies.; A repeated request with the same key and email does not receive a cached session; existing-account handling still applies.; A previously stored auth:register response is not served by registration.; Registration success, validation, rate limits and provider failure retain their existing behavior.; OpenAPI and human docs state that registration does not replay session responses.; The remaining replay call sites are scoped to the verified user for workspace creation and to the authorized workspace for billing checkout.
 - Tracker: The source fix is on dev in PR #2252. Verify on the deployed dev environment; close after production promotion. Do not repeat this fix.
 
 ### [#2116](https://github.com/chester-hill-solutions/callcaster/issues/2116) Verify the disabled-workspace billing split and continued number release

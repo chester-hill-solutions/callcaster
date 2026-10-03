@@ -1,6 +1,6 @@
 # CallCaster repository and issue review
 
-Checked on 2026-10-02 against `origin/dev@5b673c81` and `origin/master@e3a1f002`. Local `dev` and `master` now match those remote tips. The main checkout has no tracked changes. The saved local commit and all changed Stow files are preserved.
+The initial review on 2026-10-02 used `origin/dev@5b673c81` and `origin/master@e3a1f002`. Local `dev` and `master` matched those tips at cleanup. The main checkout has no tracked changes. The saved local commit and all changed Stow files are preserved.
 
 Cleanup removed 21 stale worktree records, four clean worktrees, 18 local branches and 22 remote branches. Every deleted branch was checked against a shipped PR or current trunk ancestry. A verified Git bundle preserves the original refs.
 
@@ -32,8 +32,8 @@ Cleanup removed 21 stale worktree records, four clean worktrees, 18 local branch
 
 | Lane | Issues |
 | --- | --- |
-| fix-now | 85 |
-| verify-close | 99 |
+| fix-now | 83 |
+| verify-close | 101 |
 | needs-repro | 11 |
 | needs-decision | 45 |
 | blocked-epic | 36 |
@@ -45,6 +45,8 @@ Six entries moved from Fix now to Verify and close: #1875, #2005, #2013, #2041, 
 All 101 entries in the starting Fix now lane were checked against current dev, related PRs and issue discussion. Of those entries, 86 remain in Fix now; six moved to Verify and close, four to Needs decision, four to Blocked / split first, and one to Needs reproduction. Each audited record now states the remaining work and test gaps. Original issue bodies remain in clearly marked superseded history sections where a body existed.
 
 After the source audit, PR #2252 merged to dev as `163884a4` and its #2098 entry moved to Verify and close. The next implementation also narrowed #2132 to verified-user replay scope, with its updated issue body read back and checked. The lane table includes this follow-up.
+
+The later fixes also merged on green: PR #2254 at `41b2785e` scopes workspace creation retries to the signed-in user; PR #2255 at `6aec5b03` limits outbound responses to one MiB and closes failed request/response resources. The final board follows `dev@6aec5b03` and puts all three source fixes in Verify and close. Their GitHub bodies now state the implementation, merge proof and remaining deployed verification. The issue audit corrected 77 distinct bodies in total, including the follow-up scope correction for #2132; 26 titles were corrected. The finished fix and audit branches/worktrees were removed, with separate verified recovery bundles.
 
 The normal `npm run tools:issues:board` query failed because the token lacks `read:project`. The fallback used the same board generator with live issue data. Eight IN PROGRESS markers were retained from the prior committed board and explicitly marked as not refreshed. This is not a review of live project status.
 

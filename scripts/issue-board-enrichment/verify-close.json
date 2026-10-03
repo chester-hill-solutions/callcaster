@@ -2680,9 +2680,9 @@
     "issueNumber": 2098,
     "verdict": "verify-close",
     "recommendedTitle": "The auth:register idempotency scope is global, so a replay on a shared Idempotency-Key returns another caller's live access and refresh tokens",
-    "summary": "The unauthenticated register response is still stored and replayed under one global namespace, including live bearer session tokens.",
+    "summary": "Signup responses are not cached or replayed on dev; deployed verification remains.",
     "currentBehavior": "PR #2252 merged to dev as 163884a4. Registration no longer uses the replay store. Seven route tests pass; restoring the old route fails all four replay regression cases.",
-    "resolution": "Remove withIdempotency from unauthenticated registration. Ignore Idempotency-Key on this operation, do not cache signup responses or cookies, and use normal account-creation validation for retries. Existing replay rows must be unreachable through this endpoint. Update OpenAPI and the public auth docs. Keep the authenticated workspace-create namespace fix in #2132.",
+    "resolution": "Verify registration success, validation, rate limits and absence of response replay on deployed dev. The remaining replay namespaces are user-scoped workspace creation and authorized workspace-scoped billing checkout. Promote the tested fix before closing.",
     "lookIn": [
       "app/routes/api+/auth/register.action.server.ts:16",
       "app/lib/platform-idempotency.server.ts:83",
@@ -2707,11 +2707,77 @@
       "A previously stored auth:register response is not served by registration.",
       "Registration success, validation, rate limits and provider failure retain their existing behavior.",
       "OpenAPI and human docs state that registration does not replay session responses.",
-      "List the remaining replay call sites; the global workspaces:create defect stays tracked by #2132."
+      "The remaining replay call sites are scoped to the verified user for workspace creation and to the authorized workspace for billing checkout."
     ],
     "blockedBy": [],
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "The source fix is on dev in PR #2252. Verify on the deployed dev environment; close after production promotion. Do not repeat this fix."
+  },
+  {
+    "issueNumber": 2132,
+    "verdict": "verify-close",
+    "recommendedTitle": "The workspaces:create idempotency scope is global, so one user's workspace id is replayed to another user",
+    "summary": "Workspace creation replay is scoped to the verified user on dev; deployed verification remains.",
+    "currentBehavior": "PR #2254 merged to dev as 41b2785e. Workspace creation now uses workspaces:create:${auth.user.id}. Legacy global records are unreachable through the route. Seven route tests pass, and restoring the global scope fails all three cross-user isolation regressions.",
+    "resolution": "Verify cross-user isolation, same-user retries, in-flight conflicts, authentication and input validation on the deployed dev environment. Promote the tested fix to production before closing.",
+    "lookIn": [
+      "app/routes/api+/workspaces.action.server.ts",
+      "app/lib/platform-idempotency.server.ts",
+      "app/lib/openapi-platform.ts",
+      "test/api-workspace-create-idempotency.route.test.ts"
+    ],
+    "existingTests": [
+      "test/api-workspace-create-idempotency.route.test.ts (seven route cases with real replay storage and route auth)",
+      "test/platform-api.test.ts (replay helper and public API contract)"
+    ],
+    "missingTests": [
+      "Confirm workspace creation and retry behavior on the deployed dev environment."
+    ],
+    "acceptanceCriteria": [
+      "Two users sending the same `Idempotency-Key` to workspace-create each get their own workspace, and neither sees the other's id (kill-check: revert to the bare namespace and confirm the test goes red).",
+      "The same user retrying with the same key still replays their own result (the intended behaviour must stay green).",
+      "Every `withIdempotency(` namespace is listed with its scoping rule."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "The source fix is on dev in PR #2254. Verify it on the deployed dev environment; close after production promotion. Do not start a duplicate fix."
+  },
+  {
+    "issueNumber": 2103,
+    "verdict": "verify-close",
+    "recommendedTitle": "safeOutboundFetch buffers webhook responses without a byte limit",
+    "summary": "Outbound responses are bounded to one MiB on dev; deployed verification remains.",
+    "currentBehavior": "PR #2255 merged to dev as 6aec5b03. The helper rejects before retaining an overflow chunk, clears retained chunks on failure and closes the active request and response. All 17 focused stream and DNS-pinning cases passed. Removing the byte cap failed both size regressions while six cleanup/control cases passed.",
+    "resolution": "Verify exact-limit and oversized response behavior on the deployed dev environment with a controlled webhook target. Confirm cleanup on abort/error and preserve the existing ten-second caller timeouts. Promote the tested fix before closing. Webhook scheduling remains separate work.",
+    "lookIn": [
+      "app/lib/safe-outbound-url.server.ts:268",
+      "app/lib/safe-outbound-url.server.ts:262",
+      "app/lib/workspace-webhooks.server.ts:64",
+      "test/safe-outbound-url.test.ts:175",
+      "app/lib/safe-outbound-url.server.ts (all `rejectPromise` paths, the accumulation loop)",
+      "app/lib/worker/handlers/cron.server.ts (the inline webhook call)",
+      "app/lib/worker/handlers/campaign.server.ts:545-567 (`webhook_delivery` handler)",
+      "app/lib/workspace-webhooks.server.ts"
+    ],
+    "existingTests": [
+      "test/safe-outbound-response-limit.test.ts (eight real-stream boundary and cleanup cases)",
+      "test/safe-outbound-url.test.ts (nine DNS validation, pinning and redirect cases)"
+    ],
+    "missingTests": [
+      "Confirm rejection and cleanup on the deployed dev environment using a controlled webhook target."
+    ],
+    "acceptanceCriteria": [
+      "A response above the configured cap rejects with a clear error and terminates its connection.",
+      "Buffered chunks never accumulate beyond the cap.",
+      "A response exactly at the cap succeeds.",
+      "Abort, stream-error and redirect paths release request/response resources.",
+      "Tests prove bounded buffering and cleanup. Webhook scheduling changes are separate work."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "The source fix is on dev in PR #2255. Verify on deployed dev; close after production promotion. Do not start a duplicate fix."
   }
 ]
