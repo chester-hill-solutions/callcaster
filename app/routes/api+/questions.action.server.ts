@@ -143,7 +143,7 @@ export const action = defineAction({
           where: eq(contactTable.id, Number(contact_id)),
         });
         await dequeueQueueEntry({
-          by: { contactId: Number(contact_id) },
+          by: { contactId: Number(contact_id), allCampaigns: true },
           userId: user.id,
           reason: "Do not call requested",
           workspaceId: workspace,

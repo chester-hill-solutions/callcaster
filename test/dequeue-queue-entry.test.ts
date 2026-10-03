@@ -91,6 +91,14 @@ beforeEach(() => {
 });
 
 describe("dequeueQueueEntry routing", () => {
+  test.each([0, -1, Number.NaN, Number.MAX_SAFE_INTEGER + 1])("ordinary contact dequeue rejects invalid campaign %s before writing", async (campaignId) => {
+    const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
+    await expect(dequeueQueueEntry({
+      by: { contactId: 7, campaignId }, userId: "user-1", reason: "Call completed", workspaceId: "workspace-1",
+    })).rejects.toThrow(/campaignId/);
+    expect(dbMocks.update).not.toHaveBeenCalled();
+    expect(rpcDequeueContactMock).not.toHaveBeenCalled();
+  });
   test("by: { id } always uses the plain-Drizzle mechanism, never the RPC", async () => {
     const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
 
@@ -114,7 +122,7 @@ describe("dequeueQueueEntry routing", () => {
     const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
 
     await dequeueQueueEntry({
-      by: { contactId: 7, campaignId: 99 },
+      by: { contactId: 7, allCampaigns: true },
       userId: null,
       reason: "Contact opted out via SMS",
       workspaceId: "workspace-1",
@@ -133,7 +141,7 @@ describe("dequeueQueueEntry routing", () => {
     const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
 
     await dequeueQueueEntry({
-      by: { contactId: 7 },
+      by: { contactId: 7, campaignId: 99 },
       userId: "user-1",
       reason: "Predictive Dialer called contact",
       workspaceId: "workspace-1",
@@ -145,6 +153,7 @@ describe("dequeueQueueEntry routing", () => {
       expect.anything(),
       expect.objectContaining({
         contactId: 7,
+        campaignId: 99,
         workspaceId: "workspace-1",
         groupOnHousehold: true,
         dequeuedById: "user-1",
@@ -161,7 +170,7 @@ describe("dequeueQueueEntry routing", () => {
     const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
 
     await dequeueQueueEntry({
-      by: { contactId: 7 },
+      by: { contactId: 7, campaignId: 99 },
       userId: "user-1",
       reason: "Ambiguous dial failure — call may exist at Twilio; parked for review, not redialed",
       workspaceId: "workspace-1",
@@ -181,7 +190,7 @@ describe("dequeueQueueEntry routing", () => {
     const explicitExec = { execute: vi.fn(async () => []) };
 
     await dequeueQueueEntry({
-      by: { contactId: 7 },
+      by: { contactId: 7, campaignId: 99 },
       userId: "user-1",
       reason: "Call completed",
       workspaceId: "workspace-1",
@@ -199,7 +208,7 @@ describe("dequeueQueueEntry routing", () => {
     const { dequeueQueueEntry } = await import("@/lib/campaign-queue-db.server");
 
     await dequeueQueueEntry({
-      by: { contactId: 7 },
+      by: { contactId: 7, campaignId: 99 },
       userId: "user-1",
       reason: "Call completed",
       workspaceId: "workspace-1",
@@ -219,7 +228,7 @@ describe("dequeueQueueEntry routing", () => {
 
     await expect(
       dequeueQueueEntry({
-        by: { contactId: 7 },
+        by: { contactId: 7, campaignId: 99 },
         userId: "user-1",
         reason: "Manually dequeued by user",
         workspaceId: "workspace-1",
@@ -234,7 +243,7 @@ describe("dequeueQueueEntry routing", () => {
 
     await expect(
       dequeueQueueEntry({
-        by: { contactId: 7 },
+        by: { contactId: 7, campaignId: 99 },
         userId: "user-1",
         reason: "Manually dequeued by user",
         workspaceId: "workspace-1",
@@ -258,7 +267,7 @@ describe("dequeueQueueEntry routing", () => {
 
     await expect(
       dequeueQueueEntry({
-        by: { contactId: 7, campaignId: 99 },
+        by: { contactId: 7, allCampaigns: true },
         userId: null,
         reason: "Contact opted out via SMS",
         workspaceId: "workspace-1",
@@ -271,9 +280,10 @@ describe("dequeueQueueEntry routing", () => {
 
     await expect(
       dequeueQueueEntry({
-        by: { contactId: 7 },
+        by: { contactId: 7, campaignId: 99 },
         userId: "user-1",
         reason: "Call completed",
+        workspaceId: "",
         household: true,
       }),
     ).rejects.toThrow(/workspaceId/);

@@ -7,8 +7,6 @@
  * empty queue. Kept out of campaign-queue-db.server.ts to stay under the
  * file-size guard.
  */
-import { and, eq } from "drizzle-orm";
-import { campaign_queue as campaignQueueTable } from "@/db/schema";
 import { db } from "@/server/db";
 import { createTenantDb } from "@/server/tenant-db";
 import { rpcTryCompleteCampaignIfDrained, type RpcExecutor } from "@/lib/db-rpc.server";
@@ -40,19 +38,6 @@ export async function completeCampaignsDrainedByDequeue(
     rows.map((row) => row.campaign_id).filter((id): id is number => id != null),
     exec,
   );
-}
-
-export async function campaignIdsForContact(contactId: number, workspaceId: string): Promise<number[]> {
-  const rows = await db
-    .select({ campaign_id: campaignQueueTable.campaign_id })
-    .from(campaignQueueTable)
-    .where(
-      and(
-        eq(campaignQueueTable.contact_id, contactId),
-        eq(campaignQueueTable.workspace, workspaceId),
-      ),
-    );
-  return rows.map((row) => row.campaign_id).filter((id): id is number => id != null);
 }
 
 export async function tryCompleteDrainedCampaigns(

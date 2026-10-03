@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, exists, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 import { rowsToCsv } from "@/lib/rpc-csv.server";
 import { QUEUE_LIFECYCLE_ASSIGNED, QUEUE_STATUS_QUEUED } from "@/lib/queue-status";
 import { emitQueueEvent } from "@/lib/workspace-events.server";
@@ -288,6 +288,7 @@ export async function rpcDequeueContact(
   executor: RpcExecutor,
   args: {
     contactId: number;
+    campaignId: number;
     workspaceId: string;
     groupOnHousehold: boolean;
     dequeuedById?: string | null;
@@ -337,6 +338,12 @@ export async function rpcDequeueContact(
       and(
         inArray(campaignQueueTable.contact_id, [...contactIds]),
         eq(campaignQueueTable.workspace, args.workspaceId),
+        eq(campaignQueueTable.campaign_id, args.campaignId),
+        exists(db.select({ id: campaignQueueTable.id }).from(campaignQueueTable).where(and(
+          eq(campaignQueueTable.contact_id, args.contactId),
+          eq(campaignQueueTable.workspace, args.workspaceId),
+          eq(campaignQueueTable.campaign_id, args.campaignId),
+        ))),
         isNull(campaignQueueTable.dequeued_at),
         or(
           isNull(campaignQueueTable.queue_state),
@@ -358,6 +365,7 @@ export async function rpcDequeueContact(
       executor,
       sql`select dequeue_contact(
       ${args.contactId}::bigint,
+      ${args.campaignId}::bigint,
       ${args.groupOnHousehold},
       ${args.workspaceId}::uuid,
       ${dequeuedById}::uuid,

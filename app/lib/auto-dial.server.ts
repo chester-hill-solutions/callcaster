@@ -351,7 +351,7 @@ export async function runAutoDialerTurn(
               outreachAttemptId: outreach_attempt_id,
             });
             await dequeueQueueEntry({
-              by: { contactId: contactRecord.contact_id },
+              by: { contactId: contactRecord.contact_id, campaignId: Number(campaign_id) },
               workspaceId: workspace_id,
               // false, not omitted: the guarded RPC path, not plain Drizzle
               // — deliberately parks only this one row (no household
@@ -377,7 +377,7 @@ export async function runAutoDialerTurn(
       }
 
       await dequeueQueueEntry({
-        by: { contactId: contactRecord.contact_id },
+        by: { contactId: contactRecord.contact_id, campaignId: Number(campaign_id) },
         workspaceId: workspace_id,
         household: true,
         userId: user_id,

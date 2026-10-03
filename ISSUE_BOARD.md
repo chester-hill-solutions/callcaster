@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@cc10a756 + source fix for #2094` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@26202c6d + source fix for #2096` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-02.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 80
+## Fix now — 79
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -162,17 +162,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/billing-reconciliation.test.ts; test/billing-reconciliation-alert.test.ts
 - Missing tests: Need month-unit positive control, purchase exclusion/period semantics, threshold alert and snapshot round-trip.
 - Done when: A numbers variance above the threshold raises an alert (kill-check: drop the numbers term and confirm the test goes red).; `numbersVariance` is present in the snapshot and survives a normalise round-trip.; The `numbers` comparison is unit-consistent: a workspace with one number for one month shows zero variance (positive control, and the test that proves the units are right).; A one-time purchase debit does not create a permanent variance.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2096](https://github.com/chester-hill-solutions/callcaster/issues/2096) Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- The latest dequeue_contact function still filters contact/workspace without campaign. Ordinary call completion can dequeue the same contact from other campaigns.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The latest dequeue_contact function still filters contact/workspace without campaign. Ordinary call completion can dequeue the same contact from other campaigns.
-- Resolution: Make ordinary dequeue campaign-scoped across RPC and callers. Keep an explicit separate workspace-wide suppression operation for do-not-call intent.
-- Look in: `client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql:58`, `client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql:58-69`, `client/migrations/20260807120000_scope_dequeue_and_outreach_attempt_by_workspace.sql:27-32`, `app/routes/api+/queues.action.server.ts:41-47`, `app/lib/callscreenActions.ts:201-219`, `app/routes/api+/auto-dial/status.action.server.ts`, `the agent-hangup route under `app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/`, `scripts/check-queue-rpc-contract.mjs`
-- Existing tests: test/auto-dial-status.test.ts; test/auto-dial.server.test.ts
-- Missing tests: Real Postgres: contact in two campaigns; call completion dequeues only its campaign, while deliberate opt-out can suppress both.
-- Done when: One contact in two campaigns' queues: a hang-up in campaign A dequeues only A's row; B's row is still `queued` with `dequeued_at` null.; The same holds for the predictive post-dial and the terminal-status paths.; A dequeue with a campaign id that does not own the row is a no-op, not an error.; `check:queue-rpc-contract` passes with the new signature.; The manual "Save and Next" path is campaign-scoped too.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2090](https://github.com/chester-hill-solutions/callcaster/issues/2090) Only STOP and UNSUBSCRIBE are honoured — CANCEL, END, QUIT, REVOKE and "OPT OUT" do not opt the contact out
@@ -923,7 +912,7 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 104
+## Verify and close — 105
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
@@ -938,6 +927,18 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed browser and phone calling verification, callback retries and billing verification.
 - Done when: An agent hang-up returns 200 and completes the conference.; A callee hang-up still records the attempt outcome (the existing behaviour must stay green).; The predictive dialer stops when the last conference ends.; The other agents' dashboards receive the end-of-call broadcast for an agent-leg hang-up.; Twilio receives no retry (no 500) for the agent leg.
 - Tracker: The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
+
+### [#2096](https://github.com/chester-hill-solutions/callcaster/issues/2096) Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Ordinary contact dequeues require a campaign and leave other campaign queues intact. Explicit workspace-wide opt-out remains. Deployed migration and calling verification remain.
+- Current behavior: This source fix scopes primary and household SQL, RPC event snapshots, completion and no-op diagnostics to the selected campaign. A missing primary queue row cannot dequeue siblings or emit another operation’s sibling update. SMS opt-out and do-not-call use explicit allCampaigns targets. The assigned-agent guard and primary result remain. All 196 focused cases passed (161 node, 23 real Postgres, 12 UI); eight isolated mutations each failed the relevant regression. Both standards and issue-scope reviews passed after the missing-primary correction.
+- Root cause: The guarded dequeue RPC and its event snapshot had workspace/contact limits but no campaign. Ordinary live-call paths omitted campaign scope. Optional campaign fallback and unscoped no-op diagnostics could affect unrelated campaign queues.
+- Resolution: Verify the new six-argument dequeue_contact migration and matching application on deployed dev. Call one contact from campaign A while B stays queued; check household, predictive, manual advance, hangup and terminal callbacks, another agent’s claim, no-op messages, event scope and completion. Confirm SMS STOP and do-not-call still remove the contact from all campaign queues. Old callers fail after the old RPC signature is removed, so deploy the matching application and migration together. Promote verified behavior before closure.
+- Look in: `client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql`, `app/lib/campaign-queue-db.server.ts`, `app/lib/db-rpc.server.ts`, `app/lib/auto-dial.server.ts`, `app/lib/worker/webhook-side-effects.server.ts`, `app/routes/api+/queues.action.server.ts`, `app/routes/api+/hangup.action.server.ts`, `app/routes/api+/auto-dial/status.action.server.ts`, `app/lib/callscreenActions.ts`
+- Existing tests: test/integration-db/dequeue-contact-assigned.test.ts (23 real Postgres cases: campaign/household/event/completion/no-op scope, missing-primary and concurrent events, own-assignee guard, global opt-out controls and exact RPC signature); test/queues.route.test.ts (validation, campaign/contact workspace pair and existing no-op/conflict responses); test/auto-dial.server.test.ts, test/auto-dial-status.test.ts, test/hangup.route.test.ts, test/webhook-side-effects.test.ts (campaign wiring and no-campaign controls); test/inbound-sms.route.test.ts and test/questions.route.test.ts (explicit all-campaign opt-out targets); test/ui/callscreenActions.test.ts (selected campaign in manual request)
+- Missing tests: Deployed migration and calling verification before production promotion.
+- Done when: One contact in two campaigns' queues: a hang-up in campaign A dequeues only A's row; B's row is still `queued` with `dequeued_at` null.; The same holds for the predictive post-dial and the terminal-status paths.; A dequeue with a campaign id that does not own the row is a no-op, not an error.; `check:queue-rpc-contract` passes with the new signature.; The manual "Save and Next" path is campaign-scoped too.
+- Tracker: The source fix travels with this board update. Verify the migration and browser/phone calling on deployed dev after merge, then promote and close. Do not start a duplicate fix.
 
 ### [#2093](https://github.com/chester-hill-solutions/callcaster/issues/2093) A voice test call writes a call row with the campaign id, so the campaign's own duplicate gate later dequeues the real contact as "Duplicate IVR call prevented"
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03

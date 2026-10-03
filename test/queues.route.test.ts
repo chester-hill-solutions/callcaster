@@ -120,7 +120,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
   test("action POST returns 500 and logs when dequeue errors", async () => {
     mocks.dequeueQueueEntry.mockRejectedValueOnce(new Error("rpc fail"));
     queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 1, household: true });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 1, campaign_id: 7, household: true });
 
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(mod.action(withRouteUrl({
@@ -132,10 +132,61 @@ describe("app/routes/api+/queues/route.tsx", () => {
     expect(mocks.logger.error).toHaveBeenCalled();
   });
 
+  test.each([
+    { name: "missing campaign", body: { contact_id: 1, household: false } },
+    { name: "null campaign", body: { contact_id: 1, campaign_id: null, household: false } },
+    { name: "boolean campaign", body: { contact_id: 1, campaign_id: true, household: false } },
+    { name: "negative campaign", body: { contact_id: 1, campaign_id: -1, household: false } },
+    { name: "fractional campaign", body: { contact_id: 1, campaign_id: 1.5, household: false } },
+    { name: "malformed campaign", body: { contact_id: 1, campaign_id: "7abc", household: false } },
+    { name: "unsafe campaign", body: { contact_id: 1, campaign_id: Number.MAX_SAFE_INTEGER + 1, household: false } },
+    { name: "invalid contact", body: { contact_id: 0, campaign_id: 7, household: false } },
+    { name: "invalid household", body: { contact_id: 1, campaign_id: 7, household: "false" } },
+  ])("action POST rejects $name before any queue write", async ({ body }) => {
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.safeParseJson.mockResolvedValueOnce(body);
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+      request: new Request("http://localhost/api/queues", { method: "POST" }),
+    } as any)));
+    expect(res.status).toBe(400);
+    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(mocks.resolveCampaignWorkspaceId).not.toHaveBeenCalled();
+  });
+
+  test("action POST accepts numeric strings and passes the selected campaign", async () => {
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: "2", campaign_id: "7", household: false });
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+      request: new Request("http://localhost/api/queues", { method: "POST" }),
+    } as any)));
+    expect(res.status).toBe(200);
+    expect(mocks.resolveCampaignWorkspaceId).toHaveBeenCalledWith(7);
+    expect(mocks.resolveContactWorkspaceId).toHaveBeenCalledWith(2);
+    expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
+      by: { contactId: 2, campaignId: 7 }, workspaceId: "w1", household: false,
+      userId: "u1", reason: "Manually dequeued by user",
+    });
+  });
+
+  test.each(["missing", "different workspace"])("action POST rejects a %s campaign/contact pair", async (kind) => {
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, campaign_id: 7, household: false });
+    if (kind === "missing") mocks.resolveCampaignWorkspaceId.mockResolvedValueOnce(null);
+    else mocks.resolveContactWorkspaceId.mockResolvedValueOnce("w2");
+    const mod = await import("../app/routes/api+/queues");
+    const res = await asRouteResponse(mod.action(withRouteUrl({
+      request: new Request("http://localhost/api/queues", { method: "POST" }),
+    } as any)));
+    expect(res.status).toBe(404);
+    expect(mocks.dequeueQueueEntry).not.toHaveBeenCalled();
+  });
+
   test("action POST returns data on success", async () => {
     mocks.dequeueQueueEntry.mockResolvedValueOnce({ dequeuedPrimary: true });
     queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, household: false });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 2, campaign_id: 7, household: false });
 
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(mod.action(withRouteUrl({
@@ -145,7 +196,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ success: true, dequeued: true });
     expect(mocks.dequeueQueueEntry).toHaveBeenCalledWith({
-      by: { contactId: 2 },
+      by: { contactId: 2, campaignId: 7 },
       workspaceId: "w1",
       household: false,
       userId: "u1",
@@ -161,7 +212,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.dequeueQueueEntry.mockResolvedValueOnce({ dequeuedPrimary: false });
     mocks.explainDequeueNoOp.mockResolvedValueOnce("assigned_elsewhere");
     queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 3, household: false });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 3, campaign_id: 7, household: false });
 
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(mod.action(withRouteUrl({
@@ -175,6 +226,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     });
     expect(mocks.explainDequeueNoOp).toHaveBeenCalledWith({
       contactId: 3,
+      campaignId: 7,
       workspaceId: "w1",
       userId: "u1",
     });
@@ -187,7 +239,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.dequeueQueueEntry.mockResolvedValueOnce({ dequeuedPrimary: false });
     mocks.explainDequeueNoOp.mockResolvedValueOnce("already_dequeued");
     queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 4, household: true });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 4, campaign_id: 7, household: true });
 
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(mod.action(withRouteUrl({
@@ -202,7 +254,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.dequeueQueueEntry.mockResolvedValueOnce({ dequeuedPrimary: false });
     mocks.explainDequeueNoOp.mockResolvedValueOnce("unknown");
     queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 5, household: false });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 5, campaign_id: 7, household: false });
 
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(mod.action(withRouteUrl({
@@ -220,7 +272,7 @@ describe("app/routes/api+/queues/route.tsx", () => {
     mocks.dequeueQueueEntry.mockResolvedValueOnce({ dequeuedPrimary: false });
     mocks.explainDequeueNoOp.mockResolvedValueOnce("not_found");
     queueJsonAuthSession({ user: { id: "u1" } });
-    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 6, household: false });
+    mocks.safeParseJson.mockResolvedValueOnce({ contact_id: 6, campaign_id: 7, household: false });
 
     const mod = await import("../app/routes/api+/queues");
     const res = await asRouteResponse(mod.action(withRouteUrl({

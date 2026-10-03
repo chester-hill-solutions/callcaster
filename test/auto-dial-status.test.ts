@@ -207,6 +207,7 @@ function makeDbClientStub(args?: { outreachDisposition?: string }) {
               data: {
                 disposition: args?.outreachDisposition ?? "in-progress",
                 contact_id: 1,
+                campaign_id: 1,
               },
               error: outreachFetchError,
             }),
@@ -462,7 +463,7 @@ describe("api.auto-dial.status", () => {
     expect(res.status).toBe(200);
     expect(telephonyStubState.outreachUpdateCalls.length).toBe(0);
     expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
-      expect.objectContaining({ by: { contactId: 1 }, household: true }),
+      expect.objectContaining({ by: { contactId: 1, campaignId: 1 }, household: true }),
     );
   });
 
@@ -805,7 +806,7 @@ describe("api.auto-dial.status", () => {
     } as any));
     expect(res.status).toBe(500);
     expect(dequeueQueueEntryMock).toHaveBeenCalledWith(
-      expect.objectContaining({ by: { contactId: 1 }, household: true }),
+      expect.objectContaining({ by: { contactId: 1, campaignId: 1 }, household: true }),
     );
     expect(loggerMocks.error).toHaveBeenCalledWith("Error in handleCallStatus:", expect.any(Error));
   });

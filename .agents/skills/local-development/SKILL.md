@@ -37,6 +37,15 @@ temporary table can isolate the required columns without changing stored app
 rows. Restore injected clients in `finally`. Run the fixed cases before removing
 or reversing the predicate, and retain a real-row positive control.
 
+## RPC migration changes
+
+Trace the latest function definition and both bootstrap lists before editing an
+RPC. When extracting a function body, anchor to the SQL declaration at the start
+of a line; migration comments can quote `CREATE OR REPLACE FUNCTION` too.
+Compile the new migration on a disposable Postgres database before trusting
+source-only checks. Test an upgrade from the old definition and both fresh
+bootstrap paths, including the surviving overload signature.
+
 ## Network resource tests
 
 Use real Node readable streams when testing response limits and cleanup. The

@@ -50,20 +50,20 @@ export const action = defineAction({
             // Household fan-out follows the campaign's setting; it was
             // hardcoded true, dequeuing whole households on campaigns that
             // never asked for household grouping.
-            const campaign = call.campaign_id
-                ? await tdb.campaign.findFirst({
-                      where: eq(campaignTable.id, call.campaign_id),
-                      columns: { group_household_queue: true },
-                  })
-                : null;
-            await dequeueQueueEntry({
-                by: { contactId: call.contact_id },
-                workspaceId,
-                household: campaign?.group_household_queue ?? false,
-                userId: user.id,
-                reason: "Call completed",
-                exec: tdb,
-            });
+            if (call.campaign_id) {
+                const campaign = await tdb.campaign.findFirst({
+                    where: eq(campaignTable.id, call.campaign_id),
+                    columns: { group_household_queue: true },
+                });
+                await dequeueQueueEntry({
+                    by: { contactId: call.contact_id, campaignId: call.campaign_id },
+                    workspaceId,
+                    household: campaign?.group_household_queue ?? false,
+                    userId: user.id,
+                    reason: "Call completed",
+                    exec: tdb,
+                });
+            }
             // Scope the disposition to THIS call's attempt. The old
             // updateOutreachDispositionByContactId rewrote every attempt for
             // the contact across all campaigns to "completed", destroying

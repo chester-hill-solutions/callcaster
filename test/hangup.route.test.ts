@@ -94,7 +94,9 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     const mod = await import("../app/routes/api+/hangup");
     const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
     await expect(res.json()).resolves.toEqual({ success: true });
-    expect(dequeueQueueEntry).toHaveBeenCalled();
+    expect(dequeueQueueEntry).toHaveBeenCalledWith(expect.objectContaining({
+      by: { contactId: 2, campaignId: 5 }, workspaceId: "w1",
+    }));
     // Scoped to the specific attempt (9), not every attempt for contact 2.
     expect(updateOutreachAttemptForWorkspace).toHaveBeenCalledWith(
       "w1",
@@ -134,6 +136,20 @@ describe("app/routes/api+/hangup/route.tsx", () => {
     expect(res.status).toBe(200);
     expect(dequeueQueueEntry).toHaveBeenCalled();
     expect(updateOutreachAttemptForWorkspace).not.toHaveBeenCalled();
+  });
+
+  test("a call without a campaign stops without dequeuing campaign contacts", async () => {
+    queueJsonAuthSession({ user: { id: "u1" } });
+    mocks.parseActionRequest.mockResolvedValueOnce({ workspaceId: "w1", callSid: "CA1" });
+    const stop = vi.fn(async () => ({}));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValueOnce({ calls: () => ({ update: stop }) });
+    mockCall({ campaign_id: null });
+    const mod = await import("../app/routes/api+/hangup");
+    const res = await asRouteResponse(mod.action({ request: new Request("http://x", { method: "POST" }) } as any));
+    expect(res.status).toBe(200);
+    expect(stop).toHaveBeenCalled();
+    expect(dequeueQueueEntry).not.toHaveBeenCalled();
+    expect(updateOutreachAttemptForWorkspace).toHaveBeenCalledWith("w1", 9, { disposition: "completed" }, { tdb: expect.anything() });
   });
 
   test("returns 200 when Twilio returns 21220 (call already ended)", async () => {

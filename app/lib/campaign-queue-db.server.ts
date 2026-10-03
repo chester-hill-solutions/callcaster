@@ -18,7 +18,6 @@ import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { emitQueueEvent } from "@/lib/workspace-events.server";
 import { rpcDequeueContact, type RpcExecutor } from "@/lib/db-rpc.server";
 import {
-  campaignIdsForContact,
   completeCampaignsDrainedByDequeue,
   tryCompleteDrainedCampaigns,
 } from "@/lib/campaign-queue-completion.server";
@@ -497,17 +496,17 @@ export async function resolveContactWorkspaceIdFromQueue(
  */
 async function dequeueCampaignQueueByContact(args: {
   contactId: number;
-  campaignId?: number | null;
+  campaignId: number | null;
   userId: string | null;
   reason: string;
-  workspaceId?: string;
+  workspaceId: string;
 }) {
-  const conditions: SQL[] = [eq(campaignQueueTable.contact_id, args.contactId)];
-  if (args.campaignId != null) {
+  const conditions: SQL[] = [
+    eq(campaignQueueTable.contact_id, args.contactId),
+    eq(campaignQueueTable.workspace, args.workspaceId),
+  ];
+  if (args.campaignId !== null) {
     conditions.push(eq(campaignQueueTable.campaign_id, args.campaignId));
-  }
-  if (args.workspaceId) {
-    conditions.push(eq(campaignQueueTable.workspace, args.workspaceId));
   }
 
   return updateCampaignQueueAndEmit({
@@ -518,53 +517,19 @@ async function dequeueCampaignQueueByContact(args: {
 }
 
 /**
- * The single QueueEntry dequeue entry point (issue #1240, part B3). Every
- * caller in the app routes through here — which of the three underlying
- * mechanisms actually runs is an implementation detail this function owns:
+ * Queue dequeues share one entry point. Row IDs identify one queue entry;
+ * ordinary contact targets require a campaign. Only opt-out and do-not-call
+ * use the explicit `allCampaigns` target to remove all of a contact's rows.
  *
- *  - `by: { id }` (a campaign_queue row id) always uses the plain-Drizzle
- *    mechanism ({@link dequeueCampaignQueueById}): unconditional on the
- *    row's current queue_state, optionally workspace-scoped. There's no
- *    contact to key a household lookup off of, so `household` must be
- *    omitted for this target.
+ * `household` omitted uses unconditional Drizzle updates. With `household`
+ * true or false, the RPC accepts queued/null rows or the caller's own assigned
+ * rows. Preserve that guard: an ambiguous dial failure must park its claim,
+ * but must never stop another agent's call after a concurrent reclaim.
+ * Household grouping affects only contacts in the selected campaign.
+ * A null user can reach only queued/null rows on the guarded path.
  *
- *  - `by: { contactId, campaignId? }` with `household` omitted uses the
- *    plain-Drizzle mechanism ({@link dequeueCampaignQueueByContact}): same
- *    unconditional semantics, optionally scoped to one campaign.
- *
- *  - `by: { contactId }` with `household` set (`true` or `false`) uses the
- *    household-aware `dequeue_contact` Postgres RPC
- *    (`rpcDequeueContact` in db-rpc.server — kept per ADR-0003, concurrency)
- *    via a tenant-scoped executor (`exec`, or one built from `workspaceId`
- *    if omitted). `household: true` fans the dequeue out to every contact
- *    sharing the source contact's household_id — "household is the unit of
- *    contact" per CONTEXT.md. `household: false` is a real, distinct third
- *    mode, not a no-op alias for the Drizzle path: the RPC touches a row only
- *    when it is `queued`/null, or `assigned` to the very user passed as
- *    `userId` (see
- *    client/migrations/20260815120000_dequeue_contact_covers_assigned_rows.sql).
- *    So it's a *guarded*, single-contact dequeue that silently no-ops on a
- *    row some other agent now holds — which is the point: it makes a dequeue
- *    that raced a concurrent reclaim harmless instead of letting it kill
- *    another agent's live call. app/lib/auto-dial.server.ts's
- *    ambiguous-dial-park path is the call site that depends on that guard —
- *    it deliberately avoids requeue-and-retry semantics — so `household:
- *    false` is preserved as a distinct, explicit choice rather than folded
- *    into the Drizzle default.
- *
- *    Corollary: on this path a `userId` of `null` (system-initiated dequeue)
- *    can only ever reach `queued`/null rows — the assigned-row case needs a
- *    claim holder to compare against.
- *
- * Mechanism selection here is a behavior-preserving refactor of the original
- * call sites; what each mechanism does to an `assigned` row changed in #1260.
- *
- * All three mechanisms report {@link DequeueQueueEntryResult}: whether the
- * target row itself was actually dequeued. Callers that dequeue their own
- * claim (auto-dial's park, the hangup and status-callback paths) always match
- * and are free to ignore it, as they did before #1278; the manual queue-UI
- * path in app/routes/api+/queues.action.server.ts is the one that must not
- * report success for a write that no-oped.
+ * The result counts the primary contact, not household siblings. A household
+ * fan-out that misses the requested contact must not report success to the UI.
  */
 type DequeueQueueEntryByIdArgs = {
   by: { id: number };
@@ -578,17 +543,28 @@ type DequeueQueueEntryByIdArgs = {
 };
 
 type DequeueQueueEntryByContactArgs = {
-  by: { contactId: number; campaignId?: number | null };
+  by: { contactId: number; campaignId: number };
   userId: string | null;
   reason: string;
-  workspaceId?: string;
+  workspaceId: string;
   household?: boolean;
   exec?: RpcExecutor;
 };
 
+/** Opt-out and do-not-call apply to every campaign, without household fan-out. */
+type DequeueQueueEntryAllCampaignsArgs = {
+  by: { contactId: number; allCampaigns: true };
+  userId: string | null;
+  reason: string;
+  workspaceId: string;
+  household?: undefined;
+  exec?: undefined;
+};
+
 export type DequeueQueueEntryArgs =
   | DequeueQueueEntryByIdArgs
-  | DequeueQueueEntryByContactArgs;
+  | DequeueQueueEntryByContactArgs
+  | DequeueQueueEntryAllCampaignsArgs;
 
 /**
  * What the dequeue actually did to the row it was called for.
@@ -656,7 +632,25 @@ export async function dequeueQueueEntry(
     return { dequeuedPrimary: rows.length > 0 };
   }
 
+  if ("allCampaigns" in args.by) {
+    if (args.by.allCampaigns !== true) {
+      throw new Error("dequeueQueueEntry: allCampaigns must be explicitly true");
+    }
+    const rows = await dequeueCampaignQueueByContact({
+      contactId: args.by.contactId,
+      campaignId: null,
+      userId: args.userId,
+      reason: args.reason,
+      workspaceId: args.workspaceId,
+    });
+    await completeCampaignsDrainedByDequeue(rows, args.workspaceId);
+    return { dequeuedPrimary: rows.length > 0 };
+  }
+
   const { contactId, campaignId } = args.by;
+  if (!Number.isSafeInteger(campaignId) || campaignId <= 0) {
+    throw new Error("dequeueQueueEntry: a valid campaignId is required");
+  }
 
   if (args.household !== undefined) {
     if (!args.workspaceId) {
@@ -667,17 +661,14 @@ export async function dequeueQueueEntry(
     const exec = args.exec ?? createTenantDb(args.workspaceId);
     const primaryRowsDequeued = await rpcDequeueContact(exec, {
       contactId,
+      campaignId,
       workspaceId: args.workspaceId,
       groupOnHousehold: args.household,
       dequeuedById: args.userId,
       dequeuedReasonText: args.reason,
     });
     if (primaryRowsDequeued > 0) {
-      const campaignIds =
-        campaignId != null
-          ? [campaignId]
-          : await campaignIdsForContact(contactId, args.workspaceId);
-      await tryCompleteDrainedCampaigns(campaignIds, exec);
+      await tryCompleteDrainedCampaigns([campaignId], exec);
     }
     return { dequeuedPrimary: primaryRowsDequeued > 0 };
   }
@@ -714,6 +705,7 @@ export type DequeueNoOpReason =
 
 export async function explainDequeueNoOp(args: {
   contactId: number;
+  campaignId: number;
   workspaceId: string;
   userId: string | null;
 }): Promise<DequeueNoOpReason> {
@@ -727,6 +719,7 @@ export async function explainDequeueNoOp(args: {
     .where(
       and(
         eq(campaignQueueTable.contact_id, args.contactId),
+        eq(campaignQueueTable.campaign_id, args.campaignId),
         eq(campaignQueueTable.workspace, args.workspaceId),
       ),
     );

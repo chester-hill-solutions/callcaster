@@ -213,7 +213,7 @@ export const action = defineAction({
         try {
           for (const contactId of matchingContactIds) {
             await dequeueQueueEntry({
-              by: { contactId },
+              by: { contactId, allCampaigns: true },
               userId: null,
               reason: "Contact opted out via SMS",
               workspaceId: workspaceNumber.workspace,

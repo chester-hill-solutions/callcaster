@@ -15,6 +15,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Calling or manually advancing a contact now leaves their queues in other campaigns intact; SMS opt-out and do-not-call still remove the contact from every campaign ([#2096](https://github.com/chester-hill-solutions/callcaster/issues/2096)).
+
 - Agent hangups in predictive campaigns now stop the conference, notify the matching call screen and preserve the later billing callback ([PR #2259](https://github.com/chester-hill-solutions/callcaster/pull/2259), [#2094](https://github.com/chester-hill-solutions/callcaster/issues/2094)).
 - Voice campaign test calls no longer cause an audience contact to be skipped as a duplicate; real campaign calls retain duplicate protection ([#2093](https://github.com/chester-hill-solutions/callcaster/issues/2093)).
 - Leaving a predictive campaign now waits for the conference and dialer to stop, keeps the call screen available on failure, and preserves the campaign queue ([PR #2257](https://github.com/chester-hill-solutions/callcaster/pull/2257), [#2095](https://github.com/chester-hill-solutions/callcaster/issues/2095)).
