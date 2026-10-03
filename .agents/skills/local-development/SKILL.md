@@ -88,6 +88,10 @@ Check the emitted XML: the queue name is Enqueue text supplied by
 `enqueue(attributes, name)`, not a nested Queue or a method on the Enqueue builder.
 Check both ACD URLs and decoded query values through the real route actions;
 a builder mock can accept methods that the installed SDK does not provide.
+When a fixture changes `workspace.twilio_data` outside the real writer, call
+`invalidateWorkspaceTwilioData` for that workspace. Resetting mock calls does not
+clear the production read cache. Check each state case alone and in the suite
+before treating its result as behavior evidence.
 Use `test/inbound-queue-entry.route.test.ts` for callback and guard controls and
 `test/integration-db/inbound-queue-lookup.test.ts` for actual workspace selection.
 

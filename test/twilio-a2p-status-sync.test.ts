@@ -155,76 +155,13 @@ describe("mergeA2pStatus — the aggregate, from authoritative reads only (#2143
     ).not.toBe(A);
   });
 
-  test("a resource that does not exist is not a blocker", () => {
-    // The brand-only case: there is no campaign to wait for, so an approved
-    // brand promotes. Collapsing "absent" into "unread" would strand these
-    // workspaces in review forever.
-    expect(
-      mergeA2pStatus({
-        brand: { fetched: A, exists: true },
-        campaign: { fetched: null, exists: false },
-      }),
-    ).toBe(A);
-    expect(
-      mergeA2pStatus({
-        brand: { fetched: null, exists: false },
-        campaign: { fetched: A, exists: true },
-      }),
-    ).toBe(A);
-  });
-
-  test("absent and unread differ in BOTH directions", () => {
-    // "Absent" is ignored; "unread" is an unknown that blocks. Reading the two
-    // the same way either strands a brand-only workspace in review or lets an
-    // unread campaign pass as approved.
-    const absentCampaign = mergeA2pStatus({
-      brand: { fetched: A, exists: true },
-      campaign: { fetched: null, exists: false },
-    });
-    const unreadCampaign = mergeA2pStatus({
-      brand: { fetched: A, exists: true },
-      campaign: { fetched: null, exists: true },
-    });
-    expect(absentCampaign).toBe(A);
-    expect(unreadCampaign).not.toBe(A);
-
-    const absentBrand = mergeA2pStatus({
-      brand: { fetched: null, exists: false },
-      campaign: { fetched: A, exists: true },
-    });
-    const unreadBrand = mergeA2pStatus({
-      brand: { fetched: null, exists: true },
-      campaign: { fetched: A, exists: true },
-    });
-    expect(absentBrand).toBe(A);
-    expect(unreadBrand).not.toBe(A);
-  });
-
-  test("a read of an absent resource is discarded, not honoured", () => {
-    // The two branches have to be ordered, not merely both present. A resource
-    // that does not exist cannot have been read, so `fetched` should be `null`
-    // there — but the *decision* must not depend on that, because a caller that
-    // reported a read for a resource it also reported absent is contradicting
-    // itself and the conservative reading is to drop the read.
-    //
-    // This is the case that distinguishes `exists ? fetched : null` from
-    // `fetched ?? (exists ? default : null)`. Both look equivalent until you ask
-    // what they do with a contradiction, and only the first one resolves it.
-    for (const fetched of [A, R, J] as const) {
-      expect(
-        mergeA2pStatus({
-          brand: { fetched: A, exists: true },
-          campaign: { fetched, exists: false },
-        }),
-      ).toBe(A);
-    }
-    // An absent resource that was also read as rejected must not reject.
-    expect(
-      mergeA2pStatus({
-        brand: { fetched: J, exists: false },
-        campaign: { fetched: A, exists: true },
-      }),
-    ).toBe(A);
+  test.each([
+    { brand: { fetched: A, exists: true }, campaign: { fetched: null, exists: false } },
+    { brand: { fetched: null, exists: false }, campaign: { fetched: A, exists: true } },
+    { brand: { fetched: A, exists: true }, campaign: { fetched: A, exists: false } },
+    { brand: { fetched: A, exists: true }, campaign: { fetched: J, exists: false } },
+  ])("both required resources must exist before approval: %j", (resources) => {
+    expect(mergeA2pStatus(resources)).toBe(R);
   });
 
   test("rejection wins over everything else", () => {
@@ -421,10 +358,8 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
     expect((result as any).a2p10dlc.status).toBe("approved");
   });
 
-  test("a brand-only workspace that is approved stays approved", async () => {
-    // The promotion direction on the brand-only path, so the conservative
-    // default for the absent campaign does not permanently block a workspace
-    // that Twilio has approved.
+  test("an approved brand without a campaign remains in review", async () => {
+    // Brand approval is not a completed campaign registration.
     wire({
       onboarding: storedOnboarding({ status: "in_review", campaignSid: null }),
       brand: { status: "approved" },
@@ -432,7 +367,19 @@ describe("A2P status sync — a per-resource status is never seeded from the agg
 
     await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
 
+    expect(writtenStatus()).toBe("in_review");
+  });
+
+  test("provider VERIFIED campaign and approved brand establish approval", async () => {
+    wire({ brand: { status: "APPROVED" }, campaign: { campaignStatus: "VERIFIED" } });
+    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
     expect(writtenStatus()).toBe("approved");
+  });
+
+  test("provider IN_PROGRESS campaign remains in review", async () => {
+    wire({ brand: { status: "APPROVED" }, campaign: { campaignStatus: "IN_PROGRESS" } });
+    await syncWorkspaceA2pStatus({ workspaceId: WORKSPACE_ID, actorUserId: null });
+    expect(writtenStatus()).toBe("in_review");
   });
 
   test("the failure reason is carried over from a rejected brand", async () => {

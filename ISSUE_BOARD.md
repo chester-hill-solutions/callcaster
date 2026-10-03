@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@6e46180b + source fix for #2083` · 289 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@aacb17ac + source fix for #2082` · 290 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -34,6 +34,17 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 ## Fix now — 69
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
+
+### [#2282](https://github.com/chester-hill-solutions/callcaster/issues/2282) Prepare a valid A2P Messaging Profile before brand registration
+- Verdict: **Fix now** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The canonical A2P chain omits the required Messaging Profile EndUser, suppresses product submission errors and does not resubmit a repaired existing product.
+- Current behavior: Source audit: dev@aacb17ac, 2026-10-03. provisionA2pRegistration creates the Trust Product and assigns the customer profile, leaves the required EndUser as a TODO, catches submission failure and continues to the brand step. Existing-product retries only check customer-profile assignment.
+- Resolution: Collect and validate the required provider business inputs, create/reuse and assign the Messaging Profile EndUser, evaluate and submit before brand registration, and make repair retries idempotent. Provider and input failures must stop the brand step with visible action-needed details. Do not infer regulatory attributes from prose.
+- Look in: `app/lib/twilio-a2p-provision.server.ts`, `app/lib/twilio-client.server.ts`, `app/lib/types.ts`, `app/lib/messaging-onboarding/predicates.ts`, `app/components/onboarding/`
+- Existing tests: test/twilio-a2p-provision.server.test.ts exercises campaign phases with an existing Trust Product; it does not claim product preparation is complete.
+- Missing tests: Installed SDK tests for EndUser creation/reuse, assignments, evaluation, submission, missing inputs, provider failure and repair retries.; Real persistence/readiness and deployed provider preparation verification.
+- Done when: Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.; Create/reuse and assign the required EndUser and customer profile before evaluation/submission.; Provider/input failure blocks brand creation with visible details.; Retry repairs and resubmits incomplete existing products without duplicates.; Private/public business controls and deployed provider checks pass before promotion and closure.
+- Tracker: Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation.
 
 ### [#2269](https://github.com/chester-hill-solutions/callcaster/issues/2269) Validate inbound IVR scripts before number attachment
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -164,17 +175,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/db-workspace.server.test.ts; test/twilio-sender-pool.server.test.ts
 - Missing tests: Need post-delete metadata-failure and retry tests that assert row absence, pool cleanup and explicit partial success.
 - Done when: A failure in the bookkeeping step after the Twilio delete does **not** report a plain failure; it reports the incomplete state and the release is retryable.; A retry after a partial failure reconciles the sender pool and the onboarding state, and returns success.; After any partial failure, `sender_pool_in_sync` either passes or names the exact stale reference.; The successful path is unchanged, and `test/` coverage asserts the row is gone and the pool is clean.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2082](https://github.com/chester-hill-solutions/callcaster/issues/2082) The A2P provisioning path calls messaging.v1.campaigns, which does not exist in the Twilio SDK — the campaign is silently never created
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- The older A2P provisioner skips campaign creation through an optional check for a resource it does not use correctly, then saves in_review and reports success.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The older A2P provisioner skips campaign creation through an optional check for a resource it does not use correctly, then saves in_review and reports success.
-- Resolution: Use one canonical service-scoped provisioner; do not save in_review or report success without campaign creation.
-- Look in: `app/lib/twilio-a2p.server.ts:147`, `app/lib/twilio-a2p-provision.server.ts:129`, `app/lib/twilio-a2p.server.ts:147-162`, `app/lib/twilio-a2p-provision.server.ts:129 (the working chain)`, `app/lib/twilio-client.server.ts:386`, `app/lib/platform-onboarding-handlers.server.ts:477,504-507`, `app/lib/platform-admin-twilio.server.ts:312`, `app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts:281`, `app/lib/messaging-onboarding/predicates.ts:380-390`
-- Existing tests: test/twilio-a2p.server.test.ts; test/twilio-a2p-status-sync.test.ts
-- Missing tests: A caller-level test must fail if campaign creation is skipped or rejected.
-- Done when: `provisionWorkspaceA2P` (or its replacement) creates both a brand registration **and** a campaign, and the returned state carries a non-null `campaignSid`.; A Twilio failure to create the campaign is surfaced as an error to the operator; it is never reported as success.; The onboarding success message is only returned when both resources exist.; A unit test asserts the campaign-create call happens (with the nested `services(sid).usAppToPerson` path).; No `messagingApi?.x?.create` optional-chain guard remains on a resource that must exist.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150) An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was
@@ -806,9 +806,32 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 119
+## Verify and close — 120
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2082](https://github.com/chester-hill-solutions/callcaster/issues/2082) Route manual A2P setup through the canonical compliance job
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Source fix uses the existing compliance job for all manual actions, reports queue acceptance only and requires both provider resources for A2P approval.
+- Current behavior: Source fix on dev@aacb17ac: three manual actions queue the canonical compliance job. The installed SDK creates campaigns under the Messaging Service, missing returned SIDs and failed lookups are errors, and reused SIDs are stored. Worker errors remove stale approval; retry clears stale errors. Shared readiness and reconciliation require both resources, and real VERIFIED/IN_PROGRESS campaign statuses are recognized. Required business data and the real opt-in workflow precede A2P Trust Product, brand and campaign calls inside the canonical provisioner. Existing Messaging Service/customer-profile setup can run first. All 107 focused cases pass; old source fails 27 regressions with 22 controls retained, and 16 isolated mutations fail. Full local and remote gates are still required before merge.
+- Resolution: After deployment, inspect actual brand/campaign SIDs and errors. Wait for brand approval, then use Retry compliance job to resume campaign creation. Verify provider review, error/retry recovery and the real 10DLC send gate before promotion and closure. Separate Messaging Trust Product preparation remains #2282.
+- Look in: `app/lib/platform-onboarding-handlers.server.ts`, `app/lib/platform-admin-twilio.server.ts`, `app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts`, `app/lib/twilio-a2p-provision.server.ts`, `app/lib/twilio-compliance-job.server.ts`, `app/lib/twilio-a2p-status-sync.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `docs/twilio-parent-ops-runbook.md`
+- Existing tests: test/a2p-manual-actions.test.ts (onboarding/admin API queue acceptance, failures and role controls); test/admin-workspace-twilio.route.test.ts (actual admin form success/error); test/twilio-a2p-provision.server.test.ts (installed SDK, actual writer/normalizer/send gate, creation/reuse/wait/errors/inputs and retry recovery); test/twilio-a2p-status-sync.test.ts (required resources, provider VERIFIED/IN_PROGRESS, review demotion and unknown reads); Existing onboarding, business-profile and readiness controls
+- Missing tests: Deployed provider and send-gate checks; manual retry after brand approval; production promotion before closure.
+- Done when: All manual actions queue the canonical compliance job and report queue acceptance only.; Queue failure never reports success.; Brand review waits without campaign creation; both required resources and approval evidence gate 10DLC SMS.; The installed SDK submits a service-scoped campaign with the required payload and persists created/reused SIDs.; Provider failure, missing campaign SID and thrown bootstrap error remain visible and remove stale approval; successful retry clears stale errors.; Missing business inputs stop A2P Trust Product, brand and campaign calls; prior service/profile setup is separate. Opt-in text is never fabricated.; Verify deployed provider states and retry continuation before promotion and closure.
+- Tracker: Source fix is in this change. Verify the complete deployed provider/send path and operator continuation before promotion and closure; #2282 remains separate.
+
+### [#2083](https://github.com/chester-hill-solutions/callcaster/issues/2083) Block bulk SMS when toll-free verification evidence is missing
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Complete SDK enumeration and explicit approval now establish successful verification evidence. Missing, failed and older snapshots block bulk SMS until refreshed.
+- Current behavior: Merged to dev in PR #2281 at aacb17ac. The stored bulk SMS gate requires complete successful toll-free verification evidence. Only TWILIO_APPROVED permits approval; full SDK inventory/verification lists, failed or legacy evidence and visible sync errors are covered. Approved/no-toll-free inventories and refresh recovery remain permitted. All 101 focused cases pass, 27 old-source regressions fail with 12 controls, 14 mutations fail, and full local CI passed 5,083 Vitest and 22 Bun tests. All remote gates and both Railway checks passed at 29b76839; issue-on-dev moved one item. Refresh deployed snapshots, verify behavior and promote before closure.
+- Root cause: The verification helper swallowed errors, truncated enumeration and permitted unknown status. The outer sync error handler also cleared the block. Existing healthy/false snapshots could therefore be false approval evidence.
+- Resolution: After deploying, refresh older snapshots through admin Sync Twilio or Sync Now. Verify approved, missing, provider-error, later-page inventory/verification and recovery cases through the real bulk SMS gate. Promote before closure.
+- Look in: `app/lib/twilio-toll-free.server.ts`, `app/lib/database/workspace-twilio-sync.server.ts`, `app/lib/twilio-readiness.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/workspace-twilio-sync.ts`, `app/lib/types.ts`, `scripts/check-app-file-size.mjs`, `docs/twilio-toll-free-verification-plan.md`
+- Existing tests: test/toll-free-verification-evidence.test.ts (installed SDK transport, exact status controls, provider errors and later verification pages); test/workspace-twilio-sync.server.test.ts (real writer, normalization, stored readiness gate, later inventory page, unknown/legacy/malformed/failed evidence, approval/no-TF controls and refresh recovery); Existing portal, recommendations, shared onboarding/readiness, RCS and campaign send-gate controls
+- Missing tests: Deployed dev refresh and actual bulk SMS checks before promotion and closure.
+- Done when: Missing, unknown, misleading non-approved, pending and rejected verification blocks bulk SMS.; Provider and inventory errors remain visible and block the actual gate.; Phone inventory and matching verification beyond the former 200-result cap affect the decision.; A successful complete sync is required before old or missing evidence can permit sends.; Approved senders and successful no-toll-free inventory remain allowed; successful refresh recovers from failure.; The shared gate fails closed and adds no provider call per recipient.; Refresh deployed snapshots and verify behavior before promotion and closure.
+- Tracker: Source fix is in this change. Refresh legacy snapshots after deployment, verify actual SMS decisions and recovery, then promote and close.
 
 ### [#2078](https://github.com/chester-hill-solutions/callcaster/issues/2078) Project admin workspace responses without credentials
 - Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -821,18 +844,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed admin payload, display/health and Twilio-operation verification before promotion.
 - Done when: Dashboard UI/API, detail, campaign and user-workspace UI/API payloads exclude workspace credentials, provider authToken and invitation token_hash at every depth.; Workspaces and provider accounts use explicit positive field sets with useful display and operational data preserved.; Client types use the safe workspace contract and server-only credential reads remain permitted.; Admin entry import/type guard rejects raw readers and full/unsafe workspace types, accepts positive Pick and server-only helper controls; payload tests prove dataflow separately.; Missing workspace, provider failure and real API authorization remain controlled.; Deployed verification and promotion precede closure.
 - Tracker: Source fix is in this change. Verify deployed nested payloads and admin operations, then promote and close.
-
-### [#2083](https://github.com/chester-hill-solutions/callcaster/issues/2083) Block bulk SMS when toll-free verification evidence is missing
-- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Complete SDK enumeration and explicit approval now establish successful verification evidence. Missing, failed and older snapshots block bulk SMS until refreshed.
-- Current behavior: Source fix from dev@6e46180b: full phone inventory and verification lists use SDK pagination without a total cap. Missing records, unknown/non-approved statuses and provider errors block sends. Successful complete sync writes tollFreeVerificationCheckedAt; missing, malformed, failed and legacy healthy/false evidence remains blocked. The real shared predicate and send gate retain provider error feedback. Approved and no-toll-free inventory controls pass; a successful refresh replaces a failure. All 101 focused Node cases and typechecking passed. Original source failed 27 new regressions with 12 controls retained. Fourteen isolated status, provider error, pagination, evidence and feedback mutations failed and were restored.
-- Root cause: The verification helper swallowed errors, truncated enumeration and permitted unknown status. The outer sync error handler also cleared the block. Existing healthy/false snapshots could therefore be false approval evidence.
-- Resolution: After deploying, refresh older snapshots through admin Sync Twilio or Sync Now. Verify approved, missing, provider-error, later-page inventory/verification and recovery cases through the real bulk SMS gate. Promote before closure.
-- Look in: `app/lib/twilio-toll-free.server.ts`, `app/lib/database/workspace-twilio-sync.server.ts`, `app/lib/twilio-readiness.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/workspace-twilio-sync.ts`, `app/lib/types.ts`, `scripts/check-app-file-size.mjs`, `docs/twilio-toll-free-verification-plan.md`
-- Existing tests: test/toll-free-verification-evidence.test.ts (installed SDK transport, exact status controls, provider errors and later verification pages); test/workspace-twilio-sync.server.test.ts (real writer, normalization, stored readiness gate, later inventory page, unknown/legacy/malformed/failed evidence, approval/no-TF controls and refresh recovery); Existing portal, recommendations, shared onboarding/readiness, RCS and campaign send-gate controls
-- Missing tests: Deployed dev refresh and actual bulk SMS checks before promotion and closure.
-- Done when: Missing, unknown, misleading non-approved, pending and rejected verification blocks bulk SMS.; Provider and inventory errors remain visible and block the actual gate.; Phone inventory and matching verification beyond the former 200-result cap affect the decision.; A successful complete sync is required before old or missing evidence can permit sends.; Approved senders and successful no-toll-free inventory remain allowed; successful refresh recovers from failure.; The shared gate fails closed and adds no provider call per recipient.; Refresh deployed snapshots and verify behavior before promotion and closure.
-- Tracker: Source fix is in this change. Refresh legacy snapshots after deployment, verify actual SMS decisions and recovery, then promote and close.
 
 ### [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075) Restore the password recovery email journey
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03

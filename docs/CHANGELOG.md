@@ -23,6 +23,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Manual A2P setup uses the compliance job, reports queue status accurately, and keeps 10DLC SMS blocked until both brand and campaign are approved ([#2283](https://github.com/chester-hill-solutions/callcaster/pull/2283), [#2082](https://github.com/chester-hill-solutions/callcaster/issues/2082)).
+
 - Bulk SMS now blocks missing, unknown and failed toll-free verification checks, including records on later pages; admins must refresh older Twilio snapshots after rollout ([PR #2281](https://github.com/chester-hill-solutions/callcaster/pull/2281), [#2083](https://github.com/chester-hill-solutions/callcaster/issues/2083)).
 
 - Password recovery links now reach the password form with their token; request feedback stays generic, and failed verification links return to sign-in ([PR #2279](https://github.com/chester-hill-solutions/callcaster/pull/2279), [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075)).

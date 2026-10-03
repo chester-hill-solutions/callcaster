@@ -78,7 +78,11 @@ export async function runWorkspaceTwilioComplianceJob(args: {
   const bootstrap = await ensureWorkspaceTwilioBootstrap({
     workspaceId,
     actorUserId,
-  });
+  }).catch((error: unknown) => ({
+    outcome: "failed" as const,
+    serviceSid: null,
+    lastError: presentTwilioError(error).adminDetail,
+  }));
   if (bootstrap.outcome === "failed" || !bootstrap.serviceSid) {
     await persistActionNeeded({
       workspaceId,
@@ -138,6 +142,7 @@ export async function runWorkspaceTwilioComplianceJob(args: {
   let tollFreeResult: ComplianceStepResult | null = null;
   let a2pResult: ComplianceStepResult | null = null;
   let terminalError: string | null = null;
+  let a2pError: string | null = null;
 
   // 2. Toll-free bulk SMS path.
   if (runTollFree) {
@@ -187,7 +192,8 @@ export async function runWorkspaceTwilioComplianceJob(args: {
         blockingIssues.push(...a2pResult.blockingIssues);
       }
     } catch (error) {
-      terminalError = presentTwilioError(error).adminDetail;
+      a2pError = presentTwilioError(error).adminDetail;
+      terminalError = a2pError;
       logger.error("twilio.compliance.job.a2p_failed", {
         workspaceId,
         error: terminalError,
@@ -216,13 +222,11 @@ export async function runWorkspaceTwilioComplianceJob(args: {
     lastUpdatedBy: actorUserId,
   };
 
-  if (a2pResult) {
+  if (a2pResult || a2pError) {
     updates.a2p10dlc = {
       ...current.a2p10dlc,
-      status: toOnboardingStatus(a2pResult.status),
-      rejectionReason: a2pActionNeeded
-        ? ACTION_NEEDED_MESSAGE
-        : current.a2p10dlc.rejectionReason,
+      status: a2pResult ? toOnboardingStatus(a2pResult.status) : "rejected",
+      rejectionReason: a2pError ?? (a2pActionNeeded ? ACTION_NEEDED_MESSAGE : null),
       lastSyncedAt: new Date().toISOString(),
       lastSubmittedAt:
         current.a2p10dlc.lastSubmittedAt ?? new Date().toISOString(),
@@ -236,7 +240,7 @@ export async function runWorkspaceTwilioComplianceJob(args: {
   updates.reviewState = {
     ...current.reviewState,
     blockingIssues: allBlocking,
-    lastError: terminalError ?? current.reviewState.lastError,
+    lastError: terminalError ?? (actionNeeded ? current.reviewState.lastError : null),
     lastUpdatedAt: new Date().toISOString(),
   };
 
@@ -293,6 +297,13 @@ async function persistActionNeeded(args: {
 }): Promise<void> {
   const current = await loadOnboarding(args.workspaceId);
   const nextOnboarding = mergeWorkspaceMessagingOnboardingState(current, {
+    ...(a2pApplies(current) ? {
+      a2p10dlc: {
+        ...current.a2p10dlc,
+        status: "rejected",
+        rejectionReason: args.lastError,
+      },
+    } : {}),
     reviewState: {
       ...current.reviewState,
       blockingIssues: Array.from(new Set(args.blockingIssues)),

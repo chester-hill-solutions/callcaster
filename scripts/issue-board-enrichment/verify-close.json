@@ -3408,7 +3408,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Block bulk SMS when toll-free verification evidence is missing",
     "summary": "Complete SDK enumeration and explicit approval now establish successful verification evidence. Missing, failed and older snapshots block bulk SMS until refreshed.",
-    "currentBehavior": "Source fix from dev@6e46180b: full phone inventory and verification lists use SDK pagination without a total cap. Missing records, unknown/non-approved statuses and provider errors block sends. Successful complete sync writes tollFreeVerificationCheckedAt; missing, malformed, failed and legacy healthy/false evidence remains blocked. The real shared predicate and send gate retain provider error feedback. Approved and no-toll-free inventory controls pass; a successful refresh replaces a failure. All 101 focused Node cases and typechecking passed. Original source failed 27 new regressions with 12 controls retained. Fourteen isolated status, provider error, pagination, evidence and feedback mutations failed and were restored.",
+    "currentBehavior": "Merged to dev in PR #2281 at aacb17ac. The stored bulk SMS gate requires complete successful toll-free verification evidence. Only TWILIO_APPROVED permits approval; full SDK inventory/verification lists, failed or legacy evidence and visible sync errors are covered. Approved/no-toll-free inventories and refresh recovery remain permitted. All 101 focused cases pass, 27 old-source regressions fail with 12 controls, 14 mutations fail, and full local CI passed 5,083 Vitest and 22 Bun tests. All remote gates and both Railway checks passed at 29b76839; issue-on-dev moved one item. Refresh deployed snapshots, verify behavior and promote before closure.",
     "resolution": "After deploying, refresh older snapshots through admin Sync Twilio or Sync Now. Verify approved, missing, provider-error, later-page inventory/verification and recovery cases through the real bulk SMS gate. Promote before closure.",
     "lookIn": [
       "app/lib/twilio-toll-free.server.ts",
@@ -3442,5 +3442,46 @@
     "risk": "high",
     "trackerRecommendation": "Source fix is in this change. Refresh legacy snapshots after deployment, verify actual SMS decisions and recovery, then promote and close.",
     "rootCause": "The verification helper swallowed errors, truncated enumeration and permitted unknown status. The outer sync error handler also cleared the block. Existing healthy/false snapshots could therefore be false approval evidence."
+  },
+  {
+    "issueNumber": 2082,
+    "verdict": "verify-close",
+    "recommendedTitle": "Route manual A2P setup through the canonical compliance job",
+    "summary": "Source fix uses the existing compliance job for all manual actions, reports queue acceptance only and requires both provider resources for A2P approval.",
+    "currentBehavior": "Source fix on dev@aacb17ac: three manual actions queue the canonical compliance job. The installed SDK creates campaigns under the Messaging Service, missing returned SIDs and failed lookups are errors, and reused SIDs are stored. Worker errors remove stale approval; retry clears stale errors. Shared readiness and reconciliation require both resources, and real VERIFIED/IN_PROGRESS campaign statuses are recognized. Required business data and the real opt-in workflow precede A2P Trust Product, brand and campaign calls inside the canonical provisioner. Existing Messaging Service/customer-profile setup can run first. All 107 focused cases pass; old source fails 27 regressions with 22 controls retained, and 16 isolated mutations fail. Full local and remote gates are still required before merge.",
+    "resolution": "After deployment, inspect actual brand/campaign SIDs and errors. Wait for brand approval, then use Retry compliance job to resume campaign creation. Verify provider review, error/retry recovery and the real 10DLC send gate before promotion and closure. Separate Messaging Trust Product preparation remains #2282.",
+    "lookIn": [
+      "app/lib/platform-onboarding-handlers.server.ts",
+      "app/lib/platform-admin-twilio.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts",
+      "app/lib/twilio-a2p-provision.server.ts",
+      "app/lib/twilio-compliance-job.server.ts",
+      "app/lib/twilio-a2p-status-sync.server.ts",
+      "app/lib/messaging-onboarding/predicates.ts",
+      "docs/twilio-parent-ops-runbook.md"
+    ],
+    "existingTests": [
+      "test/a2p-manual-actions.test.ts (onboarding/admin API queue acceptance, failures and role controls)",
+      "test/admin-workspace-twilio.route.test.ts (actual admin form success/error)",
+      "test/twilio-a2p-provision.server.test.ts (installed SDK, actual writer/normalizer/send gate, creation/reuse/wait/errors/inputs and retry recovery)",
+      "test/twilio-a2p-status-sync.test.ts (required resources, provider VERIFIED/IN_PROGRESS, review demotion and unknown reads)",
+      "Existing onboarding, business-profile and readiness controls"
+    ],
+    "missingTests": [
+      "Deployed provider and send-gate checks; manual retry after brand approval; production promotion before closure."
+    ],
+    "acceptanceCriteria": [
+      "All manual actions queue the canonical compliance job and report queue acceptance only.",
+      "Queue failure never reports success.",
+      "Brand review waits without campaign creation; both required resources and approval evidence gate 10DLC SMS.",
+      "The installed SDK submits a service-scoped campaign with the required payload and persists created/reused SIDs.",
+      "Provider failure, missing campaign SID and thrown bootstrap error remain visible and remove stale approval; successful retry clears stale errors.",
+      "Missing business inputs stop A2P Trust Product, brand and campaign calls; prior service/profile setup is separate. Opt-in text is never fabricated.",
+      "Verify deployed provider states and retry continuation before promotion and closure."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "Source fix is in this change. Verify the complete deployed provider/send path and operator continuation before promotion and closure; #2282 remains separate."
   }
 ]

@@ -33,7 +33,6 @@ import {
   updateWorkspaceRcsOnboarding,
 } from "@/lib/rcs-onboarding.server";
 import { ensureWorkspaceTwilioBootstrap } from "@/lib/twilio-bootstrap.server";
-import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import { updateWorkspaceName } from "@/lib/platform-workspace.server";
 import { enqueueWorkspaceComplianceJob } from "@/lib/worker/handlers.server";
 import { attachWorkspaceRcsSenderToPool } from "@/lib/twilio-sender-pool.server";
@@ -474,36 +473,17 @@ async function handleReviewEmergencyVoice(
 }
 
 async function handleProvisionA2p(ctx: OnboardingActionContext): Promise<OnboardingHandlerResult> {
-  const nextState = await provisionWorkspaceA2P({workspaceId: ctx.workspaceId,
-    actorUserId: ctx.user.id,
-  });
+  await enqueueWorkspaceComplianceJob(ctx.workspaceId, "onboarding_a2p_requested");
   await persistWorkspaceOnboardingState({workspaceId: ctx.workspaceId,
     actorUserId: ctx.actorUserId,
     updates: { currentStep: "launch_checks" },
   });
-  if (nextState.reviewState.blockingIssues.length > 0) {
-    return {
-      kind: "payload",
-      data: {
-        error:
-          "A2P submission is blocked until the required onboarding and Trust Hub prerequisites are completed.",
-      },
-    };
-  }
-  if (nextState.a2p10dlc.rejectionReason || nextState.reviewState.lastError) {
-    return {
-      kind: "payload",
-      data: {
-        error:
-          nextState.a2p10dlc.rejectionReason ??
-          nextState.reviewState.lastError ??
-          "A2P provisioning failed.",
-      },
-    };
-  }
   return {
     kind: "payload",
-    data: { success: "A2P brand and campaign were submitted for review." },
+    data: {
+      success:
+        "A2P compliance setup is queued. Check Launch checks for the latest status.",
+    },
   };
 }
 

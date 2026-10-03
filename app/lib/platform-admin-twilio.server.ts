@@ -15,7 +15,6 @@ import {
   TWILIO_RCS_PROVIDER,
   updateWorkspaceRcsOnboarding,
 } from "@/lib/rcs-onboarding.server";
-import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import {
   ensureWorkspaceTwilioBootstrap,
   repairWorkspaceTwilioWebhooks,
@@ -309,11 +308,11 @@ export async function dispatchAdminTwilioAction({
 
     case "provision_workspace_a2p":
       try {
-        await provisionWorkspaceA2P({
-          workspaceId,
-          actorUserId,
-        });
-        return { ok: true, message: "Workspace A2P provisioning started" };
+        await enqueueWorkspaceComplianceJob(workspaceId, "admin_provision_a2p");
+        return {
+          ok: true,
+          message: "A2P compliance setup is queued. Status will update after the worker runs.",
+        };
       } catch (error) {
         logger.error("Error provisioning workspace A2P:", error);
         return {

@@ -32,6 +32,11 @@ import {
 } from "@/lib/messaging-onboarding.server";
 import { loadWorkspaceTwilioData } from "@/lib/merge-workspace-twilio-data.server";
 import {
+  BUSINESS_PROFILE_REQUIRED_FIELDS,
+  businessProfileFieldRequiredMessage,
+  findMissingBusinessProfileFields,
+} from "@/lib/messaging-onboarding/predicates";
+import {
   assignA2pTrustProductEntity,
   createA2pBrandRegistration,
   createA2pCampaign,
@@ -144,6 +149,16 @@ export async function provisionA2pRegistration(
       blockingIssues: [
         "Messaging Service is not provisioned; cannot register an A2P campaign.",
       ],
+    };
+  }
+
+  const missingFields = findMissingBusinessProfileFields(onboarding.businessProfile, [
+    ...BUSINESS_PROFILE_REQUIRED_FIELDS.a2p10dlc, "optInWorkflow",
+  ]);
+  if (missingFields.length > 0) {
+    return {
+      status: "action_needed",
+      blockingIssues: missingFields.map(businessProfileFieldRequiredMessage),
     };
   }
 
@@ -327,33 +342,24 @@ export async function provisionA2pRegistration(
   let campaignRawStatus: string | null = null;
 
   if (!campaignSid) {
-    // Idempotency guard: reuse an existing campaign on the service if present.
-    try {
-      const existing = await listA2pCampaigns(twilio, serviceSid, {
-        workspaceId,
-        operation: "messaging.usAppToPerson.list",
-      });
-      const match = existing.find(
-        (c) => (c as { brandRegistrationSid?: string }).brandRegistrationSid === brandSid,
-      );
-      if (match) {
-        campaignSid = match.sid ?? null;
-        campaignRawStatus = (match as { campaignStatus?: string }).campaignStatus ?? null;
-      }
-    } catch {
-      // Non-fatal — fall through to create.
+    // A failed lookup is not evidence that no campaign exists. Do not create
+    // another provider resource after an uncertain lookup.
+    const existing = await listA2pCampaigns(twilio, serviceSid, {
+      workspaceId,
+      operation: "messaging.usAppToPerson.list",
+    });
+    const match = existing.find((campaign) => campaign.brandRegistrationSid === brandSid);
+    if (match) {
+      campaignSid = match.sid ?? null;
+      campaignRawStatus = match.campaignStatus ?? null;
     }
   }
 
   if (!campaignSid) {
     const bp = onboarding.businessProfile;
     const inputs = readA2pInputs(onboarding);
-    const description =
-      bp.useCaseSummary.trim() ||
-      `${bp.legalBusinessName.trim()} customer messaging`;
-    const messageFlow =
-      bp.optInWorkflow.trim() ||
-      "Consumers opt in via a web form on our website and consent to receive messages.";
+    const description = bp.useCaseSummary.trim();
+    const messageFlow = bp.optInWorkflow.trim();
     const messageSamples = bp.sampleMessages.filter(
       (s) => typeof s === "string" && s.trim().length > 0,
     );
@@ -381,9 +387,8 @@ export async function provisionA2pRegistration(
     );
     campaignSid = campaign.sid ?? null;
     campaignRawStatus = campaign.campaignStatus ?? null;
-    if (campaignSid) {
-      await persistA2pSids(workspaceId, actorUserId, a2p, { campaignSid });
-      a2p = { ...a2p, campaignSid };
+    if (!campaignSid) {
+      throw new Error("A2P Campaign SID was not returned");
     }
     logger.info("twilio.compliance.a2p.campaign_created", {
       workspaceId,
@@ -391,18 +396,16 @@ export async function provisionA2pRegistration(
       status: campaignRawStatus,
     });
   } else if (!campaignRawStatus) {
-    // Persisted campaign — refresh its status.
-    try {
-      const existing = await listA2pCampaigns(twilio, serviceSid, {
-        workspaceId,
-        operation: "messaging.usAppToPerson.list",
-      });
-      const match = existing.find((c) => c.sid === campaignSid);
-      campaignRawStatus =
-        (match as { campaignStatus?: string } | undefined)?.campaignStatus ?? null;
-    } catch {
-      // Non-fatal.
-    }
+    // Persisted campaign — refresh its status without inventing approval.
+    const existing = await listA2pCampaigns(twilio, serviceSid, {
+      workspaceId,
+      operation: "messaging.usAppToPerson.list",
+    });
+    campaignRawStatus = existing.find((campaign) => campaign.sid === campaignSid)?.campaignStatus ?? null;
+  }
+
+  if (campaignSid !== a2p.campaignSid) {
+    await persistA2pSids(workspaceId, actorUserId, a2p, { campaignSid });
   }
 
   const campaignStatus = mapCampaignStatus(campaignRawStatus);
