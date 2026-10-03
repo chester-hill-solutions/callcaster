@@ -14,6 +14,10 @@ curl -X POST "$BASE_URL/api/auth/register" \
 
 ### Token (login)
 
+Registration ignores `Idempotency-Key` and does not replay session responses.
+If the registration response is lost, sign in through this token endpoint. A
+repeated registration request uses normal account-creation validation.
+
 ```bash
 curl -X POST "$BASE_URL/api/auth/token" \
   -H "Content-Type: application/json" \

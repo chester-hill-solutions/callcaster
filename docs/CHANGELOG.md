@@ -4,6 +4,10 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+### Security
+
+- Registration no longer replays another account's session credentials when callers use the same retry key ([PR #2252](https://github.com/chester-hill-solutions/callcaster/pull/2252), [#2098](https://github.com/chester-hill-solutions/callcaster/issues/2098)).
+
 ### Added
 
 - Admins can now load credits into any workspace manually from the admin workspace page, with the grant recorded in the workspace transaction history as a `Manual credit load` entry naming the admin and reason ([#2041](https://github.com/chester-hill-solutions/callcaster/issues/2041)).
