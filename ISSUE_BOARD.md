@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@26202c6d + source fix for #2096` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@e2d7b4c3 + source fix for #2091` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-02.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 79
+## Fix now — 78
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -639,17 +639,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: `check:effects` fails on a fixture that calls `React.useEffect(` without the required tags (kill-check: restore the `|\.\s*$` alternative and confirm the test goes red).; check:effects still skips a genuine export function useEffect declaration; this fixture must use a hook name the scanner actually matches.; `app/components/ui/datetime.tsx:386` is annotated and listed in the inventory.; The guard has a fixture-based test for both the skip and the fail case.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2091](https://github.com/chester-hill-solutions/callcaster/issues/2091) messageMedia uploads are keyed by the client-supplied filename with no uniquifier, so a same-name upload silently replaces an existing attachment
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- MMS upload still stores the workspace plus client filename with no unique component. The S3 adapter prevents overwrite only when upsert is explicitly false; this caller does not set it.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. S3 can enforce non-overwrite with upsert:false, but this upload caller supplies neither a unique key nor that flag.
-- Resolution: Create a unique object key per upload and persist that key without rewriting historical keys.
-- Look in: `app/routes/api+/message_media.action.server.ts:175`, `app/lib/object-storage.server.ts:225`, `the `messageMedia` upload route under `app/routes/api+/`, `app/lib/object-storage.server.ts:217-219`, `app/components/sms-ui/ChatMessages.tsx:179-182`, `app/lib/campaign-sms-dispatch.server.ts:201-207`, `app/lib/object-storage.server.ts (the `upsert` option and its default)`
-- Existing tests: test/message-media.route.test.ts
-- Missing tests: Two same-name uploads must keep different bytes and each message/campaign must sign its own object.
-- Done when: Two uploads with the same filename in one workspace produce two distinct objects, and each message points at its own.; The route never reports `success: true` for an upload that replaced an existing object.; A live campaign re-signs the **correct** media for its own `message_media` value.; Historic `outbound_media` values keep resolving (no key rewrite breaks them).
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064) Nightly ledger drift check compares the wrong branch against the dev database
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
 - All three environment drift jobs still use a refless checkout. A scheduled dev job can therefore compare default-branch files with the dev database.
@@ -912,21 +901,9 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 105
+## Verify and close — 106
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
-
-### [#2094](https://github.com/chester-hill-solutions/callcaster/issues/2094) Agent hang-up on a predictive call 500s and never tears the conference down — Twilio retries forever and the dialer keeps dialling
-- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Agent participant hangups stop the conference without an outreach attempt and notify only the matching screen. Deployed calling verification remains.
-- Current behavior: This source fix handles participant hangups before ordinary call statuses, stops the carrier conference before metadata writes, and keeps the ordinary terminal billing claim available. The conference-stop broadcast has an explicit ended marker. Ordinary status events carry the stored conference name but do not clear the conference; the room and sync hooks ignore other or older conferences. All 73 focused cases passed. Restoring the old endpoint failed seven regressions with the signature control passing; removing the end event failed four cases. Removing the screen hangup or room scope each failed the real hook pipeline test. Removing ordinary event scope failed the callback sequence test; removing the ended-marker gate failed the ordinary-completion UI control.
-- Root cause: The handler required an outreach attempt and wrote a possibly empty CallStatus before stopping the conference. A terminal CallStatus also took the wrong branch. Null-contact broadcasts were ignored by the screen, and unscoped broadcasts could affect another conference.
-- Resolution: Verify on deployed dev with browser and phone agent devices: agent and callee hangups stop the conference and next dialer turn; the matching screen clears, other conferences remain active, and ordinary status callbacks still bill and record outcomes. Test provider stop failure/retry and already-ended conferences. Promote the verified fix before closing.
-- Look in: `app/routes/api+/auto-dial/status.action.server.ts`, `app/hooks/call/useCallRoom.ts`, `app/hooks/call/usePredictiveCallSync.ts`, `app/lib/workspace-events.shared.ts`, `test/auto-dial-agent-leave.route.test.ts`, `test/ui/predictive-conference-ended.test.tsx`
-- Existing tests: test/auto-dial-agent-leave.route.test.ts (eight cases: provider and legacy fields, metadata and provider errors, ended/SID-only conference, later billing claim and signature rejection); test/ui/predictive-conference-ended.test.tsx (real room and sync hooks; explicit end vs ordinary completion; matching, other and old conference events); test/auto-dial-status.test.ts (ordinary status and callee controls); test/auto-dial.server.test.ts (ended conference stops the next turn); test/ui/use-call-room.test.tsx; test/ui/use-predictive-call-sync.test.ts; test/ui/hooks-call-screen.test.tsx
-- Missing tests: Deployed browser and phone calling verification, callback retries and billing verification.
-- Done when: An agent hang-up returns 200 and completes the conference.; A callee hang-up still records the attempt outcome (the existing behaviour must stay green).; The predictive dialer stops when the last conference ends.; The other agents' dashboards receive the end-of-call broadcast for an agent-leg hang-up.; Twilio receives no retry (no 500) for the agent leg.
-- Tracker: The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
 
 ### [#2096](https://github.com/chester-hill-solutions/callcaster/issues/2096) Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -939,6 +916,30 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed migration and calling verification before production promotion.
 - Done when: One contact in two campaigns' queues: a hang-up in campaign A dequeues only A's row; B's row is still `queued` with `dequeued_at` null.; The same holds for the predictive post-dial and the terminal-status paths.; A dequeue with a campaign id that does not own the row is a no-op, not an error.; `check:queue-rpc-contract` passes with the new signature.; The manual "Save and Next" path is campaign-scoped too.
 - Tracker: The source fix travels with this board update. Verify the migration and browser/phone calling on deployed dev after merge, then promote and close. Do not start a duplicate fix.
+
+### [#2091](https://github.com/chester-hill-solutions/callcaster/issues/2091) messageMedia uploads are keyed by the client-supplied filename with no uniquifier, so a same-name upload silently replaces an existing attachment
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- New MMS uploads use unique keys and reject object collisions. Earlier chat attachments and campaign keys remain intact. Deployed upload and campaign-send verification remain.
+- Current behavior: This source fix uses one server-generated UUID plus safe filename for upload, campaign message_media and signing. It passes upsert:false and treats the real ObjectExistsError as failure before signing or campaign attachment. Historic keys retain their stored values. All 42 focused cases passed, including five route cases through the real upload/signing adapter and both campaign dispatch adapters. Removing the unique key failed two regressions with three controls; removing no-overwrite or restoring conflict continuation each failed three regressions with two controls.
+- Root cause: The messageMedia caller stored only workspace plus client filename and did not request no-overwrite. Its legacy statusCode conflict branch could continue to report success rather than handling the S3 adapter’s actual ObjectExistsError.
+- Resolution: Verify same-name chat and campaign uploads on deployed dev: both retain their own bytes and links, each campaign sends its own media, historical attachments still resolve and a storage conflict cannot report success or alter the original. Promote verified behavior before closing.
+- Look in: `app/routes/api+/message_media.action.server.ts`, `app/lib/object-storage.server.ts`, `app/lib/campaign-sms-dispatch.server.ts`, `app/components/campaign/settings/MessageSettings.tsx`, `app/components/sms-ui/ChatMessages.tsx`
+- Existing tests: test/message-media-storage-regression.test.ts (five real-adapter cases: chat/campaign bytes, historic keys, preflight conflict and conditional-write race); test/message-media.route.test.ts (validation, auth, upload failure, campaign update and historic deletion controls); test/campaign-sms-dispatch-contract.test.ts (both API and worker sign and send historic plus new media keys); test/object-storage-upsert.test.ts (no-overwrite provider behavior)
+- Missing tests: Deployed chat upload and campaign-send verification before promotion.
+- Done when: Two uploads with the same filename in one workspace produce two distinct objects, and each message points at its own.; The route never reports `success: true` for an upload that replaced an existing object.; A live campaign re-signs the **correct** media for its own `message_media` value.; Historic `outbound_media` values keep resolving (no key rewrite breaks them).
+- Tracker: The source fix travels with this board update. Verify deployed uploads and campaign sends after merge, then promote and close. Do not start a duplicate fix.
+
+### [#2094](https://github.com/chester-hill-solutions/callcaster/issues/2094) Agent hang-up on a predictive call 500s and never tears the conference down — Twilio retries forever and the dialer keeps dialling
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Agent participant hangups stop the conference without an outreach attempt and notify only the matching screen. Deployed calling verification remains.
+- Current behavior: This source fix handles participant hangups before ordinary call statuses, stops the carrier conference before metadata writes, and keeps the ordinary terminal billing claim available. The conference-stop broadcast has an explicit ended marker. Ordinary status events carry the stored conference name but do not clear the conference; the room and sync hooks ignore other or older conferences. All 73 focused cases passed. Restoring the old endpoint failed seven regressions with the signature control passing; removing the end event failed four cases. Removing the screen hangup or room scope each failed the real hook pipeline test. Removing ordinary event scope failed the callback sequence test; removing the ended-marker gate failed the ordinary-completion UI control.
+- Root cause: The handler required an outreach attempt and wrote a possibly empty CallStatus before stopping the conference. A terminal CallStatus also took the wrong branch. Null-contact broadcasts were ignored by the screen, and unscoped broadcasts could affect another conference.
+- Resolution: Verify on deployed dev with browser and phone agent devices: agent and callee hangups stop the conference and next dialer turn; the matching screen clears, other conferences remain active, and ordinary status callbacks still bill and record outcomes. Test provider stop failure/retry and already-ended conferences. Promote the verified fix before closing.
+- Look in: `app/routes/api+/auto-dial/status.action.server.ts`, `app/hooks/call/useCallRoom.ts`, `app/hooks/call/usePredictiveCallSync.ts`, `app/lib/workspace-events.shared.ts`, `test/auto-dial-agent-leave.route.test.ts`, `test/ui/predictive-conference-ended.test.tsx`
+- Existing tests: test/auto-dial-agent-leave.route.test.ts (eight cases: provider and legacy fields, metadata and provider errors, ended/SID-only conference, later billing claim and signature rejection); test/ui/predictive-conference-ended.test.tsx (real room and sync hooks; explicit end vs ordinary completion; matching, other and old conference events); test/auto-dial-status.test.ts (ordinary status and callee controls); test/auto-dial.server.test.ts (ended conference stops the next turn); test/ui/use-call-room.test.tsx; test/ui/use-predictive-call-sync.test.ts; test/ui/hooks-call-screen.test.tsx
+- Missing tests: Deployed browser and phone calling verification, callback retries and billing verification.
+- Done when: An agent hang-up returns 200 and completes the conference.; A callee hang-up still records the attempt outcome (the existing behaviour must stay green).; The predictive dialer stops when the last conference ends.; The other agents' dashboards receive the end-of-call broadcast for an agent-leg hang-up.; Twilio receives no retry (no 500) for the agent leg.
+- Tracker: The source fix travels with this board update. After merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.
 
 ### [#2093](https://github.com/chester-hill-solutions/callcaster/issues/2093) A voice test call writes a call row with the campaign id, so the campaign's own duplicate gate later dequeues the real contact as "Duplicate IVR call prevented"
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03

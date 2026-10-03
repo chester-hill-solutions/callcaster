@@ -1011,39 +1011,6 @@
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The default opt-out set is only STOP and UNSUBSCRIBE. A configured END set removes STOP. Direct checks confirm CANCEL is not suppressed and configured END loses STOP."
   },
   {
-    "issueNumber": 2091,
-    "verdict": "fix-now",
-    "recommendedTitle": "messageMedia uploads are keyed by the client-supplied filename with no uniquifier, so a same-name upload silently replaces an existing attachment",
-    "summary": "MMS upload still stores the workspace plus client filename with no unique component. The S3 adapter prevents overwrite only when upsert is explicitly false; this caller does not set it.",
-    "resolution": "Create a unique object key per upload and persist that key without rewriting historical keys.",
-    "lookIn": [
-      "app/routes/api+/message_media.action.server.ts:175",
-      "app/lib/object-storage.server.ts:225",
-      "the `messageMedia` upload route under `app/routes/api+/",
-      "app/lib/object-storage.server.ts:217-219",
-      "app/components/sms-ui/ChatMessages.tsx:179-182",
-      "app/lib/campaign-sms-dispatch.server.ts:201-207",
-      "app/lib/object-storage.server.ts (the `upsert` option and its default)"
-    ],
-    "existingTests": [
-      "test/message-media.route.test.ts"
-    ],
-    "missingTests": [
-      "Two same-name uploads must keep different bytes and each message/campaign must sign its own object."
-    ],
-    "acceptanceCriteria": [
-      "Two uploads with the same filename in one workspace produce two distinct objects, and each message points at its own.",
-      "The route never reports `success: true` for an upload that replaced an existing object.",
-      "A live campaign re-signs the **correct** media for its own `message_media` value.",
-      "Historic `outbound_media` values keep resolving (no key rewrite breaks them)."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. S3 can enforce non-overwrite with upsert:false, but this upload caller supplies neither a unique key nor that flag."
-  },
-  {
     "issueNumber": 2092,
     "verdict": "fix-now",
     "recommendedTitle": "The campaign_ended readiness code is declared and mapped to a corrective action but never emitted, so an expired campaign reads \"Ready to launch\"",

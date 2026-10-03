@@ -8,7 +8,7 @@ vi.hoisted(() => {
 
 import { asRouteResponse } from "./helpers/route-result";
 import { queueDualAuthSession } from "./helpers/route-auth-mock";
-import { uploadObject, createSignedObjectUrl, deleteObject } from "@/lib/object-storage.server";
+import { uploadObject, createSignedObjectUrl, deleteObject, ObjectExistsError } from "@/lib/object-storage.server";
 
 const postgresServerMocks = vi.hoisted(() => ({ headers: new Headers() }));
 const mocks = vi.hoisted(() => {
@@ -42,7 +42,8 @@ vi.mock("@/lib/auth.server", () => ({
   requireDualAuth: vi.fn(),
 }));
 vi.mock("@/lib/logger.server", () => ({ logger: mocks.logger }));
-vi.mock("@/lib/object-storage.server", () => ({
+vi.mock("@/lib/object-storage.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/object-storage.server")>()),
   uploadObject: vi.fn(),
   createSignedObjectUrl: vi.fn(),
   deleteObject: vi.fn(),
@@ -187,13 +188,13 @@ describe("app/routes/api+/message_media/route.tsx", () => {
     await expect(res.json()).resolves.toMatchObject({ success: true });
     expect(vi.mocked(uploadObject)).toHaveBeenCalledWith(
       "messageMedia",
-      "w1/etc_passwd.png",
+      expect.stringMatching(/^w1\/[0-9a-f-]{36}-etc_passwd\.png$/),
       expect.any(File),
       expect.any(Object),
     );
   });
 
-  test("POST handles upload errors (non-409), 409 conflict continues", async () => {
+  test("POST fails on upload errors and object collisions", async () => {
     const mod = await import("../app/routes/api+/message_media");
     const fd = new FormData();
     fd.set("workspaceId", "w1");
@@ -209,9 +210,11 @@ describe("app/routes/api+/message_media/route.tsx", () => {
 
     postgresServerMocks.headers = new Headers();
     queueDualAuthSession(authSession());
-    makeDbClient({ uploadError: { statusCode: "409" } });
+    makeDbClient({ uploadError: new ObjectExistsError("w1/a.png") });
     res = await asRouteResponse(mod.action({ request: req("POST", fd) } as any));
-    await expect(res.json()).resolves.toMatchObject({ success: true, url: "https://signed" });
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ success: false });
+    expect(vi.mocked(createSignedObjectUrl)).not.toHaveBeenCalled();
   });
 
   test("POST with campaignId updates message_campaign, covering errors and success", async () => {

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { getSession } from "@/lib/auth.server";
 import { data as routeData } from "react-router";
 import { logger } from "@/lib/logger.server";
@@ -8,7 +9,7 @@ import {
   findCampaignMessageMedia,
   updateCampaignMessageMedia,
 } from "@/lib/campaign-ivr.server";
-import { uploadObject, createSignedObjectUrl, deleteObject } from "@/lib/object-storage.server";
+import { uploadObject, createSignedObjectUrl, deleteObject, ObjectExistsError } from "@/lib/object-storage.server";
 import { AppError } from "@/lib/errors.server";
 import { defineAction } from "@/lib/handler.server";
 
@@ -154,7 +155,7 @@ export const action = defineAction({
     if (!fileValidation.ok) {
       return routeData({ success: false, error: fileValidation.error }, { headers });
     }
-    const safeFileName = fileValidation.safeName;
+    const uploadedFileName = `${randomUUID()}-${fileValidation.safeName}`;
 
     if (campaignId !== null && Number.isNaN(campaignId)) {
       return routeData({ success: false, error: "Invalid campaign ID" }, { headers });
@@ -172,15 +173,20 @@ export const action = defineAction({
     }
 
     try {
-      await uploadObject("messageMedia", `${workspaceIdStr}/${safeFileName}`, mediaToUpload as File, {
+      await uploadObject("messageMedia", `${workspaceIdStr}/${uploadedFileName}`, mediaToUpload as File, {
+        upsert: false,
         cacheControl: "60",
         contentType: (mediaToUpload as File).type || undefined,
       });
-    } catch (uploadError: any) {
-      if (uploadError?.statusCode !== "409") {
-        logger.error("Message media upload error:", uploadError);
-        return routeData({ success: false, error: uploadError }, { headers });
+    } catch (uploadError) {
+      if (uploadError instanceof ObjectExistsError) {
+        return routeData(
+          { success: false, error: "Media upload conflict. Please try again." },
+          { status: 409, headers },
+        );
       }
+      logger.error("Message media upload error:", uploadError);
+      return routeData({ success: false, error: uploadError }, { headers });
     }
 
     if (campaignId) {
@@ -193,7 +199,7 @@ export const action = defineAction({
         campaignUpdate = await updateCampaignMessageMedia(
           workspaceIdStr,
           campaignId,
-          [...((campaign.message_media ?? []) as string[]), safeFileName],
+          [...((campaign.message_media ?? []) as string[]), uploadedFileName],
         );
         if (!campaignUpdate) {
           return routeData({ success: false, error: "Failed to update campaign" }, { headers });
@@ -204,12 +210,12 @@ export const action = defineAction({
       }
 
       try {
-        const signedUrl = await createSignedObjectUrl("messageMedia", `${workspaceIdStr}/${safeFileName}`, 3600);
+        const signedUrl = await createSignedObjectUrl("messageMedia", `${workspaceIdStr}/${uploadedFileName}`, 3600);
         return routeData({
           success: true,
           error: null,
           campaignUpdate: [campaignUpdate],
-          uploadedFileName: safeFileName,
+          uploadedFileName,
           url: signedUrl,
         }, { headers });
       } catch (signedUrlError) {
@@ -219,7 +225,7 @@ export const action = defineAction({
     }
 
     try {
-      const signedUrl = await createSignedObjectUrl("messageMedia", `${workspaceIdStr}/${safeFileName}`, 3600);
+      const signedUrl = await createSignedObjectUrl("messageMedia", `${workspaceIdStr}/${uploadedFileName}`, 3600);
       return routeData({ success: true, error: null, url: signedUrl }, { headers });
     } catch (imageError) {
       return routeData({ success: false, error: imageError }, { headers });
