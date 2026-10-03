@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@9aa2025e + source fix for #2078` · 289 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@6e46180b + source fix for #2083` · 289 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 70
+## Fix now — 69
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -142,16 +142,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Look in: `app/lib/platform-workspace-numbers.server.ts:129`, `app/lib/platform-workspace-numbers.server.ts:175`, `app/lib/platform-workspace-numbers.server.ts:316`, `app/lib/platform-workspace-numbers.server.ts:129-138,175-192,216-325`, `app/lib/number-rental-billing.server.ts:394-397 (the documented precedent)`, `client/migrations/20260704000004_apply_ledger_entry_and_sync_credits.sql:75-79`, `app/lib/workspace-credits.server.ts`, `shared/pricing.ts (`NUMBER_RENTAL_MONTHLY_CREDITS`, `debitAmountFromCredits`)`, `scripts/check-credit-write-paths.mjs`
 - Missing tests: Real concurrency test for one affordable rental; provider/write fault injection must prove balance, number inventory and ledger agree.
 - Done when: Two concurrent rentals of different available numbers for a workspace with credits for only one result in exactly one provider purchase and one debit; the other returns an insufficient-credits error.; A Twilio failure after the funds are reserved leaves the balance unchanged and no `workspace_number` row.; Provider success followed by local insert, onboarding or debit failure triggers compensation or leaves a durable retry state; no unbilled active number is silently retained.; The balance can never go negative through this path (an assertion or check, not a comment).; `check:credit-writes` stays green.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2083](https://github.com/chester-hill-solutions/callcaster/issues/2083) The toll-free send gate fails open when the number has no TFV record and when the Twilio list call errors
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- A verification-list error becomes an empty result. Missing or unknown toll-free verification then permits bulk SMS. The list also has a 200-record limit.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. A verification-list error becomes an empty result. Missing or unknown toll-free verification then permits bulk SMS. The list also has a 200-record limit.
-- Resolution: Propagate or classify verification-list errors as blocking. Missing and unknown verification must block bulk SMS. Replace the bounded 200-record enumeration with complete relevant enumeration; the issue does not prove a one-page SDK bug.
-- Look in: `app/lib/twilio-toll-free.server.ts:49`, `app/lib/twilio-toll-free.server.ts:74`, `app/lib/twilio-toll-free.server.ts:25-42,44-50,52-67,68+`, `app/lib/twilio-readiness.server.ts:66-88`, `app/lib/messaging-onboarding/predicates.ts:380-471`, `app/lib/twilio-a2p-status-sync.server.ts (the same fail-open pattern is worth checking here too)`
-- Missing tests: Reject sends for provider errors, absent verification, unknown status and a sender beyond the record limit.
-- Done when: A toll-free number with **no** TFV record blocks bulk SMS with a message naming the missing verification.; A Twilio error while listing verifications **blocks** the send (fail closed) and surfaces the Twilio error.; A matching verification beyond the previous 200-record limit is included in the send decision.; An approved verification still passes; a rejected one still blocks — both are positive controls.; The fail-closed intent is documented at the decision function so the polarity cannot be flipped silently.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2113](https://github.com/chester-hill-solutions/callcaster/issues/2113) hasMaterialBillingVariance ignores categories.numbers.variance, so number-rental ledger drift never alerts and is not even stored in the snapshot
@@ -816,9 +806,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 118
+## Verify and close — 119
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2078](https://github.com/chester-hill-solutions/callcaster/issues/2078) Project admin workspace responses without credentials
+- Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Admin workspace and provider data use positive field sets at the response boundary; nested invitation hashes are excluded. Deployed checks remain.
+- Current behavior: Merged to dev in PR #2280 at 6e46180b. Six admin UI/API surfaces use the canonical positive workspace contract, nested invitation hashes are excluded and both account loaders use one five-field projection with selected-account tests. Safe client types and the static import/type gate preserve server-only credential reads and health derivation. All 50 focused Node cases passed, 13 mutations failed, full local CI passed 5,048 Vitest and 22 Bun tests. All remote gates passed on 9ee5270b; issue-on-dev moved one item. Deployed functional verification and promotion remain.
+- Root cause: Safe derived workspaceRows were returned beside raw global workspace rows. Admin services also passed raw membership/invitation joins and detail rows through to route adapters, and a smaller provider interface did not remove runtime account fields.
+- Resolution: Verify all admin UI/JSON payloads and nested rows exclude credentials and hashes on deployed dev, while display/health data and server-only Twilio operations remain usable. Promote before closure.
+- Look in: `app/lib/platform-admin.server.ts`, `app/lib/workspace-client-projection.server.ts`, `app/lib/twilio-client-projection.server.ts`, `app/routes/admin+/workspaces/$workspaceId.loader.server.ts`, `app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server.ts`, `app/routes/admin+/admin.types.ts`, `scripts/check-workspace-projection.mjs`
+- Existing tests: test/admin-response-projection.test.ts (six real service/route surfaces, complete root/workspace/provider/invitation key sets, nested secret absence, API auth, missing workspace, provider failure, selected workspace account SID and server-only portal control); test/check-workspace-projection.test.ts (raw reader/type refusal, positive/secret Pick controls and permitted server-only credentials); Existing product SQL projection, admin rows/actions/credits/portal and membership summary controls
+- Missing tests: Deployed admin payload, display/health and Twilio-operation verification before promotion.
+- Done when: Dashboard UI/API, detail, campaign and user-workspace UI/API payloads exclude workspace credentials, provider authToken and invitation token_hash at every depth.; Workspaces and provider accounts use explicit positive field sets with useful display and operational data preserved.; Client types use the safe workspace contract and server-only credential reads remain permitted.; Admin entry import/type guard rejects raw readers and full/unsafe workspace types, accepts positive Pick and server-only helper controls; payload tests prove dataflow separately.; Missing workspace, provider failure and real API authorization remain controlled.; Deployed verification and promotion precede closure.
+- Tracker: Source fix is in this change. Verify deployed nested payloads and admin operations, then promote and close.
+
+### [#2083](https://github.com/chester-hill-solutions/callcaster/issues/2083) Block bulk SMS when toll-free verification evidence is missing
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Complete SDK enumeration and explicit approval now establish successful verification evidence. Missing, failed and older snapshots block bulk SMS until refreshed.
+- Current behavior: Source fix from dev@6e46180b: full phone inventory and verification lists use SDK pagination without a total cap. Missing records, unknown/non-approved statuses and provider errors block sends. Successful complete sync writes tollFreeVerificationCheckedAt; missing, malformed, failed and legacy healthy/false evidence remains blocked. The real shared predicate and send gate retain provider error feedback. Approved and no-toll-free inventory controls pass; a successful refresh replaces a failure. All 101 focused Node cases and typechecking passed. Original source failed 27 new regressions with 12 controls retained. Fourteen isolated status, provider error, pagination, evidence and feedback mutations failed and were restored.
+- Root cause: The verification helper swallowed errors, truncated enumeration and permitted unknown status. The outer sync error handler also cleared the block. Existing healthy/false snapshots could therefore be false approval evidence.
+- Resolution: After deploying, refresh older snapshots through admin Sync Twilio or Sync Now. Verify approved, missing, provider-error, later-page inventory/verification and recovery cases through the real bulk SMS gate. Promote before closure.
+- Look in: `app/lib/twilio-toll-free.server.ts`, `app/lib/database/workspace-twilio-sync.server.ts`, `app/lib/twilio-readiness.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `app/lib/workspace-twilio-sync.ts`, `app/lib/types.ts`, `scripts/check-app-file-size.mjs`, `docs/twilio-toll-free-verification-plan.md`
+- Existing tests: test/toll-free-verification-evidence.test.ts (installed SDK transport, exact status controls, provider errors and later verification pages); test/workspace-twilio-sync.server.test.ts (real writer, normalization, stored readiness gate, later inventory page, unknown/legacy/malformed/failed evidence, approval/no-TF controls and refresh recovery); Existing portal, recommendations, shared onboarding/readiness, RCS and campaign send-gate controls
+- Missing tests: Deployed dev refresh and actual bulk SMS checks before promotion and closure.
+- Done when: Missing, unknown, misleading non-approved, pending and rejected verification blocks bulk SMS.; Provider and inventory errors remain visible and block the actual gate.; Phone inventory and matching verification beyond the former 200-result cap affect the decision.; A successful complete sync is required before old or missing evidence can permit sends.; Approved senders and successful no-toll-free inventory remain allowed; successful refresh recovers from failure.; The shared gate fails closed and adds no provider call per recipient.; Refresh deployed snapshots and verify behavior before promotion and closure.
+- Tracker: Source fix is in this change. Refresh legacy snapshots after deployment, verify actual SMS decisions and recovery, then promote and close.
 
 ### [#2075](https://github.com/chester-hill-solutions/callcaster/issues/2075) Restore the password recovery email journey
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -831,18 +845,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed password recovery and callback verification before promotion.
 - Done when: Actual issued link reaches the password form with the original token and the action changes the password.; Known and unknown emails receive the same generic acceptance feedback.; Verification failures reach a real sign-in route without carrying tokens; success keeps cookies and safe return paths.; Password completion feedback names the correct credential.; Existing expiry, replay rejection and request/reset limits remain.; Repository-wide redirect guard is tracked separately in #2278; deployed verification and promotion precede closure.
 - Tracker: Source fix is in this change. Verify deployed recovery and failure paths, then promote and close.
-
-### [#2078](https://github.com/chester-hill-solutions/callcaster/issues/2078) Project admin workspace responses without credentials
-- Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Admin workspace and provider data use positive field sets at the response boundary; nested invitation hashes are excluded. Deployed checks remain.
-- Current behavior: Source fix from dev@9aa2025e: dashboard UI/API, detail, campaign subpage and user-workspace UI/API use the canonical seven-field client workspace projection. Nested memberships and invitations use the same shape; invitation display rows exclude token_hash. Detail and standalone Twilio portal share a five-field provider account projection. The SDK client supplies the selected account SID, so detail no longer reads credentials from its response workspace. Admin client types are narrowed; the credits loader uses the existing safe SQL reader. All 50 focused Node cases and typechecking passed. Original affected source failed 14 payload/guard cases with 12 controls retained. Thirteen isolated workspace, nested invitation, provider account-selection and guard mutations failed and were restored.
-- Root cause: Safe derived workspaceRows were returned beside raw global workspace rows. Admin services also passed raw membership/invitation joins and detail rows through to route adapters, and a smaller provider interface did not remove runtime account fields.
-- Resolution: Verify all admin UI/JSON payloads and nested rows exclude credentials and hashes on deployed dev, while display/health data and server-only Twilio operations remain usable. Promote before closure.
-- Look in: `app/lib/platform-admin.server.ts`, `app/lib/workspace-client-projection.server.ts`, `app/lib/twilio-client-projection.server.ts`, `app/routes/admin+/workspaces/$workspaceId.loader.server.ts`, `app/routes/admin+/workspaces/$workspaceId/loadTwilioData.server.ts`, `app/routes/admin+/admin.types.ts`, `scripts/check-workspace-projection.mjs`
-- Existing tests: test/admin-response-projection.test.ts (six real service/route surfaces, complete root/workspace/provider/invitation key sets, nested secret absence, API auth, missing workspace, provider failure, selected workspace account SID and server-only portal control); test/check-workspace-projection.test.ts (raw reader/type refusal, positive/secret Pick controls and permitted server-only credentials); Existing product SQL projection, admin rows/actions/credits/portal and membership summary controls
-- Missing tests: Deployed admin payload, display/health and Twilio-operation verification before promotion.
-- Done when: Dashboard UI/API, detail, campaign and user-workspace UI/API payloads exclude workspace credentials, provider authToken and invitation token_hash at every depth.; Workspaces and provider accounts use explicit positive field sets with useful display and operational data preserved.; Client types use the safe workspace contract and server-only credential reads remain permitted.; Admin entry import/type guard rejects raw readers and full/unsafe workspace types, accepts positive Pick and server-only helper controls; payload tests prove dataflow separately.; Missing workspace, provider failure and real API authorization remain controlled.; Deployed verification and promotion precede closure.
-- Tracker: Source fix is in this change. Verify deployed nested payloads and admin operations, then promote and close.
 
 ### [#2077](https://github.com/chester-hill-solutions/callcaster/issues/2077) Authorize invitation resend before token rotation
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03

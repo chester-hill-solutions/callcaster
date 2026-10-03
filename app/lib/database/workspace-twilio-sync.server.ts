@@ -42,7 +42,8 @@ export const DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT: WorkspaceTwilioSyncSnapshot
     lastSyncedAt: null,
     lastSyncStatus: "never_synced",
     lastSyncError: null,
-    tollFreeVerificationBlocked: false,
+    tollFreeVerificationBlocked: true,
+    tollFreeVerificationCheckedAt: null,
   };
 
 export function normalizeWorkspaceTwilioSyncSnapshot(
@@ -59,6 +60,9 @@ export function normalizeWorkspaceTwilioSyncSnapshot(
     value.lastSyncStatus === "never_synced"
       ? value.lastSyncStatus
       : DEFAULT_WORKSPACE_TWILIO_SYNC_SNAPSHOT.lastSyncStatus;
+
+  const checkedAt = parseOptionalString(value.tollFreeVerificationCheckedAt);
+  const hasVerificationEvidence = checkedAt !== null && Number.isFinite(Date.parse(checkedAt));
 
   return {
     accountStatus: parseOptionalString(value.accountStatus),
@@ -82,10 +86,13 @@ export function normalizeWorkspaceTwilioSyncSnapshot(
     lastSyncedAt: parseOptionalString(value.lastSyncedAt),
     lastSyncStatus,
     lastSyncError: parseOptionalString(value.lastSyncError),
+    tollFreeVerificationCheckedAt: hasVerificationEvidence ? checkedAt : null,
+    // Old healthy/false snapshots could come from swallowed provider errors.
+    // Only a successful complete inventory/verification check establishes proof.
     tollFreeVerificationBlocked:
-      typeof value.tollFreeVerificationBlocked === "boolean"
-        ? value.tollFreeVerificationBlocked
-        : false,
+      lastSyncStatus !== "healthy" ||
+      !hasVerificationEvidence ||
+      value.tollFreeVerificationBlocked !== false,
   };
 }
 
@@ -161,7 +168,8 @@ export async function syncWorkspaceTwilioSnapshot({
         lastSyncedAt: new Date().toISOString(),
         lastSyncStatus: "error",
         lastSyncError: "Missing workspace Twilio credentials",
-        tollFreeVerificationBlocked: false,
+        tollFreeVerificationBlocked: true,
+        tollFreeVerificationCheckedAt: null,
       },
     });
     await syncWorkspaceTwilioBootstrapStateSafely({
@@ -186,7 +194,7 @@ export async function syncWorkspaceTwilioSnapshot({
     const { startDate, endDate } = getTwilioUsageDateRange();
     const [account, numbers, usageRecords] = await Promise.all([
       accountLevelTwilio.api.v2010.accounts(sid).fetch(),
-      twilio.incomingPhoneNumbers.list({ limit: 200 }),
+      twilio.incomingPhoneNumbers.list({ pageSize: 200 }),
       twilio.usage.records.list({
         startDate: new Date(startDate),
         endDate: new Date(endDate),
@@ -223,6 +231,7 @@ export async function syncWorkspaceTwilioSnapshot({
       },
     );
 
+    const checkedAt = new Date().toISOString();
     const snapshot = await updateWorkspaceTwilioSyncSnapshot({
       workspaceId,
       snapshot: {
@@ -235,7 +244,8 @@ export async function syncWorkspaceTwilioSnapshot({
         senderTypes: inventory.senderTypes,
         recentUsageCount: usageRecords.length,
         usageTotalPrice,
-        lastSyncedAt: new Date().toISOString(),
+        lastSyncedAt: checkedAt,
+        tollFreeVerificationCheckedAt: checkedAt,
         lastSyncStatus: "healthy",
         lastSyncError: null,
         tollFreeVerificationBlocked,
@@ -262,7 +272,8 @@ export async function syncWorkspaceTwilioSnapshot({
           syncError instanceof Error
             ? syncError.message
             : "Unknown Twilio sync failure",
-        tollFreeVerificationBlocked: false,
+        tollFreeVerificationBlocked: true,
+        tollFreeVerificationCheckedAt: null,
       },
     });
     await syncWorkspaceTwilioBootstrapStateSafely({

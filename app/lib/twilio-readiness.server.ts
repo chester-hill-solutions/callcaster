@@ -60,7 +60,7 @@ export async function assertWorkspaceCanSendSms({
     recentOutboundCount: 0,
     senderPool,
     portalConfig: { sendMode: portalConfig.sendMode },
-    syncSnapshot: { tollFreeVerificationBlocked: syncSnapshot.tollFreeVerificationBlocked },
+    syncSnapshot,
   };
 
   const sendGateResults = evaluateWorkspaceReadinessByIds(ctx, [

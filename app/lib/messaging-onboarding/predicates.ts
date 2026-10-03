@@ -51,7 +51,7 @@ export type WorkspaceReadinessContext = {
   /** Populated by the send-gate evaluator (sender pool requires a live Twilio call). */
   senderPool?: WorkspaceReadinessSenderPool;
   portalConfig?: { sendMode?: string | null };
-  syncSnapshot?: { tollFreeVerificationBlocked?: boolean };
+  syncSnapshot?: { tollFreeVerificationBlocked?: boolean; lastSyncError?: string | null };
   /** Derived RCS sender draft (server evaluators hydrate this from business profile). */
   rcsDraft?: WorkspaceMessagingOnboardingState["rcs"];
 };
@@ -368,6 +368,9 @@ function buildRcsSenderPackagePredicates(): WorkspaceReadinessPredicate[] {
   }));
 }
 
+const TOLL_FREE_VERIFICATION_BLOCKED_MESSAGE =
+  "Toll-free verification is missing, unconfirmed, pending or rejected. Bulk SMS is blocked until Twilio approves verification.";
+
 const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
   {
     id: "messaging_service_provisioned",
@@ -482,11 +485,13 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
   },
   {
     id: "toll_free_verified",
-    test: (ctx) => !ctx.syncSnapshot?.tollFreeVerificationBlocked,
+    test: (ctx) => ctx.syncSnapshot?.tollFreeVerificationBlocked === false,
     blockingFor: ["sms"] as const,
     code: "toll_free_verification_blocked",
-    message:
-      "Toll-free verification is pending or rejected. Bulk SMS is blocked until Twilio approves verification.",
+    message: TOLL_FREE_VERIFICATION_BLOCKED_MESSAGE,
+    buildMessage: (ctx) => ctx.syncSnapshot?.lastSyncError
+      ? `${TOLL_FREE_VERIFICATION_BLOCKED_MESSAGE} Sync error: ${ctx.syncSnapshot.lastSyncError}`
+      : TOLL_FREE_VERIFICATION_BLOCKED_MESSAGE,
     severity: "error" as const,
   },
   {
