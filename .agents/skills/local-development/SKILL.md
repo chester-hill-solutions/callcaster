@@ -42,6 +42,8 @@ Use object rows when a `test.each` case contains an array input, for example
 `[{ ids: [] }, { ids: ["id"] }]`. Vitest spreads a bare array row into positional
 arguments; an empty row supplies no argument. Check the fixed positive cases
 before running mutations so a fixture error cannot pass as regression evidence.
+Confirm the collected case count after adding controls; every test must be at
+suite level, outside test and fixture callbacks.
 
 ## SQL query regressions
 
@@ -50,6 +52,11 @@ cannot check which rows the SQL counts. For a read-only query, a transaction-loc
 temporary table can isolate the required columns without changing stored app
 rows. Restore injected clients in `finally`. Run the fixed cases before removing
 or reversing the predicate, and retain a real-row positive control.
+
+For global-table mutations, verify the actual UPDATE predicate with foreign and
+owned rows, then exercise the real API/form error responses. Access checks before
+a bare-ID write do not impose tenant scope. Keep a permitted-role and an explicit
+global-admin control when their policies differ.
 
 ## RPC migration changes
 

@@ -1,4 +1,5 @@
 import { randomBytes } from "crypto";
+import { AuthzError } from "@chester-hill-solutions/auth";
 import {
   API_KEY_PREFIX_LENGTH,
   hashApiKeyForStorage,
@@ -492,14 +493,14 @@ export async function cancelWorkspaceInvite(
   if (!access.ok) return access;
 
   try {
-    await cancelWorkspaceInvitationById(invitationId);
+    await cancelWorkspaceInvitationById(invitationId, workspaceId);
     return { ok: true as const, invites: [] };
   } catch (error) {
     logger.error("cancelWorkspaceInvite error", error);
     return {
       ok: false as const,
       error: error instanceof Error ? error.message : "Failed to cancel invite",
-      status: 500,
+      status: error instanceof AuthzError ? error.status : 500,
     };
   }
 }

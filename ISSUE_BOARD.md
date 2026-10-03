@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@48a29230 + source fix for #2079` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@89bd9fbb + source fix for #2076` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 73
+## Fix now — 72
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -324,16 +324,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Look in: `app/routes/api+/test-webhook.action.server.ts:10`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:243`, `app/lib/safe-outbound-url.server.ts:168`, `app/routes/api+/test-webhook.action.server.ts:9-20`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:276-298`, `app/lib/platform-members.server.ts:499-516 (the correct sibling)`, `app/lib/safe-outbound-url.server.ts:121-175`, `scripts/check-route-membership.mjs:42`
 - Missing tests: No authorization regression for no-workspace/caller; outbound URL tests establish SSRF behavior rather than role access.
 - Done when: `POST /api/test-webhook` without a workspace the caller manages returns 403/404 and performs no outbound request.; A `caller`-role user cannot use it at all.; The route is rate limited per user.; `check:route-membership` fails on a future `sideEffects: ["external"]` route with no workspace auth strategy.; The permitted path (a workspace manager testing their own webhook) still works.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2076](https://github.com/chester-hill-solutions/callcaster/issues/2076) Invite cancel is authorized on workspaceId but executed on a bare invitation id — any member can cancel any workspace's pending invite
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- Workspace authorization still ends before invitation cancellation. Both API and settings helper send a bare invitation id to the package writer.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Workspace authorization still ends before invitation cancellation. Both API and settings helper send a bare invitation id to the package writer.
-- Resolution: Require workspace identity in cancel/resend writers and use it in the update predicate; map foreign ids to uniform 404.
-- Look in: `app/lib/platform-members.server.ts:491`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:175`, `vendor/chester-hill-solutions/auth-postgres/dist/invitation.js:75`, `app/lib/platform-members.server.ts:53-75,478-497`, `app/lib/workspace-invitations.server.ts:166-174`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:198-214`, `app/routes/api+/workspaces+/$workspaceId/members.action.server.ts:165-177`, `app/routes/workspaces+/$id/settings.action.server.ts:44-53`, `app/components/workspace/TeamMember.tsx:102-125`, `app/db/schema.ts:180-193`
-- Missing tests: No cross-workspace cancellation test. Cover both routes and a valid in-workspace pending invite; assert the foreign row remains unchanged.
-- Done when: `cancelWorkspaceInvite(userA, wsA, inviteIdFromWsB)` returns `ok:false, status:404` and leaves the wsB invitation `pending`.; The `formName=cancelInvite` settings branch behaves identically.; The `workspaceId` parameter is no longer dead in either helper (a lint or type change makes an unused parameter an error so it cannot rot back).; `resendWorkspaceInvitation` gets the same scoping — see #the sibling resend-ownership issue.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2166](https://github.com/chester-hill-solutions/callcaster/issues/2166) Call audio depends on a best-effort Twilio copy — recover the ones that failed, then remove the Twilio playback fallback
@@ -847,9 +837,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 114
+## Verify and close — 115
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2079](https://github.com/chester-hill-solutions/callcaster/issues/2079) Reject workspace ownership transfer to the current owner
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Self transfer rejects before MFA or writes; API transfer failures remain errors. Deployed verification remains.
+- Current behavior: Merged to dev in PR #2275 at 89bd9fbb. One canonical rule rejects the current owner before MFA or transactions; real API and settings return a clear 400 with no writes or success audit. API failure mapping calls the domain service directly. All 65 focused Node and three real Postgres cases passed; seven isolated mutations failed and were restored. Full local CI passed 4,989 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on 48ae34a0. Deployed functional verification and promotion remain.
+- Root cause: The canonical writer promoted and demoted the same membership when both user IDs matched. The API checked a top-level error on a wrapped form response and could audit a failed transfer as successful.
+- Resolution: Verify self rejection and distinct-member transfers through API and workspace settings on deployed dev. Verify owner roles, MFA and failed-transfer audit behavior, then promote before closure.
+- Look in: `app/lib/workspace-members-db.server.ts`, `app/lib/platform-workspace.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/routes/api+/workspaces+/$workspaceId/transfer-ownership.action.server.ts`, `app/routes/workspaces+/$id/settings.action.server.ts`
+- Existing tests: test/workspace-ownership-transfer.test.ts (real API/form, shared service, error/audit, MFA and owner-role controls); test/integration-db/workspace-ownership-transfer.test.ts (real distinct rows, self rejection, workspace isolation and rollback); Existing workspace membership, settings RBAC, form-helper and OpenAPI controls
+- Missing tests: Deployed ownership-transfer verification before promotion.
+- Done when: The canonical service rejects equal owner IDs before MFA or a transaction.; API and product self transfers return a clear error and leave ownership unchanged.; Session identity, owner authorization and distinct-target MFA remain enforced.; A valid transfer promotes the distinct member and demotes the previous owner only in its workspace.; A failed transfer cannot return API success or record a success audit.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed self, distinct-target and failed-transfer behavior, then promote and close.
+
+### [#2076](https://github.com/chester-hill-solutions/callcaster/issues/2076) Scope workspace invitation cancellation to its authorized workspace
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Cancellation requires the selected workspace in its actual mutation; deployed cancellation checks remain.
+- Current behavior: Source fix from dev@89bd9fbb: the canonical writer requires a workspace ID and filters the actual UPDATE by ID, workspace and pending status. Foreign, missing and finalized invitations receive one 404. API and settings pass the authorized workspace and preserve errors. The global admin helper derives the invitation workspace before calling the same writer. All 73 focused Node and ten real Postgres cases passed; old source failed eight Node and five database regressions while 65 Node and five database controls stayed green. Eight isolated mutations failed and were restored.
+- Root cause: API and form access checks used the requested workspace, but the global-table cancellation writer dropped that workspace and called a package API that filtered only ID and pending status.
+- Resolution: Verify cross-workspace refusal, uniform not-found responses and permitted cancellation through API and settings on deployed dev. Verify global admin behavior, then promote before closure. Resend authorization and token rotation remain separate in #2077.
+- Look in: `app/lib/workspace-invitations.server.ts`, `app/lib/platform-members.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/lib/workspace-members-db.server.ts`, `app/routes/api+/workspaces+/$workspaceId/members.action.server.ts`, `app/routes/workspaces+/$id/settings.action.server.ts`
+- Existing tests: test/workspace-invitation-cancel.test.ts (real adapters, mandatory workspace wiring, 404/500 mapping, member/admin/owner controls and global admin caller); test/integration-db/workspace-invitation-cancel.test.ts (actual UPDATE, unchanged foreign/finalized rows, real API/settings, role refusal and global admin control); Existing workspace settings, invitations, member authorization and OpenAPI controls
+- Missing tests: Deployed API, product and global admin cancellation verification before promotion.
+- Done when: The canonical mutation requires workspace ID and filters ID, workspace and pending status.; API and settings reject foreign, missing and non-pending invites with the same 404 and no row change.; Current member/admin/owner cancellation policy and caller/non-member refusal stay intact.; Every cancellation caller supplies the authorized or explicitly admin-selected workspace.; Resend and invitation acceptance stay separate.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed cancellation and admin behavior, then promote and close. #2077 remains separate.
 
 ### [#2087](https://github.com/chester-hill-solutions/callcaster/issues/2087) Use saved IVR start page and page order in caller flow
 - Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -862,18 +876,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed caller-flow and launch-error verification before promotion.
 - Done when: Both outbound dispatch paths and inbound entry use the declared start.; Prompt and response fall-through use saved page order; explicit navigation and legacy behavior remain intact.; Unknown/repeated order IDs are reconciled and omitted pages remain reachable.; A dangling raw start is rejected before campaign launch; entry cannot silently choose another page.; Signature and stored campaign checks, machine-answer policy, deployed verification and promotion are complete before closure.
 - Tracker: Source fix is in this change. Verify caller flow on deployed dev, then promote and close; #2269 owns attachment/save validation.
-
-### [#2079](https://github.com/chester-hill-solutions/callcaster/issues/2079) Reject workspace ownership transfer to the current owner
-- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- Self transfer rejects before MFA or writes; API transfer failures remain errors. Deployed verification remains.
-- Current behavior: Source fix from dev@48a29230: one canonical target rule rejects the session owner as the incoming owner before MFA or transactions. Both real API and form routes return a clear 400 error with no write or successful audit. The API calls the domain transfer service directly and cannot misread a React Router form response as success. All 65 focused Node and three real Postgres cases passed; the original source failed five route cases and one real-row self-transfer case while distinct-transfer and rollback controls passed. Seven isolated mutations failed and were restored.
-- Root cause: The canonical writer promoted and demoted the same membership when both user IDs matched. The API checked a top-level error on a wrapped form response and could audit a failed transfer as successful.
-- Resolution: Verify self rejection and distinct-member transfers through API and workspace settings on deployed dev. Verify owner roles, MFA and failed-transfer audit behavior, then promote before closure.
-- Look in: `app/lib/workspace-members-db.server.ts`, `app/lib/platform-workspace.server.ts`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts`, `app/routes/api+/workspaces+/$workspaceId/transfer-ownership.action.server.ts`, `app/routes/workspaces+/$id/settings.action.server.ts`
-- Existing tests: test/workspace-ownership-transfer.test.ts (real API/form, shared service, error/audit, MFA and owner-role controls); test/integration-db/workspace-ownership-transfer.test.ts (real distinct rows, self rejection, workspace isolation and rollback); Existing workspace membership, settings RBAC, form-helper and OpenAPI controls
-- Missing tests: Deployed ownership-transfer verification before promotion.
-- Done when: The canonical service rejects equal owner IDs before MFA or a transaction.; API and product self transfers return a clear error and leave ownership unchanged.; Session identity, owner authorization and distinct-target MFA remain enforced.; A valid transfer promotes the distinct member and demotes the previous owner only in its workspace.; A failed transfer cannot return API success or record a success audit.; Deployed verification and promotion are complete before closure.
-- Tracker: Source fix is in this change. Verify deployed self, distinct-target and failed-transfer behavior, then promote and close.
 
 ### [#2130](https://github.com/chester-hill-solutions/callcaster/issues/2130) Validate ACD credentials before claiming and release failed offers
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03

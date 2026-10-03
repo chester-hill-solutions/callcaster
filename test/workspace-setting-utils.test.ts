@@ -254,8 +254,9 @@ describe("WorkspaceSettingUtils", () => {
     fd.set("userId", "wi_invite_1");
 
     inviteMocks.cancelWorkspaceInvitationById.mockRejectedValueOnce(new Error("x"));
-    const r1 = await mod.removeInvite({ workspaceId: "w1", formData: fd, headers });
+    const r1 = await asRouteResponse(mod.removeInvite({ workspaceId: "w1", formData: fd, headers }));
     expect(r1.error).toBeTruthy();
+    expect(r1.status).toBe(500);
 
     inviteMocks.cancelWorkspaceInvitationById.mockResolvedValueOnce(undefined);
     const r2 = await mod.removeInvite({ workspaceId: "w1", formData: fd, headers });

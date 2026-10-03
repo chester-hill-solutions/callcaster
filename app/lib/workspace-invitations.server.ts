@@ -1,13 +1,12 @@
 import { and, eq, gt } from "drizzle-orm";
 import {
-  cancelInvitation,
   createInvitation,
   listPendingInvitations,
   redeemInvitation,
   resendInvitation,
   type WorkspaceInvitationRow,
 } from "@chester-hill-solutions/auth-postgres";
-import { AuthzError } from "@chester-hill-solutions/auth";
+import { AuthzError, InviteError } from "@chester-hill-solutions/auth";
 import {
   user as userTable,
   workspace as workspaceTable,
@@ -163,9 +162,26 @@ export async function listWorkspaceInvitations(workspaceId: string) {
   return rows.map((row) => toWorkspaceInvitationView(row, workspaceId));
 }
 
-export async function cancelWorkspaceInvitationById(invitationId: string) {
+export async function cancelWorkspaceInvitationById(
+  invitationId: string,
+  workspaceId: string,
+) {
   const db = await adminDbClient();
-  await cancelInvitation(db, invitationId);
+  // The global table and package cancellation API do not add tenant scope.
+  const [invitation] = await db
+    .update(workspaceInvitationTable)
+    .set({ status: "canceled", updated_at: new Date() })
+    .where(
+      and(
+        eq(workspaceInvitationTable.id, invitationId),
+        eq(workspaceInvitationTable.workspace_id, workspaceId),
+        eq(workspaceInvitationTable.status, "pending"),
+      ),
+    )
+    .returning({ id: workspaceInvitationTable.id });
+  if (!invitation) {
+    throw new InviteError("Invitation not found.", "INVITE_NOT_FOUND", 404);
+  }
 }
 
 export async function resendWorkspaceInvitation(invitationId: string) {

@@ -3223,7 +3223,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Reject workspace ownership transfer to the current owner",
     "summary": "Self transfer rejects before MFA or writes; API transfer failures remain errors. Deployed verification remains.",
-    "currentBehavior": "Source fix from dev@48a29230: one canonical target rule rejects the session owner as the incoming owner before MFA or transactions. Both real API and form routes return a clear 400 error with no write or successful audit. The API calls the domain transfer service directly and cannot misread a React Router form response as success. All 65 focused Node and three real Postgres cases passed; the original source failed five route cases and one real-row self-transfer case while distinct-transfer and rollback controls passed. Seven isolated mutations failed and were restored.",
+    "currentBehavior": "Merged to dev in PR #2275 at 89bd9fbb. One canonical rule rejects the current owner before MFA or transactions; real API and settings return a clear 400 with no writes or success audit. API failure mapping calls the domain service directly. All 65 focused Node and three real Postgres cases passed; seven isolated mutations failed and were restored. Full local CI passed 4,989 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on 48ae34a0. Deployed functional verification and promotion remain.",
     "resolution": "Verify self rejection and distinct-member transfers through API and workspace settings on deployed dev. Verify owner roles, MFA and failed-transfer audit behavior, then promote before closure.",
     "lookIn": [
       "app/lib/workspace-members-db.server.ts",
@@ -3253,5 +3253,42 @@
     "risk": "medium",
     "trackerRecommendation": "Source fix is in this change. Verify deployed self, distinct-target and failed-transfer behavior, then promote and close.",
     "rootCause": "The canonical writer promoted and demoted the same membership when both user IDs matched. The API checked a top-level error on a wrapped form response and could audit a failed transfer as successful."
+  },
+  {
+    "issueNumber": 2076,
+    "verdict": "verify-close",
+    "recommendedTitle": "Scope workspace invitation cancellation to its authorized workspace",
+    "summary": "Cancellation requires the selected workspace in its actual mutation; deployed cancellation checks remain.",
+    "currentBehavior": "Source fix from dev@89bd9fbb: the canonical writer requires a workspace ID and filters the actual UPDATE by ID, workspace and pending status. Foreign, missing and finalized invitations receive one 404. API and settings pass the authorized workspace and preserve errors. The global admin helper derives the invitation workspace before calling the same writer. All 73 focused Node and ten real Postgres cases passed; old source failed eight Node and five database regressions while 65 Node and five database controls stayed green. Eight isolated mutations failed and were restored.",
+    "resolution": "Verify cross-workspace refusal, uniform not-found responses and permitted cancellation through API and settings on deployed dev. Verify global admin behavior, then promote before closure. Resend authorization and token rotation remain separate in #2077.",
+    "lookIn": [
+      "app/lib/workspace-invitations.server.ts",
+      "app/lib/platform-members.server.ts",
+      "app/lib/workspace-settings/WorkspaceSettingUtils.server.ts",
+      "app/lib/workspace-members-db.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/members.action.server.ts",
+      "app/routes/workspaces+/$id/settings.action.server.ts"
+    ],
+    "existingTests": [
+      "test/workspace-invitation-cancel.test.ts (real adapters, mandatory workspace wiring, 404/500 mapping, member/admin/owner controls and global admin caller)",
+      "test/integration-db/workspace-invitation-cancel.test.ts (actual UPDATE, unchanged foreign/finalized rows, real API/settings, role refusal and global admin control)",
+      "Existing workspace settings, invitations, member authorization and OpenAPI controls"
+    ],
+    "missingTests": [
+      "Deployed API, product and global admin cancellation verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "The canonical mutation requires workspace ID and filters ID, workspace and pending status.",
+      "API and settings reject foreign, missing and non-pending invites with the same 404 and no row change.",
+      "Current member/admin/owner cancellation policy and caller/non-member refusal stay intact.",
+      "Every cancellation caller supplies the authorized or explicitly admin-selected workspace.",
+      "Resend and invitation acceptance stay separate.",
+      "Deployed verification and promotion are complete before closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Source fix is in this change. Verify deployed cancellation and admin behavior, then promote and close. #2077 remains separate.",
+    "rootCause": "API and form access checks used the requested workspace, but the global-table cancellation writer dropped that workspace and called a package API that filtered only ID and pending status."
   }
 ]
