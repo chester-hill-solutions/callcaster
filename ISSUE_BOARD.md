@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@24c4d810 + source fix for #2104` · 291 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@0a0acd17 + source fix for #2105` · 291 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 65
+## Fix now — 64
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -603,17 +603,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: A true requested flag remains true when another known flag contains a wrong type.; A requested flag with a wrong type returns false.; A missing requested flag returns false.; Diagnostics for malformed stored known flags identify the key and workspace at a call site with workspace context.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2105](https://github.com/chester-hill-solutions/callcaster/issues/2105) env.VERIFICATION_PHONE_NUMBER throws instead of returning undefined, so the route's 503 branch is unreachable and a missing var boots green
-- Verdict: **Fix now** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- The verification number remains optional in its type/boot keys but absent from optionalEnvVars, so its getter throws before the intended 503.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. VERIFICATION_PHONE_NUMBER is optional in the type and boot required keys, but not in optionalEnvVars. The getter throws before the route 503 branch and before its DB try/catch.
-- Resolution: Add VERIFICATION_PHONE_NUMBER to optionalEnvVars so the existing unavailable-feature 503 branch is live; correct test/env.server.test.ts, which currently expects a missing-value exception.
-- Look in: `app/lib/env.server.ts:38`, `app/lib/env.server.ts:54`, `app/routes/api+/verify-call-in-session.loader.server.ts:18`, `test/env.server.test.ts:130`, `app/lib/env.server.ts:54,265-273 (`optionalEnvVars`, `isTwoFactorFeatureEnabled` as the pattern)`, `app/lib/required-env-keys.ts`, `app/lib/required-env-keys.mjs`, `the call-in verification route (`app/routes/api+/verify-audio-pin.*` and its loader)`, `test/*env*`
-- Existing tests: test/env.server.test.ts:130 currently asserts that the missing verification-number getter throws.; The route's missing-configuration 503 path needs a test using the real getter.
-- Missing tests: Test real getter missing value through loader with no session insert; configured number should still create the expected verification session.
-- Done when: With VERIFICATION_PHONE_NUMBER absent, its getter returns undefined.; The loader returns 503 with Call-in verification is not configured and writes no verification session.; With the number configured, a valid request retains the permitted verification flow.; The existing getter test no longer requires an exception for this optional variable.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
 ### [#1878](https://github.com/chester-hill-solutions/callcaster/issues/1878) Surface and select the caller audio on the /call welcome dialog
 - Verdict: **Fix now** · Size: M · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
 - The welcome dialog still carries only a voicemail boolean. It has no audio name or picker, and audiodrop still loads the campaign default. The session-only decision is recorded in the issue.
@@ -766,14 +755,14 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 125
+## Verify and close — 126
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
 ### [#2104](https://github.com/chester-hill-solutions/callcaster/issues/2104) Include namespace effect calls in the effects guard
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
 - The effect guard collects actual direct and namespace calls and reads annotations before the complete callee. Both hidden effects are now inventoried.
-- Current behavior: Source fix based on dev@24c4d810: TypeScript call syntax replaces the broad prefix exemption. Direct, namespace and multiline calls use the full-callee annotation offset; declarations and comment/string lookalikes are ignored. The datetime digit timer is documented. The audience-history fetch effect hidden after a full-stop comment is listed as CANDIDATE-REMOVE under separate runtime task #2288. Inventory now contains 120 actual calls: 118 documented and the same two grandfathered effects. No timer, fetch, dependency or baseline allowance changes. All 29 focused cases pass. Original source fails 14 of 18 CLI fixture cases with four controls; five scanner mutations and two actual annotation removals fail, and all source/inventory is restored. Full local and remote gates are required before merge.
+- Current behavior: Merged to dev in PR #2289 at 0a0acd17. The guard collects actual direct and namespace call expressions and reads annotations before the complete callee; declarations and comment/string lookalikes are ignored. Both hidden app effects are now inventoried: datetime timer documented, audience-history fetch CANDIDATE-REMOVE under #2288. Inventory lists 120 effects: 118 documented and the same two grandfathered effects. Runtime, dependencies and allowances are unchanged. All 29 focused cases pass; original scanner fails 14 of 18 with four controls, five mutations and two annotation removals fail. Full local CI passed 5,247 Vitest and 22 Bun tests; all remote and both Railway gates passed on cc58190e. Issue-on-dev moved one item. Verify merged/dev guard inventory and promote before closure.
 - Root cause: The definition-skip regex treated a preceding dot as proof of a declaration, including namespace calls and a dot in a preceding line comment. Annotation lookup at the hook name would also reject valid namespace annotations.
 - Resolution: Verify the real guard and generated inventory on the merged source; namespace calls must be enforced and documented, true declarations ignored and baseline allowances retained. Promote before closure. Audience-history behavior belongs to #2288; dependency-tag comparison remains #2067.
 - Look in: `scripts/check-effects.mjs`, `scripts/lib/effects-lib.mjs`, `app/components/ui/datetime.tsx`, `app/hooks/audience/useAudienceUploads.ts`, `docs/effects-inventory.md`, `scripts/effects-baseline.json`
@@ -781,6 +770,18 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Verification on merged/deployed dev source before promotion.
 - Done when: Actual unannotated direct, namespace and layout-effect calls fail the CLI.; Annotated complete member calls appear in inventory, including multiline forms.; Actual declarations and hook-like comments/strings are ignored.; Namespace effects count in baseline mode and growth above allowance fails.; Datetime timer annotation and audience removal debt are listed; production behavior and baseline allowance are unchanged.; Original source, scanner mutations and annotation removals fail meaningful regressions.; Full local/remote gates pass before merge; verify merged dev source before promotion and closure.
 - Tracker: Source guard fix is in this change; verify inventory/enforcement and promote before closure.
+
+### [#2105](https://github.com/chester-hill-solutions/callcaster/issues/2105) Return feature-unavailable response when call-in verification is not configured
+- Verdict: **Verify and close** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The real optional verification-number getter now permits missing/empty values, making the existing route 503 response reachable.
+- Current behavior: Source fix based on dev@0a0acd17: only VERIFICATION_PHONE_NUMBER is added to optional handling. Missing/empty configuration returns undefined and the actual loader returns the existing 503 feature-unavailable response without a session write. Configured requests retain the number, caller, ten-minute expiry and session headers; invalid callers, denied auth and writer failures retain their responses. Boot required keys and production media-stream secret handling are unchanged. All 27 focused cases pass. Original runtime fails four with 23 controls; three isolated mutations fail and all source is restored. Full local and remote gates are required before merge.
+- Root cause: The optional type/boot configuration was inconsistent with the getter optional-key list. The getter threw before the intended route branch.
+- Resolution: Verify absent/empty configuration on deployed dev returns 503 without a session write; verify configured valid session creation. Keep other required configuration and security contracts unchanged. Promote before closure.
+- Look in: `app/lib/env.server.ts`, `app/lib/required-env-keys.ts`, `app/lib/required-env-keys.mjs`, `app/routes/api+/verify-call-in-session.loader.server.ts`
+- Existing tests: test/env.server.test.ts; test/verify-call-in-session.route.test.ts; test/verification-number-config.route.test.ts
+- Missing tests: Deployed dev disabled/enabled verification before production promotion.
+- Done when: Absent/empty verification number returns undefined from the real getter and does not prevent startup.; The real loader returns 503 with Call-in verification is not configured and writes no session.; Configured valid requests retain number, caller, ten-minute expiry and headers.; Invalid callers, unauthenticated requests and session write failures retain error responses.; Required boot keys and other production configuration/security contracts remain intact.; Meaningful original-source and mutation regressions fail; full local/remote gates pass before merge.; Verify deployed dev and promote before closure.
+- Tracker: Source fix is in this change; verify disabled/enabled deployed behavior before promotion and closure.
 
 ### [#2102](https://github.com/chester-hill-solutions/callcaster/issues/2102) Match published agent-call estimates to billing rates
 - Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
