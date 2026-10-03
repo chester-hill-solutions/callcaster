@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@aacb17ac + source fix for #2082` · 290 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@e71435b3 + source fix for #2080` · 290 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 69
+## Fix now — 68
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -271,16 +271,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/public-pricing.test.ts
 - Missing tests: Contract test must compare a five-minute published lane with voiceCreditsFromDurationSeconds for the same kind.
 - Done when: The Calling lane publishes the staffed rate (4 / 5) and the IVRs lane publishes the IVR rate (2 / 3).; A test computes `voiceCreditsFromDurationSeconds(300, kind)` for each published lane and asserts it equals the published figure for a 5-minute call.; The pricing calculator's field label matches the lane it prices.; `docs/` and any marketing copy quoting the auto-dial rate is checked and corrected.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2080](https://github.com/chester-hill-solutions/callcaster/issues/2080) /api/test-webhook is an authenticated open egress relay — any signed-in user can POST to any public host with chosen headers and read the response
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- The webhook test route still authorizes only a session, then forwards caller-selected public URL, body and headers with response read-back. Private-address and redirect controls remain intact.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The webhook test route still authorizes only a session, then forwards caller-selected public URL, body and headers with response read-back. Private-address and redirect controls remain intact.
-- Resolution: Require a named workspace and manager access, add a per-user limit, and test allowed manager and refused caller/no-membership cases.
-- Look in: `app/routes/api+/test-webhook.action.server.ts:10`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:243`, `app/lib/safe-outbound-url.server.ts:168`, `app/routes/api+/test-webhook.action.server.ts:9-20`, `app/lib/workspace-settings/WorkspaceSettingUtils.server.ts:276-298`, `app/lib/platform-members.server.ts:499-516 (the correct sibling)`, `app/lib/safe-outbound-url.server.ts:121-175`, `scripts/check-route-membership.mjs:42`
-- Missing tests: No authorization regression for no-workspace/caller; outbound URL tests establish SSRF behavior rather than role access.
-- Done when: `POST /api/test-webhook` without a workspace the caller manages returns 403/404 and performs no outbound request.; A `caller`-role user cannot use it at all.; The route is rate limited per user.; `check:route-membership` fails on a future `sideEffects: ["external"]` route with no workspace auth strategy.; The permitted path (a workspace manager testing their own webhook) still works.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2166](https://github.com/chester-hill-solutions/callcaster/issues/2166) Call audio depends on a best-effort Twilio copy — recover the ones that failed, then remove the Twilio playback fallback
@@ -806,14 +796,26 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 120
+## Verify and close — 121
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2080](https://github.com/chester-hill-solutions/callcaster/issues/2080) Restrict webhook tests to permitted workspace members
+- Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Both test URLs require workspace membership and the existing member-or-higher rule, then share one Postgres-backed per-user limit before DNS and outbound delivery.
+- Current behavior: Source fix on dev@e71435b3: the flat action requires a top-level workspace ID carried by WebhookEditor. Both route actions call the existing testWorkspaceWebhook service with authenticated user/workspace IDs. Its real membership policy permits member/admin/owner, refuses callers with 403 and non-members with 404. Ten tests per minute share one user budget across workspaces and both URLs; 429 carries Retry-After and rate-limit storage failure prevents delivery. Unsaved destinations/headers, provider response read-back and existing outbound safety controls remain. The membership guard scans external effects without tenancy tokens and counts only used service/provider imports. Forty-six actual action/guard cases and one UI case pass; original source fails 23 regressions with 23 controls and the original editor fails its submission test. Thirteen isolated mutations fail. Full gates are required before merge.
+- Root cause: The flat action trusted a session without workspace authorization. The nested test service relied on membership middleware but had no role gate. Neither test path was throttled. The membership guard skipped routes without tenancy text and could count unused service/provider imports as proof.
+- Resolution: Verify both deployed URLs: permitted users can test unsaved destinations/headers; callers and non-members have no outbound effect; both URLs and workspaces share the same user budget and return actionable 429 responses. Check storage-error rejection and public-URL/response controls before production promotion and closure.
+- Look in: `app/routes/api+/test-webhook.action.server.ts`, `app/routes/api+/workspaces+/$workspaceId/webhook.action.server.ts`, `app/lib/platform-members.server.ts:testWorkspaceWebhook`, `app/lib/webhook-test-delivery.server.ts`, `app/components/workspace/WebhookEditor.tsx`, `app/lib/platform-rate-limit.server.ts`, `scripts/check-route-membership.mjs`, `docs/api-workspace-admin.md`
+- Existing tests: test/test-webhook.route.test.ts (actual actions, role/membership, real bucket, shared identities, failures, forwarding and expiry); test/check-route-membership.test.ts (external relay, unused imports, called services, auth/provider/cron controls); test/ui/webhook-editor.test.tsx (actual unsaved test submission and top-level workspace); test/openapi.test.ts; test/safe-outbound-url.test.ts; test/safe-outbound-response-limit.test.ts; test/platform-rate-limit.test.ts; test/workspace-setting-utils.test.ts
+- Missing tests: Deployed route/provider verification, shared rate-limit behavior across app processes and production promotion before closure.
+- Done when: Missing workspace or non-member cannot deliver a test. Caller is refused; member/admin/owner remains permitted.; Both URLs and all workspaces share ten tests per minute per authenticated user, independent of caller IP and destination.; Over-limit requests include Retry-After; storage failure, role rejection and membership rejection perform no DNS or HTTP work.; The editor sends top-level workspace_id while retaining unsaved URL/header testing and response read-back.; External-effect routes without workspace proof fail the guard; unused imports do not grant proof or a provider exemption. Explicit user auth/provider/cron controls remain valid.; Verify deployed behavior before promotion and closure.
+- Tracker: Source fix is in this change; verify both deployed routes and the shared database-backed rate limit before promotion and closure.
 
 ### [#2082](https://github.com/chester-hill-solutions/callcaster/issues/2082) Route manual A2P setup through the canonical compliance job
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
 - Source fix uses the existing compliance job for all manual actions, reports queue acceptance only and requires both provider resources for A2P approval.
-- Current behavior: Source fix on dev@aacb17ac: three manual actions queue the canonical compliance job. The installed SDK creates campaigns under the Messaging Service, missing returned SIDs and failed lookups are errors, and reused SIDs are stored. Worker errors remove stale approval; retry clears stale errors. Shared readiness and reconciliation require both resources, and real VERIFIED/IN_PROGRESS campaign statuses are recognized. Required business data and the real opt-in workflow precede A2P Trust Product, brand and campaign calls inside the canonical provisioner. Existing Messaging Service/customer-profile setup can run first. All 107 focused cases pass; old source fails 27 regressions with 22 controls retained, and 16 isolated mutations fail. Full local and remote gates are still required before merge.
+- Current behavior: Merged to dev in PR #2283 at e71435b3. Manual actions queue the canonical compliance job and report queue acceptance only. Required A2P resources, real SDK campaign statuses and stored worker errors gate 10DLC SMS. Required inputs precede A2P product/brand/campaign calls, while prior service/customer-profile setup can run. All 107 focused cases pass, old source fails 27 regressions with 22 controls, and 16 mutations fail. Full local CI passed 5,103 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on a4c8e9ba. Issue-on-dev moved one item. After brand approval, operators must retry the compliance job to create the campaign. Verify deployed behavior and promote before closure. Trust Product preparation remains separate in #2282.
 - Resolution: After deployment, inspect actual brand/campaign SIDs and errors. Wait for brand approval, then use Retry compliance job to resume campaign creation. Verify provider review, error/retry recovery and the real 10DLC send gate before promotion and closure. Separate Messaging Trust Product preparation remains #2282.
 - Look in: `app/lib/platform-onboarding-handlers.server.ts`, `app/lib/platform-admin-twilio.server.ts`, `app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts`, `app/lib/twilio-a2p-provision.server.ts`, `app/lib/twilio-compliance-job.server.ts`, `app/lib/twilio-a2p-status-sync.server.ts`, `app/lib/messaging-onboarding/predicates.ts`, `docs/twilio-parent-ops-runbook.md`
 - Existing tests: test/a2p-manual-actions.test.ts (onboarding/admin API queue acceptance, failures and role controls); test/admin-workspace-twilio.route.test.ts (actual admin form success/error); test/twilio-a2p-provision.server.test.ts (installed SDK, actual writer/normalizer/send gate, creation/reuse/wait/errors/inputs and retry recovery); test/twilio-a2p-status-sync.test.ts (required resources, provider VERIFIED/IN_PROGRESS, review demotion and unknown reads); Existing onboarding, business-profile and readiness controls

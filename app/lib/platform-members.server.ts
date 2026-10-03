@@ -18,11 +18,13 @@ import {
 } from "@/lib/database/workspace.server";
 import type { Database } from "@/lib/db-types";
 import { logger } from "@/lib/logger.server";
+import { checkRateLimit, rateLimitResponse } from "@/lib/platform-rate-limit.server";
 import { hasMinRole, MemberRole } from "@/lib/member-role";
 import { WORKSPACE_ROLE_RANK } from "@/lib/workspace-route.server";
 import { requireTwoFactorForPrivilegedRoleAssignment } from "@/lib/two-factor.server";
 import { safeRecordWorkspaceAuditEvent } from "@/lib/audit-event.server";
-import { assertSafeOutboundUrl, safeOutboundFetch } from "@/lib/safe-outbound-url.server";
+import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
+import { testWebhook } from "@/lib/webhook-test-delivery.server";
 import { env } from "@/lib/env.server";
 import { inviteUserByEmail } from "@/lib/invite-user-by-email.server";
 import type {
@@ -564,10 +566,22 @@ export async function upsertWorkspaceWebhook(
 }
 
 export async function testWorkspaceWebhook(
+  userId: string,
+  workspaceId: string,
   destinationUrl: string,
   customHeaders: Record<string, string> | Array<[string, string]>,
   testData: Record<string, unknown>,
 ) {
+  const access = await requireMemberManager(userId, workspaceId);
+  if (!access.ok) return access;
+
+  const limited = await checkRateLimit({
+    key: `webhook-test:${userId}`,
+    limit: 10,
+    windowMs: 60_000,
+  });
+  if (!limited.ok) return rateLimitResponse(limited.retryAfterSeconds);
+
   try {
     await assertSafeOutboundUrl(destinationUrl);
   } catch (urlError) {
@@ -576,41 +590,16 @@ export async function testWorkspaceWebhook(
     return { ok: false as const, error: message, status: 400 };
   }
 
-  const headersObject = normalizeCustomHeaders(customHeaders);
-
-  try {
-    const response = await safeOutboundFetch(destinationUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...headersObject,
-      },
-      body: JSON.stringify(testData),
-      signal: AbortSignal.timeout(10000),
-    });
-
-    let data: unknown;
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      data = await response.json();
-    } else {
-      data = await response.text();
-    }
-
-    return {
-      ok: true as const,
-      data,
-      status: response.status,
-      statusText: response.statusText,
-    };
-  } catch (error: unknown) {
-    logger.error("testWorkspaceWebhook error", error);
-    return {
-      ok: false as const,
-      error: error instanceof Error ? error.message : String(error),
-      status: 500,
-    };
+  const result = await testWebhook(testData, destinationUrl, normalizeCustomHeaders(customHeaders));
+  if (result.error !== null) {
+    return { ok: false as const, error: result.error, status: result.status };
   }
+  return {
+    ok: true as const,
+    data: result.data,
+    status: result.status,
+    statusText: result.statusText,
+  };
 }
 
 export async function listWorkspaceApiKeys(

@@ -6,6 +6,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Security
 
+- Webhook tests now require a permitted workspace member and share a per-user rate limit across both test URLs; rejected requests do not send a webhook ([PR #2284](https://github.com/chester-hill-solutions/callcaster/pull/2284), [#2080](https://github.com/chester-hill-solutions/callcaster/issues/2080)).
+
 - Admin workspace responses now use explicit client fields and keep Twilio credentials, provider tokens and invitation hashes on the server ([PR #2280](https://github.com/chester-hill-solutions/callcaster/pull/2280), [#2078](https://github.com/chester-hill-solutions/callcaster/issues/2078)).
 
 - Invitation resend now checks the session email and restricts token rotation to the matching workspace and pending invitation; refused requests do not send email ([PR #2277](https://github.com/chester-hill-solutions/callcaster/pull/2277), [#2077](https://github.com/chester-hill-solutions/callcaster/issues/2077)).

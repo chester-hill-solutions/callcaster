@@ -75,6 +75,13 @@ registration rate limit also applies to resend.
 
 Production delivery uses `safeOutboundFetch` (SEC-04a). Destination URLs must pass SSRF validation.
 
+Both webhook test URLs require a signed-in workspace member, admin or owner.
+Callers receive 403. Non-members receive 404. Each user has one budget of ten
+tests per minute across both URLs and all workspaces. A 429 response includes
+`Retry-After`; a rate-limit storage failure prevents delivery. Tests can use an
+unsaved destination or headers. The public-URL, redirect, response-size and
+timeout controls still apply.
+
 ## Phone numbers
 
 | Method | Path | Purpose |
@@ -94,6 +101,12 @@ Production delivery uses `safeOutboundFetch` (SEC-04a). Destination URLs must pa
 | Method | Path | Purpose |
 | --- | --- | --- |
 | POST | `/api/test-webhook` | Send test payload to workspace webhook URL |
+
+The flat endpoint requires `workspace_id` at the top level of the JSON body,
+along with `destination_url`, JSON-stringified `event` and JSON-stringified
+`custom_headers`. A workspace ID inside the event does not grant access.
+The workspace URL takes the workspace from the route and uses object-valued
+`event` and object or tuple-array `custom_headers`.
 
 ## Auth callback
 

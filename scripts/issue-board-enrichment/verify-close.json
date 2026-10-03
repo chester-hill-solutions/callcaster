@@ -3448,7 +3448,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Route manual A2P setup through the canonical compliance job",
     "summary": "Source fix uses the existing compliance job for all manual actions, reports queue acceptance only and requires both provider resources for A2P approval.",
-    "currentBehavior": "Source fix on dev@aacb17ac: three manual actions queue the canonical compliance job. The installed SDK creates campaigns under the Messaging Service, missing returned SIDs and failed lookups are errors, and reused SIDs are stored. Worker errors remove stale approval; retry clears stale errors. Shared readiness and reconciliation require both resources, and real VERIFIED/IN_PROGRESS campaign statuses are recognized. Required business data and the real opt-in workflow precede A2P Trust Product, brand and campaign calls inside the canonical provisioner. Existing Messaging Service/customer-profile setup can run first. All 107 focused cases pass; old source fails 27 regressions with 22 controls retained, and 16 isolated mutations fail. Full local and remote gates are still required before merge.",
+    "currentBehavior": "Merged to dev in PR #2283 at e71435b3. Manual actions queue the canonical compliance job and report queue acceptance only. Required A2P resources, real SDK campaign statuses and stored worker errors gate 10DLC SMS. Required inputs precede A2P product/brand/campaign calls, while prior service/customer-profile setup can run. All 107 focused cases pass, old source fails 27 regressions with 22 controls, and 16 mutations fail. Full local CI passed 5,103 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on a4c8e9ba. Issue-on-dev moved one item. After brand approval, operators must retry the compliance job to create the campaign. Verify deployed behavior and promote before closure. Trust Product preparation remains separate in #2282.",
     "resolution": "After deployment, inspect actual brand/campaign SIDs and errors. Wait for brand approval, then use Retry compliance job to resume campaign creation. Verify provider review, error/retry recovery and the real 10DLC send gate before promotion and closure. Separate Messaging Trust Product preparation remains #2282.",
     "lookIn": [
       "app/lib/platform-onboarding-handlers.server.ts",
@@ -3483,5 +3483,49 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Source fix is in this change. Verify the complete deployed provider/send path and operator continuation before promotion and closure; #2282 remains separate."
+  },
+  {
+    "issueNumber": 2080,
+    "verdict": "verify-close",
+    "recommendedTitle": "Restrict webhook tests to permitted workspace members",
+    "summary": "Both test URLs require workspace membership and the existing member-or-higher rule, then share one Postgres-backed per-user limit before DNS and outbound delivery.",
+    "currentBehavior": "Source fix on dev@e71435b3: the flat action requires a top-level workspace ID carried by WebhookEditor. Both route actions call the existing testWorkspaceWebhook service with authenticated user/workspace IDs. Its real membership policy permits member/admin/owner, refuses callers with 403 and non-members with 404. Ten tests per minute share one user budget across workspaces and both URLs; 429 carries Retry-After and rate-limit storage failure prevents delivery. Unsaved destinations/headers, provider response read-back and existing outbound safety controls remain. The membership guard scans external effects without tenancy tokens and counts only used service/provider imports. Forty-six actual action/guard cases and one UI case pass; original source fails 23 regressions with 23 controls and the original editor fails its submission test. Thirteen isolated mutations fail. Full gates are required before merge.",
+    "resolution": "Verify both deployed URLs: permitted users can test unsaved destinations/headers; callers and non-members have no outbound effect; both URLs and workspaces share the same user budget and return actionable 429 responses. Check storage-error rejection and public-URL/response controls before production promotion and closure.",
+    "lookIn": [
+      "app/routes/api+/test-webhook.action.server.ts",
+      "app/routes/api+/workspaces+/$workspaceId/webhook.action.server.ts",
+      "app/lib/platform-members.server.ts:testWorkspaceWebhook",
+      "app/lib/webhook-test-delivery.server.ts",
+      "app/components/workspace/WebhookEditor.tsx",
+      "app/lib/platform-rate-limit.server.ts",
+      "scripts/check-route-membership.mjs",
+      "docs/api-workspace-admin.md"
+    ],
+    "existingTests": [
+      "test/test-webhook.route.test.ts (actual actions, role/membership, real bucket, shared identities, failures, forwarding and expiry)",
+      "test/check-route-membership.test.ts (external relay, unused imports, called services, auth/provider/cron controls)",
+      "test/ui/webhook-editor.test.tsx (actual unsaved test submission and top-level workspace)",
+      "test/openapi.test.ts",
+      "test/safe-outbound-url.test.ts",
+      "test/safe-outbound-response-limit.test.ts",
+      "test/platform-rate-limit.test.ts",
+      "test/workspace-setting-utils.test.ts"
+    ],
+    "missingTests": [
+      "Deployed route/provider verification, shared rate-limit behavior across app processes and production promotion before closure."
+    ],
+    "acceptanceCriteria": [
+      "Missing workspace or non-member cannot deliver a test. Caller is refused; member/admin/owner remains permitted.",
+      "Both URLs and all workspaces share ten tests per minute per authenticated user, independent of caller IP and destination.",
+      "Over-limit requests include Retry-After; storage failure, role rejection and membership rejection perform no DNS or HTTP work.",
+      "The editor sends top-level workspace_id while retaining unsaved URL/header testing and response read-back.",
+      "External-effect routes without workspace proof fail the guard; unused imports do not grant proof or a provider exemption. Explicit user auth/provider/cron controls remain valid.",
+      "Verify deployed behavior before promotion and closure."
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "high",
+    "trackerRecommendation": "Source fix is in this change; verify both deployed routes and the shared database-backed rate limit before promotion and closure.",
+    "rootCause": "The flat action trusted a session without workspace authorization. The nested test service relied on membership middleware but had no role gate. Neither test path was throttled. The membership guard skipped routes without tenancy text and could count unused service/provider imports as proof."
   }
 ]

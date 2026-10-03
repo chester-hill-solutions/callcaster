@@ -270,6 +270,9 @@ describe("openapi spec", () => {
     expect(members.post?.["x-callcaster-capability"]).toBe("members.invite");
     expect(webhook.put?.operationId).toBe("upsertWorkspaceWebhook");
     expect(webhook.post?.operationId).toBe("testWorkspaceWebhook");
+    expect(webhook.post?.responses).toHaveProperty("404");
+    expect(webhook.post?.responses).toHaveProperty("429");
+    expect(webhook.post?.description).toContain("Ten tests per minute per user");
     expect(transfer?.operationId).toBe("transferWorkspaceOwnership");
     expect(numbers.get?.operationId).toBe("listWorkspaceNumbers");
     expect(numbers.post?.operationId).toBe("purchaseWorkspaceNumber");

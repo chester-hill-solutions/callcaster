@@ -203,6 +203,7 @@ export default function WebhookEditor({
 
     testFetcher.submit(
       {
+        workspace_id: workspaceId,
         event: JSON.stringify(testEvent),
         destination_url: destinationUrl,
         custom_headers: JSON.stringify(customHeaders),
