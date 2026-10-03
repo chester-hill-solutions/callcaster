@@ -96,7 +96,7 @@ Always talk to me like I have ADHD.
 
 **Default: use the CLI** for deploy, cleanup, env vars, DB ops, and anything that must run non-interactively. Use **MCP for read-only inspection** (status, logs, deployments). Avoid `railway-agent` for multi-step infra unless the CLI cannot do it.
 
-### CLI (prefer `@railway/cli` ≥ 5.x)
+### CLI
 
 - Link context first: `railway environment <env>` → `railway service <name>` → `railway status`.
 - **CallCaster** project (`32b36c6c-5f3d-463b-8c7f-bbcd70351e8f`); **migration/review env** is **`visual-asset-review`** (`18ef9173-4b33-4a62-9b94-9dfc7a36eb05`) — [dashboard](https://railway.com/project/32b36c6c-5f3d-463b-8c7f-bbcd70351e8f?environmentId=18ef9173-4b33-4a62-9b94-9dfc7a36eb05); see [`docs/railway-review-env.md`](docs/railway-review-env.md).
