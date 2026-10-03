@@ -1042,7 +1042,7 @@
     "verdict": "blocked-epic",
     "recommendedTitle": "Consistent feedback without page movement",
     "summary": "Shared component ownership and a no-layout-movement rule for all dynamic feedback. Implement through the separate child tasks.",
-    "currentBehavior": "Source rule and inventory are merged in PR #2302. Shared Notice host and semantic Alert metadata are reviewed in chester-hill-solutions/chester-hill-solutions#120 and #121 but not merged or adopted. Five duplicate-message defects are #2304–#2308.",
+    "currentBehavior": "Rule/inventory PR #2302 and reset-password PR #2310 are merged into dev. Canonical Notice #120, semantic Alert #121 and modal-safe Toaster #126 are reviewed local shared work, not merged/adopted. Notice source uses shared button styles; actual CallCaster shad-cc consumer proof passes four narrow/desktop light/dark cases with no page/scroll movement. Field-error #125 is reviewed local shared source at a4a07e5: 218 workbench tests, five CLI tests and four actual CallCaster shad-cc browser cases pass. Original flow adds 120px at narrow width. Shared source remains unmerged and not adopted. Native consumer children #2311/#2312 cover field placement/modal accessibility; #2305 and #2307 have real prerequisites, and #2306/#2308 remain separate defects.",
     "rootCause": "Message tone, placement and lifecycle were selected independently at each call site.",
     "resolution": "Ship shared mechanics first, then migrate consumer groups in atomic PRs. Preserve page layout, field association, unresolved conditions, required remedies, confirmation safety and root-only transient feedback. Do not implement this Epic as one large PR.",
     "lookIn": [
@@ -1052,7 +1052,8 @@
       "app/root.tsx"
     ],
     "existingTests": [
-      "PR #2302 full local and remote checks."
+      "PR #2302 full local/remote gates; PR #2310 full local/remote gates and four built-app geometry cases.",
+      "Canonical shared source proof is distinct from app adoption and fresh shared CI acceptance."
     ],
     "missingTests": [
       "Shared component merge and consumer adoption; actual narrow/desktop light/dark browser geometry for each changed dynamic group."
@@ -1066,5 +1067,131 @@
     "size": "L",
     "risk": "medium",
     "trackerRecommendation": "Split work through the native child issues; preserve the existing #2032 parent under #2000."
+  },
+  {
+    "issueNumber": 2305,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Show audio-upload failure once",
+    "summary": "Audio upload duplicates the server failure; removing its inline copy is held until the root toast stays accessible inside the open sheet.",
+    "currentBehavior": "Source audit at dev@cb88df8b. A held local duplicate-removal patch has two actual UI failures because React Aria hides the root toaster ancestor while the sheet stays open; six component/validation/retry controls pass. No green PR or completed fix is claimed.",
+    "rootCause": "The same action failure reaches localError and the root toast. The root host is also outside the modal accessibility top layer.",
+    "resolution": "Adopt the reviewed canonical modal-safe root host through #2312, then finish this atomic action-result repair with retained upload data, pending/retry and browser geometry. Local name/file validation is separate #2311 work; do not replace it with generic toasts.",
+    "lookIn": [
+      "app/components/campaign/settings/AddAudioSheet.tsx",
+      "docs/feedback-inventory.md"
+    ],
+    "existingTests": [
+      "test/ui/audio-upload-feedback.test.tsx in held local commit 8c32e890: two modal accessibility regression failures and six passing controls."
+    ],
+    "missingTests": [
+      "Consumer modal-safe host adoption in #2312, restored accessible single-result proof, actual-browser geometry and full local/remote green gates."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [
+      2312
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked by #2312 (native edge verified). Keep the held source and tests; do not push a patch whose only remaining failure result is inaccessible."
+  },
+  {
+    "issueNumber": 2307,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Show onboarding name-save failure once",
+    "summary": "Onboarding hides the name form before save acceptance and duplicates returned action failure. Preserve the entered name, retry and genuine field validation.",
+    "currentBehavior": "Source audit at dev@cb88df8b. The intro submits onContinue; the wizard force-hides it and starts step navigation before server acceptance. Actual route/wizard/hook/root-host tests fail retained pending form, retained name/retry after rejection and single returned result; native required validation, read-only access and the accepted path_selection redirect pass. Generic operation errors also mark the valid name invalid; blank/overlong server validation has no field discriminator.",
+    "rootCause": "Premature client intro-session advance races the server result. Generic actionError is rendered again and assigned to the name invalid state without a field contract.",
+    "resolution": "After shared field-error adoption #2311, keep operation failures in one root toast, associate genuine name validation with its field, and let the existing server redirect advance on acceptance. Preserve server onboarding statuses, step targets, provider writes and native/server validation.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding.route.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx",
+      "app/routes/workspaces+/$id/onboarding/OnboardingIntroStep.tsx",
+      "app/lib/platform-onboarding-handlers.server.ts",
+      "app/components/ui/form-field.tsx"
+    ],
+    "existingTests": [
+      "test/ui/onboarding-intro-step.test.tsx",
+      "test/onboarding-save-workspace-name.test.ts",
+      "Actual route source-audit reproduction: three regression failures and three passing native validation/permission/accepted-redirect controls."
+    ],
+    "missingTests": [
+      "Retained input/disabled pending action, failed acknowledgement/retry, field-specific server validation versus operation failures, no replay, actual-browser appearance/update/clear geometry."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [
+      2311
+    ],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked by #2311 (native edge and audited issue body verified on 2026-10-03). Repair the premature client advance within this name-save failure/retry concern; preserve the server onboarding state machine."
+  },
+  {
+    "issueNumber": 2311,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Keep validation errors from moving form controls",
+    "summary": "Adopt the canonical field-error presentation while preserving correct accessible field association.",
+    "currentBehavior": "FormField inserts a conditional normal-flow error paragraph; AddAudioSheet also inserts one unassociated local validation row. Shared #125 now has reviewed local source at a4a07e5: owning IDs/ARIA, SSR description, retained drafts, keyboard remedies and modal access. Full workbench/CLI checks and four actual CallCaster shad-cc browser cases pass; original flow fails geometry. Shared merge and consumer implementation/browser acceptance remain pending.",
+    "rootCause": "Conditional error rows add layout height; some validation is not associated with the invalid control.",
+    "resolution": "Implement the canonical shared contract in https://github.com/chester-hill-solutions/chester-hill-solutions/issues/125 first. Adopt its reviewed source through the existing vendor and thin FormField adapter; preserve labels, help, stable IDs, values, compound controls, hard validation and remedies. Do not make a second placement engine.",
+    "lookIn": [
+      "app/components/ui/form-field.tsx",
+      "app/components/campaign/settings/AddAudioSheet.tsx",
+      "docs/design-system.md"
+    ],
+    "existingTests": [
+      "Existing FormField accessibility tests; canonical source audit at shared main@412bb1d.",
+      "Reviewed shared local source: 218 workbench tests, five CLI tests, nine focused cases with original/five faults failing and restored source passing. Four narrow/desktop light/dark actual shad-cc cases preserve 18 page/17 dialog landmarks."
+    ],
+    "missingTests": [
+      "Fresh full shared CI and merge, then actual consumer FormField/AddAudioSheet adoption with input/textarea/compound-control multiple/long-error appearance/update/clear geometry and keyboard remedies."
+    ],
+    "acceptanceCriteria": [
+      "Canonical library owns generic placement and accessibility.",
+      "Appearance, update and clearing do not move page landmarks or scroll.",
+      "Retain domain validation, hard guards, field/control identity and required remedies."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300."
+  },
+  {
+    "issueNumber": 2312,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Keep modal action feedback accessible through the root toaster",
+    "summary": "Adopt the canonical modal-safe root toast before removing upload failure duplication.",
+    "currentBehavior": "Actual AddAudioSheet/router/themed-root-toast tests fail two accessibility checks while six controls pass. Shared #126 has a reviewed local canonical fix with 12 generic built-catalog browser cases; it is not merged or adopted. Fresh shared CI remains blocked by shared #122 and #123.",
+    "rootCause": "The root toast host is hidden by React Aria modal isolation; removing its inline copy would remove accessible failure feedback.",
+    "resolution": "Implement and merge https://github.com/chester-hill-solutions/chester-hill-solutions/issues/126 after its native CI prerequisites. Adopt its reviewed source with provenance and rebuilt vendor output, one root host, retained theme and actual modal accessibility/isolation/focus/geometry proof.",
+    "lookIn": [
+      "app/components/ui/sonner.tsx",
+      "app/components/ui/sheet.tsx",
+      "app/root.tsx",
+      "vendor/chester-hill-solutions/shad-cc/",
+      "docs/design-system.md"
+    ],
+    "existingTests": [
+      "Held app integration reproduction: two failures and six controls. Canonical shared #126 source proof: six focused/203 workbench tests and 12 browser cases; local prerequisites are not fresh CI acceptance."
+    ],
+    "missingTests": [
+      "Canonical green merge; consumer source/generated-output adoption; actual app Dialog/Sheet keyboard and narrow/desktop light/dark geometry with modal isolation, retained fields and retry."
+    ],
+    "acceptanceCriteria": [
+      "Canonical library owns generic placement and accessibility.",
+      "Appearance, update and clearing do not move page landmarks or scroll.",
+      "Retain domain validation, hard guards, field/control identity and required remedies."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300."
   }
 ]

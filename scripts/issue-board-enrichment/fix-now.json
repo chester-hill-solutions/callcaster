@@ -2127,58 +2127,6 @@
     "trackerRecommendation": "Fix now: the Option B decision is recorded. Shared Alert metadata is tracked in chester-hill-solutions/chester-hill-solutions#121; consumer adoption is still unfinished."
   },
   {
-    "issueNumber": 2304,
-    "verdict": "fix-now",
-    "recommendedTitle": "Show reset-password action failure once",
-    "summary": "The route renders actionData.error.message inline while useActionFeedback also sends the same action failure to the root toast. Keep one action-result surface; retain password/token validation, entered values and retry. Do not change auth or reset-token policy.",
-    "currentBehavior": "Source-confirmed at dev@5ad088c4, 2026-10-03. The route renders actionData.error.message inline while useActionFeedback also sends the same action failure to the root toast. Keep one action-result surface; retain password/token validation, entered values and retry. Do not change auth or reset-token policy.",
-    "rootCause": "The same action failure reaches two presentation paths.",
-    "resolution": "Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.",
-    "lookIn": [
-      "app/routes/reset-password.tsx",
-      "docs/feedback-inventory.md"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable."
-    ],
-    "acceptanceCriteria": [
-      "One visible result for one failed action.",
-      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
-      "No page or scroll movement on appearance, update or removal."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
-  },
-  {
-    "issueNumber": 2305,
-    "verdict": "fix-now",
-    "recommendedTitle": "Show audio-upload failure once",
-    "summary": "The idle fetcher callback sets localError and calls toast.error for the same data.error; the sheet also renders localError. Keep one action-result surface with retry and selected/entered upload data. Retain field-specific validation and upload limits.",
-    "currentBehavior": "Source-confirmed at dev@5ad088c4, 2026-10-03. The idle fetcher callback sets localError and calls toast.error for the same data.error; the sheet also renders localError. Keep one action-result surface with retry and selected/entered upload data. Retain field-specific validation and upload limits.",
-    "rootCause": "The same action failure reaches two presentation paths.",
-    "resolution": "Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.",
-    "lookIn": [
-      "app/components/campaign/settings/AddAudioSheet.tsx",
-      "docs/feedback-inventory.md"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable."
-    ],
-    "acceptanceCriteria": [
-      "One visible result for one failed action.",
-      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
-      "No page or scroll movement on appearance, update or removal."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
-  },
-  {
     "issueNumber": 2306,
     "verdict": "fix-now",
     "recommendedTitle": "Associate workspace settings errors with the correct action",
@@ -2188,32 +2136,6 @@
     "resolution": "Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.",
     "lookIn": [
       "app/routes/workspaces+/$id/settings.route.tsx",
-      "docs/feedback-inventory.md"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable."
-    ],
-    "acceptanceCriteria": [
-      "One visible result for one failed action.",
-      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
-      "No page or scroll movement on appearance, update or removal."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
-  },
-  {
-    "issueNumber": 2307,
-    "verdict": "fix-now",
-    "recommendedTitle": "Show onboarding name-save failure once",
-    "summary": "The onboarding route handles actionData.error through useActionFeedback while Intro renders the same actionError inline. Keep one result for the name-save operation and preserve genuine field validation, entered name and retry. Do not change the onboarding state machine or provider writes.",
-    "currentBehavior": "Source-confirmed at dev@5ad088c4, 2026-10-03. The onboarding route handles actionData.error through useActionFeedback while Intro renders the same actionError inline. Keep one result for the name-save operation and preserve genuine field validation, entered name and retry. Do not change the onboarding state machine or provider writes.",
-    "rootCause": "The same action failure reaches two presentation paths.",
-    "resolution": "Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.",
-    "lookIn": [
-      "app/routes/workspaces+/$id/onboarding/OnboardingIntroStep.tsx",
       "docs/feedback-inventory.md"
     ],
     "existingTests": [],

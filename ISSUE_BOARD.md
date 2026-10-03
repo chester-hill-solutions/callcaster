@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@5ad088c4 + feedback source audit (2026-10-03)` · 302 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@cb88df8b + feedback source audit (2026-10-03)` · 303 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the fresh REST issue snapshot read on 2026-10-03 after the verified feedback issue updates. Project markers remain cached; no current project-status result is claimed.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 67
+## Fix now — 64
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -358,17 +358,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2305](https://github.com/chester-hill-solutions/callcaster/issues/2305) Show audio-upload failure once
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- The idle fetcher callback sets localError and calls toast.error for the same data.error; the sheet also renders localError. Keep one action-result surface with retry and selected/entered upload data. Retain field-specific validation and upload limits.
-- Current behavior: Source-confirmed at dev@5ad088c4, 2026-10-03. The idle fetcher callback sets localError and calls toast.error for the same data.error; the sheet also renders localError. Keep one action-result surface with retry and selected/entered upload data. Retain field-specific validation and upload limits.
-- Root cause: The same action failure reaches two presentation paths.
-- Resolution: Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.
-- Look in: `app/components/campaign/settings/AddAudioSheet.tsx`, `docs/feedback-inventory.md`
-- Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
-- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
-- Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
-
 ### [#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308) Show agent startup failure once
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
 - The startup-failure branch passes the same token/runtime error to StatusBar and renders it again in an outer Alert. This replaces unavailable content. Keep one failure-region message, available recovery actions and disabled unavailable controls. Do not convert live call controls into brief toasts or change device/call state.
@@ -380,17 +369,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
 - Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
 
-### [#2307](https://github.com/chester-hill-solutions/callcaster/issues/2307) Show onboarding name-save failure once
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- The onboarding route handles actionData.error through useActionFeedback while Intro renders the same actionError inline. Keep one result for the name-save operation and preserve genuine field validation, entered name and retry. Do not change the onboarding state machine or provider writes.
-- Current behavior: Source-confirmed at dev@5ad088c4, 2026-10-03. The onboarding route handles actionData.error through useActionFeedback while Intro renders the same actionError inline. Keep one result for the name-save operation and preserve genuine field validation, entered name and retry. Do not change the onboarding state machine or provider writes.
-- Root cause: The same action failure reaches two presentation paths.
-- Resolution: Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.
-- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingIntroStep.tsx`, `docs/feedback-inventory.md`
-- Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
-- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
-- Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
-
 ### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
 - Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.
@@ -398,17 +376,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Root cause: The route assigns failures from unrelated settings actions to the Email field.
 - Resolution: Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.
 - Look in: `app/routes/workspaces+/$id/settings.route.tsx`, `docs/feedback-inventory.md`
-- Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
-- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
-- Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
-
-### [#2304](https://github.com/chester-hill-solutions/callcaster/issues/2304) Show reset-password action failure once
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- The route renders actionData.error.message inline while useActionFeedback also sends the same action failure to the root toast. Keep one action-result surface; retain password/token validation, entered values and retry. Do not change auth or reset-token policy.
-- Current behavior: Source-confirmed at dev@5ad088c4, 2026-10-03. The route renders actionData.error.message inline while useActionFeedback also sends the same action failure to the root toast. Keep one action-result surface; retain password/token validation, entered values and retry. Do not change auth or reset-token policy.
-- Root cause: The same action failure reaches two presentation paths.
-- Resolution: Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.
-- Look in: `app/routes/reset-password.tsx`, `docs/feedback-inventory.md`
 - Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
 - Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
 - Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
@@ -794,6 +761,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
+### [#2304](https://github.com/chester-hill-solutions/callcaster/issues/2304) Show reset-password action failure once
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- PR #2310 completes single readable reset-password action feedback on dev; deployment verification and promotion remain.
+- Current behavior: Merged at dev@cb88df8b, 2026-10-03. The root toast receives the actual error message once; the inline duplicate is removed and failed passwords remain for retry. Full local CI passed 5,325 Vitest and 22 Bun tests; four built-app narrow/desktop light/dark browser cases proved stable page/document/scroll geometry. Exact-head remote checks and both Railway checks passed before merge.
+- Root cause: The same action failure reaches two presentation paths.
+- Resolution: Verify the implemented reset failure/retry on the deployed review environment and promote through the release PR. Keep the issue open until its default-branch delivery and verification are complete.
+- Look in: `app/routes/reset-password.tsx`, `docs/feedback-inventory.md`
+- Existing tests: test/ui/reset-password-feedback.test.tsx; e2e/specs/password-reset-feedback.spec.ts; Original source fails both new error cases; restored source and validation/retry controls pass. Full PR #2310 CI and browser proof.
+- Missing tests: Deployed review verification and promotion; no further duplicate-removal implementation is needed.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Verify and close. Native Development link to PR #2310 and successful issue-on-dev workflow were verified; no deployed browser acceptance is claimed.
+
 ### [#2058](https://github.com/chester-hill-solutions/callcaster/issues/2058) Rule and inventory: inline error text used where a toast belongs
 - Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
 - PR #2302 completed the feedback rule and reviewed source inventory on dev; consumer conversions are separate work.
@@ -805,6 +784,17 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Promotion of the documentation deliverable; runtime conversions are separate acceptance.
 - Done when: A written rule exists where a contributor will find it; Every inline error site is listed with a keep-or-change verdict and a reason; Pages rendering the same failure twice are identified; Changes, if any, land in reviewable batches after the inventory, not mixed into it; No form validation is removed in the name of consistency
 - Tracker: Verify and close. PR #2302 is merged into dev at 5ad088c4; keep separate consumer issues open.
+
+### [#2014](https://github.com/chester-hill-solutions/callcaster/issues/2014) auth pages: sign-in errors should be a toast, not inline text (sweep split to #2058)
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-10-03
+- The sign-in route already sends action failures through the root feedback hook; the wider source inventory is complete in #2058.
+- Current behavior: Source audit: dev@5ad088c4, 2026-10-03. app/routes/signin.tsx uses useActionFeedback with getError(data.error) and renders no inline action failure. Source behavior is present; this audit does not claim a deployed sign-in test.
+- Root cause: The earlier board record described pre-conversion source and treated the inventory as a blocker for the page fix.
+- Resolution: Verify one sign-in failure toast, no revalidation replay, retained input/validation and stable page geometry in the deployed app. Promote before closure. The separate inventory is PR #2302; other consumer defects remain under #2300.
+- Look in: `app/routes/signin.tsx`, `app/hooks/utils/useActionFeedback.ts`, `app/root.tsx`, `docs/feedback-inventory.md`
+- Missing tests: Actual sign-in failure, retry/revalidation and real-browser geometry; deployed verification and promotion.
+- Done when: A failed sign-in surfaces through a toast, not inline text; No inline error text remains on the sign-in page; The change is scoped to this page; the sweep ships separately as #2058
+- Tracker: Verify and close the sign-in-only scope. Do not bundle the five duplicate-message defects into this page fix.
 
 ### [#2295](https://github.com/chester-hill-solutions/callcaster/issues/2295) Confirm bulk-send warning overrides explicitly
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -1421,17 +1411,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/ivr-webhook-auth.server.test.ts; test/ivr-results.test.ts; test/outreach-typed-fields.server.test.ts; test/campaign-export-voice-credits.test.ts
 - Done when: A speech answer stores { value, raw, confidence, inputType }; confidence is null when Twilio omits or sends an invalid value; DTMF answers store inputType=dtmf and no confidence; route matching still receives the same userInput string; Legacy bare strings and new objects both aggregate and export as the answer value; Typed fields and CSV export resolve the value
 - Tracker: Slice B is present in dev@5b673c81 through PR #2160 merge 9dcab08b. The earlier claim that confidence is discarded is obsolete.
-
-### [#2014](https://github.com/chester-hill-solutions/callcaster/issues/2014) auth pages: sign-in errors should be a toast, not inline text (sweep split to #2058)
-- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-09-27
-- The sign-in route already sends action failures through the root feedback hook; the wider source inventory is complete in #2058.
-- Current behavior: Source audit: dev@5ad088c4, 2026-10-03. app/routes/signin.tsx uses useActionFeedback with getError(data.error) and renders no inline action failure. Source behavior is present; this audit does not claim a deployed sign-in test.
-- Root cause: The earlier board record described pre-conversion source and treated the inventory as a blocker for the page fix.
-- Resolution: Verify one sign-in failure toast, no revalidation replay, retained input/validation and stable page geometry in the deployed app. Promote before closure. The separate inventory is PR #2302; other consumer defects remain under #2300.
-- Look in: `app/routes/signin.tsx`, `app/hooks/utils/useActionFeedback.ts`, `app/root.tsx`, `docs/feedback-inventory.md`
-- Missing tests: Actual sign-in failure, retry/revalidation and real-browser geometry; deployed verification and promotion.
-- Done when: A failed sign-in surfaces through a toast, not inline text; No inline error text remains on the sign-in page; The change is scoped to this page; the sweep ships separately as #2058
-- Tracker: Verify and close the sign-in-only scope. Do not bundle the five duplicate-message defects into this page fix.
 
 ### [#2048](https://github.com/chester-hill-solutions/callcaster/issues/2048) Block SMS campaign completion while messages are unsettled at Twilio
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-27
@@ -2091,15 +2070,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/issue-board-generator.test.ts
 - Done when: tools:issues:board exits 0 and includes every open issue, unenriched ones in Needs triage; A malformed enriched record still fails the run; The board header reports the Needs-triage count
 - Tracker: Verify and close. Dev-only (87ecef16 not in master).
-
-### [#1739](https://github.com/chester-hill-solutions/callcaster/issues/1739) Workspace notification emails should mention the workspace name in the email
-- Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
-- Fixed on dev in PR #1902 (f081cee8): the low-credit notification email names the workspace in its subject and body from the notify context. The open state does not prove the fix is absent.
-- Resolution: Verify on the review environment that the low-credit email subject and body name the workspace. Close on master promotion. Do not reimplement the template change.
-- Look in: `app/lib/low-credit-notify.server.ts`
-- Existing tests: test/low-credit-notify.server.test.ts
-- Done when: Low-credit email subject and body name the workspace
-- Tracker: PR #1902 merge f081cee8 is on dev, not yet master. Closes on master promotion.
 
 ### [#1727](https://github.com/chester-hill-solutions/callcaster/issues/1727) Campaign List should be sorted
 - Verdict: **Verify and close** · Size: S · Risk: low · Labels: ux · Assignee: @wra-sol · Updated: 2026-09-19
@@ -2764,18 +2734,68 @@ Product, security, or operations decision required before implementation can be 
 
 ---
 
-## Blocked / split first — 36
+## Blocked / split first — 40
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
+
+### [#2307](https://github.com/chester-hill-solutions/callcaster/issues/2307) Show onboarding name-save failure once
+- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Onboarding hides the name form before save acceptance and duplicates returned action failure. Preserve the entered name, retry and genuine field validation.
+- Current behavior: Source audit at dev@cb88df8b. The intro submits onContinue; the wizard force-hides it and starts step navigation before server acceptance. Actual route/wizard/hook/root-host tests fail retained pending form, retained name/retry after rejection and single returned result; native required validation, read-only access and the accepted path_selection redirect pass. Generic operation errors also mark the valid name invalid; blank/overlong server validation has no field discriminator.
+- Root cause: Premature client intro-session advance races the server result. Generic actionError is rendered again and assigned to the name invalid state without a field contract.
+- Resolution: After shared field-error adoption #2311, keep operation failures in one root toast, associate genuine name validation with its field, and let the existing server redirect advance on acceptance. Preserve server onboarding statuses, step targets, provider writes and native/server validation.
+- Look in: `app/routes/workspaces+/$id/onboarding.route.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingWizard.tsx`, `app/routes/workspaces+/$id/onboarding/OnboardingIntroStep.tsx`, `app/lib/platform-onboarding-handlers.server.ts`, `app/components/ui/form-field.tsx`
+- Blocked by: [#2311](https://github.com/chester-hill-solutions/callcaster/issues/2311)
+- Existing tests: test/ui/onboarding-intro-step.test.tsx; test/onboarding-save-workspace-name.test.ts; Actual route source-audit reproduction: three regression failures and three passing native validation/permission/accepted-redirect controls.
+- Missing tests: Retained input/disabled pending action, failed acknowledgement/retry, field-specific server validation versus operation failures, no replay, actual-browser appearance/update/clear geometry.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Blocked by #2311 (native edge and audited issue body verified on 2026-10-03). Repair the premature client advance within this name-save failure/retry concern; preserve the server onboarding state machine.
+
+### [#2311](https://github.com/chester-hill-solutions/callcaster/issues/2311) Keep validation errors from moving form controls
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Adopt the canonical field-error presentation while preserving correct accessible field association.
+- Current behavior: FormField inserts a conditional normal-flow error paragraph; AddAudioSheet also inserts one unassociated local validation row. Shared #125 now has reviewed local source at a4a07e5: owning IDs/ARIA, SSR description, retained drafts, keyboard remedies and modal access. Full workbench/CLI checks and four actual CallCaster shad-cc browser cases pass; original flow fails geometry. Shared merge and consumer implementation/browser acceptance remain pending.
+- Root cause: Conditional error rows add layout height; some validation is not associated with the invalid control.
+- Resolution: Implement the canonical shared contract in https://github.com/chester-hill-solutions/chester-hill-solutions/issues/125 first. Adopt its reviewed source through the existing vendor and thin FormField adapter; preserve labels, help, stable IDs, values, compound controls, hard validation and remedies. Do not make a second placement engine.
+- Look in: `app/components/ui/form-field.tsx`, `app/components/campaign/settings/AddAudioSheet.tsx`, `docs/design-system.md`
+- Existing tests: Existing FormField accessibility tests; canonical source audit at shared main@412bb1d.; Reviewed shared local source: 218 workbench tests, five CLI tests, nine focused cases with original/five faults failing and restored source passing. Four narrow/desktop light/dark actual shad-cc cases preserve 18 page/17 dialog landmarks.
+- Missing tests: Fresh full shared CI and merge, then actual consumer FormField/AddAudioSheet adoption with input/textarea/compound-control multiple/long-error appearance/update/clear geometry and keyboard remedies.
+- Done when: Canonical library owns generic placement and accessibility.; Appearance, update and clearing do not move page landmarks or scroll.; Retain domain validation, hard guards, field/control identity and required remedies.
+- Tracker: Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300.
+
+### [#2305](https://github.com/chester-hill-solutions/callcaster/issues/2305) Show audio-upload failure once
+- Verdict: **Blocked / split first** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Audio upload duplicates the server failure; removing its inline copy is held until the root toast stays accessible inside the open sheet.
+- Current behavior: Source audit at dev@cb88df8b. A held local duplicate-removal patch has two actual UI failures because React Aria hides the root toaster ancestor while the sheet stays open; six component/validation/retry controls pass. No green PR or completed fix is claimed.
+- Root cause: The same action failure reaches localError and the root toast. The root host is also outside the modal accessibility top layer.
+- Resolution: Adopt the reviewed canonical modal-safe root host through #2312, then finish this atomic action-result repair with retained upload data, pending/retry and browser geometry. Local name/file validation is separate #2311 work; do not replace it with generic toasts.
+- Look in: `app/components/campaign/settings/AddAudioSheet.tsx`, `docs/feedback-inventory.md`
+- Blocked by: [#2312](https://github.com/chester-hill-solutions/callcaster/issues/2312)
+- Existing tests: test/ui/audio-upload-feedback.test.tsx in held local commit 8c32e890: two modal accessibility regression failures and six passing controls.
+- Missing tests: Consumer modal-safe host adoption in #2312, restored accessible single-result proof, actual-browser geometry and full local/remote green gates.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Blocked by #2312 (native edge verified). Keep the held source and tests; do not push a patch whose only remaining failure result is inaccessible.
+
+### [#2312](https://github.com/chester-hill-solutions/callcaster/issues/2312) Keep modal action feedback accessible through the root toaster
+- Verdict: **Blocked / split first** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Adopt the canonical modal-safe root toast before removing upload failure duplication.
+- Current behavior: Actual AddAudioSheet/router/themed-root-toast tests fail two accessibility checks while six controls pass. Shared #126 has a reviewed local canonical fix with 12 generic built-catalog browser cases; it is not merged or adopted. Fresh shared CI remains blocked by shared #122 and #123.
+- Root cause: The root toast host is hidden by React Aria modal isolation; removing its inline copy would remove accessible failure feedback.
+- Resolution: Implement and merge https://github.com/chester-hill-solutions/chester-hill-solutions/issues/126 after its native CI prerequisites. Adopt its reviewed source with provenance and rebuilt vendor output, one root host, retained theme and actual modal accessibility/isolation/focus/geometry proof.
+- Look in: `app/components/ui/sonner.tsx`, `app/components/ui/sheet.tsx`, `app/root.tsx`, `vendor/chester-hill-solutions/shad-cc/`, `docs/design-system.md`
+- Existing tests: Held app integration reproduction: two failures and six controls. Canonical shared #126 source proof: six focused/203 workbench tests and 12 browser cases; local prerequisites are not fresh CI acceptance.
+- Missing tests: Canonical green merge; consumer source/generated-output adoption; actual app Dialog/Sheet keyboard and narrow/desktop light/dark geometry with modal isolation, retained fields and retry.
+- Done when: Canonical library owns generic placement and accessibility.; Appearance, update and clearing do not move page landmarks or scroll.; Retain domain validation, hard guards, field/control identity and required remedies.
+- Tracker: Blocked by the native cross-repository prerequisite linked above. The local blockedBy array intentionally excludes foreign issue numbers; parent #2300.
 
 ### [#2300](https://github.com/chester-hill-solutions/callcaster/issues/2300) Consistent feedback without page movement
 - Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
 - Shared component ownership and a no-layout-movement rule for all dynamic feedback. Implement through the separate child tasks.
-- Current behavior: Source rule and inventory are merged in PR #2302. Shared Notice host and semantic Alert metadata are reviewed in chester-hill-solutions/chester-hill-solutions#120 and #121 but not merged or adopted. Five duplicate-message defects are #2304–#2308.
+- Current behavior: Rule/inventory PR #2302 and reset-password PR #2310 are merged into dev. Canonical Notice #120, semantic Alert #121 and modal-safe Toaster #126 are reviewed local shared work, not merged/adopted. Notice source uses shared button styles; actual CallCaster shad-cc consumer proof passes four narrow/desktop light/dark cases with no page/scroll movement. Field-error #125 is reviewed local shared source at a4a07e5: 218 workbench tests, five CLI tests and four actual CallCaster shad-cc browser cases pass. Original flow adds 120px at narrow width. Shared source remains unmerged and not adopted. Native consumer children #2311/#2312 cover field placement/modal accessibility; #2305 and #2307 have real prerequisites, and #2306/#2308 remain separate defects.
 - Root cause: Message tone, placement and lifecycle were selected independently at each call site.
 - Resolution: Ship shared mechanics first, then migrate consumer groups in atomic PRs. Preserve page layout, field association, unresolved conditions, required remedies, confirmation safety and root-only transient feedback. Do not implement this Epic as one large PR.
 - Look in: `docs/design-system.md`, `docs/feedback-inventory.md`, `app/components/ui/`, `app/root.tsx`
-- Existing tests: PR #2302 full local and remote checks.
+- Existing tests: PR #2302 full local/remote gates; PR #2310 full local/remote gates and four built-app geometry cases.; Canonical shared source proof is distinct from app adoption and fresh shared CI acceptance.
 - Missing tests: Shared component merge and consumer adoption; actual narrow/desktop light/dark browser geometry for each changed dynamic group.
 - Done when: Canonical component library owns generic feedback presentation.; No dynamic alert moves page content or scroll.; Consumer groups retain domain actions and hard guards.
 - Tracker: Split work through the native child issues; preserve the existing #2032 parent under #2000.
