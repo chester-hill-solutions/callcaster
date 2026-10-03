@@ -1146,41 +1146,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2095,
-    "verdict": "fix-now",
-    "recommendedTitle": "\"Leave Campaign\" does not leave the campaign in predictive mode — the conference and the dialer keep running and real calls keep being placed",
-    "summary": "Leave Campaign still hangs up the local agent leg, destroys the device, requeues and navigates away. It does not end the predictive conference.",
-    "resolution": "In predictive mode, await server conference-end before leaving and omit the broad queue requeue. Keep live-call behavior separate.",
-    "lookIn": [
-      "app/components/call/CallScreen.Layout.tsx:176",
-      "app/lib/auto-dial.server.ts:210",
-      "app/components/call/CallScreen.Layout.tsx:167-172,238,315,504",
-      "app/lib/callscreenActions.ts (`handleConferenceEnd`)",
-      "app/hooks/call/useCallScreen.ts",
-      "app/lib/auto-dial.server.ts:210-219",
-      "app/routes/api+/workspaces+/$workspaceId/campaigns/$campaignId/dialer/$roomId.action.server.ts:198"
-    ],
-    "existingTests": [
-      "test/ui/callscreenActions.test.ts",
-      "test/ui/hooks-call-screen.test.tsx"
-    ],
-    "missingTests": [
-      "Render predictive Leave and confirm server end, no requeue and no further dispatch; compare live mode."
-    ],
-    "acceptanceCriteria": [
-      "With `campaign.dial_type === \"predictive\"`, clicking \"Leave Campaign\" posts `/api/auto-dial/end` and completes the conference.",
-      "No `DELETE /api/queues` requeue is issued when the campaign is being left in predictive mode.",
-      "The dialer stops placing calls within one turn after leave.",
-      "A non-predictive (live) campaign's Leave behaviour is unchanged.",
-      "The control is confirmed before it fires (see the related UX issue)."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Leave Campaign still hangs up the local agent leg, destroys the device, requeues and navigates away. It does not end the predictive conference."
-  },
-  {
     "issueNumber": 2096,
     "verdict": "fix-now",
     "recommendedTitle": "Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them",
