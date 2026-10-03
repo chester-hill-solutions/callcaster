@@ -69,26 +69,6 @@ export function useChatThread({
       contact_number,
     });
 
-  /**
-   * @effect CANDIDATE-REMOVE: mirror the loader's initialHasMore into local hasMoreOlder state every time the thread's loader data changes (e.g. switching contact_number).
-   * @effect-deps initialHasMore (loader value for the freshly-loaded thread)
-   * @effect-side-effects none (setState only)
-   * @effect-why-not-loader This copies loader data into state after a render — the "reset state when a prop changes" pattern the effects guide recommends avoiding (e.g. via a `key` remount or reading useLoaderData directly). It's an effect today because hasMoreOlder is also mutated later by the older-messages fetcher merge, and this route doesn't remount per contact_number.
-   */
-  useEffect(() => {
-    setHasMoreOlder(initialHasMore);
-  }, [initialHasMore]);
-
-  /**
-   * @effect Clear the "already merged" fetcher-data marker when the active conversation changes, so a stale older-messages page from the previous thread isn't mistaken for already-merged data.
-   * @effect-deps contact_number (a new thread means any previously loaded olderFetcher.data no longer applies)
-   * @effect-side-effects none (ref mutation only)
-   * @effect-why-not-loader This resets bookkeeping in a ref, not render state; it exists purely to keep the fetcher-merge effect below correct across thread switches.
-   */
-  useEffect(() => {
-    lastMergedFetcherDataRef.current = null;
-  }, [contact_number]);
-
   const loadingOlder =
     olderFetcher.state === "loading" || olderFetcher.state === "submitting";
 
@@ -125,11 +105,11 @@ export function useChatThread({
    */
   useEffect(() => {
     const data = olderFetcher.data;
-    if (!data?.messages?.length || data === lastMergedFetcherDataRef.current)
-      return;
+    if (!data || data === lastMergedFetcherDataRef.current) return;
     lastMergedFetcherDataRef.current = data;
-    const older = data.messages as Message[];
     setHasMoreOlder(data.hasMore === true);
+    if (!data.messages?.length) return;
+    const older = data.messages as Message[];
     setMessages((prev) => {
       const ids = new Set(prev.map((m) => m?.sid).filter(Boolean));
       const prepend = older.filter((m) => m?.sid && !ids.has(m.sid));

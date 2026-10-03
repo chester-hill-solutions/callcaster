@@ -620,40 +620,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2106,
-    "verdict": "fix-now",
-    "recommendedTitle": "Sending a chat message wipes every older page the user scrolled back and loaded",
-    "summary": "Loaded thread history is still replaced by each new loader message-array reference. The accumulated conversation sidebar fix in #2191 does not touch this thread reset.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Loaded thread history is still replaced by each new loader message-array reference. The accumulated conversation sidebar fix in #2191 does not touch this thread reset.",
-    "resolution": "Retain loaded pages for the same conversation and reconcile refreshed messages by SID. Reset only on conversation change; prove send/revalidation and filter navigation retain older pages and dedupe SSE.",
-    "lookIn": [
-      "app/hooks/realtime/useChatRealtime.ts:98",
-      "app/hooks/chats/useChatThread.ts:133",
-      "app/hooks/chats/useChatsPage.ts:398",
-      "app/hooks/chats/useChatRealtime.ts (the re-seed effect, ~line 98)",
-      "app/hooks/chats/useChatThread.ts:113-118",
-      "app/hooks/chats/useChatsPage.ts:341,498-522",
-      "app/components/chats/ChatMessages.tsx"
-    ],
-    "existingTests": [
-      "test/ui/hooks-chats.test.tsx (thread hook behavior; no older-pages/revalidation regression)",
-      "test/ui/hooks-realtime.test.tsx (message realtime behavior; no loader-reconciliation regression)"
-    ],
-    "missingTests": [
-      "No test covers older thread pages plus loader revalidation. Existing use-chats-page-pagination tests cover the sidebar, not useChatThread."
-    ],
-    "acceptanceCriteria": [
-      "Scrolling back through N pages, sending a message, and scrolling up again still shows all N pages (kill-check: revert to `setMessages(initial)` and confirm the test goes red).",
-      "Switching to a **different** conversation does reset the thread.",
-      "A filter/sort change while a thread is open does not wipe the loaded pages.",
-      "A message that arrived via SSE while older pages were loaded is not duplicated by the reconciliation."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Fix now. PR #2191 fixes conversation-list accumulation, not this thread-history replacement. Related PR evidence: #2191. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2107,
     "verdict": "fix-now",
     "recommendedTitle": "The public customer survey never enforces is_required — required questions can be submitted blank",

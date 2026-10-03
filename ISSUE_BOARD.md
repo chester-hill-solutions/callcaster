@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@0a0acd17 + source fix for #2105` · 291 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@c14e4a19 + source fix for #2106` · 291 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 64
+## Fix now — 63
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -218,17 +218,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Need immediate-submit final-answer ordering, multiple questions changed within 1 second, answer failure, true route unmount, and composition with required validation. A cleanup alone would lose the answer.
 - Done when: Submitting within 1s of typing the last answer persists that answer (kill-check: remove the flush and confirm the test goes red).; No timer survives unmount in any `useDebounce` consumer (a test that unmounts mid-debounce and asserts no submit fires).; The answer write is observably ordered before the completion write.; A blank answer to a required question is still caught (the related issue) — the two must compose.; Changing multiple questions within the debounce interval does not cancel another question's pending save.; Completion waits for successful answer persistence, not only for the answer request to start.; Answer or completion failure keeps a recoverable form and does not show a false success card.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2106](https://github.com/chester-hill-solutions/callcaster/issues/2106) Sending a chat message wipes every older page the user scrolled back and loaded
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Loaded thread history is still replaced by each new loader message-array reference. The accumulated conversation sidebar fix in #2191 does not touch this thread reset.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Loaded thread history is still replaced by each new loader message-array reference. The accumulated conversation sidebar fix in #2191 does not touch this thread reset.
-- Resolution: Retain loaded pages for the same conversation and reconcile refreshed messages by SID. Reset only on conversation change; prove send/revalidation and filter navigation retain older pages and dedupe SSE.
-- Look in: `app/hooks/realtime/useChatRealtime.ts:98`, `app/hooks/chats/useChatThread.ts:133`, `app/hooks/chats/useChatsPage.ts:398`, `app/hooks/chats/useChatRealtime.ts (the re-seed effect, ~line 98)`, `app/hooks/chats/useChatThread.ts:113-118`, `app/hooks/chats/useChatsPage.ts:341,498-522`, `app/components/chats/ChatMessages.tsx`
-- Existing tests: test/ui/hooks-chats.test.tsx (thread hook behavior; no older-pages/revalidation regression); test/ui/hooks-realtime.test.tsx (message realtime behavior; no loader-reconciliation regression)
-- Missing tests: No test covers older thread pages plus loader revalidation. Existing use-chats-page-pagination tests cover the sidebar, not useChatThread.
-- Done when: Scrolling back through N pages, sending a message, and scrolling up again still shows all N pages (kill-check: revert to `setMessages(initial)` and confirm the test goes red).; Switching to a **different** conversation does reset the thread.; A filter/sort change while a thread is open does not wipe the loaded pages.; A message that arrived via SSE while older pages were loaded is not duplicated by the reconciliation.
-- Tracker: Fix now. PR #2191 fixes conversation-list accumulation, not this thread-history replacement. Related PR evidence: #2191. A PR reference alone does not prove deployed behavior.
 
 ### [#2099](https://github.com/chester-hill-solutions/callcaster/issues/2099) Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address
 - Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -755,9 +744,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 126
+## Verify and close — 127
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2105](https://github.com/chester-hill-solutions/callcaster/issues/2105) Return feature-unavailable response when call-in verification is not configured
+- Verdict: **Verify and close** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The real optional verification-number getter now permits missing/empty values, making the existing route 503 response reachable.
+- Current behavior: Merged to dev in PR #2290 at c14e4a19. The single optional verification-number entry makes absent/empty real getter values undefined and the actual loader returns 503 without session writes. Configured requests retain number, caller, ten-minute expiry and session headers; invalid callers, auth denial and writer failure retain errors. Boot keys and other security settings are unchanged. All 27 focused cases pass; original runtime fails four with 23 controls, three mutations fail. Full local CI passed 5,255 Vitest and 22 Bun tests; all remote and both Railway gates passed on 0d44b4b7. Issue-on-dev moved one item. Verify disabled/enabled deployed behavior and promote before closure.
+- Root cause: The optional type/boot configuration was inconsistent with the getter optional-key list. The getter threw before the intended route branch.
+- Resolution: Verify absent/empty configuration on deployed dev returns 503 without a session write; verify configured valid session creation. Keep other required configuration and security contracts unchanged. Promote before closure.
+- Look in: `app/lib/env.server.ts`, `app/lib/required-env-keys.ts`, `app/lib/required-env-keys.mjs`, `app/routes/api+/verify-call-in-session.loader.server.ts`
+- Existing tests: test/env.server.test.ts; test/verify-call-in-session.route.test.ts; test/verification-number-config.route.test.ts
+- Missing tests: Deployed dev disabled/enabled verification before production promotion.
+- Done when: Absent/empty verification number returns undefined from the real getter and does not prevent startup.; The real loader returns 503 with Call-in verification is not configured and writes no session.; Configured valid requests retain number, caller, ten-minute expiry and headers.; Invalid callers, unauthenticated requests and session write failures retain error responses.; Required boot keys and other production configuration/security contracts remain intact.; Meaningful original-source and mutation regressions fail; full local/remote gates pass before merge.; Verify deployed dev and promote before closure.
+- Tracker: Source fix is in this change; verify disabled/enabled deployed behavior before promotion and closure.
+
+### [#2106](https://github.com/chester-hill-solutions/callcaster/issues/2106) Keep loaded chat history when the current thread refreshes
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Same-conversation loader refreshes reconcile rows by SID and retain loaded history. Workspace/contact changes reset the keyed thread.
+- Current behavior: Source fix based on dev@c14e4a19: loader refreshes update matching SIDs, add unseen rows and retain older/unmatched live rows in time order. Only previously unseen saved rows with a suitable creation time can replace matching pending replies when loader data beats SSE. Known/older/unknown-time rows keep a new repeated reply and its failure marker; second-precision saved timestamps are handled. Realtime INSERT checks the actual retained list, including older pages. Conversation identity includes workspace and normalized contact. The existing route contact key now includes workspace; pagination refs/state belong to that keyed lifetime, not latest-page refreshes. Empty older pages update exhaustion. All 32 focused cases pass. Original runtime fails ten of fourteen new cases with four controls; eleven isolated history/reset/update/duplicate/pending/pagination mutations fail and all source is restored. Full local and remote gates are required before merge.
+- Root cause: Loader array reference changes were treated as a new conversation and replaced accumulated history. SID bookkeeping also excluded manually prepended rows; latest-page pagination state did not represent the retained thread.
+- Resolution: Verify loading older pages, replying and filter/sort revalidation on deployed dev retain history, update matching records and do not duplicate saved/live replies. Different workspace/contact must reset history/pagination. Promote before closure.
+- Look in: `app/hooks/realtime/useChatRealtime.ts`, `app/hooks/chats/useChatThread.ts`, `app/routes/workspaces+/$id/chats/$contact_number.route.tsx`, `app/hooks/chats/useChatsPage.ts`
+- Existing tests: test/ui/chat-thread-history.test.tsx; test/ui/hooks-chats.test.tsx; test/ui/hooks-realtime.test.tsx; test/ui/hooks-chats-optimistic-failure.test.tsx; test/ui/use-chats-page-pagination.test.tsx
+- Missing tests: Deployed dev scroll/reply/filter/identity verification before promotion.
+- Done when: At least two older pages survive reply and filter/sort loader refreshes.; Matching SID records update, unmatched live rows remain and messages retain chronological order.; Saved rows replace matching optimistic replies when loader data arrives before SSE.; Known/older/unknown-time saved rows cannot remove a new repeated pending reply or hide send failure; valid second-precision saved rows can replace it.; SSE/loader overlap and already-loaded older SIDs do not append duplicates.; Different contact/workspace resets history and pagination; equivalent normalized contact keeps history.; Empty older pages stop pagination; latest-page availability changes do not reset exhaustion.; Current-context event filtering is retained.; Original source and isolated regressions fail meaningful tests; full local/remote gates pass before merge.; Verify deployed dev and promote before closure.
+- Tracker: Source fix is in this change. Thread history is separate from the sidebar accumulation already fixed under #2191; verify the deployed flow before promotion and closure.
 
 ### [#2104](https://github.com/chester-hill-solutions/callcaster/issues/2104) Include namespace effect calls in the effects guard
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -770,18 +783,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Verification on merged/deployed dev source before promotion.
 - Done when: Actual unannotated direct, namespace and layout-effect calls fail the CLI.; Annotated complete member calls appear in inventory, including multiline forms.; Actual declarations and hook-like comments/strings are ignored.; Namespace effects count in baseline mode and growth above allowance fails.; Datetime timer annotation and audience removal debt are listed; production behavior and baseline allowance are unchanged.; Original source, scanner mutations and annotation removals fail meaningful regressions.; Full local/remote gates pass before merge; verify merged dev source before promotion and closure.
 - Tracker: Source guard fix is in this change; verify inventory/enforcement and promote before closure.
-
-### [#2105](https://github.com/chester-hill-solutions/callcaster/issues/2105) Return feature-unavailable response when call-in verification is not configured
-- Verdict: **Verify and close** · Size: XS · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- The real optional verification-number getter now permits missing/empty values, making the existing route 503 response reachable.
-- Current behavior: Source fix based on dev@0a0acd17: only VERIFICATION_PHONE_NUMBER is added to optional handling. Missing/empty configuration returns undefined and the actual loader returns the existing 503 feature-unavailable response without a session write. Configured requests retain the number, caller, ten-minute expiry and session headers; invalid callers, denied auth and writer failures retain their responses. Boot required keys and production media-stream secret handling are unchanged. All 27 focused cases pass. Original runtime fails four with 23 controls; three isolated mutations fail and all source is restored. Full local and remote gates are required before merge.
-- Root cause: The optional type/boot configuration was inconsistent with the getter optional-key list. The getter threw before the intended route branch.
-- Resolution: Verify absent/empty configuration on deployed dev returns 503 without a session write; verify configured valid session creation. Keep other required configuration and security contracts unchanged. Promote before closure.
-- Look in: `app/lib/env.server.ts`, `app/lib/required-env-keys.ts`, `app/lib/required-env-keys.mjs`, `app/routes/api+/verify-call-in-session.loader.server.ts`
-- Existing tests: test/env.server.test.ts; test/verify-call-in-session.route.test.ts; test/verification-number-config.route.test.ts
-- Missing tests: Deployed dev disabled/enabled verification before production promotion.
-- Done when: Absent/empty verification number returns undefined from the real getter and does not prevent startup.; The real loader returns 503 with Call-in verification is not configured and writes no session.; Configured valid requests retain number, caller, ten-minute expiry and headers.; Invalid callers, unauthenticated requests and session write failures retain error responses.; Required boot keys and other production configuration/security contracts remain intact.; Meaningful original-source and mutation regressions fail; full local/remote gates pass before merge.; Verify deployed dev and promote before closure.
-- Tracker: Source fix is in this change; verify disabled/enabled deployed behavior before promotion and closure.
 
 ### [#2102](https://github.com/chester-hill-solutions/callcaster/issues/2102) Match published agent-call estimates to billing rates
 - Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
