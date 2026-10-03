@@ -189,5 +189,36 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Needs reproduction, not fix now. The inconsistency is confirmed but the cause is not, and there are two candidate causes whose fixes are opposites: one is a duplicated write, the other is a write that never happens. Guessing here would change either a write path or an aggregate on the strength of a screenshot. The repro is three queries and about ten minutes. Also file the remote-hangup button symptom separately if the repro shows it still reproduces, since the existing #1292 guard suggests that half may already be fixed."
+  },
+  {
+    "issueNumber": 2053,
+    "verdict": "needs-repro",
+    "recommendedTitle": "Reproduce current E2E image-pull failures after the Stow migration",
+    "summary": "The original MinIO/Quay failure is obsolete after the Stow migration. Two anonymous Docker Hub pulls remain. Source alone cannot prove current image-pull failures or the claimed anonymous-quota root cause.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Stow replaced MinIO. Only postgres and inbucket Docker Hub images remain. No fresh hosted-runner image-pull failure was established in this code audit.",
+    "rootCause": "The historical unauthorized Quay pull is not proof of rate limiting and no longer exists in the compose graph. Anonymous Docker Hub pulls remain a possible failure source.",
+    "resolution": "Read current master E2E runs. Separate image-pull failures from apt, database, and Playwright failures; choose mirror/auth policy only after confirming the remaining failure.",
+    "lookIn": [
+      "docker-compose.dev.yml:15",
+      ".github/workflows/e2e.yml:130",
+      ".github/workflows/e2e.yml:40,55 (runs-on) and the test:e2e:compose step",
+      "docker-compose.dev.yml:12,36,49 (the three image sources — note line 36 is quay.io)",
+      "scripts/e2e/run-compose-e2e.mjs:20,57-58,84 (composeFile, up -d, ensure-minio-bucket)",
+      "scripts/e2e/ensure-minio-bucket.mjs:12-13,25-26 (endpoint and credentials)"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Need current hosted-runner logs, registry response evidence and the ten-run acceptance measurement."
+    ],
+    "acceptanceCriteria": [
+      "npm run test:e2e:compose passes on master from a GitHub-hosted runner",
+      "No image in docker-compose.dev.yml is pulled anonymously from a rate-limited registry",
+      "No image-pull failure across ten consecutive PR runs",
+      "If the gate is not required, that is recorded deliberately"
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Move to Needs reproduction for the current runner failure. Update obsolete MinIO and Quay claims first."
   }
 ]

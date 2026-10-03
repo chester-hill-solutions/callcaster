@@ -69,6 +69,18 @@ gh api "repos/chester-hill-solutions/callcaster/issues/1155/timeline" \
 
 When closing an issue you intend as wontfix, pass `--reason "not planned"` explicitly — the default closure reason is `COMPLETED`, and the board treats those oppositely.
 
+## Issue Board Source Audits
+
+For an audit, update the existing enrichment records and regenerate `ISSUE_BOARD.md`.
+Trace the affected route or worker to its actual helper before moving an issue to
+Verify and close. A merged PR that changes another parser does not fix the upload
+path. For SQL, check bootstrap inclusion and later function definitions; a file
+that exists but is skipped or replaced is not the active fix.
+
+Separate source proof from deployed verification. Keep unfinished parts visible
+when a PR resolves only part of an issue. Check proposed query predicates against
+both the failing case and the control case before carrying them into the board.
+
 ## Atomic Task And Epic Creation
 
 One issue is one concern: a single defect, decision, or deliverable with its own acceptance criteria. Before creating, split anything that needs the word "and" in its title. Decompose large bodies of work instead of writing mega-issues:

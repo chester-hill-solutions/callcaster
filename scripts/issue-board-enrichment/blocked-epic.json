@@ -232,16 +232,6 @@
     "blockedBy": []
   },
   {
-    "issueNumber": 1356,
-    "verdict": "blocked-epic",
-    "summary": "The dev custom domain was attached in Railway; DNS and IaC ownership were still missing at the last verified report.",
-    "resolution": "Inspect current DNS and the Railway target. DNS changes need access to the domain zone, then codify the live mapping.",
-    "lookIn": [
-      ".railway/environments/dev.ts"
-    ],
-    "blockedBy": []
-  },
-  {
     "issueNumber": 1357,
     "verdict": "blocked-epic",
     "summary": "The qa custom domain depends on the environment naming decision and DNS access. Staging continues to track master.",
@@ -614,9 +604,7 @@
       "Credentials are stored as secrets/vars, not in the repo",
       "IaC-vs-manual decision is recorded"
     ],
-    "blockedBy": [
-      1356
-    ],
+    "blockedBy": [],
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "blocked-epic: #1356 (dev DNS/IaC) first. Confirm the IaC-vs-manual decision when unblocked; this unblocks #1826."
@@ -924,5 +912,159 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Deliberately last. Sweeping checks before the model exists is how you end up rewriting the same lines twice."
+  },
+  {
+    "issueNumber": 1885,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Retire the remaining auth schema after dependency verification",
+    "summary": "Partial fix only. Dead RPC removal and both actor rewrites are on dev; legacy auth shim remains and the fail-closed schema drop is absent. Issue discussion requires production dependency verification before the drop.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The two live RPCs now use app.current_user_id and get_outreach_attempts is dropped; auth.uid() is still created and schema auth remains to be retired.",
+    "rootCause": "The live RPC actor rewrites and dead RPC removal shipped. The baseline shim still creates auth.uid(), and the final dependency guard and schema retirement remain unshipped.",
+    "resolution": "Remaining work only: ship a dependency guard, verify all production dependencies/data, then release the schema drop separately and retire the bootstrap shim.",
+    "lookIn": [
+      "client/migrations/20260920120100_rewrite_manual_dial_claim_actor.sql:23",
+      "client/migrations/20260920120200_rewrite_last_access_actor.sql:18",
+      "drizzle/0001_auth_uid_shim.sql:2",
+      "scripts/db/bootstrap-fresh-db.mjs:120",
+      "app/lib/db-rpc.server.ts",
+      "drizzle/0001_auth_uid_shim.sql",
+      "drizzle/0000_baseline.sql",
+      "client/migrations/20260807130000_manual_dial_claim_attempt_count.sql",
+      "client/migrations/20260715140000_drop_legacy_rls.sql",
+      "scripts/db/check-db-orphans.mjs",
+      "scripts/db/bootstrap-fresh-db.mjs",
+      "scripts/e2e/bootstrap-compose-db.mjs"
+    ],
+    "existingTests": [
+      "test/queue-rpc-contract.test.ts",
+      "test/db-rpc-claim-queue-entry.test.ts",
+      "test/db-rpc-outreach-attempt.test.ts",
+      "test/atomic-manual-dial-claims.integration.test.ts"
+    ],
+    "missingTests": [
+      "No legacy-auth SQL guard is present on dev. Existing queue contract tests need latest-definition and actor/no-actor coverage. Database state was not queried in this read-only code audit."
+    ],
+    "acceptanceCriteria": [
+      "A dependency guard fails before any destructive operation when non-auth functions, policies, views or other schema objects still depend on auth.",
+      "Production dependencies and data-retention requirements are verified before the schema drop.",
+      "Guard and schema drop follow the separate release steps recorded in the issue.",
+      "The two rewritten RPC flows retain actor and missing-actor behavior.",
+      "A fresh bootstrap does not recreate auth.uid() after retirement."
+    ],
+    "blockedBy": [],
+    "size": "M-L",
+    "risk": "high",
+    "trackerRecommendation": "Blocked / split first. Chunks 1–2 shipped in #1966. The 2026-09-28 issue comment explicitly requires production checks and separate guard/drop release work; do not merge the old chunk-3 branch as-is. Related PR evidence: #1966, #1887. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 1873,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Call recording: workspace recording policy + campaign opt-in, wired into IVR/predictive/test dials",
+    "summary": "The recording pipeline exists, but workspace policy, campaign opt-in and IVR/predictive/test-call wiring are absent. The issue spans schema, dial paths and disclosure rules.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The recording pipeline exists, but workspace policy, campaign opt-in and IVR/predictive/test-call wiring are absent. The issue spans schema, dial paths and disclosure rules.",
+    "rootCause": "Recording was built for specific agent call paths. The workspace/campaign policy model and other dial families are not yet wired; the issue combines several release units.",
+    "resolution": "Split policy/schema, dial-path recording and disclosure into separate changes. The optional disclosure model is stated in the issue; the jurisdiction gate and transcription scope still need exact requirements. #1989 is a separate, confirmed callback defect.",
+    "lookIn": [
+      "app/lib/campaign-test-call.server.ts:105",
+      "app/lib/twilio-ivr-runtime.server.ts:20",
+      "app/db/schema-campaign.ts:1",
+      "app/routes/api+/call.action.server.ts",
+      "app/routes/api+/recording.action.server.ts",
+      "app/lib/call-recording-storage.server.ts",
+      "app/lib/worker/webhook-side-effects.server.ts",
+      "app/lib/campaign-ivr-dispatch.server.ts",
+      "app/lib/campaign-test-call.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "app/components/campaign/settings/basic/CampaignVoiceSettings.tsx",
+      "app/db/schema-campaign.ts",
+      "app/lib/coaching-schemas.ts"
+    ],
+    "existingTests": [
+      "test/recording.route.test.ts",
+      "test/webhook-side-effects.test.ts:445-560",
+      "test/call-recording-storage.server.test.ts",
+      "test/batch-transcription-gating.test.ts",
+      "test/api-call.route.test.ts:106 (dial record attrs)"
+    ],
+    "missingTests": [
+      "Check policy disabled, campaign opt-out, each supported dial path, callback persistence and disclosure before enabling recording."
+    ],
+    "acceptanceCriteria": [
+      "Workspace recording policy and campaign opt-in gate every supported recording path.",
+      "Enabled IVR, predictive and test calls persist audio through the recording callback.",
+      "#1989 callback work is verified separately.",
+      "Optional disclosure behavior and jurisdiction gating requirements are recorded before rollout."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "Blocked / split first: multiple dial families and policy requirements; keep #1989 available as a separate fix."
+  },
+  {
+    "issueNumber": 2168,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Cull old dev numbers and workspaces: backfill subaccount names and record the keep-list in the repo",
+    "summary": "The read-only report and historical number cull are complete. Durable keep-list storage, name backfill and the repeat policy remain, with workspace-row cleanup explicitly deferred.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The read-only report and historical number cull are complete. Durable keep-list storage, name backfill and the repeat policy remain, with workspace-row cleanup explicitly deferred.",
+    "rootCause": "No tooling existed to decide what could be culled, and no recorded rule to make the decision repeatable. The name-fragment junk exclusion is deliberately a --exclude flag rather than hardcoded, because it is a judgement call rather than a rule.",
+    "resolution": "Report tool and the historical number cull are complete. Split durable keep-list configuration, name backfill and repeat policy into separate work. Workspace-row deletion was deferred in the issue discussion. Recheck current ownership before any new live cleanup.",
+    "lookIn": [
+      "scripts/cull-report.mjs:1",
+      "app/lib/twilio-resource-name.ts:1",
+      "scripts/cull-report.mjs (read-only cull tool, merged #2171)",
+      "app/lib/twilio-resource-name.ts (naming helper, merged #2167)",
+      "app/lib/database/workspace-twilio-subaccount.server.ts (subaccount create path the backfill mirrors)"
+    ],
+    "existingTests": [
+      "cull-report.mjs handles 555-number test credentials, the E911 VERIFY line, cross-workspace-only blockers, and compares dates rather than strings"
+    ],
+    "missingTests": [
+      "Keep-list lookup must protect an explicitly kept phone-named workspace; name backfill must be idempotent."
+    ],
+    "acceptanceCriteria": [
+      "Subaccount display names are backfilled to the #2167 format",
+      "The keep-list lives in the repository, not a shell argument",
+      "2608141501 survives, since it is on both the keep-list and the phone-number-named rule",
+      "The cull report remains read-only with no delete path"
+    ],
+    "blockedBy": [
+      2170
+    ],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Blocked / split first: keep-list/repeat policy and external name writes are separate concerns. Related PR evidence: #2171, #2167. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2213,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Correct the remaining temporal column types listed in the schema drift baseline",
+    "summary": "The guard and campaign_queue/call/message slices are present. The committed baseline still holds 64 remaining temporal mismatches. This is a multi-table program requiring separate table changes, not one atomic fix.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. 64 committed temporal mismatch lines remain; guard and first table slices are on dev. Tenant write type boundary was tightened in PR #2244, so the earlier untyped-write prerequisite is resolved.",
+    "rootCause": "The remaining Drizzle declarations model database timestamps as text. The database types already are temporal; these slices normally change model and callers, not database column DDL. The original call/message/campaign_queue slices and tenant write-boundary repair are complete.",
+    "resolution": "Split remaining tables into atomic tasks and start one table slice. Validate invalid/empty values, wire contracts and Date sorting at each boundary.",
+    "lookIn": [
+      "scripts/baselines/schema-type-drift.txt:1",
+      "test/integration-db/schema-type-drift.test.ts:141",
+      "app/server/tenant-db.ts:121",
+      "scripts/baselines/schema-type-drift.txt",
+      "test/integration-db/schema-type-drift.test.ts",
+      "test/helpers/schema-drift.ts",
+      "app/db/schema.ts",
+      "app/db/schema-campaign.ts"
+    ],
+    "existingTests": [
+      "test/integration-db/schema-type-drift.test.ts"
+    ],
+    "missingTests": [
+      "Guard exists. Each slice needs behavior tests at Date/write/wire boundaries plus real-Postgres verification; no fresh database count performed here."
+    ],
+    "acceptanceCriteria": [
+      "The temporal drift baseline reaches zero in small table-specific changes.",
+      "The existing guard rejects both new drift and stale baseline entries."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Move to Blocked / split first as a multi-table parent. Create table-specific tasks; do not re-implement the guard or completed slices. Related PR evidence: #2231, #2233, #2241, #2244. A PR reference alone does not prove deployed behavior."
   }
 ]
