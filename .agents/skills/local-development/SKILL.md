@@ -14,6 +14,18 @@ installing dependencies. If Homebrew Node fails with a missing shared library,
 use an installed NVM Node 22 version for this task instead of changing global
 libraries or using a different Node major.
 
+For temporary Playwright configuration under `node_modules`, use JavaScript
+(`.mjs`) rather than TypeScript. Node 22 refuses TypeScript stripping in that
+directory before tests collect. Keep local-only browser/channel overrides out
+of tracked product configuration, and require the expected case count and a
+completed browser run before claiming geometry acceptance.
+
+Before another isolated install or full gate in a long audit, check available
+disk space. Remove only reproducible dependencies/build output in owned
+temporary worktrees whose readers have stopped; keep source, proof artifacts
+and user files. A disk-space failure is not a green gate: rerun the full gate
+after recovery.
+
 ## Locked project tools
 
 After the worktree's locked install completes, run project tools with
