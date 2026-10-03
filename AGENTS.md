@@ -45,7 +45,7 @@ Always talk to me like I have ADHD.
 - **`@react-router/fs-routes`:** Deferred — `remix-flat-routes` + route tooling baselines remain; evaluate fs-routes only after RR8 is stable in production.
 - Tooling: `npm run tools:routes:folderize`, `tools:routes:verify`, `tools:routes:imports` (see [scripts/](scripts/)).
 - **Pre-PR CI bar:** `npm run ci:local` is the repository's comprehensive local gate. It runs typecheck, lint, both test suites, route and API checks, structural guards, the production build, the client-bundle check, and codegen verification.
-- **Structural guards:** 15 `check:*` commands wired in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — 14 in the `quality` job (`check:route-server-leaks`, `check:twilio-webhooks`, `check:request-body-consumption`, `check:middleware`, `check:credit-writes`, `check:route-authz`, `check:workspace-projection`, `check:effects`, `check:type-safety`, `check:dry`, `check:handlers`, `check:test-mocks`, `check:bun-lock`, `check:lint-ratchet`) plus `check:client-bundle` in `bundle-guard`. That job list also runs `tools:routes:verify`, `tools:api:surface:check`, `db:ledger:check`, `db:bootstrap:check`, `tools:check-file-size` and `ci:codegen:verify`.
+- **Structural guards:** The check list changes with the scripts and workflow. Use `npm run ci:local` for the full local gate; use [`package.json`](package.json) and [`.github/workflows/ci.yml`](.github/workflows/ci.yml) as the source of truth instead of relying on a fixed count.
 
 ## Public APIs (doc-first / Hey API)
 
