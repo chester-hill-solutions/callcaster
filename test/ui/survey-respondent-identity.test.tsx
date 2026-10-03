@@ -1,10 +1,12 @@
 import React from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 import SurveyPage from "../../app/routes/survey+/$surveyId";
 
 vi.mock("../../app/routes/survey+/$surveyId.loader.server", () => ({ loader: vi.fn() }));
+
+afterEach(() => { vi.unstubAllGlobals(); });
 
 function surveyData(resultId = "respondent-a", token = "signed-a") {
   return {
@@ -20,6 +22,11 @@ function setup() {
     writes.push({ path: new URL(request.url).pathname, fields: Object.fromEntries(await request.formData()) });
     return { success: true };
   };
+  vi.stubGlobal("fetch", vi.fn(async (input: string, init: RequestInit) => {
+    if (!(init.body instanceof FormData)) throw new Error("Expected survey form data");
+    writes.push({ path: new URL(input, window.location.origin).pathname, fields: Object.fromEntries(init.body) });
+    return Response.json({ success: true });
+  }));
   const router = createMemoryRouter([
     { path: "/survey/:id", element: <SurveyPage />, loader: () => data },
     { path: "/api/survey-answer", action }, { path: "/api/survey-complete", action },
