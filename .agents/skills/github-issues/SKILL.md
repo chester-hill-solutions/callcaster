@@ -96,6 +96,16 @@ Separate source proof from deployed verification. Keep unfinished parts visible
 when a PR resolves only part of an issue. Check proposed query predicates against
 both the failing case and the control case before carrying them into the board.
 
+## Pinned Source Links
+
+Before publishing source evidence, discover uncertain paths with `rg --files`
+and verify each pinned link with `git cat-file -e COMMIT:path`. Read the cited
+lines from that exact commit. A guessed path can produce a valid-looking but
+broken GitHub URL; a successful issue write does not prove the source link works.
+After a correction, re-read the issue body and use the corrected snapshot for
+subsequent board updates. Keep historical findings separate from current scope
+so a completed task or recorded decision does not still read as unfinished.
+
 ## Atomic Task And Epic Creation
 
 One issue is one concern: a single defect, decision, or deliverable with its own acceptance criteria. Before creating, split anything that needs the word "and" in its title. Decompose large bodies of work instead of writing mega-issues:

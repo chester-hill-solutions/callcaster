@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@a3d9fc40 + source confirmation for #2295` · 294 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@5ad088c4 + feedback source audit (2026-10-03)` · 302 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 62
+## Fix now — 67
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -232,6 +232,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Failure propagation and the repair sweep remain covered by their existing regression tests.; Missing stored playback has a clear unavailable state and no raw Twilio recording link.; Repeated deliveries for one voicemail recording use one deterministic object key and the documented overwrite behavior.; An explicit recording_url retention decision is recorded.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2169, #2173, #2175, #2177. A PR reference alone does not prove deployed behavior.
 
+### [#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032) Invite acceptance shows a persistent, replayable inline banner instead of a one-time success toast
+- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Invite acceptance still redirects to a replayable query-param success banner. PR #2037 explicitly left this separate cookie/session-flash change open.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Invite acceptance still redirects to a replayable query-param success banner. PR #2037 explicitly left this separate cookie/session-flash change open.
+- Root cause: One-time state is being carried in a shareable URL because there is no server-owned flash mechanism to carry it instead. AGENTS.md names toast() from sonner as the single feedback pattern and a single root Toaster already exists (app/root.tsx:123), so the app has the right tool and the wrong transport.
+- Resolution: Implement the allow-listed signed flash cookie, preserve all Better Auth Set-Cookie headers, read/clear it in the loader on success and failure, and consume it once with toast.success.
+- Look in: `app/routes/accept-invite.action.server.ts:62`, `app/routes/workspaces+/index.tsx:272`, `app/routes/workspaces+/index.loader.server.ts:1`, `app/routes/accept-invite.action.server.ts:58 and :183 (the two redirects to /workspaces?invite=accepted)`, `app/routes/workspaces+/index.tsx:272-280 (the QueryParamBanner invite configuration)`, `app/components/shared/QueryParamBanner.tsx:16-57 (unchanged by this issue; note the Alert inside it)`, `app/routes/workspaces+/index.loader.server.ts:32-72 (where the flash is read and cleared)`, `app/lib/flash-telemetry.client.ts (beacons role=alert surfaces, so the success banner is logged as an error flash today)`, `app/root.tsx:123 (the single root Toaster, so no infrastructure change is needed)`
+- Existing tests: test/accept-invite.route.test.ts:231 (asserts /workspaces?invite=accepted and must be updated)
+- Missing tests: Both redeem paths, mixed Set-Cookie preservation, invalid/expired payload clearing, loader-failure clearing, and exactly-once UI toast tests are missing.
+- Done when: Invite acceptance shows a one-time success toast, not an inline banner; The redirect URL no longer carries invite=accepted, and refreshing it does not reproduce the message; The Better Auth session cookie survives the redirect in both redemption paths; An unknown, malformed or expired flash payload produces no client-visible output and is still cleared; A loader revalidation does not fire the toast twice; Invite acceptance uses the one-time success toast and does not produce a local error-surface warning. Workspace-scoped Alert severity classification remains separate work in #2062.; No support, analytics or e2e flow still depends on ?invite=accepted (checked before removal)
+- Tracker: Fix now. PR #2037 did not implement #2032; it names the issue as excluded work. Related PR evidence: #2037. A PR reference alone does not prove deployed behavior.
+
 ### [#2294](https://github.com/chester-hill-solutions/callcaster/issues/2294) Keep public survey answers scoped to their page
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
 - Displayed and resumed public answers collapse repeated labels across pages.
@@ -322,29 +334,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Toggling a call-list checkbox persists the membership and it survives a reload (kill-check).; Editing an "Other Data" field persists and survives a reload (kill-check).; If the controls are removed instead, they are absent rather than inert.; The unfinished-wiring comment is gone.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
-### [#2058](https://github.com/chester-hill-solutions/callcaster/issues/2058) Rule and inventory: inline error text used where a toast belongs
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- The requested rule and complete keep/change inventory have not been added. This is a documentation and classification deliverable; a blanket toast conversion would exceed the request.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The requested rule and complete keep/change inventory have not been added. This is a documentation and classification deliverable; a blanket toast conversion would exceed the request.
-- Root cause: No written rule distinguishing field-level from page-level error presentation, so each site was decided locally.
-- Resolution: Write one error-surface rule in design-system documentation and inventory every inline error with keep/change reasons and duplicate-toast cases. File conversion groups separately.
-- Look in: `docs/design-system.md:81`, `app/components/surveys/SurveyForm.tsx:347`, `app/routes/signin.tsx:1`, `AGENTS.md (design-system section)`, `app/components/ui/`, `app/components/**/Form*.tsx`, `app/routes/**`
-- Missing tests: Acceptance is an exhaustive reviewed inventory, preservation of field validation, and duplicate-surface classification; this audit did not generate that inventory.
-- Done when: A written rule exists where a contributor will find it; Every inline error site is listed with a keep-or-change verdict and a reason; Pages rendering the same failure twice are identified; Changes, if any, land in reviewable batches after the inventory, not mixed into it; No form validation is removed in the name of consistency
-- Tracker: Fix now as the rule/inventory task only. PR #2037 addresses transient instances, not this complete inventory. Related PR evidence: #2037. A PR reference alone does not prove deployed behavior.
-
-### [#2032](https://github.com/chester-hill-solutions/callcaster/issues/2032) Invite acceptance shows a persistent, replayable inline banner instead of a one-time success toast
-- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- Invite acceptance still redirects to a replayable query-param success banner. PR #2037 explicitly left this separate cookie/session-flash change open.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Invite acceptance still redirects to a replayable query-param success banner. PR #2037 explicitly left this separate cookie/session-flash change open.
-- Root cause: One-time state is being carried in a shareable URL because there is no server-owned flash mechanism to carry it instead. AGENTS.md names toast() from sonner as the single feedback pattern and a single root Toaster already exists (app/root.tsx:123), so the app has the right tool and the wrong transport.
-- Resolution: Implement the allow-listed signed flash cookie, preserve all Better Auth Set-Cookie headers, read/clear it in the loader on success and failure, and consume it once with toast.success.
-- Look in: `app/routes/accept-invite.action.server.ts:62`, `app/routes/workspaces+/index.tsx:272`, `app/routes/workspaces+/index.loader.server.ts:1`, `app/routes/accept-invite.action.server.ts:58 and :183 (the two redirects to /workspaces?invite=accepted)`, `app/routes/workspaces+/index.tsx:272-280 (the QueryParamBanner invite configuration)`, `app/components/shared/QueryParamBanner.tsx:16-57 (unchanged by this issue; note the Alert inside it)`, `app/routes/workspaces+/index.loader.server.ts:32-72 (where the flash is read and cleared)`, `app/lib/flash-telemetry.client.ts (beacons role=alert surfaces, so the success banner is logged as an error flash today)`, `app/root.tsx:123 (the single root Toaster, so no infrastructure change is needed)`
-- Existing tests: test/accept-invite.route.test.ts:231 (asserts /workspaces?invite=accepted and must be updated)
-- Missing tests: Both redeem paths, mixed Set-Cookie preservation, invalid/expired payload clearing, loader-failure clearing, and exactly-once UI toast tests are missing.
-- Done when: Invite acceptance shows a one-time success toast, not an inline banner; The redirect URL no longer carries invite=accepted, and refreshing it does not reproduce the message; The Better Auth session cookie survives the redirect in both redemption paths; An unknown, malformed or expired flash payload produces no client-visible output and is still cleared; A loader revalidation does not fire the toast twice; Invite acceptance uses the one-time success toast and does not produce a local error-surface warning. Workspace-scoped Alert severity classification remains separate work in #2062.; No support, analytics or e2e flow still depends on ?invite=accepted (checked before removal)
-- Tracker: Fix now. PR #2037 did not implement #2032; it names the issue as excluded work. Related PR evidence: #2037. A PR reference alone does not prove deployed behavior.
-
 ### [#2067](https://github.com/chester-hill-solutions/callcaster/issues/2067) check:effects never verifies @effect-deps against the real dependency array
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-09-25
 - The effects guard checks annotation presence only. It never parses the actual dependency array or compares it with @effect-deps.
@@ -368,6 +357,61 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Tests must cover null window, voice-only schedule, malformed end, and warning severity without a launch block.
 - Done when: No sms_send_window → visible unrestricted-send warning at launch; Voice schedule with null sms_send_window → same warning; Missing/malformed interval end flagged, not dropped; Warning only, no new blocker for legitimately 24/7 campaigns
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
+### [#2305](https://github.com/chester-hill-solutions/callcaster/issues/2305) Show audio-upload failure once
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The idle fetcher callback sets localError and calls toast.error for the same data.error; the sheet also renders localError. Keep one action-result surface with retry and selected/entered upload data. Retain field-specific validation and upload limits.
+- Current behavior: Source-confirmed at dev@5ad088c4, 2026-10-03. The idle fetcher callback sets localError and calls toast.error for the same data.error; the sheet also renders localError. Keep one action-result surface with retry and selected/entered upload data. Retain field-specific validation and upload limits.
+- Root cause: The same action failure reaches two presentation paths.
+- Resolution: Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.
+- Look in: `app/components/campaign/settings/AddAudioSheet.tsx`, `docs/feedback-inventory.md`
+- Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
+
+### [#2308](https://github.com/chester-hill-solutions/callcaster/issues/2308) Show agent startup failure once
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The startup-failure branch passes the same token/runtime error to StatusBar and renders it again in an outer Alert. This replaces unavailable content. Keep one failure-region message, available recovery actions and disabled unavailable controls. Do not convert live call controls into brief toasts or change device/call state.
+- Current behavior: Source-confirmed at dev@5ad088c4, 2026-10-03. The startup-failure branch passes the same token/runtime error to StatusBar and renders it again in an outer Alert. This replaces unavailable content. Keep one failure-region message, available recovery actions and disabled unavailable controls. Do not convert live call controls into brief toasts or change device/call state.
+- Root cause: The same action failure reaches two presentation paths.
+- Resolution: Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.
+- Look in: `app/components/agent/AgentDesktop.tsx`, `docs/feedback-inventory.md`
+- Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
+
+### [#2307](https://github.com/chester-hill-solutions/callcaster/issues/2307) Show onboarding name-save failure once
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The onboarding route handles actionData.error through useActionFeedback while Intro renders the same actionError inline. Keep one result for the name-save operation and preserve genuine field validation, entered name and retry. Do not change the onboarding state machine or provider writes.
+- Current behavior: Source-confirmed at dev@5ad088c4, 2026-10-03. The onboarding route handles actionData.error through useActionFeedback while Intro renders the same actionError inline. Keep one result for the name-save operation and preserve genuine field validation, entered name and retry. Do not change the onboarding state machine or provider writes.
+- Root cause: The same action failure reaches two presentation paths.
+- Resolution: Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.
+- Look in: `app/routes/workspaces+/$id/onboarding/OnboardingIntroStep.tsx`, `docs/feedback-inventory.md`
+- Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
+
+### [#2306](https://github.com/chester-hill-solutions/callcaster/issues/2306) Associate workspace settings errors with the correct action
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.
+- Current behavior: Source-confirmed at dev@5ad088c4, 2026-10-03. Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.
+- Root cause: The route assigns failures from unrelated settings actions to the Email field.
+- Resolution: Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.
+- Look in: `app/routes/workspaces+/$id/settings.route.tsx`, `docs/feedback-inventory.md`
+- Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
+
+### [#2304](https://github.com/chester-hill-solutions/callcaster/issues/2304) Show reset-password action failure once
+- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The route renders actionData.error.message inline while useActionFeedback also sends the same action failure to the root toast. Keep one action-result surface; retain password/token validation, entered values and retry. Do not change auth or reset-token policy.
+- Current behavior: Source-confirmed at dev@5ad088c4, 2026-10-03. The route renders actionData.error.message inline while useActionFeedback also sends the same action failure to the root toast. Keep one action-result surface; retain password/token validation, entered values and retry. Do not change auth or reset-token policy.
+- Root cause: The same action failure reaches two presentation paths.
+- Resolution: Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.
+- Look in: `app/routes/reset-password.tsx`, `docs/feedback-inventory.md`
+- Missing tests: Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable.
+- Done when: One visible result for one failed action.; Preserve genuine field validation, permissions, hard gates, entered values and retry.; No page or scroll movement on appearance, update or removal.
+- Tracker: Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green.
 
 ### [#2211](https://github.com/chester-hill-solutions/callcaster/issues/2211) Run the independent real-Postgres CI tier for application changes covered by its tests
 - Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -607,8 +651,19 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Literal absolute redirect pathnames match registered routes, including multiline calls.; Query/hash stripping, parameterized routes and wildcards have explicit behavior and fixtures.; Existing violations are corrected or tracked before enabling the gate.; Local and quality CI run the gate; the relative redirect check remains.
 - Tracker: Independent preventive Task split from #2075; no blocking edge.
 
+### [#2061](https://github.com/chester-hill-solutions/callcaster/issues/2061) Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-03
+- Option B is recorded: make the default Alert neutral and require explicit semantic tones. CallCaster has not adopted that contract.
+- Current behavior: Source audit: dev@5ad088c4, 2026-10-03. The app vendor default still uses border-brand-tertiary and bg-brand-wash. The issue now records a neutral default contract, without changing global brand tokens. Shared workbench ownership is confirmed; app adoption and rendered acceptance remain.
+- Root cause: The app still consumes the older brand-styled default Alert; the selected neutral contract has not been adopted.
+- Resolution: Adopt the reviewed canonical ui-kit Alert snapshot as a separate consumer change. Keep existing geometry and theme. Classify unvarianted and style-only warning sites, give conditions explicit tones, and verify light/dark contrast and no page movement. Do not change global brand-wash or brand-tertiary.
+- Look in: `vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:100`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx:23`, `app/components/ui/alert.tsx:1`, `vendor/chester-hill-solutions/shad-cc/src/styles/theme.css`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx`, `app/components/ui/alert.tsx`
+- Missing tests: Actual light/dark rendered tone and contrast, including default/explicit warning sites; browser geometry for any migrated dynamic notices.
+- Done when: Record the token change, explicit tone, or combined decision.; Under that decision, a neutral Alert remains legible and does not appear to indicate failure in dark mode.; List every Alert without an explicit tone and mark it deliberately neutral or give it the required tone.; If shared tokens change, check their other consumers in light and dark themes.; Test the selected Alert tone contract and verify the rendered result.
+- Tracker: Fix now: the Option B decision is recorded. Shared Alert metadata is tracked in chester-hill-solutions/chester-hill-solutions#121; consumer adoption is still unfinished.
+
 ### [#2062](https://github.com/chester-hill-solutions/callcaster/issues/2062) Flash telemetry infers Alert severity from its ARIA role
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-03
 - Telemetry still classifies every alert role as alert-banner without semantic severity. The invite example is overstated: /workspaces does not match a workspace ID, so it logs locally but does not send that banner to /client-flash, and alert capture has no stack.
 - Current behavior: Source audit: dev@5b673c81, 2026-10-02. All observed alerts become severity-free alert-banner events; workspace-scoped successes can become warning logs. The /workspaces invite banner only logs locally, without a stack or network beacon.
 - Root cause: The telemetry keys on the ARIA role rather than on the severity the component is actually communicating. `role="alert"` is an accessibility announcement mechanism, not a severity signal, and a neutral `Alert` uses it too.
@@ -618,6 +673,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Current flash tests cover error toast and alert-banner only. Need success, warning, neutral, unknown-role-only, existing-error retention, and sink-schema tests.
 - Done when: An explicit Alert tone or severity determines telemetry classification; role=alert alone does not imply an error.; Success and neutral Alerts inside a workspace URL do not enter the error signal.; A success Alert is recorded as success under the selected telemetry contract.; Genuine errors retain their existing reporting and deduplication.; The client payload and server sink accept the same severity contract.; The /workspaces invite path produces no error event; its current lack of a workspace ID is not used as the severity test.; The e2e alert selectors still resolve after the change.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
+### [#2035](https://github.com/chester-hill-solutions/callcaster/issues/2035) The settings-sheet Leave Campaign button bypasses the new confirmation
+- Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: @sai-sy · Updated: 2026-10-03
+- Partial fix: the top Leave Campaign button and welcome leave actions ask for confirmation, but the settings-sheet Leave button still calls cleanup immediately.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. PR #2074 adds a visible top action and confirmation, but settings-only Leave bypasses it at Layout:325.
+- Root cause: PR #2074 added confirmation to the top action and welcome leave callbacks. CallScreen.Layout.tsx:325 still passes handleLeaveCampaign directly to the settings-only CampaignHeader, so that button performs cleanup immediately.
+- Resolution: Finish confirmation wiring for the settings-sheet Leave button and cover all active-session exit controls.
+- Look in: `app/components/call/CallScreen.Header.tsx:270`, `app/components/call/CallScreen.Layout.tsx:182`, `app/components/call/CallScreen.Layout.tsx:325`, `app/components/call/CallScreen.Header.tsx:239 (TopChrome header), :264-291 (the kebab menu holding Leave Campaign), :143-150 (the settings-only visible button)`, `app/components/call/CallScreen.Layout.tsx:164-172 (handleLeaveCampaign: hangUp, device.destroy, requeueContacts, navigate(-1)) and :238, :315, :504 (the three call sites)`, `app/components/call/CallScreen.Dialogs.tsx:142 and :177 (the existing leave actions), and the Dialog imports at :4-11 for the pattern to copy`
+- Existing tests: test/ui/call-screen-header.test.tsx (covers CampaignHeader only; TopChrome is not rendered by any test)
+- Missing tests: Existing header test checks only callback invocation. No layout integration test proves settings Leave is safe, cancel does nothing, and confirm cleans up once.
+- Done when: Leave Campaign is visible on the live call screen, not only inside the kebab menu; Leaving the campaign requires an explicit confirmation that states what it does; No hangup, device teardown or requeue happens before the confirmation is accepted; All leave entry points share one confirmation and one implementation; The confirmation is keyboard accessible and has a focus-visible cancel action
+- Tracker: Partial fix; retain Fix now for the settings-sheet bypass. Related PR evidence: #2074. A PR reference alone does not prove deployed behavior.
 
 ### [#2045](https://github.com/chester-hill-solutions/callcaster/issues/2045) Unread message badge counts only the newest 100 conversations, so it undercounts and drifts down as volume grows
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: business-logic · Assignee: @wra-sol · Updated: 2026-10-02
@@ -630,18 +697,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: No >100-conversation aggregate parity test exists. The list symptom is not established by this cap alone, and #2191 addresses a different sidebar revalidation loss.
 - Done when: The badge and the Today number report the true workspace-wide unread total for workspaces with more than 100 conversations; For the same workspace and unchanged unread data, polling returns the same complete aggregate; it cannot drop an inbound increment merely because the conversation is outside the newest 100.; A Postgres test proves the aggregate equals the per-conversation sum beyond the first page; Per-conversation unread pills are unchanged; The comments asserting the 100-conversation window is by design are corrected; The list-reset symptom is either reproduced and filed as its own issue, or explicitly closed as not reproducible, with evidence
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2191. A PR reference alone does not prove deployed behavior.
-
-### [#2035](https://github.com/chester-hill-solutions/callcaster/issues/2035) The settings-sheet Leave Campaign button bypasses the new confirmation
-- Verdict: **Fix now** · Size: S · Risk: low · Labels: ux · Assignee: @sai-sy · Updated: 2026-10-02
-- Partial fix: the top Leave Campaign button and welcome leave actions ask for confirmation, but the settings-sheet Leave button still calls cleanup immediately.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. PR #2074 adds a visible top action and confirmation, but settings-only Leave bypasses it at Layout:325.
-- Root cause: PR #2074 added confirmation to the top action and welcome leave callbacks. CallScreen.Layout.tsx:325 still passes handleLeaveCampaign directly to the settings-only CampaignHeader, so that button performs cleanup immediately.
-- Resolution: Finish confirmation wiring for the settings-sheet Leave button and cover all active-session exit controls.
-- Look in: `app/components/call/CallScreen.Header.tsx:270`, `app/components/call/CallScreen.Layout.tsx:182`, `app/components/call/CallScreen.Layout.tsx:325`, `app/components/call/CallScreen.Header.tsx:239 (TopChrome header), :264-291 (the kebab menu holding Leave Campaign), :143-150 (the settings-only visible button)`, `app/components/call/CallScreen.Layout.tsx:164-172 (handleLeaveCampaign: hangUp, device.destroy, requeueContacts, navigate(-1)) and :238, :315, :504 (the three call sites)`, `app/components/call/CallScreen.Dialogs.tsx:142 and :177 (the existing leave actions), and the Dialog imports at :4-11 for the pattern to copy`
-- Existing tests: test/ui/call-screen-header.test.tsx (covers CampaignHeader only; TopChrome is not rendered by any test)
-- Missing tests: Existing header test checks only callback invocation. No layout integration test proves settings Leave is safe, cancel does nothing, and confirm cleans up once.
-- Done when: Leave Campaign is visible on the live call screen, not only inside the kebab menu; Leaving the campaign requires an explicit confirmation that states what it does; No hangup, device teardown or requeue happens before the confirmation is accepted; All leave entry points share one confirmation and one implementation; The confirmation is keyboard accessible and has a focus-visible cancel action
-- Tracker: Partial fix; retain Fix now for the settings-sheet bypass. Related PR evidence: #2074. A PR reference alone does not prove deployed behavior.
 
 ### [#2004](https://github.com/chester-hill-solutions/callcaster/issues/2004) A 403 renders as "Something went wrong" with a Reload Page button and the raw status text
 - Verdict: **Fix now** · Size: S · Risk: low · Labels: business-logic · Assignee: none · Updated: 2026-10-02
@@ -679,6 +734,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: No dial path records without a persisted callback; Conference recordings persist (or record is removed)
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
+### [#2121](https://github.com/chester-hill-solutions/callcaster/issues/2121) Dismissing a query-param banner pushes a history entry, so Back resurrects it
+- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-03
+- Banner dismissal still pushes browser history. The shared URL-flash hook already uses replacement, but QueryParamBanner does not.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Banner dismissal still pushes browser history. The shared URL-flash hook already uses replacement, but QueryParamBanner does not.
+- Resolution: Pass replace:true for banner dismissal and inventory presentation-only clears. Keep real filter/page navigation separate. Test dismiss then Back with unrelated parameters preserved.
+- Look in: `app/components/shared/QueryParamBanner.tsx:34`, `app/hooks/utils/useSearchParamFlash.ts:51`, `test/ui/components-shared-smoke.test.tsx:113`, `app/components/shared/QueryParamBanner.tsx:16-57`, `app/hooks/ (the flash hook that already uses `replace: true`)`, `every `setSearchParams(` call site (grep)`
+- Existing tests: test/ui/components-shared-smoke.test.tsx
+- Missing tests: Need router/browser history outcome, exact URL clearing, and unrelated-param preservation. Existing test would remain green with push semantics.
+- Done when: Dismissing the banner then pressing Back does **not** restore the banner (kill-check: drop `{ replace: true }` and confirm the test goes red).; Dismissing still clears the parameter from the URL.; Every presentational-parameter clear in the app uses replace (a grep-verified list recorded in the issue).
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
 ### [#2140](https://github.com/chester-hill-solutions/callcaster/issues/2140) Settings member projection drops names from the manage-sheet heading
 - Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
 - Settings member projection still drops names. Manage sheet renders the target memberName as Unnamed; it does not show the actor name as the issue also claims.
@@ -687,17 +753,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Look in: `app/lib/workspace-settings-db.server.ts:65`, `app/components/workspace/TeamMember.tsx:58`, `app/components/workspace/TeamMember.tsx:130`, `app/lib/platform-admin.server.ts:366`, `app/routes/workspaces+/$id/settings.loader.server.ts:15-22`, `app/lib/workspace-settings-db.server.ts:15 (`UserWithRole`), `getWorkspaceSettingsPageData`, `app/components/workspace/TeamMember.tsx (the heading)`
 - Missing tests: Render target names, username fallback and type narrowing regression. No actor-name defect is established.
 - Done when: Member sheet heading shows target first/last name.; When both names are absent, heading falls back to username.; Producer/consumer types require the name fields, even when null.; Other member list producers are reviewed; admin invite projection already includes names.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2121](https://github.com/chester-hill-solutions/callcaster/issues/2121) Dismissing a query-param banner pushes a history entry, so Back resurrects it
-- Verdict: **Fix now** · Size: XS · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
-- Banner dismissal still pushes browser history. The shared URL-flash hook already uses replacement, but QueryParamBanner does not.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Banner dismissal still pushes browser history. The shared URL-flash hook already uses replacement, but QueryParamBanner does not.
-- Resolution: Pass replace:true for banner dismissal and inventory presentation-only clears. Keep real filter/page navigation separate. Test dismiss then Back with unrelated parameters preserved.
-- Look in: `app/components/shared/QueryParamBanner.tsx:34`, `app/hooks/utils/useSearchParamFlash.ts:51`, `test/ui/components-shared-smoke.test.tsx:113`, `app/components/shared/QueryParamBanner.tsx:16-57`, `app/hooks/ (the flash hook that already uses `replace: true`)`, `every `setSearchParams(` call site (grep)`
-- Existing tests: test/ui/components-shared-smoke.test.tsx
-- Missing tests: Need router/browser history outcome, exact URL clearing, and unrelated-param preservation. Existing test would remain green with push semantics.
-- Done when: Dismissing the banner then pressing Back does **not** restore the banner (kill-check: drop `{ replace: true }` and confirm the test goes red).; Dismissing still clears the parameter from the URL.; Every presentational-parameter clear in the app uses replace (a grep-verified list recorded in the issue).
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2111](https://github.com/chester-hill-solutions/callcaster/issues/2111) Admin Add User and Add Workspace buttons have no action
@@ -735,21 +790,21 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 130
+## Verify and close — 132
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
 
-### [#2108](https://github.com/chester-hill-solutions/callcaster/issues/2108) Save all pending survey answers before completion
-- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
-- Each respondent keeps pending answers by page and question. Next and Submit await save acknowledgements; Thank You awaits completion success.
-- Current behavior: Merged to dev in PR #2296 at a3d9fc40. Page/question revisions drain serially through the existing form client. Next and Submit await successful answer acknowledgements; Thank You awaits completion success. Failures retain retryable form values; a completed write does not remove a newer edit. Busy controls include explicit shared Checkbox disable. Respondent unmount cancels timers and requests; shared Sidebar debounce also cleans up. All 32 focused cases pass; original fails 16 with 16 controls; nine faults fail and source is restored. Full local CI passed 5,318 Vitest and 22 Bun; all remote and both Railway gates passed on 29115361. Source prerequisite #2125 is fulfilled. Verify deployed dev and promote before closure.
-- Root cause: One timer discarded earlier question saves, and navigation/completion did not wait for successful action acknowledgements. The form owner remained mounted after optimistic completion; true unmount did not cancel timers.
-- Resolution: Verify deployed rapid edits, repeated labels across pages, immediate final submit, delayed and failed saves/completion, recoverable retry, respondent change and route unmount. Keep required-answer policy #2107, page-scoped display/resume #2294 and historical assessment #2292 separate. Promote before closure.
-- Look in: `app/hooks/surveys/useSurveySubmission.ts`, `app/routes/survey+/$surveyId.tsx`, `app/hooks/utils/useDebounce.ts`
-- Existing tests: test/ui/survey-save-order.test.tsx; test/ui/debounce-owner-unmount.test.tsx; test/ui/survey-respondent-identity.test.tsx; test/ui/hooks-utils.test.tsx
-- Missing tests: Deployed dev browser verification and promotion.
-- Done when: Submitting within 1s of typing the last answer persists that answer (kill-check: remove the flush and confirm the test goes red).; No timer survives unmount in any `useDebounce` consumer (a test that unmounts mid-debounce and asserts no submit fires).; The answer write is observably ordered before the completion write.; A blank answer to a required question is still caught (the related issue) — the two must compose.; Changing multiple questions within the debounce interval does not cancel another question's pending save.; Completion waits for successful answer persistence, not only for the answer request to start.; Answer or completion failure keeps a recoverable form and does not show a false success card.
-- Tracker: Merged source fix; verify deployed dev and promote before closure. Required validation, displayed/resumed page identity and historical assessment stay separate.
+### [#2058](https://github.com/chester-hill-solutions/callcaster/issues/2058) Rule and inventory: inline error text used where a toast belongs
+- Verdict: **Verify and close** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- PR #2302 completed the feedback rule and reviewed source inventory on dev; consumer conversions are separate work.
+- Current behavior: Source audit: dev@5ad088c4, 2026-10-03. docs/design-system.md defines no movement on appearance, update and dismissal. docs/feedback-inventory.md records 76 error candidates, 79 Alert sites, supplemental status owners and five duplicate groups. Both review axes and full local/remote checks passed. No runtime conversion or deployed browser acceptance is claimed.
+- Root cause: No written rule distinguishing field-level from page-level error presentation, so each site was decided locally.
+- Resolution: Verify the documentation deliverable after promotion, then close. Implement consumer changes separately under #2300 and #2304–#2308.
+- Look in: `docs/design-system.md`, `docs/feedback-inventory.md`, `docs/design-system-audit.md`
+- Existing tests: Full local CI for PR #2302: 5,322 Vitest tests and 22 Bun tests; remote checks and both deployments passed.
+- Missing tests: Promotion of the documentation deliverable; runtime conversions are separate acceptance.
+- Done when: A written rule exists where a contributor will find it; Every inline error site is listed with a keep-or-change verdict and a reason; Pages rendering the same failure twice are identified; Changes, if any, land in reviewable batches after the inventory, not mixed into it; No form validation is removed in the name of consistency
+- Tracker: Verify and close. PR #2302 is merged into dev at 5ad088c4; keep separate consumer issues open.
 
 ### [#2295](https://github.com/chester-hill-solutions/callcaster/issues/2295) Confirm bulk-send warning overrides explicitly
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -762,6 +817,18 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed dev browser verification and promotion.
 - Done when: Show Are you sure?, real queued count, delivery risk, Cancel and Send anyway.; Require risk acknowledgement; Cancel/Escape sends nothing and reopening resets it.; Pending confirmation locks custom Checkbox and prevents a second request.; Failed confirmation is retryable without successful override state.; Keep existing workspace/admin authorization, readiness and recipient consent/opt-out boundaries.
 - Tracker: User-authorized source change in this atomic PR; keep open for deployed verification and promotion.
+
+### [#2108](https://github.com/chester-hill-solutions/callcaster/issues/2108) Save all pending survey answers before completion
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Each respondent keeps pending answers by page and question. Next and Submit await save acknowledgements; Thank You awaits completion success.
+- Current behavior: Merged to dev in PR #2296 at a3d9fc40. Page/question revisions drain serially through the existing form client. Next and Submit await successful answer acknowledgements; Thank You awaits completion success. Failures retain retryable form values; a completed write does not remove a newer edit. Busy controls include explicit shared Checkbox disable. Respondent unmount cancels timers and requests; shared Sidebar debounce also cleans up. All 32 focused cases pass; original fails 16 with 16 controls; nine faults fail and source is restored. Full local CI passed 5,318 Vitest and 22 Bun; all remote and both Railway gates passed on 29115361. Source prerequisite #2125 is fulfilled. Verify deployed dev and promote before closure.
+- Root cause: One timer discarded earlier question saves, and navigation/completion did not wait for successful action acknowledgements. The form owner remained mounted after optimistic completion; true unmount did not cancel timers.
+- Resolution: Verify deployed rapid edits, repeated labels across pages, immediate final submit, delayed and failed saves/completion, recoverable retry, respondent change and route unmount. Keep required-answer policy #2107, page-scoped display/resume #2294 and historical assessment #2292 separate. Promote before closure.
+- Look in: `app/hooks/surveys/useSurveySubmission.ts`, `app/routes/survey+/$surveyId.tsx`, `app/hooks/utils/useDebounce.ts`
+- Existing tests: test/ui/survey-save-order.test.tsx; test/ui/debounce-owner-unmount.test.tsx; test/ui/survey-respondent-identity.test.tsx; test/ui/hooks-utils.test.tsx
+- Missing tests: Deployed dev browser verification and promotion.
+- Done when: Submitting within 1s of typing the last answer persists that answer (kill-check: remove the flush and confirm the test goes red).; No timer survives unmount in any `useDebounce` consumer (a test that unmounts mid-debounce and asserts no submit fires).; The answer write is observably ordered before the completion write.; A blank answer to a required question is still caught (the related issue) — the two must compose.; Changing multiple questions within the debounce interval does not cancel another question's pending save.; Completion waits for successful answer persistence, not only for the answer request to start.; Answer or completion failure keeps a recoverable form and does not show a false success card.
+- Tracker: Merged source fix; verify deployed dev and promote before closure. Required validation, displayed/resumed page identity and historical assessment stay separate.
 
 ### [#2125](https://github.com/chester-hill-solutions/callcaster/issues/2125) Keep one signed respondent identity through the public survey
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -1354,6 +1421,17 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Existing tests: test/ivr-webhook-auth.server.test.ts; test/ivr-results.test.ts; test/outreach-typed-fields.server.test.ts; test/campaign-export-voice-credits.test.ts
 - Done when: A speech answer stores { value, raw, confidence, inputType }; confidence is null when Twilio omits or sends an invalid value; DTMF answers store inputType=dtmf and no confidence; route matching still receives the same userInput string; Legacy bare strings and new objects both aggregate and export as the answer value; Typed fields and CSV export resolve the value
 - Tracker: Slice B is present in dev@5b673c81 through PR #2160 merge 9dcab08b. The earlier claim that confidence is discarded is obsolete.
+
+### [#2014](https://github.com/chester-hill-solutions/callcaster/issues/2014) auth pages: sign-in errors should be a toast, not inline text (sweep split to #2058)
+- Verdict: **Verify and close** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-09-27
+- The sign-in route already sends action failures through the root feedback hook; the wider source inventory is complete in #2058.
+- Current behavior: Source audit: dev@5ad088c4, 2026-10-03. app/routes/signin.tsx uses useActionFeedback with getError(data.error) and renders no inline action failure. Source behavior is present; this audit does not claim a deployed sign-in test.
+- Root cause: The earlier board record described pre-conversion source and treated the inventory as a blocker for the page fix.
+- Resolution: Verify one sign-in failure toast, no revalidation replay, retained input/validation and stable page geometry in the deployed app. Promote before closure. The separate inventory is PR #2302; other consumer defects remain under #2300.
+- Look in: `app/routes/signin.tsx`, `app/hooks/utils/useActionFeedback.ts`, `app/root.tsx`, `docs/feedback-inventory.md`
+- Missing tests: Actual sign-in failure, retry/revalidation and real-browser geometry; deployed verification and promotion.
+- Done when: A failed sign-in surfaces through a toast, not inline text; No inline error text remains on the sign-in page; The change is scoped to this page; the sweep ships separately as #2058
+- Tracker: Verify and close the sign-in-only scope. Do not bundle the five duplicate-message defects into this page fix.
 
 ### [#2048](https://github.com/chester-hill-solutions/callcaster/issues/2048) Block SMS campaign completion while messages are unsettled at Twilio
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-27
@@ -2252,7 +2330,7 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 47
+## Needs decision — 46
 
 Product, security, or operations decision required before implementation can be scoped.
 
@@ -2298,17 +2376,6 @@ Product, security, or operations decision required before implementation can be 
 - Look in: `scripts/twilio-subaccount-inventory.mjs:24`, `scripts/twilio-subaccount-inventory.mjs:29`, `scripts/twilio-subaccount-inventory.mjs:65`
 - Missing tests: Every candidate must have an evidenced absence of live ownership; no current deletion count can be inferred from the old survey.
 - Tracker: Needs decision: a historical empty-resource count does not authorize shared-account deletion. Related PR evidence: #2193, #2195. A PR reference alone does not prove deployed behavior.
-
-### [#2061](https://github.com/chester-hill-solutions/callcaster/issues/2061) Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale
-- Verdict: **Needs decision** · Size: S · Risk: low · Labels: none · Assignee: none · Updated: 2026-10-02
-- The maroon dark token and default brand Alert still exist. The issue explicitly requires an A/B/C decision and none is recorded; the onboarding instance fix does not decide the shared design contract.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The maroon dark token and default brand Alert still exist. The issue explicitly requires an A/B/C decision and none is recorded; the onboarding instance fix does not decide the shared design contract.
-- Root cause: The default Alert pairs a pale pink border token with a dark maroon background token. The dark theme overrides brand-wash but retains brand-tertiary. Whether to change tokens, require explicit tones, or do both remains undecided.
-- Resolution: Choose token change, explicit tone contract, or both; inventory default Alert and other token consumers, then verify dark/light examples before changing shared tokens.
-- Look in: `vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:100`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx:23`, `app/components/ui/alert.tsx:1`, `vendor/chester-hill-solutions/shad-cc/src/styles/theme.css`, `vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx`, `app/components/ui/alert.tsx`
-- Missing tests: A source token can confirm the described colors, not whether a user reads them as an error. No browser contrast/tone acceptance check was performed.
-- Done when: Record the token change, explicit tone, or combined decision.; Under that decision, a neutral Alert remains legible and does not appear to indicate failure in dark mode.; List every Alert without an explicit tone and mark it deliberately neutral or give it the required tone.; If shared tokens change, check their other consumers in light and dark themes.; Test the selected Alert tone contract and verify the rendered result.
-- Tracker: Needs decision: record the A/B/C design choice before a shared visual change. Related PR evidence: #2071. A PR reference alone does not prove deployed behavior.
 
 ### [#2046](https://github.com/chester-hill-solutions/callcaster/issues/2046) Attribute inbound SMS replies to a campaign
 - Verdict: **Needs decision** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -2701,6 +2768,18 @@ Product, security, or operations decision required before implementation can be 
 
 Blocked by other open issues, or too large for one agent. Split or unblock before assigning.
 
+### [#2300](https://github.com/chester-hill-solutions/callcaster/issues/2300) Consistent feedback without page movement
+- Verdict: **Blocked / split first** · Size: L · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Shared component ownership and a no-layout-movement rule for all dynamic feedback. Implement through the separate child tasks.
+- Current behavior: Source rule and inventory are merged in PR #2302. Shared Notice host and semantic Alert metadata are reviewed in chester-hill-solutions/chester-hill-solutions#120 and #121 but not merged or adopted. Five duplicate-message defects are #2304–#2308.
+- Root cause: Message tone, placement and lifecycle were selected independently at each call site.
+- Resolution: Ship shared mechanics first, then migrate consumer groups in atomic PRs. Preserve page layout, field association, unresolved conditions, required remedies, confirmation safety and root-only transient feedback. Do not implement this Epic as one large PR.
+- Look in: `docs/design-system.md`, `docs/feedback-inventory.md`, `app/components/ui/`, `app/root.tsx`
+- Existing tests: PR #2302 full local and remote checks.
+- Missing tests: Shared component merge and consumer adoption; actual narrow/desktop light/dark browser geometry for each changed dynamic group.
+- Done when: Canonical component library owns generic feedback presentation.; No dynamic alert moves page content or scroll.; Consumer groups retain domain actions and hard guards.
+- Tracker: Split work through the native child issues; preserve the existing #2032 parent under #2000.
+
 ### [#2213](https://github.com/chester-hill-solutions/callcaster/issues/2213) Correct the remaining temporal column types listed in the schema drift baseline
 - Verdict: **Blocked / split first** · Size: L · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
 - The guard and campaign_queue/call/message slices are present. The committed baseline still holds 64 remaining temporal mismatches. This is a multi-table program requiring separate table changes, not one atomic fix.
@@ -2762,18 +2841,6 @@ Blocked by other open issues, or too large for one agent. Split or unblock befor
 - Missing tests: next:'end' is terminal at runtime; dangling page/block target hangs up instead of redirecting; reachable routing cycle is reported/blocked at launch
 - Done when: Hang up is selectable as an option's next step; A published script always ends in a terminal hangup; Configurable no-input wait and reroute (delivered by #1883)
 - Tracker: Parent. #1883 shipped on dev (PR #1937 e79644b9); #1884 open. Close when #1884 lands.
-
-### [#2014](https://github.com/chester-hill-solutions/callcaster/issues/2014) auth pages: sign-in errors should be a toast, not inline text (sweep split to #2058)
-- Verdict: **Blocked / split first** · Size: XS · Risk: low · Labels: design · Assignee: none · Updated: 2026-09-27
-- The sign-in page renders errors as inline text under the form instead of a toast. The issue also asked for a codebase-wide sweep of the same mistake; that half is too large and too risky to bundle with a one-page fix, so it was split into #2058. This issue keeps the sign-in page instance only.
-- Current behavior: A failed sign-in renders inline error text under the form.
-- Root cause: The page renders the error in place rather than through the app-wide toast pattern.
-- Resolution: Blocked by #2013 so the change sees the finished layout. Render the sign-in failure through toast() from sonner, against the single root Toaster named in AGENTS.md. Do NOT widen the scope here — the codebase-wide inventory and the keep/change judgement live in #2058, and a blanket find-and-replace would delete legitimate form validation.
-- Look in: `app/routes/account.sign-in.*`, `app/components/ui/sonner.tsx`, `AGENTS.md (design-system section)`
-- Blocked by: [#2013](https://github.com/chester-hill-solutions/callcaster/issues/2013), [#2058](https://github.com/chester-hill-solutions/callcaster/issues/2058)
-- Missing tests: a failed sign-in raises a toast
-- Done when: A failed sign-in surfaces through a toast, not inline text; No inline error text remains on the sign-in page; The change is scoped to this page; the sweep ships separately as #2058
-- Tracker: Small fix, but deliberately not where the codebase-wide question gets answered. Doing both at once is how form validation gets deleted.
 
 ### [#2010](https://github.com/chester-hill-solutions/callcaster/issues/2010) auth pages: scrollbar appears even though the page fits the viewport
 - Verdict: **Blocked / split first** · Size: XS · Risk: low · Labels: design · Assignee: @sai-sy · Updated: 2026-09-27
@@ -3141,9 +3208,17 @@ Same root cause as the linked canonical issue. Do not implement separately — f
 
 ---
 
-## Needs triage — 4
+## Needs triage — 6
 
 Open and not yet audited — no enrichment record. Assign a verdict in scripts/issue-board-enrichment/ before picking up.
+
+### [#2303](https://github.com/chester-hill-solutions/callcaster/issues/2303) Extract safe-outbound-url to a shared package — three repos now need it, and two have written their own half
+- Status: No status · Labels: none · Assignee: none · Updated: 2026-10-03
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
+
+### [#2298](https://github.com/chester-hill-solutions/callcaster/issues/2298) Remove obsolete STRIPE_API_KEY configuration
+- Status: No status · Labels: devops/admin · Assignee: none · Updated: 2026-10-03
+- _No enrichment record yet — assign a verdict in `scripts/issue-board-enrichment/`._
 
 ### [#1832](https://github.com/chester-hill-solutions/callcaster/issues/1832) workspace setup sms goal continue with local number selected isn't visible on dark mode
 - Status: No status · Labels: design · Assignee: @sai-sy · Updated: 2026-10-02

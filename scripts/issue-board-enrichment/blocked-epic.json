@@ -698,36 +698,6 @@
     "trackerRecommendation": "Trivial, but land it after #2013 so nobody has to re-verify alignment afterwards."
   },
   {
-    "issueNumber": 2014,
-    "verdict": "blocked-epic",
-    "recommendedTitle": "auth pages: sign-in errors should be a toast, not inline text (sweep split to #2058)",
-    "summary": "The sign-in page renders errors as inline text under the form instead of a toast. The issue also asked for a codebase-wide sweep of the same mistake; that half is too large and too risky to bundle with a one-page fix, so it was split into #2058. This issue keeps the sign-in page instance only.",
-    "currentBehavior": "A failed sign-in renders inline error text under the form.",
-    "rootCause": "The page renders the error in place rather than through the app-wide toast pattern.",
-    "resolution": "Blocked by #2013 so the change sees the finished layout. Render the sign-in failure through toast() from sonner, against the single root Toaster named in AGENTS.md. Do NOT widen the scope here — the codebase-wide inventory and the keep/change judgement live in #2058, and a blanket find-and-replace would delete legitimate form validation.",
-    "lookIn": [
-      "app/routes/account.sign-in.*",
-      "app/components/ui/sonner.tsx",
-      "AGENTS.md (design-system section)"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "a failed sign-in raises a toast"
-    ],
-    "acceptanceCriteria": [
-      "A failed sign-in surfaces through a toast, not inline text",
-      "No inline error text remains on the sign-in page",
-      "The change is scoped to this page; the sweep ships separately as #2058"
-    ],
-    "blockedBy": [
-      2013,
-      2058
-    ],
-    "size": "XS",
-    "risk": "low",
-    "trackerRecommendation": "Small fix, but deliberately not where the codebase-wide question gets answered. Doing both at once is how form validation gets deleted."
-  },
-  {
     "issueNumber": 2002,
     "verdict": "blocked-epic",
     "recommendedTitle": "epic(authz): permission-based authorization instead of role checks",
@@ -1066,5 +1036,35 @@
     "size": "L",
     "risk": "high",
     "trackerRecommendation": "Move to Blocked / split first as a multi-table parent. Create table-specific tasks; do not re-implement the guard or completed slices. Related PR evidence: #2231, #2233, #2241, #2244. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2300,
+    "verdict": "blocked-epic",
+    "recommendedTitle": "Consistent feedback without page movement",
+    "summary": "Shared component ownership and a no-layout-movement rule for all dynamic feedback. Implement through the separate child tasks.",
+    "currentBehavior": "Source rule and inventory are merged in PR #2302. Shared Notice host and semantic Alert metadata are reviewed in chester-hill-solutions/chester-hill-solutions#120 and #121 but not merged or adopted. Five duplicate-message defects are #2304–#2308.",
+    "rootCause": "Message tone, placement and lifecycle were selected independently at each call site.",
+    "resolution": "Ship shared mechanics first, then migrate consumer groups in atomic PRs. Preserve page layout, field association, unresolved conditions, required remedies, confirmation safety and root-only transient feedback. Do not implement this Epic as one large PR.",
+    "lookIn": [
+      "docs/design-system.md",
+      "docs/feedback-inventory.md",
+      "app/components/ui/",
+      "app/root.tsx"
+    ],
+    "existingTests": [
+      "PR #2302 full local and remote checks."
+    ],
+    "missingTests": [
+      "Shared component merge and consumer adoption; actual narrow/desktop light/dark browser geometry for each changed dynamic group."
+    ],
+    "acceptanceCriteria": [
+      "Canonical component library owns generic feedback presentation.",
+      "No dynamic alert moves page content or scroll.",
+      "Consumer groups retain domain actions and hard guards."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "medium",
+    "trackerRecommendation": "Split work through the native child issues; preserve the existing #2032 parent under #2000."
   }
 ]
