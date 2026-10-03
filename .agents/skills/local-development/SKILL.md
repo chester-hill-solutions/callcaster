@@ -48,6 +48,13 @@ Use a block body for setup hooks that call a mock method. Returning a mock
 function from `beforeEach` registers it as cleanup; Vitest then calls it after
 the test, which can create a false failure or an unintended second effect.
 
+## UI fixture contracts
+
+Read the component export and prop contract before building a UI fixture.
+Tests are excluded from the app TypeScript program, so a green typecheck does
+not detect a wrong default/named import or a wrong event field in a test.
+Run the actual component test before using it as regression evidence.
+
 ## SQL query regressions
 
 Use the real Postgres tier for query predicates; a mocked duplicate helper
@@ -117,6 +124,13 @@ Baseline experiments after staging must include staged and unstaged runtime
 changes against the pinned commit (`git diff HEAD`), not only the worktree diff.
 Restore each tracked runtime file from that commit and check the actual collected
 failure/control counts. Keep restoration in `finally`.
+
+## Structural guard fixtures
+
+Guard regressions must include multiline imports, import aliases, unused
+strategies/provider helpers and single-line exported handlers. Removing only
+lines that start with `import` leaves names from multiline imports as false
+proof. Parse whole statements and retain valid called-service/auth controls.
 
 ## Generated API files
 

@@ -564,7 +564,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       tags: ["Platform API", "Workspace"],
       security: sessionOnlySecurity,
       description:
-        "Session-only trust-root route. Delivers a sample event via safe outbound fetch.",
+        "Member-or-higher signed-in session required. Delivers a sample event via safe outbound fetch. Ten tests per minute per user, shared across workspaces and both webhook test URLs. Unsaved destinations and headers are permitted.",
       requestBody: {
         required: true,
         content: {
@@ -585,6 +585,8 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
         "400": errorResponse("Validation error or blocked destination URL"),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Member manager role required"),
+        "404": errorResponse("Workspace not found"),
+        "429": rateLimitResponse,
       },
     },
   },

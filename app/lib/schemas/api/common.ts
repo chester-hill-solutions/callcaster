@@ -52,8 +52,9 @@ export const connectPhoneDeviceBodySchema = z.object({
 });
 
 export const testWebhookBodySchema = z.object({
+  workspace_id: workspaceIdSchema.optional(),
   event: z.string().min(1),
-  destination_url: z.union([z.string(), z.number()]),
+  destination_url: z.string().url(),
   custom_headers: z.string(),
 });
 

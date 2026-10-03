@@ -10120,7 +10120,7 @@
             "sessionCookie": []
           }
         ],
-        "description": "Session-only trust-root route. Delivers a sample event via safe outbound fetch.",
+        "description": "Member-or-higher signed-in session required. Delivers a sample event via safe outbound fetch. Ten tests per minute per user, shared across workspaces and both webhook test URLs. Unsaved destinations and headers are permitted.",
         "requestBody": {
           "required": true,
           "content": {
@@ -10169,6 +10169,34 @@
                 "schema": {
                   "$ref": "#/components/schemas/PlatformError"
                 }
+              }
+            }
+          },
+          "404": {
+            "description": "Workspace not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformError"
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer"
+                },
+                "description": "Seconds until the client may retry."
               }
             }
           }

@@ -1,62 +1,56 @@
 import { data as routeData } from "react-router";
-import { logger } from "@/lib/logger.server";
-import { safeParseJson } from "@/lib/request-utils.server";
-import { testWebhook } from "@/lib/workspace-settings/WorkspaceSettingUtils.server";
-import { assertSafeOutboundUrl } from "@/lib/safe-outbound-url.server";
-import { getDualAuthUser, requireDualAuth, requireJsonAuth } from "@/lib/api-auth.server";
+import { requireJsonAuth } from "@/lib/api-auth.server";
 import { defineAction } from "@/lib/handler.server";
+import { testWorkspaceWebhook } from "@/lib/platform-members.server";
+import { testWebhookBodySchema } from "@/lib/schemas/api/common";
+import { testWebhookBodySchema as deliverySchema } from "@/lib/schemas/api/platform-workspace-admin";
 
 export const action = defineAction({
   auth: ({ request }) => requireJsonAuth(request),
-  sideEffects: ["external"],
-  handler: async ({ request, auth }) => {
-    const user = auth.user;
+  input: testWebhookBodySchema,
+  sideEffects: ["db-read", "db-write", "external"],
+  handler: async ({ request, auth, input }) => {
+    if (request.method !== "POST") {
+      return routeData({ error: "Method not allowed" }, { status: 405 });
+    }
+    if (!input.workspace_id) {
+      return routeData({ error: "Workspace not found" }, { status: 404 });
+    }
 
-    const { event, destination_url, custom_headers } = await safeParseJson<{
-      event: string;
-      destination_url: string;
-      custom_headers: string;
-    }>(request);
-
-    let eventData: unknown;
+    let event: unknown;
     let customHeaders: unknown;
     try {
-      eventData = JSON.parse(event);
-      customHeaders = JSON.parse(custom_headers);
+      event = JSON.parse(input.event);
+      customHeaders = JSON.parse(input.custom_headers);
     } catch {
       return routeData({ error: "Invalid JSON payload" }, { status: 400 });
     }
 
-    if (typeof eventData !== "object" || eventData === null || typeof destination_url !== "string") {
-      logger.warn("Invalid input for webhook test");
+    const parsed = deliverySchema.safeParse({
+      event,
+      destination_url: input.destination_url,
+      custom_headers: customHeaders,
+    });
+    if (!parsed.success) {
       return routeData({ error: "Invalid input" }, { status: 400 });
     }
 
-    try {
-      await assertSafeOutboundUrl(destination_url);
-    } catch (urlError) {
-      const message =
-        urlError instanceof Error ? urlError.message : "Destination URL is not allowed";
-      return routeData({ error: message }, { status: 400 });
-    }
-
-    const cleanHeaders: Record<string, string> = {};
-    if (Array.isArray(customHeaders)) {
-      customHeaders.forEach((header: [string, string]) => {
-        if (header?.[0]) {
-          cleanHeaders[header[0]] = header[1];
-        }
-      });
-    } else if (customHeaders && typeof customHeaders === "object") {
-      Object.assign(cleanHeaders, customHeaders as Record<string, string>);
-    }
-
-    const result = await testWebhook(
-      eventData as Record<string, unknown>,
-      destination_url,
-      cleanHeaders,
+    const result = await testWorkspaceWebhook(
+      auth.user.id,
+      input.workspace_id,
+      parsed.data.destination_url,
+      parsed.data.custom_headers,
+      parsed.data.event,
     );
-
-    return routeData(result);
+    if (result instanceof Response) return result;
+    if (!result.ok) {
+      return routeData({ error: result.error }, { status: result.status });
+    }
+    return routeData({
+      data: result.data,
+      status: result.status,
+      statusText: result.statusText,
+      error: null,
+    });
   },
 });
