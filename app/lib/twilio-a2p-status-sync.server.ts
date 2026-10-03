@@ -19,6 +19,13 @@ function mapBrandStatus(raw: string | undefined): WorkspaceOnboardingStatus {
   return "provisioning";
 }
 
+function mapCampaignStatus(raw: string | undefined): WorkspaceOnboardingStatus {
+  const normalized = (raw ?? "").toUpperCase();
+  if (normalized === "VERIFIED") return "approved";
+  if (normalized === "IN_PROGRESS") return "in_review";
+  return mapBrandStatus(raw);
+}
+
 /** One resource's contribution: what the provider said, and whether it exists. */
 export type A2pResourceStatus = {
   /** `null` when the resource was not read. Never seeded from the aggregate. */
@@ -28,21 +35,10 @@ export type A2pResourceStatus = {
 };
 
 /**
- * The aggregate, computed only from authoritative per-resource reads.
- *
- * "Does not exist" and "exists but was not read" are different states and must
- * not collapse. A brand-only workspace has no campaign to wait for, so it
- * promotes on the brand alone. A campaign that exists but whose read failed is
- * an unknown, not an approval.
- *
- * The rule: **every** resource the workspace has must be approved, and a
- * resource that exists but was not read is never treated as approved. Anything
- * short of unanimous approval is `in_review` unless something was rejected.
- *
- * Seeding a per-resource status from the stored aggregate — the old behaviour —
- * made this function's output monotonic. It could only ever read the aggregate
- * back into itself, so a brand re-entering review could not demote a workspace
- * that was already `approved` (#2143).
+ * Approval requires authoritative approval for both required resources.
+ * Absent and unread resources cannot establish a completed 10DLC registration.
+ * A provider rejection takes precedence over waiting for the other resource.
+ * Never seed a per-resource value from the stored aggregate (#2143).
  */
 export function mergeA2pStatus(resources: {
   brand: A2pResourceStatus;
@@ -55,7 +51,10 @@ export function mergeA2pStatus(resources: {
     .filter((status): status is WorkspaceOnboardingStatus => status !== null);
 
   if (known.some((status) => status === "rejected")) return "rejected";
-  if (known.length > 0 && known.every((status) => status === "approved")) {
+  if (
+    resources.brand.exists && resources.campaign.exists &&
+    known.every((status) => status === "approved")
+  ) {
     return "approved";
   }
   return "in_review";
@@ -105,7 +104,7 @@ export async function syncWorkspaceA2pStatus({
         .services(serviceSid)
         .usAppToPerson(campaignSid)
         .fetch();
-      campaignStatus = mapBrandStatus(campaign.campaignStatus);
+      campaignStatus = mapCampaignStatus(campaign.campaignStatus);
     }
   } catch (syncError) {
     logger.error("A2P status sync failed:", syncError);

@@ -384,8 +384,10 @@ const CORE_PREDICATES: WorkspaceReadinessPredicate[] = [
     id: "a2p_approved",
     test: (ctx) =>
       !a2pApplies(ctx) ||
-      ctx.onboarding.a2p10dlc.status === "approved" ||
-      ctx.onboarding.a2p10dlc.status === "live",
+      (Boolean(ctx.onboarding.a2p10dlc.brandSid) &&
+        Boolean(ctx.onboarding.a2p10dlc.campaignSid) &&
+        (ctx.onboarding.a2p10dlc.status === "approved" ||
+          ctx.onboarding.a2p10dlc.status === "live")),
     blockingFor: ["a2p10dlc"] as const,
     code: "a2p_not_approved",
     message: "A2P 10DLC registration is not approved yet.",

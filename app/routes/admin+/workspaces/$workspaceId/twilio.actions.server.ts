@@ -12,7 +12,6 @@ import { persistWorkspaceBillingReconciliationSnapshot } from "@/lib/billing-rec
 import { logger } from "@/lib/logger.server";
 import { parseTwilioPortalConfigForm, parseTwilioRcsOnboardingForm } from "@/lib/schemas/twilio-portal-config";
 import { TWILIO_RCS_PROVIDER, updateWorkspaceRcsOnboarding } from "@/lib/rcs-onboarding.server";
-import { provisionWorkspaceA2P } from "@/lib/twilio-a2p.server";
 import {
   ensureWorkspaceTwilioBootstrap,
   repairWorkspaceTwilioWebhooks,
@@ -278,11 +277,11 @@ export const action = defineAction({
 
     if (actionName === "provision_workspace_a2p") {
         try {
-            await provisionWorkspaceA2P({
-                workspaceId,
-                actorUserId: user.id,
+            await enqueueWorkspaceComplianceJob(workspaceId, "admin_provision_a2p");
+            return routeData({
+              success:
+                "A2P compliance setup is queued. Status will update after the worker runs.",
             });
-            return routeData({ success: "Workspace A2P provisioning started" });
         } catch (error) {
             logger.error("Error provisioning workspace A2P:", error);
             return routeData(

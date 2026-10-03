@@ -106,6 +106,28 @@ production**:
 - The panel links to the Twilio Console Trust Hub Customer Profiles page for manual
   document upload/review; CallCaster does not have API access to that step.
 
+### Manual A2P registration
+
+- Onboarding **Provision A2P** and the admin **provision A2P** actions queue the
+  existing compliance job. A queue response confirms acceptance of work. It does
+  not confirm that a brand or campaign was submitted or approved.
+- Complete the required business fields and the actual opt-in workflow first.
+  The worker returns action-needed details for missing inputs and provider errors.
+  Validation precedes A2P Trust Product, brand and campaign calls. Existing
+  Messaging Service and customer-profile setup can run before that validation.
+- The worker stores the brand SID and waits while the brand is under review.
+  After Twilio approves the brand, use **Retry compliance job** to resume campaign
+  creation. Provider callbacks reconcile status; they do not create the campaign.
+- Campaign creation uses the workspace Messaging Service. A retry reuses provider
+  IDs, including a campaign found on the service. Failed lookup or missing returned
+  SID gives an error instead of a claim that submission succeeded.
+- A2P SMS stays blocked until both brand and campaign exist and are approved. The
+  provider campaign status `VERIFIED` means approved; `IN_PROGRESS` means review.
+  Older brand-only approvals must complete campaign setup before sending.
+- Check the stored SIDs, latest errors and provider review states after deployment.
+  Verify the real send gate before promotion. Messaging Trust Product entity and
+  submission preparation remains separate work in [#2282](https://github.com/chester-hill-solutions/callcaster/issues/2282).
+
 ## 6. Scheduled webhook audit (Phase H)
 
 A new self-re-enqueuing job type, `twilio_webhook_audit`, runs in the Bun worker

@@ -550,43 +550,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2082,
-    "verdict": "fix-now",
-    "recommendedTitle": "The A2P provisioning path calls messaging.v1.campaigns, which does not exist in the Twilio SDK — the campaign is silently never created",
-    "summary": "The older A2P provisioner skips campaign creation through an optional check for a resource it does not use correctly, then saves in_review and reports success.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The older A2P provisioner skips campaign creation through an optional check for a resource it does not use correctly, then saves in_review and reports success.",
-    "resolution": "Use one canonical service-scoped provisioner; do not save in_review or report success without campaign creation.",
-    "lookIn": [
-      "app/lib/twilio-a2p.server.ts:147",
-      "app/lib/twilio-a2p-provision.server.ts:129",
-      "app/lib/twilio-a2p.server.ts:147-162",
-      "app/lib/twilio-a2p-provision.server.ts:129 (the working chain)",
-      "app/lib/twilio-client.server.ts:386",
-      "app/lib/platform-onboarding-handlers.server.ts:477,504-507",
-      "app/lib/platform-admin-twilio.server.ts:312",
-      "app/routes/admin+/workspaces/$workspaceId/twilio.actions.server.ts:281",
-      "app/lib/messaging-onboarding/predicates.ts:380-390"
-    ],
-    "existingTests": [
-      "test/twilio-a2p.server.test.ts",
-      "test/twilio-a2p-status-sync.test.ts"
-    ],
-    "missingTests": [
-      "A caller-level test must fail if campaign creation is skipped or rejected."
-    ],
-    "acceptanceCriteria": [
-      "`provisionWorkspaceA2P` (or its replacement) creates both a brand registration **and** a campaign, and the returned state carries a non-null `campaignSid`.",
-      "A Twilio failure to create the campaign is surfaced as an error to the operator; it is never reported as success.",
-      "The onboarding success message is only returned when both resources exist.",
-      "A unit test asserts the campaign-create call happens (with the nested `services(sid).usAppToPerson` path).",
-      "No `messagingApi?.x?.create` optional-chain guard remains on a resource that must exist."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2084,
     "verdict": "fix-now",
     "recommendedTitle": "Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor",
@@ -2367,5 +2330,38 @@
     "size": "S-M",
     "risk": "low",
     "trackerRecommendation": "Independent preventive Task split from #2075; no blocking edge."
+  },
+  {
+    "issueNumber": 2282,
+    "verdict": "fix-now",
+    "recommendedTitle": "Prepare a valid A2P Messaging Profile before brand registration",
+    "summary": "The canonical A2P chain omits the required Messaging Profile EndUser, suppresses product submission errors and does not resubmit a repaired existing product.",
+    "currentBehavior": "Source audit: dev@aacb17ac, 2026-10-03. provisionA2pRegistration creates the Trust Product and assigns the customer profile, leaves the required EndUser as a TODO, catches submission failure and continues to the brand step. Existing-product retries only check customer-profile assignment.",
+    "resolution": "Collect and validate the required provider business inputs, create/reuse and assign the Messaging Profile EndUser, evaluate and submit before brand registration, and make repair retries idempotent. Provider and input failures must stop the brand step with visible action-needed details. Do not infer regulatory attributes from prose.",
+    "lookIn": [
+      "app/lib/twilio-a2p-provision.server.ts",
+      "app/lib/twilio-client.server.ts",
+      "app/lib/types.ts",
+      "app/lib/messaging-onboarding/predicates.ts",
+      "app/components/onboarding/"
+    ],
+    "existingTests": [
+      "test/twilio-a2p-provision.server.test.ts exercises campaign phases with an existing Trust Product; it does not claim product preparation is complete."
+    ],
+    "missingTests": [
+      "Installed SDK tests for EndUser creation/reuse, assignments, evaluation, submission, missing inputs, provider failure and repair retries.",
+      "Real persistence/readiness and deployed provider preparation verification."
+    ],
+    "acceptanceCriteria": [
+      "Required Messaging Profile inputs are explicit and valid; public-company attributes follow the current provider contract.",
+      "Create/reuse and assign the required EndUser and customer profile before evaluation/submission.",
+      "Provider/input failure blocks brand creation with visible details.",
+      "Retry repairs and resubmits incomplete existing products without duplicates.",
+      "Private/public business controls and deployed provider checks pass before promotion and closure."
+    ],
+    "blockedBy": [],
+    "size": "L",
+    "risk": "high",
+    "trackerRecommendation": "Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation."
   }
 ]
