@@ -121,6 +121,8 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
           in: "header",
           required: false,
           schema: { type: "string", maxLength: 256 },
+          description:
+            "Workspace creation retries are scoped to the authenticated user. Reuse this key to replay that user's original result without creating another workspace.",
         },
       ],
       requestBody: {

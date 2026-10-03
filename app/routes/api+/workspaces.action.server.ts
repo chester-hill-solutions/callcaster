@@ -35,7 +35,7 @@ export const action = defineAction({
     const parsed = await parseJsonBodyOrResponse(request, createWorkspaceBodySchema);
     if (parsed instanceof Response) return parsed;
 
-    return withIdempotency(request, "workspaces:create", async () => {
+    return withIdempotency(request, `workspaces:create:${auth.user.id}`, async () => {
       const { data: workspaceId, error, provisioningWarning } =
         await createWorkspaceForUser(        auth.user.id,
           parsed.name,

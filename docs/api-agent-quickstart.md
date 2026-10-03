@@ -54,6 +54,10 @@ curl -X POST "$BASE_URL/api/workspaces" \
 
 Export `WORKSPACE_ID` from the response.
 
+Workspace creation accepts an optional `Idempotency-Key`. The key belongs to the
+authenticated user. Reuse the same key to replay that user's original creation
+result. Another user can use the same key and create their own workspace.
+
 ## Onboarding & telephony
 
 See [Telephony provisioning](./api-telephony-provisioning.md) for the full compliance sequence:
