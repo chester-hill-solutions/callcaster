@@ -1,8 +1,8 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@7ce3dd88 + source fix for #2092` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@fd86e10a + source fix for #2090` · 285 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
-Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-02.
+Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
 ## How to use this board
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 77
+## Fix now — 76
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -162,17 +162,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/billing-reconciliation.test.ts; test/billing-reconciliation-alert.test.ts
 - Missing tests: Need month-unit positive control, purchase exclusion/period semantics, threshold alert and snapshot round-trip.
 - Done when: A numbers variance above the threshold raises an alert (kill-check: drop the numbers term and confirm the test goes red).; `numbersVariance` is present in the snapshot and survives a normalise round-trip.; The `numbers` comparison is unit-consistent: a workspace with one number for one month shows zero variance (positive control, and the test that proves the units are right).; A one-time purchase debit does not create a permanent variance.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2090](https://github.com/chester-hill-solutions/callcaster/issues/2090) Only STOP and UNSUBSCRIBE are honoured — CANCEL, END, QUIT, REVOKE and "OPT OUT" do not opt the contact out
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- The default opt-out set is only STOP and UNSUBSCRIBE. A configured END set removes STOP. Direct checks confirm CANCEL is not suppressed and configured END loses STOP.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The default opt-out set is only STOP and UNSUBSCRIBE. A configured END set removes STOP. Direct checks confirm CANCEL is not suppressed and configured END loses STOP.
-- Resolution: Keep mandatory keywords in a shared set and union extra configuration. Separate the unknown-sender suppression policy from this confirmed parsing defect.
-- Look in: `app/lib/chat-opt-out.ts:1`, `app/lib/chat-opt-out.ts:17`, `app/lib/chat-opt-out.ts:1-30`, `app/routes/api+/inbound-sms.action.server.ts:196-230`, `app/lib/campaign-sms-dispatch.server.ts:435`, `scripts/e2e/seed-data.mjs:164`, `app/lib/messaging-onboarding/ (where `advancedOptOutEnabled` is read)`
-- Existing tests: test/chat-opt-out.test.ts; test/inbound-sms.route.test.ts
-- Missing tests: Test all required keyword values, custom keyword union and unknown-sender handling.
-- Done when: `STOP`, `UNSUBSCRIBE`, `CANCEL`, `END`, `QUIT`, `REVOKE` and `OPT OUT` all set `contact.opt_out = true` (one parameterised test over the whole set).; A workspace configured with `optOutKeywords: "STOP"` still honours UNSUBSCRIBE and the rest of the mandatory set.; A STOP from a number with no contact row is recorded somewhere enforceable, or the operator is warned — decided and tested either way.; `advancedOptOutEnabled: false` is visible to the operator rather than silent.; `test/ui` / dispatch tests: a contact that opted out is skipped by the next campaign dispatch (the positive control).
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2087](https://github.com/chester-hill-solutions/callcaster/issues/2087) The IVR runtime ignores the persisted startPageId and pageOrder — the start page and the linear next-page hop are decided by jsonb key order
@@ -890,21 +879,9 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 107
+## Verify and close — 108
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
-
-### [#2091](https://github.com/chester-hill-solutions/callcaster/issues/2091) messageMedia uploads are keyed by the client-supplied filename with no uniquifier, so a same-name upload silently replaces an existing attachment
-- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- New MMS uploads use unique keys and reject object collisions. Earlier chat attachments and campaign keys remain intact. Deployed upload and campaign-send verification remain.
-- Current behavior: This source fix uses one server-generated UUID plus safe filename for upload, campaign message_media and signing. It passes upsert:false and treats the real ObjectExistsError as failure before signing or campaign attachment. Historic keys retain their stored values. All 42 focused cases passed, including five route cases through the real upload/signing adapter and both campaign dispatch adapters. Removing the unique key failed two regressions with three controls; removing no-overwrite or restoring conflict continuation each failed three regressions with two controls.
-- Root cause: The messageMedia caller stored only workspace plus client filename and did not request no-overwrite. Its legacy statusCode conflict branch could continue to report success rather than handling the S3 adapter’s actual ObjectExistsError.
-- Resolution: Verify same-name chat and campaign uploads on deployed dev: both retain their own bytes and links, each campaign sends its own media, historical attachments still resolve and a storage conflict cannot report success or alter the original. Promote verified behavior before closing.
-- Look in: `app/routes/api+/message_media.action.server.ts`, `app/lib/object-storage.server.ts`, `app/lib/campaign-sms-dispatch.server.ts`, `app/components/campaign/settings/MessageSettings.tsx`, `app/components/sms-ui/ChatMessages.tsx`
-- Existing tests: test/message-media-storage-regression.test.ts (five real-adapter cases: chat/campaign bytes, historic keys, preflight conflict and conditional-write race); test/message-media.route.test.ts (validation, auth, upload failure, campaign update and historic deletion controls); test/campaign-sms-dispatch-contract.test.ts (both API and worker sign and send historic plus new media keys); test/object-storage-upsert.test.ts (no-overwrite provider behavior)
-- Missing tests: Deployed chat upload and campaign-send verification before promotion.
-- Done when: Two uploads with the same filename in one workspace produce two distinct objects, and each message points at its own.; The route never reports `success: true` for an upload that replaced an existing object.; A live campaign re-signs the **correct** media for its own `message_media` value.; Historic `outbound_media` values keep resolving (no key rewrite breaks them).
-- Tracker: The source fix travels with this board update. Verify deployed uploads and campaign sends after merge, then promote and close. Do not start a duplicate fix.
 
 ### [#2092](https://github.com/chester-hill-solutions/callcaster/issues/2092) The campaign_ended readiness code is declared and mapped to a corrective action but never emitted, so an expired campaign reads "Ready to launch"
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -917,6 +894,30 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed expiry, date correction, launch and join verification before promotion.
 - Done when: A campaign whose end date has passed shows a blocking readiness issue, a disabled Start button, and a non-empty "Complete before launch" list.; The corrective action scrolls to the date pickers.; A campaign with a future end date is unaffected.; A guard test fails if a code is added to the union with no producer.
 - Tracker: The source fix travels with this board update. Verify deployed expiry, launch and joining after merge, then promote and close. Do not start a duplicate fix.
+
+### [#2090](https://github.com/chester-hill-solutions/callcaster/issues/2090) Retain all required SMS opt-out keywords when workspace settings add custom keywords
+- Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The shared parser and direct matcher now retain all eight standard keywords plus the OPT OUT alias. Custom settings add keywords; deployed SMS and queue verification remain.
+- Current behavior: Source fix from dev@fd86e10a: one shared merge retains mandatory keywords for both parsed configuration and direct callers. Whole-message matching normalizes case and whitespace. Returned arrays cannot mutate the defaults. Actual inbound-route tests prove every keyword updates matching contacts and removes both contacts from all workspace campaign queues. All 175 focused cases passed (162 node, 13 UI). The corrected old-source check failed 72 regressions while 43 controls passed; five isolated mutations failed the relevant checks, including both real dispatch adapter gates.
+- Root cause: The default keyword list had only STOP and UNSUBSCRIBE, and non-empty workspace or direct-call lists replaced it.
+- Resolution: Verify all standard keywords, the OPT OUT alias, custom phrases, STOP-only configuration, workspace queue removal and ordinary replies on deployed dev. Verify START still resubscribes without requeue. Promote verified behavior before closing. Unknown-sender app suppression and operator guidance remain separate decision issues #2263 and #2264.
+- Look in: `app/lib/chat-opt-out.ts`, `app/routes/api+/inbound-sms.action.server.ts`, `app/routes/workspaces+/$id/chats.loader.server.ts`, `app/hooks/chats/useChatsPage.ts`, `app/hooks/chats/useChatThread.ts`, `app/lib/campaign-sms-dispatch.server.ts`
+- Existing tests: test/chat-opt-out.test.ts (mandatory set, custom union, direct matcher, whitespace, exact match and immutable defaults); test/inbound-sms.route.test.ts (every keyword across three configurations, every fallback keyword, both matching contacts and workspace queues, ordinary replies and START controls); test/campaign-sms-dispatch-contract.test.ts (real coordinator through HTTP and worker; opted-out and eligible contacts); test/chat-sms-action.route.test.ts and test/chat-sms.route.test.ts (existing outbound route controls); test/ui/hooks-chats.test.tsx, test/ui/hooks-chats-optimistic-failure.test.tsx and test/ui/components-chats-contact.test.tsx (existing chat consumers and opt-out banner controls)
+- Missing tests: Deployed SMS keyword and workspace queue verification before promotion.
+- Done when: All eight standard keywords plus OPT OUT remain mandatory for parser and direct matcher.; Custom keywords add to the required set, with case and whitespace normalization and whole-message matching.; Matching contacts are opted out and removed from all receiving-workspace campaign queues; eligible dispatch and ordinary reply controls remain.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed behavior after merge, then promote and close. #2263 and #2264 are independent decisions; do not treat them as completed by this parser fix.
+
+### [#2091](https://github.com/chester-hill-solutions/callcaster/issues/2091) messageMedia uploads are keyed by the client-supplied filename with no uniquifier, so a same-name upload silently replaces an existing attachment
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- New MMS uploads use unique keys and reject object collisions. Earlier chat attachments and campaign keys remain intact. Deployed upload and campaign-send verification remain.
+- Current behavior: This source fix uses one server-generated UUID plus safe filename for upload, campaign message_media and signing. It passes upsert:false and treats the real ObjectExistsError as failure before signing or campaign attachment. Historic keys retain their stored values. All 42 focused cases passed, including five route cases through the real upload/signing adapter and both campaign dispatch adapters. Removing the unique key failed two regressions with three controls; removing no-overwrite or restoring conflict continuation each failed three regressions with two controls.
+- Root cause: The messageMedia caller stored only workspace plus client filename and did not request no-overwrite. Its legacy statusCode conflict branch could continue to report success rather than handling the S3 adapter’s actual ObjectExistsError.
+- Resolution: Verify same-name chat and campaign uploads on deployed dev: both retain their own bytes and links, each campaign sends its own media, historical attachments still resolve and a storage conflict cannot report success or alter the original. Promote verified behavior before closing.
+- Look in: `app/routes/api+/message_media.action.server.ts`, `app/lib/object-storage.server.ts`, `app/lib/campaign-sms-dispatch.server.ts`, `app/components/campaign/settings/MessageSettings.tsx`, `app/components/sms-ui/ChatMessages.tsx`
+- Existing tests: test/message-media-storage-regression.test.ts (five real-adapter cases: chat/campaign bytes, historic keys, preflight conflict and conditional-write race); test/message-media.route.test.ts (validation, auth, upload failure, campaign update and historic deletion controls); test/campaign-sms-dispatch-contract.test.ts (both API and worker sign and send historic plus new media keys); test/object-storage-upsert.test.ts (no-overwrite provider behavior)
+- Missing tests: Deployed chat upload and campaign-send verification before promotion.
+- Done when: Two uploads with the same filename in one workspace produce two distinct objects, and each message points at its own.; The route never reports `success: true` for an upload that replaced an existing object.; A live campaign re-signs the **correct** media for its own `message_media` value.; Historic `outbound_media` values keep resolving (no key rewrite breaks them).
+- Tracker: The source fix travels with this board update. Verify deployed uploads and campaign sends after merge, then promote and close. Do not start a duplicate fix.
 
 ### [#2096](https://github.com/chester-hill-solutions/callcaster/issues/2096) Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them
 - Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -2120,9 +2121,32 @@ Diagnosis is incomplete or contradictory. Reproduce with evidence (screenshot, p
 
 ---
 
-## Needs decision — 45
+## Needs decision — 47
 
 Product, security, or operations decision required before implementation can be scoped.
+
+### [#2263](https://github.com/chester-hill-solutions/callcaster/issues/2263) Scope unknown-sender opt-out enforcement in the consent ledger rollout
+- Verdict: **Needs decision** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Unknown-sender opt-out messages are saved, but no contact flag or app phone-level suppression protects later imports and sends.
+- Current behavior: The inbound route saves the message, then updates and dequeues only matching contacts. Zero matching IDs leave no app suppression record. The original claim that the message was discarded was incorrect.
+- Root cause: ADR-0034 already adopts recipient consent and fail-closed automated sends. The unknown-sender path lacks that ledger; its rollout boundary and implementation slices need definition.
+- Resolution: Scope the unknown-sender path in the adopted consent ledger rollout under #1268. Define recipient key, normalization, future imports, every send entry point, atomic pending-send suppression, recipient START and the legacy migration boundary. An operator warning can expose the interim legacy gap but cannot replace ADR-0034 enforcement or satisfy completion.
+- Look in: `docs/adr/0034-recipient-messaging-consent-and-fail-closed-disclosure.md`, `docs/interactive-sms-delivery-plan.md`, `app/routes/api+/inbound-sms.action.server.ts`, `app/lib/inbound-sms-context.server.ts`, `app/lib/chat-sms-guards.server.ts`, `app/lib/campaign-sms-dispatch.server.ts`
+- Existing tests: Inbound tests cover known contacts; this decision has no implementation yet.
+- Missing tests: After the decision: unknown-sender opt-out followed by import and manual/campaign sends, another-workspace control and explicit opt-in.
+- Done when: Rollout boundary and slices follow ADR-0034 and the delivery plan.; Authoritative consent, enforcement points, atomic suppression and recipient START are defined.; Implementation and real prerequisites are split after scoping.
+- Tracker: Independent follow-up from #2090. Keep visible until the adopted ledger rollout is scoped; the keyword fix does not resolve it.
+
+### [#2264](https://github.com/chester-hill-solutions/callcaster/issues/2264) Define operator guidance for Advanced Opt-Out
+- Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The saved Advanced Opt-Out request is not verified provider state. Decide how operators see the request, verification limits and Console action.
+- Current behavior: The saved flag defaults false. Console guidance appears only for requested true with a Messaging Service SID. Standard long-code provider opt-out exists by default, so a false local flag does not establish absent STOP protection.
+- Root cause: Operator guidance for requested state versus verified provider state is undefined.
+- Resolution: Choose the operator flow and any warning or justified setup blocker. Define true/false requested state, missing/present Messaging Service SID and unverified provider state. Do not label an unverified provider setting as disabled.
+- Look in: `app/lib/messaging-onboarding/normalize.server.ts`, `app/lib/database/workspace-twilio-recommendations.server.ts`, `app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.OperationalGuidancePanel.tsx`
+- Missing tests: After the decision: UI coverage for requested true/false, SID missing/present and unverified provider state.
+- Done when: Display-state meanings and operator flow are recorded.; Guidance does not imply the saved request verifies provider settings or that standard protection needs Advanced Opt-Out.; A small implementation issue with UI coverage follows the decision.
+- Tracker: Independent follow-up from #2090. Keep in Needs decision; the keyword fix does not resolve operator guidance.
 
 ### [#2216](https://github.com/chester-hill-solutions/callcaster/issues/2216) Email verification is half-wired: a verify-email route and a "verify your email" prompt both exist, but no verification email is ever sent
 - Verdict: **Needs decision** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02

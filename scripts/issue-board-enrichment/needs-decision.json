@@ -1066,5 +1066,64 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "Needs decision. The issue explicitly requires Option A/B product policy and states funnel cost is unknown; do not select cheaper removal as a bug fix. Then implement/test the chosen policy. Related PR evidence: #2223, #2222. A PR reference alone does not prove deployed behavior."
+  },
+  {
+    "issueNumber": 2263,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Scope unknown-sender opt-out enforcement in the consent ledger rollout",
+    "summary": "Unknown-sender opt-out messages are saved, but no contact flag or app phone-level suppression protects later imports and sends.",
+    "currentBehavior": "The inbound route saves the message, then updates and dequeues only matching contacts. Zero matching IDs leave no app suppression record. The original claim that the message was discarded was incorrect.",
+    "rootCause": "ADR-0034 already adopts recipient consent and fail-closed automated sends. The unknown-sender path lacks that ledger; its rollout boundary and implementation slices need definition.",
+    "resolution": "Scope the unknown-sender path in the adopted consent ledger rollout under #1268. Define recipient key, normalization, future imports, every send entry point, atomic pending-send suppression, recipient START and the legacy migration boundary. An operator warning can expose the interim legacy gap but cannot replace ADR-0034 enforcement or satisfy completion.",
+    "lookIn": [
+      "docs/adr/0034-recipient-messaging-consent-and-fail-closed-disclosure.md",
+      "docs/interactive-sms-delivery-plan.md",
+      "app/routes/api+/inbound-sms.action.server.ts",
+      "app/lib/inbound-sms-context.server.ts",
+      "app/lib/chat-sms-guards.server.ts",
+      "app/lib/campaign-sms-dispatch.server.ts"
+    ],
+    "existingTests": [
+      "Inbound tests cover known contacts; this decision has no implementation yet."
+    ],
+    "missingTests": [
+      "After the decision: unknown-sender opt-out followed by import and manual/campaign sends, another-workspace control and explicit opt-in."
+    ],
+    "acceptanceCriteria": [
+      "Rollout boundary and slices follow ADR-0034 and the delivery plan.",
+      "Authoritative consent, enforcement points, atomic suppression and recipient START are defined.",
+      "Implementation and real prerequisites are split after scoping."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Independent follow-up from #2090. Keep visible until the adopted ledger rollout is scoped; the keyword fix does not resolve it."
+  },
+  {
+    "issueNumber": 2264,
+    "verdict": "needs-decision",
+    "recommendedTitle": "Define operator guidance for Advanced Opt-Out",
+    "summary": "The saved Advanced Opt-Out request is not verified provider state. Decide how operators see the request, verification limits and Console action.",
+    "currentBehavior": "The saved flag defaults false. Console guidance appears only for requested true with a Messaging Service SID. Standard long-code provider opt-out exists by default, so a false local flag does not establish absent STOP protection.",
+    "rootCause": "Operator guidance for requested state versus verified provider state is undefined.",
+    "resolution": "Choose the operator flow and any warning or justified setup blocker. Define true/false requested state, missing/present Messaging Service SID and unverified provider state. Do not label an unverified provider setting as disabled.",
+    "lookIn": [
+      "app/lib/messaging-onboarding/normalize.server.ts",
+      "app/lib/database/workspace-twilio-recommendations.server.ts",
+      "app/routes/admin+/workspaces/$workspaceId/twilio/AdminTwilioPortal.OperationalGuidancePanel.tsx"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "After the decision: UI coverage for requested true/false, SID missing/present and unverified provider state."
+    ],
+    "acceptanceCriteria": [
+      "Display-state meanings and operator flow are recorded.",
+      "Guidance does not imply the saved request verifies provider settings or that standard protection needs Advanced Opt-Out.",
+      "A small implementation issue with UI coverage follows the decision."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Independent follow-up from #2090. Keep in Needs decision; the keyword fix does not resolve operator guidance."
   }
 ]

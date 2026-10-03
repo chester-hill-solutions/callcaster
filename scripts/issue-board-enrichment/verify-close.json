@@ -3003,5 +3003,42 @@
     "trackerRecommendation": "The source fix travels with this board update. Verify deployed expiry, launch and joining after merge, then promote and close. Do not start a duplicate fix.",
     "currentBehavior": "The source fix uses the same strict end_date < now check in pure readiness and launch. Readiness defaults to the current clock; launch passes its explicit clock. End date equality remains valid, and invalid or reversed dates keep their earlier corrections. Launch rejects expiry before status or dispatch writes. The existing UI and results loader consume the blocker. All 144 focused cases passed (132 node, 12 UI), and seven isolated mutations failed the relevant regressions while controls passed. Producer fixtures invoke every real readiness producer, including script routing; an exhaustive record and a runtime union check detect untested codes.",
     "rootCause": "campaign_ended existed in the code union and action map but readiness had no producer. Launch checked expiry separately and did not pass args.now into readiness. The expiry action led to the queue instead of date pickers."
+  },
+  {
+    "issueNumber": 2090,
+    "verdict": "verify-close",
+    "recommendedTitle": "Retain all required SMS opt-out keywords when workspace settings add custom keywords",
+    "summary": "The shared parser and direct matcher now retain all eight standard keywords plus the OPT OUT alias. Custom settings add keywords; deployed SMS and queue verification remain.",
+    "resolution": "Verify all standard keywords, the OPT OUT alias, custom phrases, STOP-only configuration, workspace queue removal and ordinary replies on deployed dev. Verify START still resubscribes without requeue. Promote verified behavior before closing. Unknown-sender app suppression and operator guidance remain separate decision issues #2263 and #2264.",
+    "lookIn": [
+      "app/lib/chat-opt-out.ts",
+      "app/routes/api+/inbound-sms.action.server.ts",
+      "app/routes/workspaces+/$id/chats.loader.server.ts",
+      "app/hooks/chats/useChatsPage.ts",
+      "app/hooks/chats/useChatThread.ts",
+      "app/lib/campaign-sms-dispatch.server.ts"
+    ],
+    "existingTests": [
+      "test/chat-opt-out.test.ts (mandatory set, custom union, direct matcher, whitespace, exact match and immutable defaults)",
+      "test/inbound-sms.route.test.ts (every keyword across three configurations, every fallback keyword, both matching contacts and workspace queues, ordinary replies and START controls)",
+      "test/campaign-sms-dispatch-contract.test.ts (real coordinator through HTTP and worker; opted-out and eligible contacts)",
+      "test/chat-sms-action.route.test.ts and test/chat-sms.route.test.ts (existing outbound route controls)",
+      "test/ui/hooks-chats.test.tsx, test/ui/hooks-chats-optimistic-failure.test.tsx and test/ui/components-chats-contact.test.tsx (existing chat consumers and opt-out banner controls)"
+    ],
+    "missingTests": [
+      "Deployed SMS keyword and workspace queue verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "All eight standard keywords plus OPT OUT remain mandatory for parser and direct matcher.",
+      "Custom keywords add to the required set, with case and whitespace normalization and whole-message matching.",
+      "Matching contacts are opted out and removed from all receiving-workspace campaign queues; eligible dispatch and ordinary reply controls remain.",
+      "Deployed verification and promotion are complete before closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Source fix is in this change. Verify deployed behavior after merge, then promote and close. #2263 and #2264 are independent decisions; do not treat them as completed by this parser fix.",
+    "currentBehavior": "Source fix from dev@fd86e10a: one shared merge retains mandatory keywords for both parsed configuration and direct callers. Whole-message matching normalizes case and whitespace. Returned arrays cannot mutate the defaults. Actual inbound-route tests prove every keyword updates matching contacts and removes both contacts from all workspace campaign queues. All 175 focused cases passed (162 node, 13 UI). The corrected old-source check failed 72 regressions while 43 controls passed; five isolated mutations failed the relevant checks, including both real dispatch adapter gates.",
+    "rootCause": "The default keyword list had only STOP and UNSUBSCRIBE, and non-empty workspace or direct-call lists replaced it."
   }
 ]
