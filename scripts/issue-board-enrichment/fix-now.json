@@ -620,39 +620,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2102,
-    "verdict": "fix-now",
-    "recommendedTitle": "The public pricing page publishes the IVR rate for the \"Calling — Agent-driven auto-dial\" lane the code bills at 4 / 5 credits",
-    "summary": "Public auto-dial Calling rates still use IVR constants. The staffed voice tariff is 4/5 credits; the public Calling card and calculator use 2/3.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Public auto-dial Calling rates still use IVR constants. The staffed voice tariff is 4/5 credits; the public Calling card and calculator use 2/3.",
-    "resolution": "Bind each published lane and calculator input to its actual billing kind; review marketing copy.",
-    "lookIn": [
-      "app/lib/public-pricing.ts:72",
-      "shared/pricing.ts:61",
-      "app/components/pricing/PricingCalculator.tsx:193",
-      "app/lib/public-pricing.ts:44-48,72-87",
-      "shared/pricing.ts:58-63,102-109,122-140",
-      "app/components/pricing/PricingCalculator.tsx",
-      "app/routes/pricing.loader.server.ts"
-    ],
-    "existingTests": [
-      "test/public-pricing.test.ts"
-    ],
-    "missingTests": [
-      "Contract test must compare a five-minute published lane with voiceCreditsFromDurationSeconds for the same kind."
-    ],
-    "acceptanceCriteria": [
-      "The Calling lane publishes the staffed rate (4 / 5) and the IVRs lane publishes the IVR rate (2 / 3).",
-      "A test computes `voiceCreditsFromDurationSeconds(300, kind)` for each published lane and asserts it equals the published figure for a 5-minute call.",
-      "The pricing calculator's field label matches the lane it prices.",
-      "`docs/` and any marketing copy quoting the auto-dial rate is checked and corrected."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2104,
     "verdict": "fix-now",
     "recommendedTitle": "check:effects skips every React.useEffect( call as a \"hook definition\", so an effect can opt out of the gate, the baseline and the inventory",

@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@a3051a42 + source fix for #2100` · 290 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@715c6844 + source fix for #2102` · 290 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 66
+## Fix now — 65
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -250,17 +250,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/campaign-sms-send.server.test.ts; test/sms-status-settled.test.ts
 - Missing tests: Create → failed/undelivered/delivered must update Results and queue filters; cover duplicate/out-of-order callbacks.
 - Done when: A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).; `undelivered` and `delivered` likewise.; A message that never receives a callback still reaches a terminal disposition (positive control).; The call path is unchanged.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2102](https://github.com/chester-hill-solutions/callcaster/issues/2102) The public pricing page publishes the IVR rate for the "Calling — Agent-driven auto-dial" lane the code bills at 4 / 5 credits
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- Public auto-dial Calling rates still use IVR constants. The staffed voice tariff is 4/5 credits; the public Calling card and calculator use 2/3.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Public auto-dial Calling rates still use IVR constants. The staffed voice tariff is 4/5 credits; the public Calling card and calculator use 2/3.
-- Resolution: Bind each published lane and calculator input to its actual billing kind; review marketing copy.
-- Look in: `app/lib/public-pricing.ts:72`, `shared/pricing.ts:61`, `app/components/pricing/PricingCalculator.tsx:193`, `app/lib/public-pricing.ts:44-48,72-87`, `shared/pricing.ts:58-63,102-109,122-140`, `app/components/pricing/PricingCalculator.tsx`, `app/routes/pricing.loader.server.ts`
-- Existing tests: test/public-pricing.test.ts
-- Missing tests: Contract test must compare a five-minute published lane with voiceCreditsFromDurationSeconds for the same kind.
-- Done when: The Calling lane publishes the staffed rate (4 / 5) and the IVRs lane publishes the IVR rate (2 / 3).; A test computes `voiceCreditsFromDurationSeconds(300, kind)` for each published lane and asserts it equals the published figure for a 5-minute call.; The pricing calculator's field label matches the lane it prices.; `docs/` and any marketing copy quoting the auto-dial rate is checked and corrected.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2166](https://github.com/chester-hill-solutions/callcaster/issues/2166) Call audio depends on a best-effort Twilio copy — recover the ones that failed, then remove the Twilio playback fallback
@@ -776,9 +765,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 123
+## Verify and close — 124
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2100](https://github.com/chester-hill-solutions/callcaster/issues/2100) Align the API session-cookie contract with Better Auth
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The API contract and SDK identify both session-cookie forms issued by the current auth configuration: HTTP and secure HTTPS deployment alternatives.
+- Current behavior: Merged to dev in PR #2286 at 715c6844. Shared session-cookie definitions identify better-auth.session_token on HTTP and __Secure-better-auth.session_token on HTTPS as deployment alternatives. All served specs preserve session-only versus API-key/session policy; the SDK uses the exact issued name and signed value through its auth callback. Auth configuration/verifier are unchanged. All 112 focused cases pass; original runtime fails eight with ten controls, five source/SDK mutations and a separate signed-value challenge fail. Full local CI passed 5,202 Vitest and 22 Bun tests. All remote gates and both Railway checks passed on b13ad43d; issue-on-dev moved one item. Verify deployed behavior and promote before closure.
+- Root cause: The OpenAPI source retained the retired Supabase cookie name. Generated outputs faithfully repeated it, and separate static security arrays omitted the HTTPS cookie mechanism.
+- Resolution: Verify the deployed server cookie and served schemes match. Confirm a generated SDK request using its issued signed cookie authenticates, browser cookie-jar access remains valid, and API-key access is retained. Promote before closing.
+- Look in: `app/lib/openapi-integrator.ts`, `app/lib/openapi-build.ts`, `app/lib/openapi-platform.ts`, `app/lib/api-generated/sdk.gen.ts`, `app/server/auth-instance.ts`, `app/lib/auth.server.ts`, `docs/api-auth-matrix.md`, `docs/api-overview.md`, `docs/api-telephony-control.md`, `test/session-cookie-contract.test.ts`
+- Existing tests: test/session-cookie-contract.test.ts (real app auth instance with isolated adapter, issued signed cookies, three generated SDK operations, HTTP/HTTPS, wrong-name/prefix/signature and API-key header controls); test/openapi.test.ts (session-only and API-key/session security policy); test/api-auth.test.ts; test/auth-instance.server.test.ts; test/api-surface.test.ts; test/openapi-complete.test.ts
+- Missing tests: Deployed cookie/SDK verification and production promotion before closure.
+- Done when: All three specs and the generated SDK identify the real HTTP and secure HTTPS deployment cookie alternatives.; All session operations include both mechanisms without widening session-only routes to API-key access.; The three SDK operations authenticate using the exact issued cookie name and signed value under both base-URL forms.; Renamed cookies, wrong secure prefixes and modified signatures are refused by the real verifier.; Browser-cookie and SDK API-key controls remain valid.; Original source and changed source/SDK names or omitted secure alternatives fail collected regressions.; Full codegen/local/remote gates pass; verify deployed behavior before promotion and closure.
+- Tracker: Source contract fix is in this change; verify deployed cookie/SDK behavior and promote before closure.
+
+### [#2102](https://github.com/chester-hill-solutions/callcaster/issues/2102) Match published agent-call estimates to billing rates
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Calling uses staffed 4/5 rates; IVR retains 2/3. Calculator inputs and billable durations now distinguish both lanes and team project quotes.
+- Current behavior: Source fix based on dev@715c6844: Calling publishes staffed constants; IVR retains its own constants. Separate agent and IVR calculator counts/durations call the canonical duration helper and exclude zero or invalid durations. Five connected minutes estimate 24 credits for agent calls and 14 for IVR. Additional started minutes round up. The workspace panel and relevant pricing docs use distinct labels; historical strategy status is explicit. Calls placed by the CallCaster team retain a project quote. All 57 focused cases pass, including the real billing processor and ledger-write boundary. Original runtime fails 22 cases with 35 controls; nine isolated source mutations fail and all cases pass after restoration. Full local and remote gates are required before merge.
+- Root cause: The public Calling card bound IVR constants and the calculator combined two billing kinds under one label with copied duration arithmetic. Quote copy did not distinguish customer agents from the CallCaster team.
+- Resolution: Verify deployed cards and calculator fields against actual billing: 24 credits for five-minute agent calls, 14 for IVR; zero-duration calls contribute zero. Retain the separate team quote flow, then promote before closure.
+- Look in: `app/lib/public-pricing.ts`, `app/components/pricing/PricingCalculator.tsx`, `app/routes/workspaces+/$id/billing.route.tsx`, `shared/pricing.ts`, `app/lib/twilio-call-status.server.ts`
+- Existing tests: test/public-pricing.test.ts; test/ui/pricing-calculator.test.tsx; test/call-status-billing.test.ts; test/ui/billing-purchase-caller-gating.test.tsx
+- Missing tests: Deployed pricing cards/calculator and actual ledger smoke verification before promotion.
+- Done when: Calling publishes 4/5 and IVR 2/3 from their canonical constants.; Representative positive durations agree across published rates, calculator estimates and the real billing processor.; Zero, negative and invalid duration estimates contribute zero.; Actual UI fields remain distinct and show matching credit/CAD totals.; The CallCaster-team quote request remains explicit.; Original source and isolated rate, kind, duration, field-wiring and copy mutations fail meaningful regressions.; Full local/remote gates and deployed verification pass before promotion and closure.
+- Tracker: Source fix is in this change; verify deployed estimates and copy, then promote before closure.
 
 ### [#2134](https://github.com/chester-hill-solutions/callcaster/issues/2134) Require conversation read capability for message acknowledgments
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -791,18 +804,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed route verification and production promotion before closure.
 - Done when: Empty/unrelated API-key scopes receive 403 and perform no message write in either acknowledgment mode.; Required-capability keys and permitted session roles succeed; missing actor is 401 and non-member/workspace mismatch is 404 with no write.; GET and POST enforce campaigns.read and generated/served API contracts state API-key/session access.; Preserve decoded phone forwarding, specific-SID and empty-body acknowledgment, POST-only behavior and write failures.; Original runtime and changed gate fail the actual route regressions while positive controls remain.; Verify deployed behavior before production promotion and closure.
 - Tracker: Source fix is in this change; verify deployed behavior and promote before closure.
-
-### [#2100](https://github.com/chester-hill-solutions/callcaster/issues/2100) Align the API session-cookie contract with Better Auth
-- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- The API contract and SDK identify both session-cookie forms issued by the current auth configuration: HTTP and secure HTTPS deployment alternatives.
-- Current behavior: Source fix based on dev@a3051a42: shared session security definitions identify better-auth.session_token on HTTP and __Secure-better-auth.session_token on HTTPS. Public, complete and integrator specs retain API-key/session versus session-only policy while exposing the matching alternatives. All three generated SDK operations can select the exact issued name through the existing auth callback. API guides document browser cookie-jar behavior and preservation of the signed name/value for server clients. The installed real verifier reads the configured name, so a cookie renamed to another prefix is not accepted. No auth configuration or verifier changes. Real app-issued cookies and generated SDK requests are covered on both base-URL forms. Full local and remote gates are required before merge.
-- Root cause: The OpenAPI source retained the retired Supabase cookie name. Generated outputs faithfully repeated it, and separate static security arrays omitted the HTTPS cookie mechanism.
-- Resolution: Verify the deployed server cookie and served schemes match. Confirm a generated SDK request using its issued signed cookie authenticates, browser cookie-jar access remains valid, and API-key access is retained. Promote before closing.
-- Look in: `app/lib/openapi-integrator.ts`, `app/lib/openapi-build.ts`, `app/lib/openapi-platform.ts`, `app/lib/api-generated/sdk.gen.ts`, `app/server/auth-instance.ts`, `app/lib/auth.server.ts`, `docs/api-auth-matrix.md`, `docs/api-overview.md`, `docs/api-telephony-control.md`, `test/session-cookie-contract.test.ts`
-- Existing tests: test/session-cookie-contract.test.ts (real app auth instance with isolated adapter, issued signed cookies, three generated SDK operations, HTTP/HTTPS, wrong-name/prefix/signature and API-key header controls); test/openapi.test.ts (session-only and API-key/session security policy); test/api-auth.test.ts; test/auth-instance.server.test.ts; test/api-surface.test.ts; test/openapi-complete.test.ts
-- Missing tests: Deployed cookie/SDK verification and production promotion before closure.
-- Done when: All three specs and the generated SDK identify the real HTTP and secure HTTPS deployment cookie alternatives.; All session operations include both mechanisms without widening session-only routes to API-key access.; The three SDK operations authenticate using the exact issued cookie name and signed value under both base-URL forms.; Renamed cookies, wrong secure prefixes and modified signatures are refused by the real verifier.; Browser-cookie and SDK API-key controls remain valid.; Original source and changed source/SDK names or omitted secure alternatives fail collected regressions.; Full codegen/local/remote gates pass; verify deployed behavior before promotion and closure.
-- Tracker: Source contract fix is in this change; verify deployed cookie/SDK behavior and promote before closure.
 
 ### [#2080](https://github.com/chester-hill-solutions/callcaster/issues/2080) Restrict webhook tests to permitted workspace members
 - Verdict: **Verify and close** · Size: S-M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03

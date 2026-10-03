@@ -11,13 +11,15 @@ Canonical constants live in [`shared/pricing.ts`](../shared/pricing.ts):
 | Credit purchase minimum                  |     500 |                $10.00 |
 | SMS segment                              |       2 |                 $0.04 |
 | MMS                                      |       4 |                 $0.08 |
-| IVR / auto-dial (first minute)           |       2 |                 $0.04 |
-| IVR / auto-dial (each additional minute) |       3 |                 $0.06 |
+| IVR (first minute)           |       2 |                 $0.04 |
+| IVR (each additional minute) |       3 |                 $0.06 |
 | Staffed live (first minute)              |       4 |                 $0.08 |
 | Staffed live (each additional minute)    |       5 |                 $0.10 |
 | Phone number rental (monthly)            |     100 |                 $2.00 |
 
 **Hard cut:** no grandfathering. Existing credit balances stay at face value; new purchases use the $0.02 peg.
+
+Agent-driven calls use the staffed rate. The IVR rate applies to robocall, simple IVR and complex IVR campaigns. Calls with positive billable duration use the first-minute rate and round each additional started minute up. Zero-duration calls are not billed. Five connected minutes cost 24 credits (CAD $0.48) for agent calls and 14 credits (CAD $0.28) for IVR. Calls placed by the CallCaster team require a separate project quote.
 
 ## Ledger
 
