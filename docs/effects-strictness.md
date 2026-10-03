@@ -8,7 +8,7 @@ question to be answered in writing.
 
 ## The annotation
 
-Put a JSDoc block **immediately above** the effect:
+Put a JSDoc block **immediately above** the complete effect call, including any namespace prefix such as `React.`. The scanner collects actual direct and namespace calls; function declarations and hook-like text in comments or strings are not effects:
 
 ```tsx
 /**
@@ -68,9 +68,9 @@ source of truth.
 
 ## Status
 
-Baseline is **0** — every `useEffect`/`useLayoutEffect` is documented in the
-[inventory](./effects-inventory.md). Any new un-annotated effect hard-fails
-`check:effects`. Remaining work is the **`CANDIDATE-REMOVE`** effects (annotations
+The current baseline allows **2** unannotated effects in `app/hooks/call/useCampaignCallFlow.ts`.
+All other collected effects are documented in the [inventory](./effects-inventory.md), including namespace calls.
+Any new unannotated effect above its file allowance fails `check:effects`. Remaining work is the **`CANDIDATE-REMOVE`** effects (annotations
 starting with that marker): effects that were really disguised data-fetching or
 derived state and should migrate to loaders / `useFetcher` / derived values. Grep
 `CANDIDATE-REMOVE` in the inventory for the current list.

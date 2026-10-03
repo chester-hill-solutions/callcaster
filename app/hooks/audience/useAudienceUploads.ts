@@ -47,7 +47,11 @@ export function useAudienceUploads({
     }
   }, [workspaceId, audienceId]);
 
-  // Syncs with the server (external system) on mount and id change.
+  /**
+   * @effect CANDIDATE-REMOVE: load upload history on audience/workspace change; move to route data (#2288).
+   * @effect-deps refresh (changes with workspaceId and audienceId)
+   * @effect-side-effects fetch + setUploads/setLoading/setError
+   */
   useEffect(() => {
     refresh();
   }, [refresh]);

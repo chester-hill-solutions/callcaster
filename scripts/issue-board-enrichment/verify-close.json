@@ -3617,7 +3617,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Match published agent-call estimates to billing rates",
     "summary": "Calling uses staffed 4/5 rates; IVR retains 2/3. Calculator inputs and billable durations now distinguish both lanes and team project quotes.",
-    "currentBehavior": "Source fix based on dev@715c6844: Calling publishes staffed constants; IVR retains its own constants. Separate agent and IVR calculator counts/durations call the canonical duration helper and exclude zero or invalid durations. Five connected minutes estimate 24 credits for agent calls and 14 for IVR. Additional started minutes round up. The workspace panel and relevant pricing docs use distinct labels; historical strategy status is explicit. Calls placed by the CallCaster team retain a project quote. All 57 focused cases pass, including the real billing processor and ledger-write boundary. Original runtime fails 22 cases with 35 controls; nine isolated source mutations fail and all cases pass after restoration. Full local and remote gates are required before merge.",
+    "currentBehavior": "Merged to dev in PR #2287 at 24c4d810. Calling publishes canonical staffed 4/5 credits; IVR retains 2/3. Distinct calculator fields use canonical duration arithmetic and exclude zero/invalid durations. Five connected minutes cost 24 and 14 credits; additional started minutes round up. Shared FormField/Input controls retain accessible hints and canonical styles. The team quote and active pricing copy are explicit; actual billing tariffs/debit logic are unchanged. All 57 focused cases pass; original runtime fails 22 with 35 controls and nine mutations fail. Full local CI passed 5,229 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on da89d57e. Issue-on-dev moved one item. Verify deployed behavior and promote before closure.",
     "resolution": "Verify deployed cards and calculator fields against actual billing: 24 credits for five-minute agent calls, 14 for IVR; zero-duration calls contribute zero. Retain the separate team quote flow, then promote before closure.",
     "lookIn": [
       "app/lib/public-pricing.ts",
@@ -3649,5 +3649,43 @@
     "risk": "medium",
     "trackerRecommendation": "Source fix is in this change; verify deployed estimates and copy, then promote before closure.",
     "rootCause": "The public Calling card bound IVR constants and the calculator combined two billing kinds under one label with copied duration arithmetic. Quote copy did not distinguish customer agents from the CallCaster team."
+  },
+  {
+    "issueNumber": 2104,
+    "verdict": "verify-close",
+    "recommendedTitle": "Include namespace effect calls in the effects guard",
+    "summary": "The effect guard collects actual direct and namespace calls and reads annotations before the complete callee. Both hidden effects are now inventoried.",
+    "currentBehavior": "Source fix based on dev@24c4d810: TypeScript call syntax replaces the broad prefix exemption. Direct, namespace and multiline calls use the full-callee annotation offset; declarations and comment/string lookalikes are ignored. The datetime digit timer is documented. The audience-history fetch effect hidden after a full-stop comment is listed as CANDIDATE-REMOVE under separate runtime task #2288. Inventory now contains 120 actual calls: 118 documented and the same two grandfathered effects. No timer, fetch, dependency or baseline allowance changes. All 29 focused cases pass. Original source fails 14 of 18 CLI fixture cases with four controls; five scanner mutations and two actual annotation removals fail, and all source/inventory is restored. Full local and remote gates are required before merge.",
+    "resolution": "Verify the real guard and generated inventory on the merged source; namespace calls must be enforced and documented, true declarations ignored and baseline allowances retained. Promote before closure. Audience-history behavior belongs to #2288; dependency-tag comparison remains #2067.",
+    "lookIn": [
+      "scripts/check-effects.mjs",
+      "scripts/lib/effects-lib.mjs",
+      "app/components/ui/datetime.tsx",
+      "app/hooks/audience/useAudienceUploads.ts",
+      "docs/effects-inventory.md",
+      "scripts/effects-baseline.json"
+    ],
+    "existingTests": [
+      "test/effects-scanner.test.ts",
+      "test/effects-compliance.test.ts",
+      "test/ui/audience-upload-history.test.tsx"
+    ],
+    "missingTests": [
+      "Verification on merged/deployed dev source before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Actual unannotated direct, namespace and layout-effect calls fail the CLI.",
+      "Annotated complete member calls appear in inventory, including multiline forms.",
+      "Actual declarations and hook-like comments/strings are ignored.",
+      "Namespace effects count in baseline mode and growth above allowance fails.",
+      "Datetime timer annotation and audience removal debt are listed; production behavior and baseline allowance are unchanged.",
+      "Original source, scanner mutations and annotation removals fail meaningful regressions.",
+      "Full local/remote gates pass before merge; verify merged dev source before promotion and closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source guard fix is in this change; verify inventory/enforcement and promote before closure.",
+    "rootCause": "The definition-skip regex treated a preceding dot as proof of a declaration, including namespace calls and a dot in a preceding line comment. Annotation lookup at the hook name would also reject valid namespace annotations."
   }
 ]

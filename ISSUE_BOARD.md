@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@715c6844 + source fix for #2102` · 290 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@24c4d810 + source fix for #2104` · 291 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -264,6 +264,18 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Done when: Failure propagation and the repair sweep remain covered by their existing regression tests.; Missing stored playback has a clear unavailable state and no raw Twilio recording link.; Repeated deliveries for one voicemail recording use one deterministic object key and the documented overwrite behavior.; An explicit recording_url retention decision is recorded.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2169, #2173, #2175, #2177. A PR reference alone does not prove deployed behavior.
 
+### [#2288](https://github.com/chester-hill-solutions/callcaster/issues/2288) Move audience-upload history loading to route data
+- Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The current audience-history mount effect fetches server data. The syntax guard now exposes it as CANDIDATE-REMOVE; route data is the adopted policy.
+- Current behavior: Source audit at dev@24c4d810. useAudienceUploads calls fetchAudienceUploads on mount and workspace/audience changes, then maintains live history via workspace events. The old guard skipped this effect because its preceding comment ended in a dot. The guard fix only inventories the existing behavior; the runtime route-data change remains open under #2288.
+- Root cause: Initial server history is owned by a client effect instead of the existing audience route data contract.
+- Resolution: Load initial upload history through the authenticated audience page loader, pass route data into the history UI/hook and retain React Router retry/revalidation plus current-audience event updates. Remove the fetch-on-mount effect and its candidate inventory row.
+- Look in: `app/hooks/audience/useAudienceUploads.ts`, `app/components/audience/AudienceUploadHistory.tsx`, `app/routes/workspaces+/$id/audiences/$audience_id.loader.server.ts`, `app/routes/workspaces+/$id/audiences/$audience_id.route.tsx`, `app/routes/api+/workspaces+/$workspaceId/audiences/$audienceId/uploads.loader.server.ts`
+- Existing tests: test/ui/audience-upload-history.test.tsx
+- Missing tests: Real route initial-history and foreign-audience denial cases.; Navigation/late-result isolation, retry and retained insert/update/delete event controls.
+- Done when: Initial history is route data; the mount fetch effect is removed.; Workspace/audience changes cannot leak old history or accept late results for another audience.; Loading, empty, error retry and success behavior remain available.; Current-audience event updates and route tenant authorization are retained.; Tests fail if the required loader, isolation, retry or event behavior is removed.; Remove candidate inventory debt and pass full local/remote gates before merge.
+- Tracker: Adopted route-data policy gives an exact implementation path. This independent runtime task does not block #2104.
+
 ### [#2215](https://github.com/chester-hill-solutions/callcaster/issues/2215) Add the five workspace foreign keys missing from the active bootstrap lineage
 - Verdict: **Fix now** · Size: M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
 - Five tenant tables lack a workspace FK in the active fresh-bootstrap SQL: outreach_attempt, workspace_events, workspace_member, workspace_audit_event and workspace_audio. Six originally listed tables are already constrained in drizzle/0006_app_schema_tail.sql.
@@ -499,17 +511,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/ui/hooks-chats-optimistic-failure.test.tsx
 - Missing tests: Existing DOM-only failure test cannot detect that bodyValue remains empty. Mount the actual composer and assert restored text, segments/credits, cursor behavior, and successful clearing.
 - Done when: After a failed send of a 340-character message, the counter shows the real length, the real segment count and the real credit estimate (kill-check: keep the DOM write and confirm the test goes red).; The restored text is the user's, unchanged, and the cursor is at a sensible position.; A successful send still clears the composer.; The 160-character boundary warning still fires on the restored text.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2104](https://github.com/chester-hill-solutions/callcaster/issues/2104) check:effects skips every React.useEffect( call as a "hook definition", so an effect can opt out of the gate, the baseline and the inventory
-- Verdict: **Fix now** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02
-- The scanner still discards member calls such as React.useEffect because its definition-skip regex includes a preceding dot.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The scanner still discards member calls such as React.useEffect because its definition-skip regex includes a preceding dot.
-- Resolution: Distinguish function declarations from calls; include member calls in baseline and inventory.
-- Look in: `scripts/check-effects.mjs:100`, `scripts/check-effects.mjs (the skip pattern)`, `scripts/effects-baseline.json`, `app/components/ui/datetime.tsx:386`, `.github/workflows/ci.yml (the `quality` job wiring)`
-- Existing tests: test/effects-compliance.test.ts covers annotation compliance rules; member-call scanner fixtures remain missing.
-- Missing tests: Fixture tests for React.useEffect failure and real function-definition skip; coordinate with #2067.
-- Done when: `check:effects` fails on a fixture that calls `React.useEffect(` without the required tags (kill-check: restore the `|\.\s*$` alternative and confirm the test goes red).; check:effects still skips a genuine export function useEffect declaration; this fixture must use a hook name the scanner actually matches.; `app/components/ui/datetime.tsx:386` is annotated and listed in the inventory.; The guard has a fixture-based test for both the skip and the fail case.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2064](https://github.com/chester-hill-solutions/callcaster/issues/2064) Nightly ledger drift check compares the wrong branch against the dev database
@@ -765,9 +766,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 124
+## Verify and close — 125
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2104](https://github.com/chester-hill-solutions/callcaster/issues/2104) Include namespace effect calls in the effects guard
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The effect guard collects actual direct and namespace calls and reads annotations before the complete callee. Both hidden effects are now inventoried.
+- Current behavior: Source fix based on dev@24c4d810: TypeScript call syntax replaces the broad prefix exemption. Direct, namespace and multiline calls use the full-callee annotation offset; declarations and comment/string lookalikes are ignored. The datetime digit timer is documented. The audience-history fetch effect hidden after a full-stop comment is listed as CANDIDATE-REMOVE under separate runtime task #2288. Inventory now contains 120 actual calls: 118 documented and the same two grandfathered effects. No timer, fetch, dependency or baseline allowance changes. All 29 focused cases pass. Original source fails 14 of 18 CLI fixture cases with four controls; five scanner mutations and two actual annotation removals fail, and all source/inventory is restored. Full local and remote gates are required before merge.
+- Root cause: The definition-skip regex treated a preceding dot as proof of a declaration, including namespace calls and a dot in a preceding line comment. Annotation lookup at the hook name would also reject valid namespace annotations.
+- Resolution: Verify the real guard and generated inventory on the merged source; namespace calls must be enforced and documented, true declarations ignored and baseline allowances retained. Promote before closure. Audience-history behavior belongs to #2288; dependency-tag comparison remains #2067.
+- Look in: `scripts/check-effects.mjs`, `scripts/lib/effects-lib.mjs`, `app/components/ui/datetime.tsx`, `app/hooks/audience/useAudienceUploads.ts`, `docs/effects-inventory.md`, `scripts/effects-baseline.json`
+- Existing tests: test/effects-scanner.test.ts; test/effects-compliance.test.ts; test/ui/audience-upload-history.test.tsx
+- Missing tests: Verification on merged/deployed dev source before promotion.
+- Done when: Actual unannotated direct, namespace and layout-effect calls fail the CLI.; Annotated complete member calls appear in inventory, including multiline forms.; Actual declarations and hook-like comments/strings are ignored.; Namespace effects count in baseline mode and growth above allowance fails.; Datetime timer annotation and audience removal debt are listed; production behavior and baseline allowance are unchanged.; Original source, scanner mutations and annotation removals fail meaningful regressions.; Full local/remote gates pass before merge; verify merged dev source before promotion and closure.
+- Tracker: Source guard fix is in this change; verify inventory/enforcement and promote before closure.
+
+### [#2102](https://github.com/chester-hill-solutions/callcaster/issues/2102) Match published agent-call estimates to billing rates
+- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Calling uses staffed 4/5 rates; IVR retains 2/3. Calculator inputs and billable durations now distinguish both lanes and team project quotes.
+- Current behavior: Merged to dev in PR #2287 at 24c4d810. Calling publishes canonical staffed 4/5 credits; IVR retains 2/3. Distinct calculator fields use canonical duration arithmetic and exclude zero/invalid durations. Five connected minutes cost 24 and 14 credits; additional started minutes round up. Shared FormField/Input controls retain accessible hints and canonical styles. The team quote and active pricing copy are explicit; actual billing tariffs/debit logic are unchanged. All 57 focused cases pass; original runtime fails 22 with 35 controls and nine mutations fail. Full local CI passed 5,229 Vitest and 22 Bun tests; all remote gates and both Railway checks passed on da89d57e. Issue-on-dev moved one item. Verify deployed behavior and promote before closure.
+- Root cause: The public Calling card bound IVR constants and the calculator combined two billing kinds under one label with copied duration arithmetic. Quote copy did not distinguish customer agents from the CallCaster team.
+- Resolution: Verify deployed cards and calculator fields against actual billing: 24 credits for five-minute agent calls, 14 for IVR; zero-duration calls contribute zero. Retain the separate team quote flow, then promote before closure.
+- Look in: `app/lib/public-pricing.ts`, `app/components/pricing/PricingCalculator.tsx`, `app/routes/workspaces+/$id/billing.route.tsx`, `shared/pricing.ts`, `app/lib/twilio-call-status.server.ts`
+- Existing tests: test/public-pricing.test.ts; test/ui/pricing-calculator.test.tsx; test/call-status-billing.test.ts; test/ui/billing-purchase-caller-gating.test.tsx
+- Missing tests: Deployed pricing cards/calculator and actual ledger smoke verification before promotion.
+- Done when: Calling publishes 4/5 and IVR 2/3 from their canonical constants.; Representative positive durations agree across published rates, calculator estimates and the real billing processor.; Zero, negative and invalid duration estimates contribute zero.; Actual UI fields remain distinct and show matching credit/CAD totals.; The CallCaster-team quote request remains explicit.; Original source and isolated rate, kind, duration, field-wiring and copy mutations fail meaningful regressions.; Full local/remote gates and deployed verification pass before promotion and closure.
+- Tracker: Source fix is in this change; verify deployed estimates and copy, then promote before closure.
 
 ### [#2100](https://github.com/chester-hill-solutions/callcaster/issues/2100) Align the API session-cookie contract with Better Auth
 - Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -780,18 +805,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed cookie/SDK verification and production promotion before closure.
 - Done when: All three specs and the generated SDK identify the real HTTP and secure HTTPS deployment cookie alternatives.; All session operations include both mechanisms without widening session-only routes to API-key access.; The three SDK operations authenticate using the exact issued cookie name and signed value under both base-URL forms.; Renamed cookies, wrong secure prefixes and modified signatures are refused by the real verifier.; Browser-cookie and SDK API-key controls remain valid.; Original source and changed source/SDK names or omitted secure alternatives fail collected regressions.; Full codegen/local/remote gates pass; verify deployed behavior before promotion and closure.
 - Tracker: Source contract fix is in this change; verify deployed cookie/SDK behavior and promote before closure.
-
-### [#2102](https://github.com/chester-hill-solutions/callcaster/issues/2102) Match published agent-call estimates to billing rates
-- Verdict: **Verify and close** · Size: S-M · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- Calling uses staffed 4/5 rates; IVR retains 2/3. Calculator inputs and billable durations now distinguish both lanes and team project quotes.
-- Current behavior: Source fix based on dev@715c6844: Calling publishes staffed constants; IVR retains its own constants. Separate agent and IVR calculator counts/durations call the canonical duration helper and exclude zero or invalid durations. Five connected minutes estimate 24 credits for agent calls and 14 for IVR. Additional started minutes round up. The workspace panel and relevant pricing docs use distinct labels; historical strategy status is explicit. Calls placed by the CallCaster team retain a project quote. All 57 focused cases pass, including the real billing processor and ledger-write boundary. Original runtime fails 22 cases with 35 controls; nine isolated source mutations fail and all cases pass after restoration. Full local and remote gates are required before merge.
-- Root cause: The public Calling card bound IVR constants and the calculator combined two billing kinds under one label with copied duration arithmetic. Quote copy did not distinguish customer agents from the CallCaster team.
-- Resolution: Verify deployed cards and calculator fields against actual billing: 24 credits for five-minute agent calls, 14 for IVR; zero-duration calls contribute zero. Retain the separate team quote flow, then promote before closure.
-- Look in: `app/lib/public-pricing.ts`, `app/components/pricing/PricingCalculator.tsx`, `app/routes/workspaces+/$id/billing.route.tsx`, `shared/pricing.ts`, `app/lib/twilio-call-status.server.ts`
-- Existing tests: test/public-pricing.test.ts; test/ui/pricing-calculator.test.tsx; test/call-status-billing.test.ts; test/ui/billing-purchase-caller-gating.test.tsx
-- Missing tests: Deployed pricing cards/calculator and actual ledger smoke verification before promotion.
-- Done when: Calling publishes 4/5 and IVR 2/3 from their canonical constants.; Representative positive durations agree across published rates, calculator estimates and the real billing processor.; Zero, negative and invalid duration estimates contribute zero.; Actual UI fields remain distinct and show matching credit/CAD totals.; The CallCaster-team quote request remains explicit.; Original source and isolated rate, kind, duration, field-wiring and copy mutations fail meaningful regressions.; Full local/remote gates and deployed verification pass before promotion and closure.
-- Tracker: Source fix is in this change; verify deployed estimates and copy, then promote before closure.
 
 ### [#2134](https://github.com/chester-hill-solutions/callcaster/issues/2134) Require conversation read capability for message acknowledgments
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
