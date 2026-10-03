@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@89bba361 + source fix for #2271` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@dbb9f691 + source fix for #2130` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 76
+## Fix now — 75
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -57,17 +57,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: Script-selected email differs from number default, legacy and other-workspace controls, script edits, retry stability and duplicate protection.
 - Done when: The script target recipient receives the voicemail.; Legacy recipients remain valid and untrusted callbacks cannot replace another call or workspace recipient.; Retries and later script edits retain the bound recipient without duplicate emails.; Runtime, docs, tests and deployed verification agree before promotion.
 - Tracker: Independent Task split from #2088. Follow the documented email contract; playback does not complete delivery.
-
-### [#2130](https://github.com/chester-hill-solutions/callcaster/issues/2130) A claimed inbound ACD offer is never released when the workspace's Twilio credentials are missing, so the caller holds for an hour and every agent shows busy
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- Claim-before-credentials leaves a busy agent and an undialled offer. The caller can remain on hold until a later claim runs the stale-offer sweep or the queue limit applies; a guaranteed hour-long hold is not proved.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The wait path claims an agent before loading credentials. Missing credentials skip dialing and leave an offered row and a busy agent without immediate cleanup.
-- Resolution: Load credentials before claiming; also release a claimed offer on any no-dial path. Log an actionable configuration error. The sweep is opportunistic, so do not treat it as prompt cleanup.
-- Look in: `app/lib/acd/acd-router.server.ts:418`, `app/lib/acd/acd-router.server.ts:172`, `app/lib/acd/acd-router.server.ts:172-179,190-193,395-430`, `client/migrations/20260731150000_reset_stale_inbound_offers.sql:1-10,204-217`, `loadWorkspaceTwilioCredentialsForAcd`, `MAX_QUEUE_TIME_SECONDS`
-- Existing tests: test/acd-router.test.ts; test/acd-router-subroutes.test.ts
-- Missing tests: A missing-credentials wait poll must neither claim nor leave an agent busy; include stale sweep recovery controls.
-- Done when: Missing credentials before claim leave no new offer or busy agent.; If a claimed call cannot be started, its offer is released and the agent becomes available.; Repeated wait polls follow an explicit bounded retry or fallback policy, rather than relying on another caller to trigger stale cleanup.; The missing-credentials condition produces an operator-visible signal.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2129](https://github.com/chester-hill-solutions/callcaster/issues/2129) The inbound-queue duplicate-offer guard is wired as "already in the baseline" but exists in no baseline, and both database lineages behave wrongly
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -880,9 +869,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 111
+## Verify and close — 112
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2271](https://github.com/chester-hill-solutions/callcaster/issues/2271) Build valid inbound queue TwiML and ACD callbacks
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Both inbound routes now emit valid Enqueue text and ACD callbacks after a workspace-scoped queue lookup; deployed direct and scripted queue verification remains.
+- Current behavior: Merged to dev in PR #2272 at dbb9f691. Direct number and IVR queues share real named Enqueue with encoded ACD wait/completion callbacks, stored IVR caller and a workspace-scoped queue check. All 59 focused Node and three real-Postgres cases passed; nine isolated mutations failed and were restored. Full local CI passed 4,941 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on 254c3fed. Deployed functional verification and promotion remain.
+- Root cause: Both routes called a nonexistent Enqueue.queue method. The IVR queue branch also omitted the ACD wait and completion callbacks. Raw query interpolation could change callback parameters; repaired routing needs an owned queue before emitting TwiML.
+- Resolution: Verify a queue-configured number and a script queue target on deployed dev, including ACD wait, agent connection and completion, then promote before closure. Inbound attachment validation remains separate in #2269.
+- Look in: `app/lib/inbound-queue-twiml.server.ts`, `app/lib/inbound-queue-db.server.ts`, `app/routes/api+/inbound.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/acd/acd-router.server.ts`
+- Existing tests: test/inbound-queue-entry.route.test.ts (both real routes and TwiML: queue text, callback URL values, stored IVR caller, invalid/missing queues, lookup failure and signatures); test/integration-db/inbound-queue-lookup.test.ts (real query: same-workspace, foreign-workspace and missing IDs); Existing inbound, IVR and voicemail suites (surrounding controls)
+- Missing tests: Deployed direct and scripted queue entry, ACD wait, agent connection and completion before promotion.
+- Done when: Both routes emit valid named Enqueue with ACD wait and completion callbacks.; Callback values round-trip unchanged; invalid, missing or foreign queues cannot emit Enqueue.; Signature, call mismatch, voicemail and navigation controls remain valid.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed queue behavior after merge, then promote and close.
+
+### [#2130](https://github.com/chester-hill-solutions/callcaster/issues/2130) Validate ACD credentials before claiming and release failed offers
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Validated credentials are reused and agent-call setup failures release the exact offer; deployed configuration, release and retry checks remain.
+- Current behavior: Source fix from dev@dbb9f691: the wait handler reuses the credentials that passed workspace signature validation. Required call URL setup runs before a new claim. SDK import, construction and create are inside failure cleanup, which releases the entry as timed_out and logs workspace, queue and entry context. All 33 focused Node and three real-Postgres cases passed. Old source failed five Node regressions with 27 controls; the real SDK/database baseline failed two cases with one control. Six isolated mutations failed and were restored.
+- Root cause: Initial missing credentials were already rejected during signature validation, but the second credential read after claim could leave an undialled offer. SDK loading/construction and URL configuration also happened outside or before the call-start cleanup boundary.
+- Resolution: Verify missing configuration, failed agent-call setup, release state and bounded retries on deployed dev, then promote before closure. No new readiness subsystem or historical migration changes are required.
+- Look in: `app/lib/acd/acd-router.server.ts`, `app/lib/db-rpc.server.ts`, `client/migrations/20260731130000_create_acd_inbound_queue_functions.sql`
+- Existing tests: test/acd-offer-start.test.ts (credential reuse, initial rejection, configuration before claim, SDK/create failure, exact release, log context and retry/active controls); test/integration-db/acd-offer-cleanup.test.ts (real SDK setup error and actual release RPC: availability, accepted-entry and missing-entry controls); test/acd-router.test.ts, test/acd-router-route.test.ts and test/acd-router-subroutes.test.ts (existing ACD, signature and stale-sweep controls)
+- Missing tests: Deployed configuration, failed setup, release and retry behavior before promotion.
+- Done when: Missing credentials or required call URL configuration cannot create a new offer.; Validated credentials are reused; failed SDK setup or create releases the exact offered entry.; Actual release makes its agent available while accepted calls and other-workspace offers remain intact.; Logs identify the affected context without credentials; existing signatures, limits, active-entry and stale-sweep controls pass.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed ACD behavior after merge, then promote and close.
 
 ### [#2088](https://github.com/chester-hill-solutions/callcaster/issues/2088) Use the number settings for inbound IVR voicemail playback
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -895,18 +908,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed greeting playback, actual-phone speech and recording capture before promotion.
 - Done when: Configured greeting resolves to Play; fallback speech uses the actual called phone and never the number row ID.; Recording, beep, timeout and callback settings remain intact; call mismatch and navigation controls retain their behavior.; Deployed verification and promotion are complete before closure.
 - Tracker: Source fix is in this change. Verify deployed playback after merge, then promote and close. #2268 and #2269 are separate tasks.
-
-### [#2271](https://github.com/chester-hill-solutions/callcaster/issues/2271) Build valid inbound queue TwiML and ACD callbacks
-- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- Both inbound routes now emit valid Enqueue text and ACD callbacks after a workspace-scoped queue lookup; deployed direct and scripted queue verification remains.
-- Current behavior: Source fix from dev@89bba361: the direct number and IVR terminal paths share an inbound enqueue renderer. It checks a positive safe queue ID and a workspace-owned queue before emitting the real SDK Enqueue with text content, an encoded wait URL and a queue-name completion URL. IVR caller values come from the verified stored call. All 59 focused Node and three real-Postgres tests passed. The old source failed five regressions with 26 controls retained. Nine isolated callback, guard and database mutations failed and were restored.
-- Root cause: Both routes called a nonexistent Enqueue.queue method. The IVR queue branch also omitted the ACD wait and completion callbacks. Raw query interpolation could change callback parameters; repaired routing needs an owned queue before emitting TwiML.
-- Resolution: Verify a queue-configured number and a script queue target on deployed dev, including ACD wait, agent connection and completion, then promote before closure. Inbound attachment validation remains separate in #2269.
-- Look in: `app/lib/inbound-queue-twiml.server.ts`, `app/lib/inbound-queue-db.server.ts`, `app/routes/api+/inbound.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/acd/acd-router.server.ts`
-- Existing tests: test/inbound-queue-entry.route.test.ts (both real routes and TwiML: queue text, callback URL values, stored IVR caller, invalid/missing queues, lookup failure and signatures); test/integration-db/inbound-queue-lookup.test.ts (real query: same-workspace, foreign-workspace and missing IDs); Existing inbound, IVR and voicemail suites (surrounding controls)
-- Missing tests: Deployed direct and scripted queue entry, ACD wait, agent connection and completion before promotion.
-- Done when: Both routes emit valid named Enqueue with ACD wait and completion callbacks.; Callback values round-trip unchanged; invalid, missing or foreign queues cannot emit Enqueue.; Signature, call mismatch, voicemail and navigation controls remain valid.; Deployed verification and promotion are complete before closure.
-- Tracker: Source fix is in this change. Verify deployed queue behavior after merge, then promote and close.
 
 ### [#2089](https://github.com/chester-hill-solutions/callcaster/issues/2089) Use the destination phone to verify the SMS recipient
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03

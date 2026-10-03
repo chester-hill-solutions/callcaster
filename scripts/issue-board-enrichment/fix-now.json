@@ -1796,39 +1796,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point. Related PR evidence: #2251. A PR reference alone does not prove deployed behavior."
   },
   {
-    "issueNumber": 2130,
-    "verdict": "fix-now",
-    "recommendedTitle": "A claimed inbound ACD offer is never released when the workspace's Twilio credentials are missing, so the caller holds for an hour and every agent shows busy",
-    "summary": "Claim-before-credentials leaves a busy agent and an undialled offer. The caller can remain on hold until a later claim runs the stale-offer sweep or the queue limit applies; a guaranteed hour-long hold is not proved.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The wait path claims an agent before loading credentials. Missing credentials skip dialing and leave an offered row and a busy agent without immediate cleanup.",
-    "resolution": "Load credentials before claiming; also release a claimed offer on any no-dial path. Log an actionable configuration error. The sweep is opportunistic, so do not treat it as prompt cleanup.",
-    "lookIn": [
-      "app/lib/acd/acd-router.server.ts:418",
-      "app/lib/acd/acd-router.server.ts:172",
-      "app/lib/acd/acd-router.server.ts:172-179,190-193,395-430",
-      "client/migrations/20260731150000_reset_stale_inbound_offers.sql:1-10,204-217",
-      "loadWorkspaceTwilioCredentialsForAcd",
-      "MAX_QUEUE_TIME_SECONDS"
-    ],
-    "existingTests": [
-      "test/acd-router.test.ts",
-      "test/acd-router-subroutes.test.ts"
-    ],
-    "missingTests": [
-      "A missing-credentials wait poll must neither claim nor leave an agent busy; include stale sweep recovery controls."
-    ],
-    "acceptanceCriteria": [
-      "Missing credentials before claim leave no new offer or busy agent.",
-      "If a claimed call cannot be started, its offer is released and the agent becomes available.",
-      "Repeated wait polls follow an explicit bounded retry or fallback policy, rather than relying on another caller to trigger stale cleanup.",
-      "The missing-credentials condition produces an operator-visible signal."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2131,
     "verdict": "fix-now",
     "recommendedTitle": "Predictive \"Start Dialing\" is a silent no-op when the campaign has no caller ID, and the error is discarded",
