@@ -135,39 +135,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2058,
-    "verdict": "fix-now",
-    "recommendedTitle": "Rule and inventory: inline error text used where a toast belongs",
-    "summary": "The requested rule and complete keep/change inventory have not been added. This is a documentation and classification deliverable; a blanket toast conversion would exceed the request.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The requested rule and complete keep/change inventory have not been added. This is a documentation and classification deliverable; a blanket toast conversion would exceed the request.",
-    "rootCause": "No written rule distinguishing field-level from page-level error presentation, so each site was decided locally.",
-    "resolution": "Write one error-surface rule in design-system documentation and inventory every inline error with keep/change reasons and duplicate-toast cases. File conversion groups separately.",
-    "lookIn": [
-      "docs/design-system.md:81",
-      "app/components/surveys/SurveyForm.tsx:347",
-      "app/routes/signin.tsx:1",
-      "AGENTS.md (design-system section)",
-      "app/components/ui/",
-      "app/components/**/Form*.tsx",
-      "app/routes/**"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Acceptance is an exhaustive reviewed inventory, preservation of field validation, and duplicate-surface classification; this audit did not generate that inventory."
-    ],
-    "acceptanceCriteria": [
-      "A written rule exists where a contributor will find it",
-      "Every inline error site is listed with a keep-or-change verdict and a reason",
-      "Pages rendering the same failure twice are identified",
-      "Changes, if any, land in reviewable batches after the inventory, not mixed into it",
-      "No form validation is removed in the name of consistency"
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "medium",
-    "trackerRecommendation": "Fix now as the rule/inventory task only. PR #2037 addresses transient instances, not this complete inventory. Related PR evidence: #2037. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2015,
     "verdict": "fix-now",
     "recommendedTitle": "auth pages: sign-in hides the real error behind \"We couldn't sign you in, Try again shortly\"",
@@ -2126,5 +2093,167 @@
     "size": "M",
     "risk": "medium",
     "trackerRecommendation": "Independent public read/state fix; no blocking dependency."
+  },
+  {
+    "issueNumber": 2061,
+    "verdict": "fix-now",
+    "recommendedTitle": "Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale",
+    "summary": "Option B is recorded: make the default Alert neutral and require explicit semantic tones. CallCaster has not adopted that contract.",
+    "currentBehavior": "Source audit: dev@5ad088c4, 2026-10-03. The app vendor default still uses border-brand-tertiary and bg-brand-wash. The issue now records a neutral default contract, without changing global brand tokens. Shared workbench ownership is confirmed; app adoption and rendered acceptance remain.",
+    "rootCause": "The app still consumes the older brand-styled default Alert; the selected neutral contract has not been adopted.",
+    "resolution": "Adopt the reviewed canonical ui-kit Alert snapshot as a separate consumer change. Keep existing geometry and theme. Classify unvarianted and style-only warning sites, give conditions explicit tones, and verify light/dark contrast and no page movement. Do not change global brand-wash or brand-tertiary.",
+    "lookIn": [
+      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:100",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx:23",
+      "app/components/ui/alert.tsx:1",
+      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css",
+      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx",
+      "app/components/ui/alert.tsx"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Actual light/dark rendered tone and contrast, including default/explicit warning sites; browser geometry for any migrated dynamic notices."
+    ],
+    "acceptanceCriteria": [
+      "Record the token change, explicit tone, or combined decision.",
+      "Under that decision, a neutral Alert remains legible and does not appear to indicate failure in dark mode.",
+      "List every Alert without an explicit tone and mark it deliberately neutral or give it the required tone.",
+      "If shared tokens change, check their other consumers in light and dark themes.",
+      "Test the selected Alert tone contract and verify the rendered result."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "low",
+    "trackerRecommendation": "Fix now: the Option B decision is recorded. Shared Alert metadata is tracked in chester-hill-solutions/chester-hill-solutions#121; consumer adoption is still unfinished."
+  },
+  {
+    "issueNumber": 2304,
+    "verdict": "fix-now",
+    "recommendedTitle": "Show reset-password action failure once",
+    "summary": "The route renders actionData.error.message inline while useActionFeedback also sends the same action failure to the root toast. Keep one action-result surface; retain password/token validation, entered values and retry. Do not change auth or reset-token policy.",
+    "currentBehavior": "Source-confirmed at dev@5ad088c4, 2026-10-03. The route renders actionData.error.message inline while useActionFeedback also sends the same action failure to the root toast. Keep one action-result surface; retain password/token validation, entered values and retry. Do not change auth or reset-token policy.",
+    "rootCause": "The same action failure reaches two presentation paths.",
+    "resolution": "Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.",
+    "lookIn": [
+      "app/routes/reset-password.tsx",
+      "docs/feedback-inventory.md"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
+  },
+  {
+    "issueNumber": 2305,
+    "verdict": "fix-now",
+    "recommendedTitle": "Show audio-upload failure once",
+    "summary": "The idle fetcher callback sets localError and calls toast.error for the same data.error; the sheet also renders localError. Keep one action-result surface with retry and selected/entered upload data. Retain field-specific validation and upload limits.",
+    "currentBehavior": "Source-confirmed at dev@5ad088c4, 2026-10-03. The idle fetcher callback sets localError and calls toast.error for the same data.error; the sheet also renders localError. Keep one action-result surface with retry and selected/entered upload data. Retain field-specific validation and upload limits.",
+    "rootCause": "The same action failure reaches two presentation paths.",
+    "resolution": "Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.",
+    "lookIn": [
+      "app/components/campaign/settings/AddAudioSheet.tsx",
+      "docs/feedback-inventory.md"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
+  },
+  {
+    "issueNumber": 2306,
+    "verdict": "fix-now",
+    "recommendedTitle": "Associate workspace settings errors with the correct action",
+    "summary": "Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.",
+    "currentBehavior": "Source-confirmed at dev@5ad088c4, 2026-10-03. Every settings action failure is toasted and assigned to the add-member Email field. Failures from other settings operations are not email validation. Associate only actual email validation with that field; render other action failures once through the root toast. Retain permission checks and action-specific recovery.",
+    "rootCause": "The route assigns failures from unrelated settings actions to the Email field.",
+    "resolution": "Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/settings.route.tsx",
+      "docs/feedback-inventory.md"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
+  },
+  {
+    "issueNumber": 2307,
+    "verdict": "fix-now",
+    "recommendedTitle": "Show onboarding name-save failure once",
+    "summary": "The onboarding route handles actionData.error through useActionFeedback while Intro renders the same actionError inline. Keep one result for the name-save operation and preserve genuine field validation, entered name and retry. Do not change the onboarding state machine or provider writes.",
+    "currentBehavior": "Source-confirmed at dev@5ad088c4, 2026-10-03. The onboarding route handles actionData.error through useActionFeedback while Intro renders the same actionError inline. Keep one result for the name-save operation and preserve genuine field validation, entered name and retry. Do not change the onboarding state machine or provider writes.",
+    "rootCause": "The same action failure reaches two presentation paths.",
+    "resolution": "Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.",
+    "lookIn": [
+      "app/routes/workspaces+/$id/onboarding/OnboardingIntroStep.tsx",
+      "docs/feedback-inventory.md"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
+  },
+  {
+    "issueNumber": 2308,
+    "verdict": "fix-now",
+    "recommendedTitle": "Show agent startup failure once",
+    "summary": "The startup-failure branch passes the same token/runtime error to StatusBar and renders it again in an outer Alert. This replaces unavailable content. Keep one failure-region message, available recovery actions and disabled unavailable controls. Do not convert live call controls into brief toasts or change device/call state.",
+    "currentBehavior": "Source-confirmed at dev@5ad088c4, 2026-10-03. The startup-failure branch passes the same token/runtime error to StatusBar and renders it again in an outer Alert. This replaces unavailable content. Keep one failure-region message, available recovery actions and disabled unavailable controls. Do not convert live call controls into brief toasts or change device/call state.",
+    "rootCause": "The same action failure reaches two presentation paths.",
+    "resolution": "Keep one result for the actual operation. Preserve field association, entered values, retry, pending locks, permissions and recovery. Use the shared feedback rule in docs/design-system.md.",
+    "lookIn": [
+      "app/components/agent/AgentDesktop.tsx",
+      "docs/feedback-inventory.md"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Actual component and feedback-hook regression: original defect fails, allowed validation/retry control passes, no replay. Real-browser page rectangles and scroll remain stable."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Fix now as one atomic PR. Parent #2300; full local CI before every push, then merge and clean up only on green."
   }
 ]

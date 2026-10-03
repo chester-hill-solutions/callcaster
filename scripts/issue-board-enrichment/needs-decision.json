@@ -983,38 +983,6 @@
     "trackerRecommendation": "Move to Needs decision. Choose reply attribution semantics before adding a historical heuristic as fact."
   },
   {
-    "issueNumber": 2061,
-    "verdict": "needs-decision",
-    "recommendedTitle": "Dark mode: a neutral Alert reads as an error because --brand-wash goes dark maroon while --brand-tertiary stays pale",
-    "summary": "The maroon dark token and default brand Alert still exist. The issue explicitly requires an A/B/C decision and none is recorded; the onboarding instance fix does not decide the shared design contract.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The maroon dark token and default brand Alert still exist. The issue explicitly requires an A/B/C decision and none is recorded; the onboarding instance fix does not decide the shared design contract.",
-    "rootCause": "The default Alert pairs a pale pink border token with a dark maroon background token. The dark theme overrides brand-wash but retains brand-tertiary. Whether to change tokens, require explicit tones, or do both remains undecided.",
-    "resolution": "Choose token change, explicit tone contract, or both; inventory default Alert and other token consumers, then verify dark/light examples before changing shared tokens.",
-    "lookIn": [
-      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css:100",
-      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx:23",
-      "app/components/ui/alert.tsx:1",
-      "vendor/chester-hill-solutions/shad-cc/src/styles/theme.css",
-      "vendor/chester-hill-solutions/shad-cc/src/components/ui/alert.tsx",
-      "app/components/ui/alert.tsx"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "A source token can confirm the described colors, not whether a user reads them as an error. No browser contrast/tone acceptance check was performed."
-    ],
-    "acceptanceCriteria": [
-      "Record the token change, explicit tone, or combined decision.",
-      "Under that decision, a neutral Alert remains legible and does not appear to indicate failure in dark mode.",
-      "List every Alert without an explicit tone and mark it deliberately neutral or give it the required tone.",
-      "If shared tokens change, check their other consumers in light and dark themes.",
-      "Test the selected Alert tone contract and verify the rendered result."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "Needs decision: record the A/B/C design choice before a shared visual change. Related PR evidence: #2071. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2194,
     "verdict": "needs-decision",
     "recommendedTitle": "Cull 111 empty legacy-named Twilio subaccounts (Console-only; 31 must be kept)",

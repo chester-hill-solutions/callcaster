@@ -3876,5 +3876,64 @@
     "size": "S",
     "risk": "medium",
     "trackerRecommendation": "User-authorized source change in this atomic PR; keep open for deployed verification and promotion."
+  },
+  {
+    "issueNumber": 2058,
+    "verdict": "verify-close",
+    "recommendedTitle": "Rule and inventory: inline error text used where a toast belongs",
+    "summary": "PR #2302 completed the feedback rule and reviewed source inventory on dev; consumer conversions are separate work.",
+    "currentBehavior": "Source audit: dev@5ad088c4, 2026-10-03. docs/design-system.md defines no movement on appearance, update and dismissal. docs/feedback-inventory.md records 76 error candidates, 79 Alert sites, supplemental status owners and five duplicate groups. Both review axes and full local/remote checks passed. No runtime conversion or deployed browser acceptance is claimed.",
+    "rootCause": "No written rule distinguishing field-level from page-level error presentation, so each site was decided locally.",
+    "resolution": "Verify the documentation deliverable after promotion, then close. Implement consumer changes separately under #2300 and #2304–#2308.",
+    "lookIn": [
+      "docs/design-system.md",
+      "docs/feedback-inventory.md",
+      "docs/design-system-audit.md"
+    ],
+    "existingTests": [
+      "Full local CI for PR #2302: 5,322 Vitest tests and 22 Bun tests; remote checks and both deployments passed."
+    ],
+    "missingTests": [
+      "Promotion of the documentation deliverable; runtime conversions are separate acceptance."
+    ],
+    "acceptanceCriteria": [
+      "A written rule exists where a contributor will find it",
+      "Every inline error site is listed with a keep-or-change verdict and a reason",
+      "Pages rendering the same failure twice are identified",
+      "Changes, if any, land in reviewable batches after the inventory, not mixed into it",
+      "No form validation is removed in the name of consistency"
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close. PR #2302 is merged into dev at 5ad088c4; keep separate consumer issues open."
+  },
+  {
+    "issueNumber": 2014,
+    "verdict": "verify-close",
+    "recommendedTitle": "auth pages: sign-in errors should be a toast, not inline text (sweep split to #2058)",
+    "summary": "The sign-in route already sends action failures through the root feedback hook; the wider source inventory is complete in #2058.",
+    "currentBehavior": "Source audit: dev@5ad088c4, 2026-10-03. app/routes/signin.tsx uses useActionFeedback with getError(data.error) and renders no inline action failure. Source behavior is present; this audit does not claim a deployed sign-in test.",
+    "rootCause": "The earlier board record described pre-conversion source and treated the inventory as a blocker for the page fix.",
+    "resolution": "Verify one sign-in failure toast, no revalidation replay, retained input/validation and stable page geometry in the deployed app. Promote before closure. The separate inventory is PR #2302; other consumer defects remain under #2300.",
+    "lookIn": [
+      "app/routes/signin.tsx",
+      "app/hooks/utils/useActionFeedback.ts",
+      "app/root.tsx",
+      "docs/feedback-inventory.md"
+    ],
+    "existingTests": [],
+    "missingTests": [
+      "Actual sign-in failure, retry/revalidation and real-browser geometry; deployed verification and promotion."
+    ],
+    "acceptanceCriteria": [
+      "A failed sign-in surfaces through a toast, not inline text",
+      "No inline error text remains on the sign-in page",
+      "The change is scoped to this page; the sweep ships separately as #2058"
+    ],
+    "blockedBy": [],
+    "size": "XS",
+    "risk": "low",
+    "trackerRecommendation": "Verify and close the sign-in-only scope. Do not bundle the five duplicate-message defects into this page fix."
   }
 ]
