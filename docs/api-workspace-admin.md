@@ -117,3 +117,7 @@ Workspace API keys authenticate the [public integrator endpoints](./api-overview
 ### Password recovery UI
 
 `/remember` accepts a reset request with generic feedback for known and unknown email addresses. Reset links use the configured application base URL and the final page `/reset-password`; Better Auth checks the issued token before sending the user there. The form retains the token in its URL for the password change. Expired or reused tokens cannot change a password. Failed email verification at `/api/auth/callback` or `/auth/confirm` returns to `/signin`.
+
+### Admin workspace response fields
+
+Global admin dashboard, detail and user-workspace responses use the same positive workspace field set as product clients: `id`, `name`, `created_at`, `credits`, `disabled`, `feature_flags` and `coaching_config`. Dashboard and detail data can add campaign rows. Membership and invitation workspaces use that field set too; invitation display rows exclude the token hash. Provider account responses contain only `sid`, `friendlyName`, `status`, `type` and `dateCreated`. Server services retain credential reads for Twilio operations and health calculations. The projection gate checks static reader imports and client types; complete serialized response tests check nested data.

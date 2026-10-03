@@ -1,8 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { Tables } from "@/lib/db-types";
+import type { WorkspaceClientData } from "@/lib/workspace-client-projection.server";
 
-type WorkspaceRecord = (Tables<"workspace"> & { campaign?: unknown[] }) | null;
+type WorkspaceRecord = (WorkspaceClientData & { campaign?: unknown[] }) | null;
 type WorkspaceUserRecord = (Tables<"workspace_users"> & { user?: Tables<"user"> | null })[] | null | undefined;
 type WorkspaceNumberRecord = Tables<"workspace_number">[] | null | undefined;
 type WorkspaceTwilioSyncSnapshot = {
@@ -72,7 +73,7 @@ export default function WorkspaceOverview({
                     </dl>
                 </CardContent>
             </Card>
-            
+
             <Card>
                 <CardHeader>
                     <CardTitle>Statistics</CardTitle>
@@ -146,4 +147,4 @@ export default function WorkspaceOverview({
             </Card>
         </div>
     );
-} 
+}

@@ -1,12 +1,13 @@
 import type { Tables } from "@/lib/db-types";
 import type { WorkspaceAdminRow } from "@/lib/admin-workspaces";
+import type { WorkspaceClientData } from "@/lib/workspace-client-projection.server";
 
-export type WorkspaceWithCampaigns = Tables<"workspace"> & {
+export type WorkspaceWithCampaigns = WorkspaceClientData & {
   campaign?: Tables<"campaign">[] | null;
 };
 
-export type CampaignWithWorkspace = Tables<"campaign"> & {
-  workspace?: Tables<"workspace"> | null;
+export type CampaignWithWorkspace = Omit<Tables<"campaign">, "workspace"> & {
+  workspace?: WorkspaceClientData | null;
 };
 
 export type DeadLetteredJobRow = {

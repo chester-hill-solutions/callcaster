@@ -6,6 +6,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Security
 
+- Admin workspace responses now use explicit client fields and keep Twilio credentials, provider tokens and invitation hashes on the server ([PR #2280](https://github.com/chester-hill-solutions/callcaster/pull/2280), [#2078](https://github.com/chester-hill-solutions/callcaster/issues/2078)).
+
 - Invitation resend now checks the session email and restricts token rotation to the matching workspace and pending invitation; refused requests do not send email ([PR #2277](https://github.com/chester-hill-solutions/callcaster/pull/2277), [#2077](https://github.com/chester-hill-solutions/callcaster/issues/2077)).
 
 - Invitation cancellation now restricts its write to the selected workspace; foreign, missing and finalized invitations return the same not-found error ([PR #2276](https://github.com/chester-hill-solutions/callcaster/pull/2276), [#2076](https://github.com/chester-hill-solutions/callcaster/issues/2076)).

@@ -3,7 +3,7 @@ import { createTenantDb } from "@/server/tenant-db";
 import { adminRouteAuth } from "@/lib/admin-route.server";
 import { defineLoader } from "@/lib/handler.server";
 import { getWorkspaceCreditsBalance } from "@/lib/workspace-credits.server";
-import { getWorkspaceById } from "@/lib/workspace-members-db.server";
+import { getWorkspaceForClient } from "@/lib/workspace-client-projection.server";
 import { LEDGER_ACTIVITY_COLUMNS } from "@/lib/transaction-history.server";
 
 /** Ledger rows shown on the Credits tab, newest first. */
@@ -29,7 +29,7 @@ export const loader = defineLoader({
     const { headers } = auth;
 
     const [workspace, balance] = await Promise.all([
-      getWorkspaceById(workspaceId),
+      getWorkspaceForClient(workspaceId),
       getWorkspaceCreditsBalance(workspaceId),
     ]);
 

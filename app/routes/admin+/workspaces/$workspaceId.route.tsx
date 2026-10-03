@@ -49,7 +49,7 @@ interface TwilioUsageRecord {
 export default function WorkspaceDetails() {
     const { workspace, workspaceUsers, phoneNumbers, twilioPortalSnapshot } = useLoaderData();
     const location = useLocation();
-    
+
     // Determine active tab from URL
     const getActiveTab = () => {
         const path = location.pathname;
@@ -111,9 +111,9 @@ export default function WorkspaceDetails() {
                     </TabsTrigger>
                 </TabsList>
                 {getActiveTab() === "overview" ? (
-                 <WorkspaceOverview 
-                    workspace={workspace as any} 
-                    workspaceUsers={workspaceUsers} 
+                 <WorkspaceOverview
+                    workspace={workspace}
+                    workspaceUsers={workspaceUsers}
                     phoneNumbers={phoneNumbers}
                     twilioSnapshot={twilioPortalSnapshot}
                  />

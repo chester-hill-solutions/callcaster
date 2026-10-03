@@ -56,6 +56,10 @@ temporary table can isolate the required columns without changing stored app
 rows. Restore injected clients in `finally`. Run the fixed cases before removing
 or reversing the predicate, and retain a real-row positive control.
 
+Projection guards need a valid positive `Pick` control, plus a secret-bearing
+`Pick` rejection. A full-row type inside an explicit safe field selection does
+not itself expose the full row. Check serialized nested payloads separately.
+
 For global-table mutations, verify the actual UPDATE predicate with foreign and
 owned rows, then exercise the real API/form error responses. Access checks before
 a bare-ID write do not impose tenant scope. Keep a permitted-role and an explicit

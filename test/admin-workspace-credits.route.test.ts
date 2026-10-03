@@ -6,7 +6,7 @@ import { createRouteContextProvider, withAdminRouteArgs } from "./helpers/route-
 const mocks = vi.hoisted(() => ({
   insertTransactionHistoryIdempotent: vi.fn(),
   getWorkspaceCreditsBalance: vi.fn(),
-  getWorkspaceById: vi.fn(),
+  getWorkspaceForClient: vi.fn(),
   findRecentTransactions: vi.fn(async () => []),
 }));
 
@@ -30,9 +30,9 @@ vi.mock("@/lib/workspace-credits.server", async (importOriginal) => ({
     mocks.getWorkspaceCreditsBalance(...args),
 }));
 
-vi.mock("@/lib/workspace-members-db.server", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/workspace-members-db.server")>()),
-  getWorkspaceById: (...args: unknown[]) => mocks.getWorkspaceById(...args),
+vi.mock("@/lib/workspace-client-projection.server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace-client-projection.server")>()),
+  getWorkspaceForClient: (...args: unknown[]) => mocks.getWorkspaceForClient(...args),
 }));
 
 function manualCreditForm(overrides: Record<string, string> = {}) {
@@ -67,7 +67,7 @@ describe("admin workspace credits route", () => {
       existingId: 1,
     });
     mocks.getWorkspaceCreditsBalance.mockResolvedValue(2500);
-    mocks.getWorkspaceById.mockResolvedValue({ id: "ws-1", name: "Acme" });
+    mocks.getWorkspaceForClient.mockResolvedValue({ id: "ws-1", name: "Acme" });
     mocks.findRecentTransactions.mockResolvedValue([]);
   });
 
@@ -187,7 +187,7 @@ describe("admin workspace credits route", () => {
   });
 
   test("loader 404s when the workspace does not exist", async () => {
-    mocks.getWorkspaceById.mockResolvedValue(null);
+    mocks.getWorkspaceForClient.mockResolvedValue(null);
     mocks.getWorkspaceCreditsBalance.mockResolvedValue(null);
 
     const mod = await import("../app/routes/admin+/workspaces/$workspaceId/credits.route");
