@@ -21,6 +21,7 @@ type CallRow = typeof callTable.$inferSelect;
  * Count calls already placed to a phone number within a campaign. Used to keep
  * IVR/robocall campaigns from dialling the same number twice (e.g. two contacts
  * sharing one household phone), mirroring hasDuplicateCampaignSms for SMS.
+ * Test calls have no outreach attempt and must not suppress audience calls.
  */
 export async function countCampaignCallsToPhone(
   workspaceId: string,
@@ -33,6 +34,7 @@ export async function countCampaignCallsToPhone(
     where: and(
       eq(callTable.campaign_id, Number(campaignId)),
       eq(callTable.to, to),
+      isNotNull(callTable.outreach_attempt_id),
     ),
   });
 }

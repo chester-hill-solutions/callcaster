@@ -26,5 +26,12 @@ request.
 - Push with `git push -u origin <branch>`.
 - After pushing, verify the remote branch and open a PR into `dev`.
 
+## Rebase with local changes
+
+Git cannot rebase a dirty worktree. Do not discard tested changes to satisfy the
+rebase step. Fetch and check whether `origin/dev` changed, commit the scoped work,
+then rebase the clean branch before pushing. If the rebase changes the tested
+source or its base, run full `npm run ci:local` again before the push.
+
 Never use destructive reset or checkout commands to discard work unless the
 user explicitly requests it.
