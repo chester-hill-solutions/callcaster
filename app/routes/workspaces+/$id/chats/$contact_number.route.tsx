@@ -27,7 +27,7 @@ export default function ChatScreen() {
 
   return (
     <ChatThreadView
-      key={contact_number}
+      key={`${workspace.id}:${contact_number}`}
       workspace={workspace}
       workspaceNumbers={workspaceNumbers}
       registerChatActions={registerChatActions}

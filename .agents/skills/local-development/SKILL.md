@@ -61,6 +61,16 @@ Read the component export and prop contract before building a UI fixture.
 Tests are excluded from the app TypeScript program, so a green typecheck does
 not detect a wrong default/named import or a wrong event field in a test.
 Run the actual component test before using it as regression evidence.
+For route UI tests, mock the one-off server loader/action re-export boundary
+when router data is supplied by the fixture. Importing the real server graph can
+fail database startup before UI cases collect; retain the actual browser hooks.
+
+## Realtime snapshot reconciliation
+
+An INSERT matcher cannot safely match every row in a loader snapshot. Check new
+saved-row identity and suitable time before replacing optimistic state. Test a
+repeated reply against known, older and unknown-time rows; it must remain present
+and still accept a send-failure update. Keep a valid saved-row precision control.
 
 ## SQL query regressions
 

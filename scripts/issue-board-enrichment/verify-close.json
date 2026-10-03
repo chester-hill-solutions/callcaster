@@ -3693,7 +3693,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Return feature-unavailable response when call-in verification is not configured",
     "summary": "The real optional verification-number getter now permits missing/empty values, making the existing route 503 response reachable.",
-    "currentBehavior": "Source fix based on dev@0a0acd17: only VERIFICATION_PHONE_NUMBER is added to optional handling. Missing/empty configuration returns undefined and the actual loader returns the existing 503 feature-unavailable response without a session write. Configured requests retain the number, caller, ten-minute expiry and session headers; invalid callers, denied auth and writer failures retain their responses. Boot required keys and production media-stream secret handling are unchanged. All 27 focused cases pass. Original runtime fails four with 23 controls; three isolated mutations fail and all source is restored. Full local and remote gates are required before merge.",
+    "currentBehavior": "Merged to dev in PR #2290 at c14e4a19. The single optional verification-number entry makes absent/empty real getter values undefined and the actual loader returns 503 without session writes. Configured requests retain number, caller, ten-minute expiry and session headers; invalid callers, auth denial and writer failure retain errors. Boot keys and other security settings are unchanged. All 27 focused cases pass; original runtime fails four with 23 controls, three mutations fail. Full local CI passed 5,255 Vitest and 22 Bun tests; all remote and both Railway gates passed on 0d44b4b7. Issue-on-dev moved one item. Verify disabled/enabled deployed behavior and promote before closure.",
     "resolution": "Verify absent/empty configuration on deployed dev returns 503 without a session write; verify configured valid session creation. Keep other required configuration and security contracts unchanged. Promote before closure.",
     "lookIn": [
       "app/lib/env.server.ts",
@@ -3723,5 +3723,46 @@
     "risk": "medium",
     "trackerRecommendation": "Source fix is in this change; verify disabled/enabled deployed behavior before promotion and closure.",
     "rootCause": "The optional type/boot configuration was inconsistent with the getter optional-key list. The getter threw before the intended route branch."
+  },
+  {
+    "issueNumber": 2106,
+    "verdict": "verify-close",
+    "recommendedTitle": "Keep loaded chat history when the current thread refreshes",
+    "summary": "Same-conversation loader refreshes reconcile rows by SID and retain loaded history. Workspace/contact changes reset the keyed thread.",
+    "currentBehavior": "Source fix based on dev@c14e4a19: loader refreshes update matching SIDs, add unseen rows and retain older/unmatched live rows in time order. Only previously unseen saved rows with a suitable creation time can replace matching pending replies when loader data beats SSE. Known/older/unknown-time rows keep a new repeated reply and its failure marker; second-precision saved timestamps are handled. Realtime INSERT checks the actual retained list, including older pages. Conversation identity includes workspace and normalized contact. The existing route contact key now includes workspace; pagination refs/state belong to that keyed lifetime, not latest-page refreshes. Empty older pages update exhaustion. All 32 focused cases pass. Original runtime fails ten of fourteen new cases with four controls; eleven isolated history/reset/update/duplicate/pending/pagination mutations fail and all source is restored. Full local and remote gates are required before merge.",
+    "resolution": "Verify loading older pages, replying and filter/sort revalidation on deployed dev retain history, update matching records and do not duplicate saved/live replies. Different workspace/contact must reset history/pagination. Promote before closure.",
+    "lookIn": [
+      "app/hooks/realtime/useChatRealtime.ts",
+      "app/hooks/chats/useChatThread.ts",
+      "app/routes/workspaces+/$id/chats/$contact_number.route.tsx",
+      "app/hooks/chats/useChatsPage.ts"
+    ],
+    "existingTests": [
+      "test/ui/chat-thread-history.test.tsx",
+      "test/ui/hooks-chats.test.tsx",
+      "test/ui/hooks-realtime.test.tsx",
+      "test/ui/hooks-chats-optimistic-failure.test.tsx",
+      "test/ui/use-chats-page-pagination.test.tsx"
+    ],
+    "missingTests": [
+      "Deployed dev scroll/reply/filter/identity verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "At least two older pages survive reply and filter/sort loader refreshes.",
+      "Matching SID records update, unmatched live rows remain and messages retain chronological order.",
+      "Saved rows replace matching optimistic replies when loader data arrives before SSE.",
+      "Known/older/unknown-time saved rows cannot remove a new repeated pending reply or hide send failure; valid second-precision saved rows can replace it.",
+      "SSE/loader overlap and already-loaded older SIDs do not append duplicates.",
+      "Different contact/workspace resets history and pagination; equivalent normalized contact keeps history.",
+      "Empty older pages stop pagination; latest-page availability changes do not reset exhaustion.",
+      "Current-context event filtering is retained.",
+      "Original source and isolated regressions fail meaningful tests; full local/remote gates pass before merge.",
+      "Verify deployed dev and promote before closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "Source fix is in this change. Thread history is separate from the sidebar accumulation already fixed under #2191; verify the deployed flow before promotion and closure.",
+    "rootCause": "Loader array reference changes were treated as a new conversation and replaced accumulated history. SID bookkeeping also excluded manually prepended rows; latest-page pagination state did not represent the retained thread."
   }
 ]
