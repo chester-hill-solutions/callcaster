@@ -976,41 +976,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2090,
-    "verdict": "fix-now",
-    "recommendedTitle": "Only STOP and UNSUBSCRIBE are honoured — CANCEL, END, QUIT, REVOKE and \"OPT OUT\" do not opt the contact out",
-    "summary": "The default opt-out set is only STOP and UNSUBSCRIBE. A configured END set removes STOP. Direct checks confirm CANCEL is not suppressed and configured END loses STOP.",
-    "resolution": "Keep mandatory keywords in a shared set and union extra configuration. Separate the unknown-sender suppression policy from this confirmed parsing defect.",
-    "lookIn": [
-      "app/lib/chat-opt-out.ts:1",
-      "app/lib/chat-opt-out.ts:17",
-      "app/lib/chat-opt-out.ts:1-30",
-      "app/routes/api+/inbound-sms.action.server.ts:196-230",
-      "app/lib/campaign-sms-dispatch.server.ts:435",
-      "scripts/e2e/seed-data.mjs:164",
-      "app/lib/messaging-onboarding/ (where `advancedOptOutEnabled` is read)"
-    ],
-    "existingTests": [
-      "test/chat-opt-out.test.ts",
-      "test/inbound-sms.route.test.ts"
-    ],
-    "missingTests": [
-      "Test all required keyword values, custom keyword union and unknown-sender handling."
-    ],
-    "acceptanceCriteria": [
-      "`STOP`, `UNSUBSCRIBE`, `CANCEL`, `END`, `QUIT`, `REVOKE` and `OPT OUT` all set `contact.opt_out = true` (one parameterised test over the whole set).",
-      "A workspace configured with `optOutKeywords: \"STOP\"` still honours UNSUBSCRIBE and the rest of the mandatory set.",
-      "A STOP from a number with no contact row is recorded somewhere enforceable, or the operator is warned — decided and tested either way.",
-      "`advancedOptOutEnabled: false` is visible to the operator rather than silent.",
-      "`test/ui` / dispatch tests: a contact that opted out is skipped by the next campaign dispatch (the positive control)."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The default opt-out set is only STOP and UNSUBSCRIBE. A configured END set removes STOP. Direct checks confirm CANCEL is not suppressed and configured END loses STOP."
-  },
-  {
     "issueNumber": 2099,
     "verdict": "fix-now",
     "recommendedTitle": "Production rate-limit buckets have no retention cleanup and use the leftmost forwarded address",
