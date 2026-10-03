@@ -3296,7 +3296,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Authorize invitation resend before token rotation",
     "summary": "Session email authorizes resend before rotation; the actual write also filters workspace, email, ID and pending state. Deployed checks remain.",
-    "currentBehavior": "Source fix from dev@8e1f89d3: the accept-invite route loads the invitation and compares normalized session email before calling resend. Foreign, missing and finalized invitations have one 404 and no email delivery. The writer requires workspace and authorized email and includes both in the actual UPDATE with ID and pending status. Shared package normalization and opaque-token helpers remain in use; only the hash is stored and the seven-day expiry is preserved. All 45 focused Node and six real Postgres cases passed. Old source failed six Node and five database regressions with 39 Node and one allowed database control retained. Nine isolated mutations failed and were restored.",
+    "currentBehavior": "Merged to dev in PR #2277 at c261919e. Session email authorizes resend before rotation or delivery; the actual UPDATE filters mandatory workspace, authorized email, ID and pending state. Same 404 for foreign/missing/finalized invitations, unsigned 401, seven-day hash-only token and expired-pending resend remain. All 45 focused Node and six real Postgres cases passed, nine isolated mutations failed, full local CI passed 5,007 Vitest and 22 Bun tests. All remote gates passed on 7a1945e7; issue-on-dev moved one item. Deployed functional verification and promotion remain.",
     "resolution": "Verify foreign, missing and finalized refusal, normalized own-email resend, token expiry and existing throttling on deployed dev. Verify no email or token change on refusal, then promote before closure.",
     "lookIn": [
       "app/routes/accept-invite.action.server.ts",
@@ -3325,5 +3325,44 @@
     "risk": "high",
     "trackerRecommendation": "Source fix is in this change. Verify deployed refusal, permitted delivery and rate limiting, then promote and close.",
     "rootCause": "The route checked only the presence of a session email. The package resend API rotated a globally named pending invitation by ID without workspace or email authorization."
+  },
+  {
+    "issueNumber": 2075,
+    "verdict": "verify-close",
+    "recommendedTitle": "Restore the password recovery email journey",
+    "summary": "The reset email reaches the password form with its token; request feedback is generic and both verification failure paths reach sign-in. Deployed checks remain.",
+    "currentBehavior": "Source fix from dev@c261919e: /remember uses the configured BASE_URL with /reset-password. The actual issued link passes through the product auth loader and installed Better Auth handler to the real reset loader and action, changes the password and rejects token reuse. Known and unknown emails receive identical acceptance. Both verification callbacks return to registered /signin on failure. Rendered feedback covers initial, success and error states and accurate password completion. All 33 focused Node and four UI tests passed; original source failed ten Node and two UI cases with 23 Node and two UI controls retained. Nine isolated destination, host, callback, token and feedback mutations failed and were restored.",
+    "resolution": "Verify the emailed journey, generic request feedback, expired and reused tokens, actual password sign-in and callback failures on deployed dev, then promote before closure. The repository-wide literal redirect guard is separate in #2278.",
+    "lookIn": [
+      "app/routes/remember.action.server.ts",
+      "app/routes/remember.tsx",
+      "app/routes/reset-password.tsx",
+      "app/routes/reset-password.loader.server.ts",
+      "app/routes/reset-password.action.server.ts",
+      "app/routes/api+/auth/callback.loader.server.ts",
+      "app/routes/auth/confirm.loader.server.ts"
+    ],
+    "existingTests": [
+      "test/password-recovery-journey.test.ts (installed Better Auth, actual email sender, auth loader, reset loader/action, sign-in, expiry, replay, configured host and throttling)",
+      "test/verification-callbacks.test.ts (both missing/rejected callbacks and success cookie/return controls)",
+      "test/ui/password-recovery-feedback.test.tsx (real rendered forms and action feedback)",
+      "Existing remember, reset, email sender, auth-instance and callback tests"
+    ],
+    "missingTests": [
+      "Deployed password recovery and callback verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Actual issued link reaches the password form with the original token and the action changes the password.",
+      "Known and unknown emails receive the same generic acceptance feedback.",
+      "Verification failures reach a real sign-in route without carrying tokens; success keeps cookies and safe return paths.",
+      "Password completion feedback names the correct credential.",
+      "Existing expiry, replay rejection and request/reset limits remain.",
+      "Repository-wide redirect guard is tracked separately in #2278; deployed verification and promotion precede closure."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Source fix is in this change. Verify deployed recovery and failure paths, then promote and close.",
+    "rootCause": "The UI passed an email verification callback as the final password reset page. That callback required other parameters and redirected to an absent route; request success feedback was disabled."
   }
 ]

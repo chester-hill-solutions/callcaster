@@ -517,46 +517,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2075,
-    "verdict": "fix-now",
-    "recommendedTitle": "Password reset email links to /api/auth/callback, which 302s to a route that does not exist — the forgot-password flow is dead end to end",
-    "summary": "Password reset UI still targets the verification callback; it accepts token_hash/type, ignores the reset token, and redirects to an absent route.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Password reset UI still targets the verification callback; it accepts token_hash/type, ignores the reset token, and redirects to an absent route.",
-    "resolution": "Send reset links to /reset-password, correct the invalid callback fallback, and enable reset-request feedback.",
-    "lookIn": [
-      "app/routes/remember.action.server.ts:24",
-      "app/routes/api+/auth/callback.loader.server.ts:11",
-      "app/routes/remember.tsx:20",
-      "test/remember.route.test.ts:35",
-      "app/routes/remember.action.server.ts:19-26",
-      "app/routes/api+/auth/callback.loader.server.ts:11-15,33",
-      "app/lib/platform-auth.server.ts:289-311 (the JSON path that is already correct)",
-      "app/routes/reset-password.loader.server.ts:7",
-      "app/routes/signin.tsx:86",
-      "app/routes/remember.tsx:18-29 (the missing success feedback)",
-      "scripts/baselines/route-tree.txt:121"
-    ],
-    "existingTests": [
-      "`test/remember.route.test.ts:55-61` asserts `redirectTo: \"http://localhost/api/auth/callback\"` — a tautological echo of the constant, which is why the break survived.",
-      "`test/api-auth-callback.route.test.ts:94-111` asserts the `auth-code-error` fallback, i.e. it pins the broken branch as correct.",
-      "`test/reset-password.route.test.ts` tests the form in isolation and never walks the emailed link.",
-      "`e2e/specs/auth.spec.ts` has no reset case."
-    ],
-    "missingTests": [
-      "Walk the issued reset link through the real callback and assert the final password form keeps the token. Existing isolated tests pin the wrong destination."
-    ],
-    "acceptanceCriteria": [
-      "A user who submits `/remember` and clicks the emailed link lands on the password form with the token populated.",
-      "No redirect target in `app/routes/` points at a URL that is absent from `scripts/baselines/route-tree.txt`.",
-      "The success toast on `/remember` fires (#the form currently gives the user no feedback at all) — see Related.",
-      "A guard exists that walks every `redirect(\"/…\")` literal in `app/routes/**` and fails when the target is not in the route tree."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Keep Fix now. #2225 added rate limiting to the HTML reset request but did not repair its reset destination or success feedback. Related PR evidence: #2225. A PR reference alone does not prove deployed behavior."
-  },
-  {
     "issueNumber": 2078,
     "verdict": "fix-now",
     "recommendedTitle": "Admin routes serialize the full workspace row — Twilio auth tokens, twilio_data and stripe_id reach the browser for every workspace",
@@ -2446,5 +2406,37 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Independent Task split from #2088. No blocking edge to playback or email delivery: the target grammar is documented."
+  },
+  {
+    "issueNumber": 2278,
+    "verdict": "fix-now",
+    "recommendedTitle": "Validate literal redirect targets against the route tree",
+    "summary": "The existing gate checks dot-relative redirects but cannot detect an absent absolute target.",
+    "currentBehavior": "Source audit dev@c261919e: check-relative-redirects freezes dot-relative calls only. The wide absolute-target gate requested by #2075 is now a separate Task.",
+    "rootCause": "The existing guard has no route-tree matching for absolute redirect literals.",
+    "resolution": "Parse literal absolute redirects with the TypeScript AST, compare normalized pathnames to the generated route tree with explicit parameter and wildcard matching, test absent/real/multiline targets, resolve current violations and wire the gate into local and quality CI.",
+    "lookIn": [
+      "scripts/check-relative-redirects.mjs",
+      "scripts/baselines/route-tree.txt",
+      "app/routes/",
+      "package.json",
+      ".github/workflows/ci.yml"
+    ],
+    "existingTests": [
+      "test/check-relative-redirects.test.ts"
+    ],
+    "missingTests": [
+      "Absolute-target parser, registered/missing route, multiline, query/hash, parameterized and wildcard fixtures."
+    ],
+    "acceptanceCriteria": [
+      "Literal absolute redirect pathnames match registered routes, including multiline calls.",
+      "Query/hash stripping, parameterized routes and wildcards have explicit behavior and fixtures.",
+      "Existing violations are corrected or tracked before enabling the gate.",
+      "Local and quality CI run the gate; the relative redirect check remains."
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "low",
+    "trackerRecommendation": "Independent preventive Task split from #2075; no blocking edge."
   }
 ]

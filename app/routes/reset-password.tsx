@@ -13,8 +13,8 @@ export default function ResetPassword() {
   const actionData = useActionData();
 
   useActionFeedback(actionData, {
-    getSuccess: (data) => data?.success != null,
-    successMessage: "Email successfully updated! Redirecting...",
+    getSuccess: (data) => data?.success === true,
+    successMessage: "Password updated. You can now sign in.",
   });
 
   return (
