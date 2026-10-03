@@ -7,6 +7,8 @@ import {
   MMS_CREDITS,
   NUMBER_RENTAL_MONTHLY_CREDITS,
   SMS_SEGMENT_CREDITS,
+  STAFFED_FIRST_MINUTE_CREDITS,
+  STAFFED_ADDITIONAL_MINUTE_CREDITS,
   formatCreditLabel,
 } from "../../shared/pricing";
 
@@ -28,8 +30,7 @@ export type PublicPricingContent = {
   /** Underlying account costs — the price of credits and phone rental. */
   account: PublicPricingRow[];
   /**
-   * Staffed live calls no longer list a rate on the public page; users are
-   * invited to reach out so we can scope the engagement. #1392.
+   * Calls placed by the CallCaster team need a project quote. #1392.
    */
   staffedCallout: {
     heading: string;
@@ -41,6 +42,10 @@ export type PublicPricingContent = {
 export function buildPublicPricingContent(): PublicPricingContent {
   const segmentCredits = formatCreditLabel(SMS_SEGMENT_CREDITS);
   const mmsCredits = formatCreditLabel(MMS_CREDITS);
+  const staffedFirstCredits = formatCreditLabel(STAFFED_FIRST_MINUTE_CREDITS);
+  const staffedPerMinuteCredits = formatCreditLabel(
+    STAFFED_ADDITIONAL_MINUTE_CREDITS,
+  );
   const ivrFirstCredits = formatCreditLabel(IVR_FIRST_MINUTE_CREDITS);
   // The additional-minute rate is often referenced as e.g. "3 credits" — the
   // label helper adds the noun so the display line reads naturally.
@@ -75,13 +80,15 @@ export function buildPublicPricingContent(): PublicPricingContent {
       rates: [
         {
           name: "First minute",
-          price: `${ivrFirstCredits} / dial`,
-          description: "Covers the first minute of each outbound auto-dial attempt.",
+          price: `${staffedFirstCredits} / dial`,
+          description:
+            "Covers the first minute of each billable call placed by your agents.",
         },
         {
           name: "Additional minutes",
-          price: `${ivrPerMinuteCredits} / minute`,
-          description: "Applies to each additional minute after the first.",
+          price: `${staffedPerMinuteCredits} / minute`,
+          description:
+            "Applies to each additional started minute after the first.",
         },
       ],
     },
@@ -92,12 +99,13 @@ export function buildPublicPricingContent(): PublicPricingContent {
         {
           name: "First minute",
           price: `${ivrFirstCredits} / dial`,
-          description: "Covers the first minute of each outbound IVR call.",
+          description: "Covers the first minute of each billable IVR call.",
         },
         {
           name: "Additional minutes",
           price: `${ivrPerMinuteCredits} / minute`,
-          description: "Applies to each additional minute after the first.",
+          description:
+            "Applies to each additional started minute after the first.",
         },
       ],
     },
@@ -122,7 +130,8 @@ export function buildPublicPricingContent(): PublicPricingContent {
         {
           name: "Rented number",
           price: `${numberRentalCredits} / month`,
-          description: "Each rented phone number renews monthly from the rental anchor date.",
+          description:
+            "Each rented phone number renews monthly from the rental anchor date.",
         },
       ],
     },
@@ -132,9 +141,8 @@ export function buildPublicPricingContent(): PublicPricingContent {
     services,
     account,
     staffedCallout: {
-      heading: "Staffed live calls",
-      body:
-        "Need our team to place the calls for you? Staffed engagements are quoted per project so we can match agent count, hours, and script complexity to what you need.",
+      heading: "Calls placed by our team",
+      body: "Need the CallCaster team to place the calls for you? These engagements are quoted per project so we can match agent count, hours, and script complexity to what you need.",
       contactEmail: "info@callcaster.ca",
     },
   };

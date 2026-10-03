@@ -1,34 +1,22 @@
 import { useId, useMemo, useState } from "react";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
 
 import {
   formatCadFromCredits,
   formatCreditLabel,
-  IVR_ADDITIONAL_MINUTE_CREDITS,
-  IVR_FIRST_MINUTE_CREDITS,
+  voiceCreditsFromDurationSeconds,
+  type VoiceBillingKind,
   MMS_CREDITS,
   NUMBER_RENTAL_MONTHLY_CREDITS,
   SMS_SEGMENT_CREDITS,
 } from "../../../shared/pricing";
 
-/**
- * Interactive credit / CAD estimator for the public pricing page (#1393).
- *
- * The calculator is a progressive-disclosure block that lives BELOW the
- * pricing cards so the primary "here are the rates" comparison stays easy
- * to scan. Users type quantities into the four channels the pricing page
- * itemises (SMS segments, MMS, IVR / auto-dial minutes, rented phone
- * numbers) and see the monthly total update on every keystroke — no
- * form submit.
- *
- * Every rate reads directly from `shared/pricing.ts`; if the rate card
- * ships a change, this calculator changes with it. Staffed live calls
- * intentionally aren't a field — that's the "reach out" flow the
- * pricing page's own callout points at.
- */
-
 type Inputs = {
   smsSegments: number;
   mmsMessages: number;
+  agentDials: number;
+  agentAverageMinutesPerDial: number;
   ivrDials: number;
   ivrAverageMinutesPerDial: number;
   phoneNumbers: number;
@@ -37,6 +25,8 @@ type Inputs = {
 const INITIAL_INPUTS: Inputs = {
   smsSegments: 0,
   mmsMessages: 0,
+  agentDials: 0,
+  agentAverageMinutesPerDial: 1,
   ivrDials: 0,
   ivrAverageMinutesPerDial: 1,
   phoneNumbers: 0,
@@ -48,41 +38,40 @@ function nonNegative(value: number): number {
   return value;
 }
 
-/**
- * Credits for one IVR / auto-dial call at N minutes:
- *   first minute at IVR_FIRST_MINUTE_CREDITS, every additional started
- *   minute at IVR_ADDITIONAL_MINUTE_CREDITS. A 0-minute call still bills
- *   for the first minute (matches voiceCreditsFromDurationSeconds).
- */
-function ivrCreditsPerDial(minutesPerDial: number): number {
-  const startedMinutes = Math.max(1, Math.ceil(nonNegative(minutesPerDial)));
-  return (
-    IVR_FIRST_MINUTE_CREDITS +
-    Math.max(0, startedMinutes - 1) * IVR_ADDITIONAL_MINUTE_CREDITS
-  );
+function voiceCreditsPerDial(
+  minutesPerDial: number,
+  kind: VoiceBillingKind,
+): number {
+  const seconds = nonNegative(minutesPerDial) * 60;
+  return seconds > 0 && Number.isFinite(seconds)
+    ? voiceCreditsFromDurationSeconds(seconds, kind)
+    : 0;
 }
 
-/**
- * Public breakdown so tests and route-level renderers can trust the same
- * math the component uses. Exported (not inlined) so a rate-card change
- * has ONE arithmetic site to update everywhere.
- */
 export function estimateMonthlyCredits(inputs: Inputs): {
   breakdown: Array<{ key: string; label: string; credits: number }>;
   total: number;
 } {
   const smsCredits = nonNegative(inputs.smsSegments) * SMS_SEGMENT_CREDITS;
   const mmsCredits = nonNegative(inputs.mmsMessages) * MMS_CREDITS;
+  const agentCredits =
+    nonNegative(inputs.agentDials) *
+    voiceCreditsPerDial(inputs.agentAverageMinutesPerDial, "staffed");
   const ivrCredits =
     nonNegative(inputs.ivrDials) *
-    ivrCreditsPerDial(inputs.ivrAverageMinutesPerDial);
+    voiceCreditsPerDial(inputs.ivrAverageMinutesPerDial, "ivr");
   const numberCredits =
     nonNegative(inputs.phoneNumbers) * NUMBER_RENTAL_MONTHLY_CREDITS;
 
   const breakdown = [
     { key: "sms", label: "SMS segments", credits: smsCredits },
     { key: "mms", label: "MMS messages", credits: mmsCredits },
-    { key: "ivr", label: "IVR / auto-dial", credits: ivrCredits },
+    {
+      key: "agent",
+      label: "Calls placed by your agents",
+      credits: agentCredits,
+    },
+    { key: "ivr", label: "IVR calls", credits: ivrCredits },
     { key: "numbers", label: "Phone number rentals", credits: numberCredits },
   ];
   const total = breakdown.reduce((sum, row) => sum + row.credits, 0);
@@ -98,38 +87,31 @@ type FieldProps = {
   onChange: (value: number) => void;
 };
 
-function CalculatorField({ label, hint, value, min = 0, step = 1, onChange }: FieldProps) {
+function CalculatorField({
+  label,
+  hint,
+  value,
+  min = 0,
+  step = 1,
+  onChange,
+}: FieldProps) {
   const id = useId();
-  const hintId = `${id}-hint`;
   return (
-    <div className="flex flex-col gap-1">
-      <label
-        htmlFor={id}
-        className="font-Zilla-Slab text-sm font-semibold text-foreground"
-      >
-        {label}
-      </label>
-      <input
+    <FormField htmlFor={id} label={label} description={hint}>
+      <Input
         id={id}
         type="number"
         inputMode="numeric"
         min={min}
         step={step}
         value={Number.isFinite(value) ? value : 0}
-        aria-describedby={hintId}
         onChange={(event) => {
           const raw = Number(event.target.value);
           onChange(Number.isFinite(raw) ? raw : 0);
         }}
-        className="w-full rounded-md border border-border bg-card px-3 py-2 font-Zilla-Slab text-lg text-foreground focus:outline-none focus:ring-2 focus:ring-brand-primary"
+        className="font-Zilla-Slab text-lg"
       />
-      <p
-        id={hintId}
-        className="font-Zilla-Slab text-xs text-muted-foreground"
-      >
-        {hint}
-      </p>
-    </div>
+    </FormField>
   );
 }
 
@@ -145,7 +127,7 @@ export function PricingCalculator() {
   return (
     <section
       aria-labelledby={`${bodyId}-heading`}
-      className="mt-6 overflow-hidden rounded-xl border border-border bg-card"
+      className="border-border bg-card mt-6 overflow-hidden rounded-xl border"
     >
       <button
         type="button"
@@ -157,21 +139,24 @@ export function PricingCalculator() {
         <div>
           <h3
             id={`${bodyId}-heading`}
-            className="font-Zilla-Slab text-2xl font-bold uppercase text-brand-primary"
+            className="font-Zilla-Slab text-brand-primary text-2xl font-bold uppercase"
           >
             Estimate your usage
           </h3>
-          <p className="font-Zilla-Slab text-base text-muted-foreground">
-            Plug in a realistic mix and see the monthly credits + CAD
-            equivalent update as you type.
+          <p className="font-Zilla-Slab text-muted-foreground text-base">
+            Plug in a realistic mix and see the monthly credits + CAD equivalent
+            update as you type.
           </p>
         </div>
-        <span aria-hidden="true" className="font-Zilla-Slab text-2xl text-muted-foreground">
+        <span
+          aria-hidden="true"
+          className="font-Zilla-Slab text-muted-foreground text-2xl"
+        >
           {expanded ? "−" : "+"}
         </span>
       </button>
       {expanded ? (
-        <div id={bodyId} className="border-t border-border p-6">
+        <div id={bodyId} className="border-border border-t p-6">
           <div className="grid gap-4 md:grid-cols-2">
             <CalculatorField
               label="SMS segments / month"
@@ -190,16 +175,34 @@ export function PricingCalculator() {
               }
             />
             <CalculatorField
-              label="IVR / auto-dial dials / month"
-              hint="Count every outbound attempt — the first minute is billed even for very short calls."
+              label="Agent calls / month"
+              hint="Count calls placed by your own agents with a billable duration."
+              value={inputs.agentDials}
+              onChange={(agentDials) =>
+                setInputs((prev) => ({ ...prev, agentDials }))
+              }
+            />
+            <CalculatorField
+              label="Average minutes per agent call"
+              hint="Each additional started minute uses the agent-call rate."
+              value={inputs.agentAverageMinutesPerDial}
+              min={0}
+              step={0.5}
+              onChange={(agentAverageMinutesPerDial) =>
+                setInputs((prev) => ({ ...prev, agentAverageMinutesPerDial }))
+              }
+            />
+            <CalculatorField
+              label="IVR calls / month"
+              hint="Count IVR calls with a billable duration; zero-duration calls are excluded."
               value={inputs.ivrDials}
               onChange={(ivrDials) =>
                 setInputs((prev) => ({ ...prev, ivrDials }))
               }
             />
             <CalculatorField
-              label="Average minutes per dial"
-              hint="Additional minutes after the first are billed at the per-minute rate."
+              label="Average minutes per IVR call"
+              hint="Each additional started minute uses the IVR rate."
               value={inputs.ivrAverageMinutesPerDial}
               min={0}
               step={0.5}
@@ -219,43 +222,43 @@ export function PricingCalculator() {
 
           <dl
             aria-label="Monthly usage breakdown"
-            className="mt-6 divide-y divide-border"
+            className="divide-border mt-6 divide-y"
           >
             {breakdown.map((row) => (
               <div
                 key={row.key}
                 className="flex items-baseline justify-between py-2"
               >
-                <dt className="font-Zilla-Slab text-base text-foreground">
+                <dt className="font-Zilla-Slab text-foreground text-base">
                   {row.label}
                 </dt>
                 <dd
-                  className="font-Zilla-Slab text-base text-muted-foreground"
+                  className="font-Zilla-Slab text-muted-foreground text-base"
                   data-testid={`calc-line-${row.key}`}
                 >
-                  {formatCreditLabel(row.credits)} · {formatCadFromCredits(row.credits)}
+                  {formatCreditLabel(row.credits)} ·{" "}
+                  {formatCadFromCredits(row.credits)}
                 </dd>
               </div>
             ))}
           </dl>
 
           <div
-            className="mt-4 flex items-baseline justify-between rounded-lg bg-brand-primary/5 p-4"
+            className="bg-brand-primary/5 mt-4 flex items-baseline justify-between rounded-lg p-4"
             data-testid="calc-total"
           >
-            <span className="font-Zilla-Slab text-lg font-semibold text-foreground">
+            <span className="font-Zilla-Slab text-foreground text-lg font-semibold">
               Monthly total
             </span>
-            <span className="font-Zilla-Slab text-2xl font-bold text-brand-primary">
+            <span className="font-Zilla-Slab text-brand-primary text-2xl font-bold">
               {formatCreditLabel(total)} · {formatCadFromCredits(total)}
             </span>
           </div>
 
-          <p className="mt-4 font-Zilla-Slab text-xs text-muted-foreground">
-            Estimates only. Excludes taxes and carrier-specific
-            variation. Staffed live calls are quoted per project — use
-            the &ldquo;Reach out&rdquo; button in the pricing section
-            above.
+          <p className="font-Zilla-Slab text-muted-foreground mt-4 text-xs">
+            Estimates only. Excludes taxes and carrier-specific variation. Calls
+            placed by the CallCaster team are quoted per project — use the
+            &ldquo;Reach out&rdquo; button in the pricing section above.
           </p>
         </div>
       ) : null}

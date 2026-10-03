@@ -3572,7 +3572,7 @@
     "verdict": "verify-close",
     "recommendedTitle": "Align the API session-cookie contract with Better Auth",
     "summary": "The API contract and SDK identify both session-cookie forms issued by the current auth configuration: HTTP and secure HTTPS deployment alternatives.",
-    "currentBehavior": "Source fix based on dev@a3051a42: shared session security definitions identify better-auth.session_token on HTTP and __Secure-better-auth.session_token on HTTPS. Public, complete and integrator specs retain API-key/session versus session-only policy while exposing the matching alternatives. All three generated SDK operations can select the exact issued name through the existing auth callback. API guides document browser cookie-jar behavior and preservation of the signed name/value for server clients. The installed real verifier reads the configured name, so a cookie renamed to another prefix is not accepted. No auth configuration or verifier changes. Real app-issued cookies and generated SDK requests are covered on both base-URL forms. Full local and remote gates are required before merge.",
+    "currentBehavior": "Merged to dev in PR #2286 at 715c6844. Shared session-cookie definitions identify better-auth.session_token on HTTP and __Secure-better-auth.session_token on HTTPS as deployment alternatives. All served specs preserve session-only versus API-key/session policy; the SDK uses the exact issued name and signed value through its auth callback. Auth configuration/verifier are unchanged. All 112 focused cases pass; original runtime fails eight with ten controls, five source/SDK mutations and a separate signed-value challenge fail. Full local CI passed 5,202 Vitest and 22 Bun tests. All remote gates and both Railway checks passed on b13ad43d; issue-on-dev moved one item. Verify deployed behavior and promote before closure.",
     "resolution": "Verify the deployed server cookie and served schemes match. Confirm a generated SDK request using its issued signed cookie authenticates, browser cookie-jar access remains valid, and API-key access is retained. Promote before closing.",
     "lookIn": [
       "app/lib/openapi-integrator.ts",
@@ -3611,5 +3611,43 @@
     "risk": "medium",
     "trackerRecommendation": "Source contract fix is in this change; verify deployed cookie/SDK behavior and promote before closure.",
     "rootCause": "The OpenAPI source retained the retired Supabase cookie name. Generated outputs faithfully repeated it, and separate static security arrays omitted the HTTPS cookie mechanism."
+  },
+  {
+    "issueNumber": 2102,
+    "verdict": "verify-close",
+    "recommendedTitle": "Match published agent-call estimates to billing rates",
+    "summary": "Calling uses staffed 4/5 rates; IVR retains 2/3. Calculator inputs and billable durations now distinguish both lanes and team project quotes.",
+    "currentBehavior": "Source fix based on dev@715c6844: Calling publishes staffed constants; IVR retains its own constants. Separate agent and IVR calculator counts/durations call the canonical duration helper and exclude zero or invalid durations. Five connected minutes estimate 24 credits for agent calls and 14 for IVR. Additional started minutes round up. The workspace panel and relevant pricing docs use distinct labels; historical strategy status is explicit. Calls placed by the CallCaster team retain a project quote. All 57 focused cases pass, including the real billing processor and ledger-write boundary. Original runtime fails 22 cases with 35 controls; nine isolated source mutations fail and all cases pass after restoration. Full local and remote gates are required before merge.",
+    "resolution": "Verify deployed cards and calculator fields against actual billing: 24 credits for five-minute agent calls, 14 for IVR; zero-duration calls contribute zero. Retain the separate team quote flow, then promote before closure.",
+    "lookIn": [
+      "app/lib/public-pricing.ts",
+      "app/components/pricing/PricingCalculator.tsx",
+      "app/routes/workspaces+/$id/billing.route.tsx",
+      "shared/pricing.ts",
+      "app/lib/twilio-call-status.server.ts"
+    ],
+    "existingTests": [
+      "test/public-pricing.test.ts",
+      "test/ui/pricing-calculator.test.tsx",
+      "test/call-status-billing.test.ts",
+      "test/ui/billing-purchase-caller-gating.test.tsx"
+    ],
+    "missingTests": [
+      "Deployed pricing cards/calculator and actual ledger smoke verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Calling publishes 4/5 and IVR 2/3 from their canonical constants.",
+      "Representative positive durations agree across published rates, calculator estimates and the real billing processor.",
+      "Zero, negative and invalid duration estimates contribute zero.",
+      "Actual UI fields remain distinct and show matching credit/CAD totals.",
+      "The CallCaster-team quote request remains explicit.",
+      "Original source and isolated rate, kind, duration, field-wiring and copy mutations fail meaningful regressions.",
+      "Full local/remote gates and deployed verification pass before promotion and closure."
+    ],
+    "blockedBy": [],
+    "size": "S-M",
+    "risk": "medium",
+    "trackerRecommendation": "Source fix is in this change; verify deployed estimates and copy, then promote before closure.",
+    "rootCause": "The public Calling card bound IVR constants and the calculator combined two billing kinds under one label with copied duration arithmetic. Quote copy did not distinguish customer agents from the CallCaster team."
   }
 ]

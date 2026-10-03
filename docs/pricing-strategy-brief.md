@@ -6,11 +6,13 @@
 
 ---
 
+This May 2026 strategy brief is a historical planning record. The 2/3 credit voice recommendation below applies to IVR calls. Agent-driven calls use 4/5 credits; calls placed by the CallCaster team require a project quote. See the current rate card in [billing-source-of-truth.md](./billing-source-of-truth.md).
+
 ## Executive summary
 
 CallCaster should move from today’s **$0.003/credit** model to **$0.02/credit**, with usage rates that cover Twilio’s real costs while staying competitive with campaign tools like Scale to Win, CallHub, and CallFire.
 
-**Recommended voice model:** **$0.04 per dial + $0.06 per additional minute** (2 credits + 3 credits per extra minute at the new peg). This matches industry leaders on short robodial calls, bundles AMD (answering machine detection) into the dial charge, and avoids the platform fees and agent seat fees competitors charge.
+**Recommended IVR voice model:** **$0.04 per dial + $0.06 per additional minute** (2 credits + 3 credits per extra minute at the new peg). This matches industry leaders on short robodial calls, bundles AMD (answering machine detection) into the dial charge, and avoids the platform fees and agent seat fees competitors charge.
 
 **Key headline for customers:** _No monthly fees. No agent seats. Pay only for what you use._
 
@@ -123,8 +125,8 @@ AMD and IVR recording are **included in the dial charge** — not shown as a sep
 | --------------------------------------------- | ----------: | ------------------: |
 | SMS / segment                                 |           2 |           **$0.04** |
 | MMS                                           |           4 |           **$0.08** |
-| IVR / auto-dial — first minute (includes AMD) |           2 |    **$0.04 / dial** |
-| IVR / auto-dial — each additional minute      |           3 |     **$0.06 / min** |
+| IVR — first minute (includes AMD) |           2 |    **$0.04 / dial** |
+| IVR — each additional minute      |           3 |     **$0.06 / min** |
 | Staffed live — first minute (2 legs + AMD)    |           4 |    **$0.08 / dial** |
 | Staffed live — each additional minute         |           5 |     **$0.10 / min** |
 | Rented phone number                           | 100 / month |   **$2.00 / month** |

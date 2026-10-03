@@ -44,6 +44,10 @@ arguments; an empty row supplies no argument. Check the fixed positive cases
 before running mutations so a fixture error cannot pass as regression evidence.
 Confirm the collected case count after adding controls; every test must be at
 suite level, outside test and fixture callbacks.
+For filtered mutation runs, use the collected `fullName` from the JSON report.
+Vitest can quote values substituted into table titles; a guessed filter can skip
+every case and still exit zero. Require at least one executed case and the
+expected regression failure before accepting proof.
 Use a block body for setup hooks that call a mock method. Returning a mock
 function from `beforeEach` registers it as cleanup; Vitest then calls it after
 the test, which can create a false failure or an unintended second effect.
