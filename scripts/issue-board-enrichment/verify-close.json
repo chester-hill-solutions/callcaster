@@ -2779,5 +2779,41 @@
     "size": "S",
     "risk": "high",
     "trackerRecommendation": "The source fix is on dev in PR #2255. Verify on deployed dev; close after production promotion. Do not start a duplicate fix."
+  },
+  {
+    "issueNumber": 2095,
+    "verdict": "verify-close",
+    "recommendedTitle": "\"Leave Campaign\" does not leave the campaign in predictive mode — the conference and the dialer keep running and real calls keep being placed",
+    "summary": "Predictive Leave waits for a confirmed conference stop and preserves the queue; deployed calling verification remains.",
+    "resolution": "Verify predictive Leave on deployed dev with browser and phone devices, pending calls and an idle conference. Confirm that the next turn stops, failed stops permit retry, other users remain connected and live Leave keeps its behavior. Promote the tested fix before closing.",
+    "lookIn": [
+      "app/components/call/CallScreen.Layout.tsx",
+      "app/lib/callscreenActions.ts",
+      "app/routes/api+/auto-dial/end.action.server.ts",
+      "app/lib/auto-dial.server.ts",
+      "test/ui/call-screen-leave.test.tsx",
+      "test/auto-dial-end.route.test.ts"
+    ],
+    "existingTests": [
+      "test/ui/call-screen-leave.test.tsx (seven cases using the real conference-end helper)",
+      "test/ui/callscreenActions.test.ts (server confirmation before agent hangup/state clearing)",
+      "test/auto-dial-end.route.test.ts (completion failures, idle discovery, explicit target, other-user rejection and SID/name deduplication)",
+      "test/auto-dial.server.test.ts (no claim, outreach attempt or call after the conference ended)"
+    ],
+    "missingTests": [
+      "Deployed browser/phone calling verification, including delayed and failed conference completion."
+    ],
+    "acceptanceCriteria": [
+      "With `campaign.dial_type === \"predictive\"`, clicking \"Leave Campaign\" posts `/api/auto-dial/end` and completes the conference.",
+      "No `DELETE /api/queues` requeue is issued when the campaign is being left in predictive mode.",
+      "The dialer stops placing calls within one turn after leave.",
+      "A non-predictive (live) campaign's Leave behaviour is unchanged.",
+      "The control is confirmed before it fires (see the related UX issue)."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "high",
+    "trackerRecommendation": "The source fix is in PR #2257. This board update travels with that fix; after merge, verify on deployed dev and close after production promotion. Do not start a duplicate fix.",
+    "currentBehavior": "PR #2257 implements #2095: Leave waits for the server stop, keeps the local device on failure and omits queue reset. The endpoint finds the current user's idle conferences and reports completion failures. All 57 focused UI and server cases passed; restoring the old Leave handler failed four regressions, and restoring the old endpoint failed twelve regressions with five controls passing."
   }
 ]

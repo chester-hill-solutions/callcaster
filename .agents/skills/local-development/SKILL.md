@@ -22,6 +22,13 @@ The node suite installs a shared `api-auth.server` mock in
 Otherwise a test can receive the suite's default 401 and never reach its target.
 Keep shared server module mock factories additive with `importOriginal`.
 
+## Table-driven tests
+
+Use object rows when a `test.each` case contains an array input, for example
+`[{ ids: [] }, { ids: ["id"] }]`. Vitest spreads a bare array row into positional
+arguments; an empty row supplies no argument. Check the fixed positive cases
+before running mutations so a fixture error cannot pass as regression evidence.
+
 ## Network resource tests
 
 Use real Node readable streams when testing response limits and cleanup. The

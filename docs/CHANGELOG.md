@@ -15,6 +15,7 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Leaving a predictive campaign now waits for the conference and dialer to stop, keeps the call screen available on failure, and preserves the campaign queue ([PR #2257](https://github.com/chester-hill-solutions/callcaster/pull/2257), [#2095](https://github.com/chester-hill-solutions/callcaster/issues/2095)).
 - Workspace creation retries now return only the signed-in user's own workspace, even when another user uses the same retry key ([PR #2254](https://github.com/chester-hill-solutions/callcaster/pull/2254), [#2132](https://github.com/chester-hill-solutions/callcaster/issues/2132)).
 
 - Workspace analytics no longer risk picking the wrong "call ended at" time when an attempt's call rows mix `Date` and ISO-string end times; the latest is now chosen numerically instead of by sorting the values as text ([#2213](https://github.com/chester-hill-solutions/callcaster/issues/2213)).

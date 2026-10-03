@@ -1,7 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { FetcherWithComponents } from "react-router";
 import { getNextContact } from "./getNextContact";
-import { Campaign, Contact, QueueItem, ActiveCall, OutreachAttempt, Call   } from "./types";
+import { Campaign, Contact, QueueItem, OutreachAttempt, Call   } from "./types";
 import { isRecent } from "./utils";
 import { isObject } from "./type-safety-utils";
 import { logger } from "@/lib/logger.client";
@@ -19,26 +19,31 @@ const getAttemptCalls = ({ attempt, calls }:{attempt:OutreachAttempt, calls:Call
   return calls.filter((call) => call.outreach_attempt_id === attempt.id);
 };
 
-export const handleConference = ({ submit, begin }:{submit:FetcherWithComponents<unknown>["submit"], begin:() => void}) => {
+export const handleConference = ({ begin }:{begin:() => void}) => {
   const handleConferenceStart = () => {
     begin();
   };
 
-  const handleConferenceEnd = async ({ activeCall, setConference, workspaceId }:{activeCall:ActiveCall, setConference:() => void, workspaceId:string}) => {
-    submit(
-      { workspaceId },
-      {
-        method: "post",
-        action: "/api/auto-dial/end",
-        encType: "application/json",
-      },
-    );
-    if (activeCall?.parameters?.CallSid) {
+  const handleConferenceEnd = async ({ activeCall, setConference, workspaceId, conferenceName }:{activeCall:{ parameters: Record<string, unknown> } | null, setConference:() => void, workspaceId:string, conferenceName?: string | null}) => {
+    const response = await fetch("/api/auto-dial/end", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId, ...(conferenceName ? { conferenceName } : {}) }),
+    });
+    if (!response.ok) {
+      throw new Error("Could not stop the predictive conference");
+    }
+    const result: unknown = await response.json();
+    if (!isObject(result) || result.success !== true) {
+      throw new Error("Could not confirm that the predictive conference stopped");
+    }
+    const callSid = activeCall?.parameters?.CallSid;
+    if (typeof callSid === "string" && callSid) {
       try {
         const response = await fetch(`/api/hangup`, {
           method: "POST",
           body: JSON.stringify({
-            callSid: activeCall.parameters.CallSid,
+            callSid: callSid,
             workspaceId,
           }),
           headers: { "Content-Type": "application/json" },
@@ -46,7 +51,7 @@ export const handleConference = ({ submit, begin }:{submit:FetcherWithComponents
 
         if (!response.ok) {
           logger.error("Failed to hang up conference call", {
-            callSid: activeCall.parameters.CallSid,
+            callSid: callSid,
             status: response.status,
           });
         }
