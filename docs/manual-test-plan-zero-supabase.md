@@ -39,7 +39,7 @@ Prerequisite: `app/server/auth-instance.ts` + `app/db/auth-schema.ts` configured
 | A5 | Accept workspace invite link (Better Auth magic link) | User added to workspace with correct role | |
 | A6 | Open `/workspaces/$id` with invalid/expired session | 401 / redirect to signin (not 500) | |
 | A7 | Open `/workspaces/$id` while member of different workspace | 404 (not 403 — no workspace-id leak) | |
-| A8 | Check session cookie name | `better-auth.session_token` (not `sb-*`) | |
+| A8 | Check the session cookie name issued by the target deployment | `better-auth.session_token` on HTTP; `__Secure-better-auth.session_token` on HTTPS. Keep its issued name and signed value. | |
 | A9 | **Parallel session test**: log in on 2 browsers, invalidate one | Other session still valid (or per Better Auth policy) | |
 | A10 | **Old Supabase session cookie** present on browser | Rejected / ignored (no backdoor) | |
 

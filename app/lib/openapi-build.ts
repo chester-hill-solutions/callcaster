@@ -9,6 +9,8 @@ import { AUTH_CLASS_TAGS } from "@/lib/api-surface-types";
 import {
   integratorOpenApiComponents,
   integratorPathOverrides,
+  apiKeyOrSessionSecurity,
+  sessionCookieSecurity,
 } from "@/lib/openapi-integrator";
 import { platformOpenApiComponents } from "@/lib/openapi-platform-components";
 import { platformPathOverrides } from "@/lib/openapi-platform";
@@ -151,10 +153,10 @@ function responsesForEntry(entry: ApiSurfaceEntry, op: ApiSurfaceOperation) {
 function securityForAuth(authClass: AuthClass) {
   switch (authClass) {
     case "apiKeyOrSession":
-      return [{ sessionCookie: [] }, { apiKey: [] }];
+      return apiKeyOrSessionSecurity;
     case "session":
     case "workspaceAdmin":
-      return [{ sessionCookie: [] }];
+      return sessionCookieSecurity;
     case "publicForm":
       return [];
     case "twilioSignature":

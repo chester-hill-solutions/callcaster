@@ -27,6 +27,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- The API contract and generated SDK now use the Better Auth session cookies issued by HTTP and HTTPS deployments ([PR #2286](https://github.com/chester-hill-solutions/callcaster/pull/2286), [#2100](https://github.com/chester-hill-solutions/callcaster/issues/2100)).
+
 - Manual A2P setup uses the compliance job, reports queue status accurately, and keeps 10DLC SMS blocked until both brand and campaign are approved ([#2283](https://github.com/chester-hill-solutions/callcaster/pull/2283), [#2082](https://github.com/chester-hill-solutions/callcaster/issues/2082)).
 
 - Bulk SMS now blocks missing, unknown and failed toll-free verification checks, including records on later pages; admins must refresh older Twilio snapshots after rollout ([PR #2281](https://github.com/chester-hill-solutions/callcaster/pull/2281), [#2083](https://github.com/chester-hill-solutions/callcaster/issues/2083)).

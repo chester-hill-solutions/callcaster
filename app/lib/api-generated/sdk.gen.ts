@@ -27,7 +27,12 @@ export const createCampaignWithScript = <ThrowOnError extends boolean = false>(o
         security: [
             {
                 in: 'cookie',
-                name: 'sb-access-token',
+                name: 'better-auth.session_token',
+                type: 'apiKey'
+            },
+            {
+                in: 'cookie',
+                name: '__Secure-better-auth.session_token',
                 type: 'apiKey'
             },
             {
@@ -53,7 +58,12 @@ export const sendChatSms = <ThrowOnError extends boolean = false>(options: Optio
         security: [
             {
                 in: 'cookie',
-                name: 'sb-access-token',
+                name: 'better-auth.session_token',
+                type: 'apiKey'
+            },
+            {
+                in: 'cookie',
+                name: '__Secure-better-auth.session_token',
                 type: 'apiKey'
             },
             {
@@ -79,7 +89,12 @@ export const dispatchCampaignSms = <ThrowOnError extends boolean = false>(option
         security: [
             {
                 in: 'cookie',
-                name: 'sb-access-token',
+                name: 'better-auth.session_token',
+                type: 'apiKey'
+            },
+            {
+                in: 'cookie',
+                name: '__Secure-better-auth.session_token',
                 type: 'apiKey'
             },
             {

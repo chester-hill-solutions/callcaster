@@ -620,43 +620,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2100,
-    "verdict": "fix-now",
-    "recommendedTitle": "The published OpenAPI, three spec JSONs, three docs and the generated SDK all name a session cookie the app never issues: sb-access-token vs better-auth.session_token",
-    "summary": "The integrator scheme, generated SDK, committed OpenAPI and three docs still publish sb-access-token; auth config uses Better Auth defaults.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The integrator scheme, generated SDK, committed OpenAPI and three docs still publish sb-access-token; auth config uses Better Auth defaults.",
-    "resolution": "Align OpenAPI, generated outputs and docs with actual auth cookie names and secure-prefix behavior.",
-    "lookIn": [
-      "app/lib/openapi-integrator.ts:21",
-      "app/lib/api-generated/sdk.gen.ts:30",
-      "openapi/integrator-api.json:336",
-      "app/server/auth-instance.ts:52",
-      "docs/api-auth-matrix.md:15",
-      "app/lib/openapi-build.ts:151-156",
-      "app/lib/auth.server.ts:23-34",
-      "app/server/auth-instance.ts",
-      "app/lib/api-generated/sdk.gen.ts",
-      "openapi/public-api.json`, `openapi/complete-api.json`, `openapi/integrator-api.json",
-      "docs/api-auth-matrix.md`, `docs/api-overview.md`, `docs/api-telephony-control.md",
-      "test/openapi*.test.ts"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "No contract test comparing generated scheme to the real auth cookie; auth state and installed runtime cookie behavior were not exercised in this source-only audit."
-    ],
-    "acceptanceCriteria": [
-      "The published scheme name equals the cookie name the app actually sets, in all three spec JSONs and the generated SDK.",
-      "The `__Secure-` prefix is documented, and the SDK/config supports both.",
-      "`ci:codegen:verify` passes with no drift.",
-      "A test asserts the published scheme name matches the real cookie name (kill-check: revert the name and confirm the test goes red).",
-      "`docs/api-auth-matrix.md`, `docs/api-overview.md` and `docs/api-telephony-control.md` no longer name the wrong cookie."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2102,
     "verdict": "fix-now",
     "recommendedTitle": "The public pricing page publishes the IVR rate for the \"Calling — Agent-driven auto-dial\" lane the code bills at 4 / 5 credits",

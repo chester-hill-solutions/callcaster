@@ -715,6 +715,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -778,6 +781,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -842,6 +848,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -907,6 +916,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -961,6 +973,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1025,6 +1040,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -1077,6 +1095,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -1141,6 +1162,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1206,6 +1230,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1470,6 +1497,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1533,6 +1563,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -1767,6 +1800,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -1952,6 +1988,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2017,6 +2056,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -2081,6 +2123,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2146,6 +2191,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2211,6 +2259,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -2275,6 +2326,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2338,6 +2392,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2391,6 +2448,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2454,6 +2514,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2507,6 +2570,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2570,6 +2636,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2633,6 +2702,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2687,6 +2759,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -2756,6 +2831,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -2810,6 +2888,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -2863,6 +2944,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -2929,6 +3013,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -2998,6 +3085,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -3052,6 +3142,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3102,6 +3195,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -3221,6 +3317,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -3314,6 +3413,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3379,6 +3481,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3444,6 +3549,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3497,6 +3605,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3611,6 +3722,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3674,6 +3788,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3737,6 +3854,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -3791,6 +3911,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -3848,6 +3971,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -3902,6 +4028,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -3956,6 +4085,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4021,6 +4153,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -4085,6 +4220,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4150,6 +4288,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4213,6 +4354,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4276,6 +4420,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4339,6 +4486,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -4390,6 +4540,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -4454,6 +4607,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4519,6 +4675,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4584,6 +4743,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4647,6 +4809,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -4700,6 +4865,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4765,6 +4933,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4828,6 +4999,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -4881,6 +5055,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -4944,6 +5121,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -5008,6 +5188,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5073,6 +5256,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5138,6 +5324,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5203,6 +5392,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5266,6 +5458,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -5317,6 +5512,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -5370,6 +5568,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5435,6 +5636,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5503,6 +5707,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -5554,6 +5761,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -5771,6 +5981,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5836,6 +6049,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5899,6 +6115,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -5962,6 +6181,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6016,6 +6238,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -6075,6 +6300,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -6129,6 +6357,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6182,6 +6413,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6247,6 +6481,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -6360,6 +6597,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6423,6 +6663,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6476,6 +6719,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6529,6 +6775,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -6592,6 +6841,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6643,6 +6895,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -6758,6 +7013,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -6806,6 +7064,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Rename a workspace. Requires an admin-or-higher signed-in session.",
@@ -6882,6 +7143,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Permanently delete a workspace. Owner session only.",
@@ -6941,6 +7205,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -6995,6 +7262,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -7054,6 +7324,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route. Requires a workspace admin session. Requested scopes are capped at the capabilities the creating member's role holds — a scope outside that set is rejected with 403 naming it. Returns the full secret once; store it immediately.",
@@ -7120,6 +7393,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route. Requires a workspace admin session.",
@@ -7186,6 +7462,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route. Lists key metadata without secrets.",
@@ -7240,6 +7519,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -7310,6 +7592,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -7376,6 +7661,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -7446,6 +7734,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -7511,6 +7802,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -7574,6 +7868,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -7634,6 +7931,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -7722,6 +8022,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -7785,6 +8088,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -7849,6 +8155,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -7914,6 +8223,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -7978,6 +8290,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -8042,6 +8357,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -8102,6 +8420,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8178,6 +8499,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -8241,6 +8565,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -8295,6 +8622,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8359,6 +8689,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8445,6 +8778,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -8511,6 +8847,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8581,6 +8920,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -8647,6 +8989,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -8716,6 +9061,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -8781,6 +9129,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -8848,6 +9199,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -8913,6 +9267,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -8976,6 +9333,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9040,6 +9400,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -9091,6 +9454,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9151,6 +9517,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -9220,6 +9589,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route. Owner-role changes require an owner actor with MFA.",
@@ -9296,6 +9668,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route for removing another member. Self-removal is not supported. Pass `target: invite` to cancel a pending invite in this workspace. Foreign, missing and non-pending invites return the same 404 without a change.",
@@ -9372,6 +9747,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route.",
@@ -9411,6 +9789,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Requires sufficient workspace credits and numbers-manager role.",
@@ -9488,6 +9869,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -9526,6 +9910,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -9602,6 +9989,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "responses": {
@@ -9664,6 +10054,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -9727,6 +10120,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -9791,6 +10187,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "requestBody": {
@@ -9857,6 +10256,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           },
           {
             "apiKey": []
@@ -9927,6 +10329,9 @@
             "sessionCookie": []
           },
           {
+            "secureSessionCookie": []
+          },
+          {
             "apiKey": []
           }
         ],
@@ -9987,6 +10392,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Owner session only. Choose a different existing workspace member as the incoming owner. The incoming owner must have MFA enrolled (SEC-08). Self transfer returns 400 without changing ownership.",
@@ -10060,6 +10468,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "parameters": [
@@ -10119,6 +10530,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Member-or-higher signed-in session required. Delivers a sample event via safe outbound fetch. Ten tests per minute per user, shared across workspaces and both webhook test URLs. Unsaved destinations and headers are permitted.",
@@ -10213,6 +10627,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route. Destination URL must pass SSRF-safe outbound validation.",
@@ -10279,6 +10696,9 @@
         "security": [
           {
             "sessionCookie": []
+          },
+          {
+            "secureSessionCookie": []
           }
         ],
         "description": "Session-only trust-root route.",
@@ -10322,8 +10742,14 @@
       "sessionCookie": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "sb-access-token",
-        "description": "Session cookie (browser). Use workspace API key for server/script access."
+        "name": "better-auth.session_token",
+        "description": "Signed Better Auth session cookie for an HTTP deployment. Preserve the name and value issued by the target server. HTTPS deployments use secureSessionCookie. Browsers send their cookie jar; server/script clients can use a workspace API key."
+      },
+      "secureSessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Secure-better-auth.session_token",
+        "description": "Signed Better Auth session cookie for an HTTPS deployment. Preserve the secure prefix and the value issued by the target server; do not rename an HTTP cookie. Browsers send their cookie jar; server/script clients can use a workspace API key."
       },
       "apiKey": {
         "type": "apiKey",

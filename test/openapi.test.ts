@@ -63,7 +63,7 @@ describe("openapi spec", () => {
       // Pinned literal: the integrator spec section name is the contract.
       expect(operation?.tags).toContain("Integrator API");
       expect(operation?.security).toEqual([
-        { sessionCookie: [] },
+        { sessionCookie: [] }, { secureSessionCookie: [] },
         { apiKey: [] },
       ]);
       expect(operation?.requestBody?.required).toBe(true);
@@ -192,8 +192,8 @@ describe("openapi spec", () => {
 
     expect(dialer?.operationId).toBe("startCampaignDialer");
     expect(disconnect?.operationId).toBe("disconnectWorkspaceCall");
-    expect(dialer?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
-    expect(disconnect?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(dialer?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }, { apiKey: [] }]);
+    expect(disconnect?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }, { apiKey: [] }]);
     expect(dialer?.["x-callcaster-capability"]).toBe("calls.start");
     expect(disconnect?.["x-callcaster-capability"]).toBe("calls.control");
     expect(dialer?.requestBody?.required).toBe(true);
@@ -207,7 +207,7 @@ describe("openapi spec", () => {
       openApiSpec.paths["/api/workspaces/{workspaceId}/audit-events"].get;
 
     expect(audit?.operationId).toBe("listWorkspaceAuditEvents");
-    expect(audit?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
+    expect(audit?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }, { apiKey: [] }]);
     expect(audit?.["x-callcaster-capability"]).toBe("audit.read");
     expect(
       audit?.responses?.["200"]?.content?.["application/json"]?.schema?.$ref,
@@ -244,9 +244,9 @@ describe("openapi spec", () => {
     expect(workspace.get?.operationId).toBe("getWorkspace");
     expect(workspace.patch?.operationId).toBe("updateWorkspace");
     expect(workspace.delete?.operationId).toBe("deleteWorkspace");
-    expect(workspace.get?.security).toEqual([{ sessionCookie: [] }, { apiKey: [] }]);
-    expect(workspace.patch?.security).toEqual([{ sessionCookie: [] }]);
-    expect(workspace.delete?.security).toEqual([{ sessionCookie: [] }]);
+    expect(workspace.get?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }, { apiKey: [] }]);
+    expect(workspace.patch?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }]);
+    expect(workspace.delete?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }]);
     expect(
       workspace.patch?.requestBody?.content?.["application/json"]?.schema?.$ref,
     ).toContain("UpdateWorkspaceRequest");
@@ -284,17 +284,17 @@ describe("openapi spec", () => {
     for (const pathItem of [apiKeys, webhook, numbers]) {
       for (const op of Object.values(pathItem)) {
         if (op && typeof op === "object" && "security" in op) {
-          expect(op.security).toEqual([{ sessionCookie: [] }]);
+          expect(op.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }]);
         }
       }
     }
-    expect(members.get?.security).toEqual([{ sessionCookie: [] }]);
+    expect(members.get?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }]);
     expect(members.post?.security).toEqual([
-      { sessionCookie: [] },
+      { sessionCookie: [] }, { secureSessionCookie: [] },
       { apiKey: [] },
     ]);
-    expect(members.patch?.security).toEqual([{ sessionCookie: [] }]);
-    expect(members.delete?.security).toEqual([{ sessionCookie: [] }]);
-    expect(transfer?.security).toEqual([{ sessionCookie: [] }]);
+    expect(members.patch?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }]);
+    expect(members.delete?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }]);
+    expect(transfer?.security).toEqual([{ sessionCookie: [] }, { secureSessionCookie: [] }]);
   });
 });
