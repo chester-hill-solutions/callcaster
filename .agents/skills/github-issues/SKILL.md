@@ -33,6 +33,16 @@ gh api graphql -f query='query { organization(login: "chester-hill-solutions") {
 
 Use only names returned with `isEnabled: true`; record the new verification date and CLI version in this skill when the inventory changes.
 
+## Older CLI fallback
+
+The installed CLI can lack `--type` and relationship flags shown below. Check
+its help first. If those flags are absent, use REST with a JSON input file:
+create via `POST repos/OWNER/REPO/issues` with the enabled type name in `type`;
+link an existing child via `POST repos/OWNER/REPO/issues/PARENT/sub_issues` with
+`sub_issue_id` set to the child's numeric issue ID. Verify the returned type and
+`GET repos/OWNER/REPO/issues/CHILD/parent`. Do not replace issue types with labels
+or create duplicate issues to repair a missing relationship.
+
 ## Closed Reasons
 
 `CLOSED` is not one state. Every closed issue carries a reason, and treating them identically produces wrong board verdicts (e.g. counting a wontfix as done):
@@ -76,6 +86,11 @@ Trace the affected route or worker to its actual helper before moving an issue t
 Verify and close. A merged PR that changes another parser does not fix the upload
 path. For SQL, check bootstrap inclusion and later function definitions; a file
 that exists but is skipped or replaced is not the active fix.
+
+Read the applicable ADRs before putting work in Needs decision. A missing
+runtime feature does not mean its policy is undecided. Keep adopted constraints
+and scope the missing rollout decision. Interim warnings cannot replace a
+required enforcement rule.
 
 Separate source proof from deployed verification. Keep unfinished parts visible
 when a PR resolves only part of an issue. Check proposed query predicates against

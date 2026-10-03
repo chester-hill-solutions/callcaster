@@ -14,6 +14,13 @@ installing dependencies. If Homebrew Node fails with a missing shared library,
 use an installed NVM Node 22 version for this task instead of changing global
 libraries or using a different Node major.
 
+## Locked project tools
+
+After the worktree's locked install completes, run project tools with
+`npx --no-install`. Plain `npx` can fetch a different tool version when the shared
+checkout has no dependencies. Use the prepared worktree instead of fetching a
+missing tool into a read-only audit.
+
 ## Route authentication tests
 
 The node suite installs a shared `api-auth.server` mock in
@@ -58,7 +65,7 @@ stream events cannot allocate or resolve a response after rejection.
 - First run or repair: `make init` (`npm run setup`, idempotent). Services already running elsewhere: `npm run setup -- --skip-docker`.
 - Services: `make up | down | logs | ps`; scope with a service name first (`make postgres logs`, `make postgres minio up`). Service names come from `docker-compose.dev.yml`.
 - Processes: `make app` (dev server on :3000), `make worker` (job worker), `make media-stream`. Run each in its own terminal so its log stays visible.
-- Checks: `npm run typecheck`, `npm run lint`, `npm run check:lint-ratchet`, `npm test`, `make e2e`. Node-tier tests need the node config: `npx vitest run -c vitest.node.config.ts <file>`; UI tests use `vitest.ui.config.ts`.
+- Checks: `npm run typecheck`, `npm run lint`, `npm run check:lint-ratchet`, `npm test`, `make e2e`. Node-tier tests need the node config: `npx --no-install vitest run -c vitest.node.config.ts <file>`; UI tests use `vitest.ui.config.ts`.
 
 ## Tailing logs
 
@@ -69,7 +76,7 @@ stream events cannot allocate or resolve a response after rejection.
 ## Git in this repository
 
 - `dev` is the trunk; `master` is the release branch and only moves by a dev → master release PR. Check `git log origin/dev` before starting an "open" issue: it may already be fixed.
-- Create or update the GitHub issue before starting work. One issue, one concern, one PR; put `Closes #N` in the PR body, never close issues by hand.
+- For product work, create or update the GitHub issue before starting work. One issue, one concern, one PR; put `Closes #N` in the PR body, never close issues by hand. User-authorized repository maintenance follows the [Git skill](../git/SKILL.md) exception and uses the `no-issue` PR label.
 - The `dev → master` release PR must list every promoted issue with a closing keyword (`Closes #N, #M`) so GitHub closes them on promotion. A bare `(#N)` mention closes nothing, which is why shipped issues used to stay open; `release-close-issues.yml` gates this, with a `no-issue` label for a genuinely issue-free release.
 - Before committing, strip comments that narrate the code. A comment must state a reason the code cannot ("keep this in UTC", "auth.uid() has no shim") — not describe what the next line does. If deleting the comment (or the line under it) changes nothing for a reader, delete the comment. `callcaster/no-useless-comments` catches number-only and punctuation-only comments; the rest is a review standard, not a lint rule (#1978).
 - Every PR that changes behaviour adds a line under `## [Unreleased]` in `docs/CHANGELOG.md`.

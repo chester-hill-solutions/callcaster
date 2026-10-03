@@ -15,7 +15,7 @@ request.
 3. Create the branch from the current `origin/dev`, then rebase it on `origin/dev` before committing or pushing.
 4. Name branches as `type/issueNumber-some-description`.
 5. Allowed types are `chore`, `bug`, `task`, `feature`, `epic`, and `test`. Use lowercase kebab-case for the description.
-6. Use the actual issue number when one exists. If no issue number exists, stop and ask for one instead of inventing an identifier.
+6. Use the actual issue number when one exists. User-authorized repository maintenance without a product issue can use `chore/<description>` and must add the `no-issue` PR label. For product work, create or update its issue before branching; do not invent an issue number.
 
 ## Required Checks
 
@@ -35,3 +35,13 @@ source or its base, run full `npm run ci:local` again before the push.
 
 Never use destructive reset or checkout commands to discard work unless the
 user explicitly requests it.
+
+## Merged worktree cleanup
+
+For a Git-created worktree, confirm the PR merged into `dev` at its tested final
+head. Verify a recovery bundle before deleting the topic refs. Require a clean
+worktree, an exact head match and source equivalence with the squash merge.
+Then fast-forward the clean shared `dev`, remove the topic worktree and local
+branch, and delete only the verified remote topic ref. Preserve dirty worktrees,
+unproven branches and user files. Use the app archive tool for app-managed
+worktrees so their saved attachments remain recoverable.
