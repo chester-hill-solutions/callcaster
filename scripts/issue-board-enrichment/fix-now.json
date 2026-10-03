@@ -1322,41 +1322,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2103,
-    "verdict": "fix-now",
-    "recommendedTitle": "safeOutboundFetch buffers webhook responses without a byte limit",
-    "summary": "safeOutboundFetch still accumulates every response chunk then concatenates it without a byte cap. DNS pinning and redirect rejection do not bound memory.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. safeOutboundFetch still accumulates every response chunk then concatenates it without a byte cap. DNS pinning and redirect rejection do not bound memory.",
-    "resolution": "Count response bytes and destroy on overflow. Verify abort/error cleanup and queue isolation as separate work if scope grows.",
-    "lookIn": [
-      "app/lib/safe-outbound-url.server.ts:268",
-      "app/lib/safe-outbound-url.server.ts:262",
-      "app/lib/workspace-webhooks.server.ts:64",
-      "test/safe-outbound-url.test.ts:175",
-      "app/lib/safe-outbound-url.server.ts (all `rejectPromise` paths, the accumulation loop)",
-      "app/lib/worker/handlers/cron.server.ts (the inline webhook call)",
-      "app/lib/worker/handlers/campaign.server.ts:545-567 (`webhook_delivery` handler)",
-      "app/lib/workspace-webhooks.server.ts"
-    ],
-    "existingTests": [
-      "test/safe-outbound-url.test.ts covers public/private destinations, DNS pinning and redirect rejection; it has no oversized-response boundary test."
-    ],
-    "missingTests": [
-      "Need above-cap, exact-cap, early termination and abort/error regressions. No OOM or peak-memory measurements were run."
-    ],
-    "acceptanceCriteria": [
-      "A response above the configured cap rejects with a clear error and terminates its connection.",
-      "Buffered chunks never accumulate beyond the cap.",
-      "A response exactly at the cap succeeds.",
-      "Abort, stream-error and redirect paths release request/response resources.",
-      "Tests prove bounded buffering and cleanup. Webhook scheduling changes are separate work."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Keep Fix now for the shared unbounded-response defect. Cap/socket cleanup is one atomic concern; any webhook scheduling redesign is separate work. Source proves no byte limit, not a measured production OOM."
-  },
-  {
     "issueNumber": 2104,
     "verdict": "fix-now",
     "recommendedTitle": "check:effects skips every React.useEffect( call as a \"hook definition\", so an effect can opt out of the gate, the baseline and the inventory",
@@ -2201,37 +2166,6 @@
     "blockedBy": [],
     "size": "S",
     "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2132,
-    "verdict": "fix-now",
-    "recommendedTitle": "The workspaces:create idempotency scope is global, so one user's workspace id is replayed to another user",
-    "summary": "Workspace creation still uses a global replay scope even though the authenticated creator id is available.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Workspace creation still uses a global replay scope even though the authenticated creator id is available.",
-    "resolution": "Scope workspace creation replay by the authenticated user ID: workspaces:create:${auth.user.id}. Keep same-user retry replay and in-flight conflict behavior. Legacy global records must be unreachable. Registration replay was removed in PR #2252; billing checkout is already workspace-scoped after authorization. Update the API docs and prove cross-user isolation with the real replay store. An owner-column migration is not required for this route fix.",
-    "lookIn": [
-      "app/routes/api+/workspaces.action.server.ts:39",
-      "app/lib/platform-idempotency.server.ts:83",
-      "test/platform-api.test.ts:108",
-      "app/lib/platform-idempotency.server.ts:54-59,79-85,240+",
-      "the workspaces-create action under `app/routes/api+/",
-      "app/lib/openapi-platform.ts:19-27"
-    ],
-    "existingTests": [
-      "test/platform-api.test.ts covers replay, concurrency and failed-handler reservation release; it does not test workspace creation by two different authenticated users sharing a key."
-    ],
-    "missingTests": [
-      "Need two users sharing a key with separate created workspaces and a same-user replay positive case."
-    ],
-    "acceptanceCriteria": [
-      "Two users sending the same `Idempotency-Key` to workspace-create each get their own workspace, and neither sees the other's id (kill-check: revert to the bare namespace and confirm the test goes red).",
-      "The same user retrying with the same key still replays their own result (the intended behaviour must stay green).",
-      "Every `withIdempotency(` namespace is listed with its scoping rule."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
