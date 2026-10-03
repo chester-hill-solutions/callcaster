@@ -49,7 +49,7 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
     await expect(res.json()).resolves.toEqual({ error: "list" });
   }, 60000);
 
-  test("handles conference/call update errors and still returns success", async () => {
+  test("keeps confirmed conference completion successful when record or call cleanup fails", async () => {
     configureTelephonyStub({
       activeConferenceIds: ["u1~00000000-0000-0000-0000-000000000000"],
       callsByConference: [
@@ -171,6 +171,95 @@ describe("app/routes/api+/auto-dial/end.route.tsx", () => {
     await run();
 
     expect(logger.error).toHaveBeenCalled();
+  });
+
+  test.each(["CF_FAILED", "agent~failed"])("returns failure when %s cannot be completed, but still stops the other conference", async (failedId) => {
+    configureTelephonyStub({ activeConferenceIds: [failedId, "CF_OTHER"], callsByConference: [] });
+    const confUpdate = vi.fn(async (sid: string) => {
+      if (sid === "CF_FAILED") throw new Error("Twilio unavailable");
+      return { status: "completed" };
+    });
+    const twilio = {
+      conferences: Object.assign(
+        (sid: string) => ({ update: () => confUpdate(sid) }),
+        { list: async () => [{ sid: "CF_FAILED" }] },
+      ),
+    };
+    const mod = await import("../app/routes/api+/auto-dial/end.route");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
+      deps: {
+        verifyAuth: async () => ({ user: { id: "u1" } }),
+        safeParseJson: async () => ({ workspaceId: "w1" }),
+        createWorkspaceTwilioInstance: async () => twilio,
+      },
+    } as any));
+    expect(res.status).toBe(502);
+    await expect(res.json()).resolves.toEqual({ error: "Could not stop all predictive conferences. Try again." });
+    expect(confUpdate).toHaveBeenCalledWith("CF_OTHER");
+    expect(telephonyDbMocks.findCallsByConferenceId).not.toHaveBeenCalledWith("w1", failedId);
+  });
+
+  test.each([{ recordedIds: [] }, { recordedIds: ["CF_OWN"] }])("ends only the current user's idle conference once, with recorded IDs $recordedIds", async ({ recordedIds }) => {
+    configureTelephonyStub({ activeConferenceIds: recordedIds, callsByConference: [] });
+    const confUpdate = vi.fn(async (_sid: string) => ({ status: "completed" }));
+    const confList = vi.fn(async ({ friendlyName }: { friendlyName?: string }) => {
+      if (friendlyName) return [{ sid: "CF_OWN", friendlyName }];
+      return [
+        { sid: "CF_OWN", friendlyName: "u1~idle" },
+        { sid: "CF_OTHER", friendlyName: "u2~idle" },
+        { sid: "CF_SIMILAR", friendlyName: "u10~idle" },
+      ];
+    });
+    const mod = await import("../app/routes/api+/auto-dial/end.route");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
+      deps: {
+        verifyAuth: async () => ({ user: { id: "u1" } }),
+        safeParseJson: async () => ({ workspaceId: "w1" }),
+        createWorkspaceTwilioInstance: async () => ({
+          conferences: Object.assign((sid: string) => ({ update: () => confUpdate(sid) }), { list: confList }),
+        }),
+      },
+    } as any));
+    expect(res.status).toBe(200);
+    expect(confUpdate).toHaveBeenCalledExactlyOnceWith("CF_OWN");
+    expect(confList).toHaveBeenCalledWith({ friendlyName: "u1~idle", status: "in-progress" });
+  });
+
+  test("a supplied own conference name does not depend on active call rows", async () => {
+    configureTelephonyStub({ activeConferenceIds: [], callsByConference: [] });
+    const confUpdate = vi.fn(async (_sid: string) => ({ status: "completed" }));
+    const confList = vi.fn(async () => [{ sid: "CF_OWN", friendlyName: "u1~idle" }]);
+    const mod = await import("../app/routes/api+/auto-dial/end.route");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
+      deps: {
+        verifyAuth: async () => ({ user: { id: "u1" } }),
+        safeParseJson: async () => ({ workspaceId: "w1", conferenceName: "u1~idle" }),
+        createWorkspaceTwilioInstance: async () => ({
+          conferences: Object.assign((sid: string) => ({ update: () => confUpdate(sid) }), { list: confList }),
+        }),
+      },
+    } as any));
+    expect(res.status).toBe(200);
+    expect(confUpdate).toHaveBeenCalledExactlyOnceWith("CF_OWN");
+    expect(telephonyDbMocks.findActiveConferenceIdsForUser).not.toHaveBeenCalled();
+  });
+
+  test.each(["u2~idle", "u10~idle", "CF_OTHER", "u1~", 42])("rejects a conference target outside the user's name prefix: %s", async (conferenceName) => {
+    const createClient = vi.fn();
+    const mod = await import("../app/routes/api+/auto-dial/end.route");
+    const res = await asRouteResponse(mod.action({
+      request: new Request("http://localhost/api/auto-dial/end", { method: "POST" }),
+      deps: {
+        verifyAuth: async () => ({ user: { id: "u1" } }),
+        safeParseJson: async () => ({ workspaceId: "w1", conferenceName }),
+        createWorkspaceTwilioInstance: createClient,
+      },
+    } as any));
+    expect(res.status).toBe(400);
+    expect(createClient).not.toHaveBeenCalled();
   });
 
   test("covers resolveDeps fallbacks and non-Error outer catch message", async () => {

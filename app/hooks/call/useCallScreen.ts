@@ -316,10 +316,7 @@ export function useCallScreen() {
   });
 
   const { startCall } = handleCall({ submit });
-  const { handleConferenceEnd } = handleConference({
-    submit,
-    begin,
-  });
+  const { handleConferenceEnd } = handleConference({ begin });
 
   const queueFlow = useCampaignQueueFlow({
     campaign: campaign ?? null,

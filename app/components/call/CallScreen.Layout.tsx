@@ -36,6 +36,7 @@ import type { CallScreenLayoutProps } from "@/hooks/call/useCallScreen";
 import type { ActiveCall, CampaignDetails, QueueItem } from "@/lib/types";
 import { useState, type ReactNode } from "react";
 import type { Tables } from "@/lib/db-types";
+import { toast } from "sonner";
 import { normalizeDispositionOptions } from "@/lib/outreach-disposition";
 
 function ErrorBanner({
@@ -85,6 +86,7 @@ export function CallScreenLayout({
   initialCoaching,
 }: CallScreenLayoutProps) {
   const [leaveDialogOpen, setLeaveDialogOpen] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
   const {
     hangUp,
     answer,
@@ -170,14 +172,35 @@ export function CallScreenLayout({
     label: option,
   }));
 
-  // The one sanctioned way off the call screen (#1313) — reused by TopChrome,
-  // the settings sheet, and the welcome/no-script dialogs' "Leave" action
-  // instead of each wiring its own copy or a bare navigation link.
-  const handleLeaveCampaign = () => {
-    hangUp();
-    device?.destroy();
-    requeueContacts();
-    navigate(-1);
+  const endPredictiveConference = async () => {
+    try {
+      await handleConferenceEnd({
+        activeCall,
+        setConference: () => setConference(null),
+        workspaceId,
+        conferenceName: conference,
+      });
+      return true;
+    } catch {
+      toast.error("Could not stop the predictive conference. Stay on this screen and try again.");
+      return false;
+    }
+  };
+
+  const handleLeaveCampaign = async () => {
+    if (isLeaving) return;
+    setIsLeaving(true);
+    try {
+      if (campaign.dial_type === "predictive") {
+        if (!(await endPredictiveConference())) return;
+      }
+      hangUp();
+      device?.destroy();
+      if (campaign.dial_type !== "predictive") requeueContacts();
+      navigate(-1);
+    } finally {
+      setIsLeaving(false);
+    }
   };
   const requestLeaveCampaign = () => setLeaveDialogOpen(true);
 
@@ -322,7 +345,7 @@ export function CallScreenLayout({
               campaign={campaign}
               count={count}
               completed={completed}
-              onLeaveCampaign={handleLeaveCampaign}
+              onLeaveCampaign={requestLeaveCampaign}
               onReportError={() => setReportDialog(!isReportDialogOpen)}
               mediaStream={stream}
               availableMicrophones={availableMicrophones}
@@ -352,20 +375,22 @@ export function CallScreenLayout({
           </SheetContent>
         </Sheet>
       </TopChrome>
-      <Dialog open={leaveDialogOpen} onOpenChange={setLeaveDialogOpen}>
+      <Dialog open={leaveDialogOpen} onOpenChange={(open) => { if (!isLeaving) setLeaveDialogOpen(open); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Leave campaign?</DialogTitle>
             <DialogDescription>
-              Your active call will end and available contacts will return to the queue.
+              {campaign.dial_type === "predictive"
+                ? "Your conference and predictive dialer will stop. Contacts will not be reset."
+                : "Your active call will end and available contacts will return to the queue."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setLeaveDialogOpen(false)}>
+            <Button type="button" variant="outline" disabled={isLeaving} onClick={() => setLeaveDialogOpen(false)}>
               Cancel
             </Button>
-            <Button type="button" variant="destructive" onClick={handleLeaveCampaign}>
-              Leave Campaign
+            <Button type="button" variant="destructive" disabled={isLeaving} onClick={handleLeaveCampaign}>
+              {isLeaving ? "Stopping campaign…" : "Leave Campaign"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -398,12 +423,7 @@ export function CallScreenLayout({
             handleVoiceDrop={handleVoiceDrop}
             hangUp={
               campaign.dial_type === "predictive"
-                ? () =>
-                    handleConferenceEnd({
-                      activeCall: activeCall as unknown as ActiveCall,
-                      setConference: () => setConference(null),
-                      workspaceId,
-                    })
+                ? endPredictiveConference
                 : () => {
                     if (hangUp) hangUp();
                   }

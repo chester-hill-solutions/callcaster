@@ -229,6 +229,27 @@ describe("auto-dial.server", () => {
     expect(update).toHaveBeenCalledTimes(2);
   });
 
+  test("an ended predictive conference cannot claim a queued contact or place another call", async () => {
+    twilioMocks.conferencesList.mockResolvedValueOnce([]);
+    claimNextQueueContactMock.mockResolvedValueOnce({
+      queue_id: 11,
+      contact_id: 101,
+      contact_phone: "+15551234567",
+      caller_id: "+15550001111",
+    });
+    const result = await runAutoDialerTurn({
+      user_id: "agent-1",
+      workspace_id: "ws-1",
+      campaign_id: 5,
+      conference_id: "agent-1~campaign-5",
+      selected_device: "",
+    });
+    expect(result).toEqual({ success: true, message: "Conference ended, stopping auto-dial" });
+    expect(claimNextQueueContactMock).not.toHaveBeenCalled();
+    expect(rpcMocks.rpcCreateOutreachAttempt).not.toHaveBeenCalled();
+    expect(twilioMocks.callsCreate).not.toHaveBeenCalled();
+  });
+
   describe("runAutoDialerTurn recipient calling window", () => {
     const turnInput = {
       user_id: "user-1",

@@ -117,7 +117,7 @@ describe("useCallScreen", () => {
           return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
         }
         return Promise.resolve(
-          new Response(JSON.stringify({ status: "in-progress" }), { status: 200 }),
+          new Response(JSON.stringify({ success: true, status: "in-progress" }), { status: 200 }),
         );
       }),
     );

@@ -26,6 +26,12 @@ type AutoDialEndDeps = Partial<{
   logger: typeof logger;
 }>;
 
+function isOwnConferenceName(value: unknown, userId: string): value is string {
+  return typeof value === "string" &&
+    value.startsWith(`${userId}~`) &&
+    value.length > userId.length + 1;
+}
+
 export const action = defineAction({
   auth: async (args) => {
     const { deps } = args as ActionFunctionArgs & { deps?: AutoDialEndDeps };
@@ -44,7 +50,7 @@ export const action = defineAction({
       deps?.createWorkspaceTwilioInstance ?? createWorkspaceTwilioInstance,
     logger: deps?.logger ?? logger,
   };
-  const { workspaceId: workspace_id } = await d.safeParseJson<{ workspaceId?: string }>(request);
+  const { workspaceId: workspace_id, conferenceName } = await d.safeParseJson<{ workspaceId?: string; conferenceName?: unknown }>(request);
   if (typeof workspace_id !== "string") {
     return routeData({ error: "Missing workspaceId" }, { status: 400 });
   }
@@ -53,6 +59,10 @@ export const action = defineAction({
     await requireWorkspaceAccess({ user, workspaceId: workspace_id });
   } catch {
     return routeData({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (conferenceName !== undefined && !isOwnConferenceName(conferenceName, user.id)) {
+    return routeData({ error: "Invalid conferenceName" }, { status: 400 });
   }
 
   const twilio = await d.createWorkspaceTwilioInstance({ workspace_id });
@@ -69,8 +79,22 @@ export const action = defineAction({
   };
 
   try {
-    const conferenceIds = await findActiveConferenceIdsForUser(workspace_id, user.id);
-    await Promise.all(
+    let conferenceIds: string[];
+    if (typeof conferenceName === "string") {
+      conferenceIds = [conferenceName];
+    } else {
+      const recordedIds = await findActiveConferenceIdsForUser(workspace_id, user.id);
+      const activeConferences = await twilio.conferences.list({ status: "in-progress" });
+      const ownConferences = activeConferences
+        .filter((conference) => isOwnConferenceName(conference.friendlyName, user.id));
+      const ownSids = new Set(ownConferences.map((conference) => conference.sid));
+      const ownNames = ownConferences.map((conference) => conference.friendlyName);
+      conferenceIds = [...new Set([
+        ...recordedIds.filter((id) => !ownSids.has(id)),
+        ...ownNames,
+      ])];
+    }
+    const stopped = await Promise.all(
       conferenceIds.map(async (conferenceId) => {
         try {
           if (conferenceId.startsWith("CF")) {
@@ -86,10 +110,15 @@ export const action = defineAction({
               ),
             );
           }
+        } catch (confError) {
+          d.logger.error(`Error completing conference ${conferenceId}:`, confError);
+          return false;
+        }
 
+        try {
           const calls = await findCallsByConferenceId(workspace_id, conferenceId);
           logger.debug("Conference calls data:", calls);
-          if (!calls.length) return;
+          if (!calls.length) return true;
           await Promise.all(
             calls.map(async (call) => {
               if (!call.outreach_attempt_id) return;
@@ -107,10 +136,17 @@ export const action = defineAction({
             }),
           );
         } catch (confError) {
-          d.logger.error(`Error updating conference ${conferenceId}:`, confError);
+          d.logger.error(`Error cleaning up completed conference ${conferenceId}:`, confError);
         }
+        return true;
       }),
     );
+    if (stopped.includes(false)) {
+      return routeData(
+        { error: "Could not stop all predictive conferences. Try again." },
+        { status: 502 },
+      );
+    }
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown error occurred";
