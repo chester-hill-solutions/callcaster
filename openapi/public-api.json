@@ -8634,15 +8634,16 @@
       "post": {
         "operationId": "postWorkspaces_workspaceId_conversations_contactNumber",
         "summary": "POST /api/workspaces/:workspaceId/conversations/:contactNumber",
-        "description": "",
+        "description": "GET reads a conversation; POST acknowledges received messages as read. Both require campaigns.read through a workspace API key or session. POST accepts an optional sid to acknowledge one received message; without sid it acknowledges the conversation. This does not set outbound provider delivery receipts.",
         "tags": [
           "Messaging",
           "Integrator API"
         ],
         "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-exposure": "publicSdk",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
+        "x-callcaster-capability": "campaigns.read",
         "security": [
           {
             "sessionCookie": []
@@ -8700,13 +8701,13 @@
       "get": {
         "operationId": "getWorkspaces_workspaceId_conversations_contactNumber",
         "summary": "GET /api/workspaces/:workspaceId/conversations/:contactNumber",
-        "description": "",
+        "description": "GET reads a conversation; POST acknowledges received messages as read. Both require campaigns.read through a workspace API key or session. POST accepts an optional sid to acknowledge one received message; without sid it acknowledges the conversation. This does not set outbound provider delivery receipts.",
         "tags": [
           "Messaging",
           "Integrator API"
         ],
         "x-callcaster-supported": true,
-        "x-callcaster-exposure": "sessionOnly",
+        "x-callcaster-exposure": "publicSdk",
         "x-callcaster-auth-class": "apiKeyOrSession",
         "x-callcaster-docs-guide": "docs/api-data-plane.md",
         "x-callcaster-capability": "campaigns.read",

@@ -3,27 +3,16 @@ import {
   markMessageAsDeliveredBySid,
   markReceivedMessagesAsDeliveredForPhone,
 } from "@/lib/message-db.server";
-import { getDataPlaneRouteContext } from "@/lib/data-plane-route.server";
+import { dataPlaneCapabilityAuthWithParam } from "@/lib/capability-guard.server";
 import { defineAction } from "@/lib/handler.server";
-import type { ActionFunctionArgs } from "react-router";
 
 export const action = defineAction({
-  auth: ({ request, params, context }: ActionFunctionArgs) => {
-    const workspaceId = params.workspaceId;
-    const contactNumber = params.contactNumber;
-    if (!workspaceId || !contactNumber) {
-      return jsonError("workspaceId and contactNumber are required", 400);
-    }
-
+  auth: dataPlaneCapabilityAuthWithParam("campaigns.read", "contactNumber"),
+  sideEffects: ["db-write"],
+  handler: async ({ request, auth }) => {
     if (request.method !== "POST") {
       return jsonError("Method not allowed", 405);
     }
-    getDataPlaneRouteContext(context, workspaceId);
-
-    return { workspaceId, contactNumber };
-  },
-  sideEffects: ["db-write"],
-  handler: async ({ request, auth }) => {
     const { workspaceId, contactNumber } = auth;
     const decodedContactNumber = decodeURIComponent(contactNumber);
     let messageSid: string | undefined;

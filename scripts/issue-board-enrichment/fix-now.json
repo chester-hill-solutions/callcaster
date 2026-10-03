@@ -1504,38 +1504,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2134,
-    "verdict": "fix-now",
-    "recommendedTitle": "POST /api/workspaces/:workspaceId/conversations/:contactNumber performs a DB write with no user or capability check, while the public OpenAPI advertises API-key access",
-    "summary": "Conversation POST still accepts data-plane context without requiring a session user or API-key capability. GET uses campaigns.read, while POST directly changes message state.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Conversation POST still accepts data-plane context without requiring a session user or API-key capability. GET uses campaigns.read, while POST directly changes message state.",
-    "resolution": "Define and enforce the POST capability or session-only contract and regenerate its API output.",
-    "lookIn": [
-      "app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.action.server.ts:21",
-      "app/lib/data-plane-route.server.ts:8",
-      "app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.loader.server.ts:10",
-      "app/lib/api-surface-annotations.ts:153",
-      "app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.action.server.ts",
-      "app/lib/data-plane-route.server.ts:6-18",
-      "app/lib/api-surface-annotations.ts",
-      "app/lib/chat-sms.server.ts (`markMessageAsDeliveredBySid`, `markReceivedMessagesAsDeliveredForPhone`)"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Zero-scope key must produce no write; required-capability/session allowed case and annotation parity need tests."
-    ],
-    "acceptanceCriteria": [
-      "A key with `[]` scopes receives 401/403 and no write happens (kill-check: remove the gate and confirm the test goes red).",
-      "A key with the required capability succeeds (positive control).",
-      "The annotation matches the implemented auth class and `ci:codegen:verify` is green.",
-      "The sweep result is recorded in the issue."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "high",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2136,
     "verdict": "fix-now",
     "recommendedTitle": "POST /api/media lacks the file-size limit enforced by its sibling route",
