@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@5b673c81` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@163884a4` · 283 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-02.
 
@@ -31,7 +31,7 @@ Lane assignments, root causes, resolution paths, and test gaps come from the aud
 
 ---
 
-## Fix now — 86
+## Fix now — 85
 
 Confirmed defects or well-scoped features with an exact resolution path. Pick from here first.
 
@@ -121,16 +121,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Missing tests: No public survey UI required-field test or database completion rejection test was found. survey-submit.ts belongs to survey editing, not this respondent path.
 - Done when: A required question left blank blocks advancing to the next page, with a visible error and focus moved to it.; A required question left blank on the last page blocks submission.; A response with a missing required answer is rejected **server-side** even if the client is bypassed (kill-check: remove the client check and confirm the server test still passes; then remove the server check and confirm a test goes red).; Non-required questions remain skippable.; An existing completed response with a blank required answer is not retroactively invalidated without a decision on that.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2098](https://github.com/chester-hill-solutions/callcaster/issues/2098) The auth:register idempotency scope is global, so a replay on a shared Idempotency-Key returns another caller's live access and refresh tokens
-- Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
-- The unauthenticated register response is still stored and replayed under one global namespace, including live bearer session tokens.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. The unauthenticated register response is still stored and replayed under one global namespace, including live bearer session tokens.
-- Resolution: Remove withIdempotency from unauthenticated registration. Ignore Idempotency-Key on this operation, do not cache signup responses or cookies, and use normal account-creation validation for retries. Existing replay rows must be unreachable through this endpoint. Update OpenAPI and the public auth docs. Keep the authenticated workspace-create namespace fix in #2132.
-- Look in: `app/routes/api+/auth/register.action.server.ts:16`, `app/lib/platform-idempotency.server.ts:83`, `app/lib/platform-auth.server.ts:99`, `app/lib/auth.server.ts:80`, `app/routes/api+/auth/register.action.server.ts:6,10,16`, `app/lib/platform-idempotency.server.ts:54-59,240+`, `app/lib/openapi-platform.ts:19-27`, `app/lib/auth.server.ts (`resolveBearerSessionUser`)`, `every other `withIdempotency(` call site (grep)`
-- Missing tests: Different emails with one key cannot replay another user token.; Same email and key from an unproven second caller cannot replay the first session token.; Legitimate retried registration does not leak or create extra accounts.
-- Done when: Two callers using the same key with different emails never share session tokens or cookies.; A repeated request with the same key and email does not receive a cached session; existing-account handling still applies.; A previously stored auth:register response is not served by registration.; Registration success, validation, rate limits and provider failure retain their existing behavior.; OpenAPI and human docs state that registration does not replay session responses.; List the remaining replay call sites; the global workspaces:create defect stays tracked by #2132.
-- Tracker: PR #2252 implements this fix and is open for review. Its full ci:local gate passed; four replay regression tests fail with the old route. The audited dev source still has the defect until that PR merges. Do not start a duplicate fix; verify after merge.
 
 ### [#2084](https://github.com/chester-hill-solutions/callcaster/issues/2084) Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor
 - Verdict: **Fix now** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-02
@@ -227,6 +217,17 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Existing tests: test/twilio-a2p.server.test.ts; test/twilio-a2p-status-sync.test.ts
 - Missing tests: A caller-level test must fail if campaign creation is skipped or rejected.
 - Done when: `provisionWorkspaceA2P` (or its replacement) creates both a brand registration **and** a campaign, and the returned state carries a non-null `campaignSid`.; A Twilio failure to create the campaign is surfaced as an error to the operator; it is never reported as success.; The onboarding success message is only returned when both resources exist.; A unit test asserts the campaign-create call happens (with the nested `services(sid).usAppToPerson` path).; No `messagingApi?.x?.create` optional-chain guard remains on a resource that must exist.
+- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
+
+### [#2132](https://github.com/chester-hill-solutions/callcaster/issues/2132) The workspaces:create idempotency scope is global, so one user's workspace id is replayed to another user
+- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- Workspace creation still uses a global replay scope even though the authenticated creator id is available.
+- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Workspace creation still uses a global replay scope even though the authenticated creator id is available.
+- Resolution: Scope workspace creation replay by the authenticated user ID: workspaces:create:${auth.user.id}. Keep same-user retry replay and in-flight conflict behavior. Legacy global records must be unreachable. Registration replay was removed in PR #2252; billing checkout is already workspace-scoped after authorization. Update the API docs and prove cross-user isolation with the real replay store. An owner-column migration is not required for this route fix.
+- Look in: `app/routes/api+/workspaces.action.server.ts:39`, `app/lib/platform-idempotency.server.ts:83`, `test/platform-api.test.ts:108`, `app/lib/platform-idempotency.server.ts:54-59,79-85,240+`, `the workspaces-create action under `app/routes/api+/`, `app/lib/openapi-platform.ts:19-27`
+- Existing tests: test/platform-api.test.ts covers replay, concurrency and failed-handler reservation release; it does not test workspace creation by two different authenticated users sharing a key.
+- Missing tests: Need two users sharing a key with separate created workspaces and a same-user replay positive case.
+- Done when: Two users sending the same `Idempotency-Key` to workspace-create each get their own workspace, and neither sees the other's id (kill-check: revert to the bare namespace and confirm the test goes red).; The same user retrying with the same key still replays their own result (the intended behaviour must stay green).; Every `withIdempotency(` namespace is listed with its scoping rule.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2150](https://github.com/chester-hill-solutions/callcaster/issues/2150) An intent row recovered by the status webhook never gets num_segments, so it is billed as a single segment no matter how long the message was
@@ -367,17 +368,6 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 - Look in: `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.action.server.ts:21`, `app/lib/data-plane-route.server.ts:8`, `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.loader.server.ts:10`, `app/lib/api-surface-annotations.ts:153`, `app/routes/api+/workspaces+/$workspaceId/conversations/$contactNumber.action.server.ts`, `app/lib/data-plane-route.server.ts:6-18`, `app/lib/api-surface-annotations.ts`, `app/lib/chat-sms.server.ts (`markMessageAsDeliveredBySid`, `markReceivedMessagesAsDeliveredForPhone`)`
 - Missing tests: Zero-scope key must produce no write; required-capability/session allowed case and annotation parity need tests.
 - Done when: A key with `[]` scopes receives 401/403 and no write happens (kill-check: remove the gate and confirm the test goes red).; A key with the required capability succeeds (positive control).; The annotation matches the implemented auth class and `ci:codegen:verify` is green.; The sweep result is recorded in the issue.
-- Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
-
-### [#2132](https://github.com/chester-hill-solutions/callcaster/issues/2132) The workspaces:create idempotency scope is global, so one user's workspace id is replayed to another user
-- Verdict: **Fix now** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-09-25
-- Workspace creation still uses a global replay scope even though the authenticated creator id is available.
-- Current behavior: Source audit: dev@5b673c81, 2026-10-02. Workspace creation still uses a global replay scope even though the authenticated creator id is available.
-- Resolution: Use creator-specific scope and inventory all replay namespaces; retain correct same-creator replay.
-- Look in: `app/routes/api+/workspaces.action.server.ts:39`, `app/lib/platform-idempotency.server.ts:83`, `test/platform-api.test.ts:108`, `app/lib/platform-idempotency.server.ts:54-59,79-85,240+`, `the workspaces-create action under `app/routes/api+/`, `app/lib/openapi-platform.ts:19-27`
-- Existing tests: test/platform-api.test.ts covers replay, concurrency and failed-handler reservation release; it does not test workspace creation by two different authenticated users sharing a key.
-- Missing tests: Need two users sharing a key with separate created workspaces and a same-user replay positive case.
-- Done when: Two users sending the same `Idempotency-Key` to workspace-create each get their own workspace, and neither sees the other's id (kill-check: revert to the bare namespace and confirm the test goes red).; The same user retrying with the same key still replays their own result (the intended behaviour must stay green).; Every `withIdempotency(` namespace is listed with its scoping rule.
 - Tracker: Source defect remains. Use the revised resolution and verify behavior through the affected entry point.
 
 ### [#2102](https://github.com/chester-hill-solutions/callcaster/issues/2102) The public pricing page publishes the IVR rate for the "Calling — Agent-driven auto-dial" lane the code bills at 4 / 5 credits
@@ -988,9 +978,20 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 98
+## Verify and close — 99
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2098](https://github.com/chester-hill-solutions/callcaster/issues/2098) The auth:register idempotency scope is global, so a replay on a shared Idempotency-Key returns another caller's live access and refresh tokens
+- Verdict: **Verify and close** · Size: M · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
+- The unauthenticated register response is still stored and replayed under one global namespace, including live bearer session tokens.
+- Current behavior: PR #2252 merged to dev as 163884a4. Registration no longer uses the replay store. Seven route tests pass; restoring the old route fails all four replay regression cases.
+- Resolution: Remove withIdempotency from unauthenticated registration. Ignore Idempotency-Key on this operation, do not cache signup responses or cookies, and use normal account-creation validation for retries. Existing replay rows must be unreachable through this endpoint. Update OpenAPI and the public auth docs. Keep the authenticated workspace-create namespace fix in #2132.
+- Look in: `app/routes/api+/auth/register.action.server.ts:16`, `app/lib/platform-idempotency.server.ts:83`, `app/lib/platform-auth.server.ts:99`, `app/lib/auth.server.ts:80`, `app/routes/api+/auth/register.action.server.ts:6,10,16`, `app/lib/platform-idempotency.server.ts:54-59,240+`, `app/lib/openapi-platform.ts:19-27`, `app/lib/auth.server.ts (`resolveBearerSessionUser`)`, `every other `withIdempotency(` call site (grep)`
+- Existing tests: test/api-auth-register.route.test.ts (seven route cases, real replay store and rate limiter); test/platform-api.test.ts (public auth API contract)
+- Missing tests: Confirm the registration behavior on the deployed dev environment before promotion.
+- Done when: Two callers using the same key with different emails never share session tokens or cookies.; A repeated request with the same key and email does not receive a cached session; existing-account handling still applies.; A previously stored auth:register response is not served by registration.; Registration success, validation, rate limits and provider failure retain their existing behavior.; OpenAPI and human docs state that registration does not replay session responses.; List the remaining replay call sites; the global workspaces:create defect stays tracked by #2132.
+- Tracker: The source fix is on dev in PR #2252. Verify on the deployed dev environment; close after production promotion. Do not repeat this fix.
 
 ### [#2116](https://github.com/chester-hill-solutions/callcaster/issues/2116) Verify the disabled-workspace billing split and continued number release
 - Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-02

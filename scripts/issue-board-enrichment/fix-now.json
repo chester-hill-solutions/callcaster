@@ -24,8 +24,8 @@
       "Tests must cover null window, voice-only schedule, malformed end, and warning severity without a launch block."
     ],
     "acceptanceCriteria": [
-      "No sms_send_window \u2192 visible unrestricted-send warning at launch",
-      "Voice schedule with null sms_send_window \u2192 same warning",
+      "No sms_send_window → visible unrestricted-send warning at launch",
+      "Voice schedule with null sms_send_window → same warning",
       "Missing/malformed interval end flagged, not dropped",
       "Warning only, no new blocker for legitimately 24/7 campaigns"
     ],
@@ -362,7 +362,7 @@
       "app/lib/database/workspace-conversations.server.ts:223-241 (the agg CTE: unread_count definition and conv_key grouping)",
       "app/lib/chats/unread-count.ts:1-11 (UNREAD_CONVERSATION_PAGE_SIZE = 100)",
       "app/routes/workspaces+/$id.loader.server.ts:73 (the server-rendered unread count, workspace root only)",
-      "app/hooks/chats/useChatsPage.ts:153-164 (the setLoadedChats reset path \u2014 the unconfirmed list symptom)"
+      "app/hooks/chats/useChatsPage.ts:153-164 (the setLoadedChats reset path — the unconfirmed list symptom)"
     ],
     "existingTests": [
       "test/workspace-conversations-sql-parity.test.ts (conversation-query parity; no complete unread aggregate assertion)",
@@ -519,7 +519,7 @@
   {
     "issueNumber": 2075,
     "verdict": "fix-now",
-    "recommendedTitle": "Password reset email links to /api/auth/callback, which 302s to a route that does not exist \u2014 the forgot-password flow is dead end to end",
+    "recommendedTitle": "Password reset email links to /api/auth/callback, which 302s to a route that does not exist — the forgot-password flow is dead end to end",
     "summary": "Password reset UI still targets the verification callback; it accepts token_hash/type, ignores the reset token, and redirects to an absent route.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Password reset UI still targets the verification callback; it accepts token_hash/type, ignores the reset token, and redirects to an absent route.",
     "resolution": "Send reset links to /reset-password, correct the invalid callback fallback, and enable reset-request feedback.",
@@ -537,7 +537,7 @@
       "scripts/baselines/route-tree.txt:121"
     ],
     "existingTests": [
-      "`test/remember.route.test.ts:55-61` asserts `redirectTo: \"http://localhost/api/auth/callback\"` \u2014 a tautological echo of the constant, which is why the break survived.",
+      "`test/remember.route.test.ts:55-61` asserts `redirectTo: \"http://localhost/api/auth/callback\"` — a tautological echo of the constant, which is why the break survived.",
       "`test/api-auth-callback.route.test.ts:94-111` asserts the `auth-code-error` fallback, i.e. it pins the broken branch as correct.",
       "`test/reset-password.route.test.ts` tests the form in isolation and never walks the emailed link.",
       "`e2e/specs/auth.spec.ts` has no reset case."
@@ -548,8 +548,8 @@
     "acceptanceCriteria": [
       "A user who submits `/remember` and clicks the emailed link lands on the password form with the token populated.",
       "No redirect target in `app/routes/` points at a URL that is absent from `scripts/baselines/route-tree.txt`.",
-      "The success toast on `/remember` fires (#the form currently gives the user no feedback at all) \u2014 see Related.",
-      "A guard exists that walks every `redirect(\"/\u2026\")` literal in `app/routes/**` and fails when the target is not in the route tree."
+      "The success toast on `/remember` fires (#the form currently gives the user no feedback at all) — see Related.",
+      "A guard exists that walks every `redirect(\"/…\")` literal in `app/routes/**` and fails when the target is not in the route tree."
     ],
     "blockedBy": [],
     "size": "S",
@@ -559,7 +559,7 @@
   {
     "issueNumber": 2076,
     "verdict": "fix-now",
-    "recommendedTitle": "Invite cancel is authorized on workspaceId but executed on a bare invitation id \u2014 any member can cancel any workspace's pending invite",
+    "recommendedTitle": "Invite cancel is authorized on workspaceId but executed on a bare invitation id — any member can cancel any workspace's pending invite",
     "summary": "Workspace authorization still ends before invitation cancellation. Both API and settings helper send a bare invitation id to the package writer.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Workspace authorization still ends before invitation cancellation. Both API and settings helper send a bare invitation id to the package writer.",
     "resolution": "Require workspace identity in cancel/resend writers and use it in the update predicate; map foreign ids to uniform 404.",
@@ -583,7 +583,7 @@
       "`cancelWorkspaceInvite(userA, wsA, inviteIdFromWsB)` returns `ok:false, status:404` and leaves the wsB invitation `pending`.",
       "The `formName=cancelInvite` settings branch behaves identically.",
       "The `workspaceId` parameter is no longer dead in either helper (a lint or type change makes an unused parameter an error so it cannot rot back).",
-      "`resendWorkspaceInvitation` gets the same scoping \u2014 see #the sibling resend-ownership issue."
+      "`resendWorkspaceInvitation` gets the same scoping — see #the sibling resend-ownership issue."
     ],
     "blockedBy": [],
     "size": "S",
@@ -593,7 +593,7 @@
   {
     "issueNumber": 2077,
     "verdict": "fix-now",
-    "recommendedTitle": "/accept-invite resend has no ownership check \u2014 any signed-in user can rotate and re-send any invitation by id",
+    "recommendedTitle": "/accept-invite resend has no ownership check — any signed-in user can rotate and re-send any invitation by id",
     "summary": "Resend is partly rate limited now, but any signed-in email still reaches a bare-id resend without being compared to the invite email.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Resend checks a session email exists but never checks invite ownership; it is now rate limited under auth:register.",
     "resolution": "Retain existing rate limiting. Before rotation, authorize the normalized session email against the invitation and apply workspace scoping in the writer. Return 404 on a mismatch without rotating or sending.",
@@ -625,7 +625,7 @@
   {
     "issueNumber": 2078,
     "verdict": "fix-now",
-    "recommendedTitle": "Admin routes serialize the full workspace row \u2014 Twilio auth tokens, twilio_data and stripe_id reach the browser for every workspace",
+    "recommendedTitle": "Admin routes serialize the full workspace row — Twilio auth tokens, twilio_data and stripe_id reach the browser for every workspace",
     "summary": "Raw workspace rows still reach dashboard, detail and sudo API payloads. The safe derived workspaceRows do not remove the original secret-bearing workspaces array.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Raw workspace rows still reach dashboard, detail and sudo API payloads. The safe derived workspaceRows do not remove the original secret-bearing workspaces array.",
     "resolution": "Use safe projections throughout dashboard, detail, sudo user workspace listings and nested workspace/provider account data. Detail loader also returns the full Twilio account object, so removing workspace secrets alone may leave provider authToken serialized. Extend admin route guards and narrow workspace types.",
@@ -701,7 +701,7 @@
   {
     "issueNumber": 2080,
     "verdict": "fix-now",
-    "recommendedTitle": "/api/test-webhook is an authenticated open egress relay \u2014 any signed-in user can POST to any public host with chosen headers and read the response",
+    "recommendedTitle": "/api/test-webhook is an authenticated open egress relay — any signed-in user can POST to any public host with chosen headers and read the response",
     "summary": "The webhook test route still authorizes only a session, then forwards caller-selected public URL, body and headers with response read-back. Private-address and redirect controls remain intact.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The webhook test route still authorizes only a session, then forwards caller-selected public URL, body and headers with response read-back. Private-address and redirect controls remain intact.",
     "resolution": "Require a named workspace and manager access, add a per-user limit, and test allowed manager and refused caller/no-membership cases.",
@@ -734,7 +734,7 @@
   {
     "issueNumber": 2082,
     "verdict": "fix-now",
-    "recommendedTitle": "The A2P provisioning path calls messaging.v1.campaigns, which does not exist in the Twilio SDK \u2014 the campaign is silently never created",
+    "recommendedTitle": "The A2P provisioning path calls messaging.v1.campaigns, which does not exist in the Twilio SDK — the campaign is silently never created",
     "summary": "The older A2P provisioner skips campaign creation through an optional check for a resource it does not use correctly, then saves in_review and reports success.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The older A2P provisioner skips campaign creation through an optional check for a resource it does not use correctly, then saves in_review and reports success.",
     "resolution": "Use one canonical service-scoped provisioner; do not save in_review or report success without campaign creation.",
@@ -791,7 +791,7 @@
       "A toll-free number with **no** TFV record blocks bulk SMS with a message naming the missing verification.",
       "A Twilio error while listing verifications **blocks** the send (fail closed) and surfaces the Twilio error.",
       "A matching verification beyond the previous 200-record limit is included in the send decision.",
-      "An approved verification still passes; a rejected one still blocks \u2014 both are positive controls.",
+      "An approved verification still passes; a rejected one still blocks — both are positive controls.",
       "The fail-closed intent is documented at the decision function so the polarity cannot be flipped silently."
     ],
     "blockedBy": [],
@@ -802,7 +802,7 @@
   {
     "issueNumber": 2084,
     "verdict": "fix-now",
-    "recommendedTitle": "Number purchase reads credits, calls Twilio, then debits \u2014 no transaction, no reservation and no balance floor",
+    "recommendedTitle": "Number purchase reads credits, calls Twilio, then debits — no transaction, no reservation and no balance floor",
     "summary": "Number rental still reads credits, provisions Twilio, writes local state and onboarding, and only then debits. There is no visible balance reservation or compensation across this sequence.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Number rental still reads credits, provisions Twilio, writes local state and onboarding, and only then debits. There is no visible balance reservation or compensation across this sequence.",
     "resolution": "Add an atomic credit reservation and explicit provider/database compensation protocol.",
@@ -870,7 +870,7 @@
   {
     "issueNumber": 2087,
     "verdict": "fix-now",
-    "recommendedTitle": "The IVR runtime ignores the persisted startPageId and pageOrder \u2014 the start page and the linear next-page hop are decided by jsonb key order",
+    "recommendedTitle": "The IVR runtime ignores the persisted startPageId and pageOrder — the start page and the linear next-page hop are decided by jsonb key order",
     "summary": "IVR entry and next-page runtime ignore saved startPageId and pageOrder. A direct check returns page_2 when pageOrder requests page_3.",
     "resolution": "Use one ordered-page/start-page resolver on all inbound and outbound entry and transition paths.",
     "lookIn": [
@@ -900,7 +900,7 @@
       "Reordering pages changes the order a caller hears when a step falls off the end of a page.",
       "An inbound IVR number whose script sets a non-first start page enters on that page.",
       "A script with a `startPageId` that points at a missing page is rejected by the launch gate with a clear message.",
-      "The existing UI test for \"Set as start\" is joined by a server-side test that proves the setting changes dispatch behaviour (today no such test exists \u2014 that is why this survived)."
+      "The existing UI test for \"Set as start\" is joined by a server-side test that proves the setting changes dispatch behaviour (today no such test exists — that is why this survived)."
     ],
     "blockedBy": [],
     "size": "M",
@@ -933,7 +933,7 @@
     "acceptanceCriteria": [
       "A caller routed to `voicemail:` hears the number's configured inbound greeting recording when one is set, and TTS only when it is not.",
       "The spoken dialled number is the number the caller called, never the row id.",
-      "Either the `{email}` payload is honoured or it is removed from `docs/contact-center-platform-plan.md:134` \u2014 one of the two, with a test.",
+      "Either the `{email}` payload is honoured or it is removed from `docs/contact-center-platform-plan.md:134` — one of the two, with a test.",
       "A number whose `inbound_script_id` has an invalid `voicemail:` target is rejected before it can be attached."
     ],
     "blockedBy": [],
@@ -978,7 +978,7 @@
   {
     "issueNumber": 2090,
     "verdict": "fix-now",
-    "recommendedTitle": "Only STOP and UNSUBSCRIBE are honoured \u2014 CANCEL, END, QUIT, REVOKE and \"OPT OUT\" do not opt the contact out",
+    "recommendedTitle": "Only STOP and UNSUBSCRIBE are honoured — CANCEL, END, QUIT, REVOKE and \"OPT OUT\" do not opt the contact out",
     "summary": "The default opt-out set is only STOP and UNSUBSCRIBE. A configured END set removes STOP. Direct checks confirm CANCEL is not suppressed and configured END loses STOP.",
     "resolution": "Keep mandatory keywords in a shared set and union extra configuration. Separate the unknown-sender suppression policy from this confirmed parsing defect.",
     "lookIn": [
@@ -1000,7 +1000,7 @@
     "acceptanceCriteria": [
       "`STOP`, `UNSUBSCRIBE`, `CANCEL`, `END`, `QUIT`, `REVOKE` and `OPT OUT` all set `contact.opt_out = true` (one parameterised test over the whole set).",
       "A workspace configured with `optOutKeywords: \"STOP\"` still honours UNSUBSCRIBE and the rest of the mandatory set.",
-      "A STOP from a number with no contact row is recorded somewhere enforceable, or the operator is warned \u2014 decided and tested either way.",
+      "A STOP from a number with no contact row is recorded somewhere enforceable, or the operator is warned — decided and tested either way.",
       "`advancedOptOutEnabled: false` is visible to the operator rather than silent.",
       "`test/ui` / dispatch tests: a contact that opted out is skipped by the next campaign dispatch (the positive control)."
     ],
@@ -1116,7 +1116,7 @@
   {
     "issueNumber": 2094,
     "verdict": "fix-now",
-    "recommendedTitle": "Agent hang-up on a predictive call 500s and never tears the conference down \u2014 Twilio retries forever and the dialer keeps dialling",
+    "recommendedTitle": "Agent hang-up on a predictive call 500s and never tears the conference down — Twilio retries forever and the dialer keeps dialling",
     "summary": "participant-leave throws for calls without outreach_attempt_id before conference teardown. Agent legs have no outreach attempt.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. participant-leave throws for calls without outreach_attempt_id before conference teardown. Agent legs have no outreach attempt.",
     "resolution": "Handle agent-leg departure without an outreach attempt and complete the intended predictive conference with bounded, retry-safe cleanup.",
@@ -1148,7 +1148,7 @@
   {
     "issueNumber": 2095,
     "verdict": "fix-now",
-    "recommendedTitle": "\"Leave Campaign\" does not leave the campaign in predictive mode \u2014 the conference and the dialer keep running and real calls keep being placed",
+    "recommendedTitle": "\"Leave Campaign\" does not leave the campaign in predictive mode — the conference and the dialer keep running and real calls keep being placed",
     "summary": "Leave Campaign still hangs up the local agent leg, destroys the device, requeues and navigates away. It does not end the predictive conference.",
     "resolution": "In predictive mode, await server conference-end before leaving and omit the broad queue requeue. Keep live-call behavior separate.",
     "lookIn": [
@@ -1183,7 +1183,7 @@
   {
     "issueNumber": 2096,
     "verdict": "fix-now",
-    "recommendedTitle": "Every live-calling dequeue is workspace-wide, not campaign-scoped \u2014 a contact called in one campaign is silently dropped from all of them",
+    "recommendedTitle": "Every live-calling dequeue is workspace-wide, not campaign-scoped — a contact called in one campaign is silently dropped from all of them",
     "summary": "The latest dequeue_contact function still filters contact/workspace without campaign. Ordinary call completion can dequeue the same contact from other campaigns.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The latest dequeue_contact function still filters contact/workspace without campaign. Ordinary call completion can dequeue the same contact from other campaigns.",
     "resolution": "Make ordinary dequeue campaign-scoped across RPC and callers. Keep an explicit separate workspace-wide suppression operation for do-not-call intent.",
@@ -1215,43 +1215,6 @@
     "size": "M",
     "risk": "high",
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
-    "issueNumber": 2098,
-    "verdict": "fix-now",
-    "recommendedTitle": "The auth:register idempotency scope is global, so a replay on a shared Idempotency-Key returns another caller's live access and refresh tokens",
-    "summary": "The unauthenticated register response is still stored and replayed under one global namespace, including live bearer session tokens.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The unauthenticated register response is still stored and replayed under one global namespace, including live bearer session tokens.",
-    "resolution": "Remove withIdempotency from unauthenticated registration. Ignore Idempotency-Key on this operation, do not cache signup responses or cookies, and use normal account-creation validation for retries. Existing replay rows must be unreachable through this endpoint. Update OpenAPI and the public auth docs. Keep the authenticated workspace-create namespace fix in #2132.",
-    "lookIn": [
-      "app/routes/api+/auth/register.action.server.ts:16",
-      "app/lib/platform-idempotency.server.ts:83",
-      "app/lib/platform-auth.server.ts:99",
-      "app/lib/auth.server.ts:80",
-      "app/routes/api+/auth/register.action.server.ts:6,10,16",
-      "app/lib/platform-idempotency.server.ts:54-59,240+",
-      "app/lib/openapi-platform.ts:19-27",
-      "app/lib/auth.server.ts (`resolveBearerSessionUser`)",
-      "every other `withIdempotency(` call site (grep)"
-    ],
-    "existingTests": [],
-    "missingTests": [
-      "Different emails with one key cannot replay another user token.",
-      "Same email and key from an unproven second caller cannot replay the first session token.",
-      "Legitimate retried registration does not leak or create extra accounts."
-    ],
-    "acceptanceCriteria": [
-      "Two callers using the same key with different emails never share session tokens or cookies.",
-      "A repeated request with the same key and email does not receive a cached session; existing-account handling still applies.",
-      "A previously stored auth:register response is not served by registration.",
-      "Registration success, validation, rate limits and provider failure retain their existing behavior.",
-      "OpenAPI and human docs state that registration does not replay session responses.",
-      "List the remaining replay call sites; the global workspaces:create defect stays tracked by #2132."
-    ],
-    "blockedBy": [],
-    "size": "M",
-    "risk": "high",
-    "trackerRecommendation": "PR #2252 implements this fix and is open for review. Its full ci:local gate passed; four replay regression tests fail with the old route. The audited dev source still has the defect until that PR merges. Do not start a duplicate fix; verify after merge."
   },
   {
     "issueNumber": 2099,
@@ -1328,7 +1291,7 @@
   {
     "issueNumber": 2102,
     "verdict": "fix-now",
-    "recommendedTitle": "The public pricing page publishes the IVR rate for the \"Calling \u2014 Agent-driven auto-dial\" lane the code bills at 4 / 5 credits",
+    "recommendedTitle": "The public pricing page publishes the IVR rate for the \"Calling — Agent-driven auto-dial\" lane the code bills at 4 / 5 credits",
     "summary": "Public auto-dial Calling rates still use IVR constants. The staffed voice tariff is 4/5 credits; the public Calling card and calculator use 2/3.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Public auto-dial Calling rates still use IVR constants. The staffed voice tariff is 4/5 credits; the public Calling card and calculator use 2/3.",
     "resolution": "Bind each published lane and calculator input to its actual billing kind; review marketing copy.",
@@ -1496,7 +1459,7 @@
   {
     "issueNumber": 2107,
     "verdict": "fix-now",
-    "recommendedTitle": "The public customer survey never enforces is_required \u2014 required questions can be submitted blank",
+    "recommendedTitle": "The public customer survey never enforces is_required — required questions can be submitted blank",
     "summary": "The public survey still has no required-answer checks in Next/Submit, and completion updates completed_at without checking required persisted answers. Native required controls sit outside a form.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The public survey still has no required-answer checks in Next/Submit, and completion updates completed_at without checking required persisted answers. Native required controls sit outside a form.",
     "resolution": "Add per-page respondent validation and independent server completion validation; do not patch survey-submit.ts, which manages survey authoring.",
@@ -1547,7 +1510,7 @@
       "Submitting within 1s of typing the last answer persists that answer (kill-check: remove the flush and confirm the test goes red).",
       "No timer survives unmount in any `useDebounce` consumer (a test that unmounts mid-debounce and asserts no submit fires).",
       "The answer write is observably ordered before the completion write.",
-      "A blank answer to a required question is still caught (the related issue) \u2014 the two must compose.",
+      "A blank answer to a required question is still caught (the related issue) — the two must compose.",
       "Changing multiple questions within the debounce interval does not cancel another question's pending save.",
       "Completion waits for successful answer persistence, not only for the answer request to start.",
       "Answer or completion failure keeps a recoverable form and does not show a false success card."
@@ -1560,7 +1523,7 @@
   {
     "issueNumber": 2109,
     "verdict": "fix-now",
-    "recommendedTitle": "Changing \"rows per page\" in the admin portal blanks the table \u2014 the page number is never reset",
+    "recommendedTitle": "Changing \"rows per page\" in the admin portal blanks the table — the page number is never reset",
     "summary": "The admin page-size blank-table defect remains across all three panels. Changing page size invokes only setItemsPerPage; the reset key excludes size and there is no clamp.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The admin page-size blank-table defect remains across all three panels. Changing page size invokes only setItemsPerPage; the reset key excludes size and there is no clamp.",
     "resolution": "Make size changes reset page 1 in the shared contract and include size/clamp in admin state. Add populated page-2 to size-50 scenarios for users/workspaces/campaigns and true-empty-state checks.",
@@ -1658,7 +1621,7 @@
   {
     "issueNumber": 2112,
     "verdict": "fix-now",
-    "recommendedTitle": "The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound \u2014 every MMS adds phantom segments",
+    "recommendedTitle": "The reconciliation SMS side divides a mixed SMS+MMS credit total by the SMS per-segment rate, while the Twilio side never reads mms-outbound — every MMS adds phantom segments",
     "summary": "Reconciliation divides all SMS-key debit credits by the SMS segment rate while provider matching excludes MMS. MMS uses the SMS key but has a flat, different debit.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Reconciliation divides all SMS-key debit credits by the SMS segment rate while provider matching excludes MMS. MMS uses the SMS key but has a flat, different debit.",
     "resolution": "Compare SMS and MMS in consistent separate units or join ledger/message facts before converting units.",
@@ -1796,7 +1759,7 @@
   {
     "issueNumber": 2117,
     "verdict": "fix-now",
-    "recommendedTitle": "sms_status_side_effects does a synchronous up-to-10s customer-webhook POST on the worker's serial loop and swallows the failure \u2014 never retried",
+    "recommendedTitle": "sms_status_side_effects does a synchronous up-to-10s customer-webhook POST on the worker's serial loop and swallows the failure — never retried",
     "summary": "SMS side effects still await the external customer webhook and log delivery failure without throwing. Durable webhook_delivery exists but this path does not use it.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. SMS side effects still await the external customer webhook and log delivery failure without throwing. Durable webhook_delivery exists but this path does not use it.",
     "resolution": "Queue customer webhooks for durable retry and SID/event deduplication. To meet the no-delay claim-loop requirement, give webhook delivery separate processing capacity or bound worker concurrency; enqueueing onto the same serial loop alone does not meet it. app/lib/worker/poll-jobs.server.ts:320-359 claims one job and awaits its handler before the next claim.",
@@ -1887,7 +1850,7 @@
       "A machine-voice campaign with no date pair, outside its calling window, reports `waiting` (kill-check: restore the combined guard and confirm the test goes red).",
       "A campaign in range reports `running`.",
       "A campaign with an expired range reports the expired state (see the related `campaign_ended` issue).",
-      "The `waiting` predicate is a single shared function used by both the sweep and the dispatch gate \u2014 asserted by a test that they agree across a table of cases.",
+      "The `waiting` predicate is a single shared function used by both the sweep and the dispatch gate — asserted by a test that they agree across a table of cases.",
       "The production count is recorded in the issue."
     ],
     "blockedBy": [],
@@ -2036,7 +1999,7 @@
   {
     "issueNumber": 2125,
     "verdict": "fix-now",
-    "recommendedTitle": "A public survey never persists one response \u2014 every answer creates a new row and \"complete\" silently updates zero rows",
+    "recommendedTitle": "A public survey never persists one response — every answer creates a new row and \"complete\" silently updates zero rows",
     "summary": "The full public page still never supplies respondent_token. Each answer and completion therefore resolves a fresh server ID, and completion reports success for an UPDATE that matches no row.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The full public page still never supplies respondent_token. Each answer and completion therefore resolves a fresh server ID, and completion reports success for an UPDATE that matches no row.",
     "resolution": "Use a signed stable respondent token through loader/page/actions and persist it across reloads. Require a matching response row on completion. Assess historical fragments through separate read-only data work before any repair.",
@@ -2233,7 +2196,7 @@
       "With `campaign.caller_id === null`, the Dial button is disabled and the reason is visible (kill-check: remove the `disabled` condition and confirm the test goes red).",
       "With no device selected, same.",
       "When the server rejects a start for any reason, the error reaches the user through a toast, not only the log (kill-check: drop the toast and confirm the test goes red).",
-      "The positive control: a configured caller ID and a device \u2192 the button is enabled and the start path runs."
+      "The positive control: a configured caller ID and a device → the button is enabled and the start path runs."
     ],
     "blockedBy": [],
     "size": "S",
@@ -2246,7 +2209,7 @@
     "recommendedTitle": "The workspaces:create idempotency scope is global, so one user's workspace id is replayed to another user",
     "summary": "Workspace creation still uses a global replay scope even though the authenticated creator id is available.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Workspace creation still uses a global replay scope even though the authenticated creator id is available.",
-    "resolution": "Use creator-specific scope and inventory all replay namespaces; retain correct same-creator replay.",
+    "resolution": "Scope workspace creation replay by the authenticated user ID: workspaces:create:${auth.user.id}. Keep same-user retry replay and in-flight conflict behavior. Legacy global records must be unreachable. Registration replay was removed in PR #2252; billing checkout is already workspace-scoped after authorization. Update the API docs and prove cross-user isolation with the real replay store. An owner-column migration is not required for this route fix.",
     "lookIn": [
       "app/routes/api+/workspaces.action.server.ts:39",
       "app/lib/platform-idempotency.server.ts:83",
@@ -2342,7 +2305,7 @@
   {
     "issueNumber": 2137,
     "verdict": "fix-now",
-    "recommendedTitle": "The billing/ledger loader has no role gate \u2014 any member, including caller, reads the full credit history",
+    "recommendedTitle": "The billing/ledger loader has no role gate — any member, including caller, reads the full credit history",
     "summary": "Billing loader/service still require membership only, so caller/member roles can read credit history despite stricter purchase controls.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Billing loader/service still require membership only, so caller/member roles can read credit history despite stricter purchase controls.",
     "resolution": "Apply Admin minimum role to loader and shared billing read service; verify API read parity.",
@@ -2497,11 +2460,11 @@
       "test/number-rental-lifecycle.test.ts"
     ],
     "missingTests": [
-      "Warn \u2192 pay \u2192 lapse warns again; also cover suspend \u2192 full recovery \u2192 lapse and idempotent reruns."
+      "Warn → pay → lapse warns again; also cover suspend → full recovery → lapse and idempotent reruns."
     ],
     "acceptanceCriteria": [
-      "The full sequence warn \u2192 suspend \u2192 pay \u2192 lapse produces a **second** warning (kill-check: remove the clear and confirm the test goes red).",
-      "Warn \u2192 pay without suspension \u2192 lapse also produces a second warning.",
+      "The full sequence warn → suspend → pay → lapse produces a **second** warning (kill-check: remove the clear and confirm the test goes red).",
+      "Warn → pay without suspension → lapse also produces a second warning.",
       "The first lapse still warns exactly once.",
       "A workspace that never lapses is never warned.",
       "The policy comment in `number-rental-lifecycle.ts` matches the tested behaviour."
@@ -2514,7 +2477,7 @@
   {
     "issueNumber": 2144,
     "verdict": "fix-now",
-    "recommendedTitle": "Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied \u2014 the purchase path returns a bare 500",
+    "recommendedTitle": "Q43 regulatory address requirements are fetched, resolved and unit-tested, then never applied — the purchase path returns a bare 500",
     "summary": "Number purchase still has explicit deferred-Q43 code and no regulatory addressSid. Its service-address precheck and validated emergencyAddressSid do not resolve local/foreign regulatory requirements.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Purchase requires a service address and may pass validated emergencyAddressSid. It still explicitly defers regulatory addressRequirements/addressSid, and provider create rejection maps to 500.",
     "resolution": "Look up inventory requirement, select compliant validated regulatory address, explain absence before purchase and pass addressSid.",
@@ -2615,8 +2578,8 @@
     "issueNumber": 2149,
     "verdict": "fix-now",
     "recommendedTitle": "An SMS campaign's outreach disposition is pinned to completed at send time and can never be updated by the delivery status",
-    "summary": "SMS create stamps completed before delivery. The transition guard refuses completed \u2192 delivered/failed/undelivered. Direct checks confirm the lock.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. SMS create stamps completed before delivery. The transition guard refuses completed \u2192 delivered/failed/undelivered. Direct checks confirm the lock.",
+    "summary": "SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.",
+    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. SMS create stamps completed before delivery. The transition guard refuses completed → delivered/failed/undelivered. Direct checks confirm the lock.",
     "resolution": "Leave create-time disposition nonterminal and let delivery callbacks own the terminal result. Define recovery for messages with no callback.",
     "lookIn": [
       "app/lib/campaign-sms-send.server.ts:238",
@@ -2633,7 +2596,7 @@
       "test/sms-status-settled.test.ts"
     ],
     "missingTests": [
-      "Create \u2192 failed/undelivered/delivered must update Results and queue filters; cover duplicate/out-of-order callbacks."
+      "Create → failed/undelivered/delivered must update Results and queue filters; cover duplicate/out-of-order callbacks."
     ],
     "acceptanceCriteria": [
       "A message the carrier reports `failed` appears under `failed` in the campaign queue filter (kill-check).",
@@ -2827,7 +2790,7 @@
   {
     "issueNumber": 2170,
     "verdict": "fix-now",
-    "recommendedTitle": "Stale subaccount credentials block the product's own number-release path \u2014 a customer cannot release their own number",
+    "recommendedTitle": "Stale subaccount credentials block the product's own number-release path — a customer cannot release their own number",
     "summary": "A 2026-09-28 run found 18 rejected workspace credentials. Current code still selects API-key auth without rejection-time fallback, and number release uses the same client. Current credential liveness was not measured in this audit.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The 18 stale-credential failures are historical incident evidence. Current client selection has no fallback after an API-key rejection; release still uses that client.",
     "rootCause": "Stored credentials were rejected in the incident; the rotation cause is not proved. Client construction prefers a key, but does not automatically retry a rejected key with the Auth Token.",
@@ -2836,8 +2799,8 @@
       "app/lib/database/workspace.server.ts:461",
       "app/lib/database/workspace.server.ts:497",
       "app/lib/database/workspace-twilio-subaccount.server.ts (createSubaccount/createKeys; the place credentials are minted and would be rotated)",
-      "app/lib/phone-numbers.server.ts (removeWorkspacePhoneNumber \u2014 authenticates with the workspace credential)",
-      "master.api.v2010.accounts(subAccountSid) \u2014 the working path for platform-operated calls"
+      "app/lib/phone-numbers.server.ts (removeWorkspacePhoneNumber — authenticates with the workspace credential)",
+      "master.api.v2010.accounts(subAccountSid) — the working path for platform-operated calls"
     ],
     "existingTests": [
       "none that exercise a stale or rejected subaccount credential"
@@ -2859,26 +2822,26 @@
   {
     "issueNumber": 2166,
     "verdict": "fix-now",
-    "recommendedTitle": "Call audio depends on a best-effort Twilio copy \u2014 recover the ones that failed, then remove the Twilio playback fallback",
+    "recommendedTitle": "Call audio depends on a best-effort Twilio copy — recover the ones that failed, then remove the Twilio playback fallback",
     "summary": "Failure propagation and the repair sweep landed. Raw Twilio playback fallback and timestamped voicemail keys remain; recording_url retention still needs a decision.",
     "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. Failure propagation and the repair sweep landed. Raw Twilio playback fallback and timestamped voicemail keys remain; recording_url retention still needs a decision.",
-    "rootCause": "The original design treated the copy as best-effort and swallowed the failure, which made an unrecoverable data loss look like success. A second, independent problem: recording_sid was written AFTER the copy, so a failed copy left no searchable row \u2014 the failure was unrepresentable in the database. #2169 fixed the ordering, which is what made the repair sweep's find query possible.",
+    "rootCause": "The original design treated the copy as best-effort and swallowed the failure, which made an unrecoverable data loss look like success. A second, independent problem: recording_sid was written AFTER the copy, so a failed copy left no searchable row — the failure was unrepresentable in the database. #2169 fixed the ordering, which is what made the repair sweep's find query possible.",
     "resolution": "Failure propagation and repair sweep are complete. Remaining concrete fixes: replace the raw Twilio playback link with a clear storage-unavailable state; make voicemail keys stable per recording identity. The S3 upload helper overwrites by default unless upsert:false, so the defect is the timestamp key, not a required upsert:true option. Decide recording_url retention separately.",
     "lookIn": [
       "app/components/calls/CallLogTable.tsx:234",
       "app/routes/api+/email-vm.action.server.ts:186",
       "app/lib/object-storage.server.ts:225",
-      "app/lib/call-recording-storage.server.ts (persistCallRecordingToStorage \u2014 throws on every failure mode)",
-      "app/lib/worker/webhook-side-effects.server.ts (runRecordingSideEffects \u2014 writes recording identity before the copy)",
+      "app/lib/call-recording-storage.server.ts (persistCallRecordingToStorage — throws on every failure mode)",
+      "app/lib/worker/webhook-side-effects.server.ts (runRecordingSideEffects — writes recording identity before the copy)",
       "app/lib/call-recording-repair.server.ts (repair sweep, PR #2173)",
-      "app/components/calls/CallLogTable.tsx:234 (Twilio-URL playback fallback \u2014 step 3)",
+      "app/components/calls/CallLogTable.tsx:234 (Twilio-URL playback fallback — step 3)",
       "app/lib/call-log.server.ts:49-52 (CallLogRow.recordingUrl is the raw Twilio URL, documented as 'a fallback that leaves the app')",
-      "app/routes/api+/email-vm.action.server.ts:185-197 (voicemail object key and upload \u2014 step 4)"
+      "app/routes/api+/email-vm.action.server.ts:185-197 (voicemail object key and upload — step 4)"
     ],
     "existingTests": [
-      "test/call-recording-storage.server.test.ts \u2014 inverted to assert the throwing behaviour",
-      "test/webhook-side-effects.test.ts \u2014 asserts identity is written before the copy",
-      "test/call-recording-repair.server.test.ts \u2014 13 tests, including a schema-contract test proving the swept payload is accepted by the real job-params schema"
+      "test/call-recording-storage.server.test.ts — inverted to assert the throwing behaviour",
+      "test/webhook-side-effects.test.ts — asserts identity is written before the copy",
+      "test/call-recording-repair.server.test.ts — 13 tests, including a schema-contract test proving the swept payload is accepted by the real job-params schema"
     ],
     "missingTests": [
       "Two same-recording callbacks yield one object; missing stored audio has a clear state and no raw Twilio link."
@@ -2913,8 +2876,8 @@
       "vitest.integration-db.config.ts"
     ],
     "existingTests": [
-      "test/integration-db/dequeue-contact-assigned.test.ts \u2014 the real dequeue_contact function, dial path only",
-      "test/integration-db/split-campaign-atomic.test.ts \u2014 six real-Postgres tests added by #2209"
+      "test/integration-db/dequeue-contact-assigned.test.ts — the real dequeue_contact function, dial path only",
+      "test/integration-db/split-campaign-atomic.test.ts — six real-Postgres tests added by #2209"
     ],
     "missingTests": [
       "Need application-only PR trigger proof and repository required-check settings; neither established in this source audit."
@@ -2947,14 +2910,14 @@
       "app/db/schema.ts:127",
       "client/migrations/20260705000200_add_campaign_queue_workspace.sql:43",
       "drizzle/0000_baseline.sql:5320 (workspace.id is uuid in the database)",
-      "app/db/schema.ts:102 (workspace.id is text() in the model \u2014 the drift)",
+      "app/db/schema.ts:102 (workspace.id is text() in the model — the drift)",
       "app/db/schema.ts:126,453,472 (the three text tenancy columns: workspace_member, workspace_audit_event, workspace_audio)",
       "app/db/schema.ts:51,79 (schema-campaign: campaign_queue.workspace is uuid)",
       "app/db/workspace-scoped-tables.ts:41-94 (the 27 registered tables)",
       "client/migrations/20260713180000_chs_workspace_membership.sql:99-106 (workspace_member, role_id FK but no workspace_id FK)",
       "client/migrations/20260713120000_workspace_audit_event.sql:4 (workspace_audit_event.workspace_id is text)",
       "client/migrations/20260715120000_workspace_audio_metadata.sql:17 (workspace_audio.workspace_id is text)",
-      "client/migrations/20260731140000_create_workspace_events.sql:24 (workspace_events.workspace_id is uuid \u2014 unconstrained)"
+      "client/migrations/20260731140000_create_workspace_events.sql:24 (workspace_events.workspace_id is uuid — unconstrained)"
     ],
     "existingTests": [],
     "missingTests": [

@@ -32,8 +32,8 @@ Cleanup removed 21 stale worktree records, four clean worktrees, 18 local branch
 
 | Lane | Issues |
 | --- | --- |
-| fix-now | 86 |
-| verify-close | 98 |
+| fix-now | 85 |
+| verify-close | 99 |
 | needs-repro | 11 |
 | needs-decision | 45 |
 | blocked-epic | 36 |
@@ -43,6 +43,8 @@ Cleanup removed 21 stale worktree records, four clean worktrees, 18 local branch
 Six entries moved from Fix now to Verify and close: #1875, #2005, #2013, #2041, #2054 and #2147. #2178 now has a verification record. Closed enrichment records for #1356, #2081, #2101, #2120, #2126, #2135 and #2208 were pruned. The closed #1356 dependency was removed from #1827. No GitHub issue was closed. The later Fix now audit corrected 76 issue bodies and 26 titles on GitHub. The other 25 issue bodies needed no material change. Every update was read back and verified; labels and assignees were retained.
 
 All 101 entries in the starting Fix now lane were checked against current dev, related PRs and issue discussion. Of those entries, 86 remain in Fix now; six moved to Verify and close, four to Needs decision, four to Blocked / split first, and one to Needs reproduction. Each audited record now states the remaining work and test gaps. Original issue bodies remain in clearly marked superseded history sections where a body existed.
+
+After the source audit, PR #2252 merged to dev as `163884a4` and its #2098 entry moved to Verify and close. The next implementation also narrowed #2132 to verified-user replay scope, with its updated issue body read back and checked. The lane table includes this follow-up.
 
 The normal `npm run tools:issues:board` query failed because the token lacks `read:project`. The fallback used the same board generator with live issue data. Eight IN PROGRESS markers were retained from the prior committed board and explicitly marked as not refreshed. This is not a review of live project status.
 

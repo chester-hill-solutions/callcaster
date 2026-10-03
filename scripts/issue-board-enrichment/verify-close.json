@@ -2675,5 +2675,43 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Move to Verify and close. Public adapters already satisfy the claimed purchase classification; do not change intentional grant prefix buckets solely to satisfy the original incorrect premise."
+  },
+  {
+    "issueNumber": 2098,
+    "verdict": "verify-close",
+    "recommendedTitle": "The auth:register idempotency scope is global, so a replay on a shared Idempotency-Key returns another caller's live access and refresh tokens",
+    "summary": "The unauthenticated register response is still stored and replayed under one global namespace, including live bearer session tokens.",
+    "currentBehavior": "PR #2252 merged to dev as 163884a4. Registration no longer uses the replay store. Seven route tests pass; restoring the old route fails all four replay regression cases.",
+    "resolution": "Remove withIdempotency from unauthenticated registration. Ignore Idempotency-Key on this operation, do not cache signup responses or cookies, and use normal account-creation validation for retries. Existing replay rows must be unreachable through this endpoint. Update OpenAPI and the public auth docs. Keep the authenticated workspace-create namespace fix in #2132.",
+    "lookIn": [
+      "app/routes/api+/auth/register.action.server.ts:16",
+      "app/lib/platform-idempotency.server.ts:83",
+      "app/lib/platform-auth.server.ts:99",
+      "app/lib/auth.server.ts:80",
+      "app/routes/api+/auth/register.action.server.ts:6,10,16",
+      "app/lib/platform-idempotency.server.ts:54-59,240+",
+      "app/lib/openapi-platform.ts:19-27",
+      "app/lib/auth.server.ts (`resolveBearerSessionUser`)",
+      "every other `withIdempotency(` call site (grep)"
+    ],
+    "existingTests": [
+      "test/api-auth-register.route.test.ts (seven route cases, real replay store and rate limiter)",
+      "test/platform-api.test.ts (public auth API contract)"
+    ],
+    "missingTests": [
+      "Confirm the registration behavior on the deployed dev environment before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Two callers using the same key with different emails never share session tokens or cookies.",
+      "A repeated request with the same key and email does not receive a cached session; existing-account handling still applies.",
+      "A previously stored auth:register response is not served by registration.",
+      "Registration success, validation, rate limits and provider failure retain their existing behavior.",
+      "OpenAPI and human docs state that registration does not replay session responses.",
+      "List the remaining replay call sites; the global workspaces:create defect stays tracked by #2132."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "high",
+    "trackerRecommendation": "The source fix is on dev in PR #2252. Verify on the deployed dev environment; close after production promotion. Do not repeat this fix."
   }
 ]
