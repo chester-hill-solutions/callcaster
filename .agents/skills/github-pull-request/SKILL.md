@@ -21,6 +21,14 @@ subcommand manual and installed `gh <command> --help` before using a command.
 9. Merge only when the user requested the merge or explicitly approved it. Select the merge strategy deliberately, then verify `state`, `mergedAt`, `mergeCommit`, and the base branch.
 10. If `--delete-branch` is used, verify the remote branch no longer exists. A checked-out local branch may remain.
 
+## Context-only issue references
+
+The `issue-on-dev` workflow also matches singular `issue #N` in body prose,
+case-insensitively. For context-only references, use a bare `#N` or an issue URL;
+do not write `issue #N`, `Issues: #N`, or a closing keyword. Before publishing,
+check which numbers the workflow regex extracts and keep only the implemented
+issues. A `no-issue` label does not stop this workflow from parsing the body.
+
 ## Common Commands
 
 - Create: `gh pr create --repo OWNER/REPO --base dev --head BRANCH --title TITLE --body-file FILE`
