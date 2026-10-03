@@ -17,6 +17,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Workspace ownership transfer now rejects the current owner as its target and returns failed transfers as errors without a success audit event ([PR #2275](https://github.com/chester-hill-solutions/callcaster/pull/2275), [#2079](https://github.com/chester-hill-solutions/callcaster/issues/2079)).
+
 - IVR calls now start on the saved start page and follow the saved page order; campaign launch rejects a missing declared start page ([PR #2274](https://github.com/chester-hill-solutions/callcaster/pull/2274), [#2087](https://github.com/chester-hill-solutions/callcaster/issues/2087)).
 
 - Inbound ACD now uses validated credentials for dispatch, checks call URL setup before claiming an agent, and releases failed agent-call setup with useful error context ([PR #2273](https://github.com/chester-hill-solutions/callcaster/pull/2273), [#2130](https://github.com/chester-hill-solutions/callcaster/issues/2130)).

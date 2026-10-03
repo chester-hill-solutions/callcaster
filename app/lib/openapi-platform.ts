@@ -595,7 +595,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
       tags: ["Platform API", "Workspace"],
       security: sessionOnlySecurity,
       description:
-        "Owner session only. The incoming owner must have MFA enrolled (SEC-08).",
+        "Owner session only. Choose a different existing workspace member as the incoming owner. The incoming owner must have MFA enrolled (SEC-08). Self transfer returns 400 without changing ownership.",
       requestBody: {
         required: true,
         content: {
@@ -613,7 +613,7 @@ export const platformPathOverrides: Record<string, Record<string, unknown>> = {
             },
           },
         },
-        "400": errorResponse("Transfer blocked"),
+        "400": errorResponse("Self transfer or another transfer failure"),
         "401": errorResponse("Unauthorized"),
         "403": errorResponse("Owner session and new-owner MFA required"),
       },

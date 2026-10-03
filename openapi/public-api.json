@@ -9988,7 +9988,7 @@
             "sessionCookie": []
           }
         ],
-        "description": "Owner session only. The incoming owner must have MFA enrolled (SEC-08).",
+        "description": "Owner session only. Choose a different existing workspace member as the incoming owner. The incoming owner must have MFA enrolled (SEC-08). Self transfer returns 400 without changing ownership.",
         "requestBody": {
           "required": true,
           "content": {
@@ -10011,7 +10011,7 @@
             }
           },
           "400": {
-            "description": "Transfer blocked",
+            "description": "Self transfer or another transfer failure",
             "content": {
               "application/json": {
                 "schema": {

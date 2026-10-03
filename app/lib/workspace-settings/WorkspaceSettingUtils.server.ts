@@ -139,7 +139,7 @@ export async function handleTransferWorkspace(
   } catch (error) {
     return routeData(
       { error: error instanceof Error ? error.message : "Transfer failed" },
-      { headers },
+      { headers, status: 400 },
     );
   }
 }

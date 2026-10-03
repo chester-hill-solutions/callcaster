@@ -23,7 +23,6 @@ export const action = defineAction({
       auth.userId,
       auth.workspaceId,
       parsed.new_owner_user_id,
-      new Headers(),
     );
 
     if (!result.ok) {

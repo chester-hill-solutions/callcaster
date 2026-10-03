@@ -221,10 +221,12 @@ describe("WorkspaceSettingUtils", () => {
 
     membersDbMocks.transferWorkspaceOwnership.mockRejectedValueOnce(new Error("new owner failed"));
     const res1 = await asRouteResponse(mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
+    expect(res1.status).toBe(400);
     expect(await res1.json()).toEqual({ error: "new owner failed" });
 
     membersDbMocks.transferWorkspaceOwnership.mockRejectedValueOnce(new Error("current failed"));
     const res2 = await asRouteResponse(mod.handleTransferWorkspace(fd, "w1", headers, "owner"));
+    expect(res2.status).toBe(400);
     expect(await res2.json()).toEqual({ error: "current failed" });
 
     membersDbMocks.transferWorkspaceOwnership.mockResolvedValueOnce({ previousOwner: { id: "owner" } });
