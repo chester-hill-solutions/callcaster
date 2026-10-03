@@ -380,8 +380,10 @@ const TimePickerInput = React.forwardRef<HTMLInputElement, TimePickerInputProps>
     const [prevIntKey, setPrevIntKey] = React.useState<string>('0');
 
     /**
-     * allow the user to enter the second digit within 2 seconds
-     * otherwise start again with entering first digit
+     * @effect Keep a two-second window for entering the second time digit.
+     * @effect-deps flag (starts or clears the digit-entry timer)
+     * @effect-side-effects timer + setFlag; timeout cleared on cleanup
+     * @effect-why-not-loader The window follows live keyboard input in local client state.
      */
     React.useEffect(() => {
       if (flag) {

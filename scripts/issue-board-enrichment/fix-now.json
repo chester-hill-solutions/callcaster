@@ -620,37 +620,6 @@
     "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
   },
   {
-    "issueNumber": 2104,
-    "verdict": "fix-now",
-    "recommendedTitle": "check:effects skips every React.useEffect( call as a \"hook definition\", so an effect can opt out of the gate, the baseline and the inventory",
-    "summary": "The scanner still discards member calls such as React.useEffect because its definition-skip regex includes a preceding dot.",
-    "currentBehavior": "Source audit: dev@5b673c81, 2026-10-02. The scanner still discards member calls such as React.useEffect because its definition-skip regex includes a preceding dot.",
-    "resolution": "Distinguish function declarations from calls; include member calls in baseline and inventory.",
-    "lookIn": [
-      "scripts/check-effects.mjs:100",
-      "scripts/check-effects.mjs (the skip pattern)",
-      "scripts/effects-baseline.json",
-      "app/components/ui/datetime.tsx:386",
-      ".github/workflows/ci.yml (the `quality` job wiring)"
-    ],
-    "existingTests": [
-      "test/effects-compliance.test.ts covers annotation compliance rules; member-call scanner fixtures remain missing."
-    ],
-    "missingTests": [
-      "Fixture tests for React.useEffect failure and real function-definition skip; coordinate with #2067."
-    ],
-    "acceptanceCriteria": [
-      "`check:effects` fails on a fixture that calls `React.useEffect(` without the required tags (kill-check: restore the `|\\.\\s*$` alternative and confirm the test goes red).",
-      "check:effects still skips a genuine export function useEffect declaration; this fixture must use a hook name the scanner actually matches.",
-      "`app/components/ui/datetime.tsx:386` is annotated and listed in the inventory.",
-      "The guard has a fixture-based test for both the skip and the fail case."
-    ],
-    "blockedBy": [],
-    "size": "S",
-    "risk": "medium",
-    "trackerRecommendation": "Source defect remains. Use the revised resolution and verify behavior through the affected entry point."
-  },
-  {
     "issueNumber": 2105,
     "verdict": "fix-now",
     "recommendedTitle": "env.VERIFICATION_PHONE_NUMBER throws instead of returning undefined, so the route's 503 branch is unreachable and a missing var boots green",
@@ -2228,5 +2197,40 @@
     "size": "L",
     "risk": "high",
     "trackerRecommendation": "Confirmed separate prerequisite defect. Implement as its own atomic concern; #2082 does not complete provider product preparation."
+  },
+  {
+    "issueNumber": 2288,
+    "verdict": "fix-now",
+    "recommendedTitle": "Move audience-upload history loading to route data",
+    "summary": "The current audience-history mount effect fetches server data. The syntax guard now exposes it as CANDIDATE-REMOVE; route data is the adopted policy.",
+    "currentBehavior": "Source audit at dev@24c4d810. useAudienceUploads calls fetchAudienceUploads on mount and workspace/audience changes, then maintains live history via workspace events. The old guard skipped this effect because its preceding comment ended in a dot. The guard fix only inventories the existing behavior; the runtime route-data change remains open under #2288.",
+    "rootCause": "Initial server history is owned by a client effect instead of the existing audience route data contract.",
+    "resolution": "Load initial upload history through the authenticated audience page loader, pass route data into the history UI/hook and retain React Router retry/revalidation plus current-audience event updates. Remove the fetch-on-mount effect and its candidate inventory row.",
+    "lookIn": [
+      "app/hooks/audience/useAudienceUploads.ts",
+      "app/components/audience/AudienceUploadHistory.tsx",
+      "app/routes/workspaces+/$id/audiences/$audience_id.loader.server.ts",
+      "app/routes/workspaces+/$id/audiences/$audience_id.route.tsx",
+      "app/routes/api+/workspaces+/$workspaceId/audiences/$audienceId/uploads.loader.server.ts"
+    ],
+    "existingTests": [
+      "test/ui/audience-upload-history.test.tsx"
+    ],
+    "missingTests": [
+      "Real route initial-history and foreign-audience denial cases.",
+      "Navigation/late-result isolation, retry and retained insert/update/delete event controls."
+    ],
+    "acceptanceCriteria": [
+      "Initial history is route data; the mount fetch effect is removed.",
+      "Workspace/audience changes cannot leak old history or accept late results for another audience.",
+      "Loading, empty, error retry and success behavior remain available.",
+      "Current-audience event updates and route tenant authorization are retained.",
+      "Tests fail if the required loader, isolation, retry or event behavior is removed.",
+      "Remove candidate inventory debt and pass full local/remote gates before merge."
+    ],
+    "blockedBy": [],
+    "size": "M",
+    "risk": "medium",
+    "trackerRecommendation": "Adopted route-data policy gives an exact implementation path. This independent runtime task does not block #2104."
   }
 ]

@@ -30,8 +30,7 @@ const BASELINE_PATH = path.join(ROOT, "scripts", "effects-baseline.json");
 const INVENTORY_PATH = path.join(ROOT, "docs", "effects-inventory.md");
 
 // Required tags for a NEW effect to count as compliant.
-import { isEffectCompliant } from "./lib/effects-lib.mjs";
-const EFFECT_RE = /\buse(Layout)?Effect\s*\(/g;
+import { effectCallOffsets, isEffectCompliant } from "./lib/effects-lib.mjs";
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -92,13 +91,8 @@ function collect() {
   for (const full of files) {
     const rel = path.relative(ROOT, full);
     const src = fs.readFileSync(full, "utf8");
-    let m;
-    EFFECT_RE.lastIndex = 0;
-    while ((m = EFFECT_RE.exec(src))) {
-      // skip the hook definitions themselves (e.g. `export function useEffect`)
-      const pre = src.slice(Math.max(0, m.index - 12), m.index);
-      if (/function\s*$|\.\s*$/.test(pre)) continue;
-      const block = precedingBlock(src, m.index);
+    for (const offset of effectCallOffsets(src, full)) {
+      const block = precedingBlock(src, offset);
       const tags = parseTags(block);
       const compliant = isEffectCompliant(tags);
       perFile[rel] ??= { annotated: [], unannotated: 0 };

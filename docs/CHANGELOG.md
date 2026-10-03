@@ -27,6 +27,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Include direct and namespace effect calls in enforcement and inventory; expose existing audience-history removal debt without changing UI behavior ([#2289](https://github.com/chester-hill-solutions/callcaster/pull/2289), [#2104](https://github.com/chester-hill-solutions/callcaster/issues/2104)).
+
 - Match agent-call pricing and calculator estimates to billed rates; keep separate IVR estimates and project quotes for calls placed by our team ([#2287](https://github.com/chester-hill-solutions/callcaster/pull/2287), [#2102](https://github.com/chester-hill-solutions/callcaster/issues/2102)).
 
 - The API contract and generated SDK now use the Better Auth session cookies issued by HTTP and HTTPS deployments ([PR #2286](https://github.com/chester-hill-solutions/callcaster/pull/2286), [#2100](https://github.com/chester-hill-solutions/callcaster/issues/2100)).
