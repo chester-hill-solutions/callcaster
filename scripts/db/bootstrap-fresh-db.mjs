@@ -125,6 +125,7 @@ const steps = [
   "client/migrations/20260925140000_index_message_date_sent_backfill.sql",
   "client/migrations/20260930150000_dequeue_paths_clear_inflight_claim.sql",
   "client/migrations/20261003000000_scope_dequeue_contact_by_campaign.sql",
+  "client/migrations/20261003231500_guard_active_inbound_offers.sql",
 ];
 
 /**
@@ -141,7 +142,6 @@ const coveredByBaseline = new Set([
   "20260704000002_unique_workspace_api_key_prefix.sql",
   "20260704000003_extend_job_table.sql",
   "20260705000100_add_call_user_id.sql",
-  "20260705000200_acd_duplicate_offer_guard.sql",
   "20260705000200_add_campaign_queue_workspace.sql",
   "20260705000200_survey_response_unique_result_id.sql",
   "20260706120000_auth_two_factor.sql",
@@ -156,18 +156,23 @@ const allMigrationFiles = readdirSync(path.join(rootDir, "client/migrations"))
 
 // Same drift guard as the compose bootstrap: a migration wired into neither
 // list is a mistake that would silently diverge this tool from the schema.
+// The later guard replaces the legacy index and final claim function.
+const coveredByLaterMigration = new Set([
+  "20260705000200_acd_duplicate_offer_guard.sql",
+]);
+
 const listed = new Set(
   steps
     .filter((step) => step.startsWith("client/migrations/"))
     .map((step) => path.basename(step)),
 );
 const unwired = allMigrationFiles.filter(
-  (file) => !listed.has(file) && !coveredByBaseline.has(file),
+  (file) => !listed.has(file) && !coveredByBaseline.has(file) && !coveredByLaterMigration.has(file),
 );
 if (unwired.length > 0) {
   console.error(
-    "[bootstrap-fresh-db] migrations exist in client/migrations/ but are wired into neither\n" +
-      "`steps` nor `coveredByBaseline` in this file:\n" +
+    "[bootstrap-fresh-db] migrations exist in client/migrations/ but are wired into none of\n" +
+      "`steps`, `coveredByBaseline` or `coveredByLaterMigration` in this file:\n" +
       unwired.map((file) => `  ${file}`).join("\n") +
       "\n\nAppend each to `steps` (in filename order), or to `coveredByBaseline` if\n" +
       "the drizzle/ baseline already contains its effect. Update the compose\n" +
@@ -188,7 +193,7 @@ const drizzleWired = new Set(
 const unwiredDrizzle = allDrizzleFiles.filter((file) => !drizzleWired.has(file));
 if (unwiredDrizzle.length > 0) {
   console.error(
-    "[bootstrap-fresh-db] drizzle/*.sql files exist but are wired into neither\n" +
+    "[bootstrap-fresh-db] drizzle/*.sql files exist but are wired into none of\n" +
       "`steps` in this file:\n" +
       unwiredDrizzle.map((file) => `  drizzle/${file}`).join("\n") +
       "\n\nAppend each to `steps` (in filename order). Update the compose\n" +

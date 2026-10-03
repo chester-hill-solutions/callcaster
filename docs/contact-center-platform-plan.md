@@ -93,9 +93,19 @@ RLS: workspace-membership read; `agent_status` self-update for own row; queue co
 
 ### 1.2 Call flow
 
+The legacy `claim_inbound_queue_entry` RPC returns a row only for a new offer.
+For each `(queue_id, call_sid)`, `queued`, `offered` and `accepted` rows are active;
+`declined` and `timed_out` permit a new offer. Duplicate requests cannot reserve
+another agent or redial an existing offer. The database partial unique index
+also protects writers outside the RPC. Upgrades reject pre-existing duplicate
+active rows rather than choosing which live call to end. Retry agent preference
+is not changed by the duplicate-offer guard.
+
+
 1. **Inbound webhook** ([inbound.action.server.ts](../app/routes/api+/inbound.action.server.ts)): if `workspace_number.inbound_queue_id` set → evaluate `business_hours` (closed → `after_hours_action` directly, no queue entry) and `max_queue_size` (full → `overflow_action`); otherwise insert `inbound_queue_entry` (`waiting`), respond `<Play greeting/><Enqueue waitUrl="/api/acd/wait/{entryId}">q-{queueId}</Enqueue>` with an `action` URL (`/api/acd/enqueue-result/{entryId}`) to record abandonment/overflow when the call leaves the queue.
 2. **Wait loop** (`/api/acd/wait/{entryId}`): plays `hold_audio` (or twimlet hold music); checks elapsed vs `max_wait_seconds` → on timeout, `<Leave>` and the enqueue `action` handler executes `overflow_action`.
 3. **Router tick** (new Edge function `acd-router`, modeled on `queue-next`): woken by a DB webhook on `inbound_queue_entry` insert and on `agent_status` transitions to `available`; self-chains at 1s while entries are `waiting`. Each tick, per queue: longest-waiting `waiting` entry × eligible agent per `ring_strategy` (eligible = queue member, `status = 'available'`, fresh heartbeat). Claims atomically via RPC (`claim_queue_entry_for_offer`) — same claim/lease/stale-reset approach as `campaign_queue` claims.
+
 4. **Offer**: set entry `offering`, agent `busy(reason=offering)`; realtime broadcast to the agent desktop. Accept → server dequeues the specific Twilio queue member (`queues(q).members(callSid).update({ url: /api/acd/bridge/{entryId} })`) which `<Dial><Conference>acd-{entryId}</Conference></Dial>`s the caller, and creates the agent client leg into the same conference (reusing the `addToConference` pattern from [auto-dial](../app/routes/api+/auto-dial/)). Caller keeps hearing hold audio until the agent leg actually joins — never silence.
 5. **Offer failure handling** (the cases that make or break trust in an ACD):
    - **Decline**: entry → `waiting` (original `enqueued_at` preserved, so the caller stays at the front), agent → `available`, decline logged to `agent_status_event`. Router excludes the declining agent for that entry's next offer.

@@ -5,7 +5,7 @@
  * tables use it. Import from "@/db/schema" as before; everything is
  * re-exported there, and the relations stay in schema.ts.
  */
-import { bigint, pgEnum, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { bigint, pgEnum, pgTable, text, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const queue_entry_state = pgEnum("queue_entry_state", ["queued","offered","accepted","declined","timed_out","abandoned","completed"]);
@@ -45,7 +45,11 @@ export const inbound_queue_entry = pgTable("inbound_queue_entry", {
   twilio_queue_sid: text(),
   updated_at: text().notNull().default(sql`now()`),
   workspace_id: uuid().notNull(),
-});
+}, (table) => [
+  uniqueIndex("inbound_queue_entry_queue_call_sid_active_uidx")
+    .on(table.queue_id, table.call_sid)
+    .where(sql`${table.status} in ('queued', 'offered', 'accepted')`),
+]);
 
 export const agent_status = pgTable("agent_status", {
   workspace_id: uuid().notNull(),

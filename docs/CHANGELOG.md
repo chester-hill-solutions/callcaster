@@ -4,6 +4,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ## [Unreleased]
 
+- Fixed: Inbound calls receive one active queue offer at a time; timed-out or declined offers can retry without dialling an existing offer again ([#2129](https://github.com/chester-hill-solutions/callcaster/issues/2129)).
+
 - Fixed: Password reset failures show one readable message, keep entered values for retry, and leave the form in place ([#2304](https://github.com/chester-hill-solutions/callcaster/issues/2304), [PR #2310](https://github.com/chester-hill-solutions/callcaster/pull/2310)).
 
 - Changed: Bulk-send warning overrides show an explicit confirmation with the recipient count and delivery risk, require a fresh acknowledgement, and offer Cancel or Send anyway ([#2295](https://github.com/chester-hill-solutions/callcaster/issues/2295), [PR #2297](https://github.com/chester-hill-solutions/callcaster/pull/2297)).
