@@ -22,6 +22,13 @@ The node suite installs a shared `api-auth.server` mock in
 Otherwise a test can receive the suite's default 401 and never reach its target.
 Keep shared server module mock factories additive with `importOriginal`.
 
+## Network resource tests
+
+Use real Node readable streams when testing response limits and cleanup. The
+request adapter must include the real `ClientRequest` lifecycle, including
+`destroy()`. Assert that rejected responses close both resources and that late
+stream events cannot allocate or resolve a response after rejection.
+
 ## Entry points
 
 - First run or repair: `make init` (`npm run setup`, idempotent). Services already running elsewhere: `npm run setup -- --skip-docker`.
