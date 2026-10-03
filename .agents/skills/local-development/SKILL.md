@@ -60,6 +60,16 @@ request adapter must include the real `ClientRequest` lifecycle, including
 `destroy()`. Assert that rejected responses close both resources and that late
 stream events cannot allocate or resolve a response after rejection.
 
+## Inbound queue TwiML tests
+
+For queue-route changes, keep the real builder from `app/lib/twilio-twiml.server.ts`.
+Check the emitted XML: the queue name is Enqueue text supplied by
+`enqueue(attributes, name)`, not a nested Queue or a method on the Enqueue builder.
+Check both ACD URLs and decoded query values through the real route actions;
+a builder mock can accept methods that the installed SDK does not provide.
+Use `test/inbound-queue-entry.route.test.ts` for callback and guard controls and
+`test/integration-db/inbound-queue-lookup.test.ts` for actual workspace selection.
+
 ## Entry points
 
 - First run or repair: `make init` (`npm run setup`, idempotent). Services already running elsewhere: `npm run setup -- --skip-docker`.

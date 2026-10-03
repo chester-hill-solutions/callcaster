@@ -17,6 +17,8 @@ Customer- and operator-facing changes, newest first. Every PR that changes app b
 
 ### Fixed
 
+- Inbound number and IVR queue routes now use valid queue TwiML with ACD wait and completion callbacks, preserve caller values, and block missing or foreign queues ([PR #2272](https://github.com/chester-hill-solutions/callcaster/pull/2272), [#2271](https://github.com/chester-hill-solutions/callcaster/issues/2271)).
+
 - Inbound IVR voicemail now plays the number's selected greeting and uses the actual called phone when no greeting file is available ([PR #2270](https://github.com/chester-hill-solutions/callcaster/pull/2270), [#2088](https://github.com/chester-hill-solutions/callcaster/issues/2088)).
 
 - SMS opt-out now honours every standard keyword and keeps them active when a workspace adds custom keywords ([PR #2265](https://github.com/chester-hill-solutions/callcaster/pull/2265), [#2090](https://github.com/chester-hill-solutions/callcaster/issues/2090)).
