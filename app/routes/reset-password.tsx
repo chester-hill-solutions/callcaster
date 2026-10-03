@@ -6,13 +6,13 @@ import { Button } from "@/components/ui/button";
 import { AuthCard } from "@/components/shared/AuthCard";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { Text } from "@/components/ui/typography";
 import { useActionFeedback } from "@/hooks/utils/useActionFeedback";
 
 export default function ResetPassword() {
   const actionData = useActionData();
 
   useActionFeedback(actionData, {
+    getError: (data) => data?.error?.message,
     getSuccess: (data) => data?.success === true,
     successMessage: "Password updated. You can now sign in.",
   });
@@ -24,12 +24,6 @@ export default function ResetPassword() {
         title="Choose New Password"
         description="Set a new password for your account to complete recovery."
       >
-        {actionData?.error ? (
-          <Text className="w-full text-center text-destructive-text">
-            {actionData.error.message}
-          </Text>
-        ) : null}
-
         <Form
           method="POST"
           className="flex w-full flex-col gap-4"
