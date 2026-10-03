@@ -278,25 +278,6 @@
     "trackerRecommendation": "PR #1899 merge 9a82cbce is on dev, not yet master. Closes on master promotion."
   },
   {
-    "issueNumber": 1739,
-    "verdict": "verify-close",
-    "summary": "Fixed on dev in PR #1902 (f081cee8): the low-credit notification email names the workspace in its subject and body from the notify context. The open state does not prove the fix is absent.",
-    "resolution": "Verify on the review environment that the low-credit email subject and body name the workspace. Close on master promotion. Do not reimplement the template change.",
-    "lookIn": [
-      "app/lib/low-credit-notify.server.ts"
-    ],
-    "existingTests": [
-      "test/low-credit-notify.server.test.ts"
-    ],
-    "missingTests": [],
-    "acceptanceCriteria": [
-      "Low-credit email subject and body name the workspace"
-    ],
-    "size": "S",
-    "risk": "low",
-    "trackerRecommendation": "PR #1902 merge f081cee8 is on dev, not yet master. Closes on master promotion."
-  },
-  {
     "issueNumber": 1940,
     "verdict": "verify-close",
     "summary": "Merged to dev in PR #1941 (58bea105): workspace and data-plane middleware build the scoped Drizzle client once and expose it as tdb on the context; 14 workspaces+/$id routes read it.",
@@ -3935,5 +3916,35 @@
     "size": "XS",
     "risk": "low",
     "trackerRecommendation": "Verify and close the sign-in-only scope. Do not bundle the five duplicate-message defects into this page fix."
+  },
+  {
+    "issueNumber": 2304,
+    "verdict": "verify-close",
+    "recommendedTitle": "Show reset-password action failure once",
+    "summary": "PR #2310 completes single readable reset-password action feedback on dev; deployment verification and promotion remain.",
+    "currentBehavior": "Merged at dev@cb88df8b, 2026-10-03. The root toast receives the actual error message once; the inline duplicate is removed and failed passwords remain for retry. Full local CI passed 5,325 Vitest and 22 Bun tests; four built-app narrow/desktop light/dark browser cases proved stable page/document/scroll geometry. Exact-head remote checks and both Railway checks passed before merge.",
+    "rootCause": "The same action failure reaches two presentation paths.",
+    "resolution": "Verify the implemented reset failure/retry on the deployed review environment and promote through the release PR. Keep the issue open until its default-branch delivery and verification are complete.",
+    "lookIn": [
+      "app/routes/reset-password.tsx",
+      "docs/feedback-inventory.md"
+    ],
+    "existingTests": [
+      "test/ui/reset-password-feedback.test.tsx",
+      "e2e/specs/password-reset-feedback.spec.ts",
+      "Original source fails both new error cases; restored source and validation/retry controls pass. Full PR #2310 CI and browser proof."
+    ],
+    "missingTests": [
+      "Deployed review verification and promotion; no further duplicate-removal implementation is needed."
+    ],
+    "acceptanceCriteria": [
+      "One visible result for one failed action.",
+      "Preserve genuine field validation, permissions, hard gates, entered values and retry.",
+      "No page or scroll movement on appearance, update or removal."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "Verify and close. Native Development link to PR #2310 and successful issue-on-dev workflow were verified; no deployed browser acceptance is claimed."
   }
 ]
