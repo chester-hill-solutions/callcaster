@@ -24,6 +24,7 @@ import { getWorkspaceById, getWorkspaceWebhookRow } from "@/lib/workspace-member
 import { createVoiceResponse, sayHangupTwiml } from "@/lib/twilio-twiml.server";
 import { inboundRingCountToDialTimeoutSeconds } from "../../../shared/inbound-rings";
 import { defineAction } from "@/lib/handler.server";
+import { appendInboundQueueTwiml } from "@/lib/inbound-queue-twiml.server";
 import type { TwilioInboundCallWebhook } from "@/lib/twilio.types";
 import type { ActionFunctionArgs } from "react-router";
 
@@ -226,21 +227,15 @@ async function handleInboundAction(
   }
 
   if (number.inbound_queue_id) {
-    const baseUrl = env.BASE_URL().replace(/\/$/, "");
-    const acdUrl = `${baseUrl}/api/acd-router`;
-    const queueName = `inbound_q_${number.inbound_queue_id}`;
     logger.info("api.inbound routing to queue", {
       workspaceId,
       CallSid: data.CallSid,
       queueId: number.inbound_queue_id,
     });
-    // The queue entry does not exist yet, so no entry_id can go in the action
-    // URL — /complete resolves the entry by CallSid + queue_name instead.
-    const enqueue = twiml.enqueue({
-      waitUrl: `${acdUrl}?queue_id=${number.inbound_queue_id}&CallSid=${data.CallSid}&From=${data.From || ""}`,
-      action: `${acdUrl}/complete?queue_name=${queueName}`,
+    await appendInboundQueueTwiml({
+      twiml, workspaceId, queueId: number.inbound_queue_id,
+      callSid: data.CallSid, callerNumber: data.From ?? "", baseUrl: env.BASE_URL(),
     });
-    enqueue.queue(queueName);
     return new Response(twiml.toString(), {
       headers: { "Content-Type": "text/xml" },
     });

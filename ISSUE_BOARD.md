@@ -1,6 +1,6 @@
 # CallCaster — Open Issue Board for Agents
 
-Reviewed at `dev@f6d02f91 + source fix for #2088` · 287 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
+Reviewed at `dev@89bba361 + source fix for #2271` · 288 open issues in `chester-hill-solutions/callcaster` · Refresh with `npm run tools:issues:board`
 
 Project status could not be refreshed: the current GitHub token lacks `read:project`. The IN PROGRESS markers are retained from the prior board at `dev@8cb8c0f7`; they are not current verification results. Issue state, labels and assignees come from the live issue snapshot read on 2026-10-03.
 
@@ -880,9 +880,33 @@ Confirmed defects or well-scoped features with an exact resolution path. Pick fr
 
 ---
 
-## Verify and close — 110
+## Verify and close — 111
 
 Likely already fixed or working as designed. Run the listed verification, then close without new code.
+
+### [#2088](https://github.com/chester-hill-solutions/callcaster/issues/2088) Use the number settings for inbound IVR voicemail playback
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- The inbound IVR terminal renderer now uses the configured greeting and actual called phone. Recording capture remains intact; deployed playback verification remains.
+- Current behavior: Merged to dev in PR #2270 at 89bba361. The terminal renderer uses the configured greeting and verified called phone; direct and listed playback first check actual object existence. All 49 focused Node tests passed; four isolated mutations failed and were restored. Full local CI passed 4,931 Vitest and 22 Bun tests; quality, e2e, bundle and both Railway checks passed on a295b40c. Deployed functional verification and promotion remain.
+- Root cause: The route already loaded inbound_audio and phoneNumber but passed null for the greeting and the number row ID for fallback speech.
+- Resolution: Verify selected greeting playback, actual-phone fallback speech and voicemail recording capture on deployed dev, then promote before closing. Script recipient delivery and attachment validation remain open in #2268 and #2269; this playback fix does not resolve them.
+- Look in: `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/inbound-ivr-db.server.ts`, `app/lib/inbound-voicemail-twiml.server.ts`
+- Existing tests: test/inbound-voicemail-audio.test.ts (real storage adapter with S3 boundaries: availability, failures and retry controls); test/inbound-ivr-block-response.route.test.ts (actual greeting Play, real called phone in speech, unavailable-audio fallback, recording attributes, existing call mismatch and navigation controls); test/inbound-ivr-block.route.test.ts, test/inbound.route.test.ts, test/ivr-block-runtime.test.ts and test/email-vm.route.test.ts (surrounding IVR and recording controls)
+- Missing tests: Deployed greeting playback, actual-phone speech and recording capture before promotion.
+- Done when: Configured greeting resolves to Play; fallback speech uses the actual called phone and never the number row ID.; Recording, beep, timeout and callback settings remain intact; call mismatch and navigation controls retain their behavior.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed playback after merge, then promote and close. #2268 and #2269 are separate tasks.
+
+### [#2271](https://github.com/chester-hill-solutions/callcaster/issues/2271) Build valid inbound queue TwiML and ACD callbacks
+- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
+- Both inbound routes now emit valid Enqueue text and ACD callbacks after a workspace-scoped queue lookup; deployed direct and scripted queue verification remains.
+- Current behavior: Source fix from dev@89bba361: the direct number and IVR terminal paths share an inbound enqueue renderer. It checks a positive safe queue ID and a workspace-owned queue before emitting the real SDK Enqueue with text content, an encoded wait URL and a queue-name completion URL. IVR caller values come from the verified stored call. All 59 focused Node and three real-Postgres tests passed. The old source failed five regressions with 26 controls retained. Nine isolated callback, guard and database mutations failed and were restored.
+- Root cause: Both routes called a nonexistent Enqueue.queue method. The IVR queue branch also omitted the ACD wait and completion callbacks. Raw query interpolation could change callback parameters; repaired routing needs an owned queue before emitting TwiML.
+- Resolution: Verify a queue-configured number and a script queue target on deployed dev, including ACD wait, agent connection and completion, then promote before closure. Inbound attachment validation remains separate in #2269.
+- Look in: `app/lib/inbound-queue-twiml.server.ts`, `app/lib/inbound-queue-db.server.ts`, `app/routes/api+/inbound.action.server.ts`, `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/acd/acd-router.server.ts`
+- Existing tests: test/inbound-queue-entry.route.test.ts (both real routes and TwiML: queue text, callback URL values, stored IVR caller, invalid/missing queues, lookup failure and signatures); test/integration-db/inbound-queue-lookup.test.ts (real query: same-workspace, foreign-workspace and missing IDs); Existing inbound, IVR and voicemail suites (surrounding controls)
+- Missing tests: Deployed direct and scripted queue entry, ACD wait, agent connection and completion before promotion.
+- Done when: Both routes emit valid named Enqueue with ACD wait and completion callbacks.; Callback values round-trip unchanged; invalid, missing or foreign queues cannot emit Enqueue.; Signature, call mismatch, voicemail and navigation controls remain valid.; Deployed verification and promotion are complete before closure.
+- Tracker: Source fix is in this change. Verify deployed queue behavior after merge, then promote and close.
 
 ### [#2089](https://github.com/chester-hill-solutions/callcaster/issues/2089) Use the destination phone to verify the SMS recipient
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03
@@ -895,18 +919,6 @@ Likely already fixed or working as designed. Run the listed verification, then c
 - Missing tests: Deployed verification through API, chat form and campaign test sender before promotion.
 - Done when: Destination phone and unique workspace contact agree before sending; supplied IDs cannot bypass opt-out or landline protection.; Ambiguous and failed verification block sends with an error distinct from opt-out and landline.; Eligible normalized recipients use verified template data and attribution; legacy manual new-number and campaign test policies remain.; Public API contract and generated artifacts describe recipient verification.; Deployed verification and promotion are complete before closure.
 - Tracker: Source fix is in this change. Verify deployed behavior after merge, then promote and close.
-
-### [#2088](https://github.com/chester-hill-solutions/callcaster/issues/2088) Use the number settings for inbound IVR voicemail playback
-- Verdict: **Verify and close** · Size: S · Risk: medium · Labels: none · Assignee: none · Updated: 2026-10-03
-- The inbound IVR terminal renderer now uses the configured greeting and actual called phone. Recording capture remains intact; deployed playback verification remains.
-- Current behavior: Source fix from dev@f6d02f91: the terminal renderer passes number.inbound_audio to the existing workspace audio resolver and the verified call.to to the voicemail renderer. Three new regressions passed with ten original response-route controls. All 49 focused node cases passed across inbound IVR, inbound routing, IVR runtime and voicemail delivery. All four isolated playback and availability mutations failed and were restored. The audio resolver checks object existence before direct and listed playback; real adapter regressions cover deleted keys, storage failure and a stale listing.
-- Root cause: The route already loaded inbound_audio and phoneNumber but passed null for the greeting and the number row ID for fallback speech.
-- Resolution: Verify selected greeting playback, actual-phone fallback speech and voicemail recording capture on deployed dev, then promote before closing. Script recipient delivery and attachment validation remain open in #2268 and #2269; this playback fix does not resolve them.
-- Look in: `app/routes/api+/inbound-ivr/$numberId/$pageId/$blockId/response.action.server.ts`, `app/lib/inbound-ivr-db.server.ts`, `app/lib/inbound-voicemail-twiml.server.ts`
-- Existing tests: test/inbound-voicemail-audio.test.ts (real storage adapter with S3 boundaries: availability, failures and retry controls); test/inbound-ivr-block-response.route.test.ts (actual greeting Play, real called phone in speech, unavailable-audio fallback, recording attributes, existing call mismatch and navigation controls); test/inbound-ivr-block.route.test.ts, test/inbound.route.test.ts, test/ivr-block-runtime.test.ts and test/email-vm.route.test.ts (surrounding IVR and recording controls)
-- Missing tests: Deployed greeting playback, actual-phone speech and recording capture before promotion.
-- Done when: Configured greeting resolves to Play; fallback speech uses the actual called phone and never the number row ID.; Recording, beep, timeout and callback settings remain intact; call mismatch and navigation controls retain their behavior.; Deployed verification and promotion are complete before closure.
-- Tracker: Source fix is in this change. Verify deployed playback after merge, then promote and close. #2268 and #2269 are separate tasks.
 
 ### [#2090](https://github.com/chester-hill-solutions/callcaster/issues/2090) Retain all required SMS opt-out keywords when workspace settings add custom keywords
 - Verdict: **Verify and close** · Size: S · Risk: high · Labels: none · Assignee: none · Updated: 2026-10-03

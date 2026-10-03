@@ -6,6 +6,14 @@ import {
 import { createTenantDb, type TenantDb } from "@/server/tenant-db";
 import { listWorkspaceMembersEnriched } from "@/lib/workspace-members-db.server";
 
+export async function findInboundQueueInWorkspace(workspaceId: string, queueId: number, tdbIn?: TenantDb) {
+  const tdb = tdbIn ?? createTenantDb(workspaceId);
+  return tdb.inbound_queue.findFirst({
+    columns: { id: true },
+    where: eq(inboundQueueTable.id, queueId),
+  });
+}
+
 export async function loadInboundQueueSettings(
   workspaceId: string,
   tdbIn?: TenantDb,

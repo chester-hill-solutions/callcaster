@@ -19,6 +19,7 @@ import {
 } from "@/lib/inbound-no-input-replay.server";
 import { defineAction } from "@/lib/handler.server";
 import { findIvrMatchedOption, type IvrOptionLike } from "@/lib/ivr-option-value";
+import { appendInboundQueueTwiml } from "@/lib/inbound-queue-twiml.server";
 
 interface Script {
   pages: Record<string, { blocks: string[] }>;
@@ -83,6 +84,8 @@ const renderTerminalTarget = async (
     workspace: string;
     inboundAudio: string | null;
     phoneNumber: string;
+    callSid: string;
+    callerNumber: string;
     baseUrl: string;
     script: Script;
   },
@@ -97,9 +100,10 @@ const renderTerminalTarget = async (
   }
 
   if (target.startsWith("queue:")) {
-    const queueId = target.slice(6);
-    const enqueue = twiml.enqueue();
-    enqueue.queue(`inbound_q_${queueId}`);
+    await appendInboundQueueTwiml({
+      twiml, workspaceId: workspace, queueId: /^\d+$/.test(target.slice(6)) ? Number(target.slice(6)) : NaN,
+      callSid: options.callSid, callerNumber: options.callerNumber, baseUrl,
+    });
     return;
   }
 
@@ -255,6 +259,8 @@ export const action = defineAction({
       workspace: number.workspaceId,
       inboundAudio: number.inbound_audio ?? null,
       phoneNumber: call.to,
+      callSid,
+      callerNumber: call.from ?? "",
       baseUrl,
       script: script as Script,
     });
