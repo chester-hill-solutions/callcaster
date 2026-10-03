@@ -669,3 +669,30 @@ describe("SMS dispatch contract — response bodies match the generated API cont
     expect(zod.zInsufficientCreditsError.safeParse(await res.json()).success).toBe(true);
   });
 });
+
+describe("MMS storage key contract", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    seedCommonMocks();
+    mocks.loadCampaignSmsDispatchData.mockResolvedValue({
+      ...baseCampaignData(),
+      message_media: ["legacy.png", "11111111-1111-4111-8111-111111111111-photo.png"],
+    });
+    mocks.getCampaignQueueById.mockResolvedValue(SCENARIOS[1].queue);
+    mocks.createSignedObjectUrl.mockImplementation(async (_bucket, key) => {
+      if (key === `${TEST_WORKSPACE_ID}/legacy.png`) return "https://media.example/old-image";
+      if (key === `${TEST_WORKSPACE_ID}/11111111-1111-4111-8111-111111111111-photo.png`) return "https://media.example/new-image";
+      throw new Error("Unexpected media key");
+    });
+  });
+
+  test.each(["HTTP", "worker"])("%s sends both historic and new media keys", async adapter => {
+    const createMessage = vi.fn(async (input: { mediaUrl?: string[] }) => ({ sid: "SM-media", ...input }));
+    mocks.createWorkspaceTwilioInstance.mockResolvedValue({ messages: { create: createMessage } });
+    if (adapter === "HTTP") await runHttpAdapter();
+    else await runWorkerAdapter();
+    expect(createMessage).toHaveBeenCalledWith(expect.objectContaining({
+      mediaUrl: ["https://media.example/old-image", "https://media.example/new-image"],
+    }));
+  });
+});

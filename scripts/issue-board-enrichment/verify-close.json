@@ -2929,5 +2929,40 @@
     "risk": "high",
     "trackerRecommendation": "The source fix travels with this board update. Verify the migration and browser/phone calling on deployed dev after merge, then promote and close. Do not start a duplicate fix.",
     "rootCause": "The guarded dequeue RPC and its event snapshot had workspace/contact limits but no campaign. Ordinary live-call paths omitted campaign scope. Optional campaign fallback and unscoped no-op diagnostics could affect unrelated campaign queues."
+  },
+  {
+    "issueNumber": 2091,
+    "verdict": "verify-close",
+    "recommendedTitle": "messageMedia uploads are keyed by the client-supplied filename with no uniquifier, so a same-name upload silently replaces an existing attachment",
+    "summary": "New MMS uploads use unique keys and reject object collisions. Earlier chat attachments and campaign keys remain intact. Deployed upload and campaign-send verification remain.",
+    "resolution": "Verify same-name chat and campaign uploads on deployed dev: both retain their own bytes and links, each campaign sends its own media, historical attachments still resolve and a storage conflict cannot report success or alter the original. Promote verified behavior before closing.",
+    "lookIn": [
+      "app/routes/api+/message_media.action.server.ts",
+      "app/lib/object-storage.server.ts",
+      "app/lib/campaign-sms-dispatch.server.ts",
+      "app/components/campaign/settings/MessageSettings.tsx",
+      "app/components/sms-ui/ChatMessages.tsx"
+    ],
+    "existingTests": [
+      "test/message-media-storage-regression.test.ts (five real-adapter cases: chat/campaign bytes, historic keys, preflight conflict and conditional-write race)",
+      "test/message-media.route.test.ts (validation, auth, upload failure, campaign update and historic deletion controls)",
+      "test/campaign-sms-dispatch-contract.test.ts (both API and worker sign and send historic plus new media keys)",
+      "test/object-storage-upsert.test.ts (no-overwrite provider behavior)"
+    ],
+    "missingTests": [
+      "Deployed chat upload and campaign-send verification before promotion."
+    ],
+    "acceptanceCriteria": [
+      "Two uploads with the same filename in one workspace produce two distinct objects, and each message points at its own.",
+      "The route never reports `success: true` for an upload that replaced an existing object.",
+      "A live campaign re-signs the **correct** media for its own `message_media` value.",
+      "Historic `outbound_media` values keep resolving (no key rewrite breaks them)."
+    ],
+    "blockedBy": [],
+    "size": "S",
+    "risk": "medium",
+    "trackerRecommendation": "The source fix travels with this board update. Verify deployed uploads and campaign sends after merge, then promote and close. Do not start a duplicate fix.",
+    "currentBehavior": "This source fix uses one server-generated UUID plus safe filename for upload, campaign message_media and signing. It passes upsert:false and treats the real ObjectExistsError as failure before signing or campaign attachment. Historic keys retain their stored values. All 42 focused cases passed, including five route cases through the real upload/signing adapter and both campaign dispatch adapters. Removing the unique key failed two regressions with three controls; removing no-overwrite or restoring conflict continuation each failed three regressions with two controls.",
+    "rootCause": "The messageMedia caller stored only workspace plus client filename and did not request no-overwrite. Its legacy statusCode conflict branch could continue to report success rather than handling the S3 adapter’s actual ObjectExistsError."
   }
 ]
